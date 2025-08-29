@@ -1,0 +1,171 @@
+#!/bin/bash
+# Filtro de impresión para Lexmark Cloud Print Manager
+# Preparado para BBVA por Javier Robles (Lexmark International)
+# E-mail: antonio@robles.ai
+# Usar set -x para activar modo debug (trace de comandos)
+# set -x
+# AVISO: VERSION COMPATIBLE SOLO CON LINUX SUSE 12 Y LEXMARK CLOUD PRINT MANAGER
+# Fecha de actualización: v20250829
+rm=0
+
+if [ -n "$6" ]
+then
+  file="$6"
+else
+  file=$(mktemp)
+  cat > $file
+  let rm++
+fi
+
+echo "==================================================" >> /tmp/lexmark.log
+date >> /tmp/lexmark.log
+echo "1: "$1 >> /tmp/lexmark.log
+echo "2: "$2 >> /tmp/lexmark.log
+echo "3: "$3 >> /tmp/lexmark.log
+echo "4: "$4 >> /tmp/lexmark.log
+echo "5: "$5 >> /tmp/lexmark.log
+echo "6: "$6 >> /tmp/lexmark.log
+SPOOLID=$1
+SPOOLPATH=$6
+SPOOLNAME=$3
+HOSTID=$(hostname)
+SPOOLTYPE=$(/usr/bin/file $file | cut -d':' -f2)
+PUESTO=$(lpstat -W all -u | grep "\-"$1 | cut -d \- -f1)
+USUARIO=$(finger | grep -m1 $PUESTO | cut -d ' ' -f1 | rev | cut -d '.' -f1 | rev)
+if [ -z "$USUARIO" ]; then
+  USUARIO=$2
+fi 
+KEY=$(echo ${PUESTO:1:4})
+
+echo "Spool ID: "$SPOOLID >> /tmp/lexmark.log
+echo "Spool Path: "$SPOOLPATH >> /tmp/lexmark.log
+echo "Spool Name: "$SPOOLNAME >> /tmp/lexmark.log
+echo "Spool Type:"$SPOOLTYPE >> /tmp/lexmark.log
+echo "Puesto: "$PUESTO >> /tmp/lexmark.log
+echo "Key: "$KEY >> /tmp/lexmark.log
+echo "Usuario: "$USUARIO  >> /tmp/lexmark.log
+echo "Host ID: "$HOSTID >> /tmp/lexmark.log
+
+# Ya no se requiere PRQUEUE="PrintRelease"
+WINHOST="w1${PUESTO:1}.pe.igrupobbva"
+echo "Windows Host: $WINHOST" >> /tmp/lexmark.log
+
+CUPS_QUEUE="w1${PUESTO:1}"
+MAPFILE="/tmp/win_hostname_user.txt"
+LINEA=$(grep "^$CUPS_QUEUE|" "$MAPFILE" 2>/dev/null)
+
+if [ -z "$LINEA" ]; then
+  echo "Error: No se encontró mapping para $CUPS_QUEUE en $MAPFILE" >> /tmp/lexmark.log
+  [ $rm -gt 0 ] && rm $file
+  exit 1
+fi
+
+GENERICO=$(echo "$LINEA" | cut -d '|' -f2 | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+WINIP=$(echo "$LINEA" | cut -d '|' -f3 | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+
+echo "Usuario genérico (mapfile): === $GENERICO ===" >> /tmp/lexmark.log
+echo "Windows IP (mapfile): $WINIP" >> /tmp/lexmark.log
+
+PORTOPEN=$(bash -c "</dev/tcp/$WINIP/515" 2>/dev/null && echo 1 || echo 0)
+if [ "$PORTOPEN" -ne 1 ]; then
+  echo "Error: El puerto 515 no está abierto en $WINIP" >> /tmp/lexmark.log
+  [ $rm -gt 0 ] && rm $file
+  exit 1
+fi
+
+EXPECT_URI="lpd://$WINIP:515/LexmarkBBVA"
+
+EXISTE=$(lpstat -v | grep -c "$CUPS_QUEUE")
+echo "Existe Cola: $EXISTE" >> /tmp/lexmark.log
+if [ "$EXISTE" -eq 0 ]; then
+  echo "Creando cola CUPS $CUPS_QUEUE..." >> /tmp/lexmark.log
+  sudo lpadmin -p $CUPS_QUEUE -D 'Dynamic Lexmark CPM Queue' -L 'CPM' -E -v "lpd://$WINIP:515/LexmarkBBVA" -P /root/bin/Lexmark.Cups.ppd.gz 1>> /tmp/lexmark.log 2>> /tmp/lexmark.log
+  echo "Cola $CUPS_QUEUE debe apuntar a $WINIP" >> /tmp/lexmark.log
+  cupsenable "$CUPS_QUEUE"
+  cupsaccept "$CUPS_QUEUE"
+else
+  echo "Cola $CUPS_QUEUE ya existe." >> /tmp/lexmark.log
+  CURURI=$(lpstat -v "$CUPS_QUEUE" 2>/dev/null | awk -F' for .*: ' '{print $2}')
+  echo "URI actual: $CURURI" >> /tmp/lexmark.log
+  if [ "$CURURI" != "$EXPECT_URI" ] && [ -n "$CURURI" ]; then
+    echo "Actualizando URI de $CUPS_QUEUE a $EXPECT_URI..." >> /tmp/lexmark.log
+    sudo lpadmin -p "$CUPS_QUEUE" -v "$EXPECT_URI" 1>> /tmp/lexmark.log 2>> /tmp/lexmark.log
+    cupsaccept "$CUPS_QUEUE"
+    cupsenable "$CUPS_QUEUE"
+  fi
+fi
+
+SUBHEADER=$(
+cat << EOF
+@PJL JOB
+@PJL SET STRINGCODESET=UTF8
+@PJL SET USERNAME="$GENERICO"
+@PJL SET LMULTIPAGEPRINT=OFF
+@PJL COMMENT Lexmark Universal v2
+@PJL LJOBINFO USERID="$GENERICO" HOSTID="$HOSTID"
+@PJL SET JOBNAME="$SPOOLNAME"
+@PJL SET HOLD=OFF
+@PJL SET HOLDKEY="$KEY"
+@PJL SET QTY=1
+@PJL SET LDUPLICATEHELDJOBS=SAVE
+@PJL SET LCOLORMODEL=BLACK
+@PJL SET RENDERMODE=GRAYSCALE
+@PJL SET LPARM:PCL LFONTPRIORITY=NORESOLUTION
+@PJL SET TIMEOUT=0
+@PJL SET LCOLLATION=ON
+@PJL SET PAGEPROTECT=OFF
+@PJL SET WIDEA4=NO
+@PJL SET RESOLUTION=600
+@PJL SET LIMAGEENHANCE=OFF
+@PJL SET BITSPERPIXEL=1
+EOF)
+
+if [ $(echo $SPOOLTYPE | grep -c "HP Printer Job") -gt 0 ]
+then
+  FORM_LIST="UA011"
+  FORM=$(head -1 $file | cut -d= -f2 | tr -d "\"\r\n")
+  if [ $(echo $FORM_LIST | grep -c $FORM) -gt 0 ]
+  then
+    echo "Formato UA011" >> /tmp/lexmark.log
+    (
+    head -1 $file
+    echo "$SUBHEADER"
+    tail -n +2 $file
+    ) | sed 's/\&l1H/\&l2H/' | perl -0777 -pe 's/(@PJL ENTER LANGUAGE = PCL\r\n\x1b)/$1\x25\x30\x41\x1b/' > /tmp/job_$1.prn
+    echo "Enviando a: $CUPS_QUEUE Usuario: $GENERICO Jobname: $3 File:$1.prn" >> /tmp/lexmark.log
+    lp -d $CUPS_QUEUE -U $GENERICO -t "$3" /tmp/job_$1.prn > /dev/null
+#    cancel $PUESTO-$SPOOLID
+    rm /tmp/job_$1.prn
+  else
+    echo "Job PCL 5 se agrega 1B253041" >> /tmp/lexmark.log
+    (
+    head -1 $file
+    echo "$SUBHEADER"
+    tail -n +2 $file
+    ) | perl -0777 -pe 's/(@PJL ENTER LANGUAGE = PCL\r\n\x1b)/$1\x25\x30\x41\x1b/' > /tmp/job_$1.prn
+    #xxd -l 700 /tmp/job_$1.prn >> /tmp/lexmark.log
+    echo "Enviando a: $CUPS_QUEUE Usuario: $GENERICO Jobname: $3 File:$1.prn" >> /tmp/lexmark.log
+    lp -d $CUPS_QUEUE -U $GENERICO -t "$3" /tmp/job_$1.prn > /dev/null
+#    cancel $PUESTO-$SPOOLID
+    rm /tmp/job_$1.prn
+  fi
+else
+(
+  echo -e "\033%-12345X$SUBHEADER"
+  if [ $(echo $SPOOLTYPE | grep -c "PostScript") -gt 0 ]
+  then
+    printf "@PJL ENTER LANGUAGE = Postscript \012\001M"
+  else
+    echo -e "@PJL ENTER LANGUAGE = PCL\033%-12345X"
+  fi
+  cat $file
+) | perl -0777 -pe 's/(@PJL ENTER LANGUAGE = PCL\r\n\x1b)/$1\x25\x30\x41\x1b/' > /tmp/job_$1.prn
+echo "Otros PDL se agrega header PCL a menos que sea PS" >> /tmp/lexmark.log
+echo "Enviando a: $CUPS_QUEUE Usuario: $GENERICO Jobname: $3 File:$1.prn" >> /tmp/lexmark.log
+lp -d $CUPS_QUEUE -U $GENERICO -t "$3" /tmp/job_$1.prn > /dev/null
+#cancel $PUESTO-$SPOOLID
+rm /tmp/job_$1.prn
+fi
+echo ""
+[ $rm -gt 0 ] && rm $file
+exit 0
