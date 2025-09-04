@@ -7,7 +7,7 @@ Está diseñado para gestionar la interceptación, transformación y redirecció
 ---
 
 ## 📂 Estructura de Archivos
-
+```
 .
 ├── Linux Server
 │   └── root
@@ -21,7 +21,7 @@ Está diseñado para gestionar la interceptación, transformación y redirecció
     │   ├── configuration.json
     └── Startup
         └── update_winhostuser.bat
-
+```
 ---
 
 ## ⚙️ Requerimientos
@@ -86,7 +86,7 @@ Archivo de configuración CPM:
 ---
 
 ## 📊 Flujo de Operación
-
+```
 [Windows Cliente]  
    ↓ (update_winhostuser.bat → LPR)  
 [Linux SUSE: cola CPMWinHostUser]  
@@ -96,7 +96,7 @@ Archivo de configuración CPM:
 [CUPS dinámica → LPD 515]  
    ↓  
 [Windows Host con CPM]
-
+```
 ---
 
 ## 🔒 Consideraciones de Seguridad
