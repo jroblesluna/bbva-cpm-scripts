@@ -17,7 +17,7 @@ else
   let rm++
 fi
 
-echo "==================================================" >> /tmp/lexmark.log
+echo "==================================================v202509031800" >> /tmp/lexmark.log
 date >> /tmp/lexmark.log
 echo "1: "$1 >> /tmp/lexmark.log
 echo "2: "$2 >> /tmp/lexmark.log
