@@ -5,7 +5,7 @@
 # Usar set -x para activar modo debug (trace de comandos)
 # set -x
 # AVISO: VERSION COMPATIBLE SOLO CON LINUX SUSE 12 Y LEXMARK CLOUD PRINT MANAGER
-# Fecha de actualización: v20250829
+# Fecha de actualización: v202509150000
 rm=0
 
 if [ -n "$6" ]
@@ -17,7 +17,7 @@ else
   let rm++
 fi
 
-echo "==================================================v202509031800" >> /tmp/lexmark.log
+echo "==================================================v202509150000" >> /tmp/lexmark.log
 date >> /tmp/lexmark.log
 echo "1: "$1 >> /tmp/lexmark.log
 echo "2: "$2 >> /tmp/lexmark.log
@@ -126,15 +126,14 @@ then
   FORM=$(head -1 $file | cut -d= -f2 | tr -d "\"\r\n")
   if [ $(echo $FORM_LIST | grep -c $FORM) -gt 0 ]
   then
-    echo "Formato UA011" >> /tmp/lexmark.log
+    echo "Formato UA011 Carta Fianza" >> /tmp/lexmark.log
     (
     head -1 $file
     echo "$SUBHEADER"
     tail -n +2 $file
     ) | sed 's/\&l1H/\&l2H/' | perl -0777 -pe 's/(@PJL ENTER LANGUAGE = PCL\r\n\x1b)/$1\x25\x30\x41\x1b/' > /tmp/job_$1.prn
-    echo "Enviando a: $CUPS_QUEUE Usuario: $GENERICO Jobname: $3 File:$1.prn" >> /tmp/lexmark.log
+    echo "Enviando PCL5 Carta Fianza a: $CUPS_QUEUE Usuario: $GENERICO Jobname: $3 File:/tmp/job_$1.prn" >> /tmp/lexmark.log
     lp -d $CUPS_QUEUE -U $GENERICO -t "$3" /tmp/job_$1.prn > /dev/null
-#    cancel $PUESTO-$SPOOLID
     rm /tmp/job_$1.prn
   else
     echo "Job PCL 5 se agrega 1B253041" >> /tmp/lexmark.log
@@ -144,9 +143,8 @@ then
     tail -n +2 $file
     ) | perl -0777 -pe 's/(@PJL ENTER LANGUAGE = PCL\r\n\x1b)/$1\x25\x30\x41\x1b/' > /tmp/job_$1.prn
     #xxd -l 700 /tmp/job_$1.prn >> /tmp/lexmark.log
-    echo "Enviando a: $CUPS_QUEUE Usuario: $GENERICO Jobname: $3 File:$1.prn" >> /tmp/lexmark.log
+    echo "Enviando PCL5 a: $CUPS_QUEUE Usuario: $GENERICO Jobname: $3 File:/tmp/job_$1.prn" >> /tmp/lexmark.log
     lp -d $CUPS_QUEUE -U $GENERICO -t "$3" /tmp/job_$1.prn > /dev/null
-#    cancel $PUESTO-$SPOOLID
     rm /tmp/job_$1.prn
   fi
 else
@@ -155,17 +153,29 @@ else
   if [ $(echo $SPOOLTYPE | grep -c "PostScript") -gt 0 ]
   then
     printf "@PJL ENTER LANGUAGE = Postscript \012\001M"
+    echo "Spool PostScript, se añade CPM Mark <0A014D>" >> /tmp/lexmark.log
   else
     echo -e "@PJL ENTER LANGUAGE = PCL\033%-12345X"
+    echo "Spool Genérico, se añade PCL Header Standard" >> /tmp/lexmark.log 
   fi
   cat $file
 ) | perl -0777 -pe 's/(@PJL ENTER LANGUAGE = PCL\r\n\x1b)/$1\x25\x30\x41\x1b/' > /tmp/job_$1.prn
-echo "Otros PDL se agrega header PCL a menos que sea PS" >> /tmp/lexmark.log
-echo "Enviando a: $CUPS_QUEUE Usuario: $GENERICO Jobname: $3 File:$1.prn" >> /tmp/lexmark.log
+
+echo "Enviando Job a: $CUPS_QUEUE Usuario: $GENERICO Jobname: $3 File:/tmp/job_$1.prn" >> /tmp/lexmark.log
 lp -d $CUPS_QUEUE -U $GENERICO -t "$3" /tmp/job_$1.prn > /dev/null
-#cancel $PUESTO-$SPOOLID
 rm /tmp/job_$1.prn
 fi
-echo ""
+echo "Spool CPM transferido correctamente. Se enviará spool original a Tea4Cups." >> /tmp/lexmark.log
+
+TEA4CUPS_QUEUE="p${PUESTO:1}"
+EXISTE=$(lpstat -v | grep -c "$TEA4CUPS_QUEUE")
+echo "Existe Cola Tea4Cups: $EXISTE" >> /tmp/lexmark.log
+if [ "$EXISTE" -eq 0 ]; then
+  echo "No existe cola Tea4Cups $TEA4CUPS_QUEUE. Se omitirá envío a Tea4Cups." >> /tmp/lexmark.log
+else
+  echo "Enviando spool original a Tea4Cups: $TEA4CUPS_QUEUE con usuario $USUARIO" >> /tmp/lexmark.log
+  lp -d $TEA4CUPS_QUEUE -U $USUARIO -t "$3" $file > /dev/null
+fi
+
 [ $rm -gt 0 ] && rm $file
 exit 0

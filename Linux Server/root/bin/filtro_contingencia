@@ -1,0 +1,96 @@
+#!/bin/bash
+# Filtro de impresión para Lexmark Cloud Print Manager (MODO CONTINGENCIA)
+# Preparado para BBVA por Javier Robles (Lexmark International)
+# E-mail: antonio@robles.ai
+# Usar set -x para activar modo debug (trace de comandos)
+# set -x
+# AVISO: VERSION COMPATIBLE SOLO CON LINUX SUSE 12 Y LEXMARK CLOUD PRINT MANAGER
+# Fecha de actualización: v202509150000
+rm=0
+
+if [ -n "$6" ]
+then
+  file="$6"
+else
+  file=$(mktemp)
+  cat > "$file"
+  let rm++
+fi
+
+echo "================================CONTINGENCIA======v202509150000" >> /tmp/lexmark.log
+date >> /tmp/lexmark.log
+echo "1: $1" >> /tmp/lexmark.log
+echo "2: $2" >> /tmp/lexmark.log
+echo "3: $3" >> /tmp/lexmark.log
+echo "4: $4" >> /tmp/lexmark.log
+echo "5: $5" >> /tmp/lexmark.log
+echo "6: $6" >> /tmp/lexmark.log
+
+SPOOLID="$1"
+SPOOLPATH="$6"
+SPOOLNAME="$3"
+HOSTID="$(hostname)"
+SPOOLTYPE="$(/usr/bin/file "$file" | cut -d':' -f2)"
+
+# Cola que ejecuta el filtro (primer match por job-id)
+PUESTO="$(lpstat -W all -u | grep -m1 "\-$SPOOLID" | cut -d '-' -f1)"
+USUARIO="$(finger 2>/dev/null | grep -m1 "$PUESTO" | cut -d ' ' -f1 | rev | cut -d '.' -f1 | rev)"
+if [ -z "$USUARIO" ]; then
+  USUARIO="$2"
+fi
+KEY="$(echo ${PUESTO:1:4})"
+
+echo "Spool ID: $SPOOLID" >> /tmp/lexmark.log
+echo "Spool Path: $SPOOLPATH" >> /tmp/lexmark.log
+echo "Spool Name: $SPOOLNAME" >> /tmp/lexmark.log
+echo "Spool Type:$SPOOLTYPE" >> /tmp/lexmark.log
+echo "Puesto: $PUESTO" >> /tmp/lexmark.log
+echo "Key: $KEY" >> /tmp/lexmark.log
+echo "Usuario: $USUARIO"  >> /tmp/lexmark.log
+echo "Host ID: $HOSTID" >> /tmp/lexmark.log
+
+CURURI="${DEVICE_URI}"
+if [ -z "$CURURI" ]; then
+  CURURI="$(lpstat -v "$PUESTO" 2>/dev/null | awk -F': ' 'END{print $2}')"
+fi
+if [ -z "$CURURI" ]; then
+  echo "ERROR: No se pudo determinar el DEVICE_URI/CURURI de la cola $PUESTO" >> /tmp/lexmark.log
+  [ $rm -gt 0 ] && rm -f "$file"
+  exit 1
+fi
+echo "CURURI (destino real cola): $CURURI" >> /tmp/lexmark.log
+
+PRNIP="$(echo "$CURURI" | sed -E 's#^[a-zA-Z]+://([^/:]+).*#\1#')"
+if [ -z "$PRNIP" ]; then
+  echo "ERROR: No se pudo extraer IP de impresora física desde CURURI=$CURURI" >> /tmp/lexmark.log
+  [ $rm -gt 0 ] && rm -f "$file"
+  exit 1
+fi
+echo "IP impresora física: $PRNIP" >> /tmp/lexmark.log
+
+LPD_BACKEND="/usr/lib/cups/backend/lpd"
+if [ ! -x "$LPD_BACKEND" ]; then
+  echo "ERROR: Backend LPD no ejecutable en $LPD_BACKEND" >> /tmp/lexmark.log
+  [ $rm -gt 0 ] && rm -f "$file"
+  exit 1
+fi
+
+DEST_URI="lpd://$PRNIP:515/raw"
+echo "Enviando por LPR directo a $DEST_URI (spool ORIGINAL, sin modificar)..." >> /tmp/lexmark.log
+"$LPD_BACKEND" "$DEST_URI" "$SPOOLID" "$USUARIO" "$SPOOLNAME" "$4" "$5" "$file" >> /tmp/lexmark.log 2>&1
+RET_BACKEND=$?
+echo "Resultado de LPD backend: $RET_BACKEND" >> /tmp/lexmark.log
+
+TEA4CUPS_QUEUE="p${PUESTO:1}"
+EXISTE_TEA="$(lpstat -v 2>/dev/null | grep -c "$TEA4CUPS_QUEUE")"
+echo "Existe Tea4Cups ($TEA4CUPS_QUEUE)?: $EXISTE_TEA" >> /tmp/lexmark.log
+if [ "$EXISTE_TEA" -gt 0 ]; then
+  echo "Enviando ORIGINAL a Tea4Cups: $TEA4CUPS_QUEUE con usuario $USUARIO" >> /tmp/lexmark.log
+  lp -d "$TEA4CUPS_QUEUE" -U "$USUARIO" -t "$SPOOLNAME" "$file" > /dev/null 2>> /tmp/lexmark.log
+  echo "Resultado de envío Tea4Cups: $?" >> /tmp/lexmark.log
+else
+  echo "No existe cola Tea4Cups $TEA4CUPS_QUEUE. Se omite." >> /tmp/lexmark.log
+fi
+
+[ $rm -gt 0 ] && rm -f "$file"
+exit $RET_BACKEND
