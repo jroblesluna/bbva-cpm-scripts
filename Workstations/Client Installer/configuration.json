@@ -1,47 +1,54 @@
 {
-  "loggerSettings": {
-    "loggingLevel": "info",
-    "logIpAddresses": false,
-    "redactPrivateInformation": true
+  "loggerSettings" : {
+    "loggingLevel" : "info",
+    "logIpAddresses" : false,
+    "redactPrivateInformation" : true
   },
-  "serverSettings": {
-    "apiVersion": "3.0",
-    "idpServerUrl": "https://idp.us.iss.lexmark.com",
-    "cpmServerUrl": "https://apis.us.iss.lexmark.com/cpm"
+  "serverSettings" : {
+    "apiVersion" : "3.0",
+    "idpServerUrl" : "https://idp.us.iss.lexmark.com",
+    "cpmServerUrl" : "https://apis.us.iss.lexmark.com/cpm"
   },
-  "hybridPrintSettings": {
-    "queueName": "LexmarkBBVA",
-    "loopbackPort": 9167,
-    "lateBindingEnabled": true
+  "hybridPrintSettings" : {
+    "queueName" : "LexmarkBBVA",
+    "loopbackPort" : 9167,
+    "lateBindingEnabled" : true
   },
-  "uiSettings": {
-    "authenticationMode": "DefaultBrowser",
-    "displayNotifications": true,
-    "displayConnectionErrorMessageBoxes": true
+  "offlinePrintSettings" : {
+    "allowSecurePrintOnly" : false,
+    "preferSecurePrintUsingPrintCryption" : false
   },
-  "certificateValidationSettings": {
-    "certificateValidationSwitch": true,
-    "certificateValidationDebugMode": false,
-    "certificateRevocationMode": 0
+  "uiSettings" : {
+    "authenticationMode" : "DefaultBrowser",
+    "displayNotifications" : true,
+    "displayConnectionErrorMessageBoxes" : true
   },
-  "networkInterfaceSelectorSettings": {
-    "prioritizeVirtualAdapters": false,
-    "filterAutoIpAddresses": false
+  "certificateValidationSettings" : {
+    "certificateValidationSwitch" : true,
+    "certificateValidationDebugMode" : false,
+    "certificateRevocationMode" : 0
   },
-  "scheduleSettings": {
-    "ipChangeMonitorIntervalInSeconds": 60,
-    "proxyCacheResetIntervalInSeconds": 60
+  "webProxySettings" : {
+    "enabled" : true,
+    "address" : "http://pac.zscalertwo.net/qcNztsBj8RN7/PER_NOAGENTE_ZS_v2.pac"
   },
-  "listenerPortSettings": {
-    "universalServicePort": 9443,
-    "updateServicePort": 3334
+  "networkInterfaceSelectorSettings" : {
+    "prioritizeVirtualAdapters" : false,
+    "filterAutoIpAddresses" : false,
+    "subnetFilter" : {
+      "include" : [ ],
+      "exclude" : [ ]
+    }
   },
-  "webProxySettings": {
-    "enabled": true,
-    "address": "http://pac.zscalertwo.net/qcNztsBj8RN7/PER_NOAGENTE_ZS_v2.pac"
+  "scheduleSettings" : {
+    "ipChangeMonitorIntervalInSeconds" : 60,
+    "proxyCacheResetIntervalInSeconds" : 60
   },
-  "driverName": "Lexmark Universal v2 XL",
-  "defaultQueueName": "LexmarkBBVA",
-  "printJobFileNameFormat": "%d_%i.prn",
-  "userFolderDirectoryMode": "Programdata"
+  "listenerPortSettings" : {
+    "universalServicePort" : 9443
+  },
+  "driverName" : "Lexmark Universal v2 XL",
+  "defaultQueueName" : "LexmarkBBVA",
+  "printJobFileNameFormat" : "%d_%i.prn",
+  "userFolderDirectoryMode" : "Programdata"
 }
