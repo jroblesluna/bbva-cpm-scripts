@@ -69,15 +69,10 @@ fi
 echo "IP impresora física: $PRNIP" >> /tmp/lexmark.log
 
 LPD_BACKEND="/usr/lib/cups/backend/lpd"
-if [ ! -x "$LPD_BACKEND" ]; then
-  echo "ERROR: Backend LPD no ejecutable en $LPD_BACKEND" >> /tmp/lexmark.log
-  [ $rm -gt 0 ] && rm -f "$file"
-  exit 1
-fi
 
-DEST_URI="lpd://$PRNIP:515/raw"
-echo "Enviando por LPR directo a $DEST_URI (spool ORIGINAL, sin modificar)..." >> /tmp/lexmark.log
-"$LPD_BACKEND" "$DEST_URI" "$SPOOLID" "$USUARIO" "$SPOOLNAME" "$4" "$5" "$file" >> /tmp/lexmark.log 2>&1
+DEVICE_URI="lpd://$PRNIP:515/lp"
+echo "Enviando por LPR directo a $DEVICE_URI (spool ORIGINAL, sin modificar)..." >> /tmp/lexmark.log
+"$LPD_BACKEND" "$SPOOLID" "$USUARIO" "$SPOOLNAME" "$4" "$5" "$file" >> /tmp/lexmark.log 2>&1
 RET_BACKEND=$?
 echo "Resultado de LPD backend: $RET_BACKEND" >> /tmp/lexmark.log
 
