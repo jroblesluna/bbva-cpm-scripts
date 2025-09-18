@@ -287,6 +287,7 @@ PPD genérico base utilizado por `filtro_nacarpr` para crear/actualizar colas di
 ---
 
 ## 📝 Historial de cambios
+- **2025‑09‑18**: Restauración `filtro_winhostuser`
 - **2025‑09‑17**: Actualización de comandos `lpadmin` para colas CPM/Contingencia. Actualización de *update_winhostuser.bat* (Lectura de VirtAplic antes de VMX)
 - **2025‑09‑15**: Añadido **filtro_contingencia** (LPD directo sin modificar + Tea4Cups opcional).
 - **2025‑09‑12**: Manual de uso paso a paso, reglas de firewall y ejemplo de visudo.
