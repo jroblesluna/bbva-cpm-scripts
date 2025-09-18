@@ -27,7 +27,7 @@ Permite:
 └── Workstations
     ├── Client Installer
     │   ├── configuration.json
-    │   └── LPMC_3.6.0_UPD_PCLXL_3.0.8.0_Win_2.2.91.exe
+    │   └── README.md
     ├── SetupLPD
     │   ├── LpdServiceMonitor.msi
     │   └── lprlpd.ps1
@@ -202,9 +202,29 @@ PPD genérico base utilizado por `filtro_nacarpr` para crear/actualizar colas di
    Ejecutar `SetupLPD/lprlpd.ps1` con privilegios (habilita características de impresión LPD/LPR según política).
 
 2. **Instalar servicio monitor**  
-   ```bat
-   msiexec /i SetupLPD\LpdServiceMonitor.msi /qn
-   ```
+   ## 🖥️ Instalación / Desinstalación
+
+   Instalar de forma silenciosa con log:
+
+   ~~~powershell
+   msiexec /i .\LpdServiceMonitor.msi /qn /L*v install.log
+   ~~~
+
+   Desinstalar:
+
+   ~~~powershell
+   msiexec /x .\LpdServiceMonitor.msi /qn /L*v uninstall.log
+   ~~~
+
+   > El MSI instala en `C:\Program Files\RoblesAI\LPD Service Monitor\` y crea el servicio  
+   > **LpdServiceMonitor** (inicia automático, cuenta `LocalSystem`).
+
+   Comprobar estado:
+
+   ~~~powershell
+   Get-Service LpdServiceMonitor
+   Get-Service LPDSVC
+   ~~~
 
 3. **Configurar script de inicio**  
    Agregar `Workstations/Startup/update_winhostuser.bat` al arranque (Inicio del usuario o GPO). Este script:
