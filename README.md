@@ -27,7 +27,7 @@ Permite:
 └── Workstations
     ├── Client Installer
     │   ├── configuration.json
-    │   └── LPMC_3.5.3_UPD_PCLXL_3.0.7.0_Win_2.2.73.exe
+    │   └── LPMC_3.6.0_UPD_PCLXL_3.0.8.0_Win_2.2.91.exe
     ├── SetupLPD
     │   ├── LpdServiceMonitor.msi
     │   └── lprlpd.ps1
@@ -123,29 +123,76 @@ Si se requiere derivación a PDF, debe existir la cola CUPS `p<puesto>` (ej. `p0
 
 ---
 
-## 💾 Scripts incluidos (resumen)
+## 💾 Scripts incluidos (detalle)
 
 ### `create_CPMWinHostUser.sh`
 Crea la cola receptora de mapping `CPMWinHostUser` usando `filtro_winhostuser`.
 
+**Comando principal:**
+```bash
+lpadmin -p CPMWinHostUser -D 'Impresora CPM Win Host User' -L 'CMPWinHostUser' -E -v file:/dev/null -i /root/bin/filtro_winhostuser
+```
+
+---
+
 ### `filtro_winhostuser`
-- Entrada: `hostname|usuario|ip` (1ª línea del spool).  
-- Validaciones: hostname 11–12 chars; usuario inicia con `o`/`p`; IP inicia con `118.`.  
-- Normaliza a 11 chars y **actualiza** `/tmp/win_hostname_user.txt` (formato: `w1XXXXXXpXX|usuario|IP`).
+**Objetivo:** Mantener una base de **mapping dinámico** `hostname → usuario → IP` para consumo de los demás filtros.
+
+**Entrada esperada:** primera línea del spool con `hostname|usuario|ip`.
+
+**Flujo y validaciones:**
+- Lee solo la **primera línea** y normaliza CR/LF.
+- Valida que existan exactamente **2 pipes** (3 campos).
+- **Hostname** de 11–12 caracteres (se normaliza a 11).  
+- **Usuario** debe iniciar con `o` o `p`.  
+- **IP** debe iniciar con `118.`.
+- Escribe/actualiza `DB=/tmp/win_hostname_user.txt` en formato `w1XXXXXXpXX|usuario|IP` **reemplazando** entradas previas del mismo host.
 - Log: `/tmp/lexmark_winhostuser.log`.
 
+**Salida:** `0` en éxito; ignora y sale `0` si el formato no es válido (no rompe el flujo de impresión).
+
+---
+
 ### `filtro_nacarpr`
-- Obtiene `PUESTO`, `USUARIO`, `SPOOLTYPE` y **maping** desde `/tmp/win_hostname_user.txt`.
-- Verifica **TCP/515** en el Windows destino; crea/actualiza **cola CUPS dinámica** `w1<puesto>` apuntando a `lpd://<WINIP>:515/LexmarkBBVA` (driver `Lexmark.Cups.ppd.gz`).
-- Inserta **PJL** (USERNAME, JOBNAME, HOLDKEY, etc.). Soporta PCL/PostScript/HP PJL.
-- Envía a la cola destino; opcionalmente duplica **spool original** a Tea4Cups `p<puesto>`.
-- Log: `/tmp/lexmark.log`.
+**Objetivo:** Enviar trabajos a **CPM en Windows** creando/ajustando **colas CUPS dinámicas** que apunten a la estación correcta y **añadiendo PJL** con metadatos del usuario/host/job.
+
+**Pasos clave:**
+1. Deriva `PUESTO`, `USUARIO`, `SPOOLTYPE` y consulta `MAPFILE=/tmp/win_hostname_user.txt` para obtener:
+   - `GENERICO` (usuario mapeado) y `WINIP` de la estación.
+2. Verifica **TCP/515** en `WINIP` (prueba de conectividad LPD).
+3. **Crea/actualiza** la cola `CUPS_QUEUE="w1${PUESTO:1}"` con URI esperado `lpd://$WINIP:515/LexmarkBBVA` y PPD `Lexmark.Cups.ppd.gz`.
+4. **Inserta PJL** (USERNAME, JOBNAME, HOLDKEY, etc.). Adapta encabezado para PCL5 / PostScript / HP PJL detectando tipo de spool.
+5. Envía el **trabajo modificado** a CPM (`w1<puesto>`) y en paralelo envía el **spool original** a Tea4Cups `p<puesto>` si existe.
+
+**Logs:** `/tmp/lexmark.log`.
+
+**Errores comunes manejados:**
+- Sin mapping para el puesto.
+- Puerto 515 cerrado en destino.
+- URI de la cola desalineado (se corrige automáticamente).
+
+---
 
 ### `filtro_contingencia`
-- Identifica **cola ejecutora** y **DEVICE_URI**; extrae **IP física** de la impresora.
-- Reenvía **sin modificar** por backend LPD nativo de CUPS.
-- Si existe `p<puesto>`, también envía el original a Tea4Cups.
-- Log: `/tmp/lexmark.log`.
+**Objetivo:** Bypass total de CPM cuando sea necesario. **Reenvía el spool original, sin modificar**, directo a la **impresora física** usando el backend LPD de CUPS.
+
+**Pasos clave:**
+1. Identifica la **cola ejecutora** (`PUESTO`) y el `DEVICE_URI` real de la cola (o lo obtiene vía `lpstat -v`).
+2. Extrae la **IP física** desde el `DEVICE_URI` (`lpd://<IP>:515/...`).  
+3. Llama al backend nativo **`/usr/lib/cups/backend/lpd`** con el archivo original.  
+4. Si existe `p<puesto>`, **duplica** el envío del spool original a Tea4Cups para generación de PDF.  
+5. Limpia temporales si corresponde y retorna el **exit code** del backend LPD.
+
+**Logs:** `/tmp/lexmark.log`.
+
+**Notas:**
+- No altera el contenido del job (sin PJL extra).
+- Usa `DEVICE_URI` de la cola como **fuente de verdad** para la IP física.
+
+---
+
+### `Lexmark.Cups.ppd.gz`
+PPD genérico base utilizado por `filtro_nacarpr` para crear/actualizar colas dinámicas en CUPS.
 
 ---
 
@@ -161,7 +208,7 @@ Crea la cola receptora de mapping `CPMWinHostUser` usando `filtro_winhostuser`.
 
 3. **Configurar script de inicio**  
    Agregar `Workstations/Startup/update_winhostuser.bat` al arranque (Inicio del usuario o GPO). Este script:
-   - Lee `Nacar_Suse12.vmx` para deducir el **servidor** LPR.
+   - Lee `virtconf.txt` (clave `srvhost=`) o `Nacar_Suse12.vmx` para deducir el **servidor** LPR.
    - Detecta IP válida del equipo.
    - Envía `hostname|usuario|ip` a la cola Linux `CPMWinHostUser`.
 
@@ -220,4 +267,6 @@ Crea la cola receptora de mapping `CPMWinHostUser` usando `filtro_winhostuser`.
 ---
 
 ## 📝 Historial de cambios
-- **2025‑09‑15**: Añadido **filtro_contingencia** (LPD directo sin modificar + Tea4Cups opcional). Manual de uso paso a paso, reglas de firewall y ejemplo de visudo. Mejora de validaciones en `filtro_winhostuser`. Actualización de comandos `lpadmin` para colas CPM/Contingencia.
+- **2025‑09‑17**: Actualización de comandos `lpadmin` para colas CPM/Contingencia. Actualización de *update_winhostuser.bat* (Lectura de VirtAplic antes de VMX)
+- **2025‑09‑15**: Añadido **filtro_contingencia** (LPD directo sin modificar + Tea4Cups opcional).
+- **2025‑09‑12**: Manual de uso paso a paso, reglas de firewall y ejemplo de visudo.
