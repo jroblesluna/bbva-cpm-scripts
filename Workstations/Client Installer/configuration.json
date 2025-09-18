@@ -1,6 +1,6 @@
 {
   "loggerSettings" : {
-    "loggingLevel" : "info",
+    "loggingLevel" : "debug",
     "logIpAddresses" : false,
     "redactPrivateInformation" : true
   },

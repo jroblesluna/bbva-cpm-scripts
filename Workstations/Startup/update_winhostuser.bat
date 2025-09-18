@@ -1,6 +1,22 @@
 @echo off
 setlocal EnableDelayedExpansion
 
+REM ───────── INTENTO 1: virtconf.txt (srvhost) ─────────
+set "VCONF=D:\VirtAplic\VirtRM\virtconf.txt"
+if exist "%VCONF%" (
+    for /f "usebackq tokens=2 delims=='" %%A in (`findstr /i /b "srvhost=" "%VCONF%"`) do (
+        set "RAWIP=%%A"
+    )
+    if defined RAWIP (
+        for /f "tokens=1-4 delims=." %%a in ("!RAWIP!") do (
+            set "SERVER=%%a.%%b.%%c.210"
+        )
+        echo [virtconf] SERVER cargado desde virtconf.txt: !SERVER!
+        goto CONTINUAR
+    )
+)
+
+REM ───────── INTENTO 2: VMX (si no se definio SERVER) ─────────
 set VMXFILE=C:\imagenes_12\Nacar_Suse12.vmx
 for /f "tokens=2 delims==" %%A in ('findstr /b "ethernet0.address" "%VMXFILE%"') do (
     for /f "tokens=* delims= " %%B in ("%%~A") do set MAC=%%B
@@ -15,6 +31,8 @@ set CHAR13=%MAC:~12,1%
 set CHAR14=%MAC:~13,1%
 
 set SERVER=s0%CHAR11%%CHAR13%%CHAR14%00%CHAR10%.nacarpe.igrupobbva
+
+:CONTINUAR
 echo Server: %SERVER%
 set QUEUE=CPMWinHostUser
 echo Queue: %QUEUE%
