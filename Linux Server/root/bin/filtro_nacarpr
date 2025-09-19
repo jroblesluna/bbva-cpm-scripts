@@ -120,7 +120,7 @@ cat << EOF
 @PJL SET BITSPERPIXEL=1
 EOF)
 
-if [ $(echo $SPOOLTYPE | grep -c "HP Printer Job") -gt 0 ]
+if [ $(echo $SPOOLTYPE | grep -Ec "HP Printer Job|PJL encapsulated PostScript document text") -gt 0 ]
 then
   FORM_LIST="UA011"
   FORM=$(head -1 $file | cut -d= -f2 | tr -d "\"\r\n")
