@@ -126,7 +126,7 @@ then
   FORM=$(head -1 $file | cut -d= -f2 | tr -d "\"\r\n")
   if [ $(echo $FORM_LIST | grep -c $FORM) -gt 0 ]
   then
-    echo "Formato UA011 Carta Fianza" >> /tmp/lexmark.log
+    echo "UA011 Carta Fianza, se agrega cambio de bandeja l2H y firma PCL5 1B253041" >> /tmp/lexmark.log
     (
     head -1 $file
     echo "$SUBHEADER"

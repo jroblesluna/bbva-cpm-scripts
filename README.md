@@ -20,7 +20,7 @@ Permite:
 │       └── bin
 │           ├── create_CPMWinHostUser.sh
 │           ├── filtro_contingencia
-│           ├── filtro_nacarpr
+│           ├── filtro_nacarpr.cpm
 │           ├── filtro_winhostuser
 │           └── Lexmark.Cups.ppd.gz
 ├── README.md
@@ -41,8 +41,11 @@ Permite:
 
 ### Servidor Linux (SUSE 12)
 - **CUPS** instalado/activo.
+- **Carpeta de Instalación** /root/bin
+- **Filtro Principal** `filtro_nacarpr` (Renombrar desde `fintro_nacarpr.cpm`)
 - **cups‑lpd** habilitado (xinetd) y **TCP/515** permitido desde las estaciones.
 - `sudo` para que el usuario **lp** ejecute `lpadmin`, `cupsenable`, `cupsaccept` sin contraseña.
+- **Backend LPD** con permisos de ejecución mediante `chmod 755 /usr/lib/cups/backend/lpd`
 - **PPD** base: `/root/bin/Lexmark.Cups.ppd.gz`.
 - **Base de mapeo** dinámica: `/tmp/win_hostname_user.txt`.
 - **Logs**:
