@@ -17,7 +17,19 @@ if exist "%VCONF%" (
 )
 
 REM ───────── INTENTO 2: VMX (si no se definio SERVER) ─────────
-set VMXFILE=C:\imagenes_12\Nacar_Suse12.vmx
+REM Primero probar C:\imagenes_12\Nacar_Suse12.vmx; si no, C:\VMware\Nacar_Suse12.vmx; si no, error.
+set "VMXFILE=C:\imagenes_12\Nacar_Suse12.vmx"
+if not exist "%VMXFILE%" (
+    set "VMXFILE=C:\VMware\Nacar_Suse12.vmx"
+    if not exist "!VMXFILE!" (
+        set "VMXFILE=C:\VMware\imagenes_12\Nacar_Suse12.vmx"
+        if not exist "!VMXFILE!" (
+            echo [ERROR] No se encuentra ruta disponible a Servidor Nacar.
+            exit /b 1
+        )
+    )
+)
+
 for /f "tokens=2 delims==" %%A in ('findstr /b "ethernet0.address" "%VMXFILE%"') do (
     for /f "tokens=* delims= " %%B in ("%%~A") do set MAC=%%B
 )
