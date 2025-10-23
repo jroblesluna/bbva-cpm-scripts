@@ -46,23 +46,62 @@ echo "Key: "$KEY >> /tmp/lexmark.log
 echo "Usuario: "$USUARIO  >> /tmp/lexmark.log
 echo "Host ID: "$HOSTID >> /tmp/lexmark.log
 
-# Ya no se requiere PRQUEUE="PrintRelease"
-WINHOST="w1${PUESTO:1}.pe.igrupobbva"
-echo "Windows Host: $WINHOST" >> /tmp/lexmark.log
+# Configuración de plantilla (crea OFF por defecto)
+CONFIG="/tmp/lexmark_filtro.config"
+if [ ! -f "$CONFIG" ]; then
+  echo "PLANTILLA_GRANDE=OFF" > "$CONFIG"
+fi
+PG=$(grep -E "^PLANTILLA_GRANDE=" "$CONFIG" | tail -n1 | cut -d= -f2)
+[ -z "$PG" ] && PG="OFF"
+echo "PLANTILLA_GRANDE=$PG" >> /tmp/lexmark.log
 
-CUPS_QUEUE="w1${PUESTO:1}"
+# Variables de nomenclatura desde $PUESTO: w0###0SpXX (10 caracteres)
+AGENCIA="${PUESTO:2:3}"     # ###
+SERVLIN="${PUESTO:6:1}"     # S
+POSXX="${PUESTO:8:2}"       # XX (string con cero a la izquierda)
+# Normaliza XX a entero seguro
+XX=$((10#$POSXX))
+
+# Cálculo de YY según plantilla
+YY=$XX
+if [ "$PG" = "ON" ]; then
+  if [ $XX -ge 11 ] && [ $XX -le 20 ]; then
+    echo "Error: Número de puesto fuera de rango permitido (11–20) para PLANTILLA_GRANDE=ON" >> /tmp/lexmark.log
+    [ $rm -gt 0 ] && rm $file
+    exit 1
+  elif [ $XX -ge 21 ]; then
+    YY=$((XX-10))
+  fi
+fi
+# YY con dos dígitos
+YY2=$(printf "%02d" $YY)
+
+# Ya no se requiere PRQUEUE="PrintRelease"
+# WINHOST queda referencial (no usado para enrutamiento directo)
+WINHOST="w1${PUESTO:1}.pe.igrupobbva"
+echo "Windows Host (referencial): $WINHOST" >> /tmp/lexmark.log
+
+# Cola CUPS dinámica: w10###0SpYY  (usa S de Linux; puede no coincidir con Windows)
+CUPS_QUEUE="w10${AGENCIA}0${SERVLIN}p${YY2}"
+echo "Cola CUPS dinámica calculada: $CUPS_QUEUE" >> /tmp/lexmark.log
+
 MAPFILE="/tmp/win_hostname_user.txt"
-LINEA=$(grep "^$CUPS_QUEUE|" "$MAPFILE" 2>/dev/null)
+
+# Búsqueda por similitud del primer hostname Windows que coincida con w10###0?pYY (S variable, posible sufijo letra antes del '|')
+SEARCH_REGEX="^w10${AGENCIA}0[0-9]p${YY2}[A-Za-z]?\\|"
+LINEA=$(grep -E "$SEARCH_REGEX" "$MAPFILE" 2>/dev/null | head -n1)
 
 if [ -z "$LINEA" ]; then
-  echo "Error: No se encontró mapping para $CUPS_QUEUE en $MAPFILE" >> /tmp/lexmark.log
+  echo "Error: No se encontró hostname Windows por similitud ($SEARCH_REGEX) en $MAPFILE" >> /tmp/lexmark.log
   [ $rm -gt 0 ] && rm $file
   exit 1
 fi
 
 GENERICO=$(echo "$LINEA" | cut -d '|' -f2 | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
 WINIP=$(echo "$LINEA" | cut -d '|' -f3 | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+WINHOST_MATCH=$(echo "$LINEA" | cut -d '|' -f1)
 
+echo "Match hostname (mapfile): $WINHOST_MATCH" >> /tmp/lexmark.log
 echo "Usuario genérico (mapfile): === $GENERICO ===" >> /tmp/lexmark.log
 echo "Windows IP (mapfile): $WINIP" >> /tmp/lexmark.log
 
@@ -79,7 +118,7 @@ EXISTE=$(lpstat -v | grep -c "$CUPS_QUEUE")
 echo "Existe Cola: $EXISTE" >> /tmp/lexmark.log
 if [ "$EXISTE" -eq 0 ]; then
   echo "Creando cola CUPS $CUPS_QUEUE..." >> /tmp/lexmark.log
-  sudo lpadmin -p $CUPS_QUEUE -D 'Dynamic Lexmark CPM Queue' -L 'CPM' -E -v "lpd://$WINIP:515/LexmarkBBVA" -P /root/bin/Lexmark.Cups.ppd.gz 1>> /tmp/lexmark.log 2>> /tmp/lexmark.log
+  sudo lpadmin -p $CUPS_QUEUE -D 'Dynamic Lexmark CPM Queue' -L 'CPM' -E -v "$EXPECT_URI" -P /root/bin/Lexmark.Cups.ppd.gz 1>> /tmp/lexmark.log 2>> /tmp/lexmark.log
   echo "Cola $CUPS_QUEUE debe apuntar a $WINIP" >> /tmp/lexmark.log
   cupsenable "$CUPS_QUEUE"
   cupsaccept "$CUPS_QUEUE"
