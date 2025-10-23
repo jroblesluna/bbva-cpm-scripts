@@ -5,7 +5,7 @@
 # Usar set -x para activar modo debug (trace de comandos)
 # set -x
 # AVISO: VERSION COMPATIBLE SOLO CON LINUX SUSE 12 Y LEXMARK CLOUD PRINT MANAGER
-# Fecha de actualización: v202510231600
+# Fecha de actualización: v202510231800
 rm=0
 
 if [ -n "$6" ]
