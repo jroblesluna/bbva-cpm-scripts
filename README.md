@@ -47,10 +47,10 @@ Permite:
 - `sudo` para que el usuario **lp** ejecute `lpadmin`, `cupsenable`, `cupsaccept` sin contraseña.
 - **Backend LPD** con permisos de ejecución mediante `chmod 755 /usr/lib/cups/backend/lpd`
 - **PPD** base: `/root/bin/Lexmark.Cups.ppd.gz`.
-- **Base de mapeo** dinámica: `/tmp/win_hostname_user.txt`.
+- **Base de mapeo** dinámica: `/var/lib/lexmark/win_hostname_user.txt`.
 - **Logs**:
-  - `/tmp/lexmark.log` → filtros `filtro_nacarpr` / `filtro_contingencia`.
-  - `/tmp/lexmark_winhostuser.log` → `filtro_winhostuser`.
+  - `/var/lib/lexmark/lexmark.log` → filtros `filtro_nacarpr` / `filtro_contingencia`.
+  - `/var/lib/lexmark/lexmark_winhostuser.log` → `filtro_winhostuser`.
 
 ### Workstations Windows
 - **Servicios LPR/LPD** habilitados (ver `SetupLPD/lprlpd.ps1`).
@@ -104,7 +104,7 @@ Ejecutar:
 # Internamente:
 # lpadmin -p CPMWinHostUser -D 'Impresora CPM Win Host User' -L 'CMPWinHostUser' -E -v file:/dev/null -i /root/bin/filtro_winhostuser
 ```
-Esta cola recibe archivos enviados por Windows con el formato: `hostname|usuario|ip` y actualiza `/tmp/win_hostname_user.txt`.
+Esta cola recibe archivos enviados por Windows con el formato: `hostname|usuario|ip` y actualiza `/var/lib/lexmark/win_hostname_user.txt`.
 
 ---
 
@@ -149,8 +149,8 @@ lpadmin -p CPMWinHostUser -D 'Impresora CPM Win Host User' -L 'CMPWinHostUser' -
 - **Hostname** de 11–12 caracteres (se normaliza a 11).  
 - **Usuario** debe iniciar con `o` o `p`.  
 - **IP** debe iniciar con `118.`.
-- Escribe/actualiza `DB=/tmp/win_hostname_user.txt` en formato `w1XXXXXXpXX|usuario|IP` **reemplazando** entradas previas del mismo host.
-- Log: `/tmp/lexmark_winhostuser.log`.
+- Escribe/actualiza `DB=/var/lib/lexmark/win_hostname_user.txt` en formato `w1XXXXXXpXX|usuario|IP` **reemplazando** entradas previas del mismo host.
+- Log: `/var/lib/lexmark/lexmark_winhostuser.log`.
 
 **Salida:** `0` en éxito; ignora y sale `0` si el formato no es válido (no rompe el flujo de impresión).
 
@@ -160,14 +160,14 @@ lpadmin -p CPMWinHostUser -D 'Impresora CPM Win Host User' -L 'CMPWinHostUser' -
 **Objetivo:** Enviar trabajos a **CPM en Windows** creando/ajustando **colas CUPS dinámicas** que apunten a la estación correcta y **añadiendo PJL** con metadatos del usuario/host/job.
 
 **Pasos clave:**
-1. Deriva `PUESTO`, `USUARIO`, `SPOOLTYPE` y consulta `MAPFILE=/tmp/win_hostname_user.txt` para obtener:
+1. Deriva `PUESTO`, `USUARIO`, `SPOOLTYPE` y consulta `MAPFILE=/var/lib/lexmark/win_hostname_user.txt` para obtener:
    - `GENERICO` (usuario mapeado) y `WINIP` de la estación.
 2. Verifica **TCP/515** en `WINIP` (prueba de conectividad LPD).
 3. **Crea/actualiza** la cola `CUPS_QUEUE="w1${PUESTO:1}"` con URI esperado `lpd://$WINIP:515/LexmarkBBVA` y PPD `Lexmark.Cups.ppd.gz`.
 4. **Inserta PJL** (USERNAME, JOBNAME, HOLDKEY, etc.). Adapta encabezado para PCL5 / PostScript / HP PJL detectando tipo de spool.
 5. Envía el **trabajo modificado** a CPM (`w1<puesto>`) y en paralelo envía el **spool original** a Tea4Cups `p<puesto>` si existe.
 
-**Logs:** `/tmp/lexmark.log`.
+**Logs:** `/var/lib/lexmark/lexmark.log`.
 
 **Errores comunes manejados:**
 - Sin mapping para el puesto.
@@ -186,7 +186,7 @@ lpadmin -p CPMWinHostUser -D 'Impresora CPM Win Host User' -L 'CMPWinHostUser' -
 4. Si existe `p<puesto>`, **duplica** el envío del spool original a Tea4Cups para generación de PDF.  
 5. Limpia temporales si corresponde y retorna el **exit code** del backend LPD.
 
-**Logs:** `/tmp/lexmark.log`.
+**Logs:** `/var/lib/lexmark/lexmark.log`.
 
 **Notas:**
 - No altera el contenido del job (sin PJL extra).
@@ -248,25 +248,25 @@ PPD genérico base utilizado por `filtro_nacarpr` para crear/actualizar colas di
 - **cups‑lpd**: `ss -lntp | grep :515` · `systemctl status xinetd`  
 - **Firewall**: `iptables -L -n | grep 515`  
 - **Colas CUPS**: `lpstat -v` · `lpstat -p -d`  
-- **Mapping**: ver `/tmp/win_hostname_user.txt`
+- **Mapping**: ver `/var/lib/lexmark/win_hostname_user.txt`
 - **Prueba manual LPR** (Linux → Windows):
   ```bash
-  echo test > /tmp/test.txt
-  /usr/lib/cups/backend/lpd 999 user Job 1 "" /tmp/test.txt lpd://<WINIP>:515/LexmarkBBVA
+  echo test > /var/lib/lexmark/test.txt
+  /usr/lib/cups/backend/lpd 999 user Job 1 "" /var/lib/lexmark/test.txt lpd://<WINIP>:515/LexmarkBBVA
   ```
 
 ---
 
 ## 🔒 Consideraciones de seguridad
 - LPD es **texto claro** → limitar a redes internas y subredes permitidas.
-- Limpiar periódicamente `/tmp` y rotar logs.
+- Limpiar periódicamente `/var/lib/lexmark` y rotar logs.
 - `sudoers` restringido **solo** a binarios requeridos (`lpadmin`, `cupsenable`, `cupsaccept`).
 - Proteger `configuration.json` y credenciales relacionadas.
 
 ---
 
 ## 🧰 Operación diaria
-- Revisar `/tmp/lexmark.log` ante incidencias de envío o creación de colas.
+- Revisar `/var/lib/lexmark/lexmark.log` ante incidencias de envío o creación de colas.
 - Si cambia la IP del host Windows, `filtro_nacarpr` actualizará la cola en el siguiente job.
 - Para forzar recreación de cola: eliminar con `lpadmin -x w1<puesto>` y re‑imprimir.
 
@@ -275,7 +275,7 @@ PPD genérico base utilizado por `filtro_nacarpr` para crear/actualizar colas di
 ## 🆘 Troubleshooting
 - **No llega mapping**: validar `update_winhostuser.bat` (consola), `CPMWinHostUser` activa y logs `lexmark_winhostuser.log`.
 - **Puerto 515 cerrado**: revisar firewall local/segmento; en Linux verificar regla INPUT.
-- **Cola apunta a IP incorrecta**: confirmar `/tmp/win_hostname_user.txt` y **lpstat -v** de la cola dinámica.
+- **Cola apunta a IP incorrecta**: confirmar `/var/lib/lexmark/win_hostname_user.txt` y **lpstat -v** de la cola dinámica.
 - **Tea4Cups no genera PDF**: confirmar existencia de `p<puesto>` y backend configurado.
 
 ---
