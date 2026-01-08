@@ -1,14 +1,15 @@
 # Lexmark Cloud Print Manager – Filtros y Utilidades BBVA
 
-Paquete con **scripts, configuraciones y utilidades** para integrar **Lexmark Cloud Print Manager (CPM)** en un entorno híbrido **Linux SUSE 12 (CUPS)** ⇄ **Windows (clientes CPM)**. 
+Paquete con **scripts, configuraciones y utilidades** para integrar **Lexmark Cloud Print Manager (CPM)** en un entorno híbrido **Linux SUSE 12 (CUPS)** ⇄ **Windows (clientes CPM)**.
 
-Permite:
+## Características principales
+
 - Identificar al usuario/puesto Windows desde Linux (mapping dinámico).
 - Enviar trabajos a **CPM** (normal) o a **impresora física por contingencia** (LPD directo), con copia opcional a **Tea4Cups** para PDF.
 - Crear/actualizar colas CUPS dinámicamente.
 
-> **Autor / Soporte:** Javier Robles – Lexmark International · 📧 antonio@robles.ai  
-> **Versión:** v2025-09-15
+> **Autor / Soporte:** Javier Robles – Lexmark International · 📧 antonio@robles.ai
+> **Versión:** v202510231800
 
 ---
 
@@ -41,9 +42,9 @@ Permite:
 
 ### Servidor Linux (SUSE 12)
 - **CUPS** instalado/activo.
-- **Carpeta de Instalación** /root/bin
-- **Filtro Principal** `filtro_nacarpr` (Renombrar desde `fintro_nacarpr.cpm`)
-- **cups‑lpd** habilitado (xinetd) y **TCP/515** permitido desde las estaciones.
+- **Carpeta de Instalación:** `/root/bin`
+- **Filtro Principal:** `filtro_nacarpr` (Renombrar desde `filtro_nacarpr.cpm`)
+- **cups-lpd** habilitado (xinetd) y **TCP/515** permitido desde las estaciones.
 - `sudo` para que el usuario **lp** ejecute `lpadmin`, `cupsenable`, `cupsaccept` sin contraseña.
 - **Backend LPD** con permisos de ejecución mediante `chmod 755 /usr/lib/cups/backend/lpd`
 - **PPD** base: `/root/bin/Lexmark.Cups.ppd.gz`.
@@ -201,59 +202,72 @@ PPD genérico base utilizado por `filtro_nacarpr` para crear/actualizar colas di
 
 ## 🪟 Preparación de Workstations Windows
 
-1. **Habilitar LPR/LPD**  
-   Ejecutar `SetupLPD/lprlpd.ps1` con privilegios (habilita características de impresión LPD/LPR según política).
+### 1. Habilitar LPR/LPD
+Ejecutar `SetupLPD/lprlpd.ps1` con privilegios (habilita características de impresión LPD/LPR según política).
 
-2. **Instalar servicio monitor**  
-   ## 🖥️ Instalación / Desinstalación
+### 2. Instalar servicio monitor LPD
 
-   Instalar de forma silenciosa con log:
+Instalar de forma silenciosa con log:
 
-   ~~~powershell
-   msiexec /i .\LpdServiceMonitor.msi /qn /L*v install.log
-   ~~~
+```powershell
+msiexec /i .\LpdServiceMonitor.msi /qn /L*v install.log
+```
 
-   Desinstalar:
+Desinstalar:
 
-   ~~~powershell
-   msiexec /x .\LpdServiceMonitor.msi /qn /L*v uninstall.log
-   ~~~
+```powershell
+msiexec /x .\LpdServiceMonitor.msi /qn /L*v uninstall.log
+```
 
-   > El MSI instala en `C:\Program Files\RoblesAI\LPD Service Monitor\` y crea el servicio  
-   > **LpdServiceMonitor** (inicia automático, cuenta `LocalSystem`).
+> El MSI instala en `C:\Program Files\RoblesAI\LPD Service Monitor\` y crea el servicio
+> **LpdServiceMonitor** (inicia automático, cuenta `LocalSystem`).
 
-   Comprobar estado:
+Comprobar estado:
 
-   ~~~powershell
-   Get-Service LpdServiceMonitor
-   Get-Service LPDSVC
-   ~~~
+```powershell
+Get-Service LpdServiceMonitor
+Get-Service LPDSVC
+```
 
-3. **Configurar script de inicio**  
-   Agregar `Workstations/Startup/update_winhostuser.bat` al arranque (Inicio del usuario o GPO). Este script:
-   - Lee `virtconf.txt` (clave `srvhost=`) o `Nacar_Suse12.vmx` para deducir el **servidor** LPR.
-   - Detecta IP válida del equipo.
-   - Envía `hostname|usuario|ip` a la cola Linux `CPMWinHostUser`.
+### 3. Configurar script de inicio
+Agregar `Workstations/Startup/update_winhostuser.bat` al arranque (Inicio del usuario o GPO). Este script:
+- Lee `virtconf.txt` (clave `srvhost=`) o `Nacar_Suse12.vmx` para deducir el **servidor** LPR.
+- Detecta IP válida del equipo.
+- Envía `hostname|usuario|ip` a la cola Linux `CPMWinHostUser`.
 
-4. **Instalar CPM**  
-   Ejecutar el instalador (recomendado **3.6.0**) junto a `Client Installer/configuration.json`:
-   - Cola **LexmarkBBVA**.
-   - Driver **Lexmark Universal v2 XL**.
-   - Puertos internos 9167, 9443, 3334.
-   - PAC/Proxy según `configuration.json`.
+### 4. Instalar cliente CPM
+Ejecutar el instalador (recomendado **3.6.0**) junto a `Client Installer/configuration.json`:
+- Cola **LexmarkBBVA**.
+- Driver **Lexmark Universal v2 XL**.
+- Puertos internos 9167, 9443, 3334.
+- PAC/Proxy según `configuration.json`.
 
 ---
 
 ## ✅ Verificaciones rápidas
-- **cups‑lpd**: `ss -lntp | grep :515` · `systemctl status xinetd`  
-- **Firewall**: `iptables -L -n | grep 515`  
-- **Colas CUPS**: `lpstat -v` · `lpstat -p -d`  
-- **Mapping**: ver `/var/lib/lexmark/win_hostname_user.txt`
-- **Prueba manual LPR** (Linux → Windows):
-  ```bash
-  echo test > /var/lib/lexmark/test.txt
-  /usr/lib/cups/backend/lpd 999 user Job 1 "" /var/lib/lexmark/test.txt lpd://<WINIP>:515/LexmarkBBVA
-  ```
+
+### Servicios y conectividad
+```bash
+# Verificar cups-lpd
+ss -lntp | grep :515
+systemctl status xinetd
+
+# Verificar firewall
+iptables -L -n | grep 515
+
+# Verificar colas CUPS
+lpstat -v
+lpstat -p -d
+
+# Ver base de mapping
+cat /var/lib/lexmark/win_hostname_user.txt
+```
+
+### Prueba manual LPR (Linux → Windows)
+```bash
+echo test > /var/lib/lexmark/test.txt
+/usr/lib/cups/backend/lpd 999 user Job 1 "" /var/lib/lexmark/test.txt lpd://<WINIP>:515/LexmarkBBVA
+```
 
 ---
 
@@ -291,8 +305,9 @@ PPD genérico base utilizado por `filtro_nacarpr` para crear/actualizar colas di
 
 ## 📝 Historial de cambios
 
-- **2025‑09‑19**: Actualización `filtro_nacarpr` para reconocer como a PCL HP Printer Job y PJL encapsulated PostScript document text (Fix para Bug de comando file en Suse 12 que afecta a CPM)
-- **2025‑09‑18**: Restauración `filtro_winhostuser`
-- **2025‑09‑17**: Actualización de comandos `lpadmin` para colas CPM/Contingencia. Actualización de *update_winhostuser.bat* (Lectura de VirtAplic antes de VMX)
-- **2025‑09‑15**: Añadido **filtro_contingencia** (LPD directo sin modificar + Tea4Cups opcional).
-- **2025‑09‑12**: Manual de uso paso a paso, reglas de firewall y ejemplo de visudo.
+- **v202510231800**: Actualización `filtro_nacarpr` (producción)
+- **v202509190000**: Actualización `filtro_nacarpr` para reconocer como a PCL HP Printer Job y PJL encapsulated PostScript document text (Fix para Bug de comando file en Suse 12 que afecta a CPM)
+- **v202509180000**: Restauración `filtro_winhostuser`
+- **v202509170000**: Actualización de comandos `lpadmin` para colas CPM/Contingencia. Actualización de `update_winhostuser.bat` (Lectura de VirtAplic antes de VMX)
+- **v202509150000**: Añadido `filtro_contingencia` (LPD directo sin modificar + Tea4Cups opcional)
+- **v202509120000**: Manual de uso paso a paso, reglas de firewall y ejemplo de visudo
