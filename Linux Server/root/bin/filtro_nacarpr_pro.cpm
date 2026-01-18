@@ -1,0 +1,266 @@
+#!/bin/bash
+# Lexmark CPM Filter - SUSE 12 compatible
+# Optimizado manteniendo 100% compatibilidad
+VERSION="v202601180100"
+
+# === CONSTANTS ===
+readonly WORKDIR="/var/lib/lexmark"
+readonly LOGFILE="$WORKDIR/lexmark.log"
+readonly CONFIG="$WORKDIR/lexmark_filtro.config"
+readonly MAPFILE="$WORKDIR/win_hostname_user.txt"
+readonly PPD="/root/bin/Lexmark.Cups.ppd.gz"
+readonly DOMAIN="pe.igrupobbva"
+
+# === HELPER FUNCTIONS ===
+log() {
+  printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOGFILE"
+}
+
+trim() {
+  echo "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+}
+
+die() {
+  log "FATAL: $*"
+  exit 1
+}
+
+# === SPOOL INPUT HANDLING ===
+rm_tmp=0
+if [ -n "${6-}" ]; then
+  file="$6"
+else
+  file="$(mktemp)" || die "No se pudo crear archivo temporal"
+  rm_tmp=1
+  cat > "$file"
+fi
+
+cleanup() {
+  [ "$rm_tmp" -eq 1 ] && [ -f "$file" ] && rm -f "$file"
+}
+trap cleanup EXIT INT TERM
+
+# === INITIALIZE ENVIRONMENT ===
+mkdir -p "$WORKDIR" || die "No se pudo crear directorio $WORKDIR"
+[ -f "$LOGFILE" ] || : > "$LOGFILE"
+
+# === CONFIG MANAGEMENT ===
+if [ ! -f "$CONFIG" ]; then
+  cat > "$CONFIG" <<'EOF'
+PLANTILLA_GRANDE=OFF
+USUARIO_GENERICO=ON
+FILTER_DNS_IP=0.0.0.0
+EOF
+fi
+
+# Read config with defaults
+PLANTILLA_GRANDE="OFF"
+USUARIO_GENERICO="ON"
+FILTER_DNS_IP="0.0.0.0"
+found_pg=0 found_ug=0 found_dns=0
+
+while IFS='=' read -r k v; do
+  [ -z "$k" ] && continue
+  case "$k" in
+    PLANTILLA_GRANDE) PLANTILLA_GRANDE="$(trim "$v")"; found_pg=1 ;;
+    USUARIO_GENERICO) USUARIO_GENERICO="$(trim "$v")"; found_ug=1 ;;
+    FILTER_DNS_IP)    FILTER_DNS_IP="$(trim "$v")";    found_dns=1 ;;
+  esac
+done < "$CONFIG"
+
+# Append missing keys
+[ "$found_pg"  -eq 0 ] && echo "PLANTILLA_GRANDE=OFF" >> "$CONFIG"
+[ "$found_ug"  -eq 0 ] && echo "USUARIO_GENERICO=ON"  >> "$CONFIG"
+[ "$found_dns" -eq 0 ] && echo "FILTER_DNS_IP=0.0.0.0" >> "$CONFIG"
+
+# === LOGGING START ===
+log "==================================================$VERSION"
+log "Config: PLANTILLA_GRANDE=$PLANTILLA_GRANDE USUARIO_GENERICO=$USUARIO_GENERICO FILTER_DNS_IP=$FILTER_DNS_IP"
+log "Params: SPOOLID=$1 USER=$2 JOBNAME=$3 COPIES=$4 OPTIONS=$5 FILE=${6-stdin}"
+
+# === EXTRACT SPOOL DATA ===
+SPOOLID="${1:?Spool ID requerido}"
+SPOOLNAME="${3:-Unnamed}"
+HOSTID="$(hostname)"
+SPOOLTYPE="$(/usr/bin/file "$file" | awk -F: '{print $2}')"
+
+# CRITICAL: Keep original lpstat parsing for compatibility
+PUESTO=$(lpstat -W all -u 2>/dev/null | grep "\-$SPOOLID" | cut -d \- -f1)
+[ -z "$PUESTO" ] && die "No se pudo extraer PUESTO desde lpstat para job $SPOOLID"
+
+# Extract user from finger
+USUARIO=""
+if [ -n "$PUESTO" ]; then
+  USUARIO="$(finger 2>/dev/null | awk -v p="$PUESTO" '$0 ~ p { print $1; exit }' | awk -F. '{print $NF}')"
+fi
+[ -z "$USUARIO" ] && USUARIO="$2"
+
+KEY="${PUESTO:1:4}"
+
+log "Spool: ID=$SPOOLID Name=$SPOOLNAME Type=$SPOOLTYPE Puesto=$PUESTO Key=$KEY User=$USUARIO Host=$HOSTID"
+
+# === NOMENCLATURE EXTRACTION ===
+AGENCIA="${PUESTO:2:3}"
+SERVLIN="${PUESTO:6:1}"
+POSXX="${PUESTO:8:2}"
+XX=$((10#$POSXX))
+
+# Calculate YY based on template
+YY=$XX
+if [ "$PLANTILLA_GRANDE" = "ON" ]; then
+  if [ "$XX" -ge 11 ] && [ "$XX" -le 20 ]; then
+    die "Puesto $XX no permitido con PLANTILLA_GRANDE=ON (rango 11-20 reservado)"
+  elif [ "$XX" -ge 21 ]; then
+    YY=$((XX - 10))
+  fi
+fi
+YY2="$(printf "%02d" "$YY")"
+
+# === LOOKUP WINDOWS HOST ===
+SEARCH_REGEX="^w10${AGENCIA}0[0-9]p${YY2}[A-Za-z]?\|"
+log "Buscando regex: $SEARCH_REGEX en $MAPFILE"
+
+[ -f "$MAPFILE" ] || die "Archivo de mapeo no existe: $MAPFILE"
+LINEA="$(grep -E "$SEARCH_REGEX" "$MAPFILE" 2>/dev/null | head -n1)"
+log "Match: $LINEA"
+[ -z "$LINEA" ] && die "No se encontró hostname Windows para regex $SEARCH_REGEX"
+
+# === DETERMINE FINAL USER ===
+if [ "$USUARIO_GENERICO" = "OFF" ]; then
+  FINAL_USER="$USUARIO"
+  log "USUARIO_GENERICO=OFF -> user=$FINAL_USER (from finger)"
+else
+  FINAL_USER="$(echo "$LINEA" | awk -F'|' '{gsub(/^[ \t]+|[ \t]+$/,"",$2); print $2}')"
+  log "USUARIO_GENERICO=ON -> user=$FINAL_USER (from map)"
+fi
+[ -z "$FINAL_USER" ] && die "No se pudo determinar FINAL_USER"
+
+# === DETERMINE WINHOST / WINIP ===
+WINHOST="w10${AGENCIA}0${SERVLIN}p${YY2}"
+if [ "$FILTER_DNS_IP" = "0.0.0.0" ]; then
+  # Use map file
+  WINIP="$(echo "$LINEA"   | awk -F'|' '{gsub(/^[ \t]+|[ \t]+$/,"",$3); print $3}')"
+  log "Mode=MAP -> host=$WINHOST ip=$WINIP"
+else
+  # DNS resolution with w10->w11 fallback
+  resolve_ip() {
+    nslookup "$1" "$2" 2>/dev/null | awk '/^Address: / { ip=$2 } END { if (ip ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) print ip }'
+  }
+
+  WINHOST_FQDN="$WINHOST.$DOMAIN"
+  WINIP="$(resolve_ip "$WINHOST_FQDN" "$FILTER_DNS_IP")"
+
+  if [ -z "$WINIP" ]; then
+    log "DNS fail w10=$WINHOST_FQDN, trying w11..."
+    WINHOST="w11${AGENCIA}0${SERVLIN}p${YY2}"
+    WINHOST_FQDN="$WINHOST.$DOMAIN"
+    WINIP="$(resolve_ip "$WINHOST_FQDN" "$FILTER_DNS_IP")"
+    [ -z "$WINIP" ] && die "DNS failed for both w10 and w11: $WINHOST_FQDN"
+    log "DNS ok w11=$WINHOST_FQDN -> ip=$WINIP"
+  else
+    log "DNS ok w10=$WINHOST_FQDN -> ip=$WINIP"
+  fi
+fi
+
+# === PORT VALIDATION ===
+if ! bash -c "</dev/tcp/$WINIP/515" 2>/dev/null; then
+  die "Puerto 515 cerrado en $WINIP"
+fi
+log "Port 515 OK on $WINIP"
+
+# === CUPS QUEUE MANAGEMENT ===
+CUPS_QUEUE="$WINHOST"
+EXPECT_URI="lpd://$WINIP:515/LexmarkBBVA"
+log "Queue=$CUPS_QUEUE URI=$EXPECT_URI"
+
+if lpstat -v "$CUPS_QUEUE" >/dev/null 2>&1; then
+  # Queue exists, check URI
+  CURURI="$(lpstat -v "$CUPS_QUEUE" 2>/dev/null | awk -F' for .*: ' '{print $2}')"
+  if [ -n "$CURURI" ] && [ "$CURURI" != "$EXPECT_URI" ]; then
+    log "Updating URI: $CURURI -> $EXPECT_URI"
+    sudo lpadmin -p "$CUPS_QUEUE" -v "$EXPECT_URI" >>"$LOGFILE" 2>&1
+    cupsaccept "$CUPS_QUEUE" >/dev/null 2>&1
+    cupsenable "$CUPS_QUEUE" >/dev/null 2>&1
+  fi
+else
+  # Create queue
+  log "Creating queue $CUPS_QUEUE"
+  sudo lpadmin -p "$CUPS_QUEUE" -D 'Dynamic Lexmark CPM Queue' -L 'CPM' -E \
+    -v "$EXPECT_URI" -P "$PPD" >>"$LOGFILE" 2>&1 || die "Failed to create CUPS queue"
+  cupsenable "$CUPS_QUEUE" >/dev/null 2>&1
+  cupsaccept "$CUPS_QUEUE" >/dev/null 2>&1
+fi
+
+# === BUILD PJL HEADER ===
+read -r -d '' SUBHEADER <<EOF || true
+@PJL JOB
+@PJL SET STRINGCODESET=UTF8
+@PJL SET USERNAME="$FINAL_USER"
+@PJL SET LMULTIPAGEPRINT=OFF
+@PJL COMMENT Lexmark Universal v2
+@PJL LJOBINFO USERID="$FINAL_USER" HOSTID="$HOSTID"
+@PJL SET JOBNAME="$SPOOLNAME"
+@PJL SET HOLD=OFF
+@PJL SET HOLDKEY="$KEY"
+@PJL SET QTY=1
+@PJL SET LDUPLICATEHELDJOBS=SAVE
+@PJL SET LCOLORMODEL=BLACK
+@PJL SET RENDERMODE=GRAYSCALE
+@PJL SET LPARM:PCL LFONTPRIORITY=NORESOLUTION
+@PJL SET TIMEOUT=0
+@PJL SET LCOLLATION=ON
+@PJL SET PAGEPROTECT=OFF
+@PJL SET WIDEA4=NO
+@PJL SET RESOLUTION=600
+@PJL SET LIMAGEENHANCE=OFF
+@PJL SET BITSPERPIXEL=1
+EOF
+
+OUT="$WORKDIR/job_${SPOOLID}.prn"
+
+# === BUILD JOB FILE ===
+if echo "$SPOOLTYPE" | grep -Eq "HP Printer Job|PJL encapsulated PostScript document text"; then
+  FORM="$(head -1 "$file" | awk -F= '{print $2}' | tr -d "\"\r\n")"
+  
+  if [ "$FORM" = "UA011" ]; then
+    log "UA011 Carta Fianza: bandeja l2H + firma PCL5"
+    { head -1 "$file"; echo "$SUBHEADER"; tail -n +2 "$file"; } | \
+      sed 's/\&l1H/\&l2H/' | \
+      perl -0777 -pe 's/(@PJL ENTER LANGUAGE = PCL\r\n\x1b)/$1\x25\x30\x41\x1b/' > "$OUT"
+  else
+    log "PCL5 job: adding signature 1B253041"
+    { head -1 "$file"; echo "$SUBHEADER"; tail -n +2 "$file"; } | \
+      perl -0777 -pe 's/(@PJL ENTER LANGUAGE = PCL\r\n\x1b)/$1\x25\x30\x41\x1b/' > "$OUT"
+  fi
+else
+  {
+    printf "\033%%-12345X%s\n" "$SUBHEADER"
+    if echo "$SPOOLTYPE" | grep -q "PostScript"; then
+      printf "@PJL ENTER LANGUAGE = Postscript \012\001M"
+      log "PostScript: adding CPM mark <0A014D>"
+    else
+      printf "@PJL ENTER LANGUAGE = PCL\033%%-12345X\n"
+      log "Generic: adding PCL header"
+    fi
+    cat "$file"
+  } | perl -0777 -pe 's/(@PJL ENTER LANGUAGE = PCL\r\n\x1b)/$1\x25\x30\x41\x1b/' > "$OUT"
+fi
+
+# === SEND TO CUPS ===
+log "Sending to $CUPS_QUEUE user=$FINAL_USER job=$SPOOLNAME file=$OUT"
+lp -d "$CUPS_QUEUE" -U "$FINAL_USER" -t "$SPOOLNAME" "$OUT" >/dev/null 2>&1 || \
+  log "WARNING: lp command failed for $CUPS_QUEUE"
+rm -f "$OUT"
+
+# === TEA4CUPS FALLBACK ===
+TEA4CUPS_QUEUE="p${PUESTO:1}"
+if lpstat -v "$TEA4CUPS_QUEUE" >/dev/null 2>&1; then
+  log "Tea4Cups: sending to $TEA4CUPS_QUEUE user=$USUARIO"
+  lp -d "$TEA4CUPS_QUEUE" -U "$USUARIO" -t "$SPOOLNAME" "$file" >/dev/null 2>&1 || \
+    log "WARNING: Tea4Cups lp failed"
+else
+  log "Tea4Cups queue not found: $TEA4CUPS_QUEUE (skipped)"
+fi
+
+log "Job $SPOOLID completed successfully"
+exit 0

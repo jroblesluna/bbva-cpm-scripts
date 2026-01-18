@@ -1,0 +1,113 @@
+#!/bin/bash
+# Filtro de impresión para Lexmark Cloud Print Manager (MODO CONTINGENCIA)
+# Preparado para BBVA por Javier Robles (Lexmark International)
+# E-mail: antonio@robles.ai
+# AVISO: VERSION COMPATIBLE SOLO CON LINUX SUSE 12 Y LEXMARK CLOUD PRINT MANAGER
+# MODO CONTINGENCIA: Envío directo LPD sin procesamiento CPM
+VERSION="v202601180200"
+
+# === CONSTANTS ===
+readonly WORKDIR="/var/lib/lexmark"
+readonly LOGFILE="$WORKDIR/lexmark.log"
+readonly LPD_BACKEND="/usr/lib/cups/backend/lpd"
+
+# === HELPER FUNCTIONS ===
+log() {
+  printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOGFILE"
+}
+
+die() {
+  log "FATAL: $*"
+  exit 1
+}
+
+# === SPOOL INPUT HANDLING ===
+rm_tmp=0
+if [ -n "${6-}" ]; then
+  file="$6"
+else
+  file="$(mktemp)" || die "No se pudo crear archivo temporal"
+  rm_tmp=1
+  cat > "$file"
+fi
+
+cleanup() {
+  [ "$rm_tmp" -eq 1 ] && [ -f "$file" ] && rm -f "$file"
+}
+trap cleanup EXIT INT TERM
+
+# === INITIALIZE ENVIRONMENT ===
+mkdir -p "$WORKDIR" || die "No se pudo crear directorio $WORKDIR"
+[ -f "$LOGFILE" ] || : > "$LOGFILE"
+
+# === LOGGING START ===
+log "================================CONTINGENCIA======$VERSION"
+log "Params: SPOOLID=$1 USER=$2 JOBNAME=$3 COPIES=$4 OPTIONS=$5 FILE=${6-stdin}"
+
+# === EXTRACT SPOOL DATA ===
+SPOOLID="${1:?Spool ID requerido}"
+SPOOLPATH="${6-stdin}"
+SPOOLNAME="${3:-Unnamed}"
+HOSTID="$(hostname)"
+SPOOLTYPE="$(/usr/bin/file "$file" | cut -d':' -f2)"
+
+# Extract queue name from lpstat (first match by job-id)
+PUESTO="$(lpstat -W all -u 2>/dev/null | grep -m1 "\-$SPOOLID" | cut -d '-' -f1)"
+
+# Extract user from finger
+USUARIO="$(finger 2>/dev/null | grep -m1 "$PUESTO" | cut -d ' ' -f1 | rev | cut -d '.' -f1 | rev)"
+[ -z "$USUARIO" ] && USUARIO="$2"
+
+KEY="${PUESTO:1:4}"
+
+log "Spool: ID=$SPOOLID Path=$SPOOLPATH Name=$SPOOLNAME Type=$SPOOLTYPE"
+log "Queue: Puesto=$PUESTO Key=$KEY User=$USUARIO Host=$HOSTID"
+
+# === DETERMINE PRINTER URI ===
+# Try environment variable first (set by CUPS), then lpstat
+CURURI="${DEVICE_URI}"
+if [ -z "$CURURI" ]; then
+  CURURI="$(lpstat -v "$PUESTO" 2>/dev/null | awk -F': ' 'END{print $2}')"
+fi
+[ -z "$CURURI" ] && die "No se pudo determinar DEVICE_URI de la cola $PUESTO"
+
+log "CURURI (destino real): $CURURI"
+
+# === EXTRACT PRINTER IP ===
+# Extract IP from URI format: protocol://IP:port/path
+PRNIP="$(echo "$CURURI" | sed -E 's#^[a-zA-Z]+://([^/:]+).*#\1#')"
+[ -z "$PRNIP" ] && die "No se pudo extraer IP desde CURURI=$CURURI"
+
+log "IP impresora física: $PRNIP"
+
+# === SEND TO PRINTER VIA LPD ===
+# CONTINGENCY MODE: Direct LPD without CPM processing
+DEVICE_URI="lpd://$PRNIP:515/lp"
+log "Enviando por LPD directo a $DEVICE_URI (spool ORIGINAL, sin modificar)"
+
+"$LPD_BACKEND" "$SPOOLID" "$USUARIO" "$SPOOLNAME" "$4" "$5" "$file" >> "$LOGFILE" 2>&1
+RET_BACKEND=$?
+
+log "Resultado LPD backend: $RET_BACKEND"
+
+# === TEA4CUPS FALLBACK ===
+# Send original spool to Tea4Cups if queue exists
+TEA4CUPS_QUEUE="p${PUESTO:1}"
+
+if lpstat -v "$TEA4CUPS_QUEUE" >/dev/null 2>&1; then
+  log "Enviando ORIGINAL a Tea4Cups: $TEA4CUPS_QUEUE user=$USUARIO"
+  lp -d "$TEA4CUPS_QUEUE" -U "$USUARIO" -t "$SPOOLNAME" "$file" >/dev/null 2>&1
+  TEA_RESULT=$?
+  log "Resultado Tea4Cups: $TEA_RESULT"
+else
+  log "Cola Tea4Cups no existe: $TEA4CUPS_QUEUE (omitido)"
+fi
+
+# === EXIT WITH BACKEND RESULT ===
+if [ "$RET_BACKEND" -eq 0 ]; then
+  log "Job $SPOOLID completado exitosamente en modo contingencia"
+else
+  log "WARNING: LPD backend falló con código $RET_BACKEND"
+fi
+
+exit $RET_BACKEND
