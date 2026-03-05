@@ -6,12 +6,12 @@
 # MODO CONTINGENCIA: Envío directo LPD sin procesamiento CPM
 VERSION="v202601180200"
 
-# === CONSTANTS ===
+# === CONSTANTES ===
 readonly WORKDIR="/var/lib/lexmark"
 readonly LOGFILE="$WORKDIR/lexmark.log"
 readonly LPD_BACKEND="/usr/lib/cups/backend/lpd"
 
-# === HELPER FUNCTIONS ===
+# === FUNCIONES AUXILIARES ===
 log() {
   printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOGFILE"
 }
@@ -21,7 +21,7 @@ die() {
   exit 1
 }
 
-# === SPOOL INPUT HANDLING ===
+# === MANEJO DEL SPOOL DE ENTRADA ===
 rm_tmp=0
 if [ -n "${6-}" ]; then
   file="$6"
@@ -36,25 +36,25 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# === INITIALIZE ENVIRONMENT ===
+# === INICIALIZAR ENTORNO ===
 mkdir -p "$WORKDIR" || die "No se pudo crear directorio $WORKDIR"
 [ -f "$LOGFILE" ] || : > "$LOGFILE"
 
-# === LOGGING START ===
+# === INICIO DE REGISTRO ===
 log "================================CONTINGENCIA======$VERSION"
 log "Params: SPOOLID=$1 USER=$2 JOBNAME=$3 COPIES=$4 OPTIONS=$5 FILE=${6-stdin}"
 
-# === EXTRACT SPOOL DATA ===
+# === EXTRACCIÓN DE DATOS DEL SPOOL ===
 SPOOLID="${1:?Spool ID requerido}"
 SPOOLPATH="${6-stdin}"
 SPOOLNAME="${3:-Unnamed}"
 HOSTID="$(hostname)"
 SPOOLTYPE="$(/usr/bin/file "$file" | cut -d':' -f2)"
 
-# Extract queue name from lpstat (first match by job-id)
+# Extraer nombre de cola desde lpstat (primer match por job-id)
 PUESTO="$(lpstat -W all -u 2>/dev/null | grep -m1 "\-$SPOOLID" | cut -d '-' -f1)"
 
-# Extract user from finger
+# Extraer usuario desde finger
 USUARIO="$(finger 2>/dev/null | grep -m1 "$PUESTO" | cut -d ' ' -f1 | rev | cut -d '.' -f1 | rev)"
 [ -z "$USUARIO" ] && USUARIO="$2"
 
@@ -63,8 +63,8 @@ KEY="${PUESTO:1:4}"
 log "Spool: ID=$SPOOLID Path=$SPOOLPATH Name=$SPOOLNAME Type=$SPOOLTYPE"
 log "Queue: Puesto=$PUESTO Key=$KEY User=$USUARIO Host=$HOSTID"
 
-# === DETERMINE PRINTER URI ===
-# Try environment variable first (set by CUPS), then lpstat
+# === DETERMINAR URI DE LA IMPRESORA ===
+# Primero intentar con variable de entorno (seteada por CUPS), luego lpstat
 CURURI="${DEVICE_URI}"
 if [ -z "$CURURI" ]; then
   CURURI="$(lpstat -v "$PUESTO" 2>/dev/null | awk -F': ' 'END{print $2}')"
@@ -73,15 +73,15 @@ fi
 
 log "CURURI (destino real): $CURURI"
 
-# === EXTRACT PRINTER IP ===
-# Extract IP from URI format: protocol://IP:port/path
+# === EXTRAER IP DE LA IMPRESORA ===
+# Extraer IP desde formato URI: protocolo://IP:puerto/ruta
 PRNIP="$(echo "$CURURI" | sed -E 's#^[a-zA-Z]+://([^/:]+).*#\1#')"
 [ -z "$PRNIP" ] && die "No se pudo extraer IP desde CURURI=$CURURI"
 
 log "IP impresora física: $PRNIP"
 
-# === SEND TO PRINTER VIA LPD ===
-# CONTINGENCY MODE: Direct LPD without CPM processing
+# === ENVÍO A IMPRESORA VÍA LPD ===
+# MODO CONTINGENCIA: LPD directo sin procesamiento CPM
 DEVICE_URI="lpd://$PRNIP:515/lp"
 log "Enviando por LPD directo a $DEVICE_URI (spool ORIGINAL, sin modificar)"
 
@@ -90,8 +90,8 @@ RET_BACKEND=$?
 
 log "Resultado LPD backend: $RET_BACKEND"
 
-# === TEA4CUPS FALLBACK ===
-# Send original spool to Tea4Cups if queue exists
+# === FALLBACK A TEA4CUPS ===
+# Enviar spool original a Tea4Cups si existe la cola
 TEA4CUPS_QUEUE="p${PUESTO:1}"
 
 if lpstat -v "$TEA4CUPS_QUEUE" >/dev/null 2>&1; then
@@ -103,7 +103,7 @@ else
   log "Cola Tea4Cups no existe: $TEA4CUPS_QUEUE (omitido)"
 fi
 
-# === EXIT WITH BACKEND RESULT ===
+# === SALIR CON RESULTADO DEL BACKEND ===
 if [ "$RET_BACKEND" -eq 0 ]; then
   log "Job $SPOOLID completado exitosamente en modo contingencia"
 else

@@ -46,7 +46,7 @@ set MAC=%MAC:"=%
 echo MAC: %MAC%
 
 if not defined MAC (
-    echo [ERROR] Could not extract MAC address from VMX file.
+    echo [ERROR] No se pudo extraer la direccion MAC del archivo VMX.
     exit /b 1
 )
 
