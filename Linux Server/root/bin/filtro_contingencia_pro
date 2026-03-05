@@ -58,6 +58,22 @@ PUESTO="$(lpstat -W all -u 2>/dev/null | grep -m1 "\-$SPOOLID" | cut -d '-' -f1)
 USUARIO="$(finger 2>/dev/null | grep -m1 "$PUESTO" | cut -d ' ' -f1 | rev | cut -d '.' -f1 | rev)"
 [ -z "$USUARIO" ] && USUARIO="$2"
 
+# Si el usuario es root, el job proviene de Nacar Web (no de sesión LDAP local).
+# Enviar directamente a cola remota p1XXXXXX en sede central y salir sin procesar CPM.
+if [ "$USUARIO" = "root" ]; then
+    TEA4CUPS_QUEUE="p1${PUESTO:1}"
+    log "Nacar Web (root): enviando a cola remota sede central $TEA4CUPS_QUEUE"
+    if lpstat -v "$TEA4CUPS_QUEUE" >/dev/null 2>&1; then
+        lp -d "$TEA4CUPS_QUEUE" -U "$USUARIO" -t "$SPOOLNAME" "$file" >/dev/null 2>&1 || \
+            log "ADVERTENCIA: lp a Tea4Cups remota falló"
+        log "Job $SPOOLID enviado a Tea4Cups remota exitosamente"
+    else
+        log "Cola Tea4Cups remota no encontrada: $TEA4CUPS_QUEUE (omitido)"
+    fi
+    exit 0
+    # trap cleanup maneja la limpieza del archivo temporal
+fi
+
 KEY="${PUESTO:1:4}"
 
 log "Spool: ID=$SPOOLID Path=$SPOOLPATH Name=$SPOOLNAME Type=$SPOOLTYPE"
