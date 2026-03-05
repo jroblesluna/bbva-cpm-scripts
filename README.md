@@ -103,7 +103,7 @@ Ejecutar:
 ```bash
 /root/bin/create_CPMWinHostUser.sh
 # Internamente:
-# lpadmin -p CPMWinHostUser -D 'Impresora CPM Win Host User' -L 'CMPWinHostUser' -E -v file:/dev/null -i /root/bin/filtro_winhostuser
+# lpadmin -p CPMWinHostUser -D 'Impresora CPM Win Host User' -L 'CPMWinHostUser' -E -v file:/dev/null -i /root/bin/filtro_winhostuser
 ```
 Esta cola recibe archivos enviados por Windows con el formato: `hostname|usuario|ip` y actualiza `/var/lib/lexmark/win_hostname_user.txt`.
 

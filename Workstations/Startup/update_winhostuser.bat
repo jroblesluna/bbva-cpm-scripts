@@ -1,5 +1,13 @@
 @echo off
 setlocal EnableDelayedExpansion
+setlocal EnableExtensions
+
+REM Comprobar si el cliente LPR está instalado
+where lpr >nul 2>nul
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Comando LPR no encontrado. Por favor, habilite la característica "LPR Port Monitor".
+    exit /b 1
+)
 
 REM ───────── INTENTO 1: virtconf.txt (srvhost) ─────────
 set "VCONF=D:\VirtAplic\VirtRM\virtconf.txt"
@@ -37,10 +45,15 @@ set MAC=%MAC:"=%
 
 echo MAC: %MAC%
 
-set CHAR10=%MAC:~9,1%
-set CHAR11=%MAC:~10,1%
-set CHAR13=%MAC:~12,1%
-set CHAR14=%MAC:~13,1%
+if not defined MAC (
+    echo [ERROR] Could not extract MAC address from VMX file.
+    exit /b 1
+)
+
+set "CHAR10=%MAC:~9,1%"
+set "CHAR11=%MAC:~10,1%"
+set "CHAR13=%MAC:~12,1%"
+set "CHAR14=%MAC:~13,1%"
 
 set SERVER=s0%CHAR11%%CHAR13%%CHAR14%00%CHAR10%.nacarpe.igrupobbva
 
@@ -59,7 +72,7 @@ if not defined IP set "IP=unknown"
 echo IP: %IP%
 set "DATA=%COMPUTERNAME%^|%USERNAME%^|%IP%"
 echo DATA: "%DATA%"
-set TEMPFILE=%TEMP%\hostuser_%RANDOM%.txt
+set "TEMPFILE=%TEMP%\hostuser_%RANDOM%.txt"
 echo TEMPFILE: %TEMPFILE%
 echo %DATA% > "%TEMPFILE%"
 echo Temp File: %TEMPFILE%
