@@ -114,7 +114,7 @@ Actualizado por los clientes Windows: `update_winhostuser.bat` → cola `CPMWinH
 
 ### `filtro_winhostuser`
 1. Lee primera línea del spool: `hostname|usuario|ip`
-2. Valida: hostname 11-12 chars, usuario empieza con 'o'/'p', IP empieza con '118.'
+2. Valida: hostname 11-12 chars, usuario empieza con 'o'/'p'/'xp', IP empieza con '118.'
 3. Normaliza hostname a 11 chars
 4. Actualiza BD reemplazando entrada previa del mismo host
 

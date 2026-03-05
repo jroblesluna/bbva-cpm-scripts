@@ -54,9 +54,9 @@ if [ "$h_len" -ne 11 ] && [ "$h_len" -ne 12 ]; then
   exit 0
 fi
 
-# Username: must start with 'o' or 'p'
-if [[ ! "$usuario" =~ ^[op] ]]; then
-  echo "Username inválido (debe iniciar con 'o' o 'p'): '$usuario'" >> "$LOG"
+# Username: must start with 'o', 'p', or 'xp'
+if [[ ! "$usuario" =~ ^(xp|[op]) ]]; then
+  echo "Username inválido (debe iniciar con 'o', 'p' o 'xp'): '$usuario'" >> "$LOG"
   [ "$rmfile" = 1 ] && rm -f "$file"
   exit 0
 fi
