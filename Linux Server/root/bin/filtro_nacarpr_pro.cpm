@@ -133,13 +133,20 @@ fi
 YY2="$(printf "%02d" "$YY")"
 
 # === BÚSQUEDA DE HOST WINDOWS ===
+[ -f "$MAPFILE" ] || die "Archivo de mapeo no existe: $MAPFILE"
+
 SEARCH_REGEX="^w10${AGENCIA}0[0-9]p${YY2}[A-Za-z]?\|"
 log "Buscando regex: $SEARCH_REGEX en $MAPFILE"
-
-[ -f "$MAPFILE" ] || die "Archivo de mapeo no existe: $MAPFILE"
 LINEA="$(grep -E "$SEARCH_REGEX" "$MAPFILE" 2>/dev/null | head -n1)"
-log "Match: $LINEA"
-[ -z "$LINEA" ] && die "No se encontró hostname Windows para regex $SEARCH_REGEX"
+log "Match w10: $LINEA"
+
+if [ -z "$LINEA" ]; then
+  SEARCH_REGEX_W11="^w11${AGENCIA}0[0-9]p${YY2}[A-Za-z]?\|"
+  log "No existe w10 para agencia $AGENCIA puesto $YY2, intentando w11: $SEARCH_REGEX_W11"
+  LINEA="$(grep -E "$SEARCH_REGEX_W11" "$MAPFILE" 2>/dev/null | head -n1)"
+  log "Match w11: $LINEA"
+  [ -z "$LINEA" ] && die "No se encontró hostname Windows 10 ni Windows 11 para regex $SEARCH_REGEX ni $SEARCH_REGEX_W11"
+fi
 
 # === DETERMINAR USUARIO FINAL ===
 if [ "$USUARIO_GENERICO" = "OFF" ]; then
