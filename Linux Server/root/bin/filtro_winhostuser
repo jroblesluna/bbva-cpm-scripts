@@ -3,7 +3,7 @@
 LOG="/var/lib/lexmark/lexmark_winhostuser.log"
 DB="/var/lib/lexmark/win_hostname_user.txt"
 
-# --- get spool file path or read stdin to a temp file ---
+# --- obtener ruta del spool o leer stdin a archivo temporal ---
 rmfile=0
 if [ -n "$6" ]; then
   file="$6"
@@ -15,20 +15,20 @@ fi
 
 {
   echo "========== $(date) =========="
-  echo "Spool file: $file"
+  echo "Archivo spool: $file"
 } >> "$LOG"
 
-# --- basic checks ---
+# --- verificaciones básicas ---
 if [ ! -s "$file" ]; then
   echo "Archivo vacío o no encontrado" >> "$LOG"
   [ "$rmfile" = 1 ] && rm -f "$file"
   exit 0
 fi
 
-# Read only the FIRST line and strip CR/LF
+# Leer solo la PRIMERA línea y eliminar CR/LF
 line="$(head -n 1 "$file" | tr -d '\r\n')"
 
-# Must have exactly 2 pipes => 3 fields
+# Debe tener exactamente 2 pipes => 3 campos
 pipe_count="$(grep -o '|' <<< "$line" | wc -l)"
 if [ "$pipe_count" -ne 2 ]; then
   echo "Formato inválido (se esperan 3 campos con 2 pipes): $line" >> "$LOG"
@@ -36,17 +36,17 @@ if [ "$pipe_count" -ne 2 ]; then
   exit 0
 fi
 
-# --- parse safely ---
+# --- parseo de campos ---
 IFS='|' read -r raw_host raw_user raw_ip <<< "$line"
 
-# Trim spaces
+# Eliminar espacios al inicio y al final
 trim() { printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
 hostname="$(trim "$raw_host" | tr '[:upper:]' '[:lower:]')"
 usuario="$(trim "$raw_user" | tr '[:upper:]' '[:lower:]')"
 ipaddr="$(trim "$raw_ip")"
 
-# --- validations ---
-# Hostname: length 11 or 12 (any chars), will process only first 11
+# --- validaciones ---
+# Hostname: longitud 11 o 12 caracteres, se procesarán solo los primeros 11
 h_len="${#hostname}"
 if [ "$h_len" -ne 11 ] && [ "$h_len" -ne 12 ]; then
   echo "Hostname inválido (longitud $h_len, se requiere 11 o 12): '$hostname'" >> "$LOG"
@@ -54,31 +54,37 @@ if [ "$h_len" -ne 11 ] && [ "$h_len" -ne 12 ]; then
   exit 0
 fi
 
-# Username: must start with 'o', 'p', or 'xp'
+# Usuario: debe iniciar con 'o', 'p' o 'xp'
 if [[ ! "$usuario" =~ ^(xp|[op]) ]]; then
-  echo "Username inválido (debe iniciar con 'o', 'p' o 'xp'): '$usuario'" >> "$LOG"
+  echo "Usuario inválido (debe iniciar con 'o', 'p' o 'xp'): '$usuario'" >> "$LOG"
   [ "$rmfile" = 1 ] && rm -f "$file"
   exit 0
 fi
 
-# IP: must start with '118.'
+# IP: debe iniciar con '118.'
 if [[ "$ipaddr" != 118.* ]]; then
   echo "IP inválida (debe iniciar con '118.'): '$ipaddr'" >> "$LOG"
   [ "$rmfile" = 1 ] && rm -f "$file"
   exit 0
 fi
 
-# --- normalize hostname to first 11 chars for processing ---
+# --- normalizar hostname a los primeros 11 caracteres ---
 host11="${hostname:0:11}"
 
-# --- update DB: replace any existing line for host11, then add new mapping ---
+# --- actualizar BD: eliminar registros con mismo hostname o misma IP, luego insertar nuevo mapeado ---
 tmpdb="$(mktemp)"
-grep -v "^$host11|" "$DB" 2>/dev/null > "$tmpdb"
+deleted="$(grep -E "^$host11\||.*\|$ipaddr$" "$DB" 2>/dev/null)"
+if [ -n "$deleted" ]; then
+  while IFS= read -r dline; do
+    echo "Eliminado: $dline" >> "$LOG"
+  done <<< "$deleted"
+fi
+grep -v "^$host11|" "$DB" 2>/dev/null | grep -v "|$ipaddr$" > "$tmpdb"
 echo "$host11|$usuario|$ipaddr" >> "$tmpdb"
 mv "$tmpdb" "$DB"
 
 {
-  echo "OK: Actualizado/Agregado -> $host11 | $usuario | $ipaddr (original hostname: $hostname)"
+  echo "OK: Actualizado/Agregado -> $host11 | $usuario | $ipaddr (hostname original: $hostname)"
 } >> "$LOG"
 
 [ "$rmfile" = 1 ] && rm -f "$file"
