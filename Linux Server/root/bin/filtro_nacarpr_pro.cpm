@@ -1,7 +1,7 @@
 #!/bin/bash
 # Filtro de impresión para Lexmark Cloud Print Manager
 # Compatible con SUSE 12 - Optimizado manteniendo 100% de compatibilidad
-VERSION="v202601180100"
+VERSION="v202603070100"
 
 # === CONSTANTES ===
 readonly WORKDIR="/var/lib/lexmark"

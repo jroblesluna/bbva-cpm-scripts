@@ -13,7 +13,7 @@ Sistema híbrido Linux-Windows de gestión de impresión que integra **Lexmark C
 
 ```
 Linux Server/root/bin/
-  filtro_nacarpr_pro.cpm      # Filtro producción CPM (versión actual v202601180100)
+  filtro_nacarpr_pro.cpm      # Filtro producción CPM (versión actual v202603070100)
   filtro_nacarpr.cpm          # Filtro producción CPM (versión legacy v202510231800)
   filtro_contingencia_pro     # Filtro contingencia LPD directo (versión actual v202601180200)
   filtro_contingencia         # Filtro contingencia LPD directo (versión legacy v202509150000)
@@ -212,7 +212,7 @@ El `.exe` y `configuration.json` deben estar en la misma carpeta al instalar.
 ## Convención de Versiones
 
 El formato es `vYYYYMMDDhhmm`:
-- v202601180100: `filtro_nacarpr_pro.cpm` — versión actual con soporte DNS, USUARIO_GENERICO
+- v202603070100: `filtro_nacarpr_pro.cpm` — versión actual con soporte DNS, USUARIO_GENERICO, fallback w10→w11 en modo MAPA
 - v202601180200: `filtro_contingencia_pro` — versión actual
 - v202510231800: `filtro_nacarpr.cpm` — versión legacy
 - v202509150000: `filtro_contingencia` — versión legacy
