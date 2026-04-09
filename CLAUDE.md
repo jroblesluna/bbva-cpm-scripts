@@ -158,6 +158,30 @@ iptables -L -n | grep 515     # reglas de firewall
 bash -c "</dev/tcp/IP/515"    # test conectividad TCP/515
 ```
 
+### Verificar Filtro Aplicado en Colas CUPS
+
+Los filtros se copian a `/etc/cups/interfaces/<nombre-cola>` al ejecutar `lpadmin -i`.
+El archivo fuente de producción es `/root/bin/filtro_nacarpr` (que debe ser `filtro_nacarpr_pro.cpm` renombrado).
+
+```bash
+# Listar interfaces instaladas
+ls -la /etc/cups/interfaces/
+
+# Comparar el filtro aplicado en una cola con el fuente de producción
+diff /etc/cups/interfaces/w034101p12 /root/bin/filtro_nacarpr
+
+# Sin diferencias = filtro correcto aplicado.
+# Con diferencias = la cola tiene una versión desactualizada; reinstalar:
+lpadmin -p w034101p12 -i /root/bin/filtro_nacarpr
+
+# Verificar todas las colas de producción de una vez
+for q in $(ls /etc/cups/interfaces/); do
+  if ! diff -q "/etc/cups/interfaces/$q" /root/bin/filtro_nacarpr > /dev/null 2>&1; then
+    echo "DESACTUALIZADA: $q"
+  fi
+done
+```
+
 ### Habilitar Debug en Filtros
 Descomentar `set -x` en la primera sección del filtro correspondiente.
 
