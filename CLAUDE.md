@@ -29,7 +29,7 @@ Workstations/
   SetupLPD/LpdServiceMonitor.msi        # Monitor de servicio LPD
 ```
 
-Los archivos `_pro` son las versiones de producción actuales. Los archivos sin sufijo son versiones legacy mantenidas como referencia.
+Los archivos `_pro` son las versiones de producción actuales. Los archivos sin sufijo son versiones legacy mantenidas como referencia. Los `.cpm` son solo referencia — **no se despliegan directamente**; se copian y renombran (ver "Despliegue").
 
 ## Conceptos Clave de Arquitectura
 
@@ -55,6 +55,8 @@ w1038401p12|ope01|118.45.23.12
 ```
 Actualizado por los clientes Windows: `update_winhostuser.bat` → cola `CPMWinHostUser` → filtro `filtro_winhostuser`.
 
+`filtro_winhostuser` elimina antes de insertar **todas** las entradas con el mismo hostname **y** todas las entradas con la misma IP, evitando duplicados por cambio de IP o reuso de equipo.
+
 ### Archivo de Configuración del Filtro
 
 `/var/lib/lexmark/lexmark_filtro.config` controla el comportamiento del filtro `_pro`:
@@ -70,6 +72,8 @@ Actualizado por los clientes Windows: `update_winhostuser.bat` → cola `CPMWinH
 `update_winhostuser.bat` determina la IP del servidor Linux con dos métodos:
 1. **virtconf.txt**: Lee `srvhost` de `D:\VirtAplic\VirtRM\virtconf.txt` y sustituye el último octeto por `.210`
 2. **VMX MAC**: Extrae la MAC del archivo VMX de la VM (`C:\imagenes_12\Nacar_Suse12.vmx` o `C:\VMware\...`) y construye el hostname: `s0{char11}{char13}{char14}00{char10}.nacarpe.igrupobbva`
+
+> **Dominios distintos**: el BAT usa `.nacarpe.igrupobbva` para resolver el servidor Linux; el filtro `_pro` usa `readonly DOMAIN="pe.igrupobbva"` para resolver los hosts Windows en modo DNS. Son dominios diferentes y no deben confundirse.
 
 ### Configuración Cliente CPM (Windows)
 
@@ -96,7 +100,7 @@ Actualizado por los clientes Windows: `update_winhostuser.bat` → cola `CPMWinH
 
 ### `filtro_nacarpr_pro.cpm`
 1. Lee configuración de `lexmark_filtro.config`
-2. Extrae `PUESTO` desde nombre de cola CUPS via `lpstat`
+2. Extrae `PUESTO` desde nombre de cola CUPS via `lpstat` y `USUARIO` via `finger`; si `USUARIO=root`, el job proviene de **Nacar Web** (no sesión LDAP): lo reenvía a la cola Tea4Cups remota `p1${PUESTO:1}` y termina sin procesar CPM
 3. Descompone nomenclatura: agencia, servidor Linux, número de puesto, calcula YY
 4. Busca host Windows por regex `^w10${AGENCIA}0[0-9]p${YY2}[A-Za-z]?\|` en mapfile (modo MAP) o resuelve por DNS con fallback w10→w11 (modo DNS)
 5. Determina usuario final (mapfile o finger según `USUARIO_GENERICO`)
@@ -104,19 +108,46 @@ Actualizado por los clientes Windows: `update_winhostuser.bat` → cola `CPMWinH
 7. Crea o actualiza cola CUPS dinámica con URI `lpd://$WINIP:515/LexmarkBBVA`
 8. Inyecta cabeceras PJL (USERNAME, JOBNAME, HOLDKEY, etc.)
 9. Maneja PCL5 (con caso especial UA011 Carta Fianza), PostScript y genérico
-10. Envía a Tea4Cups `p<puesto>` si la cola existe
+10. Envía a Tea4Cups local `p${PUESTO:1}` si la cola existe
 
 ### `filtro_contingencia_pro`
-1. Extrae IP de impresora física desde `$DEVICE_URI` o `lpstat`
-2. Envía spool original sin modificar via `/usr/lib/cups/backend/lpd`
-3. Sin inyección PJL ni modificación del job
-4. Envía a Tea4Cups si la cola existe
+1. Extrae `USUARIO` via `finger`; si es `root` (Nacar Web), reenvía a `p1${PUESTO:1}` y termina
+2. Extrae IP de impresora física desde `$DEVICE_URI` o `lpstat`
+3. Envía spool original sin modificar via `/usr/lib/cups/backend/lpd`
+4. Sin inyección PJL ni modificación del job
+5. Envía a Tea4Cups local `p${PUESTO:1}` si la cola existe; propaga el código de retorno del backend LPD
 
 ### `filtro_winhostuser`
 1. Lee primera línea del spool: `hostname|usuario|ip`
 2. Valida: hostname 11-12 chars, usuario empieza con 'o'/'p'/'xp', IP empieza con '118.'
 3. Normaliza hostname a 11 chars
 4. Actualiza BD reemplazando entrada previa del mismo host
+
+### Nomenclatura de Colas Tea4Cups
+
+| Patrón | Construcción | Uso |
+|---|---|---|
+| `p${PUESTO:1}` | Elimina el primer char ('w') de PUESTO | Cola Tea4Cups local (captura PDF en agencia) |
+| `p1${PUESTO:1}` | Prefixa con 'p1' | Cola remota sede central, para jobs de Nacar Web (usuario=root) |
+
+## Despliegue
+
+### Actualizar filtro de producción en servidor Linux
+```bash
+# Copiar versión _pro al nombre de despliegue
+cp /root/bin/filtro_nacarpr_pro.cpm /root/bin/filtro_nacarpr
+cp /root/bin/filtro_contingencia_pro /root/bin/filtro_contingencia
+
+# Reinstalar filtro en todas las colas desactualizadas
+for q in $(ls /etc/cups/interfaces/); do
+  if ! diff -q "/etc/cups/interfaces/$q" /root/bin/filtro_nacarpr > /dev/null 2>&1; then
+    lpadmin -p "$q" -i /root/bin/filtro_nacarpr
+    echo "Actualizada: $q"
+  fi
+done
+```
+
+> **Importante**: `lpadmin -i` copia el filtro a `/etc/cups/interfaces/<cola>`. Los cambios al archivo fuente en `/root/bin/` **no afectan** las colas existentes hasta reinstalar.
 
 ## Creación de Colas
 
