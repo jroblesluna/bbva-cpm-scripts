@@ -29,9 +29,9 @@ namespace AlwaysPrintService
                 _current = next;
             }
 
-            EventLogWriter.WriteInfo(
+            AlwaysPrintLogger.WriteInfo(
                 $"ServiceState: {prev} → {next}",
-                EventLogWriter.EvtServiceStarted);
+                AlwaysPrintLogger.EvtServiceStarted);
 
             StateChanged?.Invoke(prev, next);
         }

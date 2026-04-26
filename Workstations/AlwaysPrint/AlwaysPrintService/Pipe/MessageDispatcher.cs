@@ -54,7 +54,7 @@ namespace AlwaysPrintService.Pipe
             }
             catch (Exception ex)
             {
-                EventLogWriter.WriteError($"MessageDispatcher unhandled error for type {request.Type}.", ex);
+                AlwaysPrintLogger.WriteError($"MessageDispatcher unhandled error for type {request.Type}.", ex);
                 return PipeMessage.Reply(request, MessageType.Error,
                     new ErrorPayload { Code = "INTERNAL_ERROR", Message = ex.Message });
             }
@@ -67,9 +67,9 @@ namespace AlwaysPrintService.Pipe
         {
             var payload = req.GetPayload<TrayInitializedPayload>();
             TrayInitializedReceived?.Invoke(payload?.Success ?? false, payload?.Details);
-            EventLogWriter.WriteInfo(
+            AlwaysPrintLogger.WriteInfo(
                 $"TrayInitialized received. Success={payload?.Success} Details={payload?.Details}",
-                EventLogWriter.EvtTrayStarted);
+                AlwaysPrintLogger.EvtTrayStarted);
             return PipeMessage.Reply(req, MessageType.Ack, new AckPayload { Success = true, Message = "Acknowledged." });
         }
 

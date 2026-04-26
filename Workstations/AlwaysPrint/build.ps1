@@ -46,17 +46,20 @@ if ($LASTEXITCODE -ne 0) {
 # Registrar extensión (idempotente — no falla si ya está registrada)
 wix extension add WixToolset.Util.wixext --global 2>&1 | Out-Host
 
-# ── 3. Leer versión del assembly del servicio ─────────────────────────────────
-# Extrae la versión de AssemblyInfo o del .csproj para inyectarla en el MSI.
-# Si no se encuentra, usa 1.0.0 como fallback.
+# ── 3. Generar versión basada en fecha (Major.Minor.Patch = año.mes.día+hora) ─
+# Formato: 1.YYYYMMDD.HHmm → ej. 1.20260426.1045
+# WiX requiere que cada componente sea <= 65535, así que usamos:
+#   Major = 1
+#   Minor = año (ej. 2026)
+#   Build = mes*100 + día (ej. 0426)
+#   Revision = hora*100 + minuto (ej. 1045)
 
-$version = "1.0.0"
-$csprojPath = "AlwaysPrintService\AlwaysPrintService.csproj"
-if (Test-Path $csprojPath) {
-    $xml = [xml](Get-Content $csprojPath -Raw)
-    $ver = $xml.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
-    if ($ver) { $version = $ver.Trim() }
-}
+$now     = Get-Date
+$major   = 1
+$minor   = $now.Year
+$build   = [int]("{0:MM}{1:dd}" -f $now, $now)   # ej. 0426
+$rev     = [int]("{0:HH}{1:mm}" -f $now, $now)   # ej. 1045
+$version = "$major.$minor.$build.$rev"
 Write-Host "Versión del paquete: $version"
 
 # ── 4. Publicar AlwaysPrintService ────────────────────────────────────────────

@@ -35,7 +35,7 @@ namespace AlwaysPrintService.Queue
                 Name = "AlwaysPrint-TaskWorker"
             };
             _workerThread.Start();
-            EventLogWriter.WriteInfo("TaskQueueManager started.", EventLogWriter.EvtServiceStarted);
+            AlwaysPrintLogger.WriteInfo("TaskQueueManager started.", AlwaysPrintLogger.EvtServiceStarted);
         }
 
         /// <summary>
@@ -48,13 +48,13 @@ namespace AlwaysPrintService.Queue
 
             bool accepted = _queue.TryAdd(task, millisecondsTimeout: 0);
             if (!accepted)
-                EventLogWriter.WriteWarning(
+                AlwaysPrintLogger.WriteWarning(
                     $"TaskQueueManager: queue full ({MaxQueueCapacity}), task '{task.GetType().Name}' dropped.",
-                    EventLogWriter.EvtGenericWarning);
+                    AlwaysPrintLogger.EvtGenericWarning);
             else
-                EventLogWriter.WriteInfo(
+                AlwaysPrintLogger.WriteInfo(
                     $"TaskQueueManager: enqueued '{task.GetType().Name}'. Pending={_queue.Count}",
-                    EventLogWriter.EvtTaskDispatched);
+                    AlwaysPrintLogger.EvtTaskDispatched);
 
             return accepted;
         }
@@ -69,33 +69,33 @@ namespace AlwaysPrintService.Queue
 
         private void WorkerLoop()
         {
-            EventLogWriter.WriteInfo("TaskQueueManager worker loop started.");
+            AlwaysPrintLogger.WriteInfo("TaskQueueManager worker loop started.");
             try
             {
                 foreach (var task in _queue.GetConsumingEnumerable(_cts.Token))
                 {
                     try
                     {
-                        EventLogWriter.WriteInfo(
+                        AlwaysPrintLogger.WriteInfo(
                             $"TaskQueueManager: executing '{task.GetType().Name}'.",
-                            EventLogWriter.EvtTaskDispatched);
+                            AlwaysPrintLogger.EvtTaskDispatched);
 
                         var result = task.Execute();
 
                         if (result.Success)
-                            EventLogWriter.WriteInfo(
+                            AlwaysPrintLogger.WriteInfo(
                                 $"TaskQueueManager: '{task.GetType().Name}' completed. {result.Message}",
-                                EventLogWriter.EvtTaskCompleted);
+                                AlwaysPrintLogger.EvtTaskCompleted);
                         else
-                            EventLogWriter.WriteWarning(
+                            AlwaysPrintLogger.WriteWarning(
                                 $"TaskQueueManager: '{task.GetType().Name}' failed. {result.Message}",
-                                EventLogWriter.EvtTaskFailed);
+                                AlwaysPrintLogger.EvtTaskFailed);
                     }
                     catch (Exception ex)
                     {
-                        EventLogWriter.WriteError(
+                        AlwaysPrintLogger.WriteError(
                             $"TaskQueueManager: unhandled exception in '{task.GetType().Name}'.", ex,
-                            EventLogWriter.EvtTaskFailed);
+                            AlwaysPrintLogger.EvtTaskFailed);
                     }
                 }
             }
@@ -103,7 +103,7 @@ namespace AlwaysPrintService.Queue
             {
                 // Normal shutdown.
             }
-            EventLogWriter.WriteInfo("TaskQueueManager worker loop ended.");
+            AlwaysPrintLogger.WriteInfo("TaskQueueManager worker loop ended.");
         }
 
         public void Stop()

@@ -39,9 +39,9 @@ namespace AlwaysPrint.Shared.Configuration
             catch (Exception ex)
             {
                 // Loggear el error y devolver defaults para que el servicio pueda arrancar.
-                EventLogWriter.WriteWarning(
+                AlwaysPrintLogger.WriteWarning(
                     $"RegistryConfigManager.Load: error leyendo configuración, usando valores por defecto. {ex.Message}",
-                    EventLogWriter.EvtGenericWarning);
+                    AlwaysPrintLogger.EvtGenericWarning);
             }
             return cfg;
         }

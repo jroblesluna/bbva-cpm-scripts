@@ -14,15 +14,15 @@ namespace AlwaysPrintTray
         [STAThread]
         private static void Main()
         {
-            EventLogWriter.EnsureSourceExists();
+            AlwaysPrintLogger.EnsureSourceExists();
 
             // Single-instance guard using a named mutex.
             using var mutex = new Mutex(initiallyOwned: true, MutexName, out bool isNew);
 
             if (!isNew)
             {
-                EventLogWriter.WriteTrayWarning("AlwaysPrintTray: another instance is already running. Exiting.",
-                    EventLogWriter.EvtDuplicateInstance);
+                AlwaysPrintLogger.WriteTrayWarning("AlwaysPrintTray: another instance is already running. Exiting.",
+                    AlwaysPrintLogger.EvtDuplicateInstance);
                 return;
             }
 
@@ -31,16 +31,16 @@ namespace AlwaysPrintTray
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
 
-                EventLogWriter.WriteTrayInfo("AlwaysPrintTray started.", EventLogWriter.EvtServiceStarted);
+                AlwaysPrintLogger.WriteTrayInfo("AlwaysPrintTray started.", AlwaysPrintLogger.EvtServiceStarted);
                 Application.Run(new TrayApplicationContext());
             }
             catch (Exception ex)
             {
-                EventLogWriter.WriteTrayError("AlwaysPrintTray unhandled exception.", ex, EventLogWriter.EvtGenericError);
+                AlwaysPrintLogger.WriteTrayError("AlwaysPrintTray unhandled exception.", ex, AlwaysPrintLogger.EvtGenericError);
             }
             finally
             {
-                EventLogWriter.WriteTrayInfo("AlwaysPrintTray exiting.", EventLogWriter.EvtServiceStopped);
+                AlwaysPrintLogger.WriteTrayInfo("AlwaysPrintTray exiting.", AlwaysPrintLogger.EvtServiceStopped);
                 mutex.ReleaseMutex();
             }
         }

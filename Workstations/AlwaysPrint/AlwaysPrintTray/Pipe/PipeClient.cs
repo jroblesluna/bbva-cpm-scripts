@@ -9,18 +9,13 @@ using AlwaysPrint.Shared.Messages;
 namespace AlwaysPrintTray.Pipe
 {
     /// <summary>
-    /// Named pipe client for the Tray application.
-    /// Maintains a single persistent connection to the service pipe.
-    /// All sends are serialized with a lock so multiple UI threads can call safely.
-    /// Reconnects automatically on disconnect (for session edge cases).
+    /// Named pipe client para el Tray.
+    /// Mantiene una conexión persistente al pipe del servicio.
+    /// Todos los envíos están serializados con un lock para que múltiples hilos UI puedan llamar de forma segura.
     /// </summary>
     public sealed class PipeClient : IDisposable
     {
-        private const int ConnectTimeoutMs   = 60_000;
-        // Timeout de lectura: evita que ReadLine bloquee indefinidamente si el servicio
-        // no responde (p.ej. tarea WMI colgada). El servidor siempre responde; 30 s es
-        // suficiente margen incluso para consultas WMI lentas.
-        private const int ReadTimeoutMs      = 30_000;
+        private const int ConnectTimeoutMs = 60_000;
 
         private readonly object _lock = new object();
         private NamedPipeClientStream? _pipe;
@@ -30,62 +25,40 @@ namespace AlwaysPrintTray.Pipe
 
         public bool IsConnected => _pipe?.IsConnected == true;
 
-        /// <summary>Attempts to connect to the service pipe. Returns false on timeout.</summary>
+        /// <summary>Intenta conectar al pipe del servicio. Retorna false si hay timeout.</summary>
         public bool Connect()
         {
             lock (_lock)
             {
-                string logFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AlwaysPrintTray.log");
-                AppendLog(logFile, "PipeClient.Connect: intentando conectar");
-                
                 DisposeTransport();
-                _pipe = new NamedPipeClientStream(".", AlwaysPrint.Shared.Messages.PipeConstants.PipeName,
-                    PipeDirection.InOut, PipeOptions.None);
+                _pipe = new NamedPipeClientStream(".", PipeConstants.PipeName, PipeDirection.InOut, PipeOptions.None);
 
                 try
                 {
-                    AppendLog(logFile, $"PipeClient.Connect: llamando _pipe.Connect({ConnectTimeoutMs}ms)");
                     _pipe.Connect(ConnectTimeoutMs);
-                    AppendLog(logFile, "PipeClient.Connect: conectado exitosamente");
-                    
                     _pipe.ReadMode = PipeTransmissionMode.Byte;
-                    // NOTA: Los Named Pipes no soportan ReadTimeout/WriteTimeout en .NET Framework.
-                    // No establecemos timeouts aquí; usamos CancellationToken en su lugar si es necesario.
+                    // NOTA: Named Pipes no soportan ReadTimeout en .NET Framework.
                     _reader = new StreamReader(_pipe, Encoding.UTF8, false, 65536, leaveOpen: true);
                     _writer = new StreamWriter(_pipe, Encoding.UTF8, 65536, leaveOpen: true) { AutoFlush = true };
-                    AppendLog(logFile, "PipeClient.Connect: streams configurados");
+                    AlwaysPrintLogger.WriteTrayInfo("PipeClient: conectado al servicio.");
                     return true;
                 }
                 catch (TimeoutException ex)
                 {
-                    AppendLog(logFile, $"PipeClient.Connect: timeout - {ex.Message}");
-                    EventLogWriter.WriteTrayError("PipeClient: connection timed out.", EventLogWriter.EvtGenericError);
+                    AlwaysPrintLogger.WriteTrayError($"PipeClient: timeout al conectar. {ex.Message}", AlwaysPrintLogger.EvtGenericError);
                     DisposeTransport();
                     return false;
                 }
                 catch (Exception ex)
                 {
-                    AppendLog(logFile, $"PipeClient.Connect: error - {ex.GetType().Name}: {ex.Message}");
-                    EventLogWriter.WriteTrayError("PipeClient: connection failed.", ex, EventLogWriter.EvtGenericError);
+                    AlwaysPrintLogger.WriteTrayError($"PipeClient: error al conectar. {ex.GetType().Name}: {ex.Message}", AlwaysPrintLogger.EvtGenericError);
                     DisposeTransport();
                     return false;
                 }
             }
         }
 
-        private static void AppendLog(string logFile, string message)
-        {
-            try
-            {
-                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
-            }
-            catch
-            {
-                // Ignorar errores de escritura de log
-            }
-        }
-
-        /// <summary>Sends a request and returns the response, or null on failure.</summary>
+        /// <summary>Envía un request y retorna la respuesta, o null si falla.</summary>
         public PipeMessage? Send(PipeMessage request)
         {
             lock (_lock)
@@ -96,11 +69,9 @@ namespace AlwaysPrintTray.Pipe
                 {
                     _writer!.WriteLine(request.Serialize());
 
-                    // The server always responds; read the next line as the reply.
                     string? line = _reader!.ReadLine();
                     if (line == null)
                     {
-                        // Server disconnected.
                         DisposeTransport();
                         return null;
                     }
@@ -108,14 +79,14 @@ namespace AlwaysPrintTray.Pipe
                 }
                 catch (Exception ex)
                 {
-                    EventLogWriter.WriteTrayError("PipeClient: send/receive failed.", ex, EventLogWriter.EvtGenericError);
+                    AlwaysPrintLogger.WriteTrayError("PipeClient: send/receive falló.", ex, AlwaysPrintLogger.EvtGenericError);
                     DisposeTransport();
                     return null;
                 }
             }
         }
 
-        /// <summary>Sends a Ping; returns true if the service is alive.</summary>
+        /// <summary>Envía un Ping; retorna true si el servicio está activo.</summary>
         public bool Ping()
         {
             var response = Send(PipeMessage.Create(MessageType.Ping));

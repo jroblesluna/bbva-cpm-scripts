@@ -58,7 +58,7 @@ namespace AlwaysPrintTray.Bootstrap
 
                     if (response.StatusCode != HttpStatusCode.OK)
                     {
-                        EventLogWriter.WriteTrayInfo($"Bootstrap: {url} devolvió {(int)response.StatusCode}.");
+                        AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {url} devolvió {(int)response.StatusCode}.");
                         continue;
                     }
 
@@ -67,12 +67,12 @@ namespace AlwaysPrintTray.Bootstrap
                         string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                         if (body.IndexOf(ExpectedBodyFragment, StringComparison.Ordinal) < 0)
                         {
-                            EventLogWriter.WriteTrayInfo($"Bootstrap: {url} no contiene el fragmento esperado.");
+                            AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {url} no contiene el fragmento esperado.");
                             continue;
                         }
                     }
 
-                    EventLogWriter.WriteTrayInfo($"Bootstrap: {url} respondió OK.", EventLogWriter.EvtServiceStarted);
+                    AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {url} respondió OK.", AlwaysPrintLogger.EvtServiceStarted);
                     return (true, domain, url);
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -83,11 +83,11 @@ namespace AlwaysPrintTray.Bootstrap
                 catch (OperationCanceledException)
                 {
                     // Timeout del dominio individual — continuar con el siguiente.
-                    EventLogWriter.WriteTrayInfo($"Bootstrap: {url} timeout ({TimeoutSecs} s).");
+                    AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {url} timeout ({TimeoutSecs} s).");
                 }
                 catch (Exception ex)
                 {
-                    EventLogWriter.WriteTrayInfo($"Bootstrap: {url} error – {ex.Message}");
+                    AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {url} error – {ex.Message}");
                 }
             }
 

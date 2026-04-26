@@ -26,7 +26,10 @@
     <Property Id="ARPNOREPAIR"     Value="1" />
     <Property Id="ARPHELPLINK"     Value="antonio@robles.ai" />
 
-    <MajorUpgrade DowngradeErrorMessage="Ya está instalada una versión más reciente de AlwaysPrint." />
+    <MajorUpgrade
+        Schedule="afterInstallInitialize"
+        AllowSameVersionUpgrades="yes"
+        DowngradeErrorMessage="Ya está instalada una versión más reciente de AlwaysPrint." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <!-- Carpeta destino: C:\Program Files\Robles.AI\AlwaysPrint\ -->

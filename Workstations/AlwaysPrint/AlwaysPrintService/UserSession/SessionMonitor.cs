@@ -16,9 +16,7 @@ namespace AlwaysPrintService.UserSession
         public static bool IsUserLoggedIn()
         {
             uint sessionId = WTSGetActiveConsoleSessionId();
-            string logFile = @"C:\ProgramData\AlwaysPrint\service.log";
-            System.IO.Directory.CreateDirectory(@"C:\ProgramData\AlwaysPrint");
-            System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] IsUserLoggedIn: sessionId={sessionId}, NO_ACTIVE_SESSION={NO_ACTIVE_SESSION}\n");
+            AlwaysPrintLogger.WriteInfo($"IsUserLoggedIn: sessionId={sessionId}, NO_ACTIVE_SESSION={NO_ACTIVE_SESSION}");
             
             if (sessionId == NO_ACTIVE_SESSION) return false;
 
@@ -26,11 +24,11 @@ namespace AlwaysPrintService.UserSession
             // We open and immediately close the token – we just need the boolean.
             if (!WTSQueryUserToken(sessionId, out var token))
             {
-                System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] WTSQueryUserToken falló para sessionId={sessionId}\n");
+                AlwaysPrintLogger.WriteError($"WTSQueryUserToken falló para sessionId={sessionId}");
                 return false;
             }
             CloseHandle(token);
-            System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] Usuario detectado en sessionId={sessionId}\n");
+            AlwaysPrintLogger.WriteInfo($"Usuario detectado en sessionId={sessionId}");
             return true;
         }
 

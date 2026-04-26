@@ -9,7 +9,7 @@ namespace AlwaysPrintService
         [STAThread]
         private static void Main(string[] args)
         {
-            EventLogWriter.EnsureSourceExists();
+            AlwaysPrintLogger.EnsureSourceExists();
 
             // /console flag allows running outside the SCM for debugging.
             if (args.Length > 0 && args[0].Equals("/console", StringComparison.OrdinalIgnoreCase))

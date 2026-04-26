@@ -5,11 +5,11 @@ using System.IO;
 namespace AlwaysPrint.Shared.Logging
 {
     /// <summary>
-    /// Thin wrapper around file-based logging.
-    /// Logs are written to C:\ProgramData\AlwaysPrint\logs\ with date-based rotation.
-    /// Format: [timestamp] [Origen] Logging message
+    /// Logger de archivo con rotación diaria.
+    /// Escribe en C:\ProgramData\AlwaysPrint\logs\AlwaysPrint_yyyyMMdd.log
+    /// Formato: [timestamp] [SVC|APP] mensaje
     /// </summary>
-    public static class EventLogWriter
+    public static class AlwaysPrintLogger
     {
         public const string SourceService = "SVC";
         public const string SourceTray = "APP";

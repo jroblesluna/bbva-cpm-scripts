@@ -18,7 +18,6 @@ namespace AlwaysPrintService.Pipe
     /// </summary>
     public sealed class PipeServer : IDisposable
     {
-        // PipeName centralizado en Shared para que el cliente no dependa de este ensamblado.
         public const string PipeName = PipeConstants.PipeName;
 
         private readonly MessageDispatcher _dispatcher;
@@ -39,8 +38,8 @@ namespace AlwaysPrintService.Pipe
                 Name = "AlwaysPrint-PipeListener"
             };
             _listenerThread.Start();
-            EventLogWriter.WriteInfo($"PipeServer started. Pipe=\\\\.\\pipe\\{PipeName}",
-                EventLogWriter.EvtPipeServerStarted);
+            AlwaysPrintLogger.WriteInfo($"PipeServer started. Pipe=\\\\.\\pipe\\{PipeName}",
+                AlwaysPrintLogger.EvtPipeServerStarted);
         }
 
         public void Stop()
@@ -51,23 +50,18 @@ namespace AlwaysPrintService.Pipe
 
         private void ListenerLoop()
         {
-            string logFile = @"C:\ProgramData\AlwaysPrint\service.log";
-            System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] PipeServer.ListenerLoop: iniciado\n");
-            
+            AlwaysPrintLogger.WriteInfo("PipeServer.ListenerLoop: iniciado");
+
             while (!_cts.IsCancellationRequested)
             {
                 NamedPipeServerStream? pipe = null;
                 try
                 {
-                    System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] PipeServer.ListenerLoop: creando pipe\n");
+                    AlwaysPrintLogger.WriteInfo("PipeServer.ListenerLoop: esperando conexión");
                     pipe = CreatePipe();
-
-                    // Block until a client connects (or cancellation).
-                    System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] PipeServer.ListenerLoop: esperando conexión\n");
                     pipe.WaitForConnection();
-                    System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] PipeServer.ListenerLoop: cliente conectado\n");
+                    AlwaysPrintLogger.WriteInfo("PipeServer.ListenerLoop: cliente conectado");
 
-                    // Hand off to a client thread; we immediately loop to accept the next.
                     var clientPipe = pipe;
                     var t = new Thread(() => HandleClient(clientPipe))
                     {
@@ -77,33 +71,30 @@ namespace AlwaysPrintService.Pipe
                     t.Start();
                     pipe = null; // ownership transferred to HandleClient
                 }
-                catch (OperationCanceledException) 
-                { 
-                    System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] PipeServer.ListenerLoop: cancelado\n");
-                    break; 
+                catch (OperationCanceledException)
+                {
+                    break;
                 }
                 catch (Exception ex) when (!_cts.IsCancellationRequested)
                 {
-                    System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] PipeServer.ListenerLoop: error - {ex.GetType().Name}: {ex.Message}\n");
-                    EventLogWriter.WriteError("PipeServer listener error.", ex);
+                    AlwaysPrintLogger.WriteError("PipeServer listener error.", ex);
                     pipe?.Dispose();
-                    Thread.Sleep(1000); // brief back-off before re-creating the pipe
+                    Thread.Sleep(1000);
                 }
             }
-            System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] PipeServer.ListenerLoop: finalizado\n");
+
+            AlwaysPrintLogger.WriteInfo("PipeServer.ListenerLoop: finalizado");
         }
 
         private static NamedPipeServerStream CreatePipe()
         {
             var security = new PipeSecurity();
 
-            // LocalSystem (the service account) has full control.
             security.AddAccessRule(new PipeAccessRule(
                 new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
                 PipeAccessRights.FullControl,
                 AccessControlType.Allow));
 
-            // Authenticated users (the Tray, running as logged-on user) may read/write.
             security.AddAccessRule(new PipeAccessRule(
                 new SecurityIdentifier(WellKnownSidType.AuthenticatedUserSid, null),
                 PipeAccessRights.ReadWrite,
@@ -158,10 +149,10 @@ namespace AlwaysPrintService.Pipe
                         writer.WriteLine(response.Serialize());
                     }
                 }
-                catch (IOException) { /* client disconnected */ }
+                catch (IOException) { /* cliente desconectado */ }
                 catch (Exception ex)
                 {
-                    EventLogWriter.WriteError("PipeServer client handler error.", ex);
+                    AlwaysPrintLogger.WriteError("PipeServer client handler error.", ex);
                 }
             }
         }

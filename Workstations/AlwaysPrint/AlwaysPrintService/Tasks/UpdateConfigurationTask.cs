@@ -20,10 +20,10 @@ namespace AlwaysPrintService.Tasks
             try
             {
                 _registry.Save(_newConfig);
-                EventLogWriter.WriteInfo(
+                AlwaysPrintLogger.WriteInfo(
                     $"Configuration updated. CorporateQueueName='{_newConfig.CorporateQueueName}' " +
                     $"PollMinutes={_newConfig.PendingTaskPollingMinutes}",
-                    EventLogWriter.EvtConfigSaved);
+                    AlwaysPrintLogger.EvtConfigSaved);
                 return ServiceTaskResult.Ok("Configuration saved successfully.");
             }
             catch (ArgumentOutOfRangeException ex)
@@ -32,7 +32,7 @@ namespace AlwaysPrintService.Tasks
             }
             catch (Exception ex)
             {
-                EventLogWriter.WriteError("UpdateConfigurationTask failed.", ex);
+                AlwaysPrintLogger.WriteError("UpdateConfigurationTask failed.", ex);
                 return ServiceTaskResult.Fail($"Registry write failed: {ex.Message}");
             }
         }
