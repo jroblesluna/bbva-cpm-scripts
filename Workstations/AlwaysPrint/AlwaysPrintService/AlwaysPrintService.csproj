@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>AlwaysPrintService</AssemblyName>
+    <RootNamespace>AlwaysPrintService</RootNamespace>
+    <Nullable>enable</Nullable>
+    <LangVersion>9</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <Optimize Condition="'$(Configuration)' == 'Release'">true</Optimize>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AlwaysPrint.Shared\AlwaysPrint.Shared.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Windows Service infrastructure -->
+    <Reference Include="System.ServiceProcess" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.IO.Pipes" />
+  </ItemGroup>
+</Project>
