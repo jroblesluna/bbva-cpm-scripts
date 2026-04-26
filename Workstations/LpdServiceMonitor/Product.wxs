@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package Name="LPD Service Monitor"
+           Language="1033"
+           Version="1.0.0"
+           Manufacturer="Robles.AI"
+           UpgradeCode="b62f12f6-c98b-4da5-9a75-eac98b22d8b5"
+           Compressed="yes">
+    <!-- Propiedades ARP (Add/Remove Programs) -->
+    <Property Id="ARPCopyright"     Value="© 2025 Robles.AI - Antonio Robles" />
+    <Property Id="ARPCONTACT"       Value="antonio@robles.ai" />
+    <Property Id="ARPURLINFOABOUT"  Value="https://robles.ai" />
+    <!-- Opcionales útiles -->
+    <Property Id="ARPNOREPAIR"     Value="1" />
+    <Property Id="ARPHELPLINK"     Value="antonio@robles.ai" />
+
+    <!-- Icono para ARP: primero define el Icon y luego usa su Id -->
+    <Icon Id="AppIcon" SourceFile=".\app.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <!-- Carpeta destino -->
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="RoblesAI\LPD Service Monitor" />
+    </StandardDirectory>
+
+    <!-- ÚNICO componente: EXE (KeyPath), json y servicio -->
+    <ComponentGroup Id="LpdService.Component">
+      <Component Id="cmpService" Directory="INSTALLFOLDER" Guid="0d64ab4b-8665-45b9-a342-fbb688fdd293">
+        <!-- El EXE es el KeyPath del componente -->
+        <File Id="filExe" Source=".\dist\LpdServiceMonitor.exe" KeyPath="yes" />
+        <File Source=".\dist\appsettings.json" />
+
+        <!-- Crear el servicio usando ESTE componente (coge filExe como binario) -->
+        <ServiceInstall
+            Id="svcInstall"
+            Name="LpdServiceMonitor"
+            DisplayName="LPD Service Monitor"
+            Description="Monitorea y levanta el servicio LPDSVC. (c) 2025 - Robles.AI - antonio@robles.ai"
+            Type="ownProcess"
+            Start="auto"
+            ErrorControl="normal"
+            Vital="yes"
+            Account="LocalSystem" />
+
+        <ServiceControl
+            Id="svcControl"
+            Name="LpdServiceMonitor"
+            Start="install"
+            Stop="both"
+            Remove="uninstall"
+            Wait="yes" />
+
+        <!-- Política de recuperación -->
+        <util:ServiceConfig
+            ServiceName="LpdServiceMonitor"
+            FirstFailureActionType="restart"
+            SecondFailureActionType="restart"
+            ThirdFailureActionType="restart"
+            RestartServiceDelayInSeconds="60"
+            ResetPeriodInDays="1" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="ProductFeature" Title="LPD Service Monitor" Level="1">
+      <ComponentGroupRef Id="LpdService.Component" />
+    </Feature>
+  </Package>
+</Wix>

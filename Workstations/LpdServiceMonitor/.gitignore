@@ -1,0 +1,8 @@
+.wix/
+bin/
+obj/
+dist/
+test/
+*.sln 
+*.wixpdb 
+.env* 
