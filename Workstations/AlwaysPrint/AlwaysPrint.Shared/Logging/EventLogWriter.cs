@@ -70,6 +70,19 @@ namespace AlwaysPrint.Shared.Logging
                     message = message.Substring(0, 30000) + "... [truncated]";
 
                 EventLog.WriteEntry(Source, message ?? "(null)", type, eventId);
+                
+                // Also write to file log for reliability
+                string logFile = @"C:\ProgramData\AlwaysPrint\service.log";
+                try
+                {
+                    System.IO.Directory.CreateDirectory(@"C:\ProgramData\AlwaysPrint");
+                    string logMessage = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{type}] Event {eventId}: {message}";
+                    System.IO.File.AppendAllText(logFile, logMessage + "\n");
+                }
+                catch
+                {
+                    // Ignore file log errors
+                }
             }
             catch (Exception ex)
             {
