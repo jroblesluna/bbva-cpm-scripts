@@ -92,10 +92,12 @@ Write-Host "Todos los archivos requeridos presentes en dist\." -ForegroundColor 
 # ── 7. Construir MSI ──────────────────────────────────────────────────────────
 
 Write-Host "=== Compilando MSI (versión $version) ===" -ForegroundColor Cyan
+$projectDir = (Get-Location).Path + "\"
 wix build .\Product.wxs `
     -o .\AlwaysPrint.msi `
     -ext WixToolset.Util.wixext `
-    -d "ProductVersion=$version"
+    -d "ProductVersion=$version" `
+    -d "ProjectDir=$projectDir"
 if ($LASTEXITCODE -ne 0) { Write-Error "Fallo en build WiX."; exit 1 }
 
 # ── Resumen ───────────────────────────────────────────────────────────────────

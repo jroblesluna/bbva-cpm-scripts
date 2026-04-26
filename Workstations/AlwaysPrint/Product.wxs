@@ -43,12 +43,12 @@
                  Guid="C7A4B5D6-B200-4E00-8F00-0BBA00000002">
 
         <File Id="filServiceExe"
-              Source=".\dist\AlwaysPrintService.exe"
+              Source="$(var.ProjectDir)dist\AlwaysPrintService.exe"
               KeyPath="yes" />
         <File Id="filSharedDll"
-              Source=".\dist\AlwaysPrint.Shared.dll" />
+              Source="$(var.ProjectDir)dist\AlwaysPrint.Shared.dll" />
         <File Id="filNewtonsoftDll"
-              Source=".\dist\Newtonsoft.Json.dll" />
+              Source="$(var.ProjectDir)dist\Newtonsoft.Json.dll" />
 
         <!-- Windows Service -->
         <ServiceInstall
@@ -103,7 +103,7 @@
       <Component Id="cmpTray" Directory="INSTALLFOLDER"
                  Guid="C7A4B5D6-C300-4E00-8F00-0BBA00000003">
         <File Id="filTrayExe"
-              Source=".\dist\AlwaysPrintTray.exe"
+              Source="$(var.ProjectDir)dist\AlwaysPrintTray.exe"
               KeyPath="yes" />
       </Component>
 
