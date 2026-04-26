@@ -30,6 +30,16 @@ foreach ($proj in @("AlwaysPrint.Shared","AlwaysPrintService","AlwaysPrintTray")
     Remove-IfExists "$proj\obj" -Recurse
 }
 
+# ── 1.5. Generar icono si no existe ──────────────────────────────────────────
+
+if (-not (Test-Path "logo.ico") -and (Test-Path "logo.png")) {
+    Write-Host "=== Generando logo.ico desde logo.png ===" -ForegroundColor Cyan
+    .\convert-icon.ps1 | Out-Null
+    if (-not (Test-Path "logo.ico")) {
+        Write-Warning "No se pudo generar logo.ico. Los EXEs usarán icono por defecto."
+    }
+}
+
 # ── 2. wix CLI ────────────────────────────────────────────────────────────────
 # Intenta actualizar primero; si falla (no instalado), instala desde cero.
 
@@ -46,21 +56,31 @@ if ($LASTEXITCODE -ne 0) {
 # Registrar extensión (idempotente — no falla si ya está registrada)
 wix extension add WixToolset.Util.wixext --global 2>&1 | Out-Host
 
-# ── 3. Generar versión basada en fecha (Major.Minor.Patch = año.mes.día+hora) ─
-# Formato: 1.YYYYMMDD.HHmm → ej. 1.20260426.1045
-# WiX requiere que cada componente sea <= 65535, así que usamos:
-#   Major = 1
-#   Minor = año (ej. 2026)
-#   Build = mes*100 + día (ej. 0426)
-#   Revision = hora*100 + minuto (ej. 1045)
+# ── 3. Generar versión basada en fecha/hora ──────────────────────────────────
+# Formato ajustado a límites de MSI: Major.Minor.Build.Revision
+# Límites de Windows Installer:
+#   - Major < 256
+#   - Minor < 256
+#   - Build < 65536
+#   - Revision < 65536 (ignorado por MSI, pero WiX lo valida)
+#
+# Esquema usado:
+#   Major    = 1 (fijo)
+#   Minor    = YY (últimos 2 dígitos del año: 26 para 2026)
+#   Build    = MMDD (mes y día: 0426 para abril 26)
+#   Revision = HHMM (hora y minuto: 1211 para 12:11)
+#
+# Ejemplo: 1.26.426.1211 = 26 de abril de 2026, 12:11
+# Nota: Perdemos los segundos, pero ganamos versión única por minuto
+#       que es suficiente para builds de desarrollo.
 
-$now     = Get-Date
-$major   = 1
-$minor   = $now.Year
-$build   = [int]("{0:MM}{1:dd}" -f $now, $now)   # ej. 0426
-$rev     = [int]("{0:HH}{1:mm}" -f $now, $now)   # ej. 1045
-$version = "$major.$minor.$build.$rev"
-Write-Host "Versión del paquete: $version"
+$now      = [DateTime]::Now
+$major    = 1
+$minor    = [int]$now.ToString("yy")        # 26 (año 2026)
+$build    = [int]$now.ToString("MMdd")      # 426 (abril 26)
+$revision = [int]$now.ToString("HHmm")      # 1211 (12:11)
+$version  = "$major.$minor.$build.$revision"
+Write-Host "Versión del paquete: $version ($($now.ToString('yyyy-MM-dd HH:mm')))"
 
 # ── 4. Publicar AlwaysPrintService ────────────────────────────────────────────
 

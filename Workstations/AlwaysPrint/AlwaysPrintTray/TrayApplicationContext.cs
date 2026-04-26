@@ -44,7 +44,7 @@ namespace AlwaysPrintTray
         {
             var icon = new NotifyIcon
             {
-                Icon    = SystemIcons.Application,
+                Icon    = LoadIconFromResource(),
                 Visible = true,
                 Text    = "AlwaysPrint"
             };
@@ -58,6 +58,27 @@ namespace AlwaysPrintTray
             icon.ContextMenuStrip = menu;
             icon.DoubleClick     += (_, __) => ShowAbout();
             return icon;
+        }
+
+        private static Icon LoadIconFromResource()
+        {
+            try
+            {
+                // Intentar cargar el icono desde el recurso embebido
+                var assembly = typeof(TrayApplicationContext).Assembly;
+                using var stream = assembly.GetManifestResourceStream("AlwaysPrintTray.Resources.logo.ico");
+                if (stream != null)
+                {
+                    return new Icon(stream);
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayWarning($"No se pudo cargar logo.ico: {ex.Message}");
+            }
+
+            // Fallback al icono del sistema
+            return SystemIcons.Application;
         }
 
         private void BootstrapSequence()

@@ -10,6 +10,7 @@
     <PlatformTarget>x64</PlatformTarget>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Optimize Condition="'$(Configuration)' == 'Release'">true</Optimize>
+    <ApplicationIcon>..\logo.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
@@ -21,5 +22,9 @@
     <!-- Referencias de ensamblado de .NET Framework 4.8 no incluidas por defecto en SDK-style -->
     <Reference Include="System.Net.Http" />
     <Reference Include="System.ServiceProcess" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Incluir logo.ico como recurso embebido -->
+    <EmbeddedResource Include="..\logo.ico" Link="Resources\logo.ico" />
   </ItemGroup>
 </Project>

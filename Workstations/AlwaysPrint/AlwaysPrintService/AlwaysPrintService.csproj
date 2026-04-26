@@ -8,6 +8,7 @@
     <LangVersion>9</LangVersion>
     <PlatformTarget>x64</PlatformTarget>
     <Optimize Condition="'$(Configuration)' == 'Release'">true</Optimize>
+    <ApplicationIcon>..\logo.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

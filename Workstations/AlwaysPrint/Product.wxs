@@ -15,7 +15,7 @@
 
   <Package Name="AlwaysPrint"
            Language="1033"
-           Version="!(bind.FileVersion.filServiceExe)"
+           Version="$(var.ProductVersion)"
            Manufacturer="Robles.AI"
            UpgradeCode="C7A4B5D6-A100-4E00-8F00-0BBA00000001"
            Compressed="yes">
@@ -26,16 +26,49 @@
     <Property Id="ARPNOREPAIR"     Value="1" />
     <Property Id="ARPHELPLINK"     Value="antonio@robles.ai" />
 
+    <!-- MajorUpgrade: desinstala automáticamente versiones anteriores -->
     <MajorUpgrade
         Schedule="afterInstallInitialize"
         AllowSameVersionUpgrades="yes"
         DowngradeErrorMessage="Ya está instalada una versión más reciente de AlwaysPrint." />
+    
+    <!-- Cerrar automáticamente AlwaysPrintTray.exe sin preguntar -->
+    <util:CloseApplication Id="CloseAlwaysPrintTray"
+                           Target="AlwaysPrintTray.exe"
+                           CloseMessage="no"
+                           RebootPrompt="no"
+                           TerminateProcess="1" />
+    
+    <!-- Custom Action: Limpiar ProgramData al desinstalar (excepto logs) -->
+    <SetProperty Id="CleanupAppData"
+                 Before="CleanupAppData"
+                 Sequence="execute"
+                 Value="&quot;[SystemFolder]cmd.exe&quot; /c &quot;if exist &quot;[CommonAppDataFolder]AlwaysPrint&quot; (for /d %%d in (&quot;[CommonAppDataFolder]AlwaysPrint\*&quot;) do if /i not &quot;%%~nxd&quot;==&quot;logs&quot; rd /s /q &quot;%%d&quot; &amp; for %%f in (&quot;[CommonAppDataFolder]AlwaysPrint\*&quot;) do del /q &quot;%%f&quot;)&quot;" />
+    
+    <CustomAction Id="CleanupAppData"
+                  BinaryRef="Wix4UtilCA_X64"
+                  DllEntry="WixQuietExec"
+                  Execute="deferred"
+                  Return="ignore"
+                  Impersonate="no" />
+    
+    <InstallExecuteSequence>
+      <Custom Action="CleanupAppData" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+    </InstallExecuteSequence>
+    
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <!-- Carpeta destino: C:\Program Files\Robles.AI\AlwaysPrint\ -->
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="DirRoblesAI" Name="Robles.AI">
         <Directory Id="INSTALLFOLDER" Name="AlwaysPrint" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Carpeta de datos: C:\ProgramData\AlwaysPrint\ -->
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="APPDATAFOLDER" Name="AlwaysPrint">
+        <Directory Id="LOGSFOLDER" Name="logs" />
       </Directory>
     </StandardDirectory>
 
@@ -108,6 +141,13 @@
         <File Id="filTrayExe"
               Source="$(var.ProjectDir)dist\AlwaysPrintTray.exe"
               KeyPath="yes" />
+      </Component>
+
+      <!-- ── Componente para carpeta de logs (se preserva al desinstalar) ── -->
+      <Component Id="cmpLogsFolder" Directory="LOGSFOLDER"
+                 Guid="C7A4B5D6-D400-4E00-8F00-0BBA00000004"
+                 Permanent="yes">
+        <CreateFolder />
       </Component>
 
     </ComponentGroup>
