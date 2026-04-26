@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Win32;
 using Newtonsoft.Json;
+using AlwaysPrint.Shared.Logging;
 
 namespace AlwaysPrint.Shared.Configuration
 {
@@ -31,11 +32,17 @@ namespace AlwaysPrint.Shared.Configuration
 
                     var rawTargets = key.GetValue("SearchTargets", null) as string;
                     if (!string.IsNullOrWhiteSpace(rawTargets))
-                        cfg.SearchTargets = JsonConvert.DeserializeObject<SearchTargetsConfig>(rawTargets)
+                        cfg.SearchTargets = JsonConvert.DeserializeObject<SearchTargetsConfig>(rawTargets!)
                                             ?? new SearchTargetsConfig();
                 }
             }
-            catch { /* return defaults on any read failure */ }
+            catch (Exception ex)
+            {
+                // Loggear el error y devolver defaults para que el servicio pueda arrancar.
+                EventLogWriter.WriteWarning(
+                    $"RegistryConfigManager.Load: error leyendo configuración, usando valores por defecto. {ex.Message}",
+                    EventLogWriter.EvtGenericWarning);
+            }
             return cfg;
         }
 
@@ -99,8 +106,10 @@ namespace AlwaysPrint.Shared.Configuration
 
             if (cfg.SearchTargets != null)
             {
-                cfg.SearchTargets.Ips    = Sanitize(cfg.SearchTargets.Ips,    1024);
-                cfg.SearchTargets.Ranges = Sanitize(cfg.SearchTargets.Ranges, 1024);
+                SearchTargetsConfig st = cfg.SearchTargets;
+                st.Ips    = Sanitize(st.Ips,    1024);
+                st.Ranges = Sanitize(st.Ranges, 1024);
+                cfg.SearchTargets = st;
             }
         }
 

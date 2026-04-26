@@ -14,9 +14,11 @@ namespace AlwaysPrintService
 {
     public sealed class AlwaysPrintWindowsService : ServiceBase
     {
-        public const  string ServiceName = "AlwaysPrintService";
-        private const int    TrayTimeoutSeconds = 300;   // 5 minutes
-        private const int    UserPollSeconds    = 60;
+        // 'new' suprime CS0108 — la constante oculta intencionalmente ServiceBase.ServiceName
+        // para que el nombre sea accesible en tiempo de compilación sin instanciar el servicio.
+        public new const string ServiceName = "AlwaysPrintService";
+        private const int TrayTimeoutSeconds = 300;   // 5 minutos
+        private const int UserPollSeconds    = 60;
 
         // ── Components ──────────────────────────────────────────────────────────
         private readonly ServiceStateMachine   _state    = new ServiceStateMachine();
@@ -28,21 +30,26 @@ namespace AlwaysPrintService
         // Tray handshake gate.
         private readonly ManualResetEventSlim _trayInitGate = new ManualResetEventSlim(false);
 
+        // Gate para despertar WaitForUser cuando llega un evento de sesión antes del timeout.
+        private readonly ManualResetEventSlim _userArrivedGate = new ManualResetEventSlim(false);
+
         // Background worker thread for startup orchestration.
         private Thread? _startupThread;
         private CancellationTokenSource _cts = new CancellationTokenSource();
 
         // Tells SCM that session-change notifications should be delivered.
-        private const bool CanHandleSessionChangeEvent = true;
+        // 'new' suprime CS0108 — ocultamos intencionalmente la propiedad heredada para
+        // definir la constante en tiempo de compilación.
+        private new const bool CanHandleSessionChangeEvent = true;
 
         public AlwaysPrintWindowsService()
         {
-            base.ServiceName         = ServiceName;
-            base.CanStop             = true;
-            base.CanShutdown         = true;
+            base.ServiceName                 = ServiceName;
+            base.CanStop                     = true;
+            base.CanShutdown                 = true;
             base.CanHandleSessionChangeEvent = CanHandleSessionChangeEvent;
-            base.CanPauseAndContinue = false;
-            base.AutoLog             = false;   // we write our own events
+            base.CanPauseAndContinue         = false;
+            base.AutoLog                     = false;   // escribimos nuestros propios eventos
         }
 
         // ── Service entry points ────────────────────────────────────────────────
@@ -62,11 +69,12 @@ namespace AlwaysPrintService
         {
             _state.Transition(ServiceState.Stopping);
             _cts.Cancel();
+            _userArrivedGate.Set();   // desbloquea WaitForUser si está esperando
             _pipeServer?.Stop();
             _taskQueue.Stop();
             KillExistingTray();
             _state.Transition(ServiceState.Stopped);
-            EventLogWriter.WriteInfo("AlwaysPrintService stopped.", EventLogWriter.EvtServiceStopped);
+            EventLogWriter.WriteInfo("AlwaysPrintService detenido.", EventLogWriter.EvtServiceStopped);
         }
 
         protected override void OnShutdown()
@@ -90,17 +98,19 @@ namespace AlwaysPrintService
 
             if (userArrived && _state.Is(ServiceState.WaitingUser))
             {
-                // Wake the startup thread that is polling for a user.
-                Monitor.PulseAll(_cts);
+                // Despierta WaitForUser inmediatamente sin esperar el timeout de polling.
+                _userArrivedGate.Set();
             }
 
             if (userLeft && (_state.Is(ServiceState.TrayStarted) || _state.Is(ServiceState.Running)))
             {
-                EventLogWriter.WriteWarning("User session ended. Killing Tray and waiting for next user.",
+                EventLogWriter.WriteWarning("Sesión de usuario finalizada. Eliminando Tray y esperando nueva sesión.",
                     EventLogWriter.EvtTrayKilled);
                 KillExistingTray();
                 _trayInitGate.Reset();
                 _state.Transition(ServiceState.WaitingUser);
+                // Despierta MonitoringLoop para que detecte el cambio de estado y salga.
+                _userArrivedGate.Set();
             }
         }
 
@@ -110,61 +120,87 @@ namespace AlwaysPrintService
         {
             try
             {
-                EventLogWriter.WriteInfo("AlwaysPrintService starting...", EventLogWriter.EvtServiceStarted);
+                EventLogWriter.WriteInfo("AlwaysPrintService iniciando...", EventLogWriter.EvtServiceStarted);
                 _state.Transition(ServiceState.Starting);
 
-                // 1. Guard against duplicate service instances.
+                // 1. Guardia contra instancias duplicadas del servicio.
                 if (IsDuplicateServiceRunning())
                 {
-                    EventLogWriter.WriteWarning("Duplicate AlwaysPrintService instance detected. Aborting start.",
+                    EventLogWriter.WriteWarning("Instancia duplicada de AlwaysPrintService detectada. Abortando inicio.",
                         EventLogWriter.EvtDuplicateInstance);
                     Stop();
                     return;
                 }
 
-                // 2. Kill any orphaned Tray instances.
+                // 2. Matar instancias huérfanas del Tray.
                 int killedTrays = KillExistingTray();
                 if (killedTrays > 0)
-                    EventLogWriter.WriteWarning($"Killed {killedTrays} orphaned AlwaysPrintTray instance(s).",
+                    EventLogWriter.WriteWarning($"Se eliminaron {killedTrays} instancia(s) huérfana(s) de AlwaysPrintTray.",
                         EventLogWriter.EvtTrayKilled);
                 else
-                    EventLogWriter.WriteInfo("No orphaned Tray instances found.", EventLogWriter.EvtTrayKilled);
+                    EventLogWriter.WriteInfo("No se encontraron instancias huérfanas del Tray.", EventLogWriter.EvtTrayKilled);
 
-                // 3. Ensure registry defaults and load config.
+                // 3. Asegurar valores por defecto en registro y cargar configuración.
                 _registry.EnsureDefaults();
-                var cfg = _registry.Load();
 
-                // 4. Initialize task queue.
+                // 4. Inicializar cola de tareas.
                 _taskQueue.Start();
                 int cleared = _taskQueue.ClearAll();
                 if (cleared > 0)
-                    EventLogWriter.WriteWarning($"Cleared {cleared} stale tasks from queue on startup.",
+                    EventLogWriter.WriteWarning($"Se descartaron {cleared} tarea(s) pendiente(s) al iniciar.",
                         EventLogWriter.EvtQueueCleared);
                 else
-                    EventLogWriter.WriteInfo("Task queue initialized empty.", EventLogWriter.EvtQueueCleared);
+                    EventLogWriter.WriteInfo("Cola de tareas inicializada vacía.", EventLogWriter.EvtQueueCleared);
 
-                // 5. Start Named Pipe server.
+                // 5. Iniciar servidor Named Pipe.
                 _dispatcher = new MessageDispatcher(_registry, _taskQueue, _state);
                 _dispatcher.TrayInitializedReceived += OnTrayInitialized;
                 _pipeServer = new PipeServer(_dispatcher);
                 _pipeServer.Start();
 
-                // 6. Wait for an interactive user.
+                // 6. Bucle principal: esperar usuario → lanzar Tray → monitorear.
+                //    Se repite tras cada logoff para relanzar el Tray en la siguiente sesión.
+                RunSessionLoop();
+            }
+            catch (OperationCanceledException)
+            {
+                EventLogWriter.WriteInfo("Secuencia de inicio cancelada.");
+            }
+            catch (Exception ex)
+            {
+                EventLogWriter.WriteError("Error fatal en la secuencia de inicio.", ex);
+                Stop();
+            }
+        }
+
+        /// <summary>
+        /// Bucle que gestiona el ciclo completo de sesión de usuario:
+        /// WaitingUser → TrayStarting → TrayStarted → Running → (logoff) → WaitingUser → …
+        /// Se repite indefinidamente hasta que se cancele el servicio.
+        /// </summary>
+        private void RunSessionLoop()
+        {
+            while (!_cts.IsCancellationRequested)
+            {
+                // ── Esperar sesión interactiva ──────────────────────────────────
                 _state.Transition(ServiceState.WaitingUser);
                 WaitForUser();
                 if (_cts.IsCancellationRequested) return;
 
-                // 7. Launch Tray in the user's session.
+                // ── Lanzar Tray en la sesión del usuario ────────────────────────
+                _trayInitGate.Reset();
                 _state.Transition(ServiceState.TrayStarting);
                 LaunchTray();
 
-                // 8. Wait for Tray handshake.
+                // ── Esperar handshake del Tray (máx. 5 min) ─────────────────────
                 bool trayOk = _trayInitGate.Wait(TimeSpan.FromSeconds(TrayTimeoutSeconds), _cts.Token);
+                if (_cts.IsCancellationRequested) return;
+
                 if (!trayOk)
                 {
                     _state.Transition(ServiceState.TrayError);
                     EventLogWriter.WriteError(
-                        "Tray did not confirm initialization within the timeout. Stopping service for SCM recovery.",
+                        "El Tray no confirmó la inicialización en el tiempo límite. Deteniendo el servicio para recuperación SCM.",
                         EventLogWriter.EvtTrayError);
                     Stop();
                     return;
@@ -173,17 +209,13 @@ namespace AlwaysPrintService
                 _state.Transition(ServiceState.TrayStarted);
                 _state.Transition(ServiceState.Running);
 
-                // 9. Periodic monitoring loop.
-                MonitoringLoop(cfg.PendingTaskPollingMinutes);
-            }
-            catch (OperationCanceledException)
-            {
-                EventLogWriter.WriteInfo("Startup sequence cancelled.");
-            }
-            catch (Exception ex)
-            {
-                EventLogWriter.WriteError("Fatal error in startup sequence.", ex);
-                Stop();
+                // ── Bucle de monitoreo: activo mientras el usuario esté en sesión ─
+                MonitoringLoop();
+
+                // Si llegamos aquí sin cancelación, fue un logoff → volver al inicio del bucle.
+                if (!_cts.IsCancellationRequested)
+                    EventLogWriter.WriteInfo("Sesión de usuario finalizada. Esperando nueva sesión.",
+                        EventLogWriter.EvtWaitingUser);
             }
         }
 
@@ -192,10 +224,19 @@ namespace AlwaysPrintService
             while (!SessionMonitor.IsUserLoggedIn())
             {
                 if (_cts.IsCancellationRequested) return;
-                EventLogWriter.WriteInfo("Waiting for interactive user session...", EventLogWriter.EvtWaitingUser);
-                _cts.Token.WaitHandle.WaitOne(TimeSpan.FromSeconds(UserPollSeconds));
+                EventLogWriter.WriteInfo("Esperando sesión interactiva de usuario...", EventLogWriter.EvtWaitingUser);
+
+                // Espera hasta UserPollSeconds o hasta que OnSessionChange señale _userArrivedGate.
+                // WaitAny devuelve el índice del handle que se señalizó primero.
+                int signaled = WaitHandle.WaitAny(
+                    new[] { _userArrivedGate.WaitHandle, _cts.Token.WaitHandle },
+                    TimeSpan.FromSeconds(UserPollSeconds));
+
+                _userArrivedGate.Reset();
+
+                if (signaled == 1) return; // CancellationToken señalizado → salir
             }
-            EventLogWriter.WriteInfo("Interactive user session detected.", EventLogWriter.EvtUserDetected);
+            EventLogWriter.WriteInfo("Sesión interactiva de usuario detectada.", EventLogWriter.EvtUserDetected);
         }
 
         private void LaunchTray()
@@ -217,20 +258,25 @@ namespace AlwaysPrintService
                 EventLogWriter.WriteWarning($"Tray reported failed initialization: {details}", EventLogWriter.EvtTrayError);
         }
 
-        private void MonitoringLoop(int pollMinutes)
+        private void MonitoringLoop()
         {
-            while (!_cts.IsCancellationRequested)
+            while (!_cts.IsCancellationRequested && _state.Is(ServiceState.Running))
             {
-                // Re-read polling interval in case it was updated via config.
+                // Re-leer intervalo por si fue actualizado vía configuración.
                 var cfg = _registry.Load();
                 int interval = Math.Max(1, cfg.PendingTaskPollingMinutes);
 
-                // Heartbeat log.
+                // Heartbeat.
                 EventLogWriter.WriteInfo(
-                    $"AlwaysPrint running. State={_state.Current} QueueDepth={_taskQueue.PendingCount}",
+                    $"AlwaysPrint activo. Estado={_state.Current} TareasPendientes={_taskQueue.PendingCount}",
                     EventLogWriter.EvtServiceStarted);
 
-                _cts.Token.WaitHandle.WaitOne(TimeSpan.FromMinutes(interval));
+                // Espera el intervalo o hasta que _userArrivedGate sea señalizado (logoff/logon).
+                WaitHandle.WaitAny(
+                    new[] { _userArrivedGate.WaitHandle, _cts.Token.WaitHandle },
+                    TimeSpan.FromMinutes(interval));
+
+                _userArrivedGate.Reset();
             }
         }
 

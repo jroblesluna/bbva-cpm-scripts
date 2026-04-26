@@ -18,7 +18,8 @@ namespace AlwaysPrintService.Pipe
     /// </summary>
     public sealed class PipeServer : IDisposable
     {
-        public const string PipeName = "AlwaysPrintService";
+        // PipeName centralizado en Shared para que el cliente no dependa de este ensamblado.
+        public const string PipeName = PipeConstants.PipeName;
 
         private readonly MessageDispatcher _dispatcher;
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();

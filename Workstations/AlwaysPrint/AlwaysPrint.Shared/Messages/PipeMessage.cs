@@ -45,7 +45,7 @@ namespace AlwaysPrint.Shared.Messages
         public T? GetPayload<T>() where T : class
         {
             if (string.IsNullOrWhiteSpace(Payload)) return null;
-            return JsonConvert.DeserializeObject<T>(Payload);
+            return JsonConvert.DeserializeObject<T>(Payload!);
         }
 
         public string Serialize() => JsonConvert.SerializeObject(this);

@@ -17,18 +17,25 @@ namespace AlwaysPrintTray
     /// </summary>
     public sealed class TrayApplicationContext : ApplicationContext
     {
-        private const int PipeConnectTimeoutMs = 60_000;
-        private const string ServiceName       = "AlwaysPrintService";
+        private const string ServiceName = "AlwaysPrintService";
 
         private readonly NotifyIcon  _trayIcon;
         private readonly PipeClient  _pipe;
         private readonly RegistryConfigManager _registry = new RegistryConfigManager();
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
 
+        // Capturado en el constructor (hilo UI) para hacer marshal seguro desde hilos de fondo.
+        private readonly SynchronizationContext _uiContext;
+
         public TrayApplicationContext()
         {
-            _pipe      = new PipeClient();
-            _trayIcon  = BuildTrayIcon();
+            // SynchronizationContext.Current es el WindowsFormsSynchronizationContext del hilo UI
+            // en este punto, ya que Application.Run aún no ha arrancado pero el hilo es STA.
+            // Si fuera null (improbable en WinForms), usamos un fallback que invoca directamente.
+            _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
+
+            _pipe     = new PipeClient();
+            _trayIcon = BuildTrayIcon();
 
             // Run bootstrap off the UI thread so the tray appears immediately.
             var t = new Thread(BootstrapSequence)
@@ -150,26 +157,22 @@ namespace AlwaysPrintTray
 
         private void ExitApplication()
         {
+            // Puede llamarse desde el hilo de bootstrap; Application.Exit debe ejecutarse en el UI thread.
             _cts.Cancel();
-            _trayIcon.Visible = false;
-            _trayIcon.Dispose();
-            _pipe.Dispose();
-            Application.Exit();
+            _uiContext.Post(_ =>
+            {
+                _trayIcon.Visible = false;
+                _trayIcon.Dispose();
+                _pipe.Dispose();
+                Application.Exit();
+            }, null);
         }
 
         private void ShowBalloon(string title, string message, ToolTipIcon icon)
         {
-            // Marshal to UI thread.
-            if (Application.OpenForms.Count > 0)
-            {
-                Application.OpenForms[0]?.BeginInvoke(new Action(() =>
-                    _trayIcon.ShowBalloonTip(5000, title, message, icon)));
-            }
-            else
-            {
-                // No forms open (expected for tray-only app) – show directly.
-                _trayIcon.ShowBalloonTip(5000, title, message, icon);
-            }
+            // Siempre hacer marshal al hilo UI mediante el SynchronizationContext capturado
+            // en el constructor. Post es fire-and-forget; no bloquea el hilo de fondo.
+            _uiContext.Post(_ => _trayIcon.ShowBalloonTip(5000, title, message, icon), null);
         }
 
         protected override void Dispose(bool disposing)

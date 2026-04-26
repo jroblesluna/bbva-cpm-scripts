@@ -17,7 +17,10 @@ namespace AlwaysPrintTray.Pipe
     public sealed class PipeClient : IDisposable
     {
         private const int ConnectTimeoutMs   = 60_000;
-        private const int SendTimeoutMs      = 10_000;
+        // Timeout de lectura: evita que ReadLine bloquee indefinidamente si el servicio
+        // no responde (p.ej. tarea WMI colgada). El servidor siempre responde; 30 s es
+        // suficiente margen incluso para consultas WMI lentas.
+        private const int ReadTimeoutMs      = 30_000;
 
         private readonly object _lock = new object();
         private NamedPipeClientStream? _pipe;
@@ -33,13 +36,14 @@ namespace AlwaysPrintTray.Pipe
             lock (_lock)
             {
                 DisposeTransport();
-                _pipe = new NamedPipeClientStream(".", AlwaysPrintService.Pipe.PipeServer.PipeName,
+                _pipe = new NamedPipeClientStream(".", AlwaysPrint.Shared.Messages.PipeConstants.PipeName,
                     PipeDirection.InOut, PipeOptions.None);
 
                 try
                 {
                     _pipe.Connect(ConnectTimeoutMs);
                     _pipe.ReadMode = PipeTransmissionMode.Byte;
+                    _pipe.ReadTimeout = ReadTimeoutMs;
                     _reader = new StreamReader(_pipe, Encoding.UTF8, false, 65536, leaveOpen: true);
                     _writer = new StreamWriter(_pipe, Encoding.UTF8, 65536, leaveOpen: true) { AutoFlush = true };
                     return true;

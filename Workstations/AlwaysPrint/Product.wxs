@@ -15,7 +15,7 @@
 
   <Package Name="AlwaysPrint"
            Language="1033"
-           Version="1.0.0"
+           Version="!(bind.FileVersion.filServiceExe)"
            Manufacturer="Robles.AI"
            UpgradeCode="C7A4B5D6-A100-4E00-8F00-BBVA00000001"
            Compressed="yes">
@@ -79,11 +79,13 @@
             RestartServiceDelayInSeconds="60"
             ResetPeriodInDays="1" />
 
-        <!-- Event Log source (Application log) -->
+        <!-- Event Log source (Application log).
+             EventMessageFile apunta al propio EXE del servicio. Si en el futuro se
+             compila un message DLL dedicado, actualizar esta ruta. -->
         <util:EventSource
             Log="Application"
             Name="AlwaysPrint"
-            EventMessageFile="[SystemFolder]EventCreate.exe" />
+            EventMessageFile="[INSTALLFOLDER]AlwaysPrintService.exe" />
 
         <!-- Registro: clave con valores por defecto -->
         <RegistryKey Root="HKLM" Key="SOFTWARE\Robles.AI\AlwaysPrint">

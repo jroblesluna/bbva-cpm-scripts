@@ -46,7 +46,8 @@ namespace AlwaysPrintService.Tasks
 
                 if (printer == null)
                 {
-                    result.Details = $"Queue '{_queueName}' not found.";
+                    result.Details = $"La cola '{_queueName}' no existe.";
+                    // Devuelve Ok con Exists=false — no es un error de ejecución, es un resultado válido.
                     return ServiceTaskResult.Ok(result.Details, result);
                 }
 

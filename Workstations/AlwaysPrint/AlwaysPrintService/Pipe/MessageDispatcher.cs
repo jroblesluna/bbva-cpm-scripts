@@ -103,16 +103,18 @@ namespace AlwaysPrintService.Pipe
             var payload = req.GetPayload<CheckCorporateQueuePayload>();
             if (string.IsNullOrWhiteSpace(payload?.QueueName))
                 return PipeMessage.Reply(req, MessageType.Error,
-                    new ErrorPayload { Code = "INVALID_PAYLOAD", Message = "QueueName is required." });
+                    new ErrorPayload { Code = "INVALID_PAYLOAD", Message = "QueueName es obligatorio." });
 
             var cfg = _registry.Load();
-            var task = new CheckCorporateQueueTask(payload.QueueName, cfg.SearchTargets);
-            var result = task.Execute();   // inline – WMI call is fast enough
+            var task = new CheckCorporateQueueTask(payload!.QueueName, cfg.SearchTargets);
+            var result = task.Execute();   // inline — la consulta WMI es suficientemente rápida
 
-            return PipeMessage.Reply(req, result.Success ? MessageType.Ack : MessageType.Error,
-                result.Success
-                    ? (object)new AckPayload { Success = true, Message = result.Message }
-                    : new ErrorPayload { Code = "CHECK_FAILED", Message = result.Message });
+            if (!result.Success)
+                return PipeMessage.Reply(req, MessageType.Error,
+                    new ErrorPayload { Code = "CHECK_FAILED", Message = result.Message });
+
+            // Devuelve el payload tipado para que el Tray pueda leer Exists, Cloud, PortType, etc.
+            return PipeMessage.Reply(req, MessageType.Ack, result.Data);
         }
 
         private PipeMessage HandleCheckServiceStatus(PipeMessage req)
@@ -120,13 +122,13 @@ namespace AlwaysPrintService.Pipe
             var payload = req.GetPayload<CheckServiceStatusPayload>();
             if (string.IsNullOrWhiteSpace(payload?.ServiceName))
                 return PipeMessage.Reply(req, MessageType.Error,
-                    new ErrorPayload { Code = "INVALID_PAYLOAD", Message = "ServiceName is required." });
+                    new ErrorPayload { Code = "INVALID_PAYLOAD", Message = "ServiceName es obligatorio." });
 
-            var task = new CheckServiceStatusTask(payload.ServiceName);
+            var task = new CheckServiceStatusTask(payload!.ServiceName);
             var result = task.Execute();
 
-            return PipeMessage.Reply(req, MessageType.Ack,
-                new AckPayload { Success = result.Success, Message = result.Message });
+            // Devuelve el payload tipado para que el Tray pueda leer State, BinaryPath, StartTime.
+            return PipeMessage.Reply(req, MessageType.Ack, result.Data ?? new AckPayload { Success = result.Success, Message = result.Message });
         }
     }
 }

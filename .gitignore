@@ -1,2 +1,9 @@
 .DS_Store
 LPMC_*.exe
+
+# .NET build artifacts
+bin/
+obj/
+dist/
+*.user
+.vs/

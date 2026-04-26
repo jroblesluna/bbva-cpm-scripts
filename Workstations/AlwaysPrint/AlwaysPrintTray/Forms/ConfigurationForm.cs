@@ -29,7 +29,9 @@ namespace AlwaysPrintTray.Forms
         {
             _pipe = pipe ?? throw new ArgumentNullException(nameof(pipe));
             BuildUi();
-            LoadCurrentConfiguration();
+            // La carga se hace en el evento Shown para no bloquear el hilo UI durante
+            // la construcción del formulario (la llamada al pipe puede tardar).
+            Shown += (_, __) => LoadCurrentConfiguration();
         }
 
         private void BuildUi()
@@ -42,7 +44,7 @@ namespace AlwaysPrintTray.Forms
             StartPosition   = FormStartPosition.CenterScreen;
             ShowInTaskbar   = false;
 
-            int y = 16, lw = 190, cw = 290, cx = 210, lx = 12;
+            int y = 16, lw = 190, cx = 210, lx = 12;
 
             Label Lbl(string text) => new Label { Text = text, Location = new Point(lx, y + 3), Size = new Size(lw, 20) };
             TextBox Txt(int w = 290) => new TextBox { Location = new Point(cx, y), Size = new Size(w, 22) };

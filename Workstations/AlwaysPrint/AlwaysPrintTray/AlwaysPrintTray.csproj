@@ -17,4 +17,9 @@
   <ItemGroup>
     <ProjectReference Include="..\AlwaysPrint.Shared\AlwaysPrint.Shared.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Referencias de ensamblado de .NET Framework 4.8 no incluidas por defecto en SDK-style -->
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.ServiceProcess" />
+  </ItemGroup>
 </Project>

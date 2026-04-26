@@ -2,39 +2,43 @@ using System;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
-using System.Threading.Tasks;
 using AlwaysPrint.Shared.Logging;
 
 namespace AlwaysPrintTray.Bootstrap
 {
     /// <summary>
-    /// Performs an HTTP health check against "alwaysprint.{domain}/health" for each domain
-    /// in the configured BootstrapDomains list. Returns the first domain that responds with
-    /// HTTP 200 (and optionally validates the response body).
+    /// Realiza un HTTP GET a "https://alwaysprint.{dominio}/health" para cada dominio
+    /// configurado en BootstrapDomains. Devuelve el primer dominio que responda HTTP 200.
     ///
-    /// Why this design:
-    ///   - Subdomain "alwaysprint.{domain}" is a predictable, dedicated health endpoint.
-    ///   - A 200 response means the bootstrap server is reachable and the license is active.
-    ///   - Timeout of 10 seconds per domain prevents indefinite blocking.
-    ///   - If no domain responds, the Tray reports failure to the service but continues running
-    ///     (the service may still be useful for local tasks).
+    /// Diseño:
+    ///   - HttpClient es static readonly para reutilizar el pool de conexiones TCP y evitar
+    ///     socket exhaustion (antipatrón: instanciar HttpClient por llamada).
+    ///   - Timeout por dominio: 10 s. Si ninguno responde, el Tray opera en modo local.
+    ///   - Se usa un CancellationTokenSource combinado para respetar tanto el timeout por
+    ///     dominio como el token de cancelación global del Tray.
     /// </summary>
     public static class DomainHealthChecker
     {
         private const string HealthPath  = "/health";
         private const int    TimeoutSecs = 10;
 
-        // Optional: the body must contain this string to be considered healthy.
-        // Set to null to accept any 200 response.
-        private const string? ExpectedBodyFragment = null;
+        // Opcional: el body debe contener este fragmento para considerarse saludable.
+        // Cambiar a una cadena no-null para activar la validación del body.
+        // Campo estático (no const) para evitar CS0162 cuando es null.
+        private static readonly string? ExpectedBodyFragment = null;
+
+        // HttpClient reutilizable: el pool de conexiones subyacente gestiona el ciclo de vida.
+        // No se dispone nunca — es intencional para instancias static.
+        private static readonly HttpClient _http = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(TimeoutSecs)
+        };
 
         public static (bool Success, string? RespondingDomain, string? Details)
             CheckAll(string bootstrapDomains, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(bootstrapDomains))
-                return (false, null, "No bootstrap domains configured.");
-
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(TimeoutSecs) };
+                return (false, null, "No hay dominios bootstrap configurados.");
 
             foreach (var raw in bootstrapDomains.Split(','))
             {
@@ -46,35 +50,48 @@ namespace AlwaysPrintTray.Bootstrap
                 string url = $"https://alwaysprint.{domain}{HealthPath}";
                 try
                 {
-                    var response = http.GetAsync(url, ct).GetAwaiter().GetResult();
+                    // Combina el timeout del HttpClient con el token de cancelación global.
+                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    linkedCts.CancelAfter(TimeSpan.FromSeconds(TimeoutSecs));
+
+                    var response = _http.GetAsync(url, linkedCts.Token).GetAwaiter().GetResult();
 
                     if (response.StatusCode != HttpStatusCode.OK)
                     {
-                        EventLogWriter.WriteInfo($"Bootstrap: {url} returned {(int)response.StatusCode}.");
+                        EventLogWriter.WriteInfo($"Bootstrap: {url} devolvió {(int)response.StatusCode}.");
                         continue;
                     }
 
                     if (ExpectedBodyFragment != null)
                     {
                         string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                        if (!body.Contains(ExpectedBodyFragment))
+                        if (body.IndexOf(ExpectedBodyFragment, StringComparison.Ordinal) < 0)
                         {
-                            EventLogWriter.WriteInfo($"Bootstrap: {url} body did not contain expected fragment.");
+                            EventLogWriter.WriteInfo($"Bootstrap: {url} no contiene el fragmento esperado.");
                             continue;
                         }
                     }
 
-                    EventLogWriter.WriteInfo($"Bootstrap: {url} responded OK.", EventLogWriter.EvtServiceStarted);
+                    EventLogWriter.WriteInfo($"Bootstrap: {url} respondió OK.", EventLogWriter.EvtServiceStarted);
                     return (true, domain, url);
                 }
-                catch (OperationCanceledException) { break; }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    // Cancelación global del Tray — salir inmediatamente.
+                    break;
+                }
+                catch (OperationCanceledException)
+                {
+                    // Timeout del dominio individual — continuar con el siguiente.
+                    EventLogWriter.WriteInfo($"Bootstrap: {url} timeout ({TimeoutSecs} s).");
+                }
                 catch (Exception ex)
                 {
                     EventLogWriter.WriteInfo($"Bootstrap: {url} error – {ex.Message}");
                 }
             }
 
-            return (false, null, "No bootstrap domain responded successfully.");
+            return (false, null, "Ningún dominio bootstrap respondió correctamente.");
         }
     }
 }
