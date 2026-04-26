@@ -1,16 +1,18 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 
 namespace AlwaysPrint.Shared.Logging
 {
     /// <summary>
-    /// Thin wrapper around Windows Event Log.
-    /// Source must be registered before first use (done by the service installer or EnsureSourceExists).
+    /// Thin wrapper around file-based logging.
+    /// Logs are written to C:\ProgramData\AlwaysPrint\logs\ with date-based rotation.
+    /// Format: [timestamp] [Origen] Logging message
     /// </summary>
     public static class EventLogWriter
     {
-        public const string Source = "AlwaysPrint";
-        public const string LogName = "Application";
+        public const string SourceService = "SVC";
+        public const string SourceTray = "APP";
 
         // Event IDs – stable identifiers for monitoring/alerting tools.
         public const int EvtServiceStarted       = 1000;
@@ -31,64 +33,84 @@ namespace AlwaysPrint.Shared.Logging
         public const int EvtGenericWarning       = 1090;
         public const int EvtGenericError         = 1091;
 
+        private static readonly string LogDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "AlwaysPrint", "logs");
+
+        private static readonly object LogLock = new object();
+
         public static void EnsureSourceExists()
         {
-            try
-            {
-                if (!EventLog.SourceExists(Source))
-                    EventLog.CreateEventSource(Source, LogName);
-            }
-            catch { /* May fail if not admin; service installer handles registration. */ }
+            // No longer needed - we don't use EventLog anymore
         }
 
         public static void WriteInfo(string message, int eventId = EvtGenericWarning)
         {
-            Write(message, EventLogEntryType.Information, eventId);
+            Write(message, EventLogEntryType.Information, eventId, SourceService);
         }
 
         public static void WriteWarning(string message, int eventId = EvtGenericWarning)
         {
-            Write(message, EventLogEntryType.Warning, eventId);
+            Write(message, EventLogEntryType.Warning, eventId, SourceService);
         }
 
         public static void WriteError(string message, int eventId = EvtGenericError)
         {
-            Write(message, EventLogEntryType.Error, eventId);
+            Write(message, EventLogEntryType.Error, eventId, SourceService);
         }
 
         public static void WriteError(string message, Exception ex, int eventId = EvtGenericError)
         {
-            Write($"{message}\r\n{ex}", EventLogEntryType.Error, eventId);
+            Write($"{message}\r\n{ex}", EventLogEntryType.Error, eventId, SourceService);
         }
 
-        private static void Write(string message, EventLogEntryType type, int eventId)
+        public static void WriteTrayInfo(string message, int eventId = EvtGenericWarning)
+        {
+            Write(message, EventLogEntryType.Information, eventId, SourceTray);
+        }
+
+        public static void WriteTrayWarning(string message, int eventId = EvtGenericWarning)
+        {
+            Write(message, EventLogEntryType.Warning, eventId, SourceTray);
+        }
+
+        public static void WriteTrayError(string message, int eventId = EvtGenericError)
+        {
+            Write(message, EventLogEntryType.Error, eventId, SourceTray);
+        }
+
+        public static void WriteTrayError(string message, Exception ex, int eventId = EvtGenericError)
+        {
+            Write($"{message}\r\n{ex}", EventLogEntryType.Error, eventId, SourceTray);
+        }
+
+        private static void Write(string message, EventLogEntryType type, int eventId, string source)
         {
             try
             {
-                // Truncate to Event Log limit (32,766 bytes).
+                // Truncate to reasonable size
                 if (message != null && message.Length > 30000)
                     message = message.Substring(0, 30000) + "... [truncated]";
 
-                EventLog.WriteEntry(Source, message ?? "(null)", type, eventId);
-                
-                // Also write to file log for reliability
-                string logFile = @"C:\ProgramData\AlwaysPrint\service.log";
-                try
+                string logFile = GetLogFileName();
+                string logMessage = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{source}] Event {eventId}: {message}";
+
+                lock (LogLock)
                 {
-                    System.IO.Directory.CreateDirectory(@"C:\ProgramData\AlwaysPrint");
-                    string logMessage = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{type}] Event {eventId}: {message}";
-                    System.IO.File.AppendAllText(logFile, logMessage + "\n");
-                }
-                catch
-                {
-                    // Ignore file log errors
+                    Directory.CreateDirectory(LogDirectory);
+                    File.AppendAllText(logFile, logMessage + "\n");
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                // Last resort: write to Debug output – avoids infinite recursion.
-                Debug.WriteLine($"[AlwaysPrint EventLogWriter] Failed to write event: {ex.Message}");
+                // Ignore all logging errors - this is a last resort
             }
+        }
+
+        private static string GetLogFileName()
+        {
+            string datePart = DateTime.Now.ToString("yyyyMMdd");
+            return Path.Combine(LogDirectory, $"AlwaysPrint_{datePart}.log");
         }
     }
 }
