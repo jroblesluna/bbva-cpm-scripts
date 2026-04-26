@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AlwaysPrint WiX v4 Installer
+  Instala:
+    - AlwaysPrintService.exe  → servicio Windows (LocalSystem, inicio automático)
+    - AlwaysPrintTray.exe     → aplicación de bandeja (lanzada por el servicio)
+    - AlwaysPrint.Shared.dll  → biblioteca compartida
+    - Newtonsoft.Json.dll     → dependencia NuGet
+  Crea:
+    - Source de Event Log "AlwaysPrint" en Application log
+    - Claves de registro en HKLM\SOFTWARE\Robles.AI\AlwaysPrint con valores por defecto
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package Name="AlwaysPrint"
+           Language="1033"
+           Version="1.0.0"
+           Manufacturer="Robles.AI"
+           UpgradeCode="C7A4B5D6-A100-4E00-8F00-BBVA00000001"
+           Compressed="yes">
+
+    <Property Id="ARPCopyright"    Value="© 2025 Robles.AI - antonio@robles.ai" />
+    <Property Id="ARPCONTACT"      Value="antonio@robles.ai" />
+    <Property Id="ARPURLINFOABOUT" Value="https://robles.ai" />
+    <Property Id="ARPNOREPAIR"     Value="1" />
+    <Property Id="ARPHELPLINK"     Value="antonio@robles.ai" />
+
+    <MajorUpgrade DowngradeErrorMessage="Ya está instalada una versión más reciente de AlwaysPrint." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <!-- Carpeta destino: C:\Program Files\Robles.AI\AlwaysPrint\ -->
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="DirRoblesAI" Name="Robles.AI">
+        <Directory Id="INSTALLFOLDER" Name="AlwaysPrint" />
+      </Directory>
+    </StandardDirectory>
+
+    <ComponentGroup Id="AlwaysPrint.Components">
+
+      <!-- ── Componente principal: Service + DLLs compartidas + registro ── -->
+      <Component Id="cmpService" Directory="INSTALLFOLDER"
+                 Guid="C7A4B5D6-B200-4E00-8F00-BBVA00000002">
+
+        <File Id="filServiceExe"
+              Source=".\dist\AlwaysPrintService.exe"
+              KeyPath="yes" />
+        <File Id="filSharedDll"
+              Source=".\dist\AlwaysPrint.Shared.dll" />
+        <File Id="filNewtonsoftDll"
+              Source=".\dist\Newtonsoft.Json.dll" />
+
+        <!-- Windows Service -->
+        <ServiceInstall
+            Id="svcInstall"
+            Name="AlwaysPrintService"
+            DisplayName="AlwaysPrint Service"
+            Description="Gestión corporativa de colas de impresión AlwaysPrint. (c) 2025 Robles.AI"
+            Type="ownProcess"
+            Start="auto"
+            ErrorControl="normal"
+            Vital="yes"
+            Account="LocalSystem" />
+
+        <ServiceControl
+            Id="svcControl"
+            Name="AlwaysPrintService"
+            Start="install"
+            Stop="both"
+            Remove="uninstall"
+            Wait="yes" />
+
+        <!-- Política de recuperación: reinicio en los 3 primeros fallos -->
+        <util:ServiceConfig
+            ServiceName="AlwaysPrintService"
+            FirstFailureActionType="restart"
+            SecondFailureActionType="restart"
+            ThirdFailureActionType="restart"
+            RestartServiceDelayInSeconds="60"
+            ResetPeriodInDays="1" />
+
+        <!-- Event Log source (Application log) -->
+        <util:EventSource
+            Log="Application"
+            Name="AlwaysPrint"
+            EventMessageFile="[SystemFolder]EventCreate.exe" />
+
+        <!-- Registro: clave con valores por defecto -->
+        <RegistryKey Root="HKLM" Key="SOFTWARE\Robles.AI\AlwaysPrint">
+          <RegistryValue Name="CorporateQueueName"       Type="string"  Value=""  />
+          <RegistryValue Name="PendingTaskPollingMinutes" Type="integer" Value="3" />
+          <RegistryValue Name="BootstrapDomains"         Type="string"
+                         Value="robles.ai,iol.pe,sistemas.com.pe" />
+          <RegistryValue Name="RoblesAiLicenseSerial"    Type="string"  Value=""  />
+          <RegistryValue Name="SearchTargets"            Type="string"
+                         Value='{"ips":"","ranges":""}' />
+        </RegistryKey>
+      </Component>
+
+      <!-- ── Componente Tray (EXE separado, sin servicio) ── -->
+      <Component Id="cmpTray" Directory="INSTALLFOLDER"
+                 Guid="C7A4B5D6-C300-4E00-8F00-BBVA00000003">
+        <File Id="filTrayExe"
+              Source=".\dist\AlwaysPrintTray.exe"
+              KeyPath="yes" />
+      </Component>
+
+    </ComponentGroup>
+
+    <Feature Id="ProductFeature" Title="AlwaysPrint" Level="1">
+      <ComponentGroupRef Id="AlwaysPrint.Components" />
+    </Feature>
+
+  </Package>
+</Wix>
