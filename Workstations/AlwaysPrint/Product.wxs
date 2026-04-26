@@ -26,6 +26,10 @@
     <Property Id="ARPNOREPAIR"     Value="1" />
     <Property Id="ARPHELPLINK"     Value="antonio@robles.ai" />
 
+    <!-- Icono para Panel de Control (Add/Remove Programs) -->
+    <Icon Id="ProductIcon" SourceFile="logo.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
+
     <!-- MajorUpgrade: desinstala automáticamente versiones anteriores -->
     <MajorUpgrade
         Schedule="afterInstallInitialize"

@@ -13,7 +13,7 @@
 - **Tamaños incluidos**: 16x16, 32x32, 48x48, 256x256 pixels
 - **Generación**: Automática desde logo.png mediante `convert-icon.ps1`
 
-## Usos del Icono
+## Usos del Logo
 
 ### 1. Icono de Aplicación (EXE)
 
@@ -75,6 +75,20 @@ El formulario "Acerca de" muestra el logo como imagen:
   }
   ```
 - Mostrado en un `PictureBox` de 80x80 pixels
+
+### 4. Icono en Panel de Control (Add/Remove Programs)
+
+El icono se muestra en el Panel de Control junto al nombre del programa:
+
+**Configuración**:
+- Definido en `Product.wxs`:
+  ```xml
+  <Icon Id="ProductIcon" SourceFile="logo.ico" />
+  <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
+  ```
+- Se ve en: 
+  - Configuración → Aplicaciones → AlwaysPrint
+  - Panel de Control → Programas y características → AlwaysPrint
 
 ## Proceso de Build
 
