@@ -68,26 +68,37 @@ namespace AlwaysPrintTray
 
         private void BootstrapSequence()
         {
+            string logFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AlwaysPrintTray.log");
             try
             {
+                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Bootstrap iniciado\n");
+
                 // 1. Verify the service is running.
-                if (!IsServiceRunning())
+                bool serviceRunning = IsServiceRunning();
+                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Servicio corriendo: {serviceRunning}\n");
+                
+                if (!serviceRunning)
                 {
                     ShowBalloon("AlwaysPrint",
                         "El servicio AlwaysPrintService no está en ejecución.", ToolTipIcon.Error);
                     EventLogWriter.WriteError("Tray: AlwaysPrintService is not running. Exiting.",
                         EventLogWriter.EvtGenericError);
+                    System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Servicio no corriendo, saliendo\n");
                     ExitApplication();
                     return;
                 }
 
                 // 2. Connect to the Named Pipe within 60 s.
+                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Intentando conectar al pipe\n");
                 bool connected = _pipe.Connect();
+                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Conexión al pipe: {connected}\n");
+                
                 if (!connected)
                 {
                     ShowBalloon("AlwaysPrint",
                         "No se pudo conectar al servicio. Verifique que esté en ejecución.", ToolTipIcon.Error);
                     EventLogWriter.WriteError("Tray: cannot connect to pipe. Exiting.", EventLogWriter.EvtGenericError);
+                    System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] No se pudo conectar, saliendo\n");
                     ExitApplication();
                     return;
                 }
@@ -96,7 +107,9 @@ namespace AlwaysPrintTray
                 var cfg = _registry.Load();
 
                 // 4. Perform domain health check.
+                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Iniciando health check\n");
                 var (success, domain, details) = DomainHealthChecker.CheckAll(cfg.BootstrapDomains, _cts.Token);
+                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Health check: {success}, domain={domain}, details={details}\n");
 
                 // 5. Notify service of initialization result.
                 var initPayload = new TrayInitializedPayload
@@ -104,7 +117,9 @@ namespace AlwaysPrintTray
                     Success = success,
                     Details = success ? $"OK via {domain}" : details
                 };
+                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Enviando TrayInitialized\n");
                 _pipe.Send(PipeMessage.Create(MessageType.TrayInitialized, initPayload));
+                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] TrayInitialized enviado\n");
 
                 if (success)
                 {
@@ -123,6 +138,7 @@ namespace AlwaysPrintTray
             catch (OperationCanceledException) { /* normal shutdown */ }
             catch (Exception ex)
             {
+                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Error: {ex}\n");
                 EventLogWriter.WriteError("Tray bootstrap sequence failed.", ex, EventLogWriter.EvtGenericError);
             }
         }

@@ -118,14 +118,17 @@ namespace AlwaysPrintService
 
         private void RunStartupSequence()
         {
+            string logFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AlwaysPrintService.log");
             try
             {
+                System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] RunStartupSequence iniciado\n");
                 EventLogWriter.WriteInfo("AlwaysPrintService iniciando...", EventLogWriter.EvtServiceStarted);
                 _state.Transition(ServiceState.Starting);
 
                 // 1. Guardia contra instancias duplicadas del servicio.
                 if (IsDuplicateServiceRunning())
                 {
+                    System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] Instancia duplicada detectada\n");
                     EventLogWriter.WriteWarning("Instancia duplicada de AlwaysPrintService detectada. Abortando inicio.",
                         EventLogWriter.EvtDuplicateInstance);
                     Stop();
@@ -153,21 +156,26 @@ namespace AlwaysPrintService
                     EventLogWriter.WriteInfo("Cola de tareas inicializada vacía.", EventLogWriter.EvtQueueCleared);
 
                 // 5. Iniciar servidor Named Pipe.
+                System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] Iniciando PipeServer\n");
                 _dispatcher = new MessageDispatcher(_registry, _taskQueue, _state);
                 _dispatcher.TrayInitializedReceived += OnTrayInitialized;
                 _pipeServer = new PipeServer(_dispatcher);
                 _pipeServer.Start();
+                System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] PipeServer iniciado\n");
 
                 // 6. Bucle principal: esperar usuario → lanzar Tray → monitorear.
                 //    Se repite tras cada logoff para relanzar el Tray en la siguiente sesión.
+                System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] Iniciando RunSessionLoop\n");
                 RunSessionLoop();
             }
             catch (OperationCanceledException)
             {
+                System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] Cancelado\n");
                 EventLogWriter.WriteInfo("Secuencia de inicio cancelada.");
             }
             catch (Exception ex)
             {
+                System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] Error: {ex}\n");
                 EventLogWriter.WriteError("Error fatal en la secuencia de inicio.", ex);
                 Stop();
             }
@@ -221,9 +229,11 @@ namespace AlwaysPrintService
 
         private void WaitForUser()
         {
+            string logFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AlwaysPrintService.log");
             while (!SessionMonitor.IsUserLoggedIn())
             {
                 if (_cts.IsCancellationRequested) return;
+                System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] Esperando sesión de usuario...\n");
                 EventLogWriter.WriteInfo("Esperando sesión interactiva de usuario...", EventLogWriter.EvtWaitingUser);
 
                 // Espera hasta UserPollSeconds o hasta que OnSessionChange señale _userArrivedGate.
@@ -236,11 +246,15 @@ namespace AlwaysPrintService
 
                 if (signaled == 1) return; // CancellationToken señalizado → salir
             }
+            System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] Sesión de usuario detectada\n");
             EventLogWriter.WriteInfo("Sesión interactiva de usuario detectada.", EventLogWriter.EvtUserDetected);
         }
 
         private void LaunchTray()
         {
+            // Dar tiempo a que el PipeServer esté listo
+            System.Threading.Thread.Sleep(2000);
+            
             string trayExe = Path.Combine(
                 Path.GetDirectoryName(Process.GetCurrentProcess().MainModule!.FileName)!,
                 "AlwaysPrintTray.exe");
