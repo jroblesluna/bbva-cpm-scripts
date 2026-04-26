@@ -17,7 +17,7 @@ namespace AlwaysPrintService
         // 'new' suprime CS0108 — la constante oculta intencionalmente ServiceBase.ServiceName
         // para que el nombre sea accesible en tiempo de compilación sin instanciar el servicio.
         public new const string ServiceName = "AlwaysPrintService";
-        private const int TrayTimeoutSeconds = 300;   // 5 minutos
+        private const int TrayTimeoutSeconds = 1800;   // 30 minutos (aumentado para dar más tiempo al Tray)
         private const int UserPollSeconds    = 60;
 
         // ── Components ──────────────────────────────────────────────────────────
@@ -118,9 +118,10 @@ namespace AlwaysPrintService
 
         private void RunStartupSequence()
         {
-            string logFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AlwaysPrintService.log");
+            string logFile = @"C:\ProgramData\AlwaysPrint\service.log";
             try
             {
+                System.IO.Directory.CreateDirectory(@"C:\ProgramData\AlwaysPrint");
                 System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] RunStartupSequence iniciado\n");
                 EventLogWriter.WriteInfo("AlwaysPrintService iniciando...", EventLogWriter.EvtServiceStarted);
                 _state.Transition(ServiceState.Starting);
@@ -200,15 +201,17 @@ namespace AlwaysPrintService
                 _state.Transition(ServiceState.TrayStarting);
                 LaunchTray();
 
-                // ── Esperar handshake del Tray (máx. 5 min) ─────────────────────
+                // ── Esperar handshake del Tray (máx. 10 min) ─────────────────────
                 bool trayOk = _trayInitGate.Wait(TimeSpan.FromSeconds(TrayTimeoutSeconds), _cts.Token);
                 if (_cts.IsCancellationRequested) return;
 
                 if (!trayOk)
                 {
                     _state.Transition(ServiceState.TrayError);
+                    string logFile = @"C:\ProgramData\AlwaysPrint\service.log";
+                    System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] Timeout esperando handshake del Tray ({TrayTimeoutSeconds}s)\n");
                     EventLogWriter.WriteError(
-                        "El Tray no confirmó la inicialización en el tiempo límite. Deteniendo el servicio para recuperación SCM.",
+                        $"El Tray no confirmó la inicialización en el tiempo límite ({TrayTimeoutSeconds}s). Deteniendo el servicio para recuperación SCM.",
                         EventLogWriter.EvtTrayError);
                     Stop();
                     return;
@@ -229,7 +232,7 @@ namespace AlwaysPrintService
 
         private void WaitForUser()
         {
-            string logFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AlwaysPrintService.log");
+            string logFile = @"C:\ProgramData\AlwaysPrint\service.log";
             while (!SessionMonitor.IsUserLoggedIn())
             {
                 if (_cts.IsCancellationRequested) return;
@@ -252,24 +255,44 @@ namespace AlwaysPrintService
 
         private void LaunchTray()
         {
-            // Dar tiempo a que el PipeServer esté listo
-            System.Threading.Thread.Sleep(2000);
+            string logFile = @"C:\ProgramData\AlwaysPrint\service.log";
+            System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] LaunchTray: esperando 3 segundos para que PipeServer esté listo\n");
+            
+            // Dar tiempo a que el PipeServer esté completamente listo para aceptar conexiones
+            System.Threading.Thread.Sleep(3000);
             
             string trayExe = Path.Combine(
                 Path.GetDirectoryName(Process.GetCurrentProcess().MainModule!.FileName)!,
                 "AlwaysPrintTray.exe");
 
+            System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] LaunchTray: lanzando {trayExe}\n");
             bool ok = InteractiveProcessLauncher.Launch(trayExe);
             if (!ok)
-                EventLogWriter.WriteError($"Failed to launch Tray from '{trayExe}'.", EventLogWriter.EvtTrayError);
+            {
+                System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] LaunchTray: fallo al lanzar Tray\n");
+                EventLogWriter.WriteError($"No se pudo lanzar el Tray desde '{trayExe}'.", EventLogWriter.EvtTrayError);
+            }
+            else
+            {
+                System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] LaunchTray: Tray lanzado exitosamente\n");
+            }
         }
 
         private void OnTrayInitialized(bool success, string? details)
         {
+            string logFile = @"C:\ProgramData\AlwaysPrint\service.log";
+            System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] OnTrayInitialized: success={success}, details={details}\n");
+            
             if (success)
+            {
+                System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] Señalizando _trayInitGate\n");
                 _trayInitGate.Set();
+            }
             else
-                EventLogWriter.WriteWarning($"Tray reported failed initialization: {details}", EventLogWriter.EvtTrayError);
+            {
+                System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] Tray reportó fallo de inicialización\n");
+                EventLogWriter.WriteWarning($"Tray reportó fallo de inicialización: {details}", EventLogWriter.EvtTrayError);
+            }
         }
 
         private void MonitoringLoop()

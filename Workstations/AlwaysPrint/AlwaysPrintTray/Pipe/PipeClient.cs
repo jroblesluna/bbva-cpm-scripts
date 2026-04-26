@@ -35,31 +35,53 @@ namespace AlwaysPrintTray.Pipe
         {
             lock (_lock)
             {
+                string logFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AlwaysPrintTray.log");
+                AppendLog(logFile, "PipeClient.Connect: intentando conectar");
+                
                 DisposeTransport();
                 _pipe = new NamedPipeClientStream(".", AlwaysPrint.Shared.Messages.PipeConstants.PipeName,
                     PipeDirection.InOut, PipeOptions.None);
 
                 try
                 {
+                    AppendLog(logFile, $"PipeClient.Connect: llamando _pipe.Connect({ConnectTimeoutMs}ms)");
                     _pipe.Connect(ConnectTimeoutMs);
+                    AppendLog(logFile, "PipeClient.Connect: conectado exitosamente");
+                    
                     _pipe.ReadMode = PipeTransmissionMode.Byte;
-                    _pipe.ReadTimeout = ReadTimeoutMs;
+                    // NOTA: Los Named Pipes no soportan ReadTimeout/WriteTimeout en .NET Framework.
+                    // No establecemos timeouts aquí; usamos CancellationToken en su lugar si es necesario.
                     _reader = new StreamReader(_pipe, Encoding.UTF8, false, 65536, leaveOpen: true);
                     _writer = new StreamWriter(_pipe, Encoding.UTF8, 65536, leaveOpen: true) { AutoFlush = true };
+                    AppendLog(logFile, "PipeClient.Connect: streams configurados");
                     return true;
                 }
-                catch (TimeoutException)
+                catch (TimeoutException ex)
                 {
+                    AppendLog(logFile, $"PipeClient.Connect: timeout - {ex.Message}");
                     EventLogWriter.WriteError("PipeClient: connection timed out.", EventLogWriter.EvtGenericError);
                     DisposeTransport();
                     return false;
                 }
                 catch (Exception ex)
                 {
+                    AppendLog(logFile, $"PipeClient.Connect: error - {ex.GetType().Name}: {ex.Message}");
                     EventLogWriter.WriteError("PipeClient: connection failed.", ex, EventLogWriter.EvtGenericError);
                     DisposeTransport();
                     return false;
                 }
+            }
+        }
+
+        private static void AppendLog(string logFile, string message)
+        {
+            try
+            {
+                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
+            }
+            catch
+            {
+                // Ignorar errores de escritura de log
             }
         }
 

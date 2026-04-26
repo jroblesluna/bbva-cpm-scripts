@@ -51,15 +51,21 @@ namespace AlwaysPrintService.Pipe
 
         private void ListenerLoop()
         {
+            string logFile = @"C:\ProgramData\AlwaysPrint\service.log";
+            System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] PipeServer.ListenerLoop: iniciado\n");
+            
             while (!_cts.IsCancellationRequested)
             {
                 NamedPipeServerStream? pipe = null;
                 try
                 {
+                    System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] PipeServer.ListenerLoop: creando pipe\n");
                     pipe = CreatePipe();
 
                     // Block until a client connects (or cancellation).
+                    System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] PipeServer.ListenerLoop: esperando conexión\n");
                     pipe.WaitForConnection();
+                    System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] PipeServer.ListenerLoop: cliente conectado\n");
 
                     // Hand off to a client thread; we immediately loop to accept the next.
                     var clientPipe = pipe;
@@ -71,14 +77,20 @@ namespace AlwaysPrintService.Pipe
                     t.Start();
                     pipe = null; // ownership transferred to HandleClient
                 }
-                catch (OperationCanceledException) { break; }
+                catch (OperationCanceledException) 
+                { 
+                    System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] PipeServer.ListenerLoop: cancelado\n");
+                    break; 
+                }
                 catch (Exception ex) when (!_cts.IsCancellationRequested)
                 {
+                    System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] PipeServer.ListenerLoop: error - {ex.GetType().Name}: {ex.Message}\n");
                     EventLogWriter.WriteError("PipeServer listener error.", ex);
                     pipe?.Dispose();
                     Thread.Sleep(1000); // brief back-off before re-creating the pipe
                 }
             }
+            System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] PipeServer.ListenerLoop: finalizado\n");
         }
 
         private static NamedPipeServerStream CreatePipe()

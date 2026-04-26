@@ -16,7 +16,8 @@ namespace AlwaysPrintService.UserSession
         public static bool IsUserLoggedIn()
         {
             uint sessionId = WTSGetActiveConsoleSessionId();
-            string logFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AlwaysPrintService.log");
+            string logFile = @"C:\ProgramData\AlwaysPrint\service.log";
+            System.IO.Directory.CreateDirectory(@"C:\ProgramData\AlwaysPrint");
             System.IO.File.AppendAllText(logFile, $"[{System.DateTime.Now:yyyy-MM-dd HH:mm:ss}] IsUserLoggedIn: sessionId={sessionId}, NO_ACTIVE_SESSION={NO_ACTIVE_SESSION}\n");
             
             if (sessionId == NO_ACTIVE_SESSION) return false;

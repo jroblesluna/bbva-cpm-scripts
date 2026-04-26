@@ -44,6 +44,14 @@ namespace AlwaysPrintTray
                 Name = "AlwaysPrint-TrayBootstrap"
             };
             t.Start();
+            
+            // Run monitoring loop to keep the tray alive and responsive.
+            var monitorThread = new Thread(MonitoringLoop)
+            {
+                IsBackground = true,
+                Name = "AlwaysPrint-TrayMonitor"
+            };
+            monitorThread.Start();
         }
 
         private NotifyIcon BuildTrayIcon()
@@ -71,11 +79,11 @@ namespace AlwaysPrintTray
             string logFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AlwaysPrintTray.log");
             try
             {
-                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Bootstrap iniciado\n");
+                AppendLog(logFile, $"Bootstrap iniciado");
 
                 // 1. Verify the service is running.
                 bool serviceRunning = IsServiceRunning();
-                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Servicio corriendo: {serviceRunning}\n");
+                AppendLog(logFile, $"Servicio corriendo: {serviceRunning}");
                 
                 if (!serviceRunning)
                 {
@@ -83,22 +91,36 @@ namespace AlwaysPrintTray
                         "El servicio AlwaysPrintService no está en ejecución.", ToolTipIcon.Error);
                     EventLogWriter.WriteError("Tray: AlwaysPrintService is not running. Exiting.",
                         EventLogWriter.EvtGenericError);
-                    System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Servicio no corriendo, saliendo\n");
+                    AppendLog(logFile, $"Servicio no corriendo, saliendo");
                     ExitApplication();
                     return;
                 }
 
-                // 2. Connect to the Named Pipe within 60 s.
-                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Intentando conectar al pipe\n");
-                bool connected = _pipe.Connect();
-                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Conexión al pipe: {connected}\n");
+                // 2. Connect to the Named Pipe within 60 s, with retries.
+                AppendLog(logFile, $"Intentando conectar al pipe");
+                bool connected = false;
+                int maxRetries = 5;
+                int retryCount = 0;
+                
+                while (!connected && retryCount < maxRetries && !_cts.Token.IsCancellationRequested)
+                {
+                    connected = _pipe.Connect();
+                    AppendLog(logFile, $"Intento {retryCount + 1}/{maxRetries}: {(connected ? "éxito" : "fallo")}");
+                    
+                    if (!connected && retryCount < maxRetries - 1)
+                    {
+                        AppendLog(logFile, $"Esperando 1 segundo antes de reintentar...");
+                        Thread.Sleep(1000);
+                    }
+                    retryCount++;
+                }
                 
                 if (!connected)
                 {
                     ShowBalloon("AlwaysPrint",
                         "No se pudo conectar al servicio. Verifique que esté en ejecución.", ToolTipIcon.Error);
-                    EventLogWriter.WriteError("Tray: cannot connect to pipe. Exiting.", EventLogWriter.EvtGenericError);
-                    System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] No se pudo conectar, saliendo\n");
+                    EventLogWriter.WriteError("Tray: cannot connect to pipe after retries. Exiting.", EventLogWriter.EvtGenericError);
+                    AppendLog(logFile, $"No se pudo conectar después de {maxRetries} intentos, saliendo");
                     ExitApplication();
                     return;
                 }
@@ -107,9 +129,9 @@ namespace AlwaysPrintTray
                 var cfg = _registry.Load();
 
                 // 4. Perform domain health check.
-                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Iniciando health check\n");
+                AppendLog(logFile, $"Iniciando health check");
                 var (success, domain, details) = DomainHealthChecker.CheckAll(cfg.BootstrapDomains, _cts.Token);
-                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Health check: {success}, domain={domain}, details={details}\n");
+                AppendLog(logFile, $"Health check: {success}, domain={domain}, details={details}");
 
                 // 5. Notify service of initialization result.
                 var initPayload = new TrayInitializedPayload
@@ -117,9 +139,9 @@ namespace AlwaysPrintTray
                     Success = success,
                     Details = success ? $"OK via {domain}" : details
                 };
-                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Enviando TrayInitialized\n");
+                AppendLog(logFile, $"Enviando TrayInitialized");
                 _pipe.Send(PipeMessage.Create(MessageType.TrayInitialized, initPayload));
-                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] TrayInitialized enviado\n");
+                AppendLog(logFile, $"TrayInitialized enviado");
 
                 if (success)
                 {
@@ -138,8 +160,20 @@ namespace AlwaysPrintTray
             catch (OperationCanceledException) { /* normal shutdown */ }
             catch (Exception ex)
             {
-                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Error: {ex}\n");
+                AppendLog(logFile, $"Error: {ex}");
                 EventLogWriter.WriteError("Tray bootstrap sequence failed.", ex, EventLogWriter.EvtGenericError);
+            }
+        }
+
+        private static void AppendLog(string logFile, string message)
+        {
+            try
+            {
+                System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
+            }
+            catch
+            {
+                // Ignorar errores de escritura de log
             }
         }
 
@@ -189,6 +223,38 @@ namespace AlwaysPrintTray
             // Siempre hacer marshal al hilo UI mediante el SynchronizationContext capturado
             // en el constructor. Post es fire-and-forget; no bloquea el hilo de fondo.
             _uiContext.Post(_ => _trayIcon.ShowBalloonTip(5000, title, message, icon), null);
+        }
+
+        private void MonitoringLoop()
+        {
+            string logFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AlwaysPrintTray.log");
+            System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] MonitoringLoop iniciado\n");
+            
+            while (!_cts.Token.IsCancellationRequested)
+            {
+                try
+                {
+                    // Esperar 30 segundos o hasta que se cancele
+                    _cts.Token.WaitHandle.WaitOne(TimeSpan.FromSeconds(30));
+                    
+                    if (_cts.Token.IsCancellationRequested) break;
+                    
+                    // Heartbeat: verificar que el servicio sigue activo
+                    if (_pipe.IsConnected)
+                    {
+                        bool alive = _pipe.Ping();
+                        if (!alive)
+                        {
+                            System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Servicio no responde al ping\n");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] MonitoringLoop error: {ex.Message}\n");
+                }
+            }
+            System.IO.File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] MonitoringLoop finalizado\n");
         }
 
         protected override void Dispose(bool disposing)
