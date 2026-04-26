@@ -17,7 +17,7 @@
            Language="1033"
            Version="!(bind.FileVersion.filServiceExe)"
            Manufacturer="Robles.AI"
-           UpgradeCode="C7A4B5D6-A100-4E00-8F00-BBVA00000001"
+           UpgradeCode="C7A4B5D6-A100-4E00-8F00-0BBA00000001"
            Compressed="yes">
 
     <Property Id="ARPCopyright"    Value="© 2025 Robles.AI - antonio@robles.ai" />
@@ -40,7 +40,7 @@
 
       <!-- ── Componente principal: Service + DLLs compartidas + registro ── -->
       <Component Id="cmpService" Directory="INSTALLFOLDER"
-                 Guid="C7A4B5D6-B200-4E00-8F00-BBVA00000002">
+                 Guid="C7A4B5D6-B200-4E00-8F00-0BBA00000002">
 
         <File Id="filServiceExe"
               Source=".\dist\AlwaysPrintService.exe"
@@ -101,7 +101,7 @@
 
       <!-- ── Componente Tray (EXE separado, sin servicio) ── -->
       <Component Id="cmpTray" Directory="INSTALLFOLDER"
-                 Guid="C7A4B5D6-C300-4E00-8F00-BBVA00000003">
+                 Guid="C7A4B5D6-C300-4E00-8F00-0BBA00000003">
         <File Id="filTrayExe"
               Source=".\dist\AlwaysPrintTray.exe"
               KeyPath="yes" />
