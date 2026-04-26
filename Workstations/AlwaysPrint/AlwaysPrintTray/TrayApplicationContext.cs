@@ -89,7 +89,7 @@ namespace AlwaysPrintTray
                 {
                     ShowBalloon("AlwaysPrint",
                         "El servicio AlwaysPrintService no está en ejecución.", ToolTipIcon.Error);
-                    EventLogWriter.WriteError("Tray: AlwaysPrintService is not running. Exiting.",
+                    EventLogWriter.WriteTrayError("Tray: AlwaysPrintService is not running. Exiting.",
                         EventLogWriter.EvtGenericError);
                     AppendLog(logFile, $"Servicio no corriendo, saliendo");
                     ExitApplication();
@@ -119,7 +119,7 @@ namespace AlwaysPrintTray
                 {
                     ShowBalloon("AlwaysPrint",
                         "No se pudo conectar al servicio. Verifique que esté en ejecución.", ToolTipIcon.Error);
-                    EventLogWriter.WriteError("Tray: cannot connect to pipe after retries. Exiting.", EventLogWriter.EvtGenericError);
+                    EventLogWriter.WriteTrayError("Tray: cannot connect to pipe after retries. Exiting.", EventLogWriter.EvtGenericError);
                     AppendLog(logFile, $"No se pudo conectar después de {maxRetries} intentos, saliendo");
                     ExitApplication();
                     return;
@@ -146,7 +146,7 @@ namespace AlwaysPrintTray
                 if (success)
                 {
                     ShowBalloon("AlwaysPrint", $"Inicializado correctamente ({domain}).", ToolTipIcon.Info);
-                    EventLogWriter.WriteInfo($"Tray initialized successfully. Domain={domain}",
+                    EventLogWriter.WriteTrayInfo($"Tray initialized successfully. Domain={domain}",
                         EventLogWriter.EvtTrayStarted);
                 }
                 else
@@ -154,14 +154,14 @@ namespace AlwaysPrintTray
                     ShowBalloon("AlwaysPrint",
                         "No se pudo contactar el servidor de licencias. Operando en modo local.",
                         ToolTipIcon.Warning);
-                    EventLogWriter.WriteWarning($"Tray: bootstrap failed. {details}", EventLogWriter.EvtGenericWarning);
+                    EventLogWriter.WriteTrayWarning($"Tray: bootstrap failed. {details}", EventLogWriter.EvtGenericWarning);
                 }
             }
             catch (OperationCanceledException) { /* normal shutdown */ }
             catch (Exception ex)
             {
                 AppendLog(logFile, $"Error: {ex}");
-                EventLogWriter.WriteError("Tray bootstrap sequence failed.", ex, EventLogWriter.EvtGenericError);
+                EventLogWriter.WriteTrayError("Tray bootstrap sequence failed.", ex, EventLogWriter.EvtGenericError);
             }
         }
 

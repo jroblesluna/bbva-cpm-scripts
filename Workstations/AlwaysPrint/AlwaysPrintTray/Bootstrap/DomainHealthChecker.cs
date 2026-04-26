@@ -58,7 +58,7 @@ namespace AlwaysPrintTray.Bootstrap
 
                     if (response.StatusCode != HttpStatusCode.OK)
                     {
-                        EventLogWriter.WriteInfo($"Bootstrap: {url} devolvió {(int)response.StatusCode}.");
+                        EventLogWriter.WriteTrayInfo($"Bootstrap: {url} devolvió {(int)response.StatusCode}.");
                         continue;
                     }
 
@@ -67,12 +67,12 @@ namespace AlwaysPrintTray.Bootstrap
                         string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                         if (body.IndexOf(ExpectedBodyFragment, StringComparison.Ordinal) < 0)
                         {
-                            EventLogWriter.WriteInfo($"Bootstrap: {url} no contiene el fragmento esperado.");
+                            EventLogWriter.WriteTrayInfo($"Bootstrap: {url} no contiene el fragmento esperado.");
                             continue;
                         }
                     }
 
-                    EventLogWriter.WriteInfo($"Bootstrap: {url} respondió OK.", EventLogWriter.EvtServiceStarted);
+                    EventLogWriter.WriteTrayInfo($"Bootstrap: {url} respondió OK.", EventLogWriter.EvtServiceStarted);
                     return (true, domain, url);
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -83,11 +83,11 @@ namespace AlwaysPrintTray.Bootstrap
                 catch (OperationCanceledException)
                 {
                     // Timeout del dominio individual — continuar con el siguiente.
-                    EventLogWriter.WriteInfo($"Bootstrap: {url} timeout ({TimeoutSecs} s).");
+                    EventLogWriter.WriteTrayInfo($"Bootstrap: {url} timeout ({TimeoutSecs} s).");
                 }
                 catch (Exception ex)
                 {
-                    EventLogWriter.WriteInfo($"Bootstrap: {url} error – {ex.Message}");
+                    EventLogWriter.WriteTrayInfo($"Bootstrap: {url} error – {ex.Message}");
                 }
             }
 

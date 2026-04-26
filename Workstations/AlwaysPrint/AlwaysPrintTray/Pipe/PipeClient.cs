@@ -59,14 +59,14 @@ namespace AlwaysPrintTray.Pipe
                 catch (TimeoutException ex)
                 {
                     AppendLog(logFile, $"PipeClient.Connect: timeout - {ex.Message}");
-                    EventLogWriter.WriteError("PipeClient: connection timed out.", EventLogWriter.EvtGenericError);
+                    EventLogWriter.WriteTrayError("PipeClient: connection timed out.", EventLogWriter.EvtGenericError);
                     DisposeTransport();
                     return false;
                 }
                 catch (Exception ex)
                 {
                     AppendLog(logFile, $"PipeClient.Connect: error - {ex.GetType().Name}: {ex.Message}");
-                    EventLogWriter.WriteError("PipeClient: connection failed.", ex, EventLogWriter.EvtGenericError);
+                    EventLogWriter.WriteTrayError("PipeClient: connection failed.", ex, EventLogWriter.EvtGenericError);
                     DisposeTransport();
                     return false;
                 }
@@ -108,7 +108,7 @@ namespace AlwaysPrintTray.Pipe
                 }
                 catch (Exception ex)
                 {
-                    EventLogWriter.WriteError("PipeClient: send/receive failed.", ex, EventLogWriter.EvtGenericError);
+                    EventLogWriter.WriteTrayError("PipeClient: send/receive failed.", ex, EventLogWriter.EvtGenericError);
                     DisposeTransport();
                     return null;
                 }

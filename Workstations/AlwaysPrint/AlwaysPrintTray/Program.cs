@@ -21,7 +21,7 @@ namespace AlwaysPrintTray
 
             if (!isNew)
             {
-                EventLogWriter.WriteWarning("AlwaysPrintTray: another instance is already running. Exiting.",
+                EventLogWriter.WriteTrayWarning("AlwaysPrintTray: another instance is already running. Exiting.",
                     EventLogWriter.EvtDuplicateInstance);
                 return;
             }
@@ -31,16 +31,16 @@ namespace AlwaysPrintTray
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
 
-                EventLogWriter.WriteInfo("AlwaysPrintTray started.", EventLogWriter.EvtServiceStarted);
+                EventLogWriter.WriteTrayInfo("AlwaysPrintTray started.", EventLogWriter.EvtServiceStarted);
                 Application.Run(new TrayApplicationContext());
             }
             catch (Exception ex)
             {
-                EventLogWriter.WriteError("AlwaysPrintTray unhandled exception.", ex, EventLogWriter.EvtGenericError);
+                EventLogWriter.WriteTrayError("AlwaysPrintTray unhandled exception.", ex, EventLogWriter.EvtGenericError);
             }
             finally
             {
-                EventLogWriter.WriteInfo("AlwaysPrintTray exiting.", EventLogWriter.EvtServiceStopped);
+                EventLogWriter.WriteTrayInfo("AlwaysPrintTray exiting.", EventLogWriter.EvtServiceStopped);
                 mutex.ReleaseMutex();
             }
         }
