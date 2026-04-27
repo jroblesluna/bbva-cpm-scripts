@@ -24,7 +24,8 @@
     <Reference Include="System.ServiceProcess" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Incluir logo.ico como recurso embebido -->
+    <!-- Incluir logo.ico y logo.png como recursos embebidos -->
     <EmbeddedResource Include="..\logo.ico" Link="Resources\logo.ico" />
+    <EmbeddedResource Include="..\logo.png" Link="Resources\logo.png" />
   </ItemGroup>
 </Project>

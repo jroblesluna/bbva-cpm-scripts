@@ -73,6 +73,39 @@ Este formato cumple con todos los límites de MSI:
 
 ### 2026-04-26
 
+#### Actualización de Documentación (v1.26.426.HHMM)
+- **README.md**: Actualizado con información completa y precisa
+  - Agregado formato de versión en el encabezado
+  - Actualizado sistema de logging (archivos en lugar de Event Log)
+  - Corregidos timeouts: 30 minutos para handshake del Tray (no 5 minutos)
+  - Agregados detalles del ciclo de vida del servicio
+  - Mejorada tabla de Event IDs con columna de origen (SVC/APP)
+  - Actualizada sección de troubleshooting con rutas de logs correctas
+  - Agregados detalles de build (generación de logo.ico, verificación de archivos)
+  - Mejorada sección de Bootstrap del Tray con detalles de implementación
+- **CLAUDE.md**: Actualizado con guía completa para agentes de IA
+  - Agregado formato de versión en el encabezado
+  - Tabla completa de archivos críticos con descripciones detalladas
+  - Constantes de tiempo críticas documentadas (timeouts, reintentos, delays)
+  - Tabla completa de tipos de mensaje del protocolo Named Pipe
+  - Mecanismo de wake-up entre threads explicado en detalle
+  - Sistema de logging actualizado (archivos, no Event Log)
+  - Versionado automático del MSI documentado
+  - Agregada sección "Decisiones de Arquitectura Clave" con justificaciones
+  - Agregada sección "Troubleshooting Avanzado" con diagnósticos específicos
+  - Agregada sección "Extensibilidad" con guías para agregar funcionalidad
+  - Convenciones de código ampliadas con mejores prácticas
+
+#### Mejoras en Iconos (v1.26.426.1620)
+- **Logo en "Acerca de"**: Corregido logo borroso
+  - Ahora usa `logo.png` de alta resolución (767x767 pixels) en lugar de convertir el `.ico`
+  - Fallback a ICO en resolución 256x256 si PNG no está disponible
+  - Resultado: Logo nítido y de alta calidad
+- **Notificaciones**: Agregado icono en el título de las notificaciones
+  - Configuración explícita de `BalloonTipIcon`, `BalloonTipTitle` y `BalloonTipText`
+  - El icono de AlwaysPrint ahora aparece en todas las notificaciones del sistema
+- **Recursos embebidos**: Agregado `logo.png` como recurso embebido en `AlwaysPrintTray.csproj`
+
 #### ProductCode Fijo (CAMBIO IMPORTANTE)
 - **Implementado**: ProductCode fijo `C7A4B5D6-A200-4E00-8F00-0BBA00000001`
 - **Beneficio**: Cualquier MSI puede actualizar o desinstalar cualquier versión anterior

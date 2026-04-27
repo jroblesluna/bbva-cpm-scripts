@@ -87,11 +87,19 @@ namespace AlwaysPrintTray.Forms
             try
             {
                 var assembly = Assembly.GetExecutingAssembly();
-                using var stream = assembly.GetManifestResourceStream("AlwaysPrintTray.Resources.logo.ico");
+                
+                // Intentar cargar el PNG de alta resolución primero
+                using var stream = assembly.GetManifestResourceStream("AlwaysPrintTray.Resources.logo.png");
                 if (stream != null)
                 {
-                    // Cargar el icono y convertirlo a bitmap
-                    using var icon = new Icon(stream);
+                    return Image.FromStream(stream);
+                }
+                
+                // Fallback al ICO si el PNG no está disponible
+                using var icoStream = assembly.GetManifestResourceStream("AlwaysPrintTray.Resources.logo.ico");
+                if (icoStream != null)
+                {
+                    using var icon = new Icon(icoStream, 256, 256); // Usar la resolución más alta disponible
                     return icon.ToBitmap();
                 }
             }

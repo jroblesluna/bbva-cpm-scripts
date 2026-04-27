@@ -226,7 +226,14 @@ namespace AlwaysPrintTray
 
         private void ShowBalloon(string title, string message, ToolTipIcon icon)
         {
-            _uiContext.Post(_ => _trayIcon.ShowBalloonTip(5000, title, message, icon), null);
+            _uiContext.Post(_ =>
+            {
+                // Configurar el icono del balloon tip para que use el icono del tray
+                _trayIcon.BalloonTipIcon = icon;
+                _trayIcon.BalloonTipTitle = title;
+                _trayIcon.BalloonTipText = message;
+                _trayIcon.ShowBalloonTip(5000);
+            }, null);
         }
 
         protected override void Dispose(bool disposing)
