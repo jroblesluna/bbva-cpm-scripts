@@ -57,7 +57,7 @@ Plataforma SaaS multi-tenant para la gestión centralizada de workstations Windo
 - **Backend (FastAPI)**: API REST + autenticación multi-tenant
 - **Frontend (Next.js 15)**: Dashboard web con subdominios por cliente
 - **Base de Datos**: PostgreSQL (producción) / SQLite (desarrollo)
-- **Cliente Windows**: AlwaysPrint (Service + Tray) - ver `Workstations/AlwaysPrint/`
+- **Cliente Windows**: AlwaysPrint (Service + Tray) - ver `../Client/`
 
 ### Stack Tecnológico
 
@@ -277,14 +277,15 @@ Una vez iniciado el backend, la documentación interactiva está disponible en:
 - [Visión General del Sistema](../../SYSTEM-OVERVIEW.md) - Ecosistema completo
 - [Proyecto Principal](../README.md) - AlwaysPrint Project
 
-## Licencia
-
-Propietario - Todos los derechos reservados
-
-© 2026 Robles.AI
-
-## Contacto
+---
 
 **Robles.AI**  
 Email: antonio@robles.ai  
+Teléfono: +1 408 590 0153  
 Web: https://robles.ai
+
+---
+
+© 2026 Inversiones On Line SAC - Todos los derechos reservados  
+Producto de la familia de automatización Robles.AI  
+Prohibida la utilización sin autorización de Inversiones On Line SAC

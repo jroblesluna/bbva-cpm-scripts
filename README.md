@@ -1,118 +1,315 @@
-# BBVA CPM Scripts - Repositorio Principal
+# Repositorio de Sistemas de Impresión Corporativa BBVA
 
-Este repositorio contiene scripts, configuraciones y utilidades para el sistema de impresión BBVA.
+Este repositorio contiene dos sistemas complementarios para gestión de impresión corporativa.
 
-## Proyectos
-
-### 1. Lexmark Cloud Print Manager – Filtros y Utilidades BBVA
-
-Paquete con **scripts, configuraciones y utilidades** para integrar **Lexmark Cloud Print Manager (CPM)** en un entorno híbrido **Linux SUSE 12 (CUPS)** ⇄ **Windows (clientes CPM)**.
-
-**Características principales:**
-- Identificar al usuario/puesto Windows desde Linux (mapping dinámico).
-- Enviar trabajos a **CPM** (normal) o a **impresora física por contingencia** (LPD directo), con copia opcional a **Tea4Cups** para PDF.
-- Crear/actualizar colas CUPS dinámicamente.
-- Enrutamiento diferenciado Tea4Cups: cola remota sede central (Nacar Web) vs cola local (usuario LDAP).
-
-**Ubicación:** `Linux Server/` y `Workstations/`
-
-### 2. AlwaysPrint Cloud Management System
-
-Sistema fullstack de gestión centralizada para estaciones AlwaysPrint distribuidas en múltiples organizaciones cliente.
-
-**Características principales:**
-- Configuración jerárquica (Global → VLAN → IP específica)
-- Comunicación en tiempo real con WebSockets
-- Multi-tenancy para múltiples organizaciones
-- Alta disponibilidad con operación offline
-- Escalabilidad para 3000+ conexiones concurrentes
-
-**Stack tecnológico:**
-- Backend: Python 3.11+ con FastAPI
-- Frontend: Next.js 15 con App Router
-- Base de datos: PostgreSQL (producción) / SQLite (desarrollo)
-- Caché: Redis
-
-**Ubicación:** `AlwaysPrintCloudManager/`
-
-**Documentación:** Ver `AlwaysPrintCloudManager/README.md`
-
-> **Autor / Soporte:** Javier Robles – Lexmark International · antonio@robles.ai
+**Última actualización**: 8 de mayo de 2026
 
 ---
 
-## Árbol del repositorio
+## 🎯 Sistemas en el Repositorio
+
+### 1. Sistema de Producción (Principal) - Lexmark Cloud Print Manager (CPM)
+
+**El sistema de producción es Lexmark Cloud Print Manager en modo Híbrido**, gestionado por BBVA.
+
+**Tecnología**: Lexmark CPM (Hybrid Mode) + Servidor Linux SUSE 12 (CUPS)  
+**Ubicación**: `Linux Server/` y `Workstations/`  
+**Estado**: ✅ Producción activa  
+**Responsable**: BBVA
+
+**Componentes**:
+- **Lexmark CPM Client** en workstations Windows (componente principal de producción)
+- **Servidor Linux SUSE 12** con CUPS y filtros personalizados (siempre operativo, responsabilidad BBVA)
+- **Cola LexmarkBBVA** en Windows (enruta trabajos a través de CPM)
+- **LPD Service** y monitoring en Windows
+- **Tea4Cups** para generación de PDFs
+
+**Flujo Normal de Producción**:
+```
+Usuario imprime → Cola LexmarkBBVA (Windows) → Lexmark CPM Client → 
+Servidor Linux CUPS → Filtros CPM → Impresora física
+```
+
+**Documentación**: Ver sección "Manual del Sistema de Producción" más abajo
+
+---
+
+### 2. Sistema de Contingencia (Complementario) - AlwaysPrint
+
+**Mecanismo de contingencia que se activa cuando Lexmark CPM falla.**
+
+**Tecnología**: C# .NET 4.8 (Client) + Python/TypeScript (Cloud Manager)  
+**Ubicación**: `AlwaysPrintProject/`  
+**Estado**: ⏳ En desarrollo (80% completo)
+
+**Componentes**:
+- **Client**: Software Windows instalado en workstations
+  - AlwaysPrintService.exe (servicio)
+  - AlwaysPrintTray.exe (interfaz de usuario)
+- **Cloud Manager**: Plataforma SaaS para gestión centralizada
+  - Backend FastAPI (Python 3.12)
+  - Frontend Next.js 15 (TypeScript)
+
+**Propósito**:
+- ✅ **Contingencia activa**: Cuando Lexmark CPM falla, AlwaysPrint redirige el tráfico de las colas Windows directamente a las impresoras (IP:puerto estándar)
+- ✅ **Monitoreo centralizado**: Visibilidad del estado de workstations y sistema de impresión
+- ✅ **Gestión remota**: Configuración centralizada desde Cloud Manager
+- ✅ **Coexistencia**: Instalado junto a Lexmark CPM sin interferir en operación normal
+
+**Flujo de Contingencia** (cuando CPM falla):
+```
+Usuario imprime → Cola Windows → AlwaysPrint detecta falla CPM → 
+Redirige tráfico → IP impresora:puerto estándar (bypass CPM/Linux)
+```
+
+**Documentación**: `AlwaysPrintProject/README.md`
+
+---
+
+## 📁 Estructura del Repositorio
 
 ```
 .
-├── AlwaysPrintCloudManager/       ← Sistema de gestión cloud AlwaysPrint
-│   ├── backend/                   ← Backend FastAPI
-│   ├── frontend/                  ← Frontend Next.js 15
-│   ├── docker-compose.yml
-│   ├── setup.sh
-│   ├── setup.bat
+├── AlwaysPrintProject/            # Sistema de contingencia
+│   ├── Cloud/                     # Plataforma SaaS
+│   │   ├── backend/              # FastAPI (Python 3.12)
+│   │   ├── frontend/             # Next.js 15 (TypeScript)
+│   │   ├── ARCHITECTURE.md       # Arquitectura detallada
+│   │   └── README.md
+│   ├── Client/                    # Software Windows
+│   │   ├── AlwaysPrint.Shared/   # Biblioteca compartida
+│   │   ├── AlwaysPrintService/   # Servicio Windows
+│   │   ├── AlwaysPrintTray/      # Aplicación de bandeja
+│   │   ├── AlwaysPrint.sln       # Solución Visual Studio
+│   │   ├── build.ps1             # Script de compilación
+│   │   └── README.md
 │   └── README.md
-├── Linux Server/                  ← Scripts y filtros CUPS para BBVA
-│   └── root/
-│       └── bin/
-│           ├── create_CPMWinHostUser.sh
-│           ├── filtro_contingencia_pro
-│           ├── filtro_nacarpr_pro.cpm
-│           └── ...
-├── Workstations/                  ← Utilidades para estaciones Windows
-│   ├── Client Installer/
-│   ├── SetupLPD/
-│   └── Startup/
-├── .kiro/                         ← Especificaciones y configuración Kiro
-└── README.md                      ← Este archivo
+│
+├── Linux Server/                  # Servidor CUPS (BBVA, siempre operativo)
+│   └── root/bin/
+│       ├── filtro_nacarpr_pro.cpm      # Filtro producción CPM
+│       ├── filtro_contingencia_pro     # Filtro contingencia LPD
+│       ├── filtro_winhostuser          # Receptor de mapping
+│       ├── create_CPMWinHostUser.sh    # Crear cola de mapping
+│       └── Lexmark.Cups.ppd.gz         # PPD base
+│
+├── Workstations/                  # Componentes Windows (CPM + contingencia)
+│   ├── Client Installer/          # Instalador Lexmark CPM (producción)
+│   ├── SetupLPD/                  # Scripts LPD/LPR
+│   ├── Startup/                   # Scripts de inicio
+│   └── LpdServiceMonitor/         # Monitor de servicio LPD
+│
+├── .kiro/                         # Configuración Kiro
+├── AGENTS.md                      # Reglas para agentes IA
+└── README.md                      # Este archivo
 ```
 
-> Los archivos `_pro` en `Linux Server/` son las versiones activas. Los archivos sin sufijo son versiones legacy mantenidas como referencia. **No modificar los legacy.**
+
+
+---
+
+## 🏗️ Arquitectura - Sistema de Producción y Contingencia
+
+### Flujo Normal (Producción - Lexmark CPM)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    WORKSTATION WINDOWS                       │
+│                                                              │
+│  Usuario imprime                                            │
+│       ↓                                                      │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │  SISTEMA DE PRODUCCIÓN (Lexmark CPM)               │    │
+│  │  • Cola LexmarkBBVA                                │    │
+│  │  • Lexmark CPM Client ← COMPONENTE PRINCIPAL       │    │
+│  │  • LPD Service (puerto 515)                        │    │
+│  │  • LpdServiceMonitor                               │    │
+│  └────────────────┬───────────────────────────────────┘    │
+└───────────────────┼─────────────────────────────────────────┘
+                    │
+                    │ Tráfico CPM (puerto 9167/9443)
+                    ↓
+┌─────────────────────────────────────────────────────────────┐
+│              SERVIDOR LINUX SUSE 12 (BBVA)                   │
+│              Siempre operativo                               │
+│                                                              │
+│  • CUPS + Filtros personalizados                            │
+│  • Enrutamiento inteligente                                 │
+│  • Tea4Cups (PDFs)                                          │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+                 ↓
+         Impresora física
+```
+
+### Flujo de Contingencia (Cuando CPM falla)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    WORKSTATION WINDOWS                       │
+│                                                              │
+│  Usuario imprime                                            │
+│       ↓                                                      │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │  Cola Windows                                      │    │
+│  └────────────────┬───────────────────────────────────┘    │
+│                   │                                          │
+│                   │ CPM no responde ✗                       │
+│                   ↓                                          │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │  SISTEMA DE CONTINGENCIA (AlwaysPrint)             │    │
+│  │  • AlwaysPrintService detecta falla                │    │
+│  │  • Redirige tráfico a IP:puerto estándar           │    │
+│  │  • AlwaysPrintTray notifica al usuario             │    │
+│  └────────────────┬───────────────────────────────────┘    │
+└───────────────────┼─────────────────────────────────────────┘
+                    │
+                    │ Bypass CPM/Linux
+                    │ Directo a IP:puerto estándar (LPD/RAW)
+                    ↓
+         Impresora física (directo)
+         
+                    │
+                    │ Telemetría y estado
+                    ↓
+┌─────────────────────────────────────────────────────────────┐
+│              ALWAYSPRINT CLOUD MANAGER                       │
+│              • Monitoreo de fallas                           │
+│              • Alertas a administradores                     │
+│              • Analytics de contingencia                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Diferencias Clave**:
+- **Producción**: Tráfico pasa por Lexmark CPM → Servidor Linux → Impresora
+- **Contingencia**: Tráfico va directo desde Windows → Impresora (bypass completo)
+- **Servidor Linux**: Siempre operativo (responsabilidad BBVA), pero no se usa en contingencia
+
+---
+
+## 🚀 Quick Start
+
+### Sistema de Producción (Lexmark CPM)
+
+Ver sección "Manual del Sistema de Producción" más abajo para:
+- Configuración de Lexmark CPM Client (componente principal)
+- Configuración del servidor Linux SUSE (BBVA)
+- Instalación de filtros CUPS
+- Configuración de workstations Windows
+- Troubleshooting completo
+
+### Sistema de Contingencia (AlwaysPrint)
+
+```bash
+# Ver documentación completa
+cd AlwaysPrintProject
+cat README.md
+
+# Cloud Manager - Backend
+cd Cloud/backend
+conda env create -f environment.yml
+conda activate alwaysprint
+alembic upgrade head
+uvicorn app.main:app --reload
+
+# Cloud Manager - Frontend
+cd Cloud/frontend
+npm install
+npm run dev
+
+# Client Windows
+cd Client
+.\build.ps1
+msiexec /i AlwaysPrint.msi /qn
+```
+
+---
+
+## 📚 Documentación
+
+### Archivos en la Raíz
+- **README.md** (este archivo) - Visión general del repositorio completo
+- **AGENTS.md** - Reglas para agentes IA trabajando con filtros CUPS
+
+### Sistema de Contingencia (AlwaysPrint)
+- `AlwaysPrintProject/README.md` - Visión general del proyecto
+- `AlwaysPrintProject/Cloud/README.md` - Cloud Manager (instalación, configuración)
+- `AlwaysPrintProject/Cloud/ARCHITECTURE.md` - Arquitectura detallada multi-tenant
+- `AlwaysPrintProject/Client/README.md` - Cliente Windows (compilación, instalación)
+- `AlwaysPrintProject/Client/AlwaysPrint.Shared/README.md` - Biblioteca compartida
+- `AlwaysPrintProject/Client/AlwaysPrintService/README.md` - Servicio Windows
+- `AlwaysPrintProject/Client/AlwaysPrintTray/README.md` - Aplicación de bandeja
+
+### Sistema de Producción (Lexmark CPM)
+- Ver sección "Manual del Sistema de Producción" en este archivo (más abajo)
+- **Componente principal**: Lexmark CPM Client en Windows
+- **Infraestructura**: Servidor Linux SUSE 12 (BBVA)
+
+---
+
+## 📞 Contacto
+
+Para consultas sobre este repositorio, contactar a través de los canales oficiales de Robles.AI.
+
+---
+---
+---
+
+# Manual del Sistema de Producción
+
+Sistema principal de impresión corporativa BBVA basado en **Lexmark Cloud Print Manager (CPM) en modo Híbrido**.
+
+**Estado**: ✅ Producción activa  
+**Componente Principal**: Lexmark CPM Client (Windows)  
+**Infraestructura**: Servidor Linux SUSE 12 + CUPS (BBVA)
+
+---
+
+## Descripción
+
+**El sistema de producción es Lexmark Cloud Print Manager (CPM) en modo Híbrido**, que integra:
+
+- **Lexmark CPM Client** en workstations Windows (componente principal que gestiona la impresión)
+- **Servidor Linux SUSE 12** con CUPS y filtros personalizados (infraestructura BBVA, siempre operativa)
+- **Cola LexmarkBBVA** en Windows que enruta trabajos a través de CPM
+- Mapeado dinámico hostname→usuario→IP mantenido por los clientes Windows
+
+**Flujo de Impresión en Producción**:
+```
+Usuario → Cola LexmarkBBVA (Windows) → Lexmark CPM Client → 
+Servidor Linux CUPS → Filtros personalizados → Impresora física
+```
+
+**Nota importante**: El servidor Linux es responsabilidad de BBVA y está siempre operativo. Cuando Lexmark CPM falla, el sistema de contingencia AlwaysPrint redirige el tráfico directamente a las impresoras (bypass del servidor Linux).
 
 ---
 
 ## Requerimientos
 
 ### Servidor Linux (SUSE 12)
-- **CUPS** instalado/activo.
+- **CUPS** instalado/activo
 - **Carpeta de instalación:** `/root/bin`
-- **Filtro producción:** `filtro_nacarpr_pro.cpm` → renombrar/copiar como `/root/bin/filtro_nacarpr` al desplegar.
-- **Filtro contingencia:** `filtro_contingencia_pro` → renombrar/copiar como `/root/bin/filtro_contingencia` al desplegar.
-- **cups-lpd** habilitado (xinetd) y **TCP/515** permitido desde las estaciones.
-- `sudo` para que el usuario **lp** ejecute `lpadmin`, `cupsenable`, `cupsaccept` sin contraseña.
+- **Filtro producción:** `filtro_nacarpr_pro.cpm` → renombrar/copiar como `/root/bin/filtro_nacarpr` al desplegar
+- **Filtro contingencia:** `filtro_contingencia_pro` → renombrar/copiar como `/root/bin/filtro_contingencia` al desplegar
+- **cups-lpd** habilitado (xinetd) y **TCP/515** permitido desde las estaciones
+- `sudo` para que el usuario **lp** ejecute `lpadmin`, `cupsenable`, `cupsaccept` sin contraseña
 - **Backend LPD** con permisos de ejecución: `chmod 755 /usr/lib/cups/backend/lpd`
-- **PPD** base: `/root/bin/Lexmark.Cups.ppd.gz`.
-- **Base de mapeo** dinámica: `/var/lib/lexmark/win_hostname_user.txt`.
-- **Configuración del filtro:** `/var/lib/lexmark/lexmark_filtro.config` (se crea automáticamente si no existe).
+- **PPD** base: `/root/bin/Lexmark.Cups.ppd.gz`
+- **Base de mapeo** dinámica: `/var/lib/lexmark/win_hostname_user.txt`
+- **Configuración del filtro:** `/var/lib/lexmark/lexmark_filtro.config` (se crea automáticamente si no existe)
 - **Logs**:
-  - `/var/lib/lexmark/lexmark.log` → filtros `filtro_nacarpr` / `filtro_contingencia`.
-  - `/var/lib/lexmark/lexmark_winhostuser.log` → `filtro_winhostuser`.
+  - `/var/lib/lexmark/lexmark.log` → filtros `filtro_nacarpr` / `filtro_contingencia`
+  - `/var/lib/lexmark/lexmark_winhostuser.log` → `filtro_winhostuser`
 
 ### Workstations Windows
-- **Servicios LPR/LPD** habilitados (ver `SetupLPD/lprlpd.ps1`).
-- **Cliente CPM** (recomendado ≥ 3.6.0) instalado con `configuration.json` adyacente.
-- **LpdServiceMonitor.msi** instalado como servicio.
-- **Script de arranque** `Startup/update_winhostuser.bat` configurado (Inicio del usuario o GPO).
+- **Servicios LPR/LPD** habilitados (ver `SetupLPD/lprlpd.ps1`)
+- **Cliente CPM** (recomendado ≥ 3.6.0) instalado con `configuration.json` adyacente
+- **LpdServiceMonitor.msi** instalado como servicio
+- **Script de arranque** `Startup/update_winhostuser.bat` configurado (Inicio del usuario o GPO)
 
 ---
 
-## Acceso rápido a documentación
-
-### Lexmark Cloud Print Manager (BBVA)
-Para información detallada sobre configuración, instalación y troubleshooting del sistema CPM BBVA, continúa leyendo este documento más abajo.
-
-### AlwaysPrint Cloud Management
-Para información sobre el sistema de gestión cloud AlwaysPrint:
-```bash
-cd AlwaysPrintCloudManager
-cat README.md
-```
-
-O visita: `AlwaysPrintCloudManager/README.md`
-
----
-
-## Configuración Linux — Manual de uso (CPM BBVA)
+## Configuración Linux
 
 ### 1) Conceder sudo a `lp` (visudo)
 ```sudoers
@@ -188,53 +385,6 @@ Si se requiere derivación a PDF, debe existir la cola CUPS `p<puesto>` (ej. `p0
 **Enrutamiento Tea4Cups según origen del job:**
 - **Usuario `root` (Nacar Web):** el job se envía a `p1<puesto>` (cola remota en servidor sede central → archivo accesible via compartido de red desde fuera de la oficina) y el filtro termina sin procesar CPM.
 - **Usuario LDAP:** flujo normal CPM + spool a `p<puesto>` (cola local Tea4Cups → PDF accesible via web del servidor Nacar dentro de la oficina).
-
----
-
-## Scripts incluidos (detalle)
-
-### `filtro_nacarpr` (producción: `filtro_nacarpr_pro.cpm`)
-**Objetivo:** Enviar trabajos a CPM en Windows creando/ajustando colas CUPS dinámicas con cabeceras PJL.
-
-**Pasos clave:**
-1. Extrae `PUESTO` desde `lpstat` y `USUARIO` desde `finger` (fallback a `$2`).
-2. Si `USUARIO=root` (Nacar Web): envía spool a `p1<puesto>` (sede central) y termina.
-3. Consulta `win_hostname_user.txt` (modo MAPA) o resuelve por DNS con fallback w10→w11 (modo DNS) para obtener `WINIP`.
-4. Verifica **TCP/515** en `WINIP`.
-5. Crea/actualiza cola CUPS dinámica `w10<agencia>0<srv>p<YY>` con URI `lpd://$WINIP:515/LexmarkBBVA`.
-6. Inserta PJL (USERNAME, JOBNAME, HOLDKEY, etc.). Adapta para PCL5 / PostScript / HP PJL.
-7. Envía trabajo modificado a CPM y spool original a Tea4Cups `p<puesto>` si existe.
-
-### `filtro_contingencia` (producción: `filtro_contingencia_pro`)
-**Objetivo:** Bypass total de CPM. Reenvía el spool original sin modificar a la impresora física.
-
-**Pasos clave:**
-1. Identifica `PUESTO` y extrae IP física desde `$DEVICE_URI` o `lpstat -v`.
-2. Llama al backend nativo `/usr/lib/cups/backend/lpd` con el archivo original.
-3. Si existe `p<puesto>`, duplica envío a Tea4Cups para PDF.
-4. Retorna el exit code del backend LPD.
-
-### `filtro_winhostuser`
-**Objetivo:** Mantener la base de mapping dinámico `hostname → usuario → IP`.
-
-**Entrada:** primera línea del spool con `hostname|usuario|ip`.
-
-**Validaciones:**
-- Hostname: 11–12 caracteres (normaliza a 11).
-- Usuario: debe iniciar con `o` o `p`.
-- IP: debe iniciar con `118.`.
-
-Actualiza `/var/lib/lexmark/win_hostname_user.txt` reemplazando entradas previas del mismo host.
-
-### `create_CPMWinHostUser.sh`
-Crea la cola receptora de mapping `CPMWinHostUser`:
-```bash
-lpadmin -p CPMWinHostUser -D 'Impresora CPM Win Host User' -L 'CMPWinHostUser' -E \
-  -v file:/dev/null -i /root/bin/filtro_winhostuser
-```
-
-### `Lexmark.Cups.ppd.gz`
-PPD genérico base utilizado por `filtro_nacarpr` para crear colas dinámicas CUPS.
 
 ---
 
@@ -337,23 +487,16 @@ done
 - Para forzar recreación de una cola: `lpadmin -x w1<puesto>` y re-imprimir.
 - Al desplegar una nueva versión del filtro: copiar `filtro_nacarpr_pro.cpm` como `/root/bin/filtro_nacarpr` y reinstalar en las colas afectadas con `lpadmin -p <cola> -i /root/bin/filtro_nacarpr`.
 
----
-
-## Anexos
-Ejemplo de línea en BD de mapping:
-```
-w1038401p12|ope01|118.45.23.12
-```
 
 ---
 
-## Historial de cambios
+**Robles.AI**  
+Email: antonio@robles.ai  
+Teléfono: +1 408 590 0153  
+Web: https://robles.ai
 
-- **v202601180100**: `filtro_nacarpr_pro.cpm` — soporte DNS con fallback w10→w11, parámetros `USUARIO_GENERICO` y `FILTER_DNS_IP`, enrutamiento Tea4Cups diferenciado root (Nacar Web) vs LDAP, funciones auxiliares con timestamps en log.
-- **v202601180200**: `filtro_contingencia_pro` — refactorización con funciones auxiliares y manejo de errores mejorado.
-- **v202510231800**: `filtro_nacarpr.cpm` — versión legacy, mantenida como referencia.
-- **v202509190000**: Fix reconocimiento PCL `HP Printer Job` y `PJL encapsulated PostScript` (bug `file` en SUSE 12).
-- **v202509180000**: Restauración `filtro_winhostuser`.
-- **v202509170000**: Actualización comandos `lpadmin`. `update_winhostuser.bat`: lectura VirtAplic antes de VMX.
-- **v202509150000**: `filtro_contingencia` — LPD directo sin modificar + Tea4Cups opcional.
-- **v202509120000**: Manual de uso paso a paso, reglas de firewall y ejemplo de visudo.
+---
+
+© 2026 Inversiones On Line SAC - Todos los derechos reservados  
+Producto de la familia de automatización Robles.AI  
+Prohibida la utilización sin autorización de Inversiones On Line SAC

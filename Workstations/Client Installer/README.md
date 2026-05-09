@@ -7,8 +7,7 @@ Existen **dos formas** de obtener el instalador actualizado:
 
 ## 📥 Método 1: Descarga desde Google Drive (versión validada)
 - **Fuente (Google Drive):** <https://drive.google.com/file/d/1LsV04QTjbRpztplooVyfXX2Y2QRyqmPP/view>
-- **Archivo esperado:** `LPMC_3.6.0_UPD_PCLXL_3.0.8.0_Win_2.2.91.exe`  
-- **Paquete generado y validado:** 17/09/2025
+- **Archivo esperado:** `LPMC_3.6.0_UPD_PCLXL_3.0.8.0_Win_2.2.91.exe`
 
 Coloca el archivo descargado en este mismo directorio (`Workstations/Client Installer`).
 
@@ -64,7 +63,7 @@ Añadir (o actualizar) la sección del proxy:
 
 ### ⚠️ Importante
 - Ejecutar el `.exe` **con permisos administrativos**.
-- Se adjunta un `configuration.json` de referencia (generado el 17/09/2025) en este repositorio.
+- Se adjunta un `configuration.json` de referencia en este repositorio.
 
 ---
 
@@ -119,3 +118,17 @@ msiexec /i "LPMC_3.6.x_xxx.exe" /qn
 - Descarga solo desde fuentes confiables (sitio de Lexmark, Drive corporativo o portal oficial).
 - Mantén actualizado el **PAC/Proxy** en `configuration.json`.
 - No compartas enlaces públicos si contienen licencias propietarias.
+
+
+---
+
+**Robles.AI**  
+Email: antonio@robles.ai  
+Teléfono: +1 408 590 0153  
+Web: https://robles.ai
+
+---
+
+© 2026 Inversiones On Line SAC - Todos los derechos reservados  
+Producto de la familia de automatización Robles.AI  
+Prohibida la utilización sin autorización de Inversiones On Line SAC

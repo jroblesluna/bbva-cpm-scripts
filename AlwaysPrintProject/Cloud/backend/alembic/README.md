@@ -58,7 +58,6 @@ alembic revision -m "Descripción del cambio"
 ## Migraciones Existentes
 
 ### 001_initial_migration.py
-**Fecha:** 2025-01-15  
 **Descripción:** Migración inicial que crea toda la estructura de base de datos
 
 **Incluye:**
@@ -68,10 +67,6 @@ alembic revision -m "Descripción del cambio"
 - Funciones auxiliares:
   - `calculate_license_serial(ip_private)`: Calcula serial de licencia
   - `detect_vlan_for_ip(account_id, ip_private)`: Detecta VLAN por IP
-
-**Requisitos implementados:** 19.5, 30.5
-
-**Documentación detallada:** Ver `docs/MIGRATION_001_DETAILS.md`
 
 ## Flujo de Trabajo
 
@@ -105,11 +100,9 @@ python scripts/verify_migration.py
 
 ```bash
 # Opción 1: Autogenerar (recomendado)
-# Alembic detecta cambios en los modelos automáticamente
 alembic revision --autogenerate -m "Agregar campo X a tabla Y"
 
 # Opción 2: Manual
-# Crear archivo vacío para editar manualmente
 alembic revision -m "Agregar campo X a tabla Y"
 
 # Editar el archivo generado en alembic/versions/
@@ -125,13 +118,13 @@ python scripts/verify_migration.py
 ## Buenas Prácticas
 
 ### 1. Siempre revisar migraciones autogeneradas
-Alembic puede no detectar todos los cambios correctamente. Siempre revisa el archivo generado antes de aplicarlo.
+Revisar el archivo generado antes de aplicarlo para asegurar que los cambios son correctos.
 
 ### 2. Implementar downgrade()
-Siempre implementa la función `downgrade()` para poder revertir cambios si es necesario.
+Implementar la función `downgrade()` para poder revertir cambios si es necesario.
 
 ### 3. Probar en desarrollo primero
-Aplica y prueba las migraciones en SQLite antes de aplicarlas en PostgreSQL de producción.
+Aplicar y probar las migraciones en SQLite antes de aplicarlas en PostgreSQL de producción.
 
 ### 4. Backup antes de migrar en producción
 ```bash
@@ -149,7 +142,7 @@ psql -U user -d alwaysprint < backup_YYYYMMDD_HHMMSS.sql
 Alembic usa transacciones por defecto. Si una migración falla, se revierte automáticamente.
 
 ### 6. Documentar cambios complejos
-Para migraciones complejas, crea un archivo de documentación en `docs/` explicando:
+Para migraciones complejas, documentar:
 - Qué cambia
 - Por qué cambia
 - Cómo afecta a la aplicación

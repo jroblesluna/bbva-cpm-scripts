@@ -146,5 +146,13 @@ Get-Service LPDSVC
 
 ## 📜 Licencia / Contacto
 
-(c) 2025 **Robles.AI** — antonio@robles.ai  
-Uso interno / demostración. Ajusta a tus políticas antes de producción.
+**Robles.AI**  
+Email: antonio@robles.ai  
+Teléfono: +1 408 590 0153  
+Web: https://robles.ai
+
+---
+
+© 2026 Inversiones On Line SAC - Todos los derechos reservados  
+Producto de la familia de automatización Robles.AI  
+Prohibida la utilización sin autorización de Inversiones On Line SAC

@@ -87,4 +87,13 @@ Cualquier cambio en esta biblioteca requiere recompilar ambos ejecutables.
 
 ---
 
-© 2026 Robles.AI
+**Robles.AI**  
+Email: antonio@robles.ai  
+Teléfono: +1 408 590 0153  
+Web: https://robles.ai
+
+---
+
+© 2026 Inversiones On Line SAC - Todos los derechos reservados  
+Producto de la familia de automatización Robles.AI  
+Prohibida la utilización sin autorización de Inversiones On Line SAC

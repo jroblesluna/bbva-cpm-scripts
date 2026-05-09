@@ -72,7 +72,7 @@
 
 ### 1. Backend (FastAPI)
 
-**Ubicación**: `AlwaysPrintCloudManager/backend/`  
+**Ubicación**: `AlwaysPrintProject/Cloud/backend/`  
 **Tecnología**: Python 3.12, FastAPI, SQLAlchemy, Alembic  
 **Puerto**: 8000 (desarrollo), 443 (producción)
 
@@ -114,7 +114,7 @@ backend/
 
 ### 2. Frontend (Next.js)
 
-**Ubicación**: `AlwaysPrintCloudManager/frontend/`  
+**Ubicación**: `AlwaysPrintProject/Cloud/frontend/`  
 **Tecnología**: Next.js 15, React 18, TypeScript, Tailwind CSS  
 **Puerto**: 3000 (desarrollo), 443 (producción)
 
@@ -349,12 +349,12 @@ workstation = db.query(Workstation).filter(
 
 ```bash
 # Backend
-cd AlwaysPrintCloudManager/backend
+cd AlwaysPrintProject/Cloud/backend
 conda activate alwaysprint
 uvicorn app.main:app --reload
 
 # Frontend
-cd AlwaysPrintCloudManager/frontend
+cd AlwaysPrintProject/Cloud/frontend
 npm run dev
 ```
 
@@ -362,7 +362,7 @@ npm run dev
 
 **Opción 1: Docker Compose**
 ```bash
-cd AlwaysPrintCloudManager
+cd AlwaysPrintProject/Cloud
 docker-compose up -d
 ```
 
@@ -438,6 +438,11 @@ kubectl apply -f k8s/
 
 **Robles.AI**  
 Email: antonio@robles.ai  
+Teléfono: +1 408 590 0153  
 Web: https://robles.ai
 
-© 2026 Robles.AI - Todos los derechos reservados
+---
+
+© 2026 Inversiones On Line SAC - Todos los derechos reservados  
+Producto de la familia de automatización Robles.AI  
+Prohibida la utilización sin autorización de Inversiones On Line SAC

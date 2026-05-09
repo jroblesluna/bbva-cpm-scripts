@@ -1,6 +1,6 @@
 # AlwaysPrint Project
 
-Sistema completo de gestión de impresión corporativa con arquitectura cliente-servidor.
+Sistema de contingencia complementario para gestión de impresión corporativa con arquitectura cliente-servidor.
 
 **Versión**: 1.0.0  
 **Última actualización**: 8 de mayo de 2026
@@ -9,10 +9,22 @@ Sistema completo de gestión de impresión corporativa con arquitectura cliente-
 
 ## 📋 Descripción
 
-**AlwaysPrint Project** es un ecosistema completo para gestión de impresión corporativa que consta de:
+**AlwaysPrint Project** es un sistema de contingencia que complementa el sistema de producción estándar (Lexmark CPM + CUPS), proporcionando:
 
-1. **Cloud Manager** - Plataforma SaaS multi-tenant para gestión centralizada
-2. **Client** - Software Windows instalado en workstations
+1. **Mecanismo de contingencia** - Cuando el sistema principal no está disponible
+2. **Gestión centralizada** - Monitoreo y configuración remota de workstations
+3. **Visibilidad operacional** - Analytics y reportes complementarios
+
+**Componentes**:
+
+1. **Client** - Software Windows instalado en workstations como contingencia
+2. **Cloud Manager** - Plataforma SaaS multi-tenant para gestión centralizada (opcional)
+
+**Relación con el sistema de producción**:
+- ✅ **COMPLEMENTA** el sistema Lexmark CPM + CUPS (no lo reemplaza)
+- ✅ **COEXISTE** con el sistema de producción en las workstations
+- ✅ **ACTIVA** como contingencia cuando el sistema principal falla
+- ✅ **PROPORCIONA** gestión centralizada y monitoreo adicional
 
 ---
 
@@ -153,6 +165,29 @@ Ver [Client/README.md](Client/README.md) para más detalles.
 - ✅ Integración opcional con Cloud Manager
 - ✅ Instalador MSI con ProductCode fijo
 - ✅ Modo consola para debugging
+- ✅ **Mecanismo de contingencia** para el sistema de producción
+
+---
+
+## 🔄 Integración con Sistema de Producción
+
+### Sistema de Producción (Lexmark CPM + CUPS)
+- **Ubicación**: `Linux Server/` y `Workstations/`
+- **Función**: Sistema principal de impresión corporativa
+- **Estado**: Producción activa
+
+### AlwaysPrint (Contingencia Complementaria)
+- **Ubicación**: `AlwaysPrintProject/`
+- **Función**: Contingencia + gestión centralizada
+- **Estado**: Complementario al sistema principal
+
+**Flujo de Operación**:
+```
+1. Sistema principal (Lexmark CPM) → Operación normal
+2. Si CPM falla → AlwaysPrint Client actúa como contingencia
+3. Cloud Manager → Monitoreo continuo de ambos sistemas
+4. Dashboard → Visibilidad unificada de toda la infraestructura
+```
 
 ---
 
@@ -218,6 +253,11 @@ Ver [Client/README.md](Client/README.md) para más detalles.
 
 **Robles.AI**  
 Email: antonio@robles.ai  
+Teléfono: +1 408 590 0153  
 Web: https://robles.ai
 
-© 2026 Robles.AI - Todos los derechos reservados
+---
+
+© 2026 Inversiones On Line SAC - Todos los derechos reservados  
+Producto de la familia de automatización Robles.AI  
+Prohibida la utilización sin autorización de Inversiones On Line SAC

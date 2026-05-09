@@ -1,7 +1,7 @@
 # AlwaysPrint
 
-Software Windows de gestión corporativa de colas de impresión para entornos empresariales.  
-Dos ejecutables cooperan mediante Named Pipe para monitorear y configurar impresoras desde la workstation.
+Software Windows de contingencia complementaria para gestión de impresión corporativa.  
+Dos ejecutables cooperan mediante Named Pipe para monitorear y gestionar impresoras desde la workstation.
 
 **Versión:** 1.26.426.HHMM (formato: Major.YY.MMDD.HHMM)  
 **Última actualización:** 8 de mayo de 2026
@@ -10,7 +10,19 @@ Dos ejecutables cooperan mediante Named Pipe para monitorear y configurar impres
 
 ## Descripción
 
-**AlwaysPrint** es el cliente Windows que se instala en workstations para gestionar la impresión local. Opcionalmente se integra con **AlwaysPrint Cloud Manager** (plataforma SaaS) para monitoreo y gestión centralizada.
+**AlwaysPrint** es el cliente Windows que se instala en workstations como **mecanismo de contingencia complementario** al sistema de producción estándar (Lexmark CPM + CUPS). 
+
+**Propósito**:
+- ✅ **Contingencia**: Actúa cuando el sistema principal (Lexmark CPM) no está disponible
+- ✅ **Monitoreo**: Proporciona visibilidad del estado de impresión local
+- ✅ **Gestión centralizada**: Opcionalmente se integra con AlwaysPrint Cloud Manager
+- ✅ **Coexistencia**: Funciona junto al sistema de producción sin interferir
+
+**Relación con el sistema de producción**:
+- Coexiste con Lexmark CPM (sistema principal de producción)
+- Se activa como contingencia cuando CPM no está disponible
+- No reemplaza ni interfiere con el sistema principal
+- Proporciona capa adicional de monitoreo y gestión
 
 ### Arquitectura de Comunicación
 
@@ -95,7 +107,7 @@ AlwaysPrint/
 
 ## Build y empaquetado
 
-Desde la carpeta `Workstations/AlwaysPrint/`, en PowerShell:
+Desde la carpeta `AlwaysPrintProject/Client/`, en PowerShell:
 
 ```powershell
 .\build.ps1
@@ -261,7 +273,7 @@ Cada 5 minutos:
     Service aplica nueva configuración
 ```
 
-Ver documentación completa en [AlwaysPrint Cloud Manager](../../AlwaysPrintCloudManager/README.md).
+Ver documentación completa en [AlwaysPrint Cloud Manager](../Cloud/README.md).
 
 ---
 
@@ -396,8 +408,16 @@ Get-Item 'HKLM:\SOFTWARE\Robles.AI\AlwaysPrint'
 
 ## Licencia / Contacto
 
-© 2026 **Robles.AI** — antonio@robles.ai  
-Uso corporativo. Todos los derechos reservados.
+**Robles.AI**  
+Email: antonio@robles.ai  
+Teléfono: +1 408 590 0153  
+Web: https://robles.ai
+
+---
+
+© 2026 Inversiones On Line SAC - Todos los derechos reservados  
+Producto de la familia de automatización Robles.AI  
+Prohibida la utilización sin autorización de Inversiones On Line SAC
 
 ## Documentación Adicional
 
