@@ -1,0 +1,44 @@
+Directorio de migraciones de Alembic para AlwaysPrint Cloud Management
+========================================================================
+
+Este directorio contiene las migraciones de base de datos gestionadas por Alembic.
+
+## Comandos útiles
+
+### Crear una nueva migración automática
+```bash
+alembic revision --autogenerate -m "Descripción de los cambios"
+```
+
+### Aplicar todas las migraciones pendientes
+```bash
+alembic upgrade head
+```
+
+### Revertir la última migración
+```bash
+alembic downgrade -1
+```
+
+### Ver el historial de migraciones
+```bash
+alembic history
+```
+
+### Ver el estado actual
+```bash
+alembic current
+```
+
+## Estructura
+
+- `env.py`: Configuración del entorno de Alembic
+- `script.py.mako`: Template para generar nuevas migraciones
+- `versions/`: Directorio que contiene los archivos de migración
+
+## Notas importantes
+
+1. Siempre revisar las migraciones autogeneradas antes de aplicarlas
+2. Las migraciones deben ser reversibles (implementar upgrade y downgrade)
+3. Probar las migraciones en desarrollo antes de aplicarlas en producción
+4. Hacer backup de la base de datos antes de aplicar migraciones en producción

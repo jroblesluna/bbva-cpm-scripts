@@ -1,13 +1,41 @@
-# Lexmark Cloud Print Manager – Filtros y Utilidades BBVA
+# BBVA CPM Scripts - Repositorio Principal
+
+Este repositorio contiene scripts, configuraciones y utilidades para el sistema de impresión BBVA.
+
+## Proyectos
+
+### 1. Lexmark Cloud Print Manager – Filtros y Utilidades BBVA
 
 Paquete con **scripts, configuraciones y utilidades** para integrar **Lexmark Cloud Print Manager (CPM)** en un entorno híbrido **Linux SUSE 12 (CUPS)** ⇄ **Windows (clientes CPM)**.
 
-## Características principales
-
+**Características principales:**
 - Identificar al usuario/puesto Windows desde Linux (mapping dinámico).
 - Enviar trabajos a **CPM** (normal) o a **impresora física por contingencia** (LPD directo), con copia opcional a **Tea4Cups** para PDF.
 - Crear/actualizar colas CUPS dinámicamente.
 - Enrutamiento diferenciado Tea4Cups: cola remota sede central (Nacar Web) vs cola local (usuario LDAP).
+
+**Ubicación:** `Linux Server/` y `Workstations/`
+
+### 2. AlwaysPrint Cloud Management System
+
+Sistema fullstack de gestión centralizada para estaciones AlwaysPrint distribuidas en múltiples organizaciones cliente.
+
+**Características principales:**
+- Configuración jerárquica (Global → VLAN → IP específica)
+- Comunicación en tiempo real con WebSockets
+- Multi-tenancy para múltiples organizaciones
+- Alta disponibilidad con operación offline
+- Escalabilidad para 3000+ conexiones concurrentes
+
+**Stack tecnológico:**
+- Backend: Python 3.11+ con FastAPI
+- Frontend: Next.js 15 con App Router
+- Base de datos: PostgreSQL (producción) / SQLite (desarrollo)
+- Caché: Redis
+
+**Ubicación:** `AlwaysPrintCloudManager/`
+
+**Documentación:** Ver `AlwaysPrintCloudManager/README.md`
 
 > **Autor / Soporte:** Javier Robles – Lexmark International · antonio@robles.ai
 
@@ -17,29 +45,29 @@ Paquete con **scripts, configuraciones y utilidades** para integrar **Lexmark Cl
 
 ```
 .
-├── Linux Server
-│   └── root
-│       └── bin
+├── AlwaysPrintCloudManager/       ← Sistema de gestión cloud AlwaysPrint
+│   ├── backend/                   ← Backend FastAPI
+│   ├── frontend/                  ← Frontend Next.js 15
+│   ├── docker-compose.yml
+│   ├── setup.sh
+│   ├── setup.bat
+│   └── README.md
+├── Linux Server/                  ← Scripts y filtros CUPS para BBVA
+│   └── root/
+│       └── bin/
 │           ├── create_CPMWinHostUser.sh
-│           ├── filtro_contingencia            ← legacy (referencia)
-│           ├── filtro_contingencia_pro        ← versión actual de producción
-│           ├── filtro_nacarpr.cpm             ← legacy (referencia)
-│           ├── filtro_nacarpr_pro.cpm         ← versión actual de producción
-│           ├── filtro_winhostuser
-│           └── Lexmark.Cups.ppd.gz
-├── README.md
-└── Workstations
-    ├── Client Installer
-    │   ├── configuration.json
-    │   └── README.md
-    ├── SetupLPD
-    │   ├── LpdServiceMonitor.msi
-    │   └── lprlpd.ps1
-    └── Startup
-        └── update_winhostuser.bat
+│           ├── filtro_contingencia_pro
+│           ├── filtro_nacarpr_pro.cpm
+│           └── ...
+├── Workstations/                  ← Utilidades para estaciones Windows
+│   ├── Client Installer/
+│   ├── SetupLPD/
+│   └── Startup/
+├── .kiro/                         ← Especificaciones y configuración Kiro
+└── README.md                      ← Este archivo
 ```
 
-> Los archivos `_pro` son las versiones activas. Los archivos sin sufijo son versiones legacy mantenidas como referencia. **No modificar los legacy.**
+> Los archivos `_pro` en `Linux Server/` son las versiones activas. Los archivos sin sufijo son versiones legacy mantenidas como referencia. **No modificar los legacy.**
 
 ---
 
@@ -68,7 +96,23 @@ Paquete con **scripts, configuraciones y utilidades** para integrar **Lexmark Cl
 
 ---
 
-## Configuración Linux — Manual de uso
+## Acceso rápido a documentación
+
+### Lexmark Cloud Print Manager (BBVA)
+Para información detallada sobre configuración, instalación y troubleshooting del sistema CPM BBVA, continúa leyendo este documento más abajo.
+
+### AlwaysPrint Cloud Management
+Para información sobre el sistema de gestión cloud AlwaysPrint:
+```bash
+cd AlwaysPrintCloudManager
+cat README.md
+```
+
+O visita: `AlwaysPrintCloudManager/README.md`
+
+---
+
+## Configuración Linux — Manual de uso (CPM BBVA)
 
 ### 1) Conceder sudo a `lp` (visudo)
 ```sudoers

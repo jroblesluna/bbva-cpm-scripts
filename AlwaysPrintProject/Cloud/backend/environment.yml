@@ -1,0 +1,35 @@
+name: alwaysprint
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Python estable
+  - python=3.12
+  
+  # FastAPI y servidor
+  - fastapi>=0.115.0
+  - uvicorn>=0.32.0
+  - python-multipart>=0.0.12
+  
+  # Base de datos y ORM
+  - sqlalchemy>=2.0.36
+  - alembic>=1.14.0
+  
+  # Autenticación y seguridad
+  - pyjwt>=2.9.0
+  - passlib>=1.7.4
+  - bcrypt>=4.2.0
+  - python-dotenv>=1.0.1
+  
+  # Validación
+  - email-validator>=2.2.0
+  
+  # Utilidades
+  - python-dateutil>=2.9.0
+  
+  # Herramientas de desarrollo (opcional)
+  - pip
+  
+  # Instalar con pip (paquetes no disponibles en conda)
+  - pip:
+    - pyjwt>=2.9.0
