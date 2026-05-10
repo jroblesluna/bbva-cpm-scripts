@@ -9,7 +9,7 @@ from typing import Generator
 from sqlalchemy import create_engine, event, Engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import StaticPool, NullPool
 
 from app.core.config import settings
 
@@ -29,9 +29,14 @@ def get_engine_config() -> dict:
     
     if settings.is_sqlite:
         # SQLite: configuración para desarrollo/testing
+        # Usar NullPool para evitar problemas de concurrencia
+        # Cada petición obtiene una nueva conexión que se cierra al terminar
         config.update({
-            "connect_args": {"check_same_thread": False},
-            "poolclass": StaticPool,  # Pool estático para SQLite
+            "connect_args": {
+                "check_same_thread": False,
+                "timeout": 30  # Timeout de 30 segundos para locks
+            },
+            "poolclass": NullPool,  # Sin pool - nueva conexión por petición
         })
     else:
         # PostgreSQL/SQL Server: configuración para producción
