@@ -94,10 +94,12 @@ export default function AccountsPage() {
   })
 
   // Filtrar cuentas por búsqueda
-  const filteredAccounts = accounts?.filter(account =>
-    account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    account.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredAccounts = Array.isArray(accounts) 
+    ? accounts.filter(account =>
+        account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        account.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : []
 
   if (isLoading) {
     return (
