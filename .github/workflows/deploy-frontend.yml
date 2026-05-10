@@ -60,10 +60,10 @@ jobs:
           if [ ! -f /opt/alwaysprint/.env.frontend ]; then
             printf "NEXT_PUBLIC_API_URL=https://alwaysprint.apps.iol.pe\nNEXT_PUBLIC_WS_URL=wss://alwaysprint.apps.iol.pe\nNEXT_PUBLIC_APP_NAME=AlwaysPrint Cloud Management\n" > /opt/alwaysprint/.env.frontend
           fi
-          aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin $(echo ${FRONTEND_ECR_URL} | cut -d/ -f1)
-          docker pull ${FRONTEND_ECR_URL}:latest
-          docker rm -f alwaysprint-frontend 2>/dev/null || true
-          docker run -d --name alwaysprint-frontend --restart unless-stopped --network host --env-file /opt/alwaysprint/.env.frontend ${FRONTEND_ECR_URL}:latest
+          aws ecr get-login-password --region ${AWS_REGION} | sudo docker login --username AWS --password-stdin $(echo ${FRONTEND_ECR_URL} | cut -d/ -f1)
+          sudo docker pull ${FRONTEND_ECR_URL}:latest
+          sudo docker rm -f alwaysprint-frontend 2>/dev/null || true
+          sudo docker run -d --name alwaysprint-frontend --restart unless-stopped --network host --env-file /opt/alwaysprint/.env.frontend ${FRONTEND_ECR_URL}:latest
           echo "Frontend OK"
           SCRIPT
           chmod +x /tmp/deploy.sh

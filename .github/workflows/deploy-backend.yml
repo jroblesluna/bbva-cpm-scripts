@@ -57,10 +57,10 @@ jobs:
             SK=\$(aws secretsmanager get-secret-value --secret-id /alwaysprint/prod/secret_key --region ${AWS_REGION} --query SecretString --output text)
             printf "DATABASE_URL=%s\nSECRET_KEY=%s\nREDIS_URL=redis://localhost:6379/0\nLOG_LEVEL=INFO\nACCESS_TOKEN_EXPIRE_MINUTES=1440\nALGORITHM=HS256\nDB_POOL_SIZE=10\nDB_MAX_OVERFLOW=5\nWS_PING_INTERVAL=30\nWS_PING_TIMEOUT=60\nRATE_LIMIT_LOGIN=5\nRATE_LIMIT_API=100\nAPI_V1_STR=/api/v1\nCORS_ORIGINS=https://alwaysprint.apps.iol.pe\n" "\$DB_URL" "\$SK" > /opt/alwaysprint/.env.backend
           fi
-          aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin $(echo ${BACKEND_ECR_URL} | cut -d/ -f1)
-          docker pull ${BACKEND_ECR_URL}:latest
-          docker rm -f alwaysprint-backend 2>/dev/null || true
-          docker run -d --name alwaysprint-backend --restart unless-stopped --network host --env-file /opt/alwaysprint/.env.backend ${BACKEND_ECR_URL}:latest sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+          aws ecr get-login-password --region ${AWS_REGION} | sudo docker login --username AWS --password-stdin $(echo ${BACKEND_ECR_URL} | cut -d/ -f1)
+          sudo docker pull ${BACKEND_ECR_URL}:latest
+          sudo docker rm -f alwaysprint-backend 2>/dev/null || true
+          sudo docker run -d --name alwaysprint-backend --restart unless-stopped --network host --env-file /opt/alwaysprint/.env.backend ${BACKEND_ECR_URL}:latest sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
           echo "Backend OK"
           SCRIPT
           chmod +x /tmp/deploy.sh
