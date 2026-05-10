@@ -92,18 +92,6 @@ def list_users(
         skip=offset,
         limit=page_size
     )
-    total = query.count()
-    
-    # Paginar
-    offset = (page - 1) * page_size
-    users = query.offset(offset).limit(page_size).all()
-    
-    return UserListResponse(
-        items=users,
-        total=total,
-        skip=offset,
-        limit=page_size
-    )
 
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)

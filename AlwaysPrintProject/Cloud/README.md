@@ -1,140 +1,85 @@
 # AlwaysPrint Cloud Manager
 
-Plataforma SaaS multi-tenant para la gestión centralizada de workstations Windows que ejecutan AlwaysPrint.
+Sistema de gestión centralizada para el sistema de contingencia de impresión AlwaysPrint.
 
-**Versión**: 1.0.0  
-**Última actualización**: 8 de mayo de 2026
+## 📋 Descripción
 
----
+AlwaysPrint Cloud Manager es una plataforma SaaS multi-tenant que permite:
 
-## Descripción
+- **Gestión de Workstations**: Monitoreo y control de estaciones Windows con AlwaysPrint Client
+- **Gestión de VLANs**: Organización de workstations por segmentos de red
+- **Gestión de Organizaciones**: Multi-tenancy con aislamiento completo de datos
+- **Mensajería**: Envío de mensajes y comandos a workstations
+- **Auditoría**: Registro completo de acciones y eventos del sistema
+- **Autorización de IPs**: Control de acceso basado en IPs públicas
 
-**AlwaysPrint Cloud Manager (APCM)** es una plataforma cloud que permite monitorear y gestionar centralizadamente miles de workstations Windows desde una interfaz web, con:
-
-- **Multi-Tenancy**: Gestión de múltiples organizaciones cliente (BBVA, Santander, etc.)
-- **Monitoreo en Tiempo Real**: Estado de workstations, heartbeat, telemetría
-- **Configuración Remota**: Actualización de configuración desde la nube
-- **Analytics y Reportes**: Métricas de uso, disponibilidad, errores
-- **Escalabilidad**: Soporte para 200,000+ workstations
-
-## Arquitectura
+## 🏗️ Arquitectura
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    CLIENTE: BBVA                             │
-│  500 Workstations Windows 11                                │
-│  Cada workstation ejecuta AlwaysPrint (Service + Tray)     │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-                          │ HTTPS (vía Proxy Corporativo)
-                          │ Authentication: X-API-Key
-                          │
-┌─────────────────────────▼─────────────────────────────────────┐
-│              ALWAYSPRINT CLOUD MANAGER (SaaS)                 │
-│                                                               │
-│  ┌────────────────────────────────────────────────────────┐  │
-│  │  Backend (FastAPI)                                     │  │
-│  │  - API REST para dispositivos y administradores        │  │
-│  │  - Multi-tenancy con tenant isolation                  │  │
-│  │  - Autenticación: API Keys + JWT                       │  │
-│  └────────────────────────┬───────────────────────────────┘  │
-│                           │                                   │
-│  ┌────────────────────────▼───────────────────────────────┐  │
-│  │  Frontend (Next.js)                                    │  │
-│  │  - Dashboard web para administradores                  │  │
-│  │  - Subdominios por cliente (bbva.alwaysprint.com)     │  │
-│  └────────────────────────────────────────────────────────┘  │
-│                           │                                   │
-│                    ┌──────▼──────┐                           │
-│                    │  PostgreSQL │                           │
-│                    │  Multi-Tenant│                          │
-│                    └─────────────┘                           │
-└───────────────────────────────────────────────────────────────┘
+│                    ALWAYSPRINT CLOUD                         │
+│                                                              │
+│  ┌────────────────────┐         ┌────────────────────┐     │
+│  │   Frontend         │         │   Backend          │     │
+│  │   Next.js 15       │────────▶│   FastAPI          │     │
+│  │   TypeScript       │  HTTPS  │   Python 3.12      │     │
+│  │   Port 3000        │         │   Port 8000        │     │
+│  └────────────────────┘         └────────────────────┘     │
+│                                           │                  │
+│                                           ▼                  │
+│                                  ┌────────────────────┐     │
+│                                  │   PostgreSQL       │     │
+│                                  │   (Producción)     │     │
+│                                  │   SQLite (Dev)     │     │
+│                                  └────────────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+                        │
+                        ▼
+        ┌───────────────────────────────────┐
+        │   AlwaysPrint Clients (Windows)   │
+        │   - Reportan estado               │
+        │   - Reciben mensajes/comandos     │
+        │   - Envían logs                   │
+        └───────────────────────────────────┘
 ```
 
-### Componentes
-
-- **Backend (FastAPI)**: API REST + autenticación multi-tenant
-- **Frontend (Next.js 15)**: Dashboard web con subdominios por cliente
-- **Base de Datos**: PostgreSQL (producción) / SQLite (desarrollo)
-- **Cliente Windows**: AlwaysPrint (Service + Tray) - ver `../Client/`
-
-### Stack Tecnológico
-
-**Backend:**
-- Python 3.12
-- FastAPI
-- SQLAlchemy + Alembic
-- JWT + bcrypt
-
-**Frontend:**
-- Next.js 15 (App Router)
-- TypeScript
-- shadcn/ui + Tailwind CSS
-- React Query
-
-## Estructura del Proyecto
-
-```
-.
-├── backend/                    # Backend FastAPI
-│   ├── app/                   # Código de la aplicación
-│   │   ├── api/              # Endpoints REST y WebSocket
-│   │   ├── core/             # Configuración y seguridad
-│   │   ├── models/           # Modelos SQLAlchemy
-│   │   ├── schemas/          # Schemas Pydantic
-│   │   └── services/         # Lógica de negocio
-│   ├── alembic/              # Migraciones de BD
-│   ├── tests/                # Tests
-│   └── requirements.txt      # Dependencias Python
-│
-├── frontend/                  # Frontend Next.js
-│   ├── src/
-│   │   ├── app/             # App Router
-│   │   ├── components/      # Componentes React
-│   │   ├── lib/             # Utilidades
-│   │   ├── hooks/           # Custom hooks
-│   │   └── types/           # Tipos TypeScript
-│   └── package.json         # Dependencias Node.js
-│
-└── docker-compose.yml        # Orquestación de servicios
-```
-
-## Instalación y Configuración
+## 🚀 Inicio Rápido
 
 ### Requisitos Previos
 
 - **Backend**: Python 3.12+, Conda (recomendado)
-- **Frontend**: Node.js 20+, npm
-- **Docker** (opcional, para despliegue containerizado)
+- **Frontend**: Node.js 18+, npm
+- **Base de Datos**: SQLite (desarrollo) o PostgreSQL (producción)
 
-### Opción 1: Desarrollo Local
+### Instalación Local
 
-#### Backend
+#### 1. Backend
 
 ```bash
 cd backend
 
-# Con Conda (recomendado)
-conda env create -f environment.yml
+# Crear entorno conda
+conda create -n alwaysprint python=3.12
 conda activate alwaysprint
+
+# Instalar dependencias
+pip install -r requirements.txt
 
 # Configurar variables de entorno
 cp .env.example .env
 # Editar .env con tus configuraciones
 
-# Ejecutar migraciones
+# Inicializar base de datos
 alembic upgrade head
 
-# Iniciar servidor
+# Ejecutar servidor
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-El backend estará disponible en http://localhost:8000
+Backend disponible en: http://localhost:8000  
+Documentación API: http://localhost:8000/docs
 
-Ver [backend/README.md](backend/README.md) para más detalles.
-
-#### Frontend
+#### 2. Frontend
 
 ```bash
 cd frontend
@@ -144,148 +89,206 @@ npm install
 
 # Configurar variables de entorno
 cp .env.example .env.local
-# Editar .env.local con tus configuraciones
+# Editar .env.local con la URL del backend
 
-# Iniciar servidor de desarrollo
+# Ejecutar servidor de desarrollo
 npm run dev
 ```
 
-El frontend estará disponible en http://localhost:3000
+Frontend disponible en: http://localhost:3000
 
-Ver [frontend/README.md](frontend/README.md) para más detalles.
+#### 3. Inicialización del Sistema
 
-### Opción 2: Docker Compose
+1. Acceder a http://localhost:3000/setup
+2. Crear el primer usuario administrador
+3. Iniciar sesión en http://localhost:3000/login
+
+## 📁 Estructura del Proyecto
+
+```
+AlwaysPrintProject/Cloud/
+├── backend/                    # Backend FastAPI
+│   ├── app/
+│   │   ├── api/               # Endpoints REST
+│   │   │   └── v1/
+│   │   │       └── endpoints/ # Controladores por entidad
+│   │   ├── core/              # Configuración y seguridad
+│   │   ├── models/            # Modelos SQLAlchemy
+│   │   ├── schemas/           # Schemas Pydantic
+│   │   └── services/          # Lógica de negocio
+│   ├── alembic/               # Migraciones de BD
+│   ├── tests/                 # Tests pytest
+│   └── requirements.txt
+│
+├── frontend/                   # Frontend Next.js
+│   ├── src/
+│   │   ├── app/               # Páginas Next.js 15 (App Router)
+│   │   │   ├── dashboard/     # Dashboard principal
+│   │   │   ├── login/         # Autenticación
+│   │   │   └── setup/         # Configuración inicial
+│   │   ├── components/        # Componentes React
+│   │   │   └── ui/            # Componentes UI reutilizables
+│   │   ├── hooks/             # Custom hooks
+│   │   ├── lib/               # Utilidades y API client
+│   │   └── types/             # Tipos TypeScript
+│   └── package.json
+│
+├── terraform/                  # Infraestructura como código
+│   ├── modules/               # Módulos reutilizables
+│   │   ├── networking/        # VPC, subnets, security groups
+│   │   ├── ecr/               # Container registry
+│   │   ├── rds/               # PostgreSQL
+│   │   └── ec2/               # Instancia EC2 con Docker
+│   └── main.tf
+│
+├── ARCHITECTURE.md            # Arquitectura detallada
+├── DEVELOPMENT.md             # Guía de desarrollo
+└── README.md                  # Este archivo
+```
+
+## 🔑 Características Principales
+
+### Multi-Tenancy
+
+- **Aislamiento completo** de datos por organización
+- **Roles de usuario**: Admin (super usuario) y Operator (por organización)
+- **Autorización de IPs públicas**: Control de acceso por IP
+
+### Gestión de Workstations
+
+- **Monitoreo en tiempo real** del estado de workstations
+- **Configuración remota** de parámetros
+- **Activación/desactivación** de modo contingencia
+- **Historial de eventos** y cambios
+
+### Mensajería y Comandos
+
+- **Envío de mensajes** a workstations individuales, VLANs o toda la organización
+- **Comandos remotos** para operaciones específicas
+- **Confirmación de entrega** y resultados
+
+### Auditoría Completa
+
+- **Registro de todas las acciones** de usuarios
+- **Eventos del sistema** (conexiones, desconexiones, cambios)
+- **Filtrado y búsqueda** avanzada
+- **Exportación de logs**
+
+## 🔒 Seguridad
+
+- **Autenticación JWT** con tokens de 24 horas
+- **Bcrypt** para hashing de contraseñas
+- **CORS configurado** para dominios específicos
+- **Autorización basada en roles** (RBAC)
+- **Autorización de IPs públicas** para workstations
+- **HTTPS/TLS 1.3** en producción
+- **Tenant isolation** a nivel de base de datos
+
+## 🧪 Testing
+
+### Backend
 
 ```bash
-# Construir e iniciar todos los servicios
-docker-compose up -d
-
-# Ver logs
-docker-compose logs -f
-
-# Detener servicios
-docker-compose down
+cd backend
+pytest                          # Ejecutar todos los tests
+pytest tests/test_auth.py       # Test específico
+pytest -v                       # Modo verbose
+pytest --cov=app                # Con cobertura
 ```
 
-Servicios disponibles:
-- Frontend: http://localhost:3000
-- Backend: http://localhost:8000
-- PostgreSQL: localhost:5432
+### Frontend
 
-## Multi-Tenancy
-
-### Modelo de Datos
-
-**Shared Schema**: Todas las organizaciones comparten las mismas tablas, con aislamiento por `organization_id`.
-
-```sql
-organizations
-├─ id, name, slug, plan, api_key
-
-workstations
-├─ id, organization_id, hostname, api_key, status
-
-users (admins)
-├─ id, organization_id, email, role
-
-telemetry
-├─ id, organization_id, workstation_id, metrics
+```bash
+cd frontend
+npm run test                    # Ejecutar tests
+npm run test:watch              # Modo watch
+npm run build                   # Verificar build de producción
 ```
 
-### Tenant Isolation
+## 📦 Deployment
 
-Todas las queries filtran por `organization_id`:
+### Producción con Terraform (AWS)
 
-```python
-# ✅ CORRECTO
-workstation = db.query(Workstation).filter(
-    Workstation.id == id,
-    Workstation.organization_id == tenant.organization_id
-).first()
+```bash
+cd terraform
+
+# Inicializar Terraform
+terraform init
+
+# Planificar cambios
+terraform plan
+
+# Aplicar infraestructura
+terraform apply
+
+# Obtener outputs (URLs, IPs, etc.)
+terraform output
 ```
 
-### Subdominios por Cliente
+La infraestructura incluye:
+- VPC con subnets públicas y privadas
+- RDS PostgreSQL en subnet privada
+- ECR para imágenes Docker
+- EC2 con Docker Compose
+- Route53 para DNS
+- Security Groups configurados
 
-- `https://bbva.alwaysprint.com` → Dashboard de BBVA
-- `https://santander.alwaysprint.com` → Dashboard de Santander
-- `https://api.alwaysprint.com` → API única para todos
+### Variables de Entorno Requeridas
 
-### API Keys en Dos Niveles
+#### Backend (.env)
 
-**1. Organization API Key**:
-- Formato: `org_bbva_xxxxxxxxxxxxxxxx`
-- Uso: Registro inicial de workstations
-- Almacenado en: Instalador MSI de AlwaysPrint
+```bash
+# Base de datos
+DATABASE_URL=postgresql://user:pass@host:5432/dbname
 
-**2. Workstation API Key**:
-- Formato: `ws_xxxxxxxxxxxxxxxx`
-- Uso: Heartbeat, telemetría, obtener configuración
-- Único por workstation
+# Seguridad
+SECRET_KEY=your-secret-key-here
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
-## Comunicación con Workstations
+# CORS
+ALLOWED_ORIGINS=https://alwaysprint.apps.iol.pe
 
-### Flujo de Registro
-
-```
-1. Admin instala AlwaysPrint.msi en workstation
-2. Instalador configura:
-   - CloudEnabled = 1
-   - CloudApiUrl = https://api.alwaysprint.com
-   - CloudApiKey = org_bbva_xxxxxxxx
-3. AlwaysPrintTray envía POST /api/v1/workstations/register
-4. Backend devuelve workstation_id y workstation_api_key
-5. Tray guarda credenciales en Registry
-6. Tray inicia heartbeat cada 60 segundos
+# Aplicación
+PROJECT_NAME=AlwaysPrint Cloud Manager
+VERSION=1.0.0
 ```
 
-### Endpoints para Dispositivos
+#### Frontend (.env.local)
 
-- `POST /api/v1/workstations/register` - Registro inicial
-- `POST /api/v1/workstations/{id}/heartbeat` - Heartbeat (cada 60s)
-- `POST /api/v1/workstations/{id}/telemetry` - Envío de métricas
-- `GET /api/v1/workstations/{id}/config` - Obtener configuración
+```bash
+NEXT_PUBLIC_API_URL=https://api.alwaysprint.apps.iol.pe
+```
 
-### Endpoints para Administradores
+## 📚 Documentación Adicional
 
-- `POST /api/v1/auth/login` - Login con JWT
-- `GET /api/v1/admin/workstations` - Lista de workstations
-- `PUT /api/v1/admin/workstations/{id}/config` - Actualizar configuración
-- `GET /api/v1/admin/analytics` - Métricas y reportes
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Arquitectura detallada del sistema
+- **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Guía completa de desarrollo
+- **[Backend README](./backend/README.md)** - Documentación específica del backend
+- **[Frontend README](./frontend/README.md)** - Documentación específica del frontend
 
-## Documentación de la API
+## 🔗 URLs de Producción
 
-Una vez iniciado el backend, la documentación interactiva está disponible en:
+- **Frontend**: https://alwaysprint.apps.iol.pe
+- **Backend API**: https://api.alwaysprint.apps.iol.pe
+- **Documentación API**: https://api.alwaysprint.apps.iol.pe/docs
 
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+## 🤝 Contribución
 
-## Escalabilidad
+1. Crear rama desde `main`: `git checkout -b feature/nueva-funcionalidad`
+2. Hacer cambios y commits descriptivos
+3. Ejecutar tests: `pytest` (backend) y `npm run build` (frontend)
+4. Push y crear Pull Request
+5. Esperar revisión y aprobación
 
-| Workstations | Clientes | Infraestructura |
-|--------------|----------|-----------------|
-| <5,000 | 1-10 | 1 servidor (4 CPU, 8GB RAM) |
-| 5,000-50,000 | 10-50 | Load balancer + 2-3 servidores |
-| 50,000-200,000 | 50-200 | Kubernetes cluster |
-| 200,000+ | 200+ | Multi-region + CDN |
+## 📄 Licencia
 
-## Documentación Adicional
-
-- [Arquitectura Detallada](ARCHITECTURE.md) - Arquitectura completa del sistema
-- [Backend README](backend/README.md) - Instalación y configuración del backend
-- [Frontend README](frontend/README.md) - Instalación y configuración del frontend
-- [Cliente Windows](../Client/README.md) - AlwaysPrint (Service + Tray)
-- [Visión General del Sistema](../../SYSTEM-OVERVIEW.md) - Ecosistema completo
-- [Proyecto Principal](../README.md) - AlwaysPrint Project
+© 2026 Inversiones On Line SAC - Todos los derechos reservados  
+Producto de la familia de automatización Robles.AI
 
 ---
 
-**Robles.AI**  
+**Contacto:**  
 Email: antonio@robles.ai  
 Teléfono: +1 408 590 0153  
 Web: https://robles.ai
-
----
-
-© 2026 Inversiones On Line SAC - Todos los derechos reservados  
-Producto de la familia de automatización Robles.AI  
-Prohibida la utilización sin autorización de Inversiones On Line SAC
