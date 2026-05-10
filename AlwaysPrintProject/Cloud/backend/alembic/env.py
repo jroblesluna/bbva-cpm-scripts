@@ -73,17 +73,11 @@ def run_migrations_online() -> None:
     configuration = config.get_section(config.config_ini_section)
     configuration["sqlalchemy.url"] = settings.DATABASE_URL
     
-    # Agregar configuración de pool para bases de datos de producción
-    if not settings.is_sqlite:
-        configuration["sqlalchemy.pool_size"] = str(settings.DB_POOL_SIZE)
-        configuration["sqlalchemy.max_overflow"] = str(settings.DB_MAX_OVERFLOW)
-        configuration["sqlalchemy.pool_timeout"] = str(settings.DB_POOL_TIMEOUT)
-        configuration["sqlalchemy.pool_recycle"] = str(settings.DB_POOL_RECYCLE)
-    
+    # NullPool no acepta parámetros de pool - usarlo directamente sin pool_size etc.
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
-        poolclass=pool.NullPool,  # No usar pool en migraciones
+        poolclass=pool.NullPool,
     )
 
     with connectable.connect() as connection:
