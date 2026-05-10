@@ -31,23 +31,19 @@ jobs:
 
       - name: Build and push frontend image
         working-directory: AlwaysPrintProject/Cloud/frontend
-        env:
-          NEXT_PUBLIC_API_URL: "https://alwaysprint.apps.iol.pe"
-          NEXT_PUBLIC_WS_URL: "wss://alwaysprint.apps.iol.pe"
-          NEXT_PUBLIC_APP_NAME: "AlwaysPrint Cloud Management"
         run: |
           IMAGE_TAG=${GITHUB_SHA::8}
           ECR_URL=${{ secrets.FRONTEND_ECR_URL }}
           docker build \
-            --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
-            --build-arg NEXT_PUBLIC_WS_URL="$NEXT_PUBLIC_WS_URL" \
-            --build-arg NEXT_PUBLIC_APP_NAME="$NEXT_PUBLIC_APP_NAME" \
+            --build-arg NEXT_PUBLIC_API_URL="https://alwaysprint.apps.iol.pe" \
+            --build-arg NEXT_PUBLIC_WS_URL="wss://alwaysprint.apps.iol.pe" \
+            --build-arg NEXT_PUBLIC_APP_NAME="AlwaysPrint Cloud Management" \
             -t $ECR_URL:$IMAGE_TAG \
             -t $ECR_URL:latest .
           docker push $ECR_URL:$IMAGE_TAG
           docker push $ECR_URL:latest
 
-      - name: Deploy to EC2 via SSH
+      - name: Get SSH key
         run: |
           aws secretsmanager get-secret-value \
             --secret-id /alwaysprint/prod/ssh_private_key \
@@ -55,8 +51,41 @@ jobs:
             --query SecretString \
             --output text > /tmp/ec2.pem
           chmod 600 /tmp/ec2.pem
-          ssh -i /tmp/ec2.pem \
-            -o StrictHostKeyChecking=no \
-            ec2-user@${{ secrets.EC2_HOST }} \
-            "/opt/alwaysprint/deploy.sh frontend"
-          rm -f /tmp/ec2.pem
+
+      - name: Deploy frontend on EC2
+        env:
+          FRONTEND_ECR_URL: ${{ secrets.FRONTEND_ECR_URL }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          ssh -i /tmp/ec2.pem -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_HOST }} \
+            "FRONTEND_ECR_URL=$FRONTEND_ECR_URL AWS_REGION=$AWS_REGION bash -s" << 'ENDSSH'
+          set -e
+
+          mkdir -p /opt/alwaysprint
+
+          # Crear .env.frontend si no existe
+          if [ ! -f /opt/alwaysprint/.env.frontend ]; then
+            cat > /opt/alwaysprint/.env.frontend << 'EOF'
+NEXT_PUBLIC_API_URL=https://alwaysprint.apps.iol.pe
+NEXT_PUBLIC_WS_URL=wss://alwaysprint.apps.iol.pe
+NEXT_PUBLIC_APP_NAME=AlwaysPrint Cloud Management
+EOF
+          fi
+
+          aws ecr get-login-password --region $AWS_REGION \
+            | docker login --username AWS --password-stdin \
+              $(echo $FRONTEND_ECR_URL | cut -d/ -f1)
+          docker pull $FRONTEND_ECR_URL:latest
+          docker rm -f alwaysprint-frontend 2>/dev/null || true
+          docker run -d \
+            --name alwaysprint-frontend \
+            --restart unless-stopped \
+            --network host \
+            --env-file /opt/alwaysprint/.env.frontend \
+            $FRONTEND_ECR_URL:latest
+          echo "Frontend deployed OK"
+          ENDSSH
+
+      - name: Cleanup
+        if: always()
+        run: rm -f /tmp/ec2.pem
