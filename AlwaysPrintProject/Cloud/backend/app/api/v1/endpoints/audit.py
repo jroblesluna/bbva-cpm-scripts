@@ -58,24 +58,30 @@ def search_audit_logs(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
         account_id = current_user.account_id
     
-    # Crear objeto de búsqueda
-    search_params = AuditLogSearch(
-        user_id=user_id,
-        workstation_id=workstation_id,
-        account_id=account_id,
+    # Calcular skip para paginación
+    skip = (page - 1) * page_size
+    
+    # Buscar logs usando el servicio
+    logs, total = audit_service.search_audit_logs(
+        db=db,
+        account_id=str(account_id) if account_id else None,
+        user_id=str(user_id) if user_id else None,
+        workstation_id=str(workstation_id) if workstation_id else None,
         action_type=action_type,
         entity_type=entity_type,
-        entity_id=entity_id,
+        entity_id=str(entity_id) if entity_id else None,
         start_date=start_date,
         end_date=end_date,
-        page=page,
-        page_size=page_size
+        skip=skip,
+        limit=page_size
     )
     
-    # Buscar logs
-    result = audit_service.search_audit_logs(db, search_params)
-    
-    return result
+    return AuditLogListResponse(
+        total=total,
+        page=page,
+        page_size=page_size,
+        logs=logs
+    )
 
 
 @router.get("/stats", response_model=AuditLogStatsResponse)
@@ -105,8 +111,16 @@ def get_audit_stats(
     
     total_actions = query.count()
     
-    # Acciones por tipo
-    actions_by_type = audit_service.get_action_count_by_type(db, account_id)
+    # Acciones por tipo - solo si hay account_id
+    actions_by_type = {}
+    if account_id:
+        actions_by_type = audit_service.get_action_count_by_type(db, str(account_id))
+    else:
+        # Para admin sin filtro, contar todos los tipos
+        all_logs = db.query(AuditLog).all()
+        for log in all_logs:
+            action_type = log.action_type.value
+            actions_by_type[action_type] = actions_by_type.get(action_type, 0) + 1
     
     # Usuarios más activos (top 10)
     most_active_query = db.query(
@@ -160,7 +174,16 @@ def get_recent_activity(
         account_id = current_user.account_id
     
     # Obtener actividad reciente
-    logs = audit_service.get_recent_activity(db, account_id, limit)
+    if account_id:
+        logs = audit_service.get_recent_activity(db, str(account_id), hours=24, limit=limit)
+    else:
+        # Para admin, obtener actividad reciente de todas las cuentas
+        recent_date = datetime.utcnow() - timedelta(hours=24)
+        logs = db.query(AuditLog).filter(
+            AuditLog.created_at >= recent_date
+        ).order_by(
+            AuditLog.created_at.desc()
+        ).limit(limit).all()
     
     return AuditLogListResponse(
         total=len(logs),
