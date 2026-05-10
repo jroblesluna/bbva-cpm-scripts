@@ -29,5 +29,4 @@ variable "ec2_instance_type" {
 }
 
 variable "backend_env_vars" { type = map(string) }
-variable "frontend_env_vars" { type = map(string) }
 

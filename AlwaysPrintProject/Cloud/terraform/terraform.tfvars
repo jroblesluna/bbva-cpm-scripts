@@ -42,8 +42,4 @@ backend_env_vars = {
   API_V1_STR                  = "/api/v1"
 }
 
-frontend_env_vars = {
-  NEXT_PUBLIC_APP_NAME = "AlwaysPrint Cloud Management"
-}
-
 # CI/CD via GitHub Actions - no requiere variables aqui
