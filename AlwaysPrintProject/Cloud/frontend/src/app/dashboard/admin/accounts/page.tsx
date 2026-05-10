@@ -168,7 +168,7 @@ export default function AccountsPage() {
           </CardHeader>
           <CardContent>
             <AccountForm
-              onSubmit={(data) => createMutation.mutate(data)}
+              onSubmit={(data) => createMutation.mutate(data as AccountCreate)}
               onCancel={() => setShowCreateForm(false)}
               isLoading={createMutation.isPending}
               error={createMutation.error?.detail}

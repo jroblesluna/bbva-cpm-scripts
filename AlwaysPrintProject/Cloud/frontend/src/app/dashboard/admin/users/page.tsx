@@ -143,7 +143,7 @@ export default function UsersPage() {
           <CardContent>
             <UserForm
               accounts={accounts || []}
-              onSubmit={(data) => createMutation.mutate(data)}
+              onSubmit={(data) => createMutation.mutate(data as UserCreate)}
               onCancel={() => setShowCreateForm(false)}
               isLoading={createMutation.isPending}
               error={createMutation.error?.detail}
