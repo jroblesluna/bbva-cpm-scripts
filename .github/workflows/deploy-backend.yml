@@ -15,93 +15,61 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Login to Amazon ECR
+      - name: Login to ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push backend image
+      - name: Build and push
         working-directory: AlwaysPrintProject/Cloud/backend
         run: |
-          IMAGE_TAG=${GITHUB_SHA::8}
-          ECR_URL=${{ secrets.BACKEND_ECR_URL }}
-          docker build -t $ECR_URL:$IMAGE_TAG -t $ECR_URL:latest .
-          docker push $ECR_URL:$IMAGE_TAG
-          docker push $ECR_URL:latest
+          TAG=${GITHUB_SHA::8}
+          docker build -t ${{ secrets.BACKEND_ECR_URL }}:$TAG -t ${{ secrets.BACKEND_ECR_URL }}:latest .
+          docker push ${{ secrets.BACKEND_ECR_URL }}:$TAG
+          docker push ${{ secrets.BACKEND_ECR_URL }}:latest
 
       - name: Get SSH key
         run: |
           aws secretsmanager get-secret-value \
             --secret-id /alwaysprint/prod/ssh_private_key \
             --region ${{ secrets.AWS_REGION }} \
-            --query SecretString \
-            --output text > /tmp/ec2.pem
+            --query SecretString --output text > /tmp/ec2.pem
           chmod 600 /tmp/ec2.pem
 
-      - name: Deploy backend on EC2
+      - name: Create deploy script
         env:
           BACKEND_ECR_URL: ${{ secrets.BACKEND_ECR_URL }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
-          ssh -i /tmp/ec2.pem -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_HOST }} \
-            "BACKEND_ECR_URL=$BACKEND_ECR_URL AWS_REGION=$AWS_REGION bash -s" << 'ENDSSH'
+          cat > /tmp/deploy.sh << SCRIPT
+          #!/bin/bash
           set -e
-
-          # Asegurar directorio
           mkdir -p /opt/alwaysprint
-
-          # Crear .env.backend si no existe
           if [ ! -f /opt/alwaysprint/.env.backend ]; then
-            echo "Creando .env.backend desde Secrets Manager..."
-            DATABASE_URL=$(aws secretsmanager get-secret-value \
-              --secret-id /alwaysprint/prod/database_url \
-              --region $AWS_REGION --query SecretString --output text)
-            SECRET_KEY=$(aws secretsmanager get-secret-value \
-              --secret-id /alwaysprint/prod/secret_key \
-              --region $AWS_REGION --query SecretString --output text)
-            cat > /opt/alwaysprint/.env.backend << EOF
-DATABASE_URL=$DATABASE_URL
-SECRET_KEY=$SECRET_KEY
-REDIS_URL=redis://localhost:6379/0
-LOG_LEVEL=INFO
-ACCESS_TOKEN_EXPIRE_MINUTES=1440
-ALGORITHM=HS256
-DB_POOL_SIZE=10
-DB_MAX_OVERFLOW=5
-WS_PING_INTERVAL=30
-WS_PING_TIMEOUT=60
-RATE_LIMIT_LOGIN=5
-RATE_LIMIT_API=100
-API_V1_STR=/api/v1
-CORS_ORIGINS=https://alwaysprint.apps.iol.pe
-EOF
+            DB_URL=\$(aws secretsmanager get-secret-value --secret-id /alwaysprint/prod/database_url --region ${AWS_REGION} --query SecretString --output text)
+            SK=\$(aws secretsmanager get-secret-value --secret-id /alwaysprint/prod/secret_key --region ${AWS_REGION} --query SecretString --output text)
+            printf "DATABASE_URL=%s\nSECRET_KEY=%s\nREDIS_URL=redis://localhost:6379/0\nLOG_LEVEL=INFO\nACCESS_TOKEN_EXPIRE_MINUTES=1440\nALGORITHM=HS256\nDB_POOL_SIZE=10\nDB_MAX_OVERFLOW=5\nWS_PING_INTERVAL=30\nWS_PING_TIMEOUT=60\nRATE_LIMIT_LOGIN=5\nRATE_LIMIT_API=100\nAPI_V1_STR=/api/v1\nCORS_ORIGINS=https://alwaysprint.apps.iol.pe\n" "\$DB_URL" "\$SK" > /opt/alwaysprint/.env.backend
           fi
-
-          # Login ECR y deploy
-          aws ecr get-login-password --region $AWS_REGION \
-            | docker login --username AWS --password-stdin \
-              $(echo $BACKEND_ECR_URL | cut -d/ -f1)
-          docker pull $BACKEND_ECR_URL:latest
+          aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin $(echo ${BACKEND_ECR_URL} | cut -d/ -f1)
+          docker pull ${BACKEND_ECR_URL}:latest
           docker rm -f alwaysprint-backend 2>/dev/null || true
-          docker run -d \
-            --name alwaysprint-backend \
-            --restart unless-stopped \
-            --network host \
-            --env-file /opt/alwaysprint/.env.backend \
-            $BACKEND_ECR_URL:latest \
-            sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
-          echo "Backend deployed OK"
-          ENDSSH
+          docker run -d --name alwaysprint-backend --restart unless-stopped --network host --env-file /opt/alwaysprint/.env.backend ${BACKEND_ECR_URL}:latest sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+          echo "Backend OK"
+          SCRIPT
+          chmod +x /tmp/deploy.sh
+
+      - name: Deploy to EC2
+        run: |
+          scp -i /tmp/ec2.pem -o StrictHostKeyChecking=no /tmp/deploy.sh ec2-user@${{ secrets.EC2_HOST }}:/tmp/deploy-backend.sh
+          ssh -i /tmp/ec2.pem -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_HOST }} "bash /tmp/deploy-backend.sh"
 
       - name: Cleanup
         if: always()
-        run: rm -f /tmp/ec2.pem
+        run: rm -f /tmp/ec2.pem /tmp/deploy.sh
