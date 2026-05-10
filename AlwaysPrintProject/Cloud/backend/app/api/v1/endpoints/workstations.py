@@ -36,10 +36,11 @@ router = APIRouter()
 
 
 @router.get("/", response_model=WorkstationListResponse)
-async def list_workstations(
+def list_workstations(
     page: int = Query(1, ge=1, description="Número de página"),
     page_size: int = Query(50, ge=1, le=100, description="Tamaño de página"),
     vlan_id: Optional[UUID] = Query(None, description="Filtrar por VLAN"),
+    account_id: Optional[UUID] = Query(None, description="Filtrar por cuenta"),
     is_online: Optional[bool] = Query(None, description="Filtrar por estado online"),
     contingency_active: Optional[bool] = Query(None, description="Filtrar por contingencia activa"),
     search: Optional[str] = Query(None, description="Buscar por IP o hostname"),
@@ -56,6 +57,7 @@ async def list_workstations(
         page: Número de página
         page_size: Tamaño de página (1-100)
         vlan_id: Filtrar por VLAN opcional
+        account_id: Filtrar por cuenta opcional
         is_online: Filtrar por estado online opcional
         contingency_active: Filtrar por contingencia activa opcional
         search: Buscar por IP o hostname opcional
@@ -65,42 +67,71 @@ async def list_workstations(
     Returns:
         WorkstationListResponse con lista paginada de workstations
     """
-    workstation_service = WorkstationService()
+    from sqlalchemy.orm import joinedload
     
-    # Determinar account_id según rol
-    account_id = None
+    query = db.query(Workstation).options(joinedload(Workstation.account))
+    
+    # Operadores solo pueden ver workstations de su cuenta
     if current_user.role == UserRole.OPERATOR:
         if not current_user.account_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Operador sin cuenta asignada"
             )
-        account_id = current_user.account_id
+        query = query.filter(Workstation.account_id == current_user.account_id)
     
-    # Obtener workstations con filtros
-    result = await workstation_service.get_workstations_by_account(
-        db=db,
-        account_id=account_id,
-        vlan_id=vlan_id,
-        is_online=is_online,
-        contingency_active=contingency_active,
-        search=search,
-        page=page,
-        page_size=page_size
+    # Filtrar por cuenta si se proporciona (solo Admin)
+    if account_id:
+        if current_user.role != UserRole.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo Admin puede filtrar por cuenta"
+            )
+        query = query.filter(Workstation.account_id == account_id)
+    
+    # Filtrar por VLAN si se proporciona
+    if vlan_id:
+        query = query.filter(Workstation.vlan_id == vlan_id)
+    
+    # Filtrar por estado online si se proporciona
+    if is_online is not None:
+        query = query.filter(Workstation.is_online == is_online)
+    
+    # Filtrar por contingencia activa si se proporciona
+    if contingency_active is not None:
+        query = query.filter(Workstation.contingency_active == contingency_active)
+    
+    # Buscar por IP o hostname si se proporciona
+    if search:
+        query = query.filter(
+            (Workstation.ip_private.ilike(f"%{search}%")) |
+            (Workstation.hostname.ilike(f"%{search}%"))
+        )
+    
+    # Contar total
+    total = query.count()
+    
+    # Paginar
+    offset = (page - 1) * page_size
+    workstations = query.offset(offset).limit(page_size).all()
+    
+    return WorkstationListResponse(
+        items=workstations,
+        total=total,
+        skip=offset,
+        limit=page_size
     )
-    
-    return result
 
 
 @router.get("/stats", response_model=WorkstationStatsResponse)
-async def get_workstation_stats(
+def get_workstation_stats(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Obtener estadísticas de workstations.
     
-    - Admin: estadísticas de todas las cuentas
+    - Admin: estadísticas de todas las cuentas + desglose por cuenta
     - Operador: estadísticas de su cuenta
     
     Args:
@@ -110,33 +141,89 @@ async def get_workstation_stats(
     Returns:
         WorkstationStatsResponse con estadísticas
     """
-    workstation_service = WorkstationService()
-    
-    # Determinar account_id según rol
-    account_id = None
-    if current_user.role == UserRole.OPERATOR:
-        if not current_user.account_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Operador sin cuenta asignada"
-            )
-        account_id = current_user.account_id
-    
-    # Obtener estadísticas
-    total = await workstation_service.get_total_count(db, account_id)
-    online = await workstation_service.get_online_count(db, account_id)
-    contingency = await workstation_service.get_contingency_count(db, account_id)
-    
-    return WorkstationStatsResponse(
-        total=total,
-        online=online,
-        offline=total - online,
-        contingency_active=contingency
-    )
+    try:
+        workstation_service = WorkstationService()
+        
+        # Determinar account_id según rol
+        account_id = None
+        if current_user.role == UserRole.OPERATOR:
+            if not current_user.account_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Operador sin cuenta asignada"
+                )
+            account_id = str(current_user.account_id) if current_user.account_id else None
+        
+        # Obtener estadísticas generales
+        total = workstation_service.get_total_count(db, account_id)
+        online = workstation_service.get_online_count(db, account_id)
+        contingency = workstation_service.get_contingency_count(db, account_id)
+        
+        # Preparar respuesta base
+        response = WorkstationStatsResponse(
+            total=total,
+            online=online,
+            offline=total - online,
+            contingency_active=contingency
+        )
+        
+        # Si es admin, agregar estadísticas por cuenta
+        if current_user.role == UserRole.ADMIN:
+            from app.models.account import Account
+            import uuid
+            
+            # Obtener todas las cuentas
+            accounts = db.query(Account).all()
+            
+            by_account = {}
+            for account in accounts:
+                try:
+                    # Convertir account.id a string de manera segura
+                    # El tipo GUID puede devolver UUID o str dependiendo del dialecto
+                    if isinstance(account.id, uuid.UUID):
+                        account_id_str = str(account.id)
+                    elif isinstance(account.id, str):
+                        account_id_str = account.id
+                    else:
+                        account_id_str = str(account.id)
+                    
+                    account_total = workstation_service.get_total_count(db, account_id_str)
+                    account_online = workstation_service.get_online_count(db, account_id_str)
+                    account_contingency = workstation_service.get_contingency_count(db, account_id_str)
+                    
+                    by_account[account_id_str] = {
+                        "name": account.name,
+                        "total": account_total,
+                        "online": account_online,
+                        "offline": account_total - account_online,
+                        "contingency": account_contingency
+                    }
+                except Exception as e:
+                    # Si falla para una cuenta específica, continuar con las demás
+                    print(f"Error al obtener estadísticas para cuenta {account.id}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    continue
+            
+            response.by_account = by_account
+        
+        return response
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Log el error y devolver un error 500 con detalles
+        print(f"Error en get_workstation_stats: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener estadísticas: {str(e)}"
+        )
 
 
 @router.get("/{workstation_id}", response_model=WorkstationDetailResponse)
-async def get_workstation(
+def get_workstation(
     workstation_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -159,9 +246,9 @@ async def get_workstation(
         HTTPException 403: Sin permisos
         HTTPException 404: Workstation no encontrada
     """
-    workstation_service = WorkstationService()
+    from sqlalchemy.orm import joinedload
     
-    workstation = await workstation_service.get_workstation_by_id(db, workstation_id)
+    workstation = db.query(Workstation).options(joinedload(Workstation.account)).filter(Workstation.id == workstation_id).first()
     
     if not workstation:
         raise HTTPException(
@@ -177,20 +264,11 @@ async def get_workstation(
                 detail="No tienes permisos para ver esta workstation"
             )
     
-    # Obtener licencia activa
-    active_license = await workstation_service.get_active_license(db, workstation_id)
-    
-    # Crear respuesta detallada
-    response = WorkstationDetailResponse(
-        **workstation.__dict__,
-        active_license=active_license
-    )
-    
-    return response
+    return workstation
 
 
 @router.put("/{workstation_id}", response_model=WorkstationResponse)
-async def update_workstation(
+def update_workstation(
     workstation_id: UUID,
     workstation_data: WorkstationUpdate,
     current_user: User = Depends(get_current_user),
@@ -215,9 +293,7 @@ async def update_workstation(
         HTTPException 403: Sin permisos
         HTTPException 404: Workstation no encontrada
     """
-    workstation_service = WorkstationService()
-    
-    workstation = await workstation_service.get_workstation_by_id(db, workstation_id)
+    workstation = db.query(Workstation).filter(Workstation.id == workstation_id).first()
     
     if not workstation:
         raise HTTPException(
@@ -238,7 +314,7 @@ async def update_workstation(
         "hostname": workstation.hostname,
         "os_serial": workstation.os_serial,
         "current_user": workstation.current_user,
-        "vlan_id": str(workstation.vlan_id) if workstation.vlan_id else None
+        "account_id": str(workstation.account_id) if workstation.account_id else None
     }
     
     # Actualizar campos
@@ -252,15 +328,14 @@ async def update_workstation(
     
     # Registrar en auditoría
     audit_service = AuditService()
-    await audit_service.log_update(
+    audit_service.log_update(
         db=db,
-        user_id=current_user.id,
-        workstation_id=workstation.id,
-        account_id=workstation.account_id,
         entity_type="workstation",
-        entity_id=workstation.id,
-        old_values=old_values,
-        new_values=update_data
+        entity_id=str(workstation.id),
+        user_id=str(current_user.id),
+        account_id=str(workstation.account_id) if workstation.account_id else None,
+        old_data=old_values,
+        new_data=update_data
     )
     
     return workstation
@@ -269,7 +344,7 @@ async def update_workstation(
 # === ENDPOINTS DE CONFIGURACIÓN ===
 
 @router.get("/{workstation_id}/config", response_model=EffectiveConfigResponse)
-async def get_workstation_config(
+def get_workstation_config(
     workstation_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -294,7 +369,7 @@ async def get_workstation_config(
     workstation_service = WorkstationService()
     config_service = ConfigService()
     
-    workstation = await workstation_service.get_workstation_by_id(db, workstation_id)
+    workstation = workstation_service.get_workstation_by_id(db, workstation_id)
     
     if not workstation:
         raise HTTPException(
@@ -311,13 +386,13 @@ async def get_workstation_config(
             )
     
     # Obtener configuración efectiva
-    config = await config_service.get_effective_config(db, workstation_id)
+    config = config_service.get_effective_config(db, workstation_id)
     
     return config
 
 
 @router.put("/{workstation_id}/config", response_model=WorkstationConfigResponse)
-async def update_workstation_config(
+def update_workstation_config(
     workstation_id: UUID,
     config_data: WorkstationConfigUpdate,
     current_user: User = Depends(get_current_user),
@@ -345,7 +420,7 @@ async def update_workstation_config(
     workstation_service = WorkstationService()
     config_service = ConfigService()
     
-    workstation = await workstation_service.get_workstation_by_id(db, workstation_id)
+    workstation = workstation_service.get_workstation_by_id(db, workstation_id)
     
     if not workstation:
         raise HTTPException(
@@ -362,7 +437,7 @@ async def update_workstation_config(
             )
     
     # Actualizar configuración
-    config = await config_service.create_or_update_workstation_config(
+    config = config_service.create_or_update_workstation_config(
         db=db,
         workstation_id=workstation_id,
         **config_data.model_dump(exclude_unset=True)
@@ -370,7 +445,7 @@ async def update_workstation_config(
     
     # Registrar en auditoría
     audit_service = AuditService()
-    await audit_service.log_config_change(
+    audit_service.log_config_change(
         db=db,
         user_id=current_user.id,
         workstation_id=workstation_id,
@@ -384,7 +459,7 @@ async def update_workstation_config(
 
 
 @router.delete("/{workstation_id}/config", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_workstation_config(
+def delete_workstation_config(
     workstation_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -406,7 +481,7 @@ async def delete_workstation_config(
     workstation_service = WorkstationService()
     config_service = ConfigService()
     
-    workstation = await workstation_service.get_workstation_by_id(db, workstation_id)
+    workstation = workstation_service.get_workstation_by_id(db, workstation_id)
     
     if not workstation:
         raise HTTPException(
@@ -423,11 +498,11 @@ async def delete_workstation_config(
             )
     
     # Eliminar configuración
-    await config_service.delete_workstation_config(db, workstation_id)
+    config_service.delete_workstation_config(db, workstation_id)
     
     # Registrar en auditoría
     audit_service = AuditService()
-    await audit_service.log_config_change(
+    audit_service.log_config_change(
         db=db,
         user_id=current_user.id,
         workstation_id=workstation_id,

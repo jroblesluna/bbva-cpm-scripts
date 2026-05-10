@@ -22,6 +22,8 @@ from app.schemas.account import (
     AccountListResponse,
     PublicIPCreate,
     PublicIPResponse,
+    PublicIPPendingResponse,
+    PublicIPAuthorizeRequest,
 )
 
 # === WORKSTATION SCHEMAS ===
@@ -33,6 +35,7 @@ from app.schemas.workstation import (
     WorkstationStatusUpdate,
     WorkstationListResponse,
     WorkstationStatsResponse,
+    AccountBasicResponse,
 )
 
 # === VLAN SCHEMAS ===
@@ -123,6 +126,8 @@ __all__ = [
     "AccountListResponse",
     "PublicIPCreate",
     "PublicIPResponse",
+    "PublicIPPendingResponse",
+    "PublicIPAuthorizeRequest",
     # Workstation
     "LicenseResponse",
     "WorkstationResponse",
@@ -131,6 +136,7 @@ __all__ = [
     "WorkstationStatusUpdate",
     "WorkstationListResponse",
     "WorkstationStatsResponse",
+    "AccountBasicResponse",
     # VLAN
     "VLANCreate",
     "VLANUpdate",

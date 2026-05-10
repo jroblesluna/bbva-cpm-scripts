@@ -1,32 +1,47 @@
 /**
- * Tipos TypeScript compartidos
+ * Exportación centralizada de todos los tipos TypeScript.
  */
 
-// TODO: Definir tipos según los schemas del backend
-export type User = {
-  id: string
-  email: string
-  role: 'admin' | 'operator' | 'readonly'
-  accountId?: string
+// User types
+export * from './user'
+
+// Account types
+export * from './account'
+
+// Workstation types
+export * from './workstation'
+
+// VLAN types
+export * from './vlan'
+
+// Config types
+export * from './config'
+
+// Message types
+export * from './message'
+
+// Audit types
+export * from './audit'
+
+// WebSocket types
+export * from './websocket'
+
+// ============================================================================
+// TIPOS COMUNES
+// ============================================================================
+
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  skip: number
+  limit: number
 }
 
-export type Account = {
-  id: string
-  name: string
-  description: string
-  isActive: boolean
+export interface ApiError {
+  detail: string
+  status?: number
 }
 
-export type Workstation = {
-  id: string
-  accountId: string
-  vlanId?: string
-  ipPrivate: string
-  hostname?: string
-  osSerial?: string
-  currentUser?: string
-  isOnline: boolean
-  contingencyActive: boolean
-  lastConnection?: string
-  firstSeen: string
+export interface SuccessResponse {
+  message: string
 }

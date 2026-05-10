@@ -1,119 +1,402 @@
+/**
+ * Dashboard principal con estadísticas y métricas.
+ */
+
+'use client'
+
+import { useState, useEffect } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Monitor, CheckCircle, Building2, Network, AlertCircle, Globe } from 'lucide-react'
+import Link from 'next/link'
+import { useAuth } from '@/hooks/useAuth'
+
+interface WorkstationStats {
+  total: number
+  online: number
+  offline: number
+  contingency_active: number
+  by_account?: Record<string, {
+    name: string
+    total: number
+    online: number
+    offline: number
+    contingency: number
+  }>
+}
+
+interface PendingIP {
+  id: string
+  ip_address: string
+  first_seen: string
+}
+
 export default function DashboardPage() {
-  return (
-    <div className="min-h-screen bg-gray-50 p-8">
+  const { isAdmin, getAuthHeaders } = useAuth()
+  const [stats, setStats] = useState<WorkstationStats | null>(null)
+  const [pendingIPs, setPendingIPs] = useState<PendingIP[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Cargar estadísticas de workstations
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        setIsLoading(true)
+        const response = await fetch('http://localhost:8000/api/v1/workstations/stats', {
+          headers: getAuthHeaders(),
+        })
+
+        if (!response.ok) throw new Error('Error al cargar estadísticas')
+
+        const data = await response.json()
+        setStats(data)
+      } catch (err: any) {
+        console.error('Error:', err)
+        setError(err.message || 'Error al cargar estadísticas')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadStats()
+  }, [getAuthHeaders])
+
+  // Cargar IPs pendientes (solo para admin)
+  useEffect(() => {
+    if (!isAdmin()) return
+
+    const loadPendingIPs = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/api/v1/accounts/public-ips/pending', {
+          headers: getAuthHeaders(),
+        })
+
+        if (!response.ok) return // Ignorar errores silenciosamente
+
+        const data = await response.json()
+        // La respuesta es un array directamente
+        setPendingIPs(Array.isArray(data) ? data : [])
+      } catch (err) {
+        // Ignorar errores de IPs pendientes
+        console.error('Error al cargar IPs pendientes:', err)
+      }
+    }
+
+    loadPendingIPs()
+  }, [isAdmin, getAuthHeaders])
+
+  if (isLoading) {
+    return (
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">
-          AlwaysPrint Cloud Manager - Dashboard
-        </h1>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Tarjeta de Estaciones */}
-          <div className="bg-white rounded-lg shadow p-6">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">Dashboard</h1>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-6">
+                <div className="h-20 bg-gray-200 rounded"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    console.error('Error en dashboard:', error)
+    
+    // Verificar si es error de autenticación
+    const isAuthError = error && typeof error === 'object' && 'detail' in error && 
+      (String(error.detail).includes('Not authenticated') || String(error.detail).includes('autenticado'))
+    
+    // Verificar si es error de red
+    const isNetworkError = error && typeof error === 'object' && 'detail' in error &&
+      String(error.detail).includes('Network Error')
+    
+    return (
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">Dashboard</h1>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {isAuthError ? (
+              <>
+                <strong>Sesión expirada.</strong> Por favor, cierra sesión y vuelve a iniciar sesión.
+              </>
+            ) : isNetworkError ? (
+              <>
+                <strong>Error de conexión.</strong> El backend no responde. Verifica que esté corriendo en http://localhost:8000
+                <div className="mt-3">
+                  <Button onClick={() => refetch()} size="sm" variant="outline">
+                    Reintentar
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                Error al cargar estadísticas. Por favor, intenta de nuevo.
+                {error && typeof error === 'object' && 'detail' in error && (
+                  <div className="mt-2 text-xs font-mono bg-red-50 p-2 rounded">
+                    {String(error.detail)}
+                  </div>
+                )}
+                <div className="mt-3">
+                  <Button onClick={() => refetch()} size="sm" variant="outline">
+                    Reintentar
+                  </Button>
+                </div>
+              </>
+            )}
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto">
+      <h1 className="text-3xl font-bold text-gray-900 mb-8">Dashboard</h1>
+
+      {/* Tarjetas de estadísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Estaciones Totales */}
+        <Card>
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Estaciones Totales</p>
-                <p className="text-3xl font-bold text-gray-900">0</p>
+                <p className="text-3xl font-bold text-gray-900">{stats?.total || 0}</p>
               </div>
               <div className="bg-blue-100 rounded-full p-3">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
+                <Monitor className="w-6 h-6 text-blue-600" />
               </div>
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Tarjeta de Estaciones Online */}
-          <div className="bg-white rounded-lg shadow p-6">
+        {/* Estaciones Online */}
+        <Card>
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Estaciones Online</p>
-                <p className="text-3xl font-bold text-green-600">0</p>
+                <p className="text-3xl font-bold text-green-600">{stats?.online || 0}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {stats?.offline || 0} offline
+                </p>
               </div>
               <div className="bg-green-100 rounded-full p-3">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <CheckCircle className="w-6 h-6 text-green-600" />
               </div>
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Tarjeta de Agencias */}
-          <div className="bg-white rounded-lg shadow p-6">
+        {/* Contingencia Activa */}
+        <Card>
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Agencias</p>
-                <p className="text-3xl font-bold text-gray-900">0</p>
-              </div>
-              <div className="bg-purple-100 rounded-full p-3">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Tarjeta de VLANs */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">VLANs</p>
-                <p className="text-3xl font-bold text-gray-900">0</p>
+                <p className="text-sm text-gray-600">Contingencia Activa</p>
+                <p className="text-3xl font-bold text-orange-600">
+                  {stats?.contingency_active || 0}
+                </p>
               </div>
               <div className="bg-orange-100 rounded-full p-3">
-                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                </svg>
+                <AlertCircle className="w-6 h-6 text-orange-600" />
               </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Sección de Enlaces Rápidos */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Enlaces Rápidos</h2>
+        {/* IPs Pendientes (solo Admin) o VLANs */}
+        {isAdmin() && pendingIPs && pendingIPs.length > 0 ? (
+          <Link href="/dashboard/admin/pending-ips">
+            <Card className="hover:shadow-lg transition cursor-pointer border-amber-200 bg-amber-50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-amber-700 font-medium">IPs Pendientes</p>
+                    <p className="text-3xl font-bold text-amber-600">{pendingIPs.length}</p>
+                    <p className="text-xs text-amber-600 mt-1">Requieren autorización</p>
+                  </div>
+                  <div className="bg-amber-200 rounded-full p-3">
+                    <Globe className="w-6 h-6 text-amber-700" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        ) : (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">VLANs</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {stats?.by_vlan ? Object.keys(stats.by_vlan).length : 0}
+                  </p>
+                </div>
+                <div className="bg-purple-100 rounded-full p-3">
+                  <Network className="w-6 h-6 text-purple-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Distribución por VLAN */}
+      {stats?.by_vlan && Object.keys(stats.by_vlan).length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Distribución por VLAN</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(stats.by_vlan).map(([vlanId, count]) => (
+                <div
+                  key={vlanId}
+                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">VLAN {vlanId}</p>
+                    <p className="text-xs text-gray-500">{count} estaciones</p>
+                  </div>
+                  <Badge variant="secondary">{count}</Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Distribución por Cuenta (solo para Admin) */}
+      {stats?.by_account && Object.keys(stats.by_account).length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Cuentas / Organizaciones</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {Object.entries(stats.by_account).map(([accountId, accountData]) => (
+                <div
+                  key={accountId}
+                  className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center">
+                      <Building2 className="w-5 h-5 text-blue-600 mr-3" />
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {accountData.name}
+                      </h3>
+                    </div>
+                    <Badge variant="outline" className="text-sm">
+                      {accountData.total} estaciones
+                    </Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center p-3 bg-blue-50 rounded-lg">
+                      <p className="text-2xl font-bold text-blue-600">{accountData.total}</p>
+                      <p className="text-xs text-gray-600 mt-1">Total</p>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 rounded-lg">
+                      <p className="text-2xl font-bold text-green-600">{accountData.online}</p>
+                      <p className="text-xs text-gray-600 mt-1">Online</p>
+                    </div>
+                    <div className="text-center p-3 bg-gray-50 rounded-lg">
+                      <p className="text-2xl font-bold text-gray-600">{accountData.offline}</p>
+                      <p className="text-xs text-gray-600 mt-1">Offline</p>
+                    </div>
+                    <div className="text-center p-3 bg-orange-50 rounded-lg">
+                      <p className="text-2xl font-bold text-orange-600">{accountData.contingency}</p>
+                      <p className="text-xs text-gray-600 mt-1">Contingencia</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Enlaces Rápidos */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Enlaces Rápidos</CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <a href="/dashboard/workstations" className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
-              <svg className="w-5 h-5 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
+            <Link
+              href="/dashboard/workstations"
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+            >
+              <Monitor className="w-5 h-5 text-blue-600 mr-3" />
               <span className="font-medium text-gray-900">Gestionar Estaciones</span>
-            </a>
-            
-            <a href="/dashboard/vlans" className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
-              <svg className="w-5 h-5 text-orange-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-              </svg>
-              <span className="font-medium text-gray-900">Gestionar VLANs</span>
-            </a>
-            
-            <a href="/dashboard/config" className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
-              <svg className="w-5 h-5 text-gray-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span className="font-medium text-gray-900">Configuración</span>
-            </a>
-          </div>
-        </div>
+            </Link>
 
-        {/* Información del Sistema */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <Link
+              href="/dashboard/vlans"
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+            >
+              <Network className="w-5 h-5 text-purple-600 mr-3" />
+              <span className="font-medium text-gray-900">Gestionar VLANs</span>
+            </Link>
+
+            {isAdmin() ? (
+              <Link
+                href="/dashboard/admin/pending-ips"
+                className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+              >
+                <Globe className="w-5 h-5 text-amber-600 mr-3" />
+                <div className="flex items-center">
+                  <span className="font-medium text-gray-900">IPs Pendientes</span>
+                  {pendingIPs && pendingIPs.length > 0 && (
+                    <Badge variant="destructive" className="ml-2">
+                      {pendingIPs.length}
+                    </Badge>
+                  )}
+                </div>
+              </Link>
+            ) : (
+              <Link
+                href="/dashboard/config"
+                className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+              >
+                <Building2 className="w-5 h-5 text-gray-600 mr-3" />
+                <span className="font-medium text-gray-900">Configuración</span>
+              </Link>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Información del Sistema */}
+      <Alert className="mt-8">
+        <AlertDescription>
           <div className="flex items-start">
-            <svg className="w-5 h-5 text-blue-600 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-3" />
             <div>
-              <h3 className="text-sm font-medium text-blue-900">Sistema Inicializado</h3>
-              <p className="text-sm text-blue-700 mt-1">
-                El backend está corriendo en <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer" className="underline font-medium">http://localhost:8000/docs</a>
-              </p>
-              <p className="text-sm text-blue-700 mt-1">
-                Las páginas de gestión están en desarrollo. Próximamente podrás gestionar estaciones, VLANs y configuración desde aquí.
+              <h3 className="text-sm font-medium text-gray-900">Sistema Operativo</h3>
+              <p className="text-sm text-gray-700 mt-1">
+                Backend API:{' '}
+                <a
+                  href={process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline font-medium text-blue-600"
+                >
+                  {process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}
+                </a>
               </p>
             </div>
           </div>
-        </div>
-      </div>
+        </AlertDescription>
+      </Alert>
     </div>
   )
 }

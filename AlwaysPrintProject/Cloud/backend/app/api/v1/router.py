@@ -15,12 +15,20 @@ from app.api.v1.endpoints import (
     config,
     messages,
     audit,
+    setup,
 )
 
 # Router principal de la API v1
 api_router = APIRouter()
 
 # === ENDPOINTS REST ===
+
+# Setup inicial (sin autenticación)
+api_router.include_router(
+    setup.router,
+    prefix="/setup",
+    tags=["Setup"]
+)
 
 # Autenticación (sin prefijo adicional, ya está en /api/v1/auth)
 api_router.include_router(

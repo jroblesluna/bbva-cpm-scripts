@@ -34,7 +34,7 @@ router = APIRouter()
 
 
 @router.get("/", response_model=VLANListResponse)
-async def list_vlans(
+def list_vlans(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -51,15 +51,23 @@ async def list_vlans(
 
 
 @router.post("/", response_model=VLANResponse, status_code=status.HTTP_201_CREATED)
-async def create_vlan(
+def create_vlan(
     vlan_data: VLANCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Crear una nueva VLAN."""
-    account_id = current_user.account_id if current_user.role == UserRole.OPERATOR else None
-    if not account_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="account_id requerido")
+    # Determinar account_id
+    if current_user.role == UserRole.OPERATOR:
+        # Operadores solo pueden crear VLANs en su propia cuenta
+        account_id = current_user.account_id
+        if not account_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
+    else:
+        # Admins deben especificar el account_id
+        account_id = vlan_data.account_id
+        if not account_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="account_id requerido para administradores")
     
     vlan = VLAN(
         account_id=account_id,
@@ -72,13 +80,13 @@ async def create_vlan(
     db.refresh(vlan)
     
     audit_service = AuditService()
-    await audit_service.log_create(db, current_user.id, "vlan", vlan.id, {"name": vlan.name})
+    audit_service.log_create(db, current_user.id, "vlan", vlan.id, {"name": vlan.name})
     
     return vlan
 
 
 @router.get("/{vlan_id}", response_model=VLANDetailResponse)
-async def get_vlan(
+def get_vlan(
     vlan_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -96,7 +104,7 @@ async def get_vlan(
 
 
 @router.put("/{vlan_id}", response_model=VLANResponse)
-async def update_vlan(
+def update_vlan(
     vlan_id: UUID,
     vlan_data: VLANUpdate,
     current_user: User = Depends(get_current_user),
@@ -120,13 +128,13 @@ async def update_vlan(
     db.refresh(vlan)
     
     audit_service = AuditService()
-    await audit_service.log_update(db, current_user.id, "vlan", vlan.id, old_values, update_data)
+    audit_service.log_update(db, current_user.id, "vlan", vlan.id, old_values, update_data)
     
     return vlan
 
 
 @router.delete("/{vlan_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_vlan(
+def delete_vlan(
     vlan_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -143,13 +151,13 @@ async def delete_vlan(
     db.commit()
     
     audit_service = AuditService()
-    await audit_service.log_delete(db, current_user.id, "vlan", vlan_id, {"name": vlan.name})
+    audit_service.log_delete(db, current_user.id, "vlan", vlan_id, {"name": vlan.name})
     
     return None
 
 
 @router.get("/{vlan_id}/workstations", response_model=WorkstationListResponse)
-async def list_vlan_workstations(
+def list_vlan_workstations(
     vlan_id: UUID,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
@@ -165,11 +173,11 @@ async def list_vlan_workstations(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     workstation_service = WorkstationService()
-    return await workstation_service.get_workstations_by_vlan(db, vlan_id, page, page_size)
+    return workstation_service.get_workstations_by_vlan(db, vlan_id, page, page_size)
 
 
 @router.get("/{vlan_id}/config", response_model=VLANConfigResponse)
-async def get_vlan_config(
+def get_vlan_config(
     vlan_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -186,7 +194,7 @@ async def get_vlan_config(
 
 
 @router.put("/{vlan_id}/config", response_model=VLANConfigResponse)
-async def update_vlan_config(
+def update_vlan_config(
     vlan_id: UUID,
     config_data: VLANConfigUpdate,
     current_user: User = Depends(get_current_user),
@@ -201,12 +209,12 @@ async def update_vlan_config(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     config_service = ConfigService()
-    config = await config_service.create_or_update_vlan_config(
+    config = config_service.create_or_update_vlan_config(
         db, vlan_id, **config_data.model_dump(exclude_unset=True)
     )
     
     audit_service = AuditService()
-    await audit_service.log_config_change(
+    audit_service.log_config_change(
         db, current_user.id, None, vlan.account_id, "vlan", {}, config_data.model_dump(exclude_unset=True)
     )
     
@@ -214,7 +222,7 @@ async def update_vlan_config(
 
 
 @router.delete("/{vlan_id}/config", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_vlan_config(
+def delete_vlan_config(
     vlan_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -228,10 +236,10 @@ async def delete_vlan_config(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     config_service = ConfigService()
-    await config_service.delete_vlan_config(db, vlan_id)
+    config_service.delete_vlan_config(db, vlan_id)
     
     audit_service = AuditService()
-    await audit_service.log_config_change(
+    audit_service.log_config_change(
         db, current_user.id, None, vlan.account_id, "vlan", {"action": "config_deleted"}, {}
     )
     

@@ -8,10 +8,10 @@ dentro de una cuenta, identificados por rangos CIDR.
 import uuid
 from datetime import datetime
 from sqlalchemy import Column, String, DateTime, ForeignKey, JSON
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.models.account import GUID  # Importar tipo GUID para consistencia
 
 
 class VLAN(Base):
@@ -25,8 +25,8 @@ class VLAN(Base):
     __tablename__ = "vlans"
     
     # === CAMPOS PRINCIPALES ===
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    account_id = Column(GUID, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
     description = Column(String(1000), nullable=True)
     

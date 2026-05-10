@@ -15,6 +15,7 @@ import ipaddress
 
 class VLANCreate(BaseModel):
     """Schema para crear una VLAN."""
+    account_id: Optional[UUID] = Field(None, description="ID de la cuenta (opcional para operadores)")
     name: str = Field(..., min_length=1, max_length=255, description="Nombre de la VLAN")
     description: Optional[str] = Field(None, max_length=1000, description="Descripción de la VLAN")
     cidr_ranges: list[str] = Field(..., min_items=1, description="Rangos CIDR (ej: ['192.168.1.0/24'])")

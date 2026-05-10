@@ -9,12 +9,50 @@ Este módulo define el modelo User que representa usuarios con diferentes roles:
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Enum as SQLEnum, TypeDecorator
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
 import enum
 
 from app.core.database import Base
+
+
+# === TIPO UUID COMPATIBLE CON SQLITE Y POSTGRESQL ===
+class GUID(TypeDecorator):
+    """
+    Tipo UUID que funciona tanto en SQLite como en PostgreSQL.
+    
+    En PostgreSQL usa el tipo UUID nativo.
+    En SQLite usa String(36) y convierte automáticamente.
+    """
+    impl = String
+    cache_ok = True
+    
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(PG_UUID(as_uuid=True))
+        else:
+            return dialect.type_descriptor(String(36))
+    
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        elif dialect.name == 'postgresql':
+            return value
+        else:
+            if isinstance(value, uuid.UUID):
+                return str(value)
+            else:
+                return str(uuid.UUID(value))
+    
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        else:
+            if isinstance(value, uuid.UUID):
+                return value
+            else:
+                return uuid.UUID(value)
 
 
 class UserRole(str, enum.Enum):
@@ -35,15 +73,21 @@ class User(Base):
     __tablename__ = "users"
     
     # === CAMPOS PRINCIPALES ===
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
+    full_name = Column(String(255), nullable=False)
     role = Column(SQLEnum(UserRole), nullable=False, default=UserRole.READONLY)
     is_active = Column(Boolean, nullable=False, default=True)
     
     # === RELACIÓN CON CUENTA ===
     # NULL para Admin (acceso global), requerido para Operador/ReadOnly
-    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=True)
+    account_id = Column(GUID, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=True)
+    
+    # Zona horaria del usuario (hereda de la organización si es NULL)
+    # Ejemplos: "UTC", "America/Lima", "America/New_York", "Europe/Madrid"
+    # Si es NULL, usa el timezone de la organización (account.timezone)
+    timezone = Column(String(50), nullable=True)
     
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

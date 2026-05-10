@@ -34,17 +34,39 @@ class PublicIPCreate(PublicIPBase):
 class PublicIPResponse(PublicIPBase):
     """Schema para respuesta de IP pública."""
     id: UUID
-    account_id: UUID
+    account_id: Optional[UUID] = None  # Puede ser NULL si está pendiente
+    is_authorized: bool
+    created_at: datetime
+    first_seen: datetime
+    authorized_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class PublicIPPendingResponse(BaseModel):
+    """Schema para IP pública pendiente de autorización."""
+    id: UUID
+    ip_address: str
+    description: Optional[str] = None
+    first_seen: datetime
     created_at: datetime
     
     class Config:
         from_attributes = True
 
 
+class PublicIPAuthorizeRequest(BaseModel):
+    """Schema para autorizar una IP pública."""
+    account_id: UUID = Field(..., description="ID de la cuenta a la que se asignará la IP")
+    description: Optional[str] = Field(None, max_length=500, description="Descripción opcional")
+
+
 class AccountBase(BaseModel):
     """Schema base para Account."""
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=1000)
+    timezone: str = Field(default="UTC", max_length=50, description="Zona horaria de la organización (ej: UTC, America/Lima)")
 
 
 class AccountCreate(AccountBase):
@@ -57,12 +79,14 @@ class AccountUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=1000)
     is_active: Optional[bool] = None
+    timezone: Optional[str] = Field(None, max_length=50, description="Zona horaria de la organización")
 
 
 class AccountResponse(AccountBase):
     """Schema para respuesta de cuenta."""
     id: UUID
     is_active: bool
+    timezone: str
     created_at: datetime
     updated_at: datetime
     

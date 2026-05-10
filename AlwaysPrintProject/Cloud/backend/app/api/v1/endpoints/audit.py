@@ -30,7 +30,7 @@ router = APIRouter()
 
 
 @router.get("/", response_model=AuditLogListResponse)
-async def search_audit_logs(
+def search_audit_logs(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
     user_id: Optional[UUID] = Query(None),
@@ -73,13 +73,13 @@ async def search_audit_logs(
     )
     
     # Buscar logs
-    result = await audit_service.search_audit_logs(db, search_params)
+    result = audit_service.search_audit_logs(db, search_params)
     
     return result
 
 
 @router.get("/stats", response_model=AuditLogStatsResponse)
-async def get_audit_stats(
+def get_audit_stats(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -106,7 +106,7 @@ async def get_audit_stats(
     total_actions = query.count()
     
     # Acciones por tipo
-    actions_by_type = await audit_service.get_action_count_by_type(db, account_id)
+    actions_by_type = audit_service.get_action_count_by_type(db, account_id)
     
     # Usuarios más activos (top 10)
     most_active_query = db.query(
@@ -139,7 +139,7 @@ async def get_audit_stats(
 
 
 @router.get("/recent", response_model=AuditLogListResponse)
-async def get_recent_activity(
+def get_recent_activity(
     limit: int = Query(50, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -160,7 +160,7 @@ async def get_recent_activity(
         account_id = current_user.account_id
     
     # Obtener actividad reciente
-    logs = await audit_service.get_recent_activity(db, account_id, limit)
+    logs = audit_service.get_recent_activity(db, account_id, limit)
     
     return AuditLogListResponse(
         total=len(logs),
@@ -171,7 +171,7 @@ async def get_recent_activity(
 
 
 @router.get("/{log_id}", response_model=AuditLogDetailResponse)
-async def get_audit_log(
+def get_audit_log(
     log_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

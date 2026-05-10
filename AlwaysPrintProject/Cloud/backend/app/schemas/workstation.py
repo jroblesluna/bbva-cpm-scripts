@@ -7,7 +7,7 @@ Este módulo define los schemas de validación para:
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any
 from uuid import UUID
 from pydantic import BaseModel, Field
 
@@ -45,8 +45,27 @@ class WorkstationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
+    # Relación con cuenta (anidada)
+    account: Optional['AccountBasicResponse'] = None
+    
     class Config:
         from_attributes = True
+
+
+# Schema básico de cuenta para relaciones anidadas
+class AccountBasicResponse(BaseModel):
+    """Schema básico de cuenta para relaciones anidadas."""
+    id: UUID
+    name: str
+    is_active: bool
+    timezone: str
+    
+    class Config:
+        from_attributes = True
+
+
+# Actualizar forward reference
+WorkstationResponse.model_rebuild()
 
 
 class WorkstationDetailResponse(WorkstationResponse):
@@ -73,10 +92,10 @@ class WorkstationStatusUpdate(BaseModel):
 
 class WorkstationListResponse(BaseModel):
     """Schema de respuesta para lista paginada de workstations."""
+    items: list[WorkstationResponse]
     total: int
-    page: int
-    page_size: int
-    workstations: list[WorkstationResponse]
+    skip: int
+    limit: int
 
 
 class WorkstationStatsResponse(BaseModel):
@@ -85,3 +104,5 @@ class WorkstationStatsResponse(BaseModel):
     online: int
     offline: int
     contingency_active: int
+    by_vlan: Optional[Dict[str, int]] = Field(None, description="Distribución por VLAN")
+    by_account: Optional[Dict[str, Dict[str, Any]]] = Field(None, description="Distribución por cuenta (solo admin)")

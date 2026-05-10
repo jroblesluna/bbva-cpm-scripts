@@ -8,11 +8,11 @@ enviados por operadores a estaciones individuales, VLANs o cuentas completas.
 import uuid
 from datetime import datetime
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import enum
 
 from app.core.database import Base
+from app.models.account import GUID  # Importar tipo GUID para consistencia
 
 
 class TargetType(str, enum.Enum):
@@ -35,14 +35,14 @@ class Message(Base):
     __tablename__ = "messages"
     
     # === CAMPOS PRINCIPALES ===
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
-    sender_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    account_id = Column(GUID, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    sender_id = Column(GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     
     # === DESTINATARIO ===
     target_type = Column(SQLEnum(TargetType), nullable=False, index=True)
     # target_id puede ser workstation_id, vlan_id, o NULL (para broadcast a cuenta)
-    target_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    target_id = Column(GUID, nullable=True, index=True)
     
     # === CONTENIDO ===
     content = Column(String(5000), nullable=False)

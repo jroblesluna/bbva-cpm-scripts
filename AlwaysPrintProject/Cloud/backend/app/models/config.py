@@ -12,10 +12,10 @@ La resolución de configuración sigue el orden: WorkstationConfig > VLANConfig 
 import uuid
 from datetime import datetime
 from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, JSON
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.models.account import GUID  # Importar tipo GUID para consistencia
 
 
 class GlobalConfig(Base):
@@ -28,8 +28,8 @@ class GlobalConfig(Base):
     __tablename__ = "global_configs"
     
     # === CAMPOS PRINCIPALES ===
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE"), unique=True, nullable=False)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    account_id = Column(GUID, ForeignKey("accounts.id", ondelete="CASCADE"), unique=True, nullable=False)
     
     # === PARÁMETROS DE CONFIGURACIÓN ===
     # Nombre de la cola corporativa (default: "LexmarkRoblesAI")
@@ -65,8 +65,8 @@ class VLANConfig(Base):
     __tablename__ = "vlan_configs"
     
     # === CAMPOS PRINCIPALES ===
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    vlan_id = Column(UUID(as_uuid=True), ForeignKey("vlans.id", ondelete="CASCADE"), unique=True, nullable=False)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    vlan_id = Column(GUID, ForeignKey("vlans.id", ondelete="CASCADE"), unique=True, nullable=False)
     
     # === PARÁMETROS DE CONFIGURACIÓN (NULLABLE PARA OVERRIDE SELECTIVO) ===
     corporate_queue_name = Column(String(255), nullable=True)
@@ -95,8 +95,8 @@ class WorkstationConfig(Base):
     __tablename__ = "workstation_configs"
     
     # === CAMPOS PRINCIPALES ===
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    workstation_id = Column(UUID(as_uuid=True), ForeignKey("workstations.id", ondelete="CASCADE"), unique=True, nullable=False)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    workstation_id = Column(GUID, ForeignKey("workstations.id", ondelete="CASCADE"), unique=True, nullable=False)
     
     # === PARÁMETROS DE CONFIGURACIÓN (NULLABLE PARA OVERRIDE SELECTIVO) ===
     corporate_queue_name = Column(String(255), nullable=True)

@@ -14,7 +14,7 @@ psycopg2-binary>=2.9.9  # PostgreSQL driver
 # === AUTHENTICATION & SECURITY ===
 python-jose[cryptography]>=3.3.0  # JWT
 passlib[bcrypt]>=1.7.4  # Password hashing
-bcrypt>=4.2.0
+bcrypt==4.1.3  # Versión específica para compatibilidad con passlib 1.7.4
 pyjwt>=2.9.0
 
 # === VALIDATION ===

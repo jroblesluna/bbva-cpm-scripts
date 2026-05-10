@@ -15,6 +15,7 @@ from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
+import hashlib
 
 from app.core.config import settings
 from app.models.user import User, UserRole
@@ -43,6 +44,13 @@ class AuthService:
         """
         Hashea una contraseña usando bcrypt con cost factor 12.
         
+        Para evitar el límite de 72 bytes de bcrypt, primero se hashea
+        la contraseña con SHA-256, resultando en un string hexadecimal
+        de 64 caracteres (32 bytes), que luego se hashea con bcrypt.
+        
+        Este enfoque permite contraseñas de cualquier longitud y
+        caracteres Unicode sin problemas de truncamiento.
+        
         Args:
             password: Contraseña en texto plano
             
@@ -54,12 +62,19 @@ class AuthService:
             >>> print(hashed)
             $2b$12$...
         """
-        return pwd_context.hash(password)
+        # Pre-hashear con SHA-256 para evitar límite de 72 bytes de bcrypt
+        # SHA-256 produce un hash de 32 bytes (64 caracteres hex)
+        password_sha256 = hashlib.sha256(password.encode('utf-8')).hexdigest()
+        
+        # Hashear el SHA-256 con bcrypt
+        return pwd_context.hash(password_sha256)
     
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
         """
         Verifica si una contraseña en texto plano coincide con su hash.
+        
+        Aplica el mismo pre-hashing SHA-256 antes de verificar con bcrypt.
         
         Args:
             plain_password: Contraseña en texto plano
@@ -75,7 +90,11 @@ class AuthService:
             >>> AuthService.verify_password("contraseña_incorrecta", hashed)
             False
         """
-        return pwd_context.verify(plain_password, hashed_password)
+        # Pre-hashear con SHA-256 (mismo proceso que en hash_password)
+        password_sha256 = hashlib.sha256(plain_password.encode('utf-8')).hexdigest()
+        
+        # Verificar con bcrypt
+        return pwd_context.verify(password_sha256, hashed_password)
     
     # === GENERACIÓN DE TOKENS JWT ===
     

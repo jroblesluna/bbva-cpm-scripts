@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <!-- Gradiente para el lado izquierdo (cian a azul) -->
+    <linearGradient id="leftGrad" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" style="stop-color:#00d4ff"/>
+      <stop offset="100%" style="stop-color:#5b7fff"/>
+    </linearGradient>
+    
+    <!-- Gradiente para el lado derecho (azul a morado) -->
+    <linearGradient id="rightGrad" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" style="stop-color:#5b7fff"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Bandeja superior (papel) -->
+  <rect x="28" y="20" width="72" height="28" rx="6" fill="#6b7280"/>
+  
+  <!-- Fondo de la impresora (cuerpo principal) -->
+  <rect x="12" y="42" width="104" height="52" rx="10" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1.5"/>
+  
+  <!-- LED verde -->
+  <circle cx="102" cy="56" r="6" fill="#10b981"/>
+  <circle cx="102" cy="56" r="4" fill="#6ee7b7"/>
+  
+  <!-- Símbolo de infinito entrelazado - anillos más juntos -->
+  <!-- Anillo derecho (debajo en el cruce) -->
+  <g>
+    <circle cx="72" cy="68" r="18" fill="url(#rightGrad)"/>
+    <circle cx="72" cy="68" r="10" fill="#e5e7eb"/>
+  </g>
+  
+  <!-- Anillo izquierdo (encima en el cruce) -->
+  <g>
+    <circle cx="56" cy="68" r="18" fill="url(#leftGrad)"/>
+    <circle cx="56" cy="68" r="10" fill="#e5e7eb"/>
+  </g>
+  
+  <!-- Bandeja de salida -->
+  <rect x="28" y="94" width="72" height="20" rx="6" fill="#4b5563"/>
+  
+  <!-- Papel saliendo -->
+  <rect x="36" y="100" width="56" height="3" rx="1.5" fill="#d1d5db"/>
+  <rect x="36" y="106" width="56" height="3" rx="1.5" fill="#d1d5db"/>
+</svg>

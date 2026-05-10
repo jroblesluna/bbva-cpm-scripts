@@ -30,7 +30,7 @@ router = APIRouter()
 
 
 @router.get("/", response_model=MessageListResponse)
-async def list_messages(
+def list_messages(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
     target_type: Optional[TargetType] = Query(None),
@@ -60,7 +60,7 @@ async def list_messages(
 
 
 @router.post("/", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
-async def send_message(
+def send_message(
     message_data: MessageCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -77,21 +77,21 @@ async def send_message(
     
     # Enviar mensaje según tipo de destinatario
     if message_data.target_type == TargetType.WORKSTATION:
-        message = await message_service.send_to_workstation(
+        message = message_service.send_to_workstation(
             db, account_id, current_user.id, message_data.target_id, message_data.content
         )
     elif message_data.target_type == TargetType.VLAN:
-        message = await message_service.send_to_vlan(
+        message = message_service.send_to_vlan(
             db, account_id, current_user.id, message_data.target_id, message_data.content
         )
     else:  # ACCOUNT
-        message = await message_service.send_to_account(
+        message = message_service.send_to_account(
             db, account_id, current_user.id, message_data.content
         )
     
     # Registrar en auditoría
     audit_service = AuditService()
-    await audit_service.log_message_sent(
+    audit_service.log_message_sent(
         db, current_user.id, None, account_id,
         message_data.target_type.value, str(message_data.target_id) if message_data.target_id else None
     )
@@ -100,7 +100,7 @@ async def send_message(
 
 
 @router.get("/stats", response_model=MessageStatsResponse)
-async def get_message_stats(
+def get_message_stats(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -128,7 +128,7 @@ async def get_message_stats(
 
 
 @router.get("/{message_id}", response_model=MessageDetailResponse)
-async def get_message(
+def get_message(
     message_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

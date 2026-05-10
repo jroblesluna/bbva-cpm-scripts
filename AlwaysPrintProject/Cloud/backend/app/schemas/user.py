@@ -12,11 +12,24 @@ from uuid import UUID
 from app.models.user import UserRole
 
 
+# === SCHEMA ANIDADO PARA ACCOUNT ===
+class AccountInUser(BaseModel):
+    """Schema anidado para mostrar información de la organización en el usuario."""
+    id: UUID
+    name: str
+    timezone: str
+    
+    class Config:
+        from_attributes = True
+
+
 class UserBase(BaseModel):
     """Schema base para User."""
     email: EmailStr
+    full_name: str = Field(..., min_length=1, max_length=255)
     role: UserRole
     account_id: Optional[UUID] = None
+    timezone: Optional[str] = Field(None, max_length=50, description="Zona horaria del usuario (hereda de la organización si es NULL)")
 
 
 class UserCreate(UserBase):
@@ -48,9 +61,11 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     """Schema para actualizar un usuario."""
     email: Optional[EmailStr] = None
+    full_name: Optional[str] = Field(None, min_length=1, max_length=255)
     role: Optional[UserRole] = None
     account_id: Optional[UUID] = None
     is_active: Optional[bool] = None
+    timezone: Optional[str] = Field(None, max_length=50, description="Zona horaria del usuario")
 
 
 class UserPasswordUpdate(BaseModel):
@@ -74,8 +89,10 @@ class UserResponse(UserBase):
     """Schema para respuesta de usuario."""
     id: UUID
     is_active: bool
+    timezone: Optional[str]
     created_at: datetime
     updated_at: datetime
+    account: Optional[AccountInUser] = None
     
     class Config:
         from_attributes = True

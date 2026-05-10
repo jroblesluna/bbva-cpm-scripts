@@ -9,10 +9,10 @@ Este módulo define:
 import uuid
 from datetime import datetime
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, foreign
 
 from app.core.database import Base
+from app.models.account import GUID  # Importar tipo GUID para consistencia
 
 
 class Workstation(Base):
@@ -25,9 +25,9 @@ class Workstation(Base):
     __tablename__ = "workstations"
     
     # === CAMPOS PRINCIPALES ===
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
-    vlan_id = Column(UUID(as_uuid=True), ForeignKey("vlans.id", ondelete="SET NULL"), nullable=True)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    account_id = Column(GUID, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    vlan_id = Column(GUID, ForeignKey("vlans.id", ondelete="SET NULL"), nullable=True)
     
     # IP privada es el identificador único de la estación
     ip_private = Column(String(45), unique=True, nullable=False, index=True)
@@ -53,7 +53,15 @@ class Workstation(Base):
     licenses = relationship("License", back_populates="workstation", cascade="all, delete-orphan")
     workstation_config = relationship("WorkstationConfig", back_populates="workstation", uselist=False, cascade="all, delete-orphan")
     audit_logs = relationship("AuditLog", back_populates="workstation", foreign_keys="AuditLog.workstation_id")
-    messages = relationship("Message", back_populates="target_workstation", foreign_keys="Message.target_id")
+    
+    # Relación con mensajes (solo cuando target_type=workstation)
+    messages = relationship(
+        "Message",
+        back_populates="target_workstation",
+        foreign_keys="Message.target_id",
+        primaryjoin="and_(Workstation.id==foreign(Message.target_id), Message.target_type=='workstation')",
+        viewonly=True
+    )
     
     def __repr__(self):
         return f"<Workstation(id={self.id}, ip_private={self.ip_private}, is_online={self.is_online})>"
@@ -69,8 +77,8 @@ class License(Base):
     __tablename__ = "licenses"
     
     # === CAMPOS PRINCIPALES ===
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    workstation_id = Column(UUID(as_uuid=True), ForeignKey("workstations.id", ondelete="CASCADE"), nullable=False)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    workstation_id = Column(GUID, ForeignKey("workstations.id", ondelete="CASCADE"), nullable=False)
     
     # Número de serie: últimos 8 caracteres del MD5 de ip_private
     serial_number = Column(String(8), nullable=False, index=True)

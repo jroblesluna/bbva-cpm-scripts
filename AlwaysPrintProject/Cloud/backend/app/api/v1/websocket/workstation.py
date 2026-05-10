@@ -77,7 +77,7 @@ async def workstation_websocket(
         
         # Registrar workstation
         try:
-            workstation, is_new = workstation_service.register_workstation(
+            workstation, is_new, status = workstation_service.register_workstation(
                 db=db,
                 ip_private=ip_private,
                 public_ip=client_host or "unknown",
@@ -85,11 +85,38 @@ async def workstation_websocket(
                 os_serial=os_serial,
                 current_user=current_user
             )
+            
+            if status == "pending":
+                # IP pública no autorizada
+                await websocket.close(
+                    code=1008, 
+                    reason=f"IP pública {client_host} no está autorizada. "
+                           "Un administrador debe autorizar esta IP antes de que puedas conectarte. "
+                           "La IP ha sido registrada y está pendiente de autorización."
+                )
+                return
+            
+            elif status == "inactive_account":
+                # Cuenta desactivada
+                await websocket.close(
+                    code=1008,
+                    reason="La cuenta asociada a esta IP está desactivada."
+                )
+                return
+            
+            elif status != "authorized" or not workstation:
+                # Error inesperado
+                await websocket.close(
+                    code=1011,
+                    reason="Error al registrar workstation."
+                )
+                return
+            
             workstation_id = str(workstation.id)
             
-        except ValueError as e:
-            # IP pública no autorizada
-            await websocket.close(code=1008, reason=str(e))
+        except Exception as e:
+            # Error en registro
+            await websocket.close(code=1011, reason=f"Error: {str(e)}")
             return
         
         # Conectar WebSocket

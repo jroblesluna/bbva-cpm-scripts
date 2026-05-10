@@ -21,7 +21,7 @@ router = APIRouter()
 
 
 @router.get("/global", response_model=GlobalConfigResponse)
-async def get_global_config(
+def get_global_config(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -68,7 +68,7 @@ async def get_global_config(
 
 
 @router.put("/global", response_model=GlobalConfigResponse)
-async def update_global_config(
+def update_global_config(
     config_data: GlobalConfigUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -112,7 +112,7 @@ async def update_global_config(
     
     if not config:
         # Crear configuración si no existe
-        config = await config_service.create_global_config(
+        config = config_service.create_global_config(
             db=db,
             account_id=account_id,
             **config_data.model_dump(exclude_unset=True)
@@ -126,7 +126,7 @@ async def update_global_config(
             "bootstrap_domains": config.bootstrap_domains
         }
         
-        config = await config_service.update_global_config(
+        config = config_service.update_global_config(
             db=db,
             account_id=account_id,
             **config_data.model_dump(exclude_unset=True)
@@ -134,7 +134,7 @@ async def update_global_config(
         
         # Registrar en auditoría
         audit_service = AuditService()
-        await audit_service.log_config_change(
+        audit_service.log_config_change(
             db=db,
             user_id=current_user.id,
             workstation_id=None,

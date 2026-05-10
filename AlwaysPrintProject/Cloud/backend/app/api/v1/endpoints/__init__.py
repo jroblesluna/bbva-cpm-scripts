@@ -13,6 +13,7 @@ from app.api.v1.endpoints import (
     config,
     messages,
     audit,
+    setup,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "config",
     "messages",
     "audit",
+    "setup",
 ]

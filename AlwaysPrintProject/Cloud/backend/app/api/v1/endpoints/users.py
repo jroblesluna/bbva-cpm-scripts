@@ -28,7 +28,7 @@ router = APIRouter()
 
 
 @router.get("/", response_model=UserListResponse)
-async def list_users(
+def list_users(
     page: int = Query(1, ge=1, description="Número de página"),
     page_size: int = Query(50, ge=1, le=100, description="Tamaño de página"),
     role: Optional[UserRole] = Query(None, description="Filtrar por rol"),
@@ -53,7 +53,9 @@ async def list_users(
     Returns:
         UserListResponse con lista paginada de usuarios
     """
-    query = db.query(User)
+    from sqlalchemy.orm import joinedload
+    
+    query = db.query(User).options(joinedload(User.account))
     
     # Operadores solo pueden ver usuarios de su cuenta
     if current_user.role == UserRole.OPERATOR:
@@ -85,15 +87,27 @@ async def list_users(
     users = query.offset(offset).limit(page_size).all()
     
     return UserListResponse(
+        items=users,
         total=total,
-        page=page,
-        page_size=page_size,
-        users=users
+        skip=offset,
+        limit=page_size
+    )
+    total = query.count()
+    
+    # Paginar
+    offset = (page - 1) * page_size
+    users = query.offset(offset).limit(page_size).all()
+    
+    return UserListResponse(
+        items=users,
+        total=total,
+        skip=offset,
+        limit=page_size
     )
 
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def create_user(
+def create_user(
     user_data: UserCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -103,6 +117,7 @@ async def create_user(
     
     - Admin: puede crear cualquier tipo de usuario
     - Operador: solo puede crear operadores de su misma cuenta
+    - Si no se especifica timezone, se hereda de la organización
     
     Args:
         user_data: Datos del usuario a crear
@@ -116,6 +131,8 @@ async def create_user(
         HTTPException 403: Sin permisos
         HTTPException 409: Email ya existe
     """
+    from app.models.account import Account
+    
     auth_service = AuthService()
     
     # Verificar permisos
@@ -133,35 +150,50 @@ async def create_user(
             )
     
     # Verificar que el email no existe
-    existing = await auth_service.get_user_by_email(db, user_data.email)
+    existing = db.query(User).filter(User.email == user_data.email).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Ya existe un usuario con el email '{user_data.email}'"
         )
     
+    # Determinar timezone: usuario → organización → None
+    timezone = user_data.timezone
+    if timezone is None and user_data.account_id:
+        # Heredar timezone de la organización
+        account = db.query(Account).filter(Account.id == user_data.account_id).first()
+        if account and account.timezone:
+            timezone = account.timezone
+    
     # Crear usuario
-    user = await auth_service.create_user(
-        db=db,
+    user = User(
         email=user_data.email,
-        password=user_data.password,
+        password_hash=auth_service.hash_password(user_data.password),
         full_name=user_data.full_name,
         role=user_data.role,
-        account_id=user_data.account_id
+        account_id=user_data.account_id,
+        timezone=timezone,
+        is_active=True
     )
+    
+    db.add(user)
+    db.commit()
+    db.refresh(user)
     
     # Registrar en auditoría
     audit_service = AuditService()
-    await audit_service.log_create(
+    audit_service.log_create(
         db=db,
-        user_id=current_user.id,
         entity_type="user",
-        entity_id=user.id,
-        new_values={
+        entity_id=str(user.id),
+        user_id=str(current_user.id),
+        account_id=str(user.account_id) if user.account_id else None,
+        entity_data={
             "email": user.email,
             "full_name": user.full_name,
             "role": user.role.value,
-            "account_id": str(user.account_id) if user.account_id else None
+            "account_id": str(user.account_id) if user.account_id else None,
+            "timezone": user.timezone
         }
     )
     
@@ -169,7 +201,7 @@ async def create_user(
 
 
 @router.get("/{user_id}", response_model=UserResponse)
-async def get_user(
+def get_user(
     user_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -192,7 +224,9 @@ async def get_user(
         HTTPException 403: Sin permisos
         HTTPException 404: Usuario no encontrado
     """
-    user = db.query(User).filter(User.id == user_id).first()
+    from sqlalchemy.orm import joinedload
+    
+    user = db.query(User).options(joinedload(User.account)).filter(User.id == user_id).first()
     
     if not user:
         raise HTTPException(
@@ -213,7 +247,7 @@ async def get_user(
 
 
 @router.put("/{user_id}", response_model=UserResponse)
-async def update_user(
+def update_user(
     user_id: UUID,
     user_data: UserUpdate,
     current_user: User = Depends(get_current_user),
@@ -237,7 +271,7 @@ async def update_user(
     Raises:
         HTTPException 403: Sin permisos
         HTTPException 404: Usuario no encontrado
-        HTTPException 409: Email ya existe
+        HTTPException 409: Email ya existe o intento de auto-desactivación
     """
     user = db.query(User).filter(User.id == user_id).first()
     
@@ -262,6 +296,13 @@ async def update_user(
                 detail="Operadores no pueden cambiar su rol o cuenta"
             )
     
+    # Evitar que un usuario se desactive a sí mismo
+    if user.id == current_user.id and user_data.is_active is False:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No puedes desactivar tu propio usuario"
+        )
+    
     # Guardar valores anteriores para auditoría
     old_values = {
         "email": user.email,
@@ -275,8 +316,7 @@ async def update_user(
     
     # Verificar email único si se está actualizando
     if "email" in update_data and update_data["email"] != user.email:
-        auth_service = AuthService()
-        existing = await auth_service.get_user_by_email(db, update_data["email"])
+        existing = db.query(User).filter(User.email == update_data["email"]).first()
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -291,20 +331,21 @@ async def update_user(
     
     # Registrar en auditoría
     audit_service = AuditService()
-    await audit_service.log_update(
+    audit_service.log_update(
         db=db,
-        user_id=current_user.id,
         entity_type="user",
-        entity_id=user.id,
-        old_values=old_values,
-        new_values=update_data
+        entity_id=str(user.id),
+        user_id=str(current_user.id),
+        account_id=str(user.account_id) if user.account_id else None,
+        old_data=old_values,
+        new_data=update_data
     )
     
     return user
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(
+def delete_user(
     user_id: UUID,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
@@ -349,19 +390,20 @@ async def delete_user(
     
     # Registrar en auditoría
     audit_service = AuditService()
-    await audit_service.log_delete(
+    audit_service.log_delete(
         db=db,
-        user_id=current_user.id,
         entity_type="user",
-        entity_id=user_id,
-        old_values=old_values
+        entity_id=str(user_id),
+        user_id=str(current_user.id),
+        account_id=str(user.account_id) if user.account_id else None,
+        entity_data=old_values
     )
     
     return None
 
 
 @router.put("/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT)
-async def change_password(
+def change_password(
     user_id: UUID,
     password_data: UserPasswordUpdate,
     current_user: User = Depends(get_current_user),
@@ -410,16 +452,20 @@ async def change_password(
             )
     
     # Actualizar contraseña
-    user.hashed_password = auth_service.hash_password(password_data.new_password)
+    user.password_hash = auth_service.hash_password(password_data.new_password)
     db.commit()
     
     # Registrar en auditoría
+    from app.models.audit import ActionType
+    
     audit_service = AuditService()
-    await audit_service.log_update(
+    audit_service.log_action(
         db=db,
-        user_id=current_user.id,
+        action_type=ActionType.UPDATE,
         entity_type="user",
-        entity_id=user.id,
+        entity_id=str(user.id),
+        user_id=str(current_user.id),
+        account_id=str(user.account_id) if user.account_id else None,
         old_values={"action": "password_change"},
         new_values={"action": "password_changed"}
     )

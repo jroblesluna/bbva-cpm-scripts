@@ -28,7 +28,7 @@ router = APIRouter()
 
 
 @router.post("/login", response_model=TokenResponse, status_code=status.HTTP_200_OK)
-async def login(
+def login(
     credentials: LoginRequest,
     db: Session = Depends(get_db)
 ):
@@ -45,10 +45,8 @@ async def login(
     Raises:
         HTTPException 401: Credenciales inválidas
     """
-    auth_service = AuthService()
-    
     # Autenticar usuario
-    user = await auth_service.authenticate_user(db, credentials.email, credentials.password)
+    user = AuthService.authenticate_user(db, credentials.email, credentials.password)
     
     if not user:
         raise HTTPException(
@@ -57,34 +55,14 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Generar token JWT
-    access_token = auth_service.create_access_token(
-        user_id=str(user.id),
-        email=user.email,
-        role=user.role,
-        account_id=str(user.account_id) if user.account_id else None
-    )
+    # Crear tokens para el usuario
+    tokens = AuthService.create_tokens_for_user(user)
     
-    # Registrar login en auditoría
-    audit_service = AuditService()
-    await audit_service.log_action(
-        db=db,
-        user_id=user.id,
-        action_type="create",
-        entity_type="session",
-        entity_id=user.id,
-        new_values={"action": "login", "email": user.email}
-    )
-    
-    return TokenResponse(
-        access_token=access_token,
-        token_type="bearer",
-        expires_in=3600  # 1 hora
-    )
+    return tokens
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(
+def logout(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -99,13 +77,16 @@ async def logout(
         db: Sesión de base de datos
     """
     # Registrar logout en auditoría
+    from app.models.audit import ActionType
+    
     audit_service = AuditService()
-    await audit_service.log_action(
+    audit_service.log_action(
         db=db,
-        user_id=current_user.id,
-        action_type="delete",
+        action_type=ActionType.DELETE,
         entity_type="session",
-        entity_id=current_user.id,
+        entity_id=str(current_user.id),
+        user_id=str(current_user.id),
+        account_id=str(current_user.account_id) if current_user.account_id else None,
         old_values={"action": "logout", "email": current_user.email}
     )
     
@@ -113,23 +94,30 @@ async def logout(
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(
-    current_user: User = Depends(get_current_user)
+def get_current_user_info(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Obtener información del usuario autenticado actual.
     
     Args:
         current_user: Usuario autenticado actual
+        db: Sesión de base de datos
     
     Returns:
-        UserResponse con información del usuario
+        UserResponse con información del usuario (incluye relación con account)
     """
-    return current_user
+    from sqlalchemy.orm import joinedload
+    
+    # Recargar usuario con la relación account
+    user = db.query(User).options(joinedload(User.account)).filter(User.id == current_user.id).first()
+    
+    return user
 
 
 @router.post("/password-reset", status_code=status.HTTP_202_ACCEPTED)
-async def request_password_reset(
+def request_password_reset(
     request: PasswordResetRequest,
     db: Session = Depends(get_db)
 ):
@@ -147,21 +135,22 @@ async def request_password_reset(
     Returns:
         Mensaje de confirmación
     """
-    auth_service = AuthService()
-    
     # Buscar usuario por email
-    user = await auth_service.get_user_by_email(db, request.email)
+    user = db.query(User).filter(User.email == request.email).first()
     
     if user:
         # TODO: Generar token de reset y enviar email
         # Por ahora solo registramos en auditoría
+        from app.models.audit import ActionType
+        
         audit_service = AuditService()
-        await audit_service.log_action(
+        audit_service.log_action(
             db=db,
-            user_id=user.id,
-            action_type="update",
+            action_type=ActionType.UPDATE,
             entity_type="user",
-            entity_id=user.id,
+            entity_id=str(user.id),
+            user_id=str(user.id),
+            account_id=str(user.account_id) if user.account_id else None,
             new_values={"action": "password_reset_requested"}
         )
     
@@ -172,7 +161,7 @@ async def request_password_reset(
 
 
 @router.post("/password-reset/confirm", status_code=status.HTTP_200_OK)
-async def confirm_password_reset(
+def confirm_password_reset(
     confirmation: PasswordResetConfirm,
     db: Session = Depends(get_db)
 ):

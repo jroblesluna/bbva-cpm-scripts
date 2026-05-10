@@ -21,6 +21,7 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     """Schema de respuesta para token JWT."""
     access_token: str = Field(..., description="Token JWT de acceso")
+    refresh_token: Optional[str] = Field(None, description="Token de refresco (opcional)")
     token_type: str = Field(default="bearer", description="Tipo de token")
     expires_in: int = Field(..., description="Tiempo de expiración en segundos")
 
