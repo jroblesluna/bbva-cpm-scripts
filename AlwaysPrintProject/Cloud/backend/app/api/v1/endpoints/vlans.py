@@ -35,16 +35,37 @@ router = APIRouter()
 
 @router.get("/", response_model=VLANListResponse)
 def list_vlans(
+    account_id: Optional[str] = Query(None, description="Filtrar por ID de cuenta (solo Admin)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Listar VLANs de la cuenta del usuario."""
+    """
+    Listar VLANs.
+    
+    - Admin: puede ver todas las VLANs o filtrar por account_id
+    - Operador: solo puede ver VLANs de su cuenta
+    
+    Args:
+        account_id: ID de cuenta para filtrar (opcional, solo Admin)
+        current_user: Usuario autenticado
+        db: Sesión de base de datos
+    
+    Returns:
+        VLANListResponse con lista de VLANs
+    """
     if current_user.role == UserRole.OPERATOR and not current_user.account_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
     
     query = db.query(VLAN)
+    
+    # Aplicar filtros según rol
     if current_user.role == UserRole.OPERATOR:
+        # Operadores solo ven su cuenta
         query = query.filter(VLAN.account_id == current_user.account_id)
+    elif current_user.role == UserRole.ADMIN and account_id:
+        # Admins pueden filtrar por cuenta específica
+        query = query.filter(VLAN.account_id == account_id)
+    # Si es Admin sin filtro, ve todas las VLANs
     
     vlans = query.all()
     return VLANListResponse(total=len(vlans), vlans=vlans)

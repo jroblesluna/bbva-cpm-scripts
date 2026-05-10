@@ -129,11 +129,26 @@ resource "aws_codebuild_project" "backend" {
     type            = "LINUX_CONTAINER"
     privileged_mode = true
 
-    environment_variable { name = "ECR_REGISTRY", value = local.ecr_registry }
-    environment_variable { name = "ECR_REPOSITORY", value = var.backend_ecr_repository_name }
-    environment_variable { name = "AWS_DEFAULT_REGION", value = var.aws_region }
-    environment_variable { name = "BACKEND_SOURCE_PATH", value = var.backend_source_path }
-    environment_variable { name = "EC2_INSTANCE_ID", value = var.ec2_instance_id }
+    environment_variable {
+      name  = "ECR_REGISTRY"
+      value = local.ecr_registry
+    }
+    environment_variable {
+      name  = "ECR_REPOSITORY"
+      value = var.backend_ecr_repository_name
+    }
+    environment_variable {
+      name  = "AWS_DEFAULT_REGION"
+      value = var.aws_region
+    }
+    environment_variable {
+      name  = "BACKEND_SOURCE_PATH"
+      value = var.backend_source_path
+    }
+    environment_variable {
+      name  = "EC2_INSTANCE_ID"
+      value = var.ec2_instance_id
+    }
   }
 
   logs_config {
@@ -191,13 +206,34 @@ resource "aws_codebuild_project" "frontend" {
     type            = "LINUX_CONTAINER"
     privileged_mode = true
 
-    environment_variable { name = "ECR_REGISTRY", value = local.ecr_registry }
-    environment_variable { name = "ECR_REPOSITORY", value = var.frontend_ecr_repository_name }
-    environment_variable { name = "AWS_DEFAULT_REGION", value = var.aws_region }
-    environment_variable { name = "FRONTEND_SOURCE_PATH", value = var.frontend_source_path }
-    environment_variable { name = "EC2_INSTANCE_ID", value = var.ec2_instance_id }
-    environment_variable { name = "NEXT_PUBLIC_API_URL", value = var.public_url }
-    environment_variable { name = "NEXT_PUBLIC_WS_URL", value = replace(var.public_url, "https://", "wss://") }
+    environment_variable {
+      name  = "ECR_REGISTRY"
+      value = local.ecr_registry
+    }
+    environment_variable {
+      name  = "ECR_REPOSITORY"
+      value = var.frontend_ecr_repository_name
+    }
+    environment_variable {
+      name  = "AWS_DEFAULT_REGION"
+      value = var.aws_region
+    }
+    environment_variable {
+      name  = "FRONTEND_SOURCE_PATH"
+      value = var.frontend_source_path
+    }
+    environment_variable {
+      name  = "EC2_INSTANCE_ID"
+      value = var.ec2_instance_id
+    }
+    environment_variable {
+      name  = "NEXT_PUBLIC_API_URL"
+      value = var.public_url
+    }
+    environment_variable {
+      name  = "NEXT_PUBLIC_WS_URL"
+      value = replace(var.public_url, "https://", "wss://")
+    }
     dynamic "environment_variable" {
       for_each = var.frontend_env_vars
       content {

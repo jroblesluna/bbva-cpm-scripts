@@ -33,23 +33,55 @@ export default function VLANsPage() {
   const { user, getAuthHeaders } = useAuth()
   const { timezone } = useUserTimezone()
   const [vlans, setVlans] = useState<VLAN[]>([])
+  const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [filterAccountId, setFilterAccountId] = useState<string | undefined>(undefined)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [selectedVlan, setSelectedVlan] = useState<VLAN | null>(null)
   const [vlanDetail, setVlanDetail] = useState<VLANDetail | null>(null)
 
+  // Cargar cuentas (solo para Admin)
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      loadAccounts()
+    }
+  }, [user])
+
   // Cargar VLANs
   useEffect(() => {
     loadVlans()
-  }, [])
+  }, [filterAccountId])
+
+  const loadAccounts = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/accounts/?skip=0&limit=1000', {
+        headers: getAuthHeaders(),
+      })
+
+      if (!response.ok) throw new Error('Error al cargar organizaciones')
+
+      const data = await response.json()
+      setAccounts(data.items || [])
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Error al cargar organizaciones')
+    }
+  }
 
   const loadVlans = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:8000/api/v1/vlans/', {
+      
+      // Construir URL con filtro de cuenta si está seleccionado
+      let url = 'http://localhost:8000/api/v1/vlans/'
+      if (filterAccountId) {
+        url += `?account_id=${filterAccountId}`
+      }
+      
+      const response = await fetch(url, {
         headers: getAuthHeaders(),
       })
 
@@ -171,18 +203,59 @@ export default function VLANsPage() {
         </div>
       </div>
 
-      {/* Búsqueda */}
+      {/* Filtros */}
       <div className="bg-white rounded-lg shadow p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-          <Input
-            type="text"
-            placeholder="Buscar por nombre, descripción o CIDR..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Búsqueda */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Buscar por nombre, descripción o CIDR..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          {/* Filtro por cuenta (solo para Admin) */}
+          {user?.role === 'admin' && (
+            <div>
+              <select
+                value={filterAccountId || 'all'}
+                onChange={(e) => {
+                  const value = e.target.value
+                  setFilterAccountId(value === 'all' ? undefined : value)
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">Todas las organizaciones</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
+
+        {/* Botón para limpiar filtros */}
+        {(searchTerm || filterAccountId) && (
+          <div className="mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSearchTerm('')
+                setFilterAccountId(undefined)
+              }}
+            >
+              <X className="mr-2 h-4 w-4" />
+              Limpiar filtros
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Lista de VLANs */}
