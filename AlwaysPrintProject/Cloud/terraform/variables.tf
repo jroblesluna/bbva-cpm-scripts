@@ -28,11 +28,6 @@ variable "ec2_instance_type" {
   type        = string
 }
 
-variable "ssh_public_key" {
-  description = "Clave SSH publica para acceder al EC2 (contenido de ~/.ssh/id_rsa.pub)"
-  type        = string
-}
-
 variable "backend_env_vars" { type = map(string) }
 variable "frontend_env_vars" { type = map(string) }
 

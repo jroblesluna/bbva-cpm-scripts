@@ -3,6 +3,7 @@ terraform {
   required_providers {
     aws    = { source = "hashicorp/aws", version = "~> 5.0" }
     random = { source = "hashicorp/random", version = "~> 3.5" }
+    tls    = { source = "hashicorp/tls", version = "~> 4.0" }
   }
 }
 
@@ -90,7 +91,7 @@ module "ec2" {
   backend_env_vars        = var.backend_env_vars
   database_url_secret_arn = aws_secretsmanager_secret.database_url.arn
   secret_key_arn          = module.secrets.secret_key_arn
-  ssh_public_key          = var.ssh_public_key
+  ssh_public_key          = module.secrets.ssh_public_key
 
   depends_on = [aws_secretsmanager_secret_version.database_url]
 }

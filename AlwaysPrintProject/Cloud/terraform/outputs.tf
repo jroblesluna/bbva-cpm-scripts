@@ -19,6 +19,11 @@ output "frontend_ecr_url" {
   value = module.ecr.frontend_repository_url
 }
 
+output "ssh_private_key_command" {
+  description = "Comando para bajar la clave SSH privada y conectarte al EC2"
+  value       = "aws secretsmanager get-secret-value --secret-id /${var.project_name}/${var.environment}/ssh_private_key --region ${var.aws_region} --query SecretString --output text > alwaysprint.pem && icacls alwaysprint.pem /inheritance:r /grant:r \"%USERNAME%:R\" && ssh -i alwaysprint.pem ec2-user@${module.ec2.public_ip}"
+}
+
 output "github_codestar_connection_arn" {
   description = "Aprobar en AWS Console -> Developer Tools -> Connections"
   value       = module.cicd.codestar_connection_arn

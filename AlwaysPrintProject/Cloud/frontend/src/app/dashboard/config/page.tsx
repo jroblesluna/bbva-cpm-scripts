@@ -115,14 +115,25 @@ export default function ConfigPage() {
         url += `?account_id=${selectedAccountId}`
       }
       
+      // Suprimir error 404 en consola (es esperado cuando no hay configuración)
+      const originalError = console.error
+      console.error = (...args: any[]) => {
+        if (args[0]?.includes?.('404') || args[0]?.includes?.('Not Found')) {
+          return // Suprimir error 404
+        }
+        originalError.apply(console, args)
+      }
+      
       const response = await fetch(url, {
         headers: getAuthHeaders(),
       })
+      
+      // Restaurar console.error
+      console.error = originalError
 
       if (!response.ok) {
         if (response.status === 404) {
-          // No hay configuración, usar valores por defecto (esto es normal)
-          console.log('No existe configuración global para esta organización')
+          // No hay configuración, usar valores por defecto (esto es normal y esperado)
           setConfig(null)
           // Resetear formulario a valores por defecto
           setCorporateQueueName('')

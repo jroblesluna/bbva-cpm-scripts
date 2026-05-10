@@ -26,10 +26,6 @@ frontend_port = 3000
 # Free tier: t3.micro
 ec2_instance_type = "t3.micro"
 
-# Genera tu clave SSH con: ssh-keygen -t rsa -b 4096 -f ~/.ssh/alwaysprint
-# Luego pega el contenido de ~/.ssh/alwaysprint.pub aquí
-ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... reemplaza-con-tu-clave-publica"
-
 backend_env_vars = {
   LOG_LEVEL                   = "INFO"
   ACCESS_TOKEN_EXPIRE_MINUTES = "1440"
