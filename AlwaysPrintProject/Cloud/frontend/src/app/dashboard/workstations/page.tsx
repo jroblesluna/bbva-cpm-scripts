@@ -221,7 +221,7 @@ export default function WorkstationsPage() {
                 className="w-full px-3 py-2 border rounded-md"
               >
                 <option value="all">Todas las cuentas</option>
-                {accounts?.map((account) => (
+                {Array.isArray(accounts) && accounts.map((account) => (
                   <option key={account.id} value={account.id}>
                     {account.name}
                   </option>
@@ -485,7 +485,7 @@ function WorkstationForm({
             className="w-full px-3 py-2 border rounded-md"
           >
             <option value="">Sin asignar</option>
-            {accounts.map((account) => (
+            {Array.isArray(accounts) && accounts.map((account) => (
               <option key={account.id} value={account.id}>
                 {account.name}
               </option>
