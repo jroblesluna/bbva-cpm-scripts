@@ -92,8 +92,13 @@ def send_message(
     # Registrar en auditoría
     audit_service = AuditService()
     audit_service.log_message_sent(
-        db, current_user.id, None, account_id,
-        message_data.target_type.value, str(message_data.target_id) if message_data.target_id else None
+        db=db,
+        message_id=str(message.id),
+        sender_id=str(current_user.id),
+        account_id=str(account_id),
+        target_type=message_data.target_type.value,
+        target_id=str(message_data.target_id) if message_data.target_id else None,
+        content_preview=message_data.content[:200]
     )
     
     return message
