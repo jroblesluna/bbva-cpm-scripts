@@ -115,12 +115,21 @@ def get_message_stats(
     
     account_id = current_user.account_id if current_user.role == UserRole.OPERATOR else None
     
-    query = db.query(Message)
+    # Query base
+    base_query = db.query(Message)
     if account_id:
-        query = query.filter(Message.account_id == account_id)
+        base_query = base_query.filter(Message.account_id == account_id)
     
-    total_sent = query.count()
-    total_delivered = query.filter(Message.is_delivered == True).count()
+    # Contar totales
+    total_sent = base_query.count()
+    
+    # Contar entregados (crear nueva query desde base)
+    delivered_query = db.query(Message)
+    if account_id:
+        delivered_query = delivered_query.filter(Message.account_id == account_id)
+    total_delivered = delivered_query.filter(Message.is_delivered == True).count()
+    
+    # Calcular pendientes y tasa de entrega
     total_pending = total_sent - total_delivered
     delivery_rate = (total_delivered / total_sent * 100) if total_sent > 0 else 0.0
     
