@@ -33,20 +33,3 @@ export interface VLANListResponse {
   total: number
   vlans: VLAN[]
 }
-
-export interface VLANConfig {
-  vlan_id: string
-  corporate_queue_name?: string | null
-  search_targets?: string[] | null
-  pending_task_polling_minutes?: number | null
-  bootstrap_domains?: string[] | null
-  created_at?: string
-  updated_at?: string
-}
-
-export interface VLANConfigUpdate {
-  corporate_queue_name?: string | null
-  search_targets?: string[] | null
-  pending_task_polling_minutes?: number | null
-  bootstrap_domains?: string[] | null
-}

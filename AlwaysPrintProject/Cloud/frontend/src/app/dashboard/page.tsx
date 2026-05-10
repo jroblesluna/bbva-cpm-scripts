@@ -25,6 +25,7 @@ interface WorkstationStats {
     offline: number
     contingency: number
   }>
+  by_vlan?: Record<string, number>
 }
 
 interface PendingIP {
@@ -108,13 +109,9 @@ export default function DashboardPage() {
   if (error) {
     console.error('Error en dashboard:', error)
     
-    // Verificar si es error de autenticación
-    const isAuthError = error && typeof error === 'object' && 'detail' in error && 
-      (String(error.detail).includes('Not authenticated') || String(error.detail).includes('autenticado'))
-    
-    // Verificar si es error de red
-    const isNetworkError = error && typeof error === 'object' && 'detail' in error &&
-      String(error.detail).includes('Network Error')
+    // Verificar si es error de autenticación o red
+    const isAuthError = error.includes('Not authenticated') || error.includes('autenticado')
+    const isNetworkError = error.includes('Network Error') || error.includes('Failed to fetch')
     
     return (
       <div className="max-w-7xl mx-auto">
@@ -130,7 +127,7 @@ export default function DashboardPage() {
               <>
                 <strong>Error de conexión.</strong> El backend no responde. Verifica que esté corriendo en http://localhost:8000
                 <div className="mt-3">
-                  <Button onClick={() => refetch()} size="sm" variant="outline">
+                  <Button onClick={() => window.location.reload()} size="sm" variant="outline">
                     Reintentar
                   </Button>
                 </div>
@@ -138,13 +135,11 @@ export default function DashboardPage() {
             ) : (
               <>
                 Error al cargar estadísticas. Por favor, intenta de nuevo.
-                {error && typeof error === 'object' && 'detail' in error && (
-                  <div className="mt-2 text-xs font-mono bg-red-50 p-2 rounded">
-                    {String(error.detail)}
-                  </div>
-                )}
+                <div className="mt-2 text-xs font-mono bg-red-50 p-2 rounded">
+                  {error}
+                </div>
                 <div className="mt-3">
-                  <Button onClick={() => refetch()} size="sm" variant="outline">
+                  <Button onClick={() => window.location.reload()} size="sm" variant="outline">
                     Reintentar
                   </Button>
                 </div>

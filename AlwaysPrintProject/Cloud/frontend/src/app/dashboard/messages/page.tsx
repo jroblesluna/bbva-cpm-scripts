@@ -31,7 +31,7 @@ import { useUserTimezone } from '@/hooks/useUserTimezone'
 
 export default function MessagesPage() {
   const { user, getAuthHeaders } = useAuth()
-  const { timezone } = useUserTimezone()
+  const timezone = useUserTimezone()
   const [messages, setMessages] = useState<Message[]>([])
   const [stats, setStats] = useState<MessageStats | null>(null)
   const [loading, setLoading] = useState(true)

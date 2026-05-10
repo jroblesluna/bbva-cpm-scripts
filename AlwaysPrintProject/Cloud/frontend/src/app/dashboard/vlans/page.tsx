@@ -31,7 +31,7 @@ import { useUserTimezone } from '@/hooks/useUserTimezone'
 
 export default function VLANsPage() {
   const { user, getAuthHeaders } = useAuth()
-  const { timezone } = useUserTimezone()
+  const timezone = useUserTimezone()
   const [vlans, setVlans] = useState<VLAN[]>([])
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)

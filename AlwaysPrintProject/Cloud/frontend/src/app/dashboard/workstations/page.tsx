@@ -273,7 +273,7 @@ export default function WorkstationsPage() {
               onSubmit={(data) => updateMutation.mutate({ id: editingWorkstation.id, data })}
               onCancel={() => setEditingWorkstation(null)}
               isLoading={updateMutation.isPending}
-              error={updateMutation.error?.detail}
+              error={updateMutation.error?.message}
             />
           </CardContent>
         </Card>

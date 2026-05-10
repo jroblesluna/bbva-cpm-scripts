@@ -6,13 +6,10 @@ export type ActionType =
   | 'create'
   | 'update'
   | 'delete'
-  | 'login'
-  | 'logout'
   | 'config_change'
+  | 'contingency_toggle'
   | 'message_sent'
-  | 'workstation_registered'
-  | 'ip_authorized'
-  | 'ip_rejected'
+  | 'command_sent'
 
 export interface AuditLog {
   id: string

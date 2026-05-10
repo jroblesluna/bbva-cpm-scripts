@@ -32,7 +32,7 @@ import { useUserTimezone } from '@/hooks/useUserTimezone'
 
 export default function AuditPage() {
   const { user, getAuthHeaders } = useAuth()
-  const { timezone } = useUserTimezone()
+  const timezone = useUserTimezone()
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [stats, setStats] = useState<AuditLogStats | null>(null)
   const [loading, setLoading] = useState(true)

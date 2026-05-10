@@ -28,7 +28,6 @@ import type {
   VLAN,
   VLANCreate,
   VLANUpdate,
-  VLANWithWorkstations,
   GlobalConfig,
   GlobalConfigUpdate,
   VLANConfig,
@@ -39,12 +38,11 @@ import type {
   Message,
   MessageCreate,
   MessageStats,
-  MessageFilter,
   MessageListResponse,
   AuditLog,
   AuditLogSearch,
   AuditLogListResponse,
-  AuditStats,
+  AuditLogStats,
   ApiError,
 } from '@/types'
 
@@ -426,8 +424,8 @@ export const vlansApi = {
   /**
    * Obtener workstations de una VLAN.
    */
-  getWorkstations: async (id: string): Promise<VLANWithWorkstations> => {
-    const response = await apiClient.get<VLANWithWorkstations>(`/vlans/${id}/workstations`)
+  getWorkstations: async (id: string): Promise<Workstation[]> => {
+    const response = await apiClient.get<Workstation[]>(`/vlans/${id}/workstations`)
     return response.data
   },
 
@@ -485,7 +483,7 @@ export const messagesApi = {
   /**
    * Listar mensajes con filtros.
    */
-  list: async (filters?: MessageFilter): Promise<MessageListResponse> => {
+  list: async (filters?: Record<string, any>): Promise<MessageListResponse> => {
     const response = await apiClient.get<MessageListResponse>('/messages/', {
       params: filters,
     })
@@ -535,8 +533,8 @@ export const auditApi = {
   /**
    * Obtener estadísticas de auditoría.
    */
-  stats: async (): Promise<AuditStats> => {
-    const response = await apiClient.get<AuditStats>('/audit/stats')
+  stats: async (): Promise<AuditLogStats> => {
+    const response = await apiClient.get<AuditLogStats>('/audit/stats')
     return response.data
   },
 

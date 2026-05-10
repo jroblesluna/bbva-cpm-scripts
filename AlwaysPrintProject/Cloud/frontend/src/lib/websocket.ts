@@ -8,9 +8,12 @@
  * - Heartbeat automático
  */
 
+import {
+  WebSocketStatus,
+} from '@/types'
+
 import type {
   OperatorMessage,
-  WebSocketStatus,
   WorkstationConnectedMessage,
   WorkstationDisconnectedMessage,
   ContingencyToggleMessage,

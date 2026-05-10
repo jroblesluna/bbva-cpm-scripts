@@ -473,7 +473,7 @@ function UserForm({
               id="is_active"
               value={formData.is_active ? 'true' : 'false'}
               onChange={(e) => setFormData({ ...formData, is_active: e.target.value === 'true' })}
-              disabled={isLoading || isEditingSelf}
+              disabled={isLoading || !!isEditingSelf}
               className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
               <option value="true">Activo</option>
