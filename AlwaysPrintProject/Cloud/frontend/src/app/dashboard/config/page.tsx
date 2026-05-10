@@ -1,11 +1,13 @@
 /**
- * Página de configuración global de la organización.
+ * Página de configuración del sistema.
  * 
- * Permite configurar parámetros que se aplican a todas las workstations:
- * - Nombre de la cola corporativa
- * - Objetivos de búsqueda de impresoras (IPs y rangos)
- * - Intervalo de polling de tareas pendientes
- * - Dominios de bootstrap
+ * Estructura jerárquica de configuración:
+ * 1. Configuración Global (sistema) - Aplica a todas las organizaciones
+ * 2. Configuración por Organización - Sobrescribe la global para esa organización
+ * 3. Configuración por VLAN - Sobrescribe la de organización para esa VLAN
+ * 4. Configuración por Workstation - Sobrescribe todo lo anterior para esa workstation
+ * 
+ * Esta página permite gestionar los niveles 1 y 2.
  */
 
 'use client'
@@ -23,6 +25,8 @@ import {
   X,
   Info,
   AlertCircle,
+  Building2,
+  Globe,
 } from 'lucide-react'
 import type { GlobalConfig, GlobalConfigUpdate, SearchTargets } from '@/types/config'
 
@@ -32,14 +36,17 @@ interface Account {
   timezone: string
 }
 
+type ConfigTab = 'global' | 'organization'
+
 export default function ConfigPage() {
   const { user, getAuthHeaders } = useAuth()
+  const [activeTab, setActiveTab] = useState<ConfigTab>('organization')
   const [config, setConfig] = useState<GlobalConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
 
-  // Selector de organización (solo para Admin)
+  // Selector de organización (solo para Admin en tab de organización)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [selectedAccountId, setSelectedAccountId] = useState<string>('')
   const [loadingAccounts, setLoadingAccounts] = useState(false)
@@ -293,53 +300,99 @@ export default function ConfigPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Configuración Global</h1>
-          <p className="mt-2 text-gray-600">
-            Configuración que se aplica a todas las workstations de tu organización
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {hasChanges && (
-            <Button variant="outline" onClick={handleReset} disabled={saving}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Descartar
-            </Button>
-          )}
-          <Button onClick={handleSave} disabled={saving || !hasChanges || (user?.role === 'admin' && !selectedAccountId)}>
-            <Save className="mr-2 h-4 w-4" />
-            {saving ? 'Guardando...' : 'Guardar Cambios'}
-          </Button>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">Configuración</h1>
+        <p className="mt-2 text-gray-600">
+          Gestiona la configuración del sistema en diferentes niveles
+        </p>
       </div>
 
-      {/* Selector de Organización (solo para Admin) */}
-      {user?.role === 'admin' && (
-        <div className="bg-white rounded-lg shadow p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Organización *
-          </label>
-          <select
-            value={selectedAccountId}
-            onChange={(e) => {
-              setSelectedAccountId(e.target.value)
-              setHasChanges(false)
-            }}
-            className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('organization')}
+            className={`
+              py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2
+              ${activeTab === 'organization'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }
+            `}
           >
-            <option value="">Seleccionar organización...</option>
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-sm text-gray-500">
-            Selecciona la organización para configurar
-          </p>
-        </div>
-      )}
+            <Building2 className="h-5 w-5" />
+            Configuración por Organización
+          </button>
+          
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => setActiveTab('global')}
+              className={`
+                py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2
+                ${activeTab === 'global'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }
+              `}
+            >
+              <Globe className="h-5 w-5" />
+              Configuración Global del Sistema
+            </button>
+          )}
+        </nav>
+      </div>
+
+      {/* Tab: Configuración por Organización */}
+      {activeTab === 'organization' && (
+        <div className="space-y-6">
+          {/* Header de la sección */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Configuración por Organización</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Configuración que se aplica a todas las workstations de una organización
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {hasChanges && (
+                <Button variant="outline" onClick={handleReset} disabled={saving}>
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Descartar
+                </Button>
+              )}
+              <Button onClick={handleSave} disabled={saving || !hasChanges || (user?.role === 'admin' && !selectedAccountId)}>
+                <Save className="mr-2 h-4 w-4" />
+                {saving ? 'Guardando...' : 'Guardar Cambios'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Selector de Organización (solo para Admin) */}
+          {user?.role === 'admin' && (
+            <div className="bg-white rounded-lg shadow p-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Organización *
+              </label>
+              <select
+                value={selectedAccountId}
+                onChange={(e) => {
+                  setSelectedAccountId(e.target.value)
+                  setHasChanges(false)
+                }}
+                className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Seleccionar organización...</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-sm text-gray-500">
+                Selecciona la organización para configurar
+              </p>
+            </div>
+          )}
 
       {/* Alerta de jerarquía */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -348,9 +401,12 @@ export default function ConfigPage() {
           <div>
             <h3 className="text-sm font-medium text-blue-900">Jerarquía de Configuración</h3>
             <p className="mt-1 text-sm text-blue-700">
-              Esta configuración se aplica a nivel global. Puede ser sobrescrita por configuración
-              específica de VLAN o workstation individual.
+              Esta configuración se aplica a nivel de <strong>organización</strong>. 
+              Puede ser sobrescrita por configuración específica de <strong>VLAN</strong> o <strong>workstation individual</strong>.
             </p>
+            <div className="mt-2 text-xs text-blue-600 font-mono">
+              Sistema → <strong className="text-blue-800">Organización (aquí)</strong> → VLAN → Workstation
+            </div>
           </div>
         </div>
       </div>
@@ -566,6 +622,55 @@ export default function ConfigPage() {
               </h3>
               <p className="mt-1 text-sm text-blue-700">
                 Selecciona una organización del selector superior para ver o editar su configuración global.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+        </div>
+      )}
+
+      {/* Tab: Configuración Global del Sistema */}
+      {activeTab === 'global' && user?.role === 'admin' && (
+        <div className="space-y-6">
+          {/* Header de la sección */}
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Configuración Global del Sistema</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Configuración que se aplica a todas las organizaciones del sistema
+            </p>
+          </div>
+
+          {/* Alerta informativa */}
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <div className="flex">
+              <Info className="h-5 w-5 text-purple-600 mr-3 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-medium text-purple-900">Configuración de Sistema</h3>
+                <p className="mt-1 text-sm text-purple-700">
+                  Esta configuración se aplica a <strong>todas las organizaciones</strong> del sistema.
+                  Cada organización puede sobrescribir estos valores con su propia configuración.
+                </p>
+                <div className="mt-2 text-xs text-purple-600 font-mono">
+                  <strong className="text-purple-800">Sistema (aquí)</strong> → Organización → VLAN → Workstation
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Contenido del tab global */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="text-center py-12">
+              <Globe className="mx-auto h-16 w-16 text-gray-400" />
+              <h3 className="mt-4 text-lg font-medium text-gray-900">
+                Configuración Global del Sistema
+              </h3>
+              <p className="mt-2 text-sm text-gray-500 max-w-md mx-auto">
+                Esta sección permite configurar parámetros que se aplican a todas las organizaciones.
+                Actualmente, la configuración se gestiona a nivel de organización.
+              </p>
+              <p className="mt-4 text-xs text-gray-400">
+                Funcionalidad disponible en próximas versiones
               </p>
             </div>
           </div>
