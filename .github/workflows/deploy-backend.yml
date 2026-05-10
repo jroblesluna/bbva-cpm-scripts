@@ -7,6 +7,9 @@ on:
       - 'AlwaysPrintProject/Cloud/backend/**'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -34,28 +37,17 @@ jobs:
           docker build -t $ECR_URL:$IMAGE_TAG -t $ECR_URL:latest .
           docker push $ECR_URL:$IMAGE_TAG
           docker push $ECR_URL:latest
-          echo "Image pushed: $ECR_URL:$IMAGE_TAG"
 
-      - name: Deploy to EC2 via SSM
+      - name: Deploy to EC2 via SSH
         run: |
-          COMMAND_ID=$(aws ssm send-command \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
-            --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["/opt/alwaysprint/deploy.sh backend"]' \
+          aws secretsmanager get-secret-value \
+            --secret-id /alwaysprint/prod/ssh_private_key \
             --region ${{ secrets.AWS_REGION }} \
-            --query "Command.CommandId" \
-            --output text)
-          echo "Deploy command sent: $COMMAND_ID"
-
-          # Esperar resultado
-          aws ssm wait command-executed \
-            --command-id "$COMMAND_ID" \
-            --instance-id ${{ secrets.EC2_INSTANCE_ID }} \
-            --region ${{ secrets.AWS_REGION }} || true
-
-          aws ssm get-command-invocation \
-            --command-id "$COMMAND_ID" \
-            --instance-id ${{ secrets.EC2_INSTANCE_ID }} \
-            --region ${{ secrets.AWS_REGION }} \
-            --query "{Status:Status,Output:StandardOutputContent}" \
-            --output table
+            --query SecretString \
+            --output text > /tmp/ec2.pem
+          chmod 600 /tmp/ec2.pem
+          ssh -i /tmp/ec2.pem \
+            -o StrictHostKeyChecking=no \
+            ec2-user@${{ secrets.EC2_HOST }} \
+            "/opt/alwaysprint/deploy.sh backend"
+          rm -f /tmp/ec2.pem
