@@ -8,7 +8,7 @@ export interface SearchTargets {
 }
 
 export interface GlobalConfig {
-  id: string
+  id: string | null  // null indica que no existe en BD (valores por defecto)
   account_id: string
   corporate_queue_name: string
   search_targets: SearchTargets | null

@@ -58,6 +58,20 @@ export default function ConfigPage() {
   const [searchIps, setSearchIps] = useState<string[]>([''])
   const [searchRanges, setSearchRanges] = useState<string[]>([''])
 
+  // Obtener nombre de la organización seleccionada para placeholders
+  const getSelectedAccountName = (): string => {
+    if (user?.role === 'admin' && selectedAccountId) {
+      const account = accounts.find(a => a.id === selectedAccountId)
+      return account?.name || 'Organización'
+    }
+    // Para operadores, obtener el nombre de su cuenta desde user (si está disponible)
+    // Por ahora retornamos un nombre genérico
+    return 'Organización'
+  }
+
+  const queuePlaceholder = `Lexmark${getSelectedAccountName().replace(/\s+/g, '')}`
+  const domainPlaceholder = `${getSelectedAccountName().toLowerCase().replace(/\s+/g, '')}.com,${getSelectedAccountName().toLowerCase().replace(/\s+/g, '')}.local`
+
   // Cargar organizaciones (solo para Admin)
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -115,40 +129,31 @@ export default function ConfigPage() {
         url += `?account_id=${selectedAccountId}`
       }
       
-      // Suprimir error 404 en consola (es esperado cuando no hay configuración)
-      const originalError = console.error
-      console.error = (...args: any[]) => {
-        if (args[0]?.includes?.('404') || args[0]?.includes?.('Not Found')) {
-          return // Suprimir error 404
-        }
-        originalError.apply(console, args)
-      }
-      
       const response = await fetch(url, {
         headers: getAuthHeaders(),
       })
-      
-      // Restaurar console.error
-      console.error = originalError
 
       if (!response.ok) {
-        if (response.status === 404) {
-          // No hay configuración, usar valores por defecto (esto es normal y esperado)
-          setConfig(null)
-          // Resetear formulario a valores por defecto
-          setCorporateQueueName('')
-          setPollingMinutes(5)
-          setBootstrapDomains('')
-          setSearchIps([''])
-          setSearchRanges([''])
-          setHasChanges(false)
-          return
-        }
         const errorData = await response.json().catch(() => ({ detail: 'Error desconocido' }))
         throw new Error(errorData.detail || 'Error al cargar configuración')
       }
 
       const data: GlobalConfig = await response.json()
+      
+      // Si id es null, significa que no existe configuración en BD (valores por defecto)
+      if (!data.id) {
+        setConfig(null)
+        // Usar valores por defecto del backend
+        setCorporateQueueName(data.corporate_queue_name || '')
+        setPollingMinutes(data.pending_task_polling_minutes || 5)
+        setBootstrapDomains(data.bootstrap_domains || '')
+        setSearchIps([''])
+        setSearchRanges([''])
+        setHasChanges(false)
+        return
+      }
+      
+      // Configuración existente
       setConfig(data)
 
       // Cargar valores en el formulario
@@ -437,7 +442,7 @@ export default function ConfigPage() {
                 setCorporateQueueName(e.target.value)
                 setHasChanges(true)
               }}
-              placeholder="Ej: LexmarkBBVA"
+              placeholder={`Ej: ${queuePlaceholder}`}
               className="max-w-md"
               disabled={user?.role === 'admin' && !selectedAccountId}
             />
@@ -480,7 +485,7 @@ export default function ConfigPage() {
                 setBootstrapDomains(e.target.value)
                 setHasChanges(true)
               }}
-              placeholder="Ej: bbva.com,bbva.local"
+              placeholder={`Ej: ${domainPlaceholder}`}
               className="max-w-md"
               disabled={user?.role === 'admin' && !selectedAccountId}
             />

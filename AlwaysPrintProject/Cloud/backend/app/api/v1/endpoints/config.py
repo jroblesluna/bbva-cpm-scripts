@@ -29,6 +29,8 @@ def get_global_config(
     """
     Obtener configuración global de la cuenta.
     
+    Si no existe configuración, retorna valores por defecto en lugar de 404.
+    
     - Admin: puede ver configuración de cualquier cuenta (debe especificar account_id)
     - Operador: solo puede ver configuración de su cuenta
     
@@ -38,12 +40,11 @@ def get_global_config(
         db: Sesión de base de datos
     
     Returns:
-        GlobalConfigResponse con la configuración global
+        GlobalConfigResponse con la configuración global o valores por defecto
     
     Raises:
         HTTPException 400: account_id requerido para Admin
         HTTPException 403: Sin permisos
-        HTTPException 404: Configuración no encontrada
     """
     # Determinar qué cuenta usar
     if current_user.role == UserRole.ADMIN:
@@ -65,9 +66,18 @@ def get_global_config(
     config = db.query(GlobalConfig).filter(GlobalConfig.account_id == target_account_id).first()
     
     if not config:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Configuración global no encontrada para esta cuenta"
+        # Retornar configuración con valores por defecto en lugar de 404
+        # Esto evita errores en consola del navegador
+        from datetime import datetime
+        return GlobalConfigResponse(
+            id=None,  # Indica que no existe en BD
+            account_id=target_account_id,
+            corporate_queue_name="",
+            search_targets=None,
+            pending_task_polling_minutes=5,
+            bootstrap_domains="",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
         )
     
     return config

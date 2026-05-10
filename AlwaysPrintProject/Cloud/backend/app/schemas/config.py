@@ -38,7 +38,7 @@ class GlobalConfigUpdate(BaseModel):
 
 class GlobalConfigResponse(BaseModel):
     """Schema de respuesta para configuración global."""
-    id: UUID
+    id: Optional[UUID] = None  # None indica que no existe en BD (valores por defecto)
     account_id: UUID
     corporate_queue_name: str
     search_targets: Optional[dict] = None
