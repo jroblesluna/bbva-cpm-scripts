@@ -26,12 +26,23 @@ import {
 } from 'lucide-react'
 import type { GlobalConfig, GlobalConfigUpdate, SearchTargets } from '@/types/config'
 
+interface Account {
+  id: string
+  name: string
+  timezone: string
+}
+
 export default function ConfigPage() {
   const { user, getAuthHeaders } = useAuth()
   const [config, setConfig] = useState<GlobalConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
+
+  // Selector de organización (solo para Admin)
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('')
+  const [loadingAccounts, setLoadingAccounts] = useState(false)
 
   // Form state
   const [corporateQueueName, setCorporateQueueName] = useState('')
@@ -40,15 +51,63 @@ export default function ConfigPage() {
   const [searchIps, setSearchIps] = useState<string[]>([''])
   const [searchRanges, setSearchRanges] = useState<string[]>([''])
 
-  // Cargar configuración
+  // Cargar organizaciones (solo para Admin)
   useEffect(() => {
-    loadConfig()
-  }, [])
+    if (user?.role === 'admin') {
+      loadAccounts()
+    }
+  }, [user])
+
+  // Cargar configuración cuando se selecciona una organización
+  useEffect(() => {
+    if (user?.role === 'admin' && selectedAccountId) {
+      loadConfig()
+    } else if (user?.role !== 'admin') {
+      loadConfig()
+    }
+  }, [selectedAccountId, user])
+
+  const loadAccounts = async () => {
+    try {
+      setLoadingAccounts(true)
+      const response = await fetch('http://localhost:8000/api/v1/accounts/?skip=0&limit=1000', {
+        headers: getAuthHeaders(),
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al cargar organizaciones')
+      }
+
+      const data = await response.json()
+      setAccounts(data.items || [])
+      
+      // Seleccionar la primera organización por defecto
+      if (data.items && data.items.length > 0) {
+        setSelectedAccountId(data.items[0].id)
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Error al cargar organizaciones')
+    } finally {
+      setLoadingAccounts(false)
+    }
+  }
 
   const loadConfig = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:8000/api/v1/config/global', {
+      
+      // Construir URL con account_id si es Admin
+      let url = 'http://localhost:8000/api/v1/config/global'
+      if (user?.role === 'admin') {
+        if (!selectedAccountId) {
+          setLoading(false)
+          return
+        }
+        url += `?account_id=${selectedAccountId}`
+      }
+      
+      const response = await fetch(url, {
         headers: getAuthHeaders(),
       })
 
@@ -56,6 +115,12 @@ export default function ConfigPage() {
         if (response.status === 404) {
           // No hay configuración, usar valores por defecto
           setConfig(null)
+          // Resetear formulario a valores por defecto
+          setCorporateQueueName('')
+          setPollingMinutes(5)
+          setBootstrapDomains('')
+          setSearchIps([''])
+          setSearchRanges([''])
           return
         }
         throw new Error('Error al cargar configuración')
@@ -73,6 +138,8 @@ export default function ConfigPage() {
         setSearchIps(data.search_targets.ips || [''])
         setSearchRanges(data.search_targets.ranges || [''])
       }
+      
+      setHasChanges(false)
     } catch (error) {
       console.error('Error:', error)
       alert('Error al cargar configuración')
@@ -90,6 +157,12 @@ export default function ConfigPage() {
 
     if (pollingMinutes < 1 || pollingMinutes > 1440) {
       alert('El intervalo de polling debe estar entre 1 y 1440 minutos')
+      return
+    }
+
+    // Validar que Admin haya seleccionado organización
+    if (user?.role === 'admin' && !selectedAccountId) {
+      alert('Debes seleccionar una organización')
       return
     }
 
@@ -115,7 +188,13 @@ export default function ConfigPage() {
         search_targets: searchTargets,
       }
 
-      const response = await fetch('http://localhost:8000/api/v1/config/global', {
+      // Construir URL con account_id si es Admin
+      let url = 'http://localhost:8000/api/v1/config/global'
+      if (user?.role === 'admin') {
+        url += `?account_id=${selectedAccountId}`
+      }
+
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
           ...getAuthHeaders(),
@@ -193,7 +272,7 @@ export default function ConfigPage() {
     setHasChanges(true)
   }
 
-  if (loading) {
+  if (loading || (user?.role === 'admin' && loadingAccounts)) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -227,6 +306,33 @@ export default function ConfigPage() {
           </Button>
         </div>
       </div>
+
+      {/* Selector de Organización (solo para Admin) */}
+      {user?.role === 'admin' && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Organización *
+          </label>
+          <select
+            value={selectedAccountId}
+            onChange={(e) => {
+              setSelectedAccountId(e.target.value)
+              setHasChanges(false)
+            }}
+            className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Seleccionar organización...</option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-sm text-gray-500">
+            Selecciona la organización para configurar
+          </p>
+        </div>
+      )}
 
       {/* Alerta de jerarquía */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

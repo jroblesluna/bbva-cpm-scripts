@@ -22,16 +22,18 @@ router = APIRouter()
 
 @router.get("/global", response_model=GlobalConfigResponse)
 def get_global_config(
+    account_id: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Obtener configuración global de la cuenta.
     
-    - Admin: puede ver configuración de cualquier cuenta
+    - Admin: puede ver configuración de cualquier cuenta (debe especificar account_id)
     - Operador: solo puede ver configuración de su cuenta
     
     Args:
+        account_id: ID de la cuenta (requerido para Admin, ignorado para Operador)
         current_user: Usuario autenticado
         db: Sesión de base de datos
     
@@ -39,24 +41,28 @@ def get_global_config(
         GlobalConfigResponse con la configuración global
     
     Raises:
+        HTTPException 400: account_id requerido para Admin
         HTTPException 403: Sin permisos
         HTTPException 404: Configuración no encontrada
     """
-    if current_user.role == UserRole.OPERATOR and not current_user.account_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Operador sin cuenta asignada"
-        )
+    # Determinar qué cuenta usar
+    if current_user.role == UserRole.ADMIN:
+        if not account_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="account_id requerido para administradores"
+            )
+        target_account_id = account_id
+    else:
+        # Operador o ReadOnly: usar su cuenta asignada
+        if not current_user.account_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuario sin cuenta asignada"
+            )
+        target_account_id = str(current_user.account_id)
     
-    account_id = current_user.account_id if current_user.role == UserRole.OPERATOR else None
-    
-    if not account_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="account_id requerido"
-        )
-    
-    config = db.query(GlobalConfig).filter(GlobalConfig.account_id == account_id).first()
+    config = db.query(GlobalConfig).filter(GlobalConfig.account_id == target_account_id).first()
     
     if not config:
         raise HTTPException(
@@ -70,17 +76,19 @@ def get_global_config(
 @router.put("/global", response_model=GlobalConfigResponse)
 def update_global_config(
     config_data: GlobalConfigUpdate,
+    account_id: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Actualizar configuración global de la cuenta.
     
-    - Admin: puede actualizar configuración de cualquier cuenta
+    - Admin: puede actualizar configuración de cualquier cuenta (debe especificar account_id)
     - Operador: solo puede actualizar configuración de su cuenta
     
     Args:
         config_data: Datos de configuración a actualizar
+        account_id: ID de la cuenta (requerido para Admin, ignorado para Operador)
         current_user: Usuario autenticado
         db: Sesión de base de datos
     
@@ -88,33 +96,36 @@ def update_global_config(
         GlobalConfigResponse con la configuración actualizada
     
     Raises:
+        HTTPException 400: account_id requerido para Admin
         HTTPException 403: Sin permisos
-        HTTPException 404: Configuración no encontrada
     """
-    if current_user.role == UserRole.OPERATOR and not current_user.account_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Operador sin cuenta asignada"
-        )
-    
-    account_id = current_user.account_id if current_user.role == UserRole.OPERATOR else None
-    
-    if not account_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="account_id requerido"
-        )
+    # Determinar qué cuenta usar
+    if current_user.role == UserRole.ADMIN:
+        if not account_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="account_id requerido para administradores"
+            )
+        target_account_id = account_id
+    else:
+        # Operador o ReadOnly: usar su cuenta asignada
+        if not current_user.account_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuario sin cuenta asignada"
+            )
+        target_account_id = str(current_user.account_id)
     
     config_service = ConfigService()
     
     # Obtener configuración actual
-    config = db.query(GlobalConfig).filter(GlobalConfig.account_id == account_id).first()
+    config = db.query(GlobalConfig).filter(GlobalConfig.account_id == target_account_id).first()
     
     if not config:
         # Crear configuración si no existe
         config = config_service.create_global_config(
             db=db,
-            account_id=account_id,
+            account_id=target_account_id,
             **config_data.model_dump(exclude_unset=True)
         )
     else:
@@ -128,7 +139,7 @@ def update_global_config(
         
         config = config_service.update_global_config(
             db=db,
-            account_id=account_id,
+            account_id=target_account_id,
             **config_data.model_dump(exclude_unset=True)
         )
         
@@ -138,7 +149,7 @@ def update_global_config(
             db=db,
             user_id=current_user.id,
             workstation_id=None,
-            account_id=account_id,
+            account_id=target_account_id,
             config_level="global",
             old_values=old_values,
             new_values=config_data.model_dump(exclude_unset=True)

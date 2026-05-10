@@ -29,11 +29,11 @@ ecr_image_tag_limit = 10
 # -------------------------------------------------------------------
 db_name                   = "alwaysprint"
 db_username               = "alwaysprint_admin"
-db_instance_class         = "db.t3.small"
+db_instance_class         = "db.t3.micro"
 db_allocated_storage      = 20
-db_max_allocated_storage  = 100
-rds_deletion_protection   = true
-rds_backup_retention_days = 7
+db_max_allocated_storage  = 20
+rds_deletion_protection   = false
+rds_backup_retention_days = 0
 
 # -------------------------------------------------------------------
 # Redis (ElastiCache)
