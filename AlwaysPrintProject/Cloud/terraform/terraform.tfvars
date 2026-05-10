@@ -46,11 +46,4 @@ frontend_env_vars = {
   NEXT_PUBLIC_APP_NAME = "AlwaysPrint Cloud Management"
 }
 
-github_owner  = "jroblesluna"
-github_repo   = "bbva-cpm-scripts"
-github_branch = "main"
-
-pipeline_artifact_bucket_name = "alwaysprint-pipeline-artifacts-prod"
-
-backend_source_path  = "AlwaysPrintProject/Cloud/backend"
-frontend_source_path = "AlwaysPrintProject/Cloud/frontend"
+# CI/CD via GitHub Actions - no requiere variables aqui

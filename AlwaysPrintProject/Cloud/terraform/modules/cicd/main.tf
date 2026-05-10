@@ -162,25 +162,47 @@ resource "aws_codebuild_project" "backend" {
       phases:
         pre_build:
           commands:
-            - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-            - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-8)
+            - CHANGED=$(git diff --name-only HEAD^ HEAD 2>/dev/null || echo "all")
+            - echo "Changed files $CHANGED"
+            - |
+              if echo "$CHANGED" | grep -q "$BACKEND_SOURCE_PATH" || [ "$CHANGED" = "all" ]; then
+                echo "DEPLOY_BACKEND=true" >> $CODEBUILD_SRC_DIR/.env_flags
+              else
+                echo "No backend changes, skipping build"
+                echo "DEPLOY_BACKEND=false" >> $CODEBUILD_SRC_DIR/.env_flags
+              fi
+            - source $CODEBUILD_SRC_DIR/.env_flags || true
+            - |
+              if [ "$DEPLOY_BACKEND" = "true" ]; then
+                aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+                IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-8)
+                echo "IMAGE_TAG=$IMAGE_TAG" >> $CODEBUILD_SRC_DIR/.env_flags
+              fi
         build:
           commands:
-            - cd $BACKEND_SOURCE_PATH
-            - docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-            - docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+            - source $CODEBUILD_SRC_DIR/.env_flags || true
+            - |
+              if [ "$DEPLOY_BACKEND" = "true" ]; then
+                cd $BACKEND_SOURCE_PATH
+                docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+                docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+              fi
         post_build:
           commands:
-            - docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-            - docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+            - source $CODEBUILD_SRC_DIR/.env_flags || true
             - |
-              COMMAND_ID=$(aws ssm send-command \
-                --instance-ids $EC2_INSTANCE_ID \
-                --document-name "AWS-RunShellScript" \
-                --parameters 'commands=["/opt/alwaysprint/deploy.sh backend"]' \
-                --region $AWS_DEFAULT_REGION \
-                --query Command.CommandId --output text)
-              echo "SSM Command sent: $COMMAND_ID"
+              if [ "$DEPLOY_BACKEND" = "true" ]; then
+                docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+                docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+                aws ssm send-command \
+                  --instance-ids $EC2_INSTANCE_ID \
+                  --document-name "AWS-RunShellScript" \
+                  --parameters 'commands=["/opt/alwaysprint/deploy.sh backend"]' \
+                  --region $AWS_DEFAULT_REGION
+                echo "Backend deployed"
+              else
+                echo "Backend skipped (no changes)"
+              fi
     BUILDSPEC
   }
 
@@ -254,39 +276,62 @@ resource "aws_codebuild_project" "frontend" {
       phases:
         pre_build:
           commands:
-            - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-            - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-8)
+            - CHANGED=$(git diff --name-only HEAD^ HEAD 2>/dev/null || echo "all")
+            - |
+              if echo "$CHANGED" | grep -q "$FRONTEND_SOURCE_PATH" || [ "$CHANGED" = "all" ]; then
+                echo "DEPLOY_FRONTEND=true" >> $CODEBUILD_SRC_DIR/.env_flags
+              else
+                echo "No frontend changes, skipping build"
+                echo "DEPLOY_FRONTEND=false" >> $CODEBUILD_SRC_DIR/.env_flags
+              fi
+            - source $CODEBUILD_SRC_DIR/.env_flags || true
+            - |
+              if [ "$DEPLOY_FRONTEND" = "true" ]; then
+                aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+                IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-8)
+                echo "IMAGE_TAG=$IMAGE_TAG" >> $CODEBUILD_SRC_DIR/.env_flags
+              fi
         build:
           commands:
-            - cd $FRONTEND_SOURCE_PATH
+            - source $CODEBUILD_SRC_DIR/.env_flags || true
             - |
-              docker build \
-                --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
-                --build-arg NEXT_PUBLIC_WS_URL="$NEXT_PUBLIC_WS_URL" \
-                --build-arg NEXT_PUBLIC_APP_NAME="$NEXT_PUBLIC_APP_NAME" \
-                -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-            - docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+              if [ "$DEPLOY_FRONTEND" = "true" ]; then
+                cd $FRONTEND_SOURCE_PATH
+                docker build \
+                  --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
+                  --build-arg NEXT_PUBLIC_WS_URL="$NEXT_PUBLIC_WS_URL" \
+                  --build-arg NEXT_PUBLIC_APP_NAME="$NEXT_PUBLIC_APP_NAME" \
+                  -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+                docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+              fi
         post_build:
           commands:
-            - docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-            - docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+            - source $CODEBUILD_SRC_DIR/.env_flags || true
             - |
-              COMMAND_ID=$(aws ssm send-command \
-                --instance-ids $EC2_INSTANCE_ID \
-                --document-name "AWS-RunShellScript" \
-                --parameters 'commands=["/opt/alwaysprint/deploy.sh frontend"]' \
-                --region $AWS_DEFAULT_REGION \
-                --query Command.CommandId --output text)
-              echo "SSM Command sent: $COMMAND_ID"
+              if [ "$DEPLOY_FRONTEND" = "true" ]; then
+                docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+                docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+                aws ssm send-command \
+                  --instance-ids $EC2_INSTANCE_ID \
+                  --document-name "AWS-RunShellScript" \
+                  --parameters 'commands=["/opt/alwaysprint/deploy.sh frontend"]' \
+                  --region $AWS_DEFAULT_REGION
+                echo "Frontend deployed"
+              else
+                echo "Frontend skipped (no changes)"
+              fi
     BUILDSPEC
   }
 
   tags = { Name = "${local.prefix}-codebuild-frontend" }
 }
 
-# ── CodePipeline V2: Backend ──────────────────────────────────────────
-resource "aws_codepipeline" "backend" {
-  name          = "${local.prefix}-pipeline-backend"
+# ── CodePipeline V2: Único pipeline (gratis) ─────────────────────────
+# Se dispara si cambia backend O frontend.
+# Ambos CodeBuild corren en paralelo; cada uno detecta si sus archivos
+# cambiaron antes de compilar (ver buildspec de cada proyecto).
+resource "aws_codepipeline" "main" {
+  name          = "${local.prefix}-pipeline"
   role_arn      = aws_iam_role.codepipeline.arn
   pipeline_type = "V2"
 
@@ -296,7 +341,12 @@ resource "aws_codepipeline" "backend" {
       source_action_name = "Source"
       push {
         branches { includes = [var.github_branch] }
-        file_paths { includes = ["${var.backend_source_path}/**"] }
+        file_paths {
+          includes = [
+            "${var.backend_source_path}/**",
+            "${var.frontend_source_path}/**"
+          ]
+        }
       }
     }
   }
@@ -319,81 +369,39 @@ resource "aws_codepipeline" "backend" {
         ConnectionArn    = aws_codestarconnections_connection.github.arn
         FullRepositoryId = "${var.github_owner}/${var.github_repo}"
         BranchName       = var.github_branch
-        DetectChanges    = "true"
+        DetectChanges    = "false"
       }
     }
   }
 
+  # Backend y frontend se compilan en paralelo en el mismo stage
   stage {
     name = "Build-and-Deploy"
+
     action {
-      name             = "Build"
+      name             = "Backend"
       category         = "Build"
       owner            = "AWS"
       provider         = "CodeBuild"
       version          = "1"
+      run_order        = 1
       input_artifacts  = ["source_output"]
-      output_artifacts = ["build_output"]
+      output_artifacts = ["backend_output"]
       configuration    = { ProjectName = aws_codebuild_project.backend.name }
     }
-  }
 
-  tags = { Name = "${local.prefix}-pipeline-backend" }
-}
-
-# ── CodePipeline V2: Frontend ─────────────────────────────────────────
-resource "aws_codepipeline" "frontend" {
-  name          = "${local.prefix}-pipeline-frontend"
-  role_arn      = aws_iam_role.codepipeline.arn
-  pipeline_type = "V2"
-
-  trigger {
-    provider_type = "CodeStarSourceConnection"
-    git_configuration {
-      source_action_name = "Source"
-      push {
-        branches { includes = [var.github_branch] }
-        file_paths { includes = ["${var.frontend_source_path}/**"] }
-      }
-    }
-  }
-
-  artifact_store {
-    location = aws_s3_bucket.artifacts.bucket
-    type     = "S3"
-  }
-
-  stage {
-    name = "Source"
     action {
-      name             = "Source"
-      category         = "Source"
-      owner            = "AWS"
-      provider         = "CodeStarSourceConnection"
-      version          = "1"
-      output_artifacts = ["source_output"]
-      configuration = {
-        ConnectionArn    = aws_codestarconnections_connection.github.arn
-        FullRepositoryId = "${var.github_owner}/${var.github_repo}"
-        BranchName       = var.github_branch
-        DetectChanges    = "true"
-      }
-    }
-  }
-
-  stage {
-    name = "Build-and-Deploy"
-    action {
-      name             = "Build"
+      name             = "Frontend"
       category         = "Build"
       owner            = "AWS"
       provider         = "CodeBuild"
       version          = "1"
+      run_order        = 2
       input_artifacts  = ["source_output"]
-      output_artifacts = ["build_output"]
+      output_artifacts = ["frontend_output"]
       configuration    = { ProjectName = aws_codebuild_project.frontend.name }
     }
   }
 
-  tags = { Name = "${local.prefix}-pipeline-frontend" }
+  tags = { Name = "${local.prefix}-pipeline" }
 }

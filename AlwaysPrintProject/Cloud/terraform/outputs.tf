@@ -3,8 +3,13 @@ output "app_url" {
 }
 
 output "ec2_public_ip" {
-  description = "IP publica del servidor - apunta tu dominio a esta IP"
+  description = "IP publica del servidor"
   value       = module.ec2.public_ip
+}
+
+output "ec2_instance_id" {
+  description = "ID del EC2 - agregar como secreto EC2_INSTANCE_ID en GitHub"
+  value       = module.ec2.instance_id
 }
 
 output "rds_endpoint" {
@@ -20,72 +25,18 @@ output "frontend_ecr_url" {
 }
 
 output "ssh_private_key_command" {
-  description = "Comando para bajar la clave SSH privada y conectarte al EC2"
+  description = "Comando para bajar la clave SSH y conectarte al EC2"
   value       = "aws secretsmanager get-secret-value --secret-id /${var.project_name}/${var.environment}/ssh_private_key --region ${var.aws_region} --query SecretString --output text > alwaysprint.pem && icacls alwaysprint.pem /inheritance:r /grant:r \"%USERNAME%:R\" && ssh -i alwaysprint.pem ec2-user@${module.ec2.public_ip}"
 }
 
-output "github_codestar_connection_arn" {
-  description = "Aprobar en AWS Console -> Developer Tools -> Connections"
-  value       = module.cicd.codestar_connection_arn
-}
-
-output "manual_dns_records" {
-  description = "Registros a agregar en Hostinger para que la app funcione"
+output "github_actions_secrets" {
+  description = "Secretos a configurar en GitHub → Settings → Secrets and variables → Actions"
   value = {
-    "CNAME_app" = {
-      tipo    = "CNAME"
-      nombre  = "${var.subdomain}.${var.zone_name}"
-      apunta_a = "-- no aplica, usa el registro A --"
-    }
-    "A_app" = {
-      tipo    = "A"
-      nombre  = "${var.subdomain}"
-      valor   = module.ec2.public_ip
-      nota    = "En Hostinger: tipo A, nombre 'alwaysprint.apps', valor = IP de arriba"
-    }
+    AWS_ACCESS_KEY_ID     = "(tu Access Key ID de IAM)"
+    AWS_SECRET_ACCESS_KEY = "(tu Secret Access Key de IAM)"
+    AWS_REGION            = var.aws_region
+    EC2_INSTANCE_ID       = module.ec2.instance_id
+    BACKEND_ECR_URL       = module.ecr.backend_repository_url
+    FRONTEND_ECR_URL      = module.ecr.frontend_repository_url
   }
-}
-
-output "setup_instructions" {
-  value = <<-EOT
-
-    ====================================================================
-    PASOS DESPUÉS DE TERRAFORM APPLY
-    ====================================================================
-
-    1. AGREGAR REGISTRO DNS EN HOSTINGER (apps.iol.pe):
-       Tipo  : A
-       Nombre: alwaysprint.apps
-       Valor : ${module.ec2.public_ip}
-
-       Esto apunta alwaysprint.apps.iol.pe a tu servidor EC2.
-       Let's Encrypt se configura automáticamente una vez que el DNS propague.
-
-    2. APROBAR CONEXIÓN GITHUB:
-       AWS Console -> Developer Tools -> Settings -> Connections
-       Aprueba: ${module.cicd.codestar_connection_arn}
-
-    3. PRIMER DEPLOY (push imágenes a ECR):
-       # Generar clave SSH si no tienes:
-       # ssh-keygen -t rsa -b 4096 -f ~/.ssh/alwaysprint
-
-       # Backend
-       aws ecr get-login-password --region ${var.aws_region} | \
-         docker login --username AWS --password-stdin ${module.ecr.backend_repository_url}
-       cd AlwaysPrintProject/Cloud/backend
-       docker build -t ${module.ecr.backend_repository_url}:latest .
-       docker push ${module.ecr.backend_repository_url}:latest
-
-       # Frontend
-       cd AlwaysPrintProject/Cloud/frontend
-       docker build -t ${module.ecr.frontend_repository_url}:latest .
-       docker push ${module.ecr.frontend_repository_url}:latest
-
-       # Trigger deploy en EC2
-       ssh -i ~/.ssh/alwaysprint ec2-user@${module.ec2.public_ip} \
-         "/opt/alwaysprint/deploy.sh all"
-
-    4. A partir de ahí, cada git push dispara el pipeline automaticamente.
-    ====================================================================
-  EOT
 }

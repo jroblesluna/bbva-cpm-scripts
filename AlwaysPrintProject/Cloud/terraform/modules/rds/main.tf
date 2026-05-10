@@ -49,12 +49,11 @@ resource "aws_db_instance" "main" {
   backup_window           = "03:00-04:00"
   maintenance_window      = "Mon:04:00-Mon:05:00"
 
-  deletion_protection = var.deletion_protection
-  skip_final_snapshot = !var.deletion_protection
-  final_snapshot_identifier = var.deletion_protection ? "${local.prefix}-final-snapshot" : null
+  deletion_protection       = var.deletion_protection
+  skip_final_snapshot       = true
 
-  performance_insights_enabled = true
-  monitoring_interval          = 60
+  performance_insights_enabled = false
+  monitoring_interval          = 0
 
   tags = { Name = "${local.prefix}-rds" }
 }

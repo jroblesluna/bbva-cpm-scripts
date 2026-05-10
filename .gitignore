@@ -33,6 +33,7 @@ out/
 
 # IDEs
 .*
+!.github/
 .vscode/
 .idea/
 *.swp

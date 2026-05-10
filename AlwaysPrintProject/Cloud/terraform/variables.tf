@@ -31,9 +31,3 @@ variable "ec2_instance_type" {
 variable "backend_env_vars" { type = map(string) }
 variable "frontend_env_vars" { type = map(string) }
 
-variable "github_owner" { type = string }
-variable "github_repo" { type = string }
-variable "github_branch" { type = string }
-variable "pipeline_artifact_bucket_name" { type = string }
-variable "backend_source_path" { type = string }
-variable "frontend_source_path" { type = string }

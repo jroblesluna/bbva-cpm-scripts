@@ -96,21 +96,4 @@ module "ec2" {
   depends_on = [aws_secretsmanager_secret_version.database_url]
 }
 
-module "cicd" {
-  source                       = "./modules/cicd"
-  project_name                 = var.project_name
-  environment                  = var.environment
-  aws_region                   = var.aws_region
-  aws_account_id               = data.aws_caller_identity.current.account_id
-  github_owner                 = var.github_owner
-  github_repo                  = var.github_repo
-  github_branch                = var.github_branch
-  backend_ecr_repository_name  = module.ecr.backend_repository_name
-  frontend_ecr_repository_name = module.ecr.frontend_repository_name
-  artifact_bucket_name         = var.pipeline_artifact_bucket_name
-  backend_source_path          = var.backend_source_path
-  frontend_source_path         = var.frontend_source_path
-  public_url                   = "https://${var.subdomain}.${var.zone_name}"
-  frontend_env_vars            = var.frontend_env_vars
-  ec2_instance_id              = module.ec2.instance_id
-}
+# CI/CD manejado por GitHub Actions (ver .github/workflows/)
