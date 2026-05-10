@@ -55,17 +55,18 @@ export default function ConfigPage() {
   useEffect(() => {
     if (user?.role === 'admin') {
       loadAccounts()
+    } else if (user?.role === 'operator' || user?.role === 'readonly') {
+      // Para operadores, cargar configuración inmediatamente
+      loadConfig()
     }
   }, [user])
 
-  // Cargar configuración cuando se selecciona una organización
+  // Cargar configuración cuando se selecciona una organización (solo Admin)
   useEffect(() => {
     if (user?.role === 'admin' && selectedAccountId) {
       loadConfig()
-    } else if (user?.role !== 'admin') {
-      loadConfig()
     }
-  }, [selectedAccountId, user])
+  }, [selectedAccountId])
 
   const loadAccounts = async () => {
     try {
@@ -113,7 +114,8 @@ export default function ConfigPage() {
 
       if (!response.ok) {
         if (response.status === 404) {
-          // No hay configuración, usar valores por defecto
+          // No hay configuración, usar valores por defecto (esto es normal)
+          console.log('No existe configuración global para esta organización')
           setConfig(null)
           // Resetear formulario a valores por defecto
           setCorporateQueueName('')
@@ -121,9 +123,11 @@ export default function ConfigPage() {
           setBootstrapDomains('')
           setSearchIps([''])
           setSearchRanges([''])
+          setHasChanges(false)
           return
         }
-        throw new Error('Error al cargar configuración')
+        const errorData = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+        throw new Error(errorData.detail || 'Error al cargar configuración')
       }
 
       const data: GlobalConfig = await response.json()
@@ -137,12 +141,15 @@ export default function ConfigPage() {
       if (data.search_targets) {
         setSearchIps(data.search_targets.ips || [''])
         setSearchRanges(data.search_targets.ranges || [''])
+      } else {
+        setSearchIps([''])
+        setSearchRanges([''])
       }
       
       setHasChanges(false)
-    } catch (error) {
-      console.error('Error:', error)
-      alert('Error al cargar configuración')
+    } catch (error: any) {
+      console.error('Error al cargar configuración:', error)
+      alert(error.message || 'Error al cargar configuración')
     } finally {
       setLoading(false)
     }
@@ -300,7 +307,7 @@ export default function ConfigPage() {
               Descartar
             </Button>
           )}
-          <Button onClick={handleSave} disabled={saving || !hasChanges}>
+          <Button onClick={handleSave} disabled={saving || !hasChanges || (user?.role === 'admin' && !selectedAccountId)}>
             <Save className="mr-2 h-4 w-4" />
             {saving ? 'Guardando...' : 'Guardar Cambios'}
           </Button>
@@ -365,6 +372,7 @@ export default function ConfigPage() {
               }}
               placeholder="Ej: LexmarkBBVA"
               className="max-w-md"
+              disabled={user?.role === 'admin' && !selectedAccountId}
             />
             <p className="mt-1 text-sm text-gray-500">
               Nombre de la cola de impresión corporativa en Windows
@@ -386,6 +394,7 @@ export default function ConfigPage() {
                 setHasChanges(true)
               }}
               className="max-w-xs"
+              disabled={user?.role === 'admin' && !selectedAccountId}
             />
             <p className="mt-1 text-sm text-gray-500">
               Frecuencia con la que las workstations consultan por tareas pendientes (1-1440 minutos)
@@ -406,6 +415,7 @@ export default function ConfigPage() {
               }}
               placeholder="Ej: bbva.com,bbva.local"
               className="max-w-md"
+              disabled={user?.role === 'admin' && !selectedAccountId}
             />
             <p className="mt-1 text-sm text-gray-500">
               Dominios separados por comas para configuración inicial
@@ -426,6 +436,7 @@ export default function ConfigPage() {
                     onChange={(e) => updateSearchIp(index, e.target.value)}
                     placeholder="Ej: 192.168.1.100"
                     className="max-w-md"
+                    disabled={user?.role === 'admin' && !selectedAccountId}
                   />
                   {searchIps.length > 1 && (
                     <Button
@@ -433,6 +444,7 @@ export default function ConfigPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => removeSearchIp(index)}
+                      disabled={user?.role === 'admin' && !selectedAccountId}
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -446,6 +458,7 @@ export default function ConfigPage() {
               size="sm"
               onClick={addSearchIp}
               className="mt-2"
+              disabled={user?.role === 'admin' && !selectedAccountId}
             >
               <Plus className="mr-2 h-4 w-4" />
               Agregar IP
@@ -469,6 +482,7 @@ export default function ConfigPage() {
                     onChange={(e) => updateSearchRange(index, e.target.value)}
                     placeholder="Ej: 192.168.1.0/24"
                     className="max-w-md"
+                    disabled={user?.role === 'admin' && !selectedAccountId}
                   />
                   {searchRanges.length > 1 && (
                     <Button
@@ -476,6 +490,7 @@ export default function ConfigPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => removeSearchRange(index)}
+                      disabled={user?.role === 'admin' && !selectedAccountId}
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -489,6 +504,7 @@ export default function ConfigPage() {
               size="sm"
               onClick={addSearchRange}
               className="mt-2"
+              disabled={user?.role === 'admin' && !selectedAccountId}
             >
               <Plus className="mr-2 h-4 w-4" />
               Agregar Rango
@@ -522,7 +538,7 @@ export default function ConfigPage() {
       )}
 
       {/* Advertencia si no hay configuración */}
-      {!config && (
+      {!config && selectedAccountId && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="flex">
             <AlertCircle className="h-5 w-5 text-yellow-600 mr-3 flex-shrink-0 mt-0.5" />
@@ -531,8 +547,25 @@ export default function ConfigPage() {
                 No hay configuración global
               </h3>
               <p className="mt-1 text-sm text-yellow-700">
-                Aún no has configurado los parámetros globales. Completa el formulario y guarda
+                Esta organización aún no tiene configuración global. Completa el formulario y guarda
                 los cambios para crear la configuración inicial.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mensaje cuando Admin no ha seleccionado organización */}
+      {user?.role === 'admin' && !selectedAccountId && !loadingAccounts && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex">
+            <Info className="h-5 w-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-medium text-blue-900">
+                Selecciona una organización
+              </h3>
+              <p className="mt-1 text-sm text-blue-700">
+                Selecciona una organización del selector superior para ver o editar su configuración global.
               </p>
             </div>
           </div>

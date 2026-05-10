@@ -1,20 +1,14 @@
 output "app_url" {
-  description = "URL pública de la aplicación"
-  value       = "https://${var.subdomain}.${var.zone_name}"
+  value = "https://${var.subdomain}.${var.zone_name}"
 }
 
-output "alb_dns_name" {
-  description = "DNS del Application Load Balancer"
-  value       = module.alb.alb_dns_name
+output "ec2_public_ip" {
+  description = "IP publica del servidor - apunta tu dominio a esta IP"
+  value       = module.ec2.public_ip
 }
 
-output "acm_certificate_arn" {
-  description = "ARN del certificado SSL/TLS"
-  value       = module.acm.certificate_arn
-}
-
-output "ecs_cluster_name" {
-  value = module.ecs.cluster_name
+output "rds_endpoint" {
+  value = module.rds.db_endpoint
 }
 
 output "backend_ecr_url" {
@@ -25,70 +19,68 @@ output "frontend_ecr_url" {
   value = module.ecr.frontend_repository_url
 }
 
-output "rds_endpoint" {
-  description = "Endpoint de conexión a RDS PostgreSQL"
-  value       = module.rds.db_endpoint
-}
-
 output "github_codestar_connection_arn" {
-  description = "ARN de la conexión CodeStar a GitHub - DEBE APROBARSE MANUALMENTE en la consola AWS"
+  description = "Aprobar en AWS Console -> Developer Tools -> Connections"
   value       = module.cicd.codestar_connection_arn
 }
 
-output "backend_pipeline_name" {
-  value = module.cicd.backend_pipeline_name
-}
-
-output "frontend_pipeline_name" {
-  value = module.cicd.frontend_pipeline_name
-}
-
-# -------------------------------------------------------------------
-# Registros DNS a agregar manualmente en tu proveedor DNS
-# -------------------------------------------------------------------
 output "manual_dns_records" {
-  description = "Registros DNS a crear en tu proveedor (Hostinger, Cloudflare, GoDaddy, etc.)"
+  description = "Registros a agregar en Hostinger para que la app funcione"
   value = {
-    "1_ssl_validation_CNAME" = {
-      description = "Valida el certificado SSL - agregar como CNAME en tu proveedor DNS"
-      records     = module.acm.validation_options
+    "CNAME_app" = {
+      tipo    = "CNAME"
+      nombre  = "${var.subdomain}.${var.zone_name}"
+      apunta_a = "-- no aplica, usa el registro A --"
     }
-    "2_app_CNAME" = {
-      description = "Apunta tu dominio al load balancer - agregar como CNAME"
-      name        = "${var.subdomain}.${var.zone_name}"
-      value       = module.alb.alb_dns_name
+    "A_app" = {
+      tipo    = "A"
+      nombre  = "${var.subdomain}"
+      valor   = module.ec2.public_ip
+      nota    = "En Hostinger: tipo A, nombre 'alwaysprint.apps', valor = IP de arriba"
     }
   }
 }
 
 output "setup_instructions" {
-  description = "Instrucciones post-despliegue"
-  value       = <<-EOT
+  value = <<-EOT
 
     ====================================================================
-    PASOS OBLIGATORIOS DESPUÉS DE TERRAFORM APPLY
+    PASOS DESPUÉS DE TERRAFORM APPLY
     ====================================================================
 
-    1. AGREGAR 2 REGISTROS DNS EN TU PROVEEDOR DNS:
+    1. AGREGAR REGISTRO DNS EN HOSTINGER (apps.iol.pe):
+       Tipo  : A
+       Nombre: alwaysprint.apps
+       Valor : ${module.ec2.public_ip}
 
-       a) CNAME de validación SSL:
-          Revisa el output "manual_dns_records.1_ssl_validation_CNAME"
-          Agrega ese CNAME en tu proveedor DNS.
-          ACM valida automáticamente en ~5 minutos.
-
-       b) CNAME de la aplicación:
-          Nombre : ${var.subdomain}   (o ${var.subdomain}.${var.zone_name})
-          Tipo   : CNAME
-          Valor  : (ver output alb_dns_name)
+       Esto apunta alwaysprint.apps.iol.pe a tu servidor EC2.
+       Let's Encrypt se configura automáticamente una vez que el DNS propague.
 
     2. APROBAR CONEXIÓN GITHUB:
-       AWS Console → Developer Tools → Settings → Connections
-       Aprueba la conexión pendiente con GitHub.
+       AWS Console -> Developer Tools -> Settings -> Connections
+       Aprueba: ${module.cicd.codestar_connection_arn}
 
-    3. PRIMER DESPLIEGUE (push de imágenes iniciales a ECR):
-       Ver output "backend_ecr_url" y "frontend_ecr_url" para los comandos exactos.
+    3. PRIMER DEPLOY (push imágenes a ECR):
+       # Generar clave SSH si no tienes:
+       # ssh-keygen -t rsa -b 4096 -f ~/.ssh/alwaysprint
 
-    4. A partir de ahí, cada git push a main dispara el pipeline automáticamente.
+       # Backend
+       aws ecr get-login-password --region ${var.aws_region} | \
+         docker login --username AWS --password-stdin ${module.ecr.backend_repository_url}
+       cd AlwaysPrintProject/Cloud/backend
+       docker build -t ${module.ecr.backend_repository_url}:latest .
+       docker push ${module.ecr.backend_repository_url}:latest
+
+       # Frontend
+       cd AlwaysPrintProject/Cloud/frontend
+       docker build -t ${module.ecr.frontend_repository_url}:latest .
+       docker push ${module.ecr.frontend_repository_url}:latest
+
+       # Trigger deploy en EC2
+       ssh -i ~/.ssh/alwaysprint ec2-user@${module.ec2.public_ip} \
+         "/opt/alwaysprint/deploy.sh all"
+
+    4. A partir de ahí, cada git push dispara el pipeline automaticamente.
     ====================================================================
   EOT
 }
