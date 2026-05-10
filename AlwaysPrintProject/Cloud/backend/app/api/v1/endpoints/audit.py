@@ -12,6 +12,7 @@ from uuid import UUID
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_admin
@@ -125,13 +126,13 @@ def get_audit_stats(
     # Usuarios más activos (top 10)
     most_active_query = db.query(
         AuditLog.user_id,
-        db.func.count(AuditLog.id).label("count")
+        func.count(AuditLog.id).label("count")
     )
     if account_id:
         most_active_query = most_active_query.filter(AuditLog.account_id == account_id)
     
     most_active = most_active_query.group_by(AuditLog.user_id).order_by(
-        db.func.count(AuditLog.id).desc()
+        func.count(AuditLog.id).desc()
     ).limit(10).all()
     
     most_active_users = [
