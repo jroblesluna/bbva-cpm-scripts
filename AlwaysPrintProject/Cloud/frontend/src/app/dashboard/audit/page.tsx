@@ -116,13 +116,10 @@ export default function AuditPage() {
       create: 'Crear',
       update: 'Actualizar',
       delete: 'Eliminar',
-      login: 'Login',
-      logout: 'Logout',
       config_change: 'Cambio Config',
+      contingency_toggle: 'Contingencia',
       message_sent: 'Mensaje Enviado',
-      workstation_registered: 'Estación Registrada',
-      ip_authorized: 'IP Autorizada',
-      ip_rejected: 'IP Rechazada',
+      command_sent: 'Comando Enviado',
     }
     return labels[type] || type
   }
@@ -132,13 +129,10 @@ export default function AuditPage() {
       create: 'bg-green-100 text-green-800',
       update: 'bg-blue-100 text-blue-800',
       delete: 'bg-red-100 text-red-800',
-      login: 'bg-purple-100 text-purple-800',
-      logout: 'bg-gray-100 text-gray-800',
       config_change: 'bg-yellow-100 text-yellow-800',
+      contingency_toggle: 'bg-orange-100 text-orange-800',
       message_sent: 'bg-indigo-100 text-indigo-800',
-      workstation_registered: 'bg-teal-100 text-teal-800',
-      ip_authorized: 'bg-green-100 text-green-800',
-      ip_rejected: 'bg-red-100 text-red-800',
+      command_sent: 'bg-purple-100 text-purple-800',
     }
     return colors[type] || 'bg-gray-100 text-gray-800'
   }
@@ -271,13 +265,10 @@ export default function AuditPage() {
             <option value="create">Crear</option>
             <option value="update">Actualizar</option>
             <option value="delete">Eliminar</option>
-            <option value="login">Login</option>
-            <option value="logout">Logout</option>
             <option value="config_change">Cambio Config</option>
+            <option value="contingency_toggle">Contingencia</option>
             <option value="message_sent">Mensaje Enviado</option>
-            <option value="workstation_registered">Estación Registrada</option>
-            <option value="ip_authorized">IP Autorizada</option>
-            <option value="ip_rejected">IP Rechazada</option>
+            <option value="command_sent">Comando Enviado</option>
           </select>
 
           {/* Filtro por tipo de entidad */}
