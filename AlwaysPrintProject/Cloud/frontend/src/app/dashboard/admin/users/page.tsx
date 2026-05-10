@@ -146,7 +146,7 @@ export default function UsersPage() {
               onSubmit={(data) => createMutation.mutate(data as UserCreate)}
               onCancel={() => setShowCreateForm(false)}
               isLoading={createMutation.isPending}
-              error={createMutation.error?.detail}
+              error={(createMutation.error as any)?.detail}
             />
           </CardContent>
         </Card>
@@ -165,7 +165,7 @@ export default function UsersPage() {
               onSubmit={(data) => updateMutation.mutate({ id: editingUser.id, data })}
               onCancel={() => setEditingUser(null)}
               isLoading={updateMutation.isPending}
-              error={updateMutation.error?.detail}
+              error={(updateMutation.error as any)?.detail}
             />
           </CardContent>
         </Card>
@@ -275,7 +275,7 @@ export default function UsersPage() {
           onConfirm={() => deleteMutation.mutate(deletingUser.id)}
           onCancel={() => setDeletingUser(null)}
           isLoading={deleteMutation.isPending}
-          error={deleteMutation.error?.detail}
+          error={(deleteMutation.error as any)?.detail}
         />
       )}
     </div>

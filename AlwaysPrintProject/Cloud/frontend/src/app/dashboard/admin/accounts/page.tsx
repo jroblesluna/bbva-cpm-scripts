@@ -171,7 +171,7 @@ export default function AccountsPage() {
               onSubmit={(data) => createMutation.mutate(data as AccountCreate)}
               onCancel={() => setShowCreateForm(false)}
               isLoading={createMutation.isPending}
-              error={createMutation.error?.detail}
+              error={(createMutation.error as any)?.detail}
             />
           </CardContent>
         </Card>
@@ -189,7 +189,7 @@ export default function AccountsPage() {
               onSubmit={(data) => updateMutation.mutate({ id: editingAccount.id, data })}
               onCancel={() => setEditingAccount(null)}
               isLoading={updateMutation.isPending}
-              error={updateMutation.error?.detail}
+              error={(updateMutation.error as any)?.detail}
             />
           </CardContent>
         </Card>
@@ -214,7 +214,7 @@ export default function AccountsPage() {
               onAddIP={(data) => addIPMutation.mutate({ accountId: managingIPsAccount.id, data })}
               onRemoveIP={(ipId) => removeIPMutation.mutate({ accountId: managingIPsAccount.id, ipId })}
               isLoading={addIPMutation.isPending || removeIPMutation.isPending}
-              error={addIPMutation.error?.detail || removeIPMutation.error?.detail}
+              error={(addIPMutation.error as any)?.detail || (removeIPMutation.error as any)?.detail}
             />
           </CardContent>
         </Card>
