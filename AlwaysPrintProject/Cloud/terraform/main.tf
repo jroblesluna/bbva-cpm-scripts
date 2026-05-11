@@ -38,9 +38,10 @@ module "ecr" {
 }
 
 module "secrets" {
-  source       = "./modules/secrets"
-  project_name = var.project_name
-  environment  = var.environment
+  source         = "./modules/secrets"
+  project_name   = var.project_name
+  environment    = var.environment
+  ssh_public_key = var.ssh_public_key
 }
 
 module "rds" {

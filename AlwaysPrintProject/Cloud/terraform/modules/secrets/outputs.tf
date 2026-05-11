@@ -12,7 +12,7 @@ output "secret_key_arn" {
 }
 
 output "ssh_public_key" {
-  value = tls_private_key.ssh.public_key_openssh
+  value = var.ssh_public_key
 }
 
 output "ssh_private_key_secret_arn" {

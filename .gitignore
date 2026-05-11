@@ -48,3 +48,9 @@ logs/
 # Variables de entorno
 .env
 .env.local
+
+# Terraform — archivos locales generados
+AlwaysPrintProject/Cloud/terraform/.terraform/
+AlwaysPrintProject/Cloud/terraform/.terraform.lock.hcl
+AlwaysPrintProject/Cloud/terraform/*.tfstate
+AlwaysPrintProject/Cloud/terraform/*.tfstate.backup
