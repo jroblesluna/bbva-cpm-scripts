@@ -29,8 +29,10 @@ export function IntlProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.lang = locale
   }, [locale])
 
+  const timeZone = user?.timezone ?? 'UTC'
+
   return (
-    <NextIntlClientProvider locale={locale} messages={messages[locale]}>
+    <NextIntlClientProvider locale={locale} messages={messages[locale]} timeZone={timeZone}>
       {children}
     </NextIntlClientProvider>
   )
