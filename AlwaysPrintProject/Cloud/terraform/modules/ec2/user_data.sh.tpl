@@ -154,7 +154,7 @@ EMAIL=antonio@robles.ai
 
 for i in $(seq 1 20); do
   PUBLIC_IP=$(curl -s http://checkip.amazonaws.com)
-  DNS_IP=$(dig +short $DOMAIN | tail -1)
+  DNS_IP=$(nslookup $DOMAIN 2>/dev/null | awk '/^Address: /{print $2}' | tail -1)
   if [ "$PUBLIC_IP" = "$DNS_IP" ]; then
     certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $EMAIL
     systemctl reload nginx
