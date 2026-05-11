@@ -13,6 +13,7 @@ import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { LanguageSelector } from '@/components/LanguageSelector'
+import { BuildInfo } from '@/components/BuildInfo'
 import {
   LayoutDashboard,
   Monitor,
@@ -150,6 +151,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <LogOut className="mr-2 h-4 w-4" />
                 {t('logout')}
               </Button>
+              <BuildInfo />
             </div>
           </div>
         </div>
@@ -211,6 +213,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <LogOut className="mr-2 h-4 w-4" />
               {t('logout')}
             </Button>
+            <BuildInfo />
           </div>
         </div>
       </div>

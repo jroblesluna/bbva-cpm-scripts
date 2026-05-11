@@ -42,6 +42,7 @@ jobs:
             --build-arg NEXT_PUBLIC_API_URL="https://alwaysprint.apps.iol.pe" \
             --build-arg NEXT_PUBLIC_WS_URL="wss://alwaysprint.apps.iol.pe" \
             --build-arg NEXT_PUBLIC_APP_NAME="AlwaysPrint Cloud Management" \
+            --build-arg NEXT_PUBLIC_BUILD_TAG="$TAG" \
             -t $ECR_URL:$TAG \
             -t $ECR_URL:latest .
           docker push $ECR_URL:$TAG

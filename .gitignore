@@ -35,6 +35,7 @@ out/
 .*
 !.github/
 !.gitattributes
+!.dockerignore
 .vscode/
 .idea/
 *.swp

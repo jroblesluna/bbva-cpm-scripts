@@ -3,6 +3,7 @@ Punto de entrada principal de la aplicación FastAPI
 """
 
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -87,7 +88,18 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Endpoint de health check"""
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "build_tag": os.environ.get("BUILD_TAG", "dev"),
+    }
+
+
+@app.get("/api/v1/version")
+async def version():
+    """Build info — accesible via nginx /api/ proxy"""
+    return {
+        "build_tag": os.environ.get("BUILD_TAG", "dev"),
+    }
 
 
 @app.get("/ws/status")

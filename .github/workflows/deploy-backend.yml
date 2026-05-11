@@ -52,10 +52,11 @@ jobs:
 
           echo "EC2 Instance: $INSTANCE_ID"
 
+          TAG=${GITHUB_SHA::8}
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["bash /opt/alwaysprint/deploy.sh backend"]' \
+            --parameters "{\"commands\":[\"sed -i '/^BUILD_TAG=/d' /opt/alwaysprint/.env && echo 'BUILD_TAG=${TAG}' >> /opt/alwaysprint/.env && bash /opt/alwaysprint/deploy.sh backend\"]}" \
             --comment "Deploy backend ${{ github.sha }}" \
             --query "Command.CommandId" --output text)
 
