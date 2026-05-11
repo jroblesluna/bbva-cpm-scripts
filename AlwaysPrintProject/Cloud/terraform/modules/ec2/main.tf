@@ -8,6 +8,8 @@ locals {
     CORS_ORIGINS = local.public_url
     API_V1_STR   = "/api/v1"
     REDIS_URL    = "redis://redis:6379/0"
+    AWS_REGION   = var.aws_region
+    FRONTEND_URL = local.public_url
   })
 }
 
@@ -49,6 +51,11 @@ resource "aws_iam_role" "ec2" {
 resource "aws_iam_role_policy_attachment" "ssm" {
   role       = aws_iam_role.ec2.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_role_policy_attachment" "ses" {
+  role       = aws_iam_role.ec2.name
+  policy_arn = var.ses_send_policy_arn
 }
 
 resource "aws_iam_role_policy" "ec2_permissions" {

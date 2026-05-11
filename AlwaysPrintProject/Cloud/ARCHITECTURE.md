@@ -2,10 +2,10 @@
 
 ## Descripción General
 
-**AlwaysPrint Cloud Manager (APCM)** es una plataforma SaaS multi-tenant para la gestión centralizada de workstations Windows que utilizan el sistema AlwaysPrint para gestión de impresión corporativa.
+**AlwaysPrint Cloud Manager (APCM)** es una plataforma SaaS multi-cuenta para la gestión centralizada de workstations Windows que utilizan el sistema AlwaysPrint para gestión de impresión corporativa.
 
 **Versión**: 1.0.0  
-**Última actualización**: 8 de mayo de 2026
+**Última actualización**: 10 de mayo de 2026
 
 ---
 
@@ -14,7 +14,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    CLIENTE: BBVA                             │
-│  500 Workstations Windows 11                                │
+│  Workstations Windows                                        │
 │                                                              │
 │  Cada workstation ejecuta:                                  │
 │  ├─ AlwaysPrintService.exe (LocalSystem, sin Internet)     │
@@ -23,47 +23,37 @@
 │  AlwaysPrintTray se comunica con la nube                   │
 └─────────────────────────┬───────────────────────────────────┘
                           │
-┌─────────────────────────┼───────────────────────────────────┐
-│                    CLIENTE: Santander                        │
-│  300 Workstations                                           │
-└─────────────────────────┼───────────────────────────────────┘
-                          │
                           │ HTTPS (vía Proxy Corporativo)
+                          │ Autenticación: IP pública autorizada
                           │
 ┌─────────────────────────▼─────────────────────────────────────┐
-│              TU NUBE (APCM - Multi-Tenant SaaS)               │
+│              AWS us-west-2 (APCM)                              │
 │                                                               │
 │  ┌────────────────────────────────────────────────────────┐  │
-│  │  Backend (FastAPI)                                     │  │
-│  │  https://api.alwaysprint.tudominio.com                 │  │
+│  │  EC2 t3.micro (Amazon Linux 2023)                      │  │
+│  │  Elastic IP estática                                   │  │
+│  │  Nginx (reverse proxy + Let's Encrypt SSL)             │  │
 │  │                                                         │  │
-│  │  Endpoints para Dispositivos (AlwaysPrintTray):        │  │
-│  │  ├─ POST /api/v1/workstations/register                 │  │
-│  │  ├─ POST /api/v1/workstations/{id}/heartbeat           │  │
-│  │  ├─ POST /api/v1/workstations/{id}/telemetry           │  │
-│  │  └─ GET  /api/v1/workstations/{id}/config              │  │
-│  │                                                         │  │
-│  │  Endpoints para Administradores (Dashboard):           │  │
-│  │  ├─ POST /api/v1/auth/login                            │  │
-│  │  ├─ GET  /api/v1/admin/workstations                    │  │
-│  │  ├─ PUT  /api/v1/admin/workstations/{id}/config        │  │
-│  │  └─ GET  /api/v1/admin/analytics                       │  │
-│  └────────────────────────┬───────────────────────────────┘  │
-│                           │                                   │
-│  ┌────────────────────────▼───────────────────────────────┐  │
-│  │  Frontend (Next.js)                                    │  │
-│  │  https://bbva.alwaysprint.tudominio.com                │  │
-│  │  https://santander.alwaysprint.tudominio.com           │  │
-│  │                                                         │  │
-│  │  Dashboard Web para Administradores                    │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │  │
+│  │  │ Backend      │  │ Frontend     │  │ Redis       │  │  │
+│  │  │ FastAPI :8000│  │ Next.js :3000│  │ :6379       │  │  │
+│  │  └──────┬───────┘  └──────────────┘  └─────────────┘  │  │
+│  │         │ (Docker Compose bridge network)               │  │
+│  └─────────┼──────────────────────────────────────────────┘  │
+│            │                                                   │
+│  ┌─────────▼──────────────────────────────────────────────┐  │
+│  │  RDS PostgreSQL 16 (db.t3.micro, subnet privada)       │  │
+│  │  Solo accesible desde el EC2 (security group)          │  │
 │  └────────────────────────────────────────────────────────┘  │
-│                           │                                   │
-│                    ┌──────▼──────┐                           │
-│                    │  PostgreSQL │                           │
-│                    │  Database   │                           │
-│                    │  Multi-Tenant│                          │
-│                    └─────────────┘                           │
+│                                                               │
+│  ┌─────────────────┐  ┌─────────────────────────────────┐   │
+│  │  ECR            │  │  Secrets Manager                │   │
+│  │  (imágenes      │  │  db_password, secret_key,       │   │
+│  │  backend/front) │  │  ssh_private_key, database_url  │   │
+│  └─────────────────┘  └─────────────────────────────────┘   │
 └───────────────────────────────────────────────────────────────┘
+
+URL pública: https://alwaysprint.apps.iol.pe
 ```
 
 ---
@@ -74,15 +64,15 @@
 
 **Ubicación**: `AlwaysPrintProject/Cloud/backend/`  
 **Tecnología**: Python 3.12, FastAPI, SQLAlchemy, Alembic  
-**Puerto**: 8000 (desarrollo), 443 (producción)
+**Puerto**: 8000 (desarrollo y producción interna)
 
 **Responsabilidades**:
 - API REST para dispositivos (AlwaysPrintTray)
 - API REST para administradores (Dashboard)
-- Autenticación multi-tenant (API Keys + JWT)
-- Tenant isolation (filtrado por organization_id)
-- Gestión de base de datos
-- WebSocket para comunicación en tiempo real (opcional)
+- WebSocket en tiempo real para workstations y operadores
+- Autenticación JWT para administradores
+- Autorización por IP pública para workstations
+- Multi-cuenta con `account_id` en todas las tablas
 
 **Estructura**:
 ```
@@ -91,24 +81,48 @@ backend/
 │   ├── api/
 │   │   └── v1/
 │   │       ├── endpoints/
-│   │       │   ├── devices.py      # Endpoints para AlwaysPrintTray
-│   │       │   ├── admin.py        # Endpoints para Dashboard
-│   │       │   └── auth.py         # Autenticación
+│   │       │   ├── accounts.py     # CRUD de cuentas (superadmin)
+│   │       │   ├── audit.py        # Logs de auditoría
+│   │       │   ├── auth.py         # Login JWT
+│   │       │   ├── config.py       # Configuración global/workstation
+│   │       │   ├── messages.py     # Mensajes a workstations
+│   │       │   ├── setup.py        # Setup inicial (primer admin)
+│   │       │   ├── users.py        # Gestión de usuarios admin
+│   │       │   ├── vlans.py        # Gestión de VLANs
+│   │       │   └── workstations.py # Registro/heartbeat/estado
+│   │       ├── websocket/
+│   │       │   ├── operator.py     # WS para dashboard (operador)
+│   │       │   └── workstation.py  # WS para AlwaysPrintTray
 │   │       └── router.py
 │   ├── core/
-│   │   ├── config.py               # Configuración
-│   │   ├── database.py             # Conexión a BD
+│   │   ├── config.py               # Configuración (env vars)
+│   │   ├── database.py             # Conexión PostgreSQL (NullPool en Alembic)
 │   │   └── security.py             # JWT, hashing
 │   ├── middleware/
-│   │   └── tenant.py               # Tenant isolation
-│   ├── models/                     # Modelos SQLAlchemy
-│   │   ├── organization.py
-│   │   ├── workstation.py
-│   │   ├── user.py
-│   │   └── telemetry.py
+│   │   ├── rate_limit.py           # Rate limiting por IP/ruta
+│   │   └── security_headers.py     # Headers de seguridad HTTP
+│   ├── models/
+│   │   ├── account.py              # Account + PublicIP
+│   │   ├── audit.py                # AuditLog
+│   │   ├── config.py               # GlobalConfig + WorkstationConfig
+│   │   ├── message.py              # Message (broadcast a workstations)
+│   │   ├── user.py                 # User (admins)
+│   │   ├── vlan.py                 # VLAN
+│   │   └── workstation.py          # Workstation + License
 │   ├── schemas/                    # Schemas Pydantic
+│   ├── services/
+│   │   ├── audit.py
+│   │   ├── auth.py
+│   │   ├── config.py
+│   │   ├── message.py
+│   │   └── websocket_manager.py    # Manager de conexiones WS activas
 │   └── main.py
 ├── alembic/                        # Migraciones
+│   └── versions/
+│       ├── 001_initial_migration.py
+│       ├── 002_add_timezone_fields.py
+│       ├── 003_add_public_ip_authorization.py
+│       └── d4a203945821_add_full_name_to_users.py
 └── requirements.txt
 ```
 
@@ -116,236 +130,249 @@ backend/
 
 **Ubicación**: `AlwaysPrintProject/Cloud/frontend/`  
 **Tecnología**: Next.js 15, React 18, TypeScript, Tailwind CSS  
-**Puerto**: 3000 (desarrollo), 443 (producción)
+**Puerto**: 3000 (desarrollo y producción interna)
 
 **Responsabilidades**:
 - Dashboard web para administradores
-- Visualización de workstations
-- Configuración centralizada
-- Analytics y reportes
-- Gestión de usuarios
-- Multi-tenant (subdominios por cliente)
+- Visualización y gestión de workstations en tiempo real (WebSocket)
+- Configuración global y por workstation
+- Gestión de VLANs, mensajes, auditoría
+- Panel de administración de cuentas y usuarios
 
 **Estructura**:
 ```
-frontend/
-├── src/
-│   ├── app/
-│   │   ├── dashboard/
-│   │   │   ├── page.tsx            # Dashboard principal
-│   │   │   ├── workstations/       # Gestión de workstations
-│   │   │   ├── analytics/          # Reportes
-│   │   │   └── settings/           # Configuración
-│   │   ├── login/
+frontend/src/
+├── app/
+│   ├── dashboard/
+│   │   ├── page.tsx                # Dashboard principal (resumen)
+│   │   ├── workstations/           # Lista y estado de workstations
+│   │   ├── config/                 # Configuración global/workstation
+│   │   ├── messages/               # Mensajes a workstations
+│   │   ├── vlans/                  # Gestión de VLANs
+│   │   ├── audit/                  # Logs de auditoría
+│   │   ├── admin/
+│   │   │   ├── accounts/           # CRUD de cuentas (superadmin)
+│   │   │   ├── users/              # Gestión de usuarios
+│   │   │   └── pending-ips/        # IPs pendientes de autorización
 │   │   └── layout.tsx
-│   ├── components/
-│   │   ├── ui/                     # Componentes shadcn/ui
-│   │   └── dashboard/              # Componentes específicos
-│   ├── lib/
-│   │   ├── api.ts                  # Cliente HTTP
-│   │   └── tenant.ts               # Detección de tenant
-│   └── types/
-└── package.json
+│   ├── login/
+│   ├── setup/                      # Setup inicial
+│   └── not-found.tsx
+├── components/
+│   ├── providers/                  # QueryProvider (React Query)
+│   └── ui/                         # Componentes shadcn/ui
+├── hooks/
+│   ├── useAuth.ts
+│   ├── useUserTimezone.ts
+│   ├── useWebSocket.ts
+│   └── useWorkstations.ts
+├── lib/
+│   ├── api.ts                      # Cliente HTTP
+│   ├── dateUtils.ts                # Manejo de fechas/zonas horarias
+│   ├── utils.ts
+│   └── websocket.ts                # Cliente WebSocket
+└── types/                          # Tipos TypeScript
+    ├── account.ts, audit.ts, config.ts
+    ├── message.ts, user.ts, vlan.ts
+    ├── websocket.ts, workstation.ts
 ```
 
-### 3. Base de Datos (PostgreSQL)
+### 3. Base de Datos (PostgreSQL 16)
 
-**Modelo Multi-Tenant**: Shared Schema  
-**Tenant Isolation**: Todas las queries filtradas por `organization_id`
+**Modelo Multi-Cuenta**: Shared Schema  
+**Aislamiento**: Todas las queries filtradas por `account_id`
 
 **Tablas principales**:
-- `organizations` - Clientes (BBVA, Santander, etc.)
-- `workstations` - Estaciones de trabajo
-- `users` - Administradores por organización
-- `telemetry` - Métricas y logs
-- `organization_configs` - Configuración por cliente
-- `audit_logs` - Auditoría de acciones
+- `accounts` — Cuentas cliente (BBVA, Ripley, etc.)
+- `public_ips` — IPs públicas autorizadas por cuenta (mecanismo de auth de workstations)
+- `workstations` — Estaciones de trabajo (identificadas por `ip_private`)
+- `licenses` — Licencias de workstation (serial = MD5(ip_private)[últimos 8 chars])
+- `vlans` — VLANs por cuenta
+- `users` — Administradores por cuenta
+- `global_configs` — Configuración global por cuenta
+- `workstation_configs` — Configuración específica por workstation
+- `messages` — Mensajes broadcast a workstations
+- `audit_logs` — Auditoría de acciones
+
+### 4. AWS SES
+
+Servicio de email transaccional para el flujo de recuperación de contraseña.
+
+- **Identidad verificada**: dominio `apps.iol.pe`
+- **Desde**: `noreply@alwaysprint.apps.iol.pe`
+- **Integración**: boto3 en `app/services/email.py`
+- **Credenciales**: vía IAM role del EC2 (política `ses:SendEmail` / `ses:SendRawEmail`)
+- **Desarrollo local**: `SES_ENABLED=false` imprime el enlace en logs sin enviar email
+
+### 5. Redis
+
+Desplegado como container Docker junto al backend. Usado para caché de configuración y soporte de rate limiting.  
+URL interna: `redis://redis:6379/0`
 
 ---
 
 ## Flujo de Comunicación
 
-### 1. Workstation → Nube (Reporte de Estado)
+### 1. Autenticación de Workstations (por IP pública)
+
+```
+AlwaysPrintTray intenta conectarse
+    │
+    │ HTTPS — sin API key
+    │ Backend extrae IP pública del request
+    │
+    ├─ IP no registrada → crea PublicIP(is_authorized=False, account_id=NULL)
+    │   Admin ve en /admin/pending-ips y la asigna a una cuenta
+    │
+    └─ IP autorizada → extrae account_id de public_ips
+           │
+           ▼
+       Backend procesa la solicitud con el account_id correspondiente
+```
+
+### 2. Workstation → Nube (Estado / Heartbeat)
 
 ```
 AlwaysPrintService (LocalSystem, sin Internet)
-    │
     │ Named Pipe (IPC local)
-    │
     ▼
 AlwaysPrintTray (Usuario, con Internet)
-    │
     │ HTTPS (vía Proxy Corporativo)
-    │ Authentication: X-API-Key
-    │
+    │ Identificada por IP pública autorizada
     ▼
 Backend FastAPI
-    │
-    ├─ Middleware: Extrae organization_id del API Key
-    ├─ Tenant Isolation: Filtra por organization_id
-    │
+    ├─ Middleware: extrae account_id de la IP pública
+    ├─ Actualiza workstation (ip_private, hostname, is_online, etc.)
     ▼
-PostgreSQL Database
+PostgreSQL (filtered by account_id)
 ```
 
-**Ejemplo de Heartbeat**:
-```
-1. AlwaysPrintService detecta cambio de estado
-2. Envía mensaje a AlwaysPrintTray vía Named Pipe
-3. AlwaysPrintTray envía HTTPS POST a backend:
-   POST /api/v1/workstations/123/heartbeat
-   Headers: X-API-Key: ws_abc123...
-4. Backend extrae organization_id del API Key
-5. Actualiza workstation en BD (filtrado por organization_id)
-```
-
-### 2. Nube → Workstation (Configuración/Comandos)
+### 3. Comunicación en Tiempo Real (WebSocket)
 
 ```
-Admin cambia configuración en Dashboard
+AlwaysPrintTray  ←──── wss://alwaysprint.apps.iol.pe/ws/workstation/{id}
+                         │
+                  WebSocket Manager (in-memory, por proceso)
+                         │
+Dashboard Admin  ←──── wss://alwaysprint.apps.iol.pe/ws/operator/{token}
+```
+
+### 4. Nube → Workstation (Configuración / Mensajes)
+
+```
+Admin actúa en Dashboard
+    │ HTTPS — Bearer JWT
+    ▼
+Backend actualiza config o crea mensaje en BD
     │
     ▼
-Frontend Next.js
-    │
-    │ HTTPS
-    │ Authentication: Bearer JWT
-    │
-    ▼
-Backend FastAPI
-    │
-    ├─ Middleware: Extrae organization_id del JWT
-    ├─ Actualiza configuración en BD
-    │
-    ▼
-AlwaysPrintTray hace polling (cada 5 min)
-    │
-    │ GET /api/v1/workstations/123/config
-    │
-    ▼
-AlwaysPrintTray recibe nueva configuración
-    │
+WebSocket push inmediato a AlwaysPrintTray
     │ Named Pipe
-    │
     ▼
 AlwaysPrintService aplica configuración
 ```
 
 ---
 
-## Multi-Tenancy
+## Autenticación
 
-### Tenant Isolation
+### Para Administradores (Dashboard)
 
-**Principio**: Cada organización (cliente) solo puede acceder a sus propios datos.
+- Método: JWT en header `Authorization: Bearer <token>`
+- Endpoint: `POST /api/v1/auth/login`
+- Token incluye `user_id` y `account_id`
+- Setup inicial vía `POST /api/v1/setup` (crea primer superadmin)
 
-**Implementación**:
-1. Todas las tablas tienen columna `organization_id`
-2. Middleware extrae `organization_id` del API Key o JWT
-3. Todas las queries filtran por `organization_id`
-4. Índices compuestos para performance
+### Para Workstations (AlwaysPrintTray)
 
-**Ejemplo de Query Segura**:
-```python
-# ❌ INCORRECTO (sin tenant isolation)
-workstation = db.query(Workstation).filter(
-    Workstation.id == id
-).first()
+- No usa API keys
+- Autenticación basada en IP pública del request
+- La IP debe estar en la tabla `public_ips` con `is_authorized=True`
+- El `account_id` se deriva de la IP autorizada
+- IPs nuevas quedan en estado pendiente hasta que un admin las autoriza
 
-# ✅ CORRECTO (con tenant isolation)
-workstation = db.query(Workstation).filter(
-    Workstation.id == id,
-    Workstation.organization_id == tenant.organization_id
-).first()
+---
+
+## Infraestructura (Terraform — AWS us-west-2)
+
+### Módulos
+
+| Módulo | Recursos |
+|--------|----------|
+| `networking` | VPC, 2 subnets públicas, 2 subnets DB (privadas), IGW, route tables, Security Groups (EC2 y RDS) |
+| `ec2` | EC2 t3.micro (AL2023), Elastic IP, IAM role (ECR + Secrets Manager), Key pair SSH, volumen gp3 20GB cifrado |
+| `rds` | RDS PostgreSQL 16 db.t3.micro, 20GB gp3, cifrado, en subnets privadas |
+| `ecr` | 2 repositorios ECR (backend, frontend), retención 10 tags |
+| `secrets` | Secrets Manager: db_password, secret_key, ssh_private_key |
+| `main` | Secret `database_url` compuesto, wires todos los módulos |
+
+### Stack de producción en EC2
+
+```
+Nginx (puerto 80/443, Let's Encrypt SSL)
+  ├── /api/*   → backend:8000
+  ├── /ws/*    → backend:8000 (WebSocket upgrade)
+  └── /*       → frontend:3000
+
+Docker Compose (bridge network "app"):
+  ├── backend  (imagen ECR, 2 workers uvicorn)
+  ├── frontend (imagen ECR)
+  └── redis    (redis:7-alpine)
 ```
 
-### API Keys en Dos Niveles
+### CI/CD
 
-**1. Organization API Key**:
-- Formato: `org_bbva_xxxxxxxxxxxxxxxx`
-- Uso: Registro inicial de workstations
-- Permisos: Crear workstations, obtener configuración global
+Manejado por GitHub Actions. El EC2 expone un script `/opt/alwaysprint/deploy.sh` que hace pull de ECR y reinicia los containers afectados.
 
-**2. Workstation API Key**:
-- Formato: `ws_xxxxxxxxxxxxxxxx`
-- Uso: Operaciones de la workstation (heartbeat, telemetría)
-- Permisos: Solo acceso a datos de esa workstation específica
+### Dominio y SSL
 
-### Subdominios por Cliente
+- **Dominio**: `alwaysprint.apps.iol.pe` (zona `apps.iol.pe`)
+- **SSL**: Let's Encrypt (Certbot + nginx), renovación automática vía cron
+- **IP**: Elastic IP estática (no cambia al reiniciar el EC2)
 
-**Producción**:
-- `https://bbva.alwaysprint.com` → Dashboard de BBVA
-- `https://santander.alwaysprint.com` → Dashboard de Santander
-- `https://api.alwaysprint.com` → API única para todos
+### Variables clave (terraform.tfvars)
 
-**Desarrollo**:
-- `http://localhost:3000` → Frontend
-- `http://localhost:8000` → Backend
+| Variable | Valor |
+|----------|-------|
+| `aws_region` | `us-west-2` |
+| `ec2_instance_type` | `t3.micro` |
+| `db_instance_class` | `db.t3.micro` |
+| `zone_name` | `apps.iol.pe` |
+| `subdomain` | `alwaysprint` |
+| `backend_port` | `8000` |
+| `frontend_port` | `3000` |
 
 ---
 
 ## Seguridad
 
-### Autenticación
-
-**Para Dispositivos (AlwaysPrintTray)**:
-- Método: API Key en header `X-API-Key`
-- Validación: Lookup en tabla `workstations`
-- Extracción de tenant: `organization_id` de la workstation
-
-**Para Administradores (Dashboard)**:
-- Método: JWT en header `Authorization: Bearer <token>`
-- Validación: Verificación de firma JWT
-- Extracción de tenant: `organization_id` del usuario
-
 ### Comunicación
 
-- ✅ HTTPS/TLS 1.3 obligatorio en producción
-- ✅ Proxy corporativo soportado (detección automática)
-- ✅ Rate limiting por API Key
-- ✅ CORS configurado por dominio
+- HTTPS/TLS 1.3 vía Let's Encrypt en producción
+- Proxy corporativo soportado (detección automática del cliente)
+- WebSocket sobre WSS
 
-### Datos
+### Backend
 
-- ✅ Passwords hasheados con bcrypt
-- ✅ API Keys generados con secrets.token_urlsafe()
-- ✅ Logs anonimizados (sin PII)
-- ✅ Auditoría de todas las acciones de admin
+- Rate limiting por IP/ruta (`rate_limit.py`)
+- Security headers HTTP (`security_headers.py`)
+- Passwords con bcrypt
+- JWT con expiración configurable (`ACCESS_TOKEN_EXPIRE_MINUTES`)
+- Secrets sensibles en AWS Secrets Manager (nunca en env vars planas)
+- RDS accesible solo desde el security group del EC2
 
----
+### IP Authorization Flow
 
-## Escalabilidad
-
-### Capacidad por Configuración
-
-| Configuración | Workstations | Clientes | Infraestructura |
-|---------------|--------------|----------|-----------------|
-| Básica | <5,000 | 1-10 | 1 servidor (4 CPU, 8GB RAM) |
-| Estándar | 5,000-50,000 | 10-50 | Load balancer + 2-3 servidores |
-| Enterprise | 50,000-200,000 | 50-200 | Kubernetes cluster |
-| Global | 200,000+ | 200+ | Multi-region + CDN |
-
-### Optimizaciones
-
-**Base de Datos**:
-- Índices compuestos en `(organization_id, ...)` para todas las tablas
-- Particionamiento de tabla `telemetry` por `organization_id`
-- Connection pooling (20 conexiones por defecto)
-
-**Backend**:
-- Caché de configuración con Redis (opcional)
-- Async I/O con FastAPI
-- Background tasks para procesamiento pesado
-
-**Frontend**:
-- Server-Side Rendering (SSR) con Next.js
-- Static Generation para páginas públicas
-- CDN para assets estáticos
+1. Workstation desconocida → `PublicIP` creada con `is_authorized=False`
+2. Admin ve IPs pendientes en dashboard (`/admin/pending-ips`)
+3. Admin asigna la IP a una cuenta → `is_authorized=True`, `account_id` asignado
+4. Siguiente request de esa IP queda autorizado automáticamente
 
 ---
 
 ## Despliegue
 
-### Desarrollo
+### Desarrollo local
 
 ```bash
 # Backend
@@ -358,70 +385,43 @@ cd AlwaysPrintProject/Cloud/frontend
 npm run dev
 ```
 
-### Producción
+### Producción (Terraform + GitHub Actions)
 
-**Opción 1: Docker Compose**
 ```bash
-cd AlwaysPrintProject/Cloud
-docker-compose up -d
+# Provisionar infraestructura (primera vez)
+cd AlwaysPrintProject/Cloud/terraform
+terraform init
+terraform apply
+
+# Bajar clave SSH para acceso
+aws secretsmanager get-secret-value \
+  --secret-id /alwaysprint/prod/ssh_private_key \
+  --query SecretString --output text > alwaysprint.pem
+chmod 400 alwaysprint.pem
 ```
 
-**Opción 2: Kubernetes**
-```bash
-kubectl apply -f k8s/
-```
-
-**Opción 3: Cloud Providers**
-- AWS: ECS + RDS + CloudFront
-- Azure: App Service + Azure Database + CDN
-- GCP: Cloud Run + Cloud SQL + Cloud CDN
+El CI/CD (GitHub Actions) construye las imágenes, las sube a ECR y ejecuta `deploy.sh` en el EC2 vía SSH.
 
 ---
 
-## Monitoreo
+## Estado actual del proyecto
 
-### Métricas Clave
+### Implementado
+- Backend FastAPI completo con todos los endpoints
+- WebSocket en tiempo real (workstations y operadores)
+- Frontend Next.js con dashboard completo
+- Autenticación JWT (admins) + autorización por IP (workstations)
+- Password reset completo vía AWS SES (token 1h, páginas forgot/reset)
+- Multi-cuenta con aislamiento por `account_id`
+- Gestión de VLANs, mensajes, configuración, auditoría
+- Infraestructura AWS completa vía Terraform (EC2, RDS, ECR, SES, Secrets Manager)
+- CI/CD via GitHub Actions
 
-**Dispositivos**:
-- Total de workstations registradas
-- Workstations online/offline
-- Heartbeats por minuto
-- Latencia de API
-
-**Negocio**:
-- Clientes activos
-- Workstations por cliente
-- Uso de recursos por cliente
-- Tasa de crecimiento
-
-### Herramientas
-
-- **Logs**: Structured logging con timestamps
-- **Métricas**: Prometheus + Grafana (opcional)
-- **Alertas**: Email/Slack cuando workstation offline > 5 min
-- **Uptime**: Health checks en `/health`
-
----
-
-## Roadmap
-
-### Fase 1: MVP (Actual)
-- ✅ Backend FastAPI con multi-tenancy
-- ✅ Frontend Next.js con dashboard básico
-- ✅ Autenticación y tenant isolation
-- ⏳ Integración con AlwaysPrintTray
-
-### Fase 2: Producción
-- ⏳ WebSocket para comandos en tiempo real
-- ⏳ Analytics avanzados
-- ⏳ Sistema de alertas
-- ⏳ API pública para integraciones
-
-### Fase 3: Enterprise
-- ⏳ SSO (SAML, OAuth)
-- ⏳ Multi-region deployment
-- ⏳ SLA 99.9%
-- ⏳ Soporte 24/7
+### Pendiente
+- Integración completa con AlwaysPrintTray (cliente Windows)
+- Alertas automáticas (workstation offline > X min)
+- Analytics y reportes avanzados
+- SSO (SAML/OAuth)
 
 ---
 
@@ -429,8 +429,7 @@ kubectl apply -f k8s/
 
 - [Backend README](backend/README.md)
 - [Frontend README](frontend/README.md)
-- [API Documentation](backend/docs/API.md)
-- [Deployment Guide](DEPLOYMENT.md)
+- [CHANGELOG](CHANGELOG.md)
 
 ---
 

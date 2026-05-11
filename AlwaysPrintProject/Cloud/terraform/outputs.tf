@@ -29,6 +29,11 @@ output "ssh_private_key_command" {
   value       = "aws secretsmanager get-secret-value --secret-id /${var.project_name}/${var.environment}/ssh_private_key --region ${var.aws_region} --query SecretString --output text > alwaysprint.pem && icacls alwaysprint.pem /inheritance:r /grant:r \"%USERNAME%:R\" && ssh -i alwaysprint.pem ec2-user@${module.ec2.public_ip}"
 }
 
+output "ses_dns_records" {
+  description = "Registros DNS a agregar manualmente en Hostinger (zona iol.pe)"
+  value       = module.ses.ses_dns_records
+}
+
 output "github_actions_secrets" {
   description = "Secretos a configurar en GitHub → Settings → Secrets and variables → Actions"
   value = {

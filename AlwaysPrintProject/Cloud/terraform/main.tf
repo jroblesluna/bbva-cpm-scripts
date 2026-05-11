@@ -70,6 +70,16 @@ resource "aws_secretsmanager_secret_version" "database_url" {
   secret_string = "postgresql://${var.db_username}:${module.secrets.db_password_value}@${module.rds.db_endpoint}/${var.db_name}"
 }
 
+module "ses" {
+  source         = "./modules/ses"
+  project_name   = var.project_name
+  environment    = var.environment
+  aws_region     = var.aws_region
+  aws_account_id = data.aws_caller_identity.current.account_id
+  zone_name      = var.zone_name
+  from_email     = var.ses_from_email
+}
+
 module "ec2" {
   source                  = "./modules/ec2"
   project_name            = var.project_name
@@ -89,11 +99,12 @@ module "ec2" {
   db_name                 = var.db_name
   db_username             = var.db_username
   backend_env_vars        = var.backend_env_vars
+  ses_send_policy_arn     = module.ses.ses_send_policy_arn
   database_url_secret_arn = aws_secretsmanager_secret.database_url.arn
   secret_key_arn          = module.secrets.secret_key_arn
   ssh_public_key          = module.secrets.ssh_public_key
 
-  depends_on = [aws_secretsmanager_secret_version.database_url]
+  depends_on = [aws_secretsmanager_secret_version.database_url, module.ses]
 }
 
 # CI/CD manejado por GitHub Actions (ver .github/workflows/)

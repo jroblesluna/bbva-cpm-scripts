@@ -53,10 +53,10 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# EC2: puertos 80, 443 y 22 desde internet
+# EC2: puertos 80 y 443 desde internet. SSH eliminado — usar SSM Session Manager.
 resource "aws_security_group" "ec2" {
   name        = "${local.prefix}-sg-ec2"
-  description = "EC2 instance - HTTP, HTTPS and SSH"
+  description = "EC2 instance - HTTP and HTTPS only (SSH via SSM)"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -69,13 +69,6 @@ resource "aws_security_group" "ec2" {
   ingress {
     from_port   = 443
     to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }

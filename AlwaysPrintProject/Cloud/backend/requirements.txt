@@ -1,5 +1,5 @@
 # AlwaysPrint Cloud Management - Backend Dependencies
-# Python 3.12+
+# Python 3.12
 
 # === CORE FRAMEWORK ===
 fastapi>=0.115.0
@@ -28,6 +28,9 @@ python-dateutil>=2.9.0
 
 # === CACHE (OPTIONAL) ===
 redis>=5.0.0
+
+# === AWS ===
+boto3>=1.35.0
 
 # === DEVELOPMENT (OPTIONAL) ===
 # pytest>=8.0.0

@@ -66,6 +66,12 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
     
+    # === CONFIGURACIÓN SES ===
+    SES_ENABLED: bool = False
+    SES_FROM_EMAIL: str = "noreply@alwaysprint.apps.iol.pe"
+    AWS_REGION: str = "us-west-2"
+    FRONTEND_URL: str = "http://localhost:3000"
+
     # === CONFIGURACIÓN DE REDIS (CACHÉ) ===
     REDIS_URL: Optional[str] = None  # Ejemplo: redis://localhost:6379/0
     CACHE_TTL_SECONDS: int = 300  # 5 minutos

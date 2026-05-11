@@ -13,12 +13,13 @@ db_name                   = "alwaysprint"
 db_username               = "alwaysprint_admin"
 db_instance_class         = "db.t3.micro"
 db_allocated_storage      = 20
-db_max_allocated_storage  = 20
+db_max_allocated_storage  = 100
 rds_deletion_protection   = false
-rds_backup_retention_days = 0
+rds_backup_retention_days = 7
 
-zone_name = "apps.iol.pe"
-subdomain = "alwaysprint"
+zone_name      = "apps.iol.pe"
+subdomain      = "alwaysprint"
+ses_from_email = "noreply@alwaysprint.apps.iol.pe"
 
 backend_port  = 8000
 frontend_port = 3000
@@ -28,6 +29,8 @@ ec2_instance_type = "t3.micro"
 
 backend_env_vars = {
   LOG_LEVEL                   = "INFO"
+  SES_ENABLED                 = "true"
+  SES_FROM_EMAIL              = "noreply@alwaysprint.apps.iol.pe"
   ACCESS_TOKEN_EXPIRE_MINUTES = "1440"
   ALGORITHM                   = "HS256"
   DB_POOL_SIZE                = "10"

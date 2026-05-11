@@ -8,9 +8,13 @@ Este módulo define los endpoints para:
 - Reset de contraseña
 """
 
+import secrets
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
@@ -23,6 +27,7 @@ from app.schemas import (
 )
 from app.services.auth import AuthService
 from app.services.audit import AuditService
+from app.services.email import send_password_reset_email
 
 router = APIRouter()
 
@@ -123,41 +128,21 @@ def request_password_reset(
 ):
     """
     Solicitar reset de contraseña.
-    
-    Envía un email con un token para resetear la contraseña.
-    Siempre retorna 202 Accepted, incluso si el email no existe
-    (para evitar enumeración de usuarios).
-    
-    Args:
-        request: Email del usuario
-        db: Sesión de base de datos
-    
-    Returns:
-        Mensaje de confirmación
+
+    Siempre retorna 202 aunque el email no exista (evita enumeración de usuarios).
     """
-    # Buscar usuario por email
     user = db.query(User).filter(User.email == request.email).first()
-    
-    if user:
-        # TODO: Generar token de reset y enviar email
-        # Por ahora solo registramos en auditoría
-        from app.models.audit import ActionType
-        
-        audit_service = AuditService()
-        audit_service.log_action(
-            db=db,
-            action_type=ActionType.UPDATE,
-            entity_type="user",
-            entity_id=str(user.id),
-            user_id=str(user.id),
-            account_id=str(user.account_id) if user.account_id else None,
-            new_values={"action": "password_reset_requested"}
-        )
-    
-    # Siempre retornar el mismo mensaje (seguridad)
-    return {
-        "message": "Si el email existe, recibirás instrucciones para resetear tu contraseña"
-    }
+
+    if user and user.is_active:
+        token = secrets.token_urlsafe(32)
+        user.password_reset_token = token
+        user.password_reset_expires = datetime.utcnow() + timedelta(hours=1)
+        db.commit()
+
+        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+        send_password_reset_email(user.email, reset_url)
+
+    return {"message": "Si el email existe, recibirás instrucciones para restablecer tu contraseña."}
 
 
 @router.post("/password-reset/confirm", status_code=status.HTTP_200_OK)
@@ -166,21 +151,27 @@ def confirm_password_reset(
     db: Session = Depends(get_db)
 ):
     """
-    Confirmar reset de contraseña con token.
-    
-    Args:
-        confirmation: Token de reset y nueva contraseña
-        db: Sesión de base de datos
-    
-    Returns:
-        Mensaje de confirmación
-    
+    Confirmar reset de contraseña con el token recibido por email.
+
     Raises:
         HTTPException 400: Token inválido o expirado
     """
-    # TODO: Validar token y actualizar contraseña
-    # Por ahora retornamos error
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Funcionalidad de reset de contraseña pendiente de implementación"
-    )
+    user = db.query(User).filter(
+        User.password_reset_token == confirmation.token
+    ).first()
+
+    if not user or not user.password_reset_expires:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token inválido.")
+
+    if datetime.utcnow() > user.password_reset_expires:
+        user.password_reset_token = None
+        user.password_reset_expires = None
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token expirado.")
+
+    user.password_hash = AuthService.hash_password(confirmation.new_password)
+    user.password_reset_token = None
+    user.password_reset_expires = None
+    db.commit()
+
+    return {"message": "Contraseña actualizada correctamente."}

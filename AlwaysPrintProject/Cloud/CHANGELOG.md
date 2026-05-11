@@ -1,5 +1,45 @@
 # Changelog - AlwaysPrint Cloud
 
+## [1.1.0] - 2026-05-10
+
+### Correcciones de estabilidad
+
+- **WebSocket**: reducido `uvicorn --workers 2` → `--workers 1` — el `ConnectionManager`
+  es un singleton en memoria; múltiples workers rompen el broadcast entre conexiones
+- **RDS**: `backup_retention_days` 0 → 7 días de backups point-in-time
+- **RDS**: `db_max_allocated_storage` 20 → 100 GB para habilitar autoscaling real
+- **Security group EC2**: eliminada regla SSH puerto 22 abierto a `0.0.0.0/0`;
+  acceso al servidor via SSM Session Manager
+- **SQLAlchemy 2.0**: `conn.execute("SELECT 1")` → `conn.execute(text("SELECT 1"))`
+- **Docker**: imagen base `python:3.11-slim` → `python:3.12-slim`
+- **Certbot**: email de notificación corregido a `antonio@robles.ai`
+- **WebSocket frontend**: heartbeat ya no es no-op — detecta conexión caída y fuerza reconexión
+
+### AWS SES — email transaccional
+
+- Nuevo módulo Terraform `modules/ses/`: domain identity, DKIM, MAIL FROM, política IAM
+- El módulo EC2 adjunta la política SES al rol del EC2 via IAM
+- `AWS_REGION` y `FRONTEND_URL` inyectados automáticamente en el entorno del backend
+- `terraform output ses_dns_records` imprime los 6 registros DNS a agregar en el proveedor DNS
+
+### Password reset
+
+- Nuevos campos en `users`: `password_reset_token`, `password_reset_expires`
+- Migración `004_add_password_reset_token`
+- Nuevo servicio `app/services/email.py` — envía via boto3/SES; modo offline con `SES_ENABLED=false`
+- Endpoints implementados: `POST /auth/password-reset` y `POST /auth/password-reset/confirm`
+- Token urlsafe de 32 bytes, expira en 1 hora, se invalida al usarse
+- Frontend: páginas `/forgot-password` y `/reset-password`; link en login page
+- `authApi.confirmPasswordReset()` en `lib/api.ts`
+
+### Documentación
+
+- `ARCHITECTURE.md` reescrito para reflejar la arquitectura real
+- `DEVELOPMENT.md` actualizado con estructura real, variables de entorno y cadena de migraciones
+- `DNS_SETUP.md` creado con guía genérica para configurar DNS en cualquier proveedor
+
+---
+
 ## [1.0.0] - 2026-01-10
 
 ### 🎉 Limpieza Completa del Codebase

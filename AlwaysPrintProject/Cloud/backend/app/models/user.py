@@ -84,10 +84,11 @@ class User(Base):
     # NULL para Admin (acceso global), requerido para Operador/ReadOnly
     account_id = Column(GUID, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=True)
     
-    # Zona horaria del usuario (hereda de la organización si es NULL)
-    # Ejemplos: "UTC", "America/Lima", "America/New_York", "Europe/Madrid"
-    # Si es NULL, usa el timezone de la organización (account.timezone)
     timezone = Column(String(50), nullable=True)
+
+    # === PASSWORD RESET ===
+    password_reset_token   = Column(String(255), nullable=True, index=True)
+    password_reset_expires = Column(DateTime, nullable=True)
     
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Image from 'next/image'
 import { useAuth } from '@/hooks/useAuth'
 import { setupApi } from '@/lib/api'
@@ -126,6 +127,12 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </Button>
+
+            <p className="text-center text-sm text-gray-500">
+              <Link href="/forgot-password" className="text-blue-600 hover:underline">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </p>
           </form>
 
           <div className="mt-6 text-center text-sm text-gray-500">

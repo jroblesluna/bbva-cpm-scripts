@@ -28,5 +28,10 @@ variable "ec2_instance_type" {
   type        = string
 }
 
+variable "ses_from_email" {
+  description = "Dirección de origen para emails transaccionales vía SES"
+  type        = string
+}
+
 variable "backend_env_vars" { type = map(string) }
 

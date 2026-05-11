@@ -243,16 +243,15 @@ export class WebSocketClient {
   }
 
   private startHeartbeat(): void {
-    // Limpiar heartbeat anterior si existe
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval)
     }
 
-    // Ping cada 30 segundos
+    // Verifica que la conexión siga abierta cada 30s.
+    // Si no lo está, fuerza reconexión (el backend ya hace ping propio).
     this.heartbeatInterval = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        // El backend envía ping, nosotros solo verificamos la conexión
-        // Si no hay respuesta en 60s, el backend cerrará la conexión
+      if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
+        this.handleClose({ code: 1006, reason: 'heartbeat: connection lost' } as CloseEvent)
       }
     }, 30000)
   }

@@ -21,3 +21,7 @@ variable "ssh_public_key" {
   description = "Clave publica SSH generada por el modulo secrets"
   type        = string
 }
+variable "ses_send_policy_arn" {
+  description = "ARN de la política IAM de envío SES"
+  type        = string
+}

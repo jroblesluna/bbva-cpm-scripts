@@ -177,6 +177,10 @@ export const authApi = {
   requestPasswordReset: async (email: string): Promise<void> => {
     await apiClient.post('/auth/password-reset', { email })
   },
+
+  confirmPasswordReset: async (token: string, new_password: string): Promise<void> => {
+    await apiClient.post('/auth/password-reset/confirm', { token, new_password })
+  },
 }
 
 // ============================================================================

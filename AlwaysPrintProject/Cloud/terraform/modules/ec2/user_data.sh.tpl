@@ -60,7 +60,7 @@ services:
     env_file: /opt/alwaysprint/.env.backend
     command: >
       sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port ${backend_port} --workers 2"
+             uvicorn app.main:app --host 0.0.0.0 --port ${backend_port} --workers 1"
     networks: [app]
     depends_on: [redis]
 
@@ -144,7 +144,7 @@ docker compose up -d redis 2>/dev/null || true
 cat > /opt/alwaysprint/setup_ssl.sh <<'SSL'
 #!/bin/bash
 DOMAIN=${domain_name}
-EMAIL=admin@$DOMAIN
+EMAIL=antonio@robles.ai
 
 for i in $(seq 1 20); do
   PUBLIC_IP=$(curl -s http://checkip.amazonaws.com)

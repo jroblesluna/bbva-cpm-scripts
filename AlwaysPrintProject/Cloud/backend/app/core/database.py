@@ -6,7 +6,7 @@ para SQLAlchemy, soportando SQLite, PostgreSQL y SQL Server.
 """
 
 from typing import Generator
-from sqlalchemy import create_engine, event, Engine
+from sqlalchemy import create_engine, event, text, Engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool, NullPool
@@ -142,7 +142,7 @@ def check_db_connection() -> bool:
     """
     try:
         with engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1"))
         return True
     except Exception as e:
         print(f"Error al conectar con la base de datos: {e}")
