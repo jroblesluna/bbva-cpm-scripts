@@ -110,6 +110,10 @@ resource "aws_instance" "main" {
     encrypted   = true
   }
 
+  # No reemplazar el EC2 automáticamente al cambiar user_data —
+  # los cambios al script solo aplican en el próximo reemplazo manual.
+  user_data_replace_on_change = false
+
   user_data = base64encode(templatefile("${path.module}/user_data.sh.tpl", {
     aws_region          = var.aws_region
     ecr_registry        = local.ecr_registry

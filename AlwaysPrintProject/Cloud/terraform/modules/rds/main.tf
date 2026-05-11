@@ -51,6 +51,7 @@ resource "aws_db_instance" "main" {
 
   deletion_protection       = var.deletion_protection
   skip_final_snapshot       = true
+  apply_immediately         = true
 
   performance_insights_enabled = false
   monitoring_interval          = 0
