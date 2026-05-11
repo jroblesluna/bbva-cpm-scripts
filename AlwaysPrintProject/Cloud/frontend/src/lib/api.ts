@@ -56,7 +56,7 @@ const API_V1_PREFIX = '/api/v1'
 /**
  * Instancia de axios configurada para el backend.
  */
-const apiClient: AxiosInstance = axios.create({
+export const apiClient: AxiosInstance = axios.create({
   baseURL: `${API_BASE_URL}${API_V1_PREFIX}`,
   timeout: 30000,
   headers: {
