@@ -28,7 +28,7 @@ resource "aws_iam_policy" "ses_send" {
     Statement = [{
       Effect   = "Allow"
       Action   = ["ses:SendEmail", "ses:SendRawEmail"]
-      Resource = "arn:aws:ses:${var.aws_region}:${var.aws_account_id}:identity/${var.zone_name}"
+      Resource = "arn:aws:ses:${var.aws_region}:${var.aws_account_id}:identity/*"
     }]
   })
 }
