@@ -5,6 +5,7 @@ const nextConfig = {
     domains: [],
   },
   output: 'standalone',
+  outputFileTracingRoot: require('path').join(__dirname, '../../..'),
   async rewrites() {
     // En desarrollo, proxy /api/* al backend en localhost:8000
     // En producción nginx hace este proxy directamente
