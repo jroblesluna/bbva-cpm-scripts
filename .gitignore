@@ -53,4 +53,5 @@ logs/
 AlwaysPrintProject/Cloud/terraform/.terraform/
 AlwaysPrintProject/Cloud/terraform/.terraform.lock.hcl
 AlwaysPrintProject/Cloud/terraform/*.tfstate
+AlwaysPrintProject/Cloud/terraform/*.tfstate.*
 AlwaysPrintProject/Cloud/terraform/*.tfstate.backup
