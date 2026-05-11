@@ -3,12 +3,12 @@ output "app_url" {
 }
 
 output "ec2_public_ip" {
-  description = "IP publica del servidor"
+  description = "IP publica del servidor — actualizar registro A en DNS"
   value       = module.ec2.public_ip
 }
 
 output "ec2_instance_id" {
-  description = "ID del EC2 - agregar como secreto EC2_INSTANCE_ID en GitHub"
+  description = "ID del EC2 (informativo — los workflows lo derivan automaticamente por tag)"
   value       = module.ec2.instance_id
 }
 
@@ -24,24 +24,23 @@ output "frontend_ecr_url" {
   value = module.ecr.frontend_repository_url
 }
 
-output "ssh_private_key_command" {
-  description = "Comando para bajar la clave SSH y conectarte al EC2"
-  value       = "aws secretsmanager get-secret-value --secret-id /${var.project_name}/${var.environment}/ssh_private_key --region ${var.aws_region} --query SecretString --output text > alwaysprint.pem && chmod 600 alwaysprint.pem && ssh -i alwaysprint.pem ec2-user@${module.ec2.public_ip}"
-}
-
 output "ses_dns_records" {
-  description = "Registros DNS a agregar manualmente en Hostinger (zona iol.pe)"
+  description = "Registros DNS a agregar en el editor de zona del proveedor DNS (zona iol.pe)"
   value       = module.ses.ses_dns_records
 }
 
-output "github_actions_secrets" {
-  description = "Secretos a configurar en GitHub → Settings → Secrets and variables → Actions"
+output "ssh_access" {
+  description = "Acceso al servidor via SSM (recomendado) o SSH (emergencias)"
   value = {
-    AWS_ACCESS_KEY_ID     = "(tu Access Key ID de IAM)"
-    AWS_SECRET_ACCESS_KEY = "(tu Secret Access Key de IAM)"
-    AWS_REGION            = var.aws_region
-    EC2_INSTANCE_ID       = module.ec2.instance_id
-    BACKEND_ECR_URL       = module.ecr.backend_repository_url
-    FRONTEND_ECR_URL      = module.ecr.frontend_repository_url
+    ssm     = "aws ssm start-session --target ${module.ec2.instance_id} --region ${var.aws_region}"
+    ssh_key = "aws secretsmanager get-secret-value --secret-id /${var.project_name}/${var.environment}/ssh_private_key --region ${var.aws_region} --query SecretString --output text > server.pem && chmod 600 server.pem && ssh -i server.pem ec2-user@${module.ec2.public_ip}"
+  }
+}
+
+output "github_actions_secrets" {
+  description = "Unicos secretos requeridos en GitHub Actions (Settings → Secrets → Actions)"
+  value = {
+    AWS_ACCESS_KEY_ID     = "(IAM Access Key ID con permisos ECR + SSM)"
+    AWS_SECRET_ACCESS_KEY = "(IAM Secret Access Key correspondiente)"
   }
 }
