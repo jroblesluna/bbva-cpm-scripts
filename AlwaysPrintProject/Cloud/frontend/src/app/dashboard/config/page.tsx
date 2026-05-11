@@ -95,7 +95,7 @@ export default function ConfigPage() {
   const loadAccounts = async () => {
     try {
       setLoadingAccounts(true)
-      const response = await fetch('http://localhost:8000/api/v1/accounts/?skip=0&limit=1000', {
+      const response = await fetch('/api/v1/accounts/?skip=0&limit=1000', {
         headers: getAuthHeaders(),
       })
 
@@ -123,7 +123,7 @@ export default function ConfigPage() {
       setLoading(true)
       
       // Construir URL con account_id si es Admin
-      let url = 'http://localhost:8000/api/v1/config/global'
+      let url = '/api/v1/config/global'
       if (user?.role === 'admin') {
         if (!selectedAccountId) {
           setLoading(false)
@@ -222,7 +222,7 @@ export default function ConfigPage() {
       }
 
       // Construir URL con account_id si es Admin
-      let url = 'http://localhost:8000/api/v1/config/global'
+      let url = '/api/v1/config/global'
       if (user?.role === 'admin') {
         url += `?account_id=${selectedAccountId}`
       }
