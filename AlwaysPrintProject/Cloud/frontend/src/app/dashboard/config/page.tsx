@@ -46,7 +46,7 @@ export default function ConfigPage() {
   const tCommon = useTranslations('common')
   const [activeTab, setActiveTab] = useState<ConfigTab>('organization')
   const [config, setConfig] = useState<GlobalConfig | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
 
