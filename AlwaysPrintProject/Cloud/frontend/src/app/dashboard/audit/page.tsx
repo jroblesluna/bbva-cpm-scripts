@@ -5,6 +5,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { apiClient } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -48,9 +49,8 @@ export default function AuditPage() {
       const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() })
       if (filterActionType) params.append('action_type', filterActionType)
       if (filterEntityType) params.append('entity_type', filterEntityType)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/audit/?${params.toString()}`, { headers: getAuthHeaders() })
-      if (!response.ok) throw new Error('Error')
-      const data = await response.json()
+      const response = await apiClient.get(`/audit/?${params.toString()}`)
+      const data = response.data
       setLogs(data.logs || [])
       setTotal(data.total || 0)
     } catch (error) {
@@ -62,9 +62,8 @@ export default function AuditPage() {
 
   const loadStats = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/audit/stats`, { headers: getAuthHeaders() })
-      if (!response.ok) throw new Error('Error')
-      const data = await response.json()
+      const response = await apiClient.get('/audit/stats')
+      const data = response.data
       setStats(data)
     } catch (error) {
       console.error('Error:', error)

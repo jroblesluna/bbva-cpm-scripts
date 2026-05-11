@@ -5,6 +5,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { apiClient } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -51,9 +52,8 @@ export default function MessagesPage() {
       const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() })
       if (filterDelivered !== null) params.append('is_delivered', filterDelivered.toString())
       if (filterTargetType) params.append('target_type', filterTargetType)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/messages/?${params.toString()}`, { headers: getAuthHeaders() })
-      if (!response.ok) throw new Error('Error')
-      const data = await response.json()
+      const response = await apiClient.get(`/messages/?${params.toString()}`)
+      const data = response.data
       setMessages(data.messages || [])
       setTotal(data.total || 0)
     } catch (error) {
@@ -65,9 +65,8 @@ export default function MessagesPage() {
 
   const loadStats = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/messages/stats`, { headers: getAuthHeaders() })
-      if (!response.ok) throw new Error('Error')
-      const data = await response.json()
+      const response = await apiClient.get('/messages/stats')
+      const data = response.data
       setStats(data)
     } catch (error) {
       console.error('Error:', error)
@@ -286,14 +285,14 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
   useEffect(() => {
     const loadWS = async () => {
       try {
-        const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/workstations/`, { headers: getAuthHeaders() })
-        if (r.ok) { const d = await r.json(); setWorkstations(d.items || []) }
+        const r = await apiClient.get('/workstations/')
+        setWorkstations(r.data.items || [])
       } catch (e) { console.error(e) }
     }
     const loadVLANs = async () => {
       try {
-        const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/vlans/`, { headers: getAuthHeaders() })
-        if (r.ok) { const d = await r.json(); setVlans(d.vlans || []) }
+        const r = await apiClient.get('/vlans/')
+        setVlans(r.data.vlans || [])
       } catch (e) { console.error(e) }
     }
     loadWS()
@@ -311,12 +310,7 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
         target_id: targetType === 'account' ? null : targetId,
         content: content.trim(),
       }
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/messages/`, {
-        method: 'POST',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify(messageData),
-      })
-      if (!response.ok) { const err = await response.json(); throw new Error(err.detail) }
+      await apiClient.post('/messages/', messageData)
       onSuccess()
     } catch (error: any) {
       console.error('Error:', error)

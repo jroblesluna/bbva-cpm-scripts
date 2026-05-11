@@ -19,6 +19,7 @@ import {
   Monitor,
   X,
 } from 'lucide-react'
+import { apiClient } from '@/lib/api'
 import type { VLAN, VLANCreate, VLANUpdate, VLANDetail } from '@/types/vlan'
 import { formatDateWithTimezone } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
@@ -40,37 +41,28 @@ export default function VLANsPage() {
   const [vlanDetail, setVlanDetail] = useState<VLANDetail | null>(null)
 
   useEffect(() => {
-    if (user?.role === 'admin') loadAccounts()
-  }, [user])
-
-  useEffect(() => {
+    if (!user) return
+    if (user.role === 'admin') loadAccounts()
     loadVlans()
-  }, [filterAccountId])
+  }, [user, filterAccountId])
 
   const loadAccounts = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/accounts/?skip=0&limit=1000`, {
-        headers: getAuthHeaders(),
-      })
-      if (!response.ok) throw new Error('Error')
-      const data = await response.json()
-      setAccounts(data.items || [])
+      const response = await apiClient.get('/accounts/?skip=0&limit=1000')
+      setAccounts(response.data.items || [])
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error loading accounts:', error)
     }
   }
 
   const loadVlans = async () => {
     try {
       setLoading(true)
-      let url = '/api/v1/vlans/'
-      if (filterAccountId) url += `?account_id=${filterAccountId}`
-      const response = await fetch(url, { headers: getAuthHeaders() })
-      if (!response.ok) throw new Error('Error')
-      const data = await response.json()
-      setVlans(data.vlans || [])
+      const params = filterAccountId ? `?account_id=${filterAccountId}` : ''
+      const response = await apiClient.get(`/vlans/${params}`)
+      setVlans(response.data.vlans || [])
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error loading vlans:', error)
     } finally {
       setLoading(false)
     }
@@ -87,11 +79,8 @@ export default function VLANsPage() {
 
   const handleEdit = async (vlan: VLAN) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/vlans/${vlan.id}`, {
-        headers: getAuthHeaders(),
-      })
-      if (!response.ok) throw new Error('Error')
-      const detail = await response.json()
+      const response = await apiClient.get(`/vlans/${vlan.id}`)
+      const detail = response.data
       setVlanDetail(detail)
       setSelectedVlan(vlan)
       setShowEditModal(true)
@@ -304,11 +293,8 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
     if (!isAdmin()) return
     const load = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/accounts/`, { headers: getAuthHeaders() })
-        if (response.ok) {
-          const data = await response.json()
-          setAccounts(data.items || [])
-        }
+        const response = await apiClient.get('/accounts/')
+        setAccounts(response.data.items || [])
       } catch (error) { console.error(error) }
     }
     load()
@@ -321,12 +307,7 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
 
     try {
       setLoading(true)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/vlans/`, {
-        method: 'POST',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, cidr_ranges: validCidrs }),
-      })
-      if (!response.ok) { const err = await response.json(); throw new Error(err.detail) }
+      await apiClient.post('/vlans/', { ...formData, cidr_ranges: validCidrs })
       onSuccess()
     } catch (error: any) {
       console.error('Error:', error)
@@ -418,12 +399,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
     if (!formData.name?.trim() || validCidrs.length === 0) return
     try {
       setLoading(true)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/vlans/${vlan.id}`, {
-        method: 'PUT',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, cidr_ranges: validCidrs }),
-      })
-      if (!response.ok) { const err = await response.json(); throw new Error(err.detail) }
+      await apiClient.put(`/vlans/${vlan.id}`, { ...formData, cidr_ranges: validCidrs })
       onSuccess()
     } catch (error: any) {
       console.error('Error:', error)
@@ -504,11 +480,7 @@ function DeleteVLANModal({ vlan, onClose, onSuccess }: { vlan: VLAN; onClose: ()
   const handleDelete = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/vlans/${vlan.id}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      })
-      if (!response.ok) { const err = await response.json(); throw new Error(err.detail) }
+      await apiClient.delete(`/vlans/${vlan.id}`)
       onSuccess()
     } catch (error: any) {
       console.error('Error:', error)

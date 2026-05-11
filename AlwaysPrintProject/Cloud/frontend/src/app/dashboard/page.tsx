@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Monitor, CheckCircle, Building2, Network, AlertCircle, Globe } from 'lucide-react'
 import Link from 'next/link'
+import { apiClient } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
 
@@ -44,48 +45,33 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!user) return
     const loadStats = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/workstations/stats`, {
-          headers: getAuthHeaders(),
-        })
-
-        if (!response.ok) throw new Error('Error al cargar estadísticas')
-
-        const data = await response.json()
-        setStats(data)
+        const response = await apiClient.get('/workstations/stats')
+        setStats(response.data)
       } catch (err: any) {
-        console.error('Error:', err)
         setError(err.message || 'Error al cargar estadísticas')
       } finally {
         setIsLoading(false)
       }
     }
-
     loadStats()
-  }, [getAuthHeaders])
+  }, [user])
 
   useEffect(() => {
-    if (!isAdmin()) return
-
+    if (!user || !isAdmin()) return
     const loadPendingIPs = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/accounts/public-ips/pending`, {
-          headers: getAuthHeaders(),
-        })
-
-        if (!response.ok) return
-
-        const data = await response.json()
-        setPendingIPs(Array.isArray(data) ? data : [])
+        const response = await apiClient.get('/accounts/public-ips/pending')
+        setPendingIPs(Array.isArray(response.data) ? response.data : [])
       } catch (err) {
-        console.error('Error al cargar IPs pendientes:', err)
+        console.error('Error loading pending IPs:', err)
       }
     }
-
     loadPendingIPs()
-  }, [isAdmin, getAuthHeaders])
+  }, [user])
 
   if (isLoading) {
     return (
