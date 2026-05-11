@@ -4,6 +4,7 @@ Router principal de la API v1.
 Este módulo integra todos los routers de endpoints y WebSocket.
 """
 
+import os
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
@@ -85,3 +86,8 @@ api_router.include_router(
     prefix="/audit",
     tags=["Auditoría"]
 )
+
+
+@api_router.get("/version", tags=["Sistema"])
+async def version():
+    return {"build_tag": os.environ.get("BUILD_TAG", "dev")}

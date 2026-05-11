@@ -94,13 +94,6 @@ async def health_check():
     }
 
 
-@app.get("/api/v1/version")
-async def version():
-    """Build info — accesible via nginx /api/ proxy"""
-    return {
-        "build_tag": os.environ.get("BUILD_TAG", "dev"),
-    }
-
 
 @app.get("/ws/status")
 async def websocket_status():
