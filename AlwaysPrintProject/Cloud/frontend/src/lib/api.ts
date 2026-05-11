@@ -134,6 +134,7 @@ export const setupApi = {
     email: string
     password: string
     full_name: string
+    language?: string
   }): Promise<{ success: boolean; message: string; user: any }> => {
     const response = await apiClient.post<{ success: boolean; message: string; user: any }>(
       '/setup/initialize',
