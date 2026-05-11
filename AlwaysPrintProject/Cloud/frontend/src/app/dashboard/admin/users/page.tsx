@@ -34,6 +34,14 @@ import { useUserTimezone } from '@/hooks/useUserTimezone'
 import { useAuth } from '@/hooks/useAuth'
 import type { User, UserCreate, UserUpdate, Account } from '@/types'
 
+function formatApiError(error: any): string | undefined {
+  if (!error) return undefined
+  const detail = error?.detail ?? error?.message ?? error
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) return detail.map((e: any) => e?.msg || JSON.stringify(e)).join(', ')
+  return JSON.stringify(detail)
+}
+
 export default function UsersPage() {
   const queryClient = useQueryClient()
   const userTimezone = useUserTimezone()
@@ -147,7 +155,7 @@ export default function UsersPage() {
               onSubmit={(data) => createMutation.mutate(data as UserCreate)}
               onCancel={() => setShowCreateForm(false)}
               isLoading={createMutation.isPending}
-              error={(createMutation.error as any)?.detail}
+              error={formatApiError(createMutation.error)}
             />
           </CardContent>
         </Card>
@@ -166,7 +174,7 @@ export default function UsersPage() {
               onSubmit={(data) => updateMutation.mutate({ id: editingUser.id, data })}
               onCancel={() => setEditingUser(null)}
               isLoading={updateMutation.isPending}
-              error={(updateMutation.error as any)?.detail}
+              error={formatApiError(updateMutation.error)}
             />
           </CardContent>
         </Card>
@@ -274,7 +282,7 @@ export default function UsersPage() {
           onConfirm={() => deleteMutation.mutate(deletingUser.id)}
           onCancel={() => setDeletingUser(null)}
           isLoading={deleteMutation.isPending}
-          error={(deleteMutation.error as any)?.detail}
+          error={formatApiError(deleteMutation.error)}
         />
       )}
     </div>
