@@ -17,11 +17,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read AWS region from terraform.tfvars
+        run: |
+          REGION=$(grep 'aws_region' AlwaysPrintProject/Cloud/terraform/terraform.tfvars | grep -oP '(?<=")[^"]+')
+          echo "AWS_REGION=$REGION" >> $GITHUB_ENV
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to ECR
         id: login-ecr
