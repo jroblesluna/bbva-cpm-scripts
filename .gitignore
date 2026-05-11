@@ -35,7 +35,6 @@ out/
 .*
 !.github/
 !.gitattributes
-!.env.example
 .vscode/
 .idea/
 *.swp

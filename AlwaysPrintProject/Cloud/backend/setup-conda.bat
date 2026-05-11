@@ -48,13 +48,26 @@ echo.
 
 echo [3/4] Configurando variables de entorno...
 if not exist .env (
-    if exist .env.example (
-        copy .env.example .env
-        echo Archivo .env creado desde .env.example
-        echo Revisa y actualiza la configuracion en .env antes de continuar
-    ) else (
-        echo [WARNING] No se encontro .env.example
-    )
+    (
+        echo DATABASE_URL=sqlite:///./alwaysprint.db
+        echo SECRET_KEY=dev-secret-key-change-in-production
+        echo ALGORITHM=HS256
+        echo ACCESS_TOKEN_EXPIRE_MINUTES=1440
+        echo CORS_ORIGINS=http://localhost:3000
+        echo API_V1_STR=/api/v1
+        echo REDIS_URL=redis://localhost:6379/0
+        echo SES_ENABLED=false
+        echo SES_FROM_EMAIL=noreply@alwaysprint.apps.iol.pe
+        echo AWS_REGION=us-west-2
+        echo FRONTEND_URL=http://localhost:3000
+        echo LOG_LEVEL=DEBUG
+        echo WS_PING_INTERVAL=30
+        echo WS_PING_TIMEOUT=60
+        echo RATE_LIMIT_LOGIN=5
+        echo RATE_LIMIT_API=100
+    ) > .env
+    echo Archivo .env creado con valores de desarrollo.
+    echo Actualiza SECRET_KEY y DATABASE_URL segun tu entorno.
 ) else (
     echo Archivo .env ya existe.
 )
