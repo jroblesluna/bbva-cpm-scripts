@@ -4,7 +4,7 @@ APP_DIR=/opt/alwaysprint
 
 # ── Sistema ──────────────────────────────────────────────────────────
 dnf update -y
-dnf install -y docker python3-pip certbot python3-certbot-nginx
+dnf install -y docker nginx python3-pip certbot python3-certbot-nginx
 
 systemctl enable docker
 systemctl start docker
