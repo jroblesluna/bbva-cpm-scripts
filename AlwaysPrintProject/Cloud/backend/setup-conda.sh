@@ -59,6 +59,13 @@ fi
 echo ""
 
 echo "[4/4] Aplicando migraciones de base de datos..."
+# Si usa SQLite y el .db existe en estado inconsistente, borrarlo para empezar limpio
+DB_FILE=$(grep "^DATABASE_URL=sqlite" .env 2>/dev/null | grep -oP '(?<=///).*' || true)
+if [ -n "$DB_FILE" ] && [ -f "$DB_FILE" ]; then
+    echo "[INFO] Eliminando base de datos SQLite existente para setup limpio..."
+    rm -f "$DB_FILE"
+fi
+
 conda run -n alwaysprint alembic upgrade head || {
     echo "[WARNING] Error al aplicar migraciones."
     echo "Verifica la configuración DATABASE_URL en .env y ejecuta 'alembic upgrade head' manualmente."

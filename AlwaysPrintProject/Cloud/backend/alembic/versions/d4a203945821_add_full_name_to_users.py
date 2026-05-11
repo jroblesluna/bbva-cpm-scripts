@@ -19,14 +19,17 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Agregar columna full_name a la tabla users
-    op.add_column('users', sa.Column('full_name', sa.String(length=255), nullable=True))
-    
-    # Actualizar registros existentes con un valor por defecto
-    op.execute("UPDATE users SET full_name = email WHERE full_name IS NULL")
-    
-    # Hacer la columna NOT NULL después de actualizar los datos
-    op.alter_column('users', 'full_name', nullable=False)
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing = [col['name'] for col in inspector.get_columns('users')]
+
+    if 'full_name' not in existing:
+        op.add_column('users', sa.Column('full_name', sa.String(length=255), nullable=True))
+        op.execute("UPDATE users SET full_name = email WHERE full_name IS NULL")
+
+    # batch_alter_table es compatible con SQLite (que no soporta ALTER COLUMN directo)
+    with op.batch_alter_table('users') as batch_op:
+        batch_op.alter_column('full_name', nullable=False)
 
 
 def downgrade() -> None:
