@@ -41,20 +41,38 @@ if (-not (Test-Path "logo.ico") -and (Test-Path "logo.png")) {
 }
 
 # ── 2. wix CLI ────────────────────────────────────────────────────────────────
-# Intenta actualizar primero; si falla (no instalado), instala desde cero.
+# Se fija WiX 4.x (MIT license). WiX v5+ y v7 requieren aceptar la OSMF EULA
+# (licencia de pago). No usar "dotnet tool update wix" sin versión explícita
+# porque instalaría v7 automáticamente.
 
-Write-Host "=== Configurando wix CLI ===" -ForegroundColor Cyan
-$wixUpdateOutput = dotnet tool update --global wix 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "wix no estaba instalado, instalando..."
-    dotnet tool install --global wix
-    if ($LASTEXITCODE -ne 0) { Write-Error "No se pudo instalar wix CLI."; exit 1 }
-} else {
-    Write-Host $wixUpdateOutput
+Write-Host "=== Configurando wix CLI (v4) ===" -ForegroundColor Cyan
+
+$wixVersion = "4.0.5"
+
+# Desinstalar cualquier versión incompatible (v5/v7) si está presente
+$installedWix = dotnet tool list --global 2>&1 | Select-String "^wix\s"
+if ($installedWix) {
+    $installedVersion = ($installedWix -split '\s+')[1]
+    if ($installedVersion -and -not $installedVersion.StartsWith("4.")) {
+        Write-Host "Desinstalando wix $installedVersion (incompatible, requiere EULA)..."
+        dotnet tool uninstall --global wix | Out-Null
+    }
 }
 
-# Registrar extensión (idempotente — no falla si ya está registrada)
-wix extension add WixToolset.Util.wixext --global 2>&1 | Out-Host
+# Instalar o actualizar a la versión 4.x fijada
+$currentWix = dotnet tool list --global 2>&1 | Select-String "^wix\s"
+if ($currentWix) {
+    Write-Host "wix ya instalado: $($currentWix.ToString().Trim())"
+} else {
+    Write-Host "Instalando wix $wixVersion..."
+    dotnet tool install --global wix --version $wixVersion
+    if ($LASTEXITCODE -ne 0) { Write-Error "No se pudo instalar wix CLI v$wixVersion."; exit 1 }
+}
+
+# Registrar extensión con versión explícita (idempotente — no falla si ya está registrada)
+# Se fija la misma versión que el CLI para evitar que NuGet resuelva la v7 incompatible.
+Write-Host "Registrando extensión WixToolset.Util.wixext v$wixVersion..."
+wix extension add "WixToolset.Util.wixext/$wixVersion" --global 2>&1 | Out-Host
 
 # ── 3. Generar versión basada en fecha/hora ──────────────────────────────────
 # Formato ajustado a límites de MSI: Major.Minor.Build.Revision
