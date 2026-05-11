@@ -49,7 +49,7 @@ export default function VLANsPage() {
 
   const loadAccounts = async () => {
     try {
-      const response = await fetch('/api/v1/accounts/?skip=0&limit=1000', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/accounts/?skip=0&limit=1000`, {
         headers: getAuthHeaders(),
       })
       if (!response.ok) throw new Error('Error')
@@ -87,7 +87,7 @@ export default function VLANsPage() {
 
   const handleEdit = async (vlan: VLAN) => {
     try {
-      const response = await fetch(`/api/v1/vlans/${vlan.id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/vlans/${vlan.id}`, {
         headers: getAuthHeaders(),
       })
       if (!response.ok) throw new Error('Error')
@@ -304,7 +304,7 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
     if (!isAdmin()) return
     const load = async () => {
       try {
-        const response = await fetch('/api/v1/accounts/', { headers: getAuthHeaders() })
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/accounts/`, { headers: getAuthHeaders() })
         if (response.ok) {
           const data = await response.json()
           setAccounts(data.items || [])
@@ -321,7 +321,7 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
 
     try {
       setLoading(true)
-      const response = await fetch('/api/v1/vlans/', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/vlans/`, {
         method: 'POST',
         headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, cidr_ranges: validCidrs }),
@@ -418,7 +418,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
     if (!formData.name?.trim() || validCidrs.length === 0) return
     try {
       setLoading(true)
-      const response = await fetch(`/api/v1/vlans/${vlan.id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/vlans/${vlan.id}`, {
         method: 'PUT',
         headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, cidr_ranges: validCidrs }),
@@ -504,7 +504,7 @@ function DeleteVLANModal({ vlan, onClose, onSuccess }: { vlan: VLAN; onClose: ()
   const handleDelete = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/v1/vlans/${vlan.id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/vlans/${vlan.id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       })

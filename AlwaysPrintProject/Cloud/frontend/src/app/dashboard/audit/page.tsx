@@ -48,7 +48,7 @@ export default function AuditPage() {
       const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() })
       if (filterActionType) params.append('action_type', filterActionType)
       if (filterEntityType) params.append('entity_type', filterEntityType)
-      const response = await fetch(`/api/v1/audit/?${params.toString()}`, { headers: getAuthHeaders() })
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/audit/?${params.toString()}`, { headers: getAuthHeaders() })
       if (!response.ok) throw new Error('Error')
       const data = await response.json()
       setLogs(data.logs || [])
@@ -62,7 +62,7 @@ export default function AuditPage() {
 
   const loadStats = async () => {
     try {
-      const response = await fetch('/api/v1/audit/stats', { headers: getAuthHeaders() })
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/audit/stats`, { headers: getAuthHeaders() })
       if (!response.ok) throw new Error('Error')
       const data = await response.json()
       setStats(data)

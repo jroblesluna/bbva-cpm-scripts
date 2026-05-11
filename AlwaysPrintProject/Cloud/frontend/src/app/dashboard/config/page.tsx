@@ -95,7 +95,7 @@ export default function ConfigPage() {
   const loadAccounts = async () => {
     try {
       setLoadingAccounts(true)
-      const response = await fetch('/api/v1/accounts/?skip=0&limit=1000', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/accounts/?skip=0&limit=1000`, {
         headers: getAuthHeaders(),
       })
 

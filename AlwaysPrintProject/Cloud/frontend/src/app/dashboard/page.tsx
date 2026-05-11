@@ -47,7 +47,7 @@ export default function DashboardPage() {
     const loadStats = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch('/api/v1/workstations/stats', {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/workstations/stats`, {
           headers: getAuthHeaders(),
         })
 
@@ -71,7 +71,7 @@ export default function DashboardPage() {
 
     const loadPendingIPs = async () => {
       try {
-        const response = await fetch('/api/v1/accounts/public-ips/pending', {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/accounts/public-ips/pending`, {
           headers: getAuthHeaders(),
         })
 

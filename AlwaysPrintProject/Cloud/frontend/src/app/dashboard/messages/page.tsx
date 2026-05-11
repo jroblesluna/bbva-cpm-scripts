@@ -51,7 +51,7 @@ export default function MessagesPage() {
       const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() })
       if (filterDelivered !== null) params.append('is_delivered', filterDelivered.toString())
       if (filterTargetType) params.append('target_type', filterTargetType)
-      const response = await fetch(`/api/v1/messages/?${params.toString()}`, { headers: getAuthHeaders() })
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/messages/?${params.toString()}`, { headers: getAuthHeaders() })
       if (!response.ok) throw new Error('Error')
       const data = await response.json()
       setMessages(data.messages || [])
@@ -65,7 +65,7 @@ export default function MessagesPage() {
 
   const loadStats = async () => {
     try {
-      const response = await fetch('/api/v1/messages/stats', { headers: getAuthHeaders() })
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/messages/stats`, { headers: getAuthHeaders() })
       if (!response.ok) throw new Error('Error')
       const data = await response.json()
       setStats(data)
@@ -286,13 +286,13 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
   useEffect(() => {
     const loadWS = async () => {
       try {
-        const r = await fetch('/api/v1/workstations/', { headers: getAuthHeaders() })
+        const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/workstations/`, { headers: getAuthHeaders() })
         if (r.ok) { const d = await r.json(); setWorkstations(d.items || []) }
       } catch (e) { console.error(e) }
     }
     const loadVLANs = async () => {
       try {
-        const r = await fetch('/api/v1/vlans/', { headers: getAuthHeaders() })
+        const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/vlans/`, { headers: getAuthHeaders() })
         if (r.ok) { const d = await r.json(); setVlans(d.vlans || []) }
       } catch (e) { console.error(e) }
     }
@@ -311,7 +311,7 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
         target_id: targetType === 'account' ? null : targetId,
         content: content.trim(),
       }
-      const response = await fetch('/api/v1/messages/', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/messages/`, {
         method: 'POST',
         headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(messageData),
