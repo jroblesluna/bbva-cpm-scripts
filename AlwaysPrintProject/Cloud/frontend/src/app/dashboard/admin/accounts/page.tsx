@@ -10,6 +10,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { accountsApi } from '@/lib/api'
+import { useTranslations } from 'next-intl'
 import { COMMON_TIMEZONES, formatDateWithTimezone, getTimezoneName } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -37,6 +38,8 @@ import type { Account, AccountCreate, AccountUpdate, PublicIPCreate } from '@/ty
 export default function AccountsPage() {
   const queryClient = useQueryClient()
   const userTimezone = useUserTimezone()
+  const t = useTranslations('accounts')
+  const tCommon = useTranslations('common')
   const [searchTerm, setSearchTerm] = useState('')
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Account | null>(null)
@@ -104,7 +107,7 @@ export default function AccountsPage() {
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Organizaciones</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
         <div className="animate-pulse space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
@@ -117,7 +120,7 @@ export default function AccountsPage() {
   if (error) {
     return (
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Organizaciones</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -133,14 +136,12 @@ export default function AccountsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Organizaciones</h1>
-          <p className="text-gray-600 mt-2">
-            Gestiona las organizaciones que usan el sistema (BBVA, Ripley, etc.)
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
+          <p className="text-gray-600 mt-2">{t('subtitle')}</p>
         </div>
         <Button onClick={() => setShowCreateForm(true)}>
           <Plus className="w-4 h-4 mr-2" />
-          Nueva Organización
+          {t('new')}
         </Button>
       </div>
 
@@ -151,7 +152,7 @@ export default function AccountsPage() {
             <Search className="w-5 h-5 text-gray-400 mr-3" />
             <Input
               type="text"
-              placeholder="Buscar por nombre o descripción..."
+              placeholder={t('searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="flex-1"
@@ -164,7 +165,7 @@ export default function AccountsPage() {
       {showCreateForm && (
         <Card className="mb-6 border-blue-200 bg-blue-50">
           <CardHeader>
-            <CardTitle>Nueva Organización</CardTitle>
+            <CardTitle>{t('createTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             <AccountForm
@@ -181,7 +182,7 @@ export default function AccountsPage() {
       {editingAccount && (
         <Card className="mb-6 border-amber-200 bg-amber-50">
           <CardHeader>
-            <CardTitle>Editar Organización: {editingAccount.name}</CardTitle>
+            <CardTitle>{t('editTitle', { name: editingAccount.name })}</CardTitle>
           </CardHeader>
           <CardContent>
             <AccountForm
@@ -199,7 +200,7 @@ export default function AccountsPage() {
       {managingIPsAccount && (
         <Card className="mb-6 border-green-200 bg-green-50">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Gestionar IPs Públicas: {managingIPsAccount.name}</CardTitle>
+            <CardTitle>{t('manageIpsTitle', { name: managingIPsAccount.name })}</CardTitle>
             <Button
               variant="ghost"
               size="sm"
@@ -237,7 +238,7 @@ export default function AccountsPage() {
                           {account.name}
                         </h3>
                         <Badge variant={account.is_active ? 'default' : 'secondary'}>
-                          {account.is_active ? 'Activa' : 'Inactiva'}
+                          {account.is_active ? tCommon('active') : tCommon('inactive')}
                         </Badge>
                       </div>
                       
@@ -248,7 +249,7 @@ export default function AccountsPage() {
                       <div className="flex items-center text-sm text-gray-500 space-x-4">
                         <div className="flex items-center">
                           <Globe className="w-4 h-4 mr-1" />
-                          {account.public_ips?.length || 0} IPs públicas
+                          {account.public_ips?.length || 0} {t('publicIps')}
                         </div>
                         <div className="flex items-center">
                           <Monitor className="w-4 h-4 mr-1" />
@@ -282,10 +283,10 @@ export default function AccountsPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => setManagingIPsAccount(account)}
-                      title="Gestionar IPs públicas"
+                      title={t('manageIps')}
                     >
                       <Network className="w-4 h-4 mr-1" />
-                      IPs
+                      {t('manageIps')}
                     </Button>
                     <Button
                       variant="outline"
@@ -299,7 +300,7 @@ export default function AccountsPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        if (confirm(`¿Eliminar la cuenta "${account.name}"? Esta acción eliminará todos los usuarios, workstations y configuraciones asociadas. No se puede deshacer.`)) {
+                        if (confirm(t('deleteAccountConfirm', { name: account.name }))) {
                           deleteMutation.mutate(account.id)
                         }
                       }}
@@ -317,18 +318,14 @@ export default function AccountsPage() {
           <Card>
             <CardContent className="p-12 text-center">
               <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No hay cuentas
-              </h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">{t('emptyTitle')}</h3>
               <p className="text-gray-600 mb-4">
-                {searchTerm
-                  ? 'No se encontraron cuentas con ese criterio de búsqueda.'
-                  : 'Comienza creando la primera cuenta del sistema.'}
+                {searchTerm ? t('emptyFilter') : t('emptyCreate')}
               </p>
               {!searchTerm && (
                 <Button onClick={() => setShowCreateForm(true)}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Nueva Cuenta
+                  {t('new')}
                 </Button>
               )}
             </CardContent>
@@ -353,11 +350,14 @@ function AccountForm({
   isLoading: boolean
   error?: string
 }) {
+  const t = useTranslations('accounts')
+  const tCommon = useTranslations('common')
   const [formData, setFormData] = useState<AccountCreate>({
     name: initialData?.name || '',
     description: initialData?.description || '',
     is_active: initialData?.is_active ?? true,
     timezone: initialData?.timezone || 'UTC',
+    language: initialData?.language || 'en',
   })
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -376,11 +376,11 @@ function AccountForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="name">Nombre *</Label>
+          <Label htmlFor="name">{t('nameLabel')}</Label>
           <Input
             id="name"
             type="text"
-            placeholder="BBVA, Ripley, etc."
+            placeholder={t('namePlaceholder')}
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             required
@@ -389,11 +389,11 @@ function AccountForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="description">Descripción</Label>
+          <Label htmlFor="description">{t('descriptionLabel')}</Label>
           <Input
             id="description"
             type="text"
-            placeholder="Descripción de la organización"
+            placeholder={t('descriptionPlaceholder')}
             value={formData.description || ''}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             disabled={isLoading}
@@ -402,7 +402,7 @@ function AccountForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="timezone">Zona Horaria *</Label>
+        <Label htmlFor="timezone">{t('timezoneLabel')}</Label>
         <select
           id="timezone"
           value={formData.timezone}
@@ -412,14 +412,25 @@ function AccountForm({
           required
         >
           {COMMON_TIMEZONES.map((tz) => (
-            <option key={tz.value} value={tz.value}>
-              {tz.label}
-            </option>
+            <option key={tz.value} value={tz.value}>{tz.label}</option>
           ))}
         </select>
-        <p className="text-xs text-gray-500">
-          Los usuarios de esta organización heredarán esta zona horaria por defecto
-        </p>
+        <p className="text-xs text-gray-500">{t('timezoneHelper')}</p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="language">{t('languageLabel')}</Label>
+        <select
+          id="language"
+          value={formData.language || 'en'}
+          onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+          disabled={isLoading}
+          className="w-full px-3 py-2 border rounded-md"
+        >
+          <option value="en">English</option>
+          <option value="es">Español</option>
+        </select>
+        <p className="text-xs text-gray-500">{t('languageHelper')}</p>
       </div>
 
       <div className="flex items-center space-x-2">
@@ -431,17 +442,15 @@ function AccountForm({
           disabled={isLoading}
           className="rounded"
         />
-        <Label htmlFor="is_active" className="cursor-pointer">
-          Organización activa
-        </Label>
+        <Label htmlFor="is_active" className="cursor-pointer">{t('activeLabel')}</Label>
       </div>
 
       <div className="flex justify-end space-x-3">
         <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-          Cancelar
+          {tCommon('cancel')}
         </Button>
         <Button type="submit" disabled={isLoading}>
-          {isLoading ? (initialData ? 'Actualizando...' : 'Creando...') : (initialData ? 'Actualizar' : 'Crear Organización')}
+          {isLoading ? (initialData ? tCommon('updating') : tCommon('creating')) : (initialData ? tCommon('update') : t('createBtn'))}
         </Button>
       </div>
     </form>
@@ -462,16 +471,17 @@ function IPManagementForm({
   isLoading: boolean
   error?: string
 }) {
+  const t = useTranslations('accounts')
+  const tCommon = useTranslations('common')
   const [newIP, setNewIP] = useState('')
   const [newIPDescription, setNewIPDescription] = useState('')
 
   const handleAddIP = (e: React.FormEvent) => {
     e.preventDefault()
-    
-    // Validación básica de IP
+
     const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/
     if (!ipRegex.test(newIP)) {
-      alert('Por favor, ingresa una dirección IP válida (ej: 192.168.1.1)')
+      alert('Please enter a valid IP address')
       return
     }
 
@@ -480,7 +490,6 @@ function IPManagementForm({
       description: newIPDescription || undefined,
     })
 
-    // Limpiar formulario
     setNewIP('')
     setNewIPDescription('')
   }
@@ -496,15 +505,15 @@ function IPManagementForm({
 
       {/* Formulario para agregar IP */}
       <div className="border-b pb-4">
-        <h3 className="text-sm font-medium text-gray-900 mb-3">Agregar Nueva IP Pública</h3>
+        <h3 className="text-sm font-medium text-gray-900 mb-3">{t('addIpTitle')}</h3>
         <form onSubmit={handleAddIP} className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="ip_address">Dirección IP *</Label>
+              <Label htmlFor="ip_address">{t('ipLabel')}</Label>
               <Input
                 id="ip_address"
                 type="text"
-                placeholder="192.168.1.1"
+                placeholder={t('ipPlaceholder')}
                 value={newIP}
                 onChange={(e) => setNewIP(e.target.value)}
                 required
@@ -513,11 +522,11 @@ function IPManagementForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="ip_description">Descripción</Label>
+              <Label htmlFor="ip_description">{t('ipDescLabel')}</Label>
               <Input
                 id="ip_description"
                 type="text"
-                placeholder="Oficina principal, sucursal, etc."
+                placeholder={t('ipDescPlaceholder')}
                 value={newIPDescription}
                 onChange={(e) => setNewIPDescription(e.target.value)}
                 disabled={isLoading}
@@ -528,7 +537,7 @@ function IPManagementForm({
           <div className="flex justify-end">
             <Button type="submit" disabled={isLoading} size="sm">
               <Plus className="w-4 h-4 mr-2" />
-              Agregar IP
+              {t('addIpBtn')}
             </Button>
           </div>
         </form>
@@ -537,7 +546,7 @@ function IPManagementForm({
       {/* Lista de IPs existentes */}
       <div>
         <h3 className="text-sm font-medium text-gray-900 mb-3">
-          IPs Públicas Registradas ({account.public_ips?.length || 0})
+          {t('registeredIps', { count: account.public_ips?.length || 0 })}
         </h3>
         
         {account.public_ips && account.public_ips.length > 0 ? (
@@ -563,7 +572,7 @@ function IPManagementForm({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    if (confirm(`¿Eliminar la IP ${ip.ip_address}? Las workstations que se conecten desde esta IP ya no se asignarán automáticamente a esta cuenta.`)) {
+                    if (confirm(t('deleteIpConfirm', { ip: ip.ip_address }))) {
                       onRemoveIP(ip.id)
                     }
                   }}
@@ -577,12 +586,8 @@ function IPManagementForm({
         ) : (
           <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed">
             <Globe className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-600">
-              No hay IPs públicas registradas para esta cuenta.
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Agrega IPs para que las workstations se asignen automáticamente.
-            </p>
+            <p className="text-sm text-gray-600">{t('noIps')}</p>
+            <p className="text-xs text-gray-500 mt-1">{t('noIpsSuggestion')}</p>
           </div>
         )}
       </div>
@@ -591,8 +596,7 @@ function IPManagementForm({
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription className="text-xs">
-          <strong>Auto-asignación:</strong> Cuando una workstation se conecta desde una de estas IPs públicas,
-          se asignará automáticamente a esta cuenta. Esto permite gestionar múltiples sucursales u oficinas.
+          {t('autoAssignNote')}
         </AlertDescription>
       </Alert>
     </div>

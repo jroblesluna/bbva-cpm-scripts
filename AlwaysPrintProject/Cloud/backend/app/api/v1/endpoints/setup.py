@@ -30,12 +30,13 @@ class SetupRequest(BaseModel):
     """Request para configuración inicial."""
     email: EmailStr = Field(..., description="Email del administrador")
     password: str = Field(
-        ..., 
-        min_length=8, 
+        ...,
+        min_length=8,
         max_length=72,
         description="Contraseña (8-72 caracteres)"
     )
     full_name: str = Field(..., min_length=1, max_length=255, description="Nombre completo")
+    language: str = Field(default='en', max_length=2, description="Idioma del primer administrador (en, es)")
 
 
 class SetupResponse(BaseModel):
@@ -117,7 +118,8 @@ def initialize_system(
             full_name=setup_data.full_name,
             role=UserRole.ADMIN,
             account_id=None,  # Admin no pertenece a ninguna cuenta
-            is_active=True
+            is_active=True,
+            language=setup_data.language if setup_data.language in ('en', 'es') else 'en',
         )
         
         db.add(admin_user)

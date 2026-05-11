@@ -105,7 +105,8 @@ def create_account(
     account = Account(
         name=account_data.name,
         description=account_data.description,
-        timezone=account_data.timezone
+        timezone=account_data.timezone,
+        language=account_data.language if account_data.language in ('en', 'es') else 'en',
     )
     db.add(account)
     db.commit()

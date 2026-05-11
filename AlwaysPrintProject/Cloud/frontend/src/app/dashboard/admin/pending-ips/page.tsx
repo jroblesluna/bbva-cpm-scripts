@@ -26,6 +26,7 @@ import {
   Search,
   Building2
 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { formatDateWithTimezone } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 
@@ -46,6 +47,8 @@ interface Account {
 export default function PendingIPsPage() {
   const queryClient = useQueryClient()
   const userTimezone = useUserTimezone()
+  const t = useTranslations('pendingIps')
+  const tCommon = useTranslations('common')
   const [searchTerm, setSearchTerm] = useState('')
   const [authorizingIP, setAuthorizingIP] = useState<PendingIP | null>(null)
   const [selectedAccountId, setSelectedAccountId] = useState('')
@@ -108,7 +111,7 @@ export default function PendingIPsPage() {
   }
 
   const handleReject = (ip: PendingIP) => {
-    if (confirm(`¿Estás seguro de rechazar la IP ${ip.ip_address}? Esta acción no se puede deshacer.`)) {
+    if (confirm(t('rejectConfirm', { ip: ip.ip_address }))) {
       rejectMutation.mutate(ip.id)
     }
   }
@@ -123,7 +126,7 @@ export default function PendingIPsPage() {
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">IPs Públicas Pendientes</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
         <div className="animate-pulse space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
@@ -136,7 +139,7 @@ export default function PendingIPsPage() {
   if (error) {
     return (
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">IPs Públicas Pendientes</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -152,14 +155,12 @@ export default function PendingIPsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">IPs Públicas Pendientes</h1>
-          <p className="text-gray-600 mt-2">
-            Autoriza o rechaza IPs desde las cuales clientes intentaron conectarse
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
+          <p className="text-gray-600 mt-2">{t('subtitle')}</p>
         </div>
         <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['pending-ips'] })}>
           <RefreshCw className="w-4 h-4 mr-2" />
-          Actualizar
+          {tCommon('refresh')}
         </Button>
       </div>
 
@@ -169,7 +170,7 @@ export default function PendingIPsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Pendientes</p>
+                <p className="text-sm font-medium text-gray-600">{t('totalPending')}</p>
                 <p className="text-3xl font-bold text-gray-900">{pendingIPs?.length || 0}</p>
               </div>
               <Clock className="w-12 h-12 text-amber-600" />
@@ -181,7 +182,7 @@ export default function PendingIPsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Cuentas Activas</p>
+                <p className="text-sm font-medium text-gray-600">{t('activeAccounts')}</p>
                 <p className="text-3xl font-bold text-gray-900">{accounts.filter((a: Account) => a.is_active).length}</p>
               </div>
               <Building2 className="w-12 h-12 text-blue-600" />
@@ -193,7 +194,7 @@ export default function PendingIPsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Filtradas</p>
+                <p className="text-sm font-medium text-gray-600">{t('filtered')}</p>
                 <p className="text-3xl font-bold text-gray-900">{filteredIPs.length}</p>
               </div>
               <Search className="w-12 h-12 text-green-600" />
@@ -209,7 +210,7 @@ export default function PendingIPsPage() {
             <Search className="w-5 h-5 text-gray-400 mr-3" />
             <Input
               type="text"
-              placeholder="Buscar por dirección IP..."
+              placeholder={t('searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="flex-1"
@@ -236,7 +237,7 @@ export default function PendingIPsPage() {
                         </h3>
                         <Badge variant="secondary">
                           <Clock className="w-3 h-3 mr-1" />
-                          Pendiente
+                          {t('pending')}
                         </Badge>
                       </div>
 
@@ -247,7 +248,7 @@ export default function PendingIPsPage() {
                       <div className="flex items-center text-xs text-gray-500 space-x-4">
                         <div className="flex items-center">
                           <Clock className="w-3 h-3 mr-1" />
-                          Primera vez: {formatDateWithTimezone(ip.first_seen, userTimezone)}
+                          {t('firstSeen')} {formatDateWithTimezone(ip.first_seen, userTimezone)}
                         </div>
                       </div>
                     </div>
@@ -261,7 +262,7 @@ export default function PendingIPsPage() {
                       disabled={authorizeMutation.isPending || rejectMutation.isPending}
                     >
                       <CheckCircle className="w-4 h-4 mr-1" />
-                      Autorizar
+                      {t('authorize')}
                     </Button>
                     <Button
                       variant="destructive"
@@ -270,7 +271,7 @@ export default function PendingIPsPage() {
                       disabled={authorizeMutation.isPending || rejectMutation.isPending}
                     >
                       <XCircle className="w-4 h-4 mr-1" />
-                      Rechazar
+                      {t('reject')}
                     </Button>
                   </div>
                 </div>
@@ -281,13 +282,9 @@ export default function PendingIPsPage() {
           <Card>
             <CardContent className="p-12 text-center">
               <Globe className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No hay IPs pendientes
-              </h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">{t('emptyTitle')}</h3>
               <p className="text-gray-600 mb-4">
-                {searchTerm
-                  ? 'No se encontraron IPs con ese criterio de búsqueda.'
-                  : 'Todas las IPs han sido autorizadas o rechazadas.'}
+                {searchTerm ? t('emptyFilter') : t('emptyMessage')}
               </p>
             </CardContent>
           </Card>
@@ -299,13 +296,13 @@ export default function PendingIPsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <Card className="max-w-md w-full">
             <CardHeader>
-              <CardTitle>Autorizar IP Pública</CardTitle>
+              <CardTitle>{t('authorizeTitle')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <Alert>
                 <Globe className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>IP:</strong> {authorizingIP.ip_address}
+                  <strong>{t('ipLabel')}</strong> {authorizingIP.ip_address}
                 </AlertDescription>
               </Alert>
 
@@ -319,7 +316,7 @@ export default function PendingIPsPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="account">Cuenta *</Label>
+                <Label htmlFor="account">{t('accountLabel')}</Label>
                 <select
                   id="account"
                   value={selectedAccountId}
@@ -327,7 +324,7 @@ export default function PendingIPsPage() {
                   className="w-full px-3 py-2 border rounded-md"
                   disabled={authorizeMutation.isPending}
                 >
-                  <option value="">Selecciona una cuenta...</option>
+                  <option value="">{t('selectAccount')}</option>
                   {accounts
                     .filter((account: Account) => account.is_active)
                     .map((account: Account) => (
@@ -339,11 +336,11 @@ export default function PendingIPsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Descripción (opcional)</Label>
+                <Label htmlFor="description">{t('descriptionLabel')}</Label>
                 <Input
                   id="description"
                   type="text"
-                  placeholder="Ej: Oficina Principal Lima"
+                  placeholder={t('descriptionPlaceholder')}
                   value={customDescription}
                   onChange={(e) => setCustomDescription(e.target.value)}
                   disabled={authorizeMutation.isPending}
@@ -361,14 +358,14 @@ export default function PendingIPsPage() {
                   }}
                   disabled={authorizeMutation.isPending}
                 >
-                  Cancelar
+                  {tCommon('cancel')}
                 </Button>
                 <Button
                   type="button"
                   onClick={handleAuthorize}
                   disabled={!selectedAccountId || authorizeMutation.isPending}
                 >
-                  {authorizeMutation.isPending ? 'Autorizando...' : 'Autorizar'}
+                  {authorizeMutation.isPending ? t('authorizing') : t('authorize')}
                 </Button>
               </div>
             </CardContent>

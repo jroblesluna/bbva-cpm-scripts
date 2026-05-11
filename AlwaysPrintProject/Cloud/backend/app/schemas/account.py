@@ -67,6 +67,7 @@ class AccountBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=1000)
     timezone: str = Field(default="UTC", max_length=50, description="Zona horaria de la organización (ej: UTC, America/Lima)")
+    language: str = Field(default="en", max_length=2, description="Idioma por defecto de la organización (en, es)")
 
 
 class AccountCreate(AccountBase):
@@ -80,6 +81,7 @@ class AccountUpdate(BaseModel):
     description: Optional[str] = Field(None, max_length=1000)
     is_active: Optional[bool] = None
     timezone: Optional[str] = Field(None, max_length=50, description="Zona horaria de la organización")
+    language: Optional[str] = Field(None, max_length=2, description="Idioma por defecto de la organización")
 
 
 class AccountResponse(AccountBase):
@@ -87,9 +89,10 @@ class AccountResponse(AccountBase):
     id: UUID
     is_active: bool
     timezone: str
+    language: str
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 

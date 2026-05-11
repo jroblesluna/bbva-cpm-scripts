@@ -147,12 +147,17 @@ def create_user(
     
     # Determinar timezone: usuario → organización → None
     timezone = user_data.timezone
-    if timezone is None and user_data.account_id:
-        # Heredar timezone de la organización
+    language = user_data.language if user_data.language in ('en', 'es') else None
+    if user_data.account_id:
         account = db.query(Account).filter(Account.id == user_data.account_id).first()
-        if account and account.timezone:
-            timezone = account.timezone
-    
+        if account:
+            if timezone is None and account.timezone:
+                timezone = account.timezone
+            if language is None:
+                language = account.language
+    if language is None:
+        language = 'en'
+
     # Crear usuario
     user = User(
         email=user_data.email,
@@ -161,6 +166,7 @@ def create_user(
         role=user_data.role,
         account_id=user_data.account_id,
         timezone=timezone,
+        language=language,
         is_active=True
     )
     
@@ -186,6 +192,34 @@ def create_user(
     )
     
     return user
+
+
+@router.patch("/me/language")
+def update_my_language(
+    language: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Actualizar el idioma del usuario autenticado.
+
+    Args:
+        language: Código de idioma ('en' o 'es')
+        current_user: Usuario autenticado
+        db: Sesión de base de datos
+
+    Returns:
+        dict con el nuevo idioma
+
+    Raises:
+        HTTPException 400: Idioma no válido
+    """
+    if language not in ('en', 'es'):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid language. Use 'en' or 'es'.")
+    current_user.language = language
+    db.commit()
+    db.refresh(current_user)
+    return {"language": current_user.language}
 
 
 @router.get("/{user_id}", response_model=UserResponse)

@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useAuth } from '@/hooks/useAuth'
+import { useTranslations } from 'next-intl'
 import { setupApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +20,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 export default function LoginPage() {
   const router = useRouter()
   const { login, isLoading, error } = useAuth()
+  const t = useTranslations('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isCheckingSetup, setIsCheckingSetup] = useState(true)
@@ -48,10 +50,7 @@ export default function LoginPage() {
 
     try {
       await login({ email, password })
-      // La redirección se maneja en el hook useAuth
     } catch (error: any) {
-      // El error ya se maneja en el hook useAuth y se muestra en el Alert
-      // Solo logueamos errores inesperados (no 401)
       if (process.env.NODE_ENV === 'development' && error?.status !== 401) {
         console.error('Error inesperado en login:', error)
       }
@@ -64,7 +63,7 @@ export default function LoginPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Verificando configuración...</p>
+          <p className="mt-4 text-gray-600">{t('verifying')}</p>
         </div>
       </div>
     )
@@ -84,10 +83,10 @@ export default function LoginPage() {
             />
           </div>
           <CardTitle className="text-2xl font-bold text-center">
-            AlwaysPrint Cloud Manager
+            {t('title')}
           </CardTitle>
           <CardDescription className="text-center">
-            Ingresa tus credenciales para acceder al sistema
+            {t('subtitle')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -99,11 +98,11 @@ export default function LoginPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Correo electrónico</Label>
+              <Label htmlFor="email">{t('email')}</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="usuario@ejemplo.com"
+                placeholder={t('emailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -112,7 +111,7 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
+              <Label htmlFor="password">{t('password')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -125,19 +124,19 @@ export default function LoginPage() {
             </div>
 
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+              {isLoading ? t('submitting') : t('submit')}
             </Button>
 
             <p className="text-center text-sm text-gray-500">
               <Link href="/forgot-password" className="text-blue-600 hover:underline">
-                ¿Olvidaste tu contraseña?
+                {t('forgotPassword')}
               </Link>
             </p>
           </form>
 
           <div className="mt-6 text-center text-sm text-gray-500">
-            <p>© 2026 Inversiones On Line SAC</p>
-            <p className="mt-1">Producto de la familia de automatización Robles.AI</p>
+            <p>{t('footer1')}</p>
+            <p className="mt-1">{t('footer2')}</p>
           </div>
         </CardContent>
       </Card>

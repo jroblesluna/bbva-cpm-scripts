@@ -72,7 +72,8 @@ class Account(Base):
     # Zona horaria de la organización (por defecto UTC)
     # Ejemplos: "UTC", "America/Lima", "America/New_York", "Europe/Madrid"
     timezone = Column(String(50), nullable=False, default="UTC")
-    
+    language = Column(String(2), nullable=False, server_default='en')
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -316,6 +316,16 @@ export const usersApi = {
   changePassword: async (id: string, data: UserPasswordChange): Promise<void> => {
     await apiClient.put(`/users/${id}/password`, data)
   },
+
+  /**
+   * Actualizar idioma del usuario autenticado.
+   */
+  updateLanguage: async (language: string): Promise<{ language: string }> => {
+    const response = await apiClient.patch<{ language: string }>('/users/me/language', null, {
+      params: { language },
+    })
+    return response.data
+  },
 }
 
 // ============================================================================

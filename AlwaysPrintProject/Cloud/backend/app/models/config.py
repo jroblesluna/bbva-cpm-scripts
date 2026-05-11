@@ -43,7 +43,8 @@ class GlobalConfig(Base):
     
     # Dominios de bootstrap separados por comas (default: "robles.ai,iol.pe,sistemas.com.pe")
     bootstrap_domains = Column(String(1000), nullable=False, default="robles.ai,iol.pe,sistemas.com.pe")
-    
+    language = Column(String(2), nullable=False, server_default='en')
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

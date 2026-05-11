@@ -85,6 +85,7 @@ class User(Base):
     account_id = Column(GUID, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=True)
     
     timezone = Column(String(50), nullable=True)
+    language = Column(String(2), nullable=False, server_default='en')
 
     # === PASSWORD RESET ===
     password_reset_token   = Column(String(255), nullable=True, index=True)

@@ -1,18 +1,12 @@
 /**
- * Página de gestión de VLANs (segmentos de red).
- * 
- * Permite a los administradores y operadores:
- * - Ver lista de VLANs de su organización
- * - Crear nuevas VLANs con rangos CIDR
- * - Editar VLANs existentes
- * - Eliminar VLANs
- * - Ver workstations por VLAN
+ * Página de gestión de VLANs.
  */
 
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -32,6 +26,8 @@ import { useUserTimezone } from '@/hooks/useUserTimezone'
 export default function VLANsPage() {
   const { user, getAuthHeaders } = useAuth()
   const timezone = useUserTimezone()
+  const t = useTranslations('vlans')
+  const tCommon = useTranslations('common')
   const [vlans, setVlans] = useState<VLAN[]>([])
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
@@ -43,14 +39,10 @@ export default function VLANsPage() {
   const [selectedVlan, setSelectedVlan] = useState<VLAN | null>(null)
   const [vlanDetail, setVlanDetail] = useState<VLANDetail | null>(null)
 
-  // Cargar cuentas (solo para Admin)
   useEffect(() => {
-    if (user?.role === 'admin') {
-      loadAccounts()
-    }
+    if (user?.role === 'admin') loadAccounts()
   }, [user])
 
-  // Cargar VLANs
   useEffect(() => {
     loadVlans()
   }, [filterAccountId])
@@ -60,74 +52,54 @@ export default function VLANsPage() {
       const response = await fetch('http://localhost:8000/api/v1/accounts/?skip=0&limit=1000', {
         headers: getAuthHeaders(),
       })
-
-      if (!response.ok) throw new Error('Error al cargar organizaciones')
-
+      if (!response.ok) throw new Error('Error')
       const data = await response.json()
       setAccounts(data.items || [])
     } catch (error) {
       console.error('Error:', error)
-      alert('Error al cargar organizaciones')
     }
   }
 
   const loadVlans = async () => {
     try {
       setLoading(true)
-      
-      // Construir URL con filtro de cuenta si está seleccionado
       let url = 'http://localhost:8000/api/v1/vlans/'
-      if (filterAccountId) {
-        url += `?account_id=${filterAccountId}`
-      }
-      
-      const response = await fetch(url, {
-        headers: getAuthHeaders(),
-      })
-
-      if (!response.ok) throw new Error('Error al cargar VLANs')
-
+      if (filterAccountId) url += `?account_id=${filterAccountId}`
+      const response = await fetch(url, { headers: getAuthHeaders() })
+      if (!response.ok) throw new Error('Error')
       const data = await response.json()
       setVlans(data.vlans || [])
     } catch (error) {
       console.error('Error:', error)
-      alert('Error al cargar VLANs')
     } finally {
       setLoading(false)
     }
   }
 
-  // Filtrar VLANs por búsqueda
   const filteredVlans = vlans.filter((vlan) => {
-    const searchLower = searchTerm.toLowerCase()
+    const s = searchTerm.toLowerCase()
     return (
-      vlan.name.toLowerCase().includes(searchLower) ||
-      vlan.description?.toLowerCase().includes(searchLower) ||
-      vlan.cidr_ranges.some((cidr) => cidr.includes(searchLower))
+      vlan.name.toLowerCase().includes(s) ||
+      vlan.description?.toLowerCase().includes(s) ||
+      vlan.cidr_ranges.some((cidr) => cidr.includes(s))
     )
   })
 
-  // Abrir modal de edición
   const handleEdit = async (vlan: VLAN) => {
     try {
-      // Cargar detalles de la VLAN
       const response = await fetch(`http://localhost:8000/api/v1/vlans/${vlan.id}`, {
         headers: getAuthHeaders(),
       })
-
-      if (!response.ok) throw new Error('Error al cargar detalles')
-
+      if (!response.ok) throw new Error('Error')
       const detail = await response.json()
       setVlanDetail(detail)
       setSelectedVlan(vlan)
       setShowEditModal(true)
     } catch (error) {
       console.error('Error:', error)
-      alert('Error al cargar detalles de la VLAN')
     }
   }
 
-  // Abrir modal de eliminación
   const handleDelete = (vlan: VLAN) => {
     setSelectedVlan(vlan)
     setShowDeleteModal(true)
@@ -138,7 +110,7 @@ export default function VLANsPage() {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando VLANs...</p>
+          <p className="mt-4 text-gray-600">{tCommon('loading')}</p>
         </div>
       </div>
     )
@@ -146,55 +118,43 @@ export default function VLANsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">VLANs</h1>
-          <p className="mt-2 text-gray-600">
-            Gestiona los segmentos de red de tu organización
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
+          <p className="mt-2 text-gray-600">{t('subtitle')}</p>
         </div>
         <Button onClick={() => setShowCreateModal(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Crear VLAN
+          {t('create')}
         </Button>
       </div>
 
-      {/* Estadísticas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Network className="h-6 w-6 text-blue-600" />
-            </div>
+            <div className="p-3 bg-blue-100 rounded-lg"><Network className="h-6 w-6 text-blue-600" /></div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total VLANs</p>
+              <p className="text-sm font-medium text-gray-600">{t('totalVlans')}</p>
               <p className="text-2xl font-bold text-gray-900">{vlans.length}</p>
             </div>
           </div>
         </div>
-
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <Monitor className="h-6 w-6 text-green-600" />
-            </div>
+            <div className="p-3 bg-green-100 rounded-lg"><Monitor className="h-6 w-6 text-green-600" /></div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Estaciones</p>
+              <p className="text-sm font-medium text-gray-600">{t('stations')}</p>
               <p className="text-2xl font-bold text-gray-900">
-                {vlans.reduce((acc, v) => acc + (v as any).workstation_count || 0, 0)}
+                {vlans.reduce((acc, v) => acc + ((v as any).workstation_count || 0), 0)}
               </p>
             </div>
           </div>
         </div>
-
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <Network className="h-6 w-6 text-purple-600" />
-            </div>
+            <div className="p-3 bg-purple-100 rounded-lg"><Network className="h-6 w-6 text-purple-600" /></div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Rangos CIDR</p>
+              <p className="text-sm font-medium text-gray-600">{t('cidrRanges')}</p>
               <p className="text-2xl font-bold text-gray-900">
                 {vlans.reduce((acc, v) => acc + v.cidr_ranges.length, 0)}
               </p>
@@ -203,75 +163,54 @@ export default function VLANsPage() {
         </div>
       </div>
 
-      {/* Filtros */}
       <div className="bg-white rounded-lg shadow p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Búsqueda */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <Input
               type="text"
-              placeholder="Buscar por nombre, descripción o CIDR..."
+              placeholder={t('searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
-
-          {/* Filtro por cuenta (solo para Admin) */}
           {user?.role === 'admin' && (
-            <div>
-              <select
-                value={filterAccountId || 'all'}
-                onChange={(e) => {
-                  const value = e.target.value
-                  setFilterAccountId(value === 'all' ? undefined : value)
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">Todas las organizaciones</option>
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <select
+              value={filterAccountId || 'all'}
+              onChange={(e) => setFilterAccountId(e.target.value === 'all' ? undefined : e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">{t('allOrganizations')}</option>
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>{account.name}</option>
+              ))}
+            </select>
           )}
         </div>
-
-        {/* Botón para limpiar filtros */}
         {(searchTerm || filterAccountId) && (
           <div className="mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSearchTerm('')
-                setFilterAccountId(undefined)
-              }}
-            >
+            <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterAccountId(undefined) }}>
               <X className="mr-2 h-4 w-4" />
-              Limpiar filtros
+              {tCommon('clearFilters')}
             </Button>
           </div>
         )}
       </div>
 
-      {/* Lista de VLANs */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {filteredVlans.length === 0 ? (
           <div className="text-center py-12">
             <Network className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No hay VLANs</h3>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">{t('emptyTitle')}</h3>
             <p className="mt-1 text-sm text-gray-500">
-              {searchTerm ? 'No se encontraron VLANs con ese criterio' : 'Comienza creando una nueva VLAN'}
+              {searchTerm ? t('emptyMessage') : t('emptyCreate')}
             </p>
             {!searchTerm && (
               <div className="mt-6">
                 <Button onClick={() => setShowCreateModal(true)}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Crear VLAN
+                  {t('create')}
                 </Button>
               </div>
             )}
@@ -281,21 +220,11 @@ export default function VLANsPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Nombre
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Descripción
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Rangos CIDR
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Creado
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colName')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colDescription')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colCidr')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colCreated')}</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colActions')}</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -308,16 +237,12 @@ export default function VLANsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-gray-500">
-                        {vlan.description || '-'}
-                      </span>
+                      <span className="text-sm text-gray-500">{vlan.description || '-'}</span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
                         {vlan.cidr_ranges.map((cidr, idx) => (
-                          <Badge key={idx} variant="secondary">
-                            {cidr}
-                          </Badge>
+                          <Badge key={idx} variant="secondary">{cidr}</Badge>
                         ))}
                       </div>
                     </td>
@@ -325,19 +250,10 @@ export default function VLANsPage() {
                       {formatDateWithTimezone(vlan.created_at, timezone)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(vlan)}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(vlan)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(vlan)}
-                        className="text-red-600 hover:text-red-700"
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(vlan)} className="text-red-600 hover:text-red-700">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </td>
@@ -349,64 +265,32 @@ export default function VLANsPage() {
         )}
       </div>
 
-      {/* Modal de Crear */}
       {showCreateModal && (
-        <CreateVLANModal
-          onClose={() => setShowCreateModal(false)}
-          onSuccess={() => {
-            setShowCreateModal(false)
-            loadVlans()
-          }}
-        />
+        <CreateVLANModal onClose={() => setShowCreateModal(false)} onSuccess={() => { setShowCreateModal(false); loadVlans() }} />
       )}
-
-      {/* Modal de Editar */}
       {showEditModal && selectedVlan && vlanDetail && (
         <EditVLANModal
           vlan={selectedVlan}
           detail={vlanDetail}
-          onClose={() => {
-            setShowEditModal(false)
-            setSelectedVlan(null)
-            setVlanDetail(null)
-          }}
-          onSuccess={() => {
-            setShowEditModal(false)
-            setSelectedVlan(null)
-            setVlanDetail(null)
-            loadVlans()
-          }}
+          onClose={() => { setShowEditModal(false); setSelectedVlan(null); setVlanDetail(null) }}
+          onSuccess={() => { setShowEditModal(false); setSelectedVlan(null); setVlanDetail(null); loadVlans() }}
         />
       )}
-
-      {/* Modal de Eliminar */}
       {showDeleteModal && selectedVlan && (
         <DeleteVLANModal
           vlan={selectedVlan}
-          onClose={() => {
-            setShowDeleteModal(false)
-            setSelectedVlan(null)
-          }}
-          onSuccess={() => {
-            setShowDeleteModal(false)
-            setSelectedVlan(null)
-            loadVlans()
-          }}
+          onClose={() => { setShowDeleteModal(false); setSelectedVlan(null) }}
+          onSuccess={() => { setShowDeleteModal(false); setSelectedVlan(null); loadVlans() }}
         />
       )}
     </div>
   )
 }
 
-// Modal de Crear VLAN
-function CreateVLANModal({
-  onClose,
-  onSuccess,
-}: {
-  onClose: () => void
-  onSuccess: () => void
-}) {
+function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const { getAuthHeaders, user, isAdmin } = useAuth()
+  const t = useTranslations('vlans')
+  const tCommon = useTranslations('common')
   const [loading, setLoading] = useState(false)
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
   const [formData, setFormData] = useState<VLANCreate>({
@@ -416,205 +300,99 @@ function CreateVLANModal({
     cidr_ranges: [''],
   })
 
-  // Cargar organizaciones (solo para admin)
   useEffect(() => {
     if (!isAdmin()) return
-
-    const loadAccounts = async () => {
+    const load = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/v1/accounts/', {
-          headers: getAuthHeaders(),
-        })
+        const response = await fetch('http://localhost:8000/api/v1/accounts/', { headers: getAuthHeaders() })
         if (response.ok) {
           const data = await response.json()
-          // El backend retorna { items, total, skip, limit }
           setAccounts(data.items || [])
         }
-      } catch (error) {
-        console.error('Error al cargar organizaciones:', error)
-      }
+      } catch (error) { console.error(error) }
     }
-
-    loadAccounts()
+    load()
   }, [isAdmin, getAuthHeaders])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    // Validar
-    if (!formData.name.trim()) {
-      alert('El nombre es requerido')
-      return
-    }
-
-    if (!formData.account_id) {
-      alert('Debe seleccionar una organización')
-      return
-    }
-
     const validCidrs = formData.cidr_ranges.filter((c) => c.trim())
-    if (validCidrs.length === 0) {
-      alert('Debe agregar al menos un rango CIDR')
-      return
-    }
+    if (!formData.name.trim() || !formData.account_id || validCidrs.length === 0) return
 
     try {
       setLoading(true)
-
       const response = await fetch('http://localhost:8000/api/v1/vlans/', {
         method: 'POST',
-        headers: {
-          ...getAuthHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          cidr_ranges: validCidrs,
-        }),
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, cidr_ranges: validCidrs }),
       })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Error al crear VLAN')
-      }
-
+      if (!response.ok) { const err = await response.json(); throw new Error(err.detail) }
       onSuccess()
     } catch (error: any) {
       console.error('Error:', error)
-      alert(error.message || 'Error al crear VLAN')
+      alert(error.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const addCidrField = () => {
-    setFormData({
-      ...formData,
-      cidr_ranges: [...formData.cidr_ranges, ''],
-    })
-  }
-
-  const removeCidrField = (index: number) => {
-    setFormData({
-      ...formData,
-      cidr_ranges: formData.cidr_ranges.filter((_, i) => i !== index),
-    })
-  }
-
-  const updateCidrField = (index: number, value: string) => {
-    const newCidrs = [...formData.cidr_ranges]
-    newCidrs[index] = value
-    setFormData({ ...formData, cidr_ranges: newCidrs })
+  const addCidrField = () => setFormData({ ...formData, cidr_ranges: [...formData.cidr_ranges, ''] })
+  const removeCidrField = (i: number) => setFormData({ ...formData, cidr_ranges: formData.cidr_ranges.filter((_, idx) => idx !== i) })
+  const updateCidrField = (i: number, v: string) => {
+    const n = [...formData.cidr_ranges]; n[i] = v; setFormData({ ...formData, cidr_ranges: n })
   }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Crear VLAN</h2>
-
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('createTitle')}</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Organización (solo para admin) */}
             {isAdmin() && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Organización *
-                </label>
-                <select
-                  value={formData.account_id || ''}
-                  onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  <option value="">-- Seleccionar Organización --</option>
-                  {accounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.name}
-                    </option>
-                  ))}
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('organization')}</label>
+                <select value={formData.account_id || ''} onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                  <option value="">{t('selectOrg')}</option>
+                  {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
               </div>
             )}
-
-            {/* Nombre */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nombre *
-              </label>
-              <Input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Ej: VLAN Oficina Principal"
-                required
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">{tCommon('name')} *</label>
+              <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder={t('namePlaceholder')} required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
-
-            {/* Descripción */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Descripción
-              </label>
-              <textarea
-                value={formData.description || ''}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Descripción opcional de la VLAN"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={3}
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">{tCommon('description')}</label>
+              <textarea value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder={t('descPlaceholder')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" rows={3} />
             </div>
-
-            {/* Rangos CIDR */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Rangos CIDR *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('cidrLabel')}</label>
               <div className="space-y-2">
                 {formData.cidr_ranges.map((cidr, index) => (
                   <div key={index} className="flex gap-2">
-                    <Input
-                      type="text"
-                      value={cidr}
-                      onChange={(e) => updateCidrField(index, e.target.value)}
-                      placeholder="Ej: 192.168.1.0/24"
-                      className="flex-1"
-                    />
+                    <input type="text" value={cidr} onChange={(e) => updateCidrField(index, e.target.value)}
+                      placeholder="Ej: 192.168.1.0/24" className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     {formData.cidr_ranges.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeCidrField(index)}
-                      >
+                      <Button type="button" variant="outline" size="sm" onClick={() => removeCidrField(index)}>
                         <X className="h-4 w-4" />
                       </Button>
                     )}
                   </div>
                 ))}
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addCidrField}
-                className="mt-2"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Agregar rango
+              <Button type="button" variant="outline" size="sm" onClick={addCidrField} className="mt-2">
+                <Plus className="mr-2 h-4 w-4" />{t('addRange')}
               </Button>
-              <p className="mt-1 text-xs text-gray-500">
-                Formato: dirección/máscara (ej: 192.168.1.0/24, 10.0.0.0/16)
-              </p>
+              <p className="mt-1 text-xs text-gray-500">{t('cidrHelper')}</p>
             </div>
-
-            {/* Botones */}
             <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Creando...' : 'Crear VLAN'}
-              </Button>
+              <Button type="button" variant="outline" onClick={onClose} disabled={loading}>{tCommon('cancel')}</Button>
+              <Button type="submit" disabled={loading}>{loading ? tCommon('creating') : t('createTitle')}</Button>
             </div>
           </form>
         </div>
@@ -623,19 +401,10 @@ function CreateVLANModal({
   )
 }
 
-// Modal de Editar VLAN
-function EditVLANModal({
-  vlan,
-  detail,
-  onClose,
-  onSuccess,
-}: {
-  vlan: VLAN
-  detail: VLANDetail
-  onClose: () => void
-  onSuccess: () => void
-}) {
+function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detail: VLANDetail; onClose: () => void; onSuccess: () => void }) {
   const { getAuthHeaders } = useAuth()
+  const t = useTranslations('vlans')
+  const tCommon = useTranslations('common')
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState<VLANUpdate>({
     name: vlan.name,
@@ -645,161 +414,79 @@ function EditVLANModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    // Validar
-    if (!formData.name?.trim()) {
-      alert('El nombre es requerido')
-      return
-    }
-
     const validCidrs = formData.cidr_ranges?.filter((c) => c.trim()) || []
-    if (validCidrs.length === 0) {
-      alert('Debe agregar al menos un rango CIDR')
-      return
-    }
-
+    if (!formData.name?.trim() || validCidrs.length === 0) return
     try {
       setLoading(true)
-
       const response = await fetch(`http://localhost:8000/api/v1/vlans/${vlan.id}`, {
         method: 'PUT',
-        headers: {
-          ...getAuthHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          cidr_ranges: validCidrs,
-        }),
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, cidr_ranges: validCidrs }),
       })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Error al actualizar VLAN')
-      }
-
+      if (!response.ok) { const err = await response.json(); throw new Error(err.detail) }
       onSuccess()
     } catch (error: any) {
       console.error('Error:', error)
-      alert(error.message || 'Error al actualizar VLAN')
+      alert(error.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const addCidrField = () => {
-    setFormData({
-      ...formData,
-      cidr_ranges: [...(formData.cidr_ranges || []), ''],
-    })
-  }
-
-  const removeCidrField = (index: number) => {
-    setFormData({
-      ...formData,
-      cidr_ranges: formData.cidr_ranges?.filter((_, i) => i !== index) || [],
-    })
-  }
-
-  const updateCidrField = (index: number, value: string) => {
-    const newCidrs = [...(formData.cidr_ranges || [])]
-    newCidrs[index] = value
-    setFormData({ ...formData, cidr_ranges: newCidrs })
+  const addCidrField = () => setFormData({ ...formData, cidr_ranges: [...(formData.cidr_ranges || []), ''] })
+  const removeCidrField = (i: number) => setFormData({ ...formData, cidr_ranges: formData.cidr_ranges?.filter((_, idx) => idx !== i) || [] })
+  const updateCidrField = (i: number, v: string) => {
+    const n = [...(formData.cidr_ranges || [])]; n[i] = v; setFormData({ ...formData, cidr_ranges: n })
   }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Editar VLAN</h2>
-
-          {/* Info de workstations */}
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('editTitle')}</h2>
           {detail.workstation_count > 0 && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
               <p className="text-sm text-blue-800">
                 <Monitor className="inline h-4 w-4 mr-1" />
-                Esta VLAN tiene {detail.workstation_count} estación(es) asignada(s)
+                {t('stationsAssigned', { count: detail.workstation_count })}
               </p>
             </div>
           )}
-
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Nombre */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nombre *
-              </label>
-              <Input
-                type="text"
-                value={formData.name || ''}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Ej: VLAN Oficina Principal"
-                required
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">{tCommon('name')} *</label>
+              <input type="text" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder={t('namePlaceholder')} required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
-
-            {/* Descripción */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Descripción
-              </label>
-              <textarea
-                value={formData.description || ''}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Descripción opcional de la VLAN"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={3}
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">{tCommon('description')}</label>
+              <textarea value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder={t('descPlaceholder')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" rows={3} />
             </div>
-
-            {/* Rangos CIDR */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Rangos CIDR *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('cidrLabel')}</label>
               <div className="space-y-2">
                 {(formData.cidr_ranges || []).map((cidr, index) => (
                   <div key={index} className="flex gap-2">
-                    <Input
-                      type="text"
-                      value={cidr}
-                      onChange={(e) => updateCidrField(index, e.target.value)}
-                      placeholder="Ej: 192.168.1.0/24"
-                      className="flex-1"
-                    />
+                    <input type="text" value={cidr} onChange={(e) => updateCidrField(index, e.target.value)}
+                      placeholder="Ej: 192.168.1.0/24" className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     {(formData.cidr_ranges?.length || 0) > 1 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeCidrField(index)}
-                      >
+                      <Button type="button" variant="outline" size="sm" onClick={() => removeCidrField(index)}>
                         <X className="h-4 w-4" />
                       </Button>
                     )}
                   </div>
                 ))}
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addCidrField}
-                className="mt-2"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Agregar rango
+              <Button type="button" variant="outline" size="sm" onClick={addCidrField} className="mt-2">
+                <Plus className="mr-2 h-4 w-4" />{t('addRange')}
               </Button>
             </div>
-
-            {/* Botones */}
             <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Actualizando...' : 'Actualizar'}
-              </Button>
+              <Button type="button" variant="outline" onClick={onClose} disabled={loading}>{tCommon('cancel')}</Button>
+              <Button type="submit" disabled={loading}>{loading ? tCommon('updating') : tCommon('update')}</Button>
             </div>
           </form>
         </div>
@@ -808,37 +495,24 @@ function EditVLANModal({
   )
 }
 
-// Modal de Eliminar VLAN
-function DeleteVLANModal({
-  vlan,
-  onClose,
-  onSuccess,
-}: {
-  vlan: VLAN
-  onClose: () => void
-  onSuccess: () => void
-}) {
+function DeleteVLANModal({ vlan, onClose, onSuccess }: { vlan: VLAN; onClose: () => void; onSuccess: () => void }) {
   const { getAuthHeaders } = useAuth()
+  const t = useTranslations('vlans')
+  const tCommon = useTranslations('common')
   const [loading, setLoading] = useState(false)
 
   const handleDelete = async () => {
     try {
       setLoading(true)
-
       const response = await fetch(`http://localhost:8000/api/v1/vlans/${vlan.id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Error al eliminar VLAN')
-      }
-
+      if (!response.ok) { const err = await response.json(); throw new Error(err.detail) }
       onSuccess()
     } catch (error: any) {
       console.error('Error:', error)
-      alert(error.message || 'Error al eliminar VLAN')
+      alert(error.message)
     } finally {
       setLoading(false)
     }
@@ -848,23 +522,12 @@ function DeleteVLANModal({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
         <div className="p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Eliminar VLAN</h2>
-
-          <p className="text-gray-600 mb-6">
-            ¿Estás seguro de que deseas eliminar la VLAN <strong>{vlan.name}</strong>?
-            Esta acción no se puede deshacer.
-          </p>
-
+          <h2 className="text-xl font-bold text-gray-900 mb-4">{t('deleteTitle')}</h2>
+          <p className="text-gray-600 mb-6">{t('deleteConfirm', { name: vlan.name })}</p>
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={onClose} disabled={loading}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleDelete}
-              disabled={loading}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {loading ? 'Eliminando...' : 'Eliminar'}
+            <Button variant="outline" onClick={onClose} disabled={loading}>{tCommon('cancel')}</Button>
+            <Button onClick={handleDelete} disabled={loading} className="bg-red-600 hover:bg-red-700">
+              {loading ? tCommon('deleting') : tCommon('delete')}
             </Button>
           </div>
         </div>

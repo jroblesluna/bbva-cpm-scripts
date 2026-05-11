@@ -8,6 +8,7 @@ export interface Account {
   description?: string | null
   is_active: boolean
   timezone: string
+  language: string
   created_at: string
   updated_at: string
   public_ips?: PublicIP[]
@@ -26,6 +27,7 @@ export interface AccountCreate {
   description?: string | null
   is_active?: boolean
   timezone?: string
+  language?: string
 }
 
 export interface AccountUpdate {
@@ -33,6 +35,7 @@ export interface AccountUpdate {
   description?: string | null
   is_active?: boolean
   timezone?: string
+  language?: string
 }
 
 export interface PublicIPCreate {

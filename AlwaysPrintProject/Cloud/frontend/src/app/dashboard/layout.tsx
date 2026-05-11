@@ -9,8 +9,10 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useAuth } from '@/hooks/useAuth'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { LanguageSelector } from '@/components/LanguageSelector'
 import {
   LayoutDashboard,
   Monitor,
@@ -27,30 +29,24 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 
-interface NavItem {
-  name: string
-  href: string
-  icon: React.ComponentType<{ className?: string }>
-  adminOnly?: boolean
-}
-
-const navigation: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Estaciones', href: '/dashboard/workstations', icon: Monitor },
-  { name: 'VLANs', href: '/dashboard/vlans', icon: Network },
-  { name: 'Configuración', href: '/dashboard/config', icon: Settings },
-  { name: 'Mensajes', href: '/dashboard/messages', icon: MessageSquare },
-  { name: 'Auditoría', href: '/dashboard/audit', icon: FileText },
-  { name: 'Organizaciones', href: '/dashboard/admin/accounts', icon: Building2, adminOnly: true },
-  { name: 'Usuarios', href: '/dashboard/admin/users', icon: Users, adminOnly: true },
-  { name: 'IPs Pendientes', href: '/dashboard/admin/pending-ips', icon: Globe, adminOnly: true },
-]
-
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const { user, isAuthenticated, isLoading, logout, isAdmin } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const t = useTranslations('nav')
+
+  const navigation = [
+    { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { key: 'workstations', href: '/dashboard/workstations', icon: Monitor },
+    { key: 'vlans', href: '/dashboard/vlans', icon: Network },
+    { key: 'config', href: '/dashboard/config', icon: Settings },
+    { key: 'messages', href: '/dashboard/messages', icon: MessageSquare },
+    { key: 'audit', href: '/dashboard/audit', icon: FileText },
+    { key: 'accounts', href: '/dashboard/admin/accounts', icon: Building2, adminOnly: true },
+    { key: 'users', href: '/dashboard/admin/users', icon: Users, adminOnly: true },
+    { key: 'pendingIps', href: '/dashboard/admin/pending-ips', icon: Globe, adminOnly: true },
+  ]
 
   // Redirigir a login si no está autenticado
   useEffect(() => {
@@ -65,7 +61,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando...</p>
+          <p className="mt-4 text-gray-600">{t('loading')}</p>
         </div>
       </div>
     )
@@ -83,6 +79,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
     return true
   })
+
+  const roleLabel = user?.role === 'admin' ? t('admin') : t('operator')
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -111,7 +109,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 const isActive = pathname === item.href
                 return (
                   <Link
-                    key={item.name}
+                    key={item.key}
                     href={item.href}
                     onClick={() => setSidebarOpen(false)}
                     className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
@@ -121,7 +119,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     }`}
                   >
                     <item.icon className="mr-3 h-5 w-5" />
-                    {item.name}
+                    {t(item.key as any)}
                   </Link>
                 )
               })}
@@ -133,9 +131,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <p className="text-sm font-medium text-gray-900 truncate">{user?.full_name}</p>
                   <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                   <Badge variant="secondary" className="mt-1">
-                    {user?.role === 'admin' ? 'Administrador' : 'Operador'}
+                    {roleLabel}
                   </Badge>
                 </div>
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <LanguageSelector />
               </div>
               <Button
                 variant="outline"
@@ -147,7 +148,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 }}
               >
                 <LogOut className="mr-2 h-4 w-4" />
-                Cerrar sesión
+                {t('logout')}
               </Button>
             </div>
           </div>
@@ -174,7 +175,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               const isActive = pathname === item.href
               return (
                 <Link
-                  key={item.name}
+                  key={item.key}
                   href={item.href}
                   className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                     isActive
@@ -183,29 +184,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   }`}
                 >
                   <item.icon className="mr-3 h-5 w-5" />
-                  {item.name}
+                  {t(item.key as any)}
                 </Link>
               )
             })}
           </nav>
           <div className="flex-shrink-0 border-t border-gray-200 p-4">
-            <div className="flex items-center">
+            <div className="flex items-center mb-2">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{user?.full_name}</p>
                 <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                 <Badge variant="secondary" className="mt-1">
-                  {user?.role === 'admin' ? 'Administrador' : 'Operador'}
+                  {roleLabel}
                 </Badge>
               </div>
+            </div>
+            <div className="mb-2">
+              <LanguageSelector />
             </div>
             <Button
               variant="outline"
               size="sm"
-              className="w-full mt-3"
+              className="w-full mt-1"
               onClick={logout}
             >
               <LogOut className="mr-2 h-4 w-4" />
-              Cerrar sesión
+              {t('logout')}
             </Button>
           </div>
         </div>

@@ -14,6 +14,7 @@ export interface User {
   role: UserRole
   account_id: string | null
   timezone?: string | null
+  language: string
   is_active: boolean
   created_at: string
   updated_at: string
@@ -21,6 +22,7 @@ export interface User {
     id: string
     name: string
     timezone: string
+    language: string
   }
 }
 
@@ -31,6 +33,7 @@ export interface UserCreate {
   role: UserRole
   account_id?: string | null
   timezone?: string | null
+  language?: string
 }
 
 export interface UserUpdate {
@@ -40,6 +43,7 @@ export interface UserUpdate {
   account_id?: string | null
   is_active?: boolean
   timezone?: string | null
+  language?: string
 }
 
 export interface UserPasswordChange {

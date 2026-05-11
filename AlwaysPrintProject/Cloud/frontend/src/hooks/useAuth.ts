@@ -12,7 +12,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { authApi } from '@/lib/api'
+import { authApi, usersApi } from '@/lib/api'
 import type { User, LoginRequest, UserRole } from '@/types'
 
 interface AuthState {
@@ -194,6 +194,22 @@ export function useAuth() {
   }, [])
 
   /**
+   * Actualizar idioma del usuario autenticado.
+   */
+  const updateLanguage = useCallback(async (language: 'en' | 'es') => {
+    try {
+      await usersApi.updateLanguage(language)
+      const updatedUser = state.user ? { ...state.user, language } : null
+      if (updatedUser) {
+        localStorage.setItem('user', JSON.stringify(updatedUser))
+        setState((prev) => ({ ...prev, user: updatedUser }))
+      }
+    } catch (error) {
+      console.error('Error al actualizar idioma:', error)
+    }
+  }, [state.user])
+
+  /**
    * Obtener headers de autenticación para requests.
    */
   const getAuthHeaders = useCallback(() => {
@@ -216,5 +232,6 @@ export function useAuth() {
     isOperator,
     refreshUser,
     getAuthHeaders,
+    updateLanguage,
   }
 }

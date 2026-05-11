@@ -28,6 +28,7 @@ import {
   Building2,
   Globe,
 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import type { GlobalConfig, GlobalConfigUpdate, SearchTargets } from '@/types/config'
 
 interface Account {
@@ -40,6 +41,8 @@ type ConfigTab = 'global' | 'organization'
 
 export default function ConfigPage() {
   const { user, getAuthHeaders } = useAuth()
+  const t = useTranslations('config')
+  const tCommon = useTranslations('common')
   const [activeTab, setActiveTab] = useState<ConfigTab>('organization')
   const [config, setConfig] = useState<GlobalConfig | null>(null)
   const [loading, setLoading] = useState(true)
@@ -317,10 +320,8 @@ export default function ConfigPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Configuración</h1>
-        <p className="mt-2 text-gray-600">
-          Gestiona la configuración del sistema en diferentes niveles
-        </p>
+        <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
+        <p className="mt-2 text-gray-600">{t('subtitle')}</p>
       </div>
 
       {/* Tabs */}
@@ -337,9 +338,9 @@ export default function ConfigPage() {
             `}
           >
             <Building2 className="h-5 w-5" />
-            Configuración por Organización
+            {t('tabOrg')}
           </button>
-          
+
           {user?.role === 'admin' && (
             <button
               onClick={() => setActiveTab('global')}
@@ -352,7 +353,7 @@ export default function ConfigPage() {
               `}
             >
               <Globe className="h-5 w-5" />
-              Configuración Global del Sistema
+              {t('tabGlobal')}
             </button>
           )}
         </nav>
@@ -364,21 +365,19 @@ export default function ConfigPage() {
           {/* Header de la sección */}
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Configuración por Organización</h2>
-              <p className="mt-1 text-sm text-gray-600">
-                Configuración que se aplica a todas las workstations de una organización
-              </p>
+              <h2 className="text-xl font-semibold text-gray-900">{t('orgTitle')}</h2>
+              <p className="mt-1 text-sm text-gray-600">{t('orgDesc')}</p>
             </div>
             <div className="flex gap-2">
               {hasChanges && (
                 <Button variant="outline" onClick={handleReset} disabled={saving}>
                   <RotateCcw className="mr-2 h-4 w-4" />
-                  Descartar
+                  {t('discard')}
                 </Button>
               )}
               <Button onClick={handleSave} disabled={saving || !hasChanges || (user?.role === 'admin' && !selectedAccountId)}>
                 <Save className="mr-2 h-4 w-4" />
-                {saving ? 'Guardando...' : 'Guardar Cambios'}
+                {saving ? t('saving') : t('save')}
               </Button>
             </div>
           </div>
@@ -387,7 +386,7 @@ export default function ConfigPage() {
           {user?.role === 'admin' && (
             <div className="bg-white rounded-lg shadow p-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Organización *
+                {t('selectOrg')}
               </label>
               <select
                 value={selectedAccountId}
@@ -397,16 +396,14 @@ export default function ConfigPage() {
                 }}
                 className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Seleccionar organización...</option>
+                <option value="">{t('selectOrg')}</option>
                 {accounts.map((account) => (
                   <option key={account.id} value={account.id}>
                     {account.name}
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-sm text-gray-500">
-                Selecciona la organización para configurar
-              </p>
+              <p className="mt-1 text-sm text-gray-500">{t('selectOrgHelper')}</p>
             </div>
           )}
 
@@ -415,14 +412,9 @@ export default function ConfigPage() {
         <div className="flex">
           <Info className="h-5 w-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" />
           <div>
-            <h3 className="text-sm font-medium text-blue-900">Jerarquía de Configuración</h3>
-            <p className="mt-1 text-sm text-blue-700">
-              Esta configuración se aplica a nivel de <strong>organización</strong>. 
-              Puede ser sobrescrita por configuración específica de <strong>VLAN</strong> o <strong>workstation individual</strong>.
-            </p>
-            <div className="mt-2 text-xs text-blue-600 font-mono">
-              Sistema → <strong className="text-blue-800">Organización (aquí)</strong> → VLAN → Workstation
-            </div>
+            <h3 className="text-sm font-medium text-blue-900">{t('hierarchyTitle')}</h3>
+            <p className="mt-1 text-sm text-blue-700">{t('hierarchyMsg')}</p>
+            <div className="mt-2 text-xs text-blue-600 font-mono">{t('hierarchy')}</div>
           </div>
         </div>
       </div>
@@ -433,7 +425,7 @@ export default function ConfigPage() {
           {/* Cola Corporativa */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nombre de la Cola Corporativa *
+              {t('corpQueue')}
             </label>
             <Input
               type="text"
@@ -446,15 +438,13 @@ export default function ConfigPage() {
               className="max-w-md"
               disabled={user?.role === 'admin' && !selectedAccountId}
             />
-            <p className="mt-1 text-sm text-gray-500">
-              Nombre de la cola de impresión corporativa en Windows
-            </p>
+            <p className="mt-1 text-sm text-gray-500">{t('corpQueueHelper')}</p>
           </div>
 
           {/* Intervalo de Polling */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Intervalo de Polling (minutos) *
+              {t('pollingInterval')}
             </label>
             <Input
               type="number"
@@ -468,15 +458,13 @@ export default function ConfigPage() {
               className="max-w-xs"
               disabled={user?.role === 'admin' && !selectedAccountId}
             />
-            <p className="mt-1 text-sm text-gray-500">
-              Frecuencia con la que las workstations consultan por tareas pendientes (1-1440 minutos)
-            </p>
+            <p className="mt-1 text-sm text-gray-500">{t('pollingHelper')}</p>
           </div>
 
           {/* Dominios de Bootstrap */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Dominios de Bootstrap
+              {t('bootstrapDomains')}
             </label>
             <Input
               type="text"
@@ -489,15 +477,12 @@ export default function ConfigPage() {
               className="max-w-md"
               disabled={user?.role === 'admin' && !selectedAccountId}
             />
-            <p className="mt-1 text-sm text-gray-500">
-              Dominios separados por comas para configuración inicial
-            </p>
           </div>
 
           {/* Objetivos de Búsqueda - IPs */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              IPs de Búsqueda de Impresoras
+              {t('printerIps')}
             </label>
             <div className="space-y-2">
               {searchIps.map((ip, index) => (
@@ -533,17 +518,15 @@ export default function ConfigPage() {
               disabled={user?.role === 'admin' && !selectedAccountId}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Agregar IP
+              {t('addIp')}
             </Button>
-            <p className="mt-1 text-sm text-gray-500">
-              IPs específicas donde buscar impresoras disponibles
-            </p>
+            <p className="mt-1 text-sm text-gray-500">{t('printerIpsHelper')}</p>
           </div>
 
           {/* Objetivos de Búsqueda - Rangos */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Rangos de Búsqueda de Impresoras
+              {t('printerRanges')}
             </label>
             <div className="space-y-2">
               {searchRanges.map((range, index) => (
@@ -579,11 +562,9 @@ export default function ConfigPage() {
               disabled={user?.role === 'admin' && !selectedAccountId}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Agregar Rango
+              {t('addRange')}
             </Button>
-            <p className="mt-1 text-sm text-gray-500">
-              Rangos CIDR donde buscar impresoras (ej: 192.168.1.0/24)
-            </p>
+            <p className="mt-1 text-sm text-gray-500">{t('printerRangesHelper')}</p>
           </div>
         </div>
       </div>
@@ -591,19 +572,15 @@ export default function ConfigPage() {
       {/* Información adicional */}
       {config && (
         <div className="bg-gray-50 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-gray-900 mb-2">Información</h3>
+          <h3 className="text-sm font-medium text-gray-900 mb-2">{tCommon('status')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="text-gray-600">Última actualización:</span>
-              <span className="ml-2 text-gray-900">
-                {new Date(config.updated_at).toLocaleString('es-PE')}
-              </span>
+              <span className="text-gray-600">{t('lastUpdated')}</span>
+              <span className="ml-2 text-gray-900">{new Date(config.updated_at).toLocaleString()}</span>
             </div>
             <div>
-              <span className="text-gray-600">Creado:</span>
-              <span className="ml-2 text-gray-900">
-                {new Date(config.created_at).toLocaleString('es-PE')}
-              </span>
+              <span className="text-gray-600">{t('created')}</span>
+              <span className="ml-2 text-gray-900">{new Date(config.created_at).toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -615,13 +592,8 @@ export default function ConfigPage() {
           <div className="flex">
             <AlertCircle className="h-5 w-5 text-yellow-600 mr-3 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="text-sm font-medium text-yellow-900">
-                No hay configuración global
-              </h3>
-              <p className="mt-1 text-sm text-yellow-700">
-                Esta organización aún no tiene configuración global. Completa el formulario y guarda
-                los cambios para crear la configuración inicial.
-              </p>
+              <h3 className="text-sm font-medium text-yellow-900">{t('noConfigTitle')}</h3>
+              <p className="mt-1 text-sm text-yellow-700">{t('noConfigMsg')}</p>
             </div>
           </div>
         </div>
@@ -633,12 +605,8 @@ export default function ConfigPage() {
           <div className="flex">
             <Info className="h-5 w-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="text-sm font-medium text-blue-900">
-                Selecciona una organización
-              </h3>
-              <p className="mt-1 text-sm text-blue-700">
-                Selecciona una organización del selector superior para ver o editar su configuración global.
-              </p>
+              <h3 className="text-sm font-medium text-blue-900">{t('selectOrgTitle')}</h3>
+              <p className="mt-1 text-sm text-blue-700">{t('selectOrgMsg')}</p>
             </div>
           </div>
         </div>
@@ -651,10 +619,8 @@ export default function ConfigPage() {
         <div className="space-y-6">
           {/* Header de la sección */}
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Configuración Global del Sistema</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Configuración que se aplica a todas las organizaciones del sistema
-            </p>
+            <h2 className="text-xl font-semibold text-gray-900">{t('systemConfigTitle')}</h2>
+            <p className="mt-1 text-sm text-gray-600">{t('systemConfigMsg')}</p>
           </div>
 
           {/* Alerta informativa */}
@@ -662,14 +628,9 @@ export default function ConfigPage() {
             <div className="flex">
               <Info className="h-5 w-5 text-purple-600 mr-3 flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="text-sm font-medium text-purple-900">Configuración de Sistema</h3>
-                <p className="mt-1 text-sm text-purple-700">
-                  Esta configuración se aplica a <strong>todas las organizaciones</strong> del sistema.
-                  Cada organización puede sobrescribir estos valores con su propia configuración.
-                </p>
-                <div className="mt-2 text-xs text-purple-600 font-mono">
-                  <strong className="text-purple-800">Sistema (aquí)</strong> → Organización → VLAN → Workstation
-                </div>
+                <h3 className="text-sm font-medium text-purple-900">{t('systemConfigTitle')}</h3>
+                <p className="mt-1 text-sm text-purple-700">{t('systemConfigMsg')}</p>
+                <div className="mt-2 text-xs text-purple-600 font-mono">{t('systemHierarchy')}</div>
               </div>
             </div>
           </div>
@@ -685,9 +646,7 @@ export default function ConfigPage() {
                 Esta sección permite configurar parámetros que se aplican a todas las organizaciones.
                 Actualmente, la configuración se gestiona a nivel de organización.
               </p>
-              <p className="mt-4 text-xs text-gray-400">
-                Funcionalidad disponible en próximas versiones
-              </p>
+              <p className="mt-4 text-xs text-gray-400">{t('comingSoon')}</p>
             </div>
           </div>
         </div>

@@ -28,6 +28,7 @@ import {
   Clock,
   X
 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { formatDateWithTimezone, COMMON_TIMEZONES } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 import { useAuth } from '@/hooks/useAuth'
@@ -37,6 +38,8 @@ export default function UsersPage() {
   const queryClient = useQueryClient()
   const userTimezone = useUserTimezone()
   const { user: currentUser, refreshUser } = useAuth()
+  const t = useTranslations('users')
+  const tCommon = useTranslations('common')
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [deletingUser, setDeletingUser] = useState<User | null>(null)
@@ -94,7 +97,7 @@ export default function UsersPage() {
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Usuarios</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
         <div className="animate-pulse space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-24 bg-gray-200 rounded-lg"></div>
@@ -107,7 +110,7 @@ export default function UsersPage() {
   if (error) {
     return (
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Usuarios</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -123,14 +126,12 @@ export default function UsersPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Usuarios</h1>
-          <p className="text-gray-600 mt-2">
-            Gestiona los usuarios del sistema
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
+          <p className="text-gray-600 mt-2">{t('subtitle')}</p>
         </div>
         <Button onClick={() => setShowCreateForm(true)}>
           <Plus className="w-4 h-4 mr-2" />
-          Nuevo Usuario
+          {t('newUser')}
         </Button>
       </div>
 
@@ -138,7 +139,7 @@ export default function UsersPage() {
       {showCreateForm && (
         <Card className="mb-6 border-blue-200 bg-blue-50">
           <CardHeader>
-            <CardTitle>Crear Nuevo Usuario</CardTitle>
+            <CardTitle>{t('createTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             <UserForm
@@ -156,7 +157,7 @@ export default function UsersPage() {
       {editingUser && (
         <Card className="mb-6 border-amber-200 bg-amber-50">
           <CardHeader>
-            <CardTitle>Editar Usuario: {editingUser.email}</CardTitle>
+            <CardTitle>{t('editTitle', { email: editingUser.email })}</CardTitle>
           </CardHeader>
           <CardContent>
             <UserForm
@@ -188,7 +189,7 @@ export default function UsersPage() {
                           {user.full_name}
                         </h3>
                         <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                          {user.role === 'admin' ? 'Administrador' : 'Operador'}
+                          {user.role === 'admin' ? t('roleAdmin') : t('roleOperator')}
                         </Badge>
                         {!user.is_active && (
                           <Badge variant="destructive" className="ml-2">
@@ -254,14 +255,12 @@ export default function UsersPage() {
             <CardContent className="p-12 text-center">
               <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No hay usuarios
+                {t('emptyTitle')}
               </h3>
-              <p className="text-gray-600 mb-4">
-                Crea el primer usuario del sistema.
-              </p>
+              <p className="text-gray-600 mb-4">{t('emptyMessage')}</p>
               <Button onClick={() => setShowCreateForm(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Crear Usuario
+                {t('createBtn')}
               </Button>
             </CardContent>
           </Card>
@@ -299,9 +298,11 @@ function UserForm({
   error?: string
 }) {
   const { user: currentUser } = useAuth()
+  const t = useTranslations('users')
+  const tCommon = useTranslations('common')
   const isEdit = !!user
   const isEditingSelf = isEdit && currentUser && user.id === currentUser.id
-  
+
   const [formData, setFormData] = useState<any>({
     email: user?.email || '',
     password: '',
@@ -309,6 +310,7 @@ function UserForm({
     role: user?.role || 'operator',
     account_id: user?.account_id || '',
     timezone: user?.timezone || '',
+    language: user?.language || 'en',
     is_active: user?.is_active ?? true,
   })
 
@@ -322,6 +324,7 @@ function UserForm({
       role: formData.role,
       account_id: formData.account_id || undefined,
       timezone: formData.timezone || undefined,
+      language: formData.language || 'en',
     }
     
     if (isEdit) {
@@ -354,11 +357,11 @@ function UserForm({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Email */}
         <div className="space-y-2">
-          <Label htmlFor="email">Email *</Label>
+          <Label htmlFor="email">{t('emailLabel')}</Label>
           <Input
             id="email"
             type="email"
-            placeholder="usuario@ejemplo.com"
+            placeholder={t('emailPlaceholder')}
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             disabled={isLoading}
@@ -368,11 +371,11 @@ function UserForm({
 
         {/* Nombre completo */}
         <div className="space-y-2">
-          <Label htmlFor="full_name">Nombre Completo *</Label>
+          <Label htmlFor="full_name">{t('fullNameLabel')}</Label>
           <Input
             id="full_name"
             type="text"
-            placeholder="Juan Pérez"
+            placeholder={t('fullNamePlaceholder')}
             value={formData.full_name}
             onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
             disabled={isLoading}
@@ -383,13 +386,13 @@ function UserForm({
         {/* Contraseña */}
         <div className="space-y-2">
           <Label htmlFor="password">
-            Contraseña {!isEdit && '*'}
-            {isEdit && <span className="text-xs text-gray-500 ml-2">(dejar vacío para no cambiar)</span>}
+            {t('passwordLabel')}
+            {isEdit && <span className="text-xs text-gray-500 ml-2">{t('passwordHint')}</span>}
           </Label>
           <Input
             id="password"
             type="password"
-            placeholder={isEdit ? '••••••••' : 'Contraseña segura'}
+            placeholder={isEdit ? '••••••••' : t('passwordPlaceholder')}
             value={formData.password}
             onChange={(e) => setFormData({ ...formData, password: e.target.value })}
             disabled={isLoading}
@@ -399,7 +402,7 @@ function UserForm({
 
         {/* Rol */}
         <div className="space-y-2">
-          <Label htmlFor="role">Rol *</Label>
+          <Label htmlFor="role">{t('roleLabel')}</Label>
           <select
             id="role"
             value={formData.role}
@@ -408,14 +411,14 @@ function UserForm({
             className="w-full px-3 py-2 border rounded-md"
             required
           >
-            <option value="operator">Operador</option>
-            <option value="admin">Administrador</option>
+            <option value="operator">{t('roleOperator')}</option>
+            <option value="admin">{t('roleAdmin')}</option>
           </select>
         </div>
 
         {/* Organización */}
         <div className="space-y-2">
-          <Label htmlFor="account_id">Organización</Label>
+          <Label htmlFor="account_id">{t('orgLabel')}</Label>
           <select
             id="account_id"
             value={formData.account_id}
@@ -423,11 +426,9 @@ function UserForm({
             disabled={isLoading}
             className="w-full px-3 py-2 border rounded-md"
           >
-            <option value="">Sin asignar</option>
+            <option value="">{t('timezoneDefault')}</option>
             {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
+              <option key={account.id} value={account.id}>{account.name}</option>
             ))}
           </select>
         </div>
@@ -435,10 +436,10 @@ function UserForm({
         {/* Timezone */}
         <div className="space-y-2">
           <Label htmlFor="timezone">
-            Zona Horaria
+            {t('timezoneLabel')}
             {formData.account_id && (
               <span className="text-xs text-gray-500 ml-2">
-                (heredará {inheritedTimezone} si no se especifica)
+                {t('timezoneInherit', { timezone: inheritedTimezone })}
               </span>
             )}
           </Label>
@@ -449,12 +450,25 @@ function UserForm({
             disabled={isLoading}
             className="w-full px-3 py-2 border rounded-md"
           >
-            <option value="">Heredar de organización</option>
+            <option value="">{t('timezoneDefault')}</option>
             {COMMON_TIMEZONES.map((tz) => (
-              <option key={tz.value} value={tz.value}>
-                {tz.label}
-              </option>
+              <option key={tz.value} value={tz.value}>{tz.label}</option>
             ))}
+          </select>
+        </div>
+
+        {/* Idioma */}
+        <div className="space-y-2">
+          <Label htmlFor="language">{t('languageLabel')}</Label>
+          <select
+            id="language"
+            value={formData.language}
+            onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+            disabled={isLoading}
+            className="w-full px-3 py-2 border rounded-md"
+          >
+            <option value="en">English</option>
+            <option value="es">Español</option>
           </select>
         </div>
 
@@ -462,11 +476,9 @@ function UserForm({
         {isEdit && (
           <div className="space-y-2">
             <Label htmlFor="is_active">
-              Estado
+              {t('statusLabel')}
               {isEditingSelf && (
-                <span className="text-xs text-amber-600 ml-2">
-                  (no puedes desactivar tu propio usuario)
-                </span>
+                <span className="text-xs text-amber-600 ml-2">{t('statusWarning')}</span>
               )}
             </Label>
             <select
@@ -476,13 +488,11 @@ function UserForm({
               disabled={isLoading || !!isEditingSelf}
               className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
-              <option value="true">Activo</option>
-              <option value="false">Inactivo</option>
+              <option value="true">{t('statusActive')}</option>
+              <option value="false">{t('statusInactive')}</option>
             </select>
             {isEditingSelf && (
-              <p className="text-xs text-gray-500">
-                Por seguridad, no puedes cambiar el estado de tu propio usuario.
-              </p>
+              <p className="text-xs text-gray-500">{t('selfDeactivateNote')}</p>
             )}
           </div>
         )}
@@ -491,18 +501,16 @@ function UserForm({
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription className="text-xs">
-          <strong>Nota:</strong> Si no se especifica una zona horaria, el usuario heredará
-          la zona horaria de su organización ({inheritedTimezone}). Los administradores sin
-          organización usarán UTC por defecto.
+          {t('timezoneNote', { timezone: inheritedTimezone })}
         </AlertDescription>
       </Alert>
 
       <div className="flex justify-end space-x-3">
         <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-          Cancelar
+          {tCommon('cancel')}
         </Button>
         <Button type="submit" disabled={isLoading}>
-          {isLoading ? (isEdit ? 'Actualizando...' : 'Creando...') : (isEdit ? 'Actualizar' : 'Crear')}
+          {isLoading ? (isEdit ? tCommon('updating') : tCommon('creating')) : (isEdit ? t('updateBtn') : t('createBtn'))}
         </Button>
       </div>
     </form>
@@ -523,11 +531,14 @@ function DeleteConfirmModal({
   isLoading: boolean
   error?: string
 }) {
+  const t = useTranslations('users')
+  const tCommon = useTranslations('common')
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <Card className="max-w-md w-full">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-red-600">Confirmar Eliminación</CardTitle>
+          <CardTitle className="text-red-600">{t('deleteTitle')}</CardTitle>
           <Button variant="ghost" size="sm" onClick={onCancel} disabled={isLoading}>
             <X className="w-5 h-5" />
           </Button>
@@ -541,26 +552,20 @@ function DeleteConfirmModal({
           )}
 
           <p className="text-gray-700">
-            ¿Estás seguro de que deseas eliminar al usuario <strong>{user.full_name}</strong> ({user.email})?
+            {t('deleteConfirm', { name: user.full_name, email: user.email })}
           </p>
 
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Esta acción no se puede deshacer. Todos los datos asociados al usuario se perderán.
-            </AlertDescription>
+            <AlertDescription>{t('deleteWarning')}</AlertDescription>
           </Alert>
 
           <div className="flex justify-end space-x-3">
             <Button variant="outline" onClick={onCancel} disabled={isLoading}>
-              Cancelar
+              {tCommon('cancel')}
             </Button>
-            <Button 
-              variant="destructive" 
-              onClick={onConfirm} 
-              disabled={isLoading}
-            >
-              {isLoading ? 'Eliminando...' : 'Eliminar Usuario'}
+            <Button variant="destructive" onClick={onConfirm} disabled={isLoading}>
+              {isLoading ? tCommon('deleting') : t('deleteBtn')}
             </Button>
           </div>
         </CardContent>

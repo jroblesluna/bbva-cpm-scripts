@@ -1,26 +1,18 @@
 /**
  * Página de auditoría del sistema.
- * 
- * Muestra un registro completo de todas las acciones realizadas:
- * - Creación, actualización y eliminación de entidades
- * - Cambios de configuración
- * - Logins y logouts
- * - Mensajes enviados
- * - Registro de workstations
- * - Autorización/rechazo de IPs
  */
 
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   FileText,
   Search,
-  Filter,
   Calendar,
   User,
   Activity,
@@ -31,8 +23,10 @@ import { formatDateWithTimezone } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 
 export default function AuditPage() {
-  const { user, getAuthHeaders } = useAuth()
+  const { getAuthHeaders } = useAuth()
   const timezone = useUserTimezone()
+  const t = useTranslations('audit')
+  const tCommon = useTranslations('common')
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [stats, setStats] = useState<AuditLogStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -43,7 +37,6 @@ export default function AuditPage() {
   const [total, setTotal] = useState(0)
   const pageSize = 50
 
-  // Cargar logs y estadísticas
   useEffect(() => {
     loadLogs()
     loadStats()
@@ -52,35 +45,16 @@ export default function AuditPage() {
   const loadLogs = async () => {
     try {
       setLoading(true)
-
-      const params = new URLSearchParams({
-        page: page.toString(),
-        page_size: pageSize.toString(),
-      })
-
-      if (filterActionType) {
-        params.append('action_type', filterActionType)
-      }
-
-      if (filterEntityType) {
-        params.append('entity_type', filterEntityType)
-      }
-
-      const response = await fetch(
-        `http://localhost:8000/api/v1/audit/?${params.toString()}`,
-        {
-          headers: getAuthHeaders(),
-        }
-      )
-
-      if (!response.ok) throw new Error('Error al cargar logs de auditoría')
-
+      const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() })
+      if (filterActionType) params.append('action_type', filterActionType)
+      if (filterEntityType) params.append('entity_type', filterEntityType)
+      const response = await fetch(`http://localhost:8000/api/v1/audit/?${params.toString()}`, { headers: getAuthHeaders() })
+      if (!response.ok) throw new Error('Error')
       const data = await response.json()
       setLogs(data.logs || [])
       setTotal(data.total || 0)
     } catch (error) {
       console.error('Error:', error)
-      alert('Error al cargar logs de auditoría')
     } finally {
       setLoading(false)
     }
@@ -88,12 +62,8 @@ export default function AuditPage() {
 
   const loadStats = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/audit/stats', {
-        headers: getAuthHeaders(),
-      })
-
-      if (!response.ok) throw new Error('Error al cargar estadísticas')
-
+      const response = await fetch('http://localhost:8000/api/v1/audit/stats', { headers: getAuthHeaders() })
+      if (!response.ok) throw new Error('Error')
       const data = await response.json()
       setStats(data)
     } catch (error) {
@@ -101,31 +71,26 @@ export default function AuditPage() {
     }
   }
 
-  // Filtrar logs por búsqueda
   const filteredLogs = logs.filter((log) => {
-    const searchLower = searchTerm.toLowerCase()
-    return (
-      log.entity_type.toLowerCase().includes(searchLower) ||
-      log.action_type.toLowerCase().includes(searchLower) ||
-      log.entity_id.toLowerCase().includes(searchLower)
-    )
+    const s = searchTerm.toLowerCase()
+    return log.entity_type.toLowerCase().includes(s) || log.action_type.toLowerCase().includes(s) || log.entity_id.toLowerCase().includes(s)
   })
 
   const getActionTypeLabel = (type: ActionType): string => {
-    const labels: Record<ActionType, string> = {
-      create: 'Crear',
-      update: 'Actualizar',
-      delete: 'Eliminar',
-      config_change: 'Cambio Config',
-      contingency_toggle: 'Contingencia',
-      message_sent: 'Mensaje Enviado',
-      command_sent: 'Comando Enviado',
+    const labels: Record<string, string> = {
+      create: t('create'),
+      update: t('update'),
+      delete: t('delete'),
+      config_change: t('configChange'),
+      contingency_toggle: t('contingency'),
+      message_sent: t('messageSent'),
+      command_sent: t('commandSent'),
     }
     return labels[type] || type
   }
 
   const getActionTypeBadgeColor = (type: ActionType): string => {
-    const colors: Record<ActionType, string> = {
+    const colors: Record<string, string> = {
       create: 'bg-green-100 text-green-800',
       update: 'bg-blue-100 text-blue-800',
       delete: 'bg-red-100 text-red-800',
@@ -142,7 +107,7 @@ export default function AuditPage() {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando auditoría...</p>
+          <p className="mt-4 text-gray-600">{tCommon('loading')}</p>
         </div>
       </div>
     )
@@ -150,79 +115,55 @@ export default function AuditPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Auditoría</h1>
-        <p className="mt-2 text-gray-600">
-          Registro completo de todas las acciones realizadas en el sistema
-        </p>
+        <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
+        <p className="mt-2 text-gray-600">{t('subtitle')}</p>
       </div>
 
-      {/* Estadísticas */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <FileText className="h-6 w-6 text-blue-600" />
-              </div>
+              <div className="p-3 bg-blue-100 rounded-lg"><FileText className="h-6 w-6 text-blue-600" /></div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Acciones</p>
+                <p className="text-sm font-medium text-gray-600">{t('totalActions')}</p>
                 <p className="text-2xl font-bold text-gray-900">{stats.total_actions}</p>
               </div>
             </div>
           </div>
-
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Activity className="h-6 w-6 text-green-600" />
-              </div>
+              <div className="p-3 bg-green-100 rounded-lg"><Activity className="h-6 w-6 text-green-600" /></div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Últimas 24h</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.recent_activity_count}
-                </p>
+                <p className="text-sm font-medium text-gray-600">{t('last24h')}</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.recent_activity_count}</p>
               </div>
             </div>
           </div>
-
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <User className="h-6 w-6 text-purple-600" />
-              </div>
+              <div className="p-3 bg-purple-100 rounded-lg"><User className="h-6 w-6 text-purple-600" /></div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Usuarios Activos</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.most_active_users.length}
-                </p>
+                <p className="text-sm font-medium text-gray-600">{t('activeUsers')}</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.most_active_users.length}</p>
               </div>
             </div>
           </div>
-
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center">
-              <div className="p-3 bg-yellow-100 rounded-lg">
-                <TrendingUp className="h-6 w-6 text-yellow-600" />
-              </div>
+              <div className="p-3 bg-yellow-100 rounded-lg"><TrendingUp className="h-6 w-6 text-yellow-600" /></div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Tipos de Acción</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {Object.keys(stats.actions_by_type).length}
-                </p>
+                <p className="text-sm font-medium text-gray-600">{t('actionTypes')}</p>
+                <p className="text-2xl font-bold text-gray-900">{Object.keys(stats.actions_by_type).length}</p>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Distribución por tipo de acción */}
       {stats && Object.keys(stats.actions_by_type).length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            Distribución por Tipo de Acción
-          </h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">{t('distribution')}</h3>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {Object.entries(stats.actions_by_type).map(([type, count]) => (
               <div key={type} className="text-center">
@@ -236,64 +177,37 @@ export default function AuditPage() {
         </div>
       )}
 
-      {/* Filtros */}
       <div className="bg-white rounded-lg shadow p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Búsqueda */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <Input
-              type="text"
-              placeholder="Buscar en logs..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+            <Input type="text" placeholder={t('searchPlaceholder')} value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
           </div>
-
-          {/* Filtro por tipo de acción */}
-          <select
-            value={filterActionType || 'all'}
-            onChange={(e) => {
-              const value = e.target.value
-              setFilterActionType(value === 'all' ? null : (value as ActionType))
-              setPage(1)
-            }}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">Todos los tipos de acción</option>
-            <option value="create">Crear</option>
-            <option value="update">Actualizar</option>
-            <option value="delete">Eliminar</option>
-            <option value="config_change">Cambio Config</option>
-            <option value="contingency_toggle">Contingencia</option>
-            <option value="message_sent">Mensaje Enviado</option>
-            <option value="command_sent">Comando Enviado</option>
+          <select value={filterActionType || 'all'}
+            onChange={(e) => { setFilterActionType(e.target.value === 'all' ? null : (e.target.value as ActionType)); setPage(1) }}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="all">{t('allTypes')}</option>
+            <option value="create">{t('create')}</option>
+            <option value="update">{t('update')}</option>
+            <option value="delete">{t('delete')}</option>
+            <option value="config_change">{t('configChange')}</option>
+            <option value="contingency_toggle">{t('contingency')}</option>
+            <option value="message_sent">{t('messageSent')}</option>
+            <option value="command_sent">{t('commandSent')}</option>
           </select>
-
-          {/* Filtro por tipo de entidad */}
-          <Input
-            type="text"
-            placeholder="Filtrar por tipo de entidad..."
-            value={filterEntityType}
-            onChange={(e) => {
-              setFilterEntityType(e.target.value)
-              setPage(1)
-            }}
-          />
+          <Input type="text" placeholder={t('filterEntity')} value={filterEntityType}
+            onChange={(e) => { setFilterEntityType(e.target.value); setPage(1) }} />
         </div>
       </div>
 
-      {/* Lista de logs */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {filteredLogs.length === 0 ? (
           <div className="text-center py-12">
             <FileText className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No hay registros</h3>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">{t('emptyTitle')}</h3>
             <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || filterActionType || filterEntityType
-                ? 'No se encontraron registros con ese criterio'
-                : 'Aún no hay actividad registrada'}
+              {searchTerm || filterActionType || filterEntityType ? t('emptyFilterMessage') : t('emptyMessage')}
             </p>
           </div>
         ) : (
@@ -301,21 +215,11 @@ export default function AuditPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Fecha
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acción
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Entidad
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ID Entidad
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    IP
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colDate')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colAction')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colEntity')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colEntityId')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colIp')}</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -333,9 +237,7 @@ export default function AuditPage() {
                       <span className="text-sm text-gray-900">{log.entity_type}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-500 font-mono">
-                        {log.entity_id.substring(0, 8)}...
-                      </span>
+                      <span className="text-sm text-gray-500 font-mono">{log.entity_id.substring(0, 8)}...</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {log.ip_address || '-'}
@@ -347,53 +249,15 @@ export default function AuditPage() {
           </div>
         )}
 
-        {/* Paginación */}
         {total > pageSize && (
           <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-            <div className="flex-1 flex justify-between sm:hidden">
-              <Button
-                variant="outline"
-                onClick={() => setPage(page - 1)}
-                disabled={page === 1}
-              >
-                Anterior
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setPage(page + 1)}
-                disabled={page * pageSize >= total}
-              >
-                Siguiente
-              </Button>
-            </div>
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Mostrando <span className="font-medium">{(page - 1) * pageSize + 1}</span> a{' '}
-                  <span className="font-medium">
-                    {Math.min(page * pageSize, total)}
-                  </span>{' '}
-                  de <span className="font-medium">{total}</span> registros
-                </p>
-              </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                  <Button
-                    variant="outline"
-                    onClick={() => setPage(page - 1)}
-                    disabled={page === 1}
-                  >
-                    Anterior
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setPage(page + 1)}
-                    disabled={page * pageSize >= total}
-                    className="ml-2"
-                  >
-                    Siguiente
-                  </Button>
-                </nav>
+              <p className="text-sm text-gray-700">
+                {t('pagination', { start: (page - 1) * pageSize + 1, end: Math.min(page * pageSize, total), total })}
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setPage(page - 1)} disabled={page === 1}>{tCommon('previous')}</Button>
+                <Button variant="outline" onClick={() => setPage(page + 1)} disabled={page * pageSize >= total}>{tCommon('next')}</Button>
               </div>
             </div>
           </div>

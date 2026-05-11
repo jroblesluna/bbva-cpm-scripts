@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Monitor, CheckCircle, Building2, Network, AlertCircle, Globe } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
+import { useTranslations } from 'next-intl'
 
 interface WorkstationStats {
   total: number
@@ -36,12 +37,12 @@ interface PendingIP {
 
 export default function DashboardPage() {
   const { isAdmin, getAuthHeaders } = useAuth()
+  const t = useTranslations('dashboard')
   const [stats, setStats] = useState<WorkstationStats | null>(null)
   const [pendingIPs, setPendingIPs] = useState<PendingIP[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Cargar estadísticas de workstations
   useEffect(() => {
     const loadStats = async () => {
       try {
@@ -65,7 +66,6 @@ export default function DashboardPage() {
     loadStats()
   }, [getAuthHeaders])
 
-  // Cargar IPs pendientes (solo para admin)
   useEffect(() => {
     if (!isAdmin()) return
 
@@ -75,13 +75,11 @@ export default function DashboardPage() {
           headers: getAuthHeaders(),
         })
 
-        if (!response.ok) return // Ignorar errores silenciosamente
+        if (!response.ok) return
 
         const data = await response.json()
-        // La respuesta es un array directamente
         setPendingIPs(Array.isArray(data) ? data : [])
       } catch (err) {
-        // Ignorar errores de IPs pendientes
         console.error('Error al cargar IPs pendientes:', err)
       }
     }
@@ -92,7 +90,7 @@ export default function DashboardPage() {
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Dashboard</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i} className="animate-pulse">
@@ -108,39 +106,38 @@ export default function DashboardPage() {
 
   if (error) {
     console.error('Error en dashboard:', error)
-    
-    // Verificar si es error de autenticación o red
+
     const isAuthError = error.includes('Not authenticated') || error.includes('autenticado')
     const isNetworkError = error.includes('Network Error') || error.includes('Failed to fetch')
-    
+
     return (
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Dashboard</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             {isAuthError ? (
               <>
-                <strong>Sesión expirada.</strong> Por favor, cierra sesión y vuelve a iniciar sesión.
+                <strong>{t('sessionExpired')}</strong>
               </>
             ) : isNetworkError ? (
               <>
-                <strong>Error de conexión.</strong> El backend no responde. Verifica que esté corriendo en http://localhost:8000
+                <strong>{t('connectionError')}</strong>
                 <div className="mt-3">
                   <Button onClick={() => window.location.reload()} size="sm" variant="outline">
-                    Reintentar
+                    {t('retry')}
                   </Button>
                 </div>
               </>
             ) : (
               <>
-                Error al cargar estadísticas. Por favor, intenta de nuevo.
+                {t('loadError')}
                 <div className="mt-2 text-xs font-mono bg-red-50 p-2 rounded">
                   {error}
                 </div>
                 <div className="mt-3">
                   <Button onClick={() => window.location.reload()} size="sm" variant="outline">
-                    Reintentar
+                    {t('retry')}
                   </Button>
                 </div>
               </>
@@ -153,16 +150,15 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Dashboard</h1>
+      <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
 
       {/* Tarjetas de estadísticas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* Estaciones Totales */}
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Estaciones Totales</p>
+                <p className="text-sm text-gray-600">{t('totalStations')}</p>
                 <p className="text-3xl font-bold text-gray-900">{stats?.total || 0}</p>
               </div>
               <div className="bg-blue-100 rounded-full p-3">
@@ -172,15 +168,14 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Estaciones Online */}
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Estaciones Online</p>
+                <p className="text-sm text-gray-600">{t('onlineStations')}</p>
                 <p className="text-3xl font-bold text-green-600">{stats?.online || 0}</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {stats?.offline || 0} offline
+                  {stats?.offline || 0} {t('offline')}
                 </p>
               </div>
               <div className="bg-green-100 rounded-full p-3">
@@ -190,12 +185,11 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Contingencia Activa */}
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Contingencia Activa</p>
+                <p className="text-sm text-gray-600">{t('activeContingency')}</p>
                 <p className="text-3xl font-bold text-orange-600">
                   {stats?.contingency_active || 0}
                 </p>
@@ -207,16 +201,15 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* IPs Pendientes (solo Admin) o VLANs */}
         {isAdmin() && pendingIPs && pendingIPs.length > 0 ? (
           <Link href="/dashboard/admin/pending-ips">
             <Card className="hover:shadow-lg transition cursor-pointer border-amber-200 bg-amber-50">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-amber-700 font-medium">IPs Pendientes</p>
+                    <p className="text-sm text-amber-700 font-medium">{t('pendingIps')}</p>
                     <p className="text-3xl font-bold text-amber-600">{pendingIPs.length}</p>
-                    <p className="text-xs text-amber-600 mt-1">Requieren autorización</p>
+                    <p className="text-xs text-amber-600 mt-1">{t('requireAuthorization')}</p>
                   </div>
                   <div className="bg-amber-200 rounded-full p-3">
                     <Globe className="w-6 h-6 text-amber-700" />
@@ -230,7 +223,7 @@ export default function DashboardPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">VLANs</p>
+                  <p className="text-sm text-gray-600">{t('vlans')}</p>
                   <p className="text-3xl font-bold text-gray-900">
                     {stats?.by_vlan ? Object.keys(stats.by_vlan).length : 0}
                   </p>
@@ -248,7 +241,7 @@ export default function DashboardPage() {
       {stats?.by_vlan && Object.keys(stats.by_vlan).length > 0 && (
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Distribución por VLAN</CardTitle>
+            <CardTitle>{t('vlanDistribution')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -259,7 +252,7 @@ export default function DashboardPage() {
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-900">VLAN {vlanId}</p>
-                    <p className="text-xs text-gray-500">{count} estaciones</p>
+                    <p className="text-xs text-gray-500">{count} {t('stations')}</p>
                   </div>
                   <Badge variant="secondary">{count}</Badge>
                 </div>
@@ -269,11 +262,11 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Distribución por Cuenta (solo para Admin) */}
+      {/* Distribución por Cuenta */}
       {stats?.by_account && Object.keys(stats.by_account).length > 0 && (
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Cuentas / Organizaciones</CardTitle>
+            <CardTitle>{t('accountsTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -290,26 +283,26 @@ export default function DashboardPage() {
                       </h3>
                     </div>
                     <Badge variant="outline" className="text-sm">
-                      {accountData.total} estaciones
+                      {accountData.total} {t('stations')}
                     </Badge>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="text-center p-3 bg-blue-50 rounded-lg">
                       <p className="text-2xl font-bold text-blue-600">{accountData.total}</p>
-                      <p className="text-xs text-gray-600 mt-1">Total</p>
+                      <p className="text-xs text-gray-600 mt-1">{t('total')}</p>
                     </div>
                     <div className="text-center p-3 bg-green-50 rounded-lg">
                       <p className="text-2xl font-bold text-green-600">{accountData.online}</p>
-                      <p className="text-xs text-gray-600 mt-1">Online</p>
+                      <p className="text-xs text-gray-600 mt-1">{t('online')}</p>
                     </div>
                     <div className="text-center p-3 bg-gray-50 rounded-lg">
                       <p className="text-2xl font-bold text-gray-600">{accountData.offline}</p>
-                      <p className="text-xs text-gray-600 mt-1">Offline</p>
+                      <p className="text-xs text-gray-600 mt-1">{t('offline')}</p>
                     </div>
                     <div className="text-center p-3 bg-orange-50 rounded-lg">
                       <p className="text-2xl font-bold text-orange-600">{accountData.contingency}</p>
-                      <p className="text-xs text-gray-600 mt-1">Contingencia</p>
+                      <p className="text-xs text-gray-600 mt-1">{t('contingency')}</p>
                     </div>
                   </div>
                 </div>
@@ -322,7 +315,7 @@ export default function DashboardPage() {
       {/* Enlaces Rápidos */}
       <Card>
         <CardHeader>
-          <CardTitle>Enlaces Rápidos</CardTitle>
+          <CardTitle>{t('quickLinks')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -331,7 +324,7 @@ export default function DashboardPage() {
               className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
             >
               <Monitor className="w-5 h-5 text-blue-600 mr-3" />
-              <span className="font-medium text-gray-900">Gestionar Estaciones</span>
+              <span className="font-medium text-gray-900">{t('manageStations')}</span>
             </Link>
 
             <Link
@@ -339,7 +332,7 @@ export default function DashboardPage() {
               className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
             >
               <Network className="w-5 h-5 text-purple-600 mr-3" />
-              <span className="font-medium text-gray-900">Gestionar VLANs</span>
+              <span className="font-medium text-gray-900">{t('manageVlans')}</span>
             </Link>
 
             {isAdmin() ? (
@@ -349,7 +342,7 @@ export default function DashboardPage() {
               >
                 <Globe className="w-5 h-5 text-amber-600 mr-3" />
                 <div className="flex items-center">
-                  <span className="font-medium text-gray-900">IPs Pendientes</span>
+                  <span className="font-medium text-gray-900">{t('pendingIps')}</span>
                   {pendingIPs && pendingIPs.length > 0 && (
                     <Badge variant="destructive" className="ml-2">
                       {pendingIPs.length}
@@ -363,35 +356,12 @@ export default function DashboardPage() {
                 className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
               >
                 <Building2 className="w-5 h-5 text-gray-600 mr-3" />
-                <span className="font-medium text-gray-900">Configuración</span>
+                <span className="font-medium text-gray-900">{t('configuration')}</span>
               </Link>
             )}
           </div>
         </CardContent>
       </Card>
-
-      {/* Información del Sistema */}
-      <Alert className="mt-8">
-        <AlertDescription>
-          <div className="flex items-start">
-            <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-3" />
-            <div>
-              <h3 className="text-sm font-medium text-gray-900">Sistema Operativo</h3>
-              <p className="text-sm text-gray-700 mt-1">
-                Backend API:{' '}
-                <a
-                  href={process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline font-medium text-blue-600"
-                >
-                  {process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}
-                </a>
-              </p>
-            </div>
-          </div>
-        </AlertDescription>
-      </Alert>
     </div>
   )
 }

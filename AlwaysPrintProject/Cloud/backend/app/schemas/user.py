@@ -18,7 +18,8 @@ class AccountInUser(BaseModel):
     id: UUID
     name: str
     timezone: str
-    
+    language: str = 'en'
+
     class Config:
         from_attributes = True
 
@@ -30,6 +31,7 @@ class UserBase(BaseModel):
     role: UserRole
     account_id: Optional[UUID] = None
     timezone: Optional[str] = Field(None, max_length=50, description="Zona horaria del usuario (hereda de la organización si es NULL)")
+    language: str = 'en'
 
 
 class UserCreate(UserBase):
@@ -66,6 +68,7 @@ class UserUpdate(BaseModel):
     account_id: Optional[UUID] = None
     is_active: Optional[bool] = None
     timezone: Optional[str] = Field(None, max_length=50, description="Zona horaria del usuario")
+    language: Optional[str] = Field(None, max_length=2, description="Idioma del usuario (en, es)")
 
 
 class UserPasswordUpdate(BaseModel):
@@ -90,10 +93,11 @@ class UserResponse(UserBase):
     id: UUID
     is_active: bool
     timezone: Optional[str]
+    language: str
     created_at: datetime
     updated_at: datetime
     account: Optional[AccountInUser] = None
-    
+
     class Config:
         from_attributes = True
 

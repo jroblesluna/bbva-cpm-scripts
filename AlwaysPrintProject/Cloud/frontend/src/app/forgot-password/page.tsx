@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { authApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export default function ForgotPasswordPage() {
+  const t = useTranslations('forgotPassword')
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -24,7 +26,7 @@ export default function ForgotPasswordPage() {
       await authApi.requestPasswordReset(email)
       setSent(true)
     } catch {
-      setError('Ocurrió un error. Intenta nuevamente.')
+      setError(t('error'))
     } finally {
       setIsLoading(false)
     }
@@ -35,20 +37,20 @@ export default function ForgotPasswordPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
-            Restablecer contraseña
+            {t('title')}
           </CardTitle>
           <CardDescription className="text-center">
-            Ingresa tu email y te enviaremos un enlace para restablecer tu contraseña.
+            {t('subtitle')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {sent ? (
             <div className="space-y-4 text-center">
               <p className="text-green-700 bg-green-50 border border-green-200 rounded-md p-4 text-sm">
-                Si el email existe en el sistema, recibirás las instrucciones en unos minutos.
+                {t('success')}
               </p>
               <Link href="/login" className="text-blue-600 hover:underline text-sm">
-                Volver al inicio de sesión
+                {t('backToLogin')}
               </Link>
             </div>
           ) : (
@@ -60,11 +62,11 @@ export default function ForgotPasswordPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Correo electrónico</Label>
+                <Label htmlFor="email">{t('email')}</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="usuario@ejemplo.com"
+                  placeholder={t('emailPlaceholder')}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -73,12 +75,12 @@ export default function ForgotPasswordPage() {
               </div>
 
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Enviando...' : 'Enviar enlace'}
+                {isLoading ? t('submitting') : t('submit')}
               </Button>
 
               <p className="text-center text-sm text-gray-500">
                 <Link href="/login" className="text-blue-600 hover:underline">
-                  Volver al inicio de sesión
+                  {t('backToLogin')}
                 </Link>
               </p>
             </form>
