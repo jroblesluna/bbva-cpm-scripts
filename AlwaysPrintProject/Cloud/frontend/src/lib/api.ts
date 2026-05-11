@@ -50,7 +50,7 @@ import type {
 // CONFIGURACIÓN BASE
 // ============================================================================
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ''
 const API_V1_PREFIX = '/api/v1'
 
 /**
