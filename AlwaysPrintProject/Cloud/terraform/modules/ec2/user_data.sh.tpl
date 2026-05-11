@@ -28,8 +28,8 @@ aws ecr get-login-password --region ${aws_region} \
 # ── Directorio de la app ──────────────────────────────────────────────
 mkdir -p $APP_DIR
 
-# ── Variables de entorno del backend (no sensibles) ───────────────────
-cat > $APP_DIR/.env.backend <<'ENVFILE'
+# ── Variables de entorno del backend ─────────────────────────────────
+cat > $APP_DIR/.env <<'ENVFILE'
 ${backend_env_vars}
 ENVFILE
 
@@ -41,19 +41,11 @@ SECRET_KEY=$(aws secretsmanager get-secret-value \
   --secret-id "${secret_key_secret}" --region ${aws_region} \
   --query SecretString --output text)
 
-echo "DATABASE_URL=$DATABASE_URL" >> $APP_DIR/.env.backend
-echo "SECRET_KEY=$SECRET_KEY"     >> $APP_DIR/.env.backend
-
-# ── Variables de entorno del frontend ────────────────────────────────
-cat > $APP_DIR/.env.frontend <<ENVFILE
-NEXT_PUBLIC_API_URL=${public_url}
-NEXT_PUBLIC_WS_URL=${ws_url}
-NEXT_PUBLIC_APP_NAME=AlwaysPrint Cloud Management
-ENVFILE
+echo "DATABASE_URL=$DATABASE_URL" >> $APP_DIR/.env
+echo "SECRET_KEY=$SECRET_KEY"     >> $APP_DIR/.env
 
 # ── docker-compose.yml ───────────────────────────────────────────────
 cat > $APP_DIR/docker-compose.yml <<COMPOSE
-version: '3.8'
 services:
   redis:
     image: redis:7-alpine
@@ -63,7 +55,7 @@ services:
   backend:
     image: ${backend_ecr_url}:latest
     restart: unless-stopped
-    env_file: /opt/alwaysprint/.env.backend
+    env_file: /opt/alwaysprint/.env
     ports:
       - "${backend_port}:${backend_port}"
     command: >
@@ -75,7 +67,6 @@ services:
   frontend:
     image: ${frontend_ecr_url}:latest
     restart: unless-stopped
-    env_file: /opt/alwaysprint/.env.frontend
     ports:
       - "${frontend_port}:${frontend_port}"
     networks: [app]

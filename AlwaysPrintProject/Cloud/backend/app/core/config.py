@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     
     # === CONFIGURACIÓN SES ===
     SES_ENABLED: bool = False
-    SES_FROM_EMAIL: str = "noreply@alwaysprint.apps.iol.pe"
+    SES_FROM_EMAIL: str = "noreply@apps.iol.pe"
     AWS_REGION: str = "us-west-2"
     FRONTEND_URL: str = "http://localhost:3000"
 

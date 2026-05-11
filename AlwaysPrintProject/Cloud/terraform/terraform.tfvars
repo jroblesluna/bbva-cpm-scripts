@@ -24,7 +24,7 @@ rds_backup_retention_days = 0  # Free Tier no permite > 0; cambiar al actualizar
 
 zone_name      = "apps.iol.pe"
 subdomain      = "alwaysprint"
-ses_from_email = "noreply@alwaysprint.apps.iol.pe"
+ses_from_email = "noreply@apps.iol.pe"
 
 backend_port  = 8000
 frontend_port = 3000
@@ -35,7 +35,7 @@ ec2_instance_type = "t3.micro"
 backend_env_vars = {
   LOG_LEVEL                   = "INFO"
   SES_ENABLED                 = "true"
-  SES_FROM_EMAIL              = "noreply@alwaysprint.apps.iol.pe"
+  SES_FROM_EMAIL              = "noreply@apps.iol.pe"
   ACCESS_TOKEN_EXPIRE_MINUTES = "1440"
   ALGORITHM                   = "HS256"
   DB_POOL_SIZE                = "10"
