@@ -37,7 +37,7 @@ interface PendingIP {
 }
 
 export default function DashboardPage() {
-  const { isAdmin, getAuthHeaders } = useAuth()
+  const { user, isAdmin } = useAuth()
   const t = useTranslations('dashboard')
   const [stats, setStats] = useState<WorkstationStats | null>(null)
   const [pendingIPs, setPendingIPs] = useState<PendingIP[]>([])
