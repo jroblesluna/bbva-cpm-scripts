@@ -64,6 +64,8 @@ services:
     image: ${backend_ecr_url}:latest
     restart: unless-stopped
     env_file: /opt/alwaysprint/.env.backend
+    ports:
+      - "${backend_port}:${backend_port}"
     command: >
       sh -c "alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port ${backend_port} --workers 1"
@@ -74,6 +76,8 @@ services:
     image: ${frontend_ecr_url}:latest
     restart: unless-stopped
     env_file: /opt/alwaysprint/.env.frontend
+    ports:
+      - "${frontend_port}:${frontend_port}"
     networks: [app]
 
 networks:

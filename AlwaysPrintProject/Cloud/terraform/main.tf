@@ -69,6 +69,10 @@ resource "aws_secretsmanager_secret" "database_url" {
 resource "aws_secretsmanager_secret_version" "database_url" {
   secret_id     = aws_secretsmanager_secret.database_url.id
   secret_string = "postgresql://${var.db_username}:${module.secrets.db_password_value}@${module.rds.db_endpoint}/${var.db_name}"
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
 }
 
 module "ses" {
