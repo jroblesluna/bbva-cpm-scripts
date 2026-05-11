@@ -342,7 +342,8 @@ function UserForm({
   }
 
   // Obtener timezone de la organización seleccionada
-  const selectedAccount = accounts.find(a => a.id === formData.account_id)
+  const accountList = Array.isArray(accounts) ? accounts : []
+  const selectedAccount = accountList.find(a => a.id === formData.account_id)
   const inheritedTimezone = selectedAccount?.timezone || 'UTC'
 
   return (
@@ -427,7 +428,7 @@ function UserForm({
             className="w-full px-3 py-2 border rounded-md"
           >
             <option value="">{t('timezoneDefault')}</option>
-            {accounts.map((account) => (
+            {accountList.map((account) => (
               <option key={account.id} value={account.id}>{account.name}</option>
             ))}
           </select>
