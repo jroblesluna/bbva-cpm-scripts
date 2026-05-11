@@ -1,5 +1,48 @@
 # Changelog - AlwaysPrint Cloud
 
+## [1.2.0] - 2026-05-11
+
+### Correcciones críticas de producción
+
+- **Backend crash loop — contraseña URL-unsafe**: `random_password` generaba contraseñas con
+  caracteres `%`, `+`, `[`, `]`, `=` que psycopg2 no puede parsear en una URL de conexión.
+  Solución: contraseña renovada manualmente con solo `[a-zA-Z0-9-_]`, nueva contraseña
+  almacenada en Secrets Manager. `random_password` cambiado a `special = false` para
+  futuras recreaciones.
+
+- **Docker Compose sin `ports:`**: el `docker-compose.yml` generado por `user_data.sh.tpl`
+  no mapeaba los puertos de backend y frontend al host, por lo que nginx no podía llegar a
+  `localhost:8000` ni `localhost:3000` (conexión rehusada). Corregido en template y en el
+  EC2 en producción.
+
+- **`lifecycle ignore_changes` en secretos de contraseña**: agregado a
+  `aws_secretsmanager_secret_version.database_url` y `.db_password` para que `terraform apply`
+  no sobreescriba contraseñas gestionadas manualmente.
+
+### CI/CD — migración SSH → SSM
+
+- **GitHub Actions** reemplaza despliegue SSH/SCP por `aws ssm send-command` llamando a
+  `/opt/alwaysprint/deploy.sh [backend|frontend]` en el EC2
+- Puerto 22 eliminado del Security Group del EC2; acceso al servidor solo vía SSM Session Manager
+- Workflows `.github/workflows/deploy-backend.yml` y `deploy-frontend.yml` actualizados
+
+### Infraestructura — gestión de clave SSH
+
+- Nuevo script `terraform/setup.sh`: único punto de entrada para `terraform plan/apply`
+  - Genera clave ed25519 la primera vez y la guarda en Secrets Manager
+  - Recupera la clave pública del secreto en ejecuciones posteriores
+  - Flag `--rotate-key` para rotación forzada
+- El módulo `secrets` conserva el contenedor `ssh_private_key` en Secrets Manager pero
+  no genera la clave (gestión externa via `setup.sh`)
+
+### Alembic — fix configparser con contraseñas especiales
+
+- `alembic/env.py` reescrito: usa `create_engine(settings.DATABASE_URL, poolclass=NullPool)`
+  directamente en lugar de pasar la URL por `alembic.ini`, evitando el error
+  `ValueError: invalid interpolation syntax` cuando la contraseña contiene `%` o `[`.
+
+---
+
 ## [1.1.0] - 2026-05-10
 
 ### Correcciones de estabilidad

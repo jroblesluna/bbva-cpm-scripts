@@ -4,8 +4,8 @@
 
 **AlwaysPrint Cloud Manager (APCM)** es una plataforma SaaS multi-cuenta para la gestión centralizada de workstations Windows que utilizan el sistema AlwaysPrint para gestión de impresión corporativa.
 
-**Versión**: 1.0.0  
-**Última actualización**: 10 de mayo de 2026
+**Versión**: 1.2.0  
+**Última actualización**: 11 de mayo de 2026
 
 ---
 
@@ -83,7 +83,7 @@ backend/
 │   │       ├── endpoints/
 │   │       │   ├── accounts.py     # CRUD de cuentas (superadmin)
 │   │       │   ├── audit.py        # Logs de auditoría
-│   │       │   ├── auth.py         # Login JWT
+│   │       │   ├── auth.py         # Login JWT + password reset
 │   │       │   ├── config.py       # Configuración global/workstation
 │   │       │   ├── messages.py     # Mensajes a workstations
 │   │       │   ├── setup.py        # Setup inicial (primer admin)
@@ -95,8 +95,8 @@ backend/
 │   │       │   └── workstation.py  # WS para AlwaysPrintTray
 │   │       └── router.py
 │   ├── core/
-│   │   ├── config.py               # Configuración (env vars)
-│   │   ├── database.py             # Conexión PostgreSQL (NullPool en Alembic)
+│   │   ├── config.py               # Configuración (env vars, Pydantic Settings)
+│   │   ├── database.py             # Engine SQLAlchemy (NullPool en Alembic)
 │   │   └── security.py             # JWT, hashing
 │   ├── middleware/
 │   │   ├── rate_limit.py           # Rate limiting por IP/ruta
@@ -104,9 +104,9 @@ backend/
 │   ├── models/
 │   │   ├── account.py              # Account + PublicIP
 │   │   ├── audit.py                # AuditLog
-│   │   ├── config.py               # GlobalConfig + WorkstationConfig
+│   │   ├── config.py               # GlobalConfig + VLANConfig + WorkstationConfig
 │   │   ├── message.py              # Message (broadcast a workstations)
-│   │   ├── user.py                 # User (admins)
+│   │   ├── user.py                 # User (password_reset_token, password_reset_expires)
 │   │   ├── vlan.py                 # VLAN
 │   │   └── workstation.py          # Workstation + License
 │   ├── schemas/                    # Schemas Pydantic
@@ -114,15 +114,18 @@ backend/
 │   │   ├── audit.py
 │   │   ├── auth.py
 │   │   ├── config.py
+│   │   ├── email.py                # Envío vía AWS SES (fallback a log si SES_ENABLED=false)
 │   │   ├── message.py
-│   │   └── websocket_manager.py    # Manager de conexiones WS activas
+│   │   ├── websocket_manager.py    # ConnectionManager singleton (1 worker requerido)
+│   │   └── workstation.py
 │   └── main.py
-├── alembic/                        # Migraciones
+├── alembic/                        # Migraciones (cadena lineal)
 │   └── versions/
 │       ├── 001_initial_migration.py
+│       ├── d4a203945821_add_full_name_to_users.py
 │       ├── 002_add_timezone_fields.py
 │       ├── 003_add_public_ip_authorization.py
-│       └── d4a203945821_add_full_name_to_users.py
+│       └── 004_add_password_reset_token.py  ← última
 └── requirements.txt
 ```
 
@@ -310,25 +313,30 @@ AlwaysPrintService aplica configuración
 
 ```
 Nginx (puerto 80/443, Let's Encrypt SSL)
-  ├── /api/*   → backend:8000
-  ├── /ws/*    → backend:8000 (WebSocket upgrade)
-  └── /*       → frontend:3000
+  ├── /api/*   → localhost:8000 (backend)
+  ├── /ws/*    → localhost:8000 (WebSocket upgrade)
+  └── /*       → localhost:3000 (frontend)
 
-Docker Compose (bridge network "app"):
-  ├── backend  (imagen ECR, 2 workers uvicorn)
-  ├── frontend (imagen ECR)
-  └── redis    (redis:7-alpine)
+Docker Compose (bridge network "app", puertos mapeados al host):
+  ├── backend  (imagen ECR, uvicorn 1 worker — singleton WebSocket)
+  ├── frontend (imagen ECR, Next.js)
+  └── redis    (redis:7-alpine, caché interna)
 ```
 
 ### CI/CD
 
-Manejado por GitHub Actions. El EC2 expone un script `/opt/alwaysprint/deploy.sh` que hace pull de ECR y reinicia los containers afectados.
+Manejado por GitHub Actions. Al hacer push a `main`:
+1. Build y push de la imagen Docker a ECR
+2. `aws ssm send-command` ejecuta `/opt/alwaysprint/deploy.sh [backend|frontend]` en el EC2
+3. El script hace pull de ECR y reinicia solo el servicio afectado
+
+No se usa SSH — el acceso al EC2 es exclusivamente vía **SSM Session Manager** (sin puerto 22).
 
 ### Dominio y SSL
 
-- **Dominio**: `alwaysprint.apps.iol.pe` (zona `apps.iol.pe`)
+- **Dominio**: `alwaysprint.apps.iol.pe` (zona `apps.iol.pe` — DNS en Hostinger, no Route53)
 - **SSL**: Let's Encrypt (Certbot + nginx), renovación automática vía cron
-- **IP**: Elastic IP estática (no cambia al reiniciar el EC2)
+- **IP**: Elastic IP estática `34.213.90.95` (no cambia al reiniciar el EC2)
 
 ### Variables clave (terraform.tfvars)
 
@@ -388,19 +396,22 @@ npm run dev
 ### Producción (Terraform + GitHub Actions)
 
 ```bash
-# Provisionar infraestructura (primera vez)
+# Provisionar infraestructura (primera vez o cambios)
 cd AlwaysPrintProject/Cloud/terraform
-terraform init
-terraform apply
+./setup.sh plan    # revisa cambios
+./setup.sh apply   # aplica — gestiona la clave SSH automáticamente
 
-# Bajar clave SSH para acceso
+# Acceso interactivo al servidor (SSM, sin SSH)
+aws ssm start-session --target i-0177ed8ad554ffc08 --profile Antonio-Robles-425642439683
+
+# Recuperar clave SSH (solo para emergencias)
 aws secretsmanager get-secret-value \
   --secret-id /alwaysprint/prod/ssh_private_key \
   --query SecretString --output text > alwaysprint.pem
 chmod 400 alwaysprint.pem
 ```
 
-El CI/CD (GitHub Actions) construye las imágenes, las sube a ECR y ejecuta `deploy.sh` en el EC2 vía SSH.
+El CI/CD (GitHub Actions) construye las imágenes, las sube a ECR y ejecuta `deploy.sh` en el EC2 vía **SSM send-command** (sin SSH).
 
 ---
 

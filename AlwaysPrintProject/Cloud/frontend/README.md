@@ -126,6 +126,9 @@ npm run test:watch
 
 - `/` - Redirección a dashboard
 - `/login` - Página de autenticación
+- `/forgot-password` - Solicitar reset de contraseña
+- `/reset-password` - Confirmar reset con token (vía link del email)
+- `/setup` - Setup inicial (crear primer superadmin)
 - `/dashboard` - Dashboard principal (métricas)
 - `/dashboard/workstations` - Lista de workstations
 - `/dashboard/workstations/[id]` - Detalle de workstation
@@ -133,8 +136,9 @@ npm run test:watch
 - `/dashboard/config` - Configuración global/VLAN/IP
 - `/dashboard/messages` - Envío de mensajes
 - `/dashboard/audit` - Búsqueda de auditoría
-- `/dashboard/admin/accounts` - Gestión de cuentas (Admin)
-- `/dashboard/admin/users` - Gestión de usuarios (Admin)
+- `/dashboard/admin/accounts` - Gestión de cuentas (solo superadmin)
+- `/dashboard/admin/users` - Gestión de usuarios
+- `/dashboard/admin/pending-ips` - IPs pendientes de autorización
 
 
 ---

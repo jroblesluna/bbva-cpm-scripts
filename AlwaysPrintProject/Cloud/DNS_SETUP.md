@@ -149,6 +149,12 @@ Por defecto SES solo envía a emails verificados manualmente. Para habilitar env
 ```
 ✅ terraform apply completado — 2026-05-10
 ✅ Registros DNS propagados y verificados con nslookup — 2026-05-10
-⏳ Verificación SES en proceso (AWS verifica automáticamente, puede tardar horas)
-⏳ Salida de sandbox pendiente (solicitar en AWS Console → SES → Account dashboard)
+✅ Sitio en producción: https://alwaysprint.apps.iol.pe — 2026-05-11
+✅ SSL/HTTPS activo (Let's Encrypt via Certbot) — 2026-05-10
+⏳ Verificación SES en proceso (AWS verifica automáticamente)
+⏳ Salida de sandbox SES pendiente (solicitar en AWS Console → SES → Account dashboard)
 ```
+
+> **Nota**: La IP del EC2 es la Elastic IP `34.213.90.95`. Si se destruye y recrea la
+> infraestructura con `terraform destroy` + `terraform apply`, verificar con
+> `terraform output ec2_public_ip` si la IP cambió y actualizar el registro A en Hostinger.

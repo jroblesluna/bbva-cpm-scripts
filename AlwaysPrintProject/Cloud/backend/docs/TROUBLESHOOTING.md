@@ -138,6 +138,44 @@ ModuleNotFoundError: No module named 'psycopg2'
 pip install psycopg2-binary
 ```
 
+### Error: "password authentication failed" con psycopg2 y URL
+
+**Síntomas**:
+```
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) FATAL: password authentication failed
+```
+
+**Causa**: La contraseña del usuario PostgreSQL contiene caracteres URL-unsafe (`%`, `+`, `[`, `]`, `=`)
+que psycopg2 no puede parsear correctamente en una URL de conexión DSN.
+Por ejemplo, `%` inicia una secuencia percent-encoded; `+` puede ser interpretado como espacio.
+
+**Solución**: Usar una contraseña con solo caracteres alfanuméricos y `-_`:
+
+```bash
+# Generar contraseña segura URL-compatible
+python3 -c "import secrets, string; chars=string.ascii_letters+string.digits+'-_'; print(''.join(secrets.choice(chars) for _ in range(32)))"
+```
+
+En producción, si la contraseña de RDS contiene caracteres especiales:
+1. Generar nueva contraseña URL-safe
+2. `aws rds modify-db-instance --master-user-password <nueva> --apply-immediately`
+3. Actualizar el secreto en Secrets Manager
+4. Actualizar `.env.backend` en el EC2 y reiniciar el backend
+
+### Error: "invalid interpolation syntax" en Alembic
+
+**Síntomas**:
+```
+ValueError: invalid interpolation syntax in 'postgresql://user:%password@...' at position 22
+```
+
+**Causa**: Alembic usa `configparser` para leer `alembic.ini`, que interpola `%` como
+sintaxis de formato. Contraseñas con `%` rompen el parser.
+
+**Solución**: En `alembic/env.py`, usar `create_engine(settings.DATABASE_URL)` directamente
+en lugar de pasar la URL a través de `context.config.set_main_option("sqlalchemy.url", ...)`.
+El archivo `env.py` del proyecto ya implementa esta solución.
+
 ### Error: "Connection refused" (PostgreSQL)
 
 **Síntomas**:

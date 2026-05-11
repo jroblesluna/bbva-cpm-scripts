@@ -108,21 +108,52 @@ npm run lint       # linter
 
 ## Infraestructura (Terraform)
 
+Usar siempre `setup.sh` — gestiona la clave SSH automáticamente:
+
 ```bash
 cd AlwaysPrintProject/Cloud/terraform
 
-terraform init
-terraform plan
-terraform apply
+./setup.sh plan    # muestra los cambios sin aplicar
+./setup.sh apply   # aplica los cambios
+
+# Forzar rotación de clave SSH (raro)
+./setup.sh apply --rotate-key
 ```
 
-Tras el apply, obtener los registros DNS para SES:
+Tras el primer apply, obtener los registros DNS para SES:
 
 ```bash
 terraform output ses_dns_records
 ```
 
 Ver [DNS_SETUP.md](./DNS_SETUP.md) para el procedimiento completo de configuración DNS.
+
+---
+
+## Acceso al servidor de producción (SSM)
+
+El EC2 no tiene puerto 22 abierto. Acceso vía AWS SSM Session Manager:
+
+```bash
+# Sesión interactiva (terminal)
+aws ssm start-session \
+  --target i-0177ed8ad554ffc08 \
+  --profile Antonio-Robles-425642439683
+
+# Ejecutar comando puntual
+aws ssm send-command \
+  --instance-ids i-0177ed8ad554ffc08 \
+  --document-name AWS-RunShellScript \
+  --parameters file:///tmp/params.json \
+  --profile Antonio-Robles-425642439683
+
+# Ver logs del backend
+# (dentro de la sesión SSM)
+docker logs alwaysprint-backend-1 --tail 50 -f
+
+# Reiniciar un servicio
+cd /opt/alwaysprint && docker compose restart backend
+```
 
 ---
 

@@ -2,54 +2,55 @@
 
 Sistema de gestión centralizada para el sistema de contingencia de impresión AlwaysPrint.
 
-## 📋 Descripción
+## Descripción
 
-AlwaysPrint Cloud Manager es una plataforma SaaS multi-tenant que permite:
+AlwaysPrint Cloud Manager (APCM) es una plataforma SaaS multi-cuenta que permite:
 
-- **Gestión de Workstations**: Monitoreo y control de estaciones Windows con AlwaysPrint Client
+- **Gestión de Workstations**: Monitoreo y control de estaciones Windows con AlwaysPrint Tray Client
 - **Gestión de VLANs**: Organización de workstations por segmentos de red
-- **Gestión de Organizaciones**: Multi-tenancy con aislamiento completo de datos
-- **Mensajería**: Envío de mensajes y comandos a workstations
+- **Multi-cuenta**: Aislamiento completo de datos por organización/cliente
+- **Mensajería en tiempo real**: Envío de mensajes y comandos vía WebSocket
 - **Auditoría**: Registro completo de acciones y eventos del sistema
-- **Autorización de IPs**: Control de acceso basado en IPs públicas
+- **Autorización de IPs**: Control de acceso basado en IP pública (sin API keys)
 
-## 🏗️ Arquitectura
+## Arquitectura
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    ALWAYSPRINT CLOUD                         │
+│  Workstations Windows (cliente BBVA, etc.)                  │
+│  AlwaysPrintService (LocalSystem) ←──Named Pipe──           │
+│  AlwaysPrintTray (usuario)   ──── HTTPS/WSS ───────────┐   │
+└─────────────────────────────────────────────────────────┼───┘
+                                                          │
+                                              vía proxy corporativo
+                                                          │
+┌─────────────────────────────────────────────────────────▼───┐
+│  EC2 t3.micro — AWS us-west-2                               │
+│  Nginx (80/443, Let's Encrypt)                              │
+│  ├── /api/*  → Backend FastAPI :8000                        │
+│  ├── /ws/*   → Backend WebSocket :8000                      │
+│  └── /*      → Frontend Next.js :3000                       │
 │                                                              │
-│  ┌────────────────────┐         ┌────────────────────┐     │
-│  │   Frontend         │         │   Backend          │     │
-│  │   Next.js 15       │────────▶│   FastAPI          │     │
-│  │   TypeScript       │  HTTPS  │   Python 3.12      │     │
-│  │   Port 3000        │         │   Port 8000        │     │
-│  └────────────────────┘         └────────────────────┘     │
-│                                           │                  │
-│                                           ▼                  │
-│                                  ┌────────────────────┐     │
-│                                  │   PostgreSQL       │     │
-│                                  │   (Producción)     │     │
-│                                  │   SQLite (Dev)     │     │
-│                                  └────────────────────┘     │
-└─────────────────────────────────────────────────────────────┘
-                        │
-                        ▼
-        ┌───────────────────────────────────┐
-        │   AlwaysPrint Clients (Windows)   │
-        │   - Reportan estado               │
-        │   - Reciben mensajes/comandos     │
-        │   - Envían logs                   │
-        └───────────────────────────────────┘
+│  Docker Compose (bridge network):                           │
+│  ├── backend   (FastAPI, uvicorn 1 worker)                  │
+│  ├── frontend  (Next.js)                                    │
+│  └── redis     (caché + rate limiting)                      │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+              ┌────────────────▼──────────────────┐
+              │  RDS PostgreSQL 16 (subnet privada) │
+              └────────────────────────────────────┘
 ```
 
-## 🚀 Inicio Rápido
+**URL de producción**: https://alwaysprint.apps.iol.pe
+
+## Inicio Rápido
 
 ### Requisitos Previos
 
 - **Backend**: Python 3.12+, Conda (recomendado)
-- **Frontend**: Node.js 18+, npm
-- **Base de Datos**: SQLite (desarrollo) o PostgreSQL (producción)
+- **Frontend**: Node.js 20+, npm
+- **Base de Datos**: PostgreSQL 16 (producción) o SQLite (solo desarrollo local)
 
 ### Instalación Local
 
@@ -205,41 +206,38 @@ npm run test:watch              # Modo watch
 npm run build                   # Verificar build de producción
 ```
 
-## 📦 Deployment
+## Deployment
 
 ### Producción con Terraform (AWS)
 
 ```bash
-cd terraform
+cd AlwaysPrintProject/Cloud/terraform
 
-# Inicializar Terraform
-terraform init
+# Primera vez: genera clave SSH, planifica y aplica
+./setup.sh plan
+./setup.sh apply
 
-# Planificar cambios
-terraform plan
-
-# Aplicar infraestructura
-terraform apply
-
-# Obtener outputs (URLs, IPs, etc.)
-terraform output
+# Aplicaciones posteriores
+./setup.sh apply
 ```
 
+El script `setup.sh` gestiona la clave SSH automáticamente (la crea y guarda en Secrets Manager si no existe).
+
 La infraestructura incluye:
-- VPC con subnets públicas y privadas
-- RDS PostgreSQL en subnet privada
-- ECR para imágenes Docker
-- EC2 con Docker Compose
-- Route53 para DNS
-- Security Groups configurados
+- VPC con subnets públicas y privadas (sin Route53 — DNS externo en Hostinger)
+- RDS PostgreSQL 16 en subnet privada
+- ECR para imágenes Docker (backend y frontend)
+- EC2 t3.micro con Docker Compose + nginx + Certbot
+- AWS SES para emails transaccionales
+- Secrets Manager para contraseñas y claves
 
 ### Variables de Entorno Requeridas
 
 #### Backend (.env)
 
 ```bash
-# Base de datos
-DATABASE_URL=postgresql://user:pass@host:5432/dbname
+# Base de datos — sin caracteres URL-unsafe en la contraseña
+DATABASE_URL=postgresql://user:pass@host:5432/alwaysprint
 
 # Seguridad
 SECRET_KEY=your-secret-key-here
@@ -247,17 +245,21 @@ ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
 # CORS
-ALLOWED_ORIGINS=https://alwaysprint.apps.iol.pe
+CORS_ORIGINS=https://alwaysprint.apps.iol.pe
 
-# Aplicación
-PROJECT_NAME=AlwaysPrint Cloud Manager
-VERSION=1.0.0
+# SES (email transaccional)
+SES_ENABLED=false           # true en producción
+SES_FROM_EMAIL=noreply@alwaysprint.apps.iol.pe
+AWS_REGION=us-west-2
+FRONTEND_URL=http://localhost:3000
 ```
 
 #### Frontend (.env.local)
 
 ```bash
-NEXT_PUBLIC_API_URL=https://api.alwaysprint.apps.iol.pe
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_WS_URL=ws://localhost:8000
+NEXT_PUBLIC_APP_NAME=AlwaysPrint Cloud Management
 ```
 
 ## 📚 Documentación Adicional
@@ -267,19 +269,36 @@ NEXT_PUBLIC_API_URL=https://api.alwaysprint.apps.iol.pe
 - **[Backend README](./backend/README.md)** - Documentación específica del backend
 - **[Frontend README](./frontend/README.md)** - Documentación específica del frontend
 
-## 🔗 URLs de Producción
+## URLs de Producción
 
-- **Frontend**: https://alwaysprint.apps.iol.pe
-- **Backend API**: https://api.alwaysprint.apps.iol.pe
-- **Documentación API**: https://api.alwaysprint.apps.iol.pe/docs
+- **Frontend / Dashboard**: https://alwaysprint.apps.iol.pe
+- **Backend API**: https://alwaysprint.apps.iol.pe/api/v1
+- **Documentación API (Swagger)**: https://alwaysprint.apps.iol.pe/docs
+- **WebSocket**: wss://alwaysprint.apps.iol.pe/ws/
 
-## 🤝 Contribución
+## Acceso al Servidor
+
+El acceso al EC2 de producción es vía **AWS SSM Session Manager** (no SSH):
+
+```bash
+# Acceso interactivo
+aws ssm start-session --target i-0177ed8ad554ffc08 --profile Antonio-Robles-425642439683
+
+# Ejecutar comando directo
+aws ssm send-command \
+  --instance-ids i-0177ed8ad554ffc08 \
+  --document-name AWS-RunShellScript \
+  --parameters commands=["docker compose -f /opt/alwaysprint/docker-compose.yml ps"]
+```
+
+No se necesita par de claves SSH para acceso operativo normal.
+
+## Contribución
 
 1. Crear rama desde `main`: `git checkout -b feature/nueva-funcionalidad`
 2. Hacer cambios y commits descriptivos
 3. Ejecutar tests: `pytest` (backend) y `npm run build` (frontend)
-4. Push y crear Pull Request
-5. Esperar revisión y aprobación
+4. Push — GitHub Actions despliega automáticamente a producción vía SSM
 
 ## 📄 Licencia
 

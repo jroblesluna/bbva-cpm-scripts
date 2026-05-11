@@ -13,10 +13,11 @@ Backend de AlwaysPrint Cloud Management, sistema de gestión centralizada para e
 ### Características Principales
 
 - ✅ **API REST** con 40+ endpoints
-- ✅ **WebSocket** para comunicación en tiempo real (3000+ conexiones)
-- ✅ **Multi-tenancy** con aislamiento estricto por cuenta
+- ✅ **WebSocket** para comunicación en tiempo real (operadores y workstations)
+- ✅ **Multi-cuenta** con aislamiento estricto por `account_id`
 - ✅ **Autenticación JWT** con roles (Admin, Operador)
 - ✅ **Configuración jerárquica** (Global → VLAN → Workstation)
+- ✅ **Password reset** vía AWS SES (token 1h)
 - ✅ **Auditoría completa** de operaciones
 - ✅ **Rate limiting** y headers de seguridad
 - ✅ **Documentación automática** (Swagger/OpenAPI)
@@ -33,16 +34,21 @@ Backend de AlwaysPrint Cloud Management, sistema de gestión centralizada para e
 
 ### Instalación
 
-```powershell
-# Ejecutar script de instalación
-.\setup-conda.ps1
-```
+```bash
+# Crear entorno conda
+conda create -n alwaysprint python=3.12
+conda activate alwaysprint
 
-El script automáticamente:
-1. Crea el entorno conda con Python 3.12
-2. Instala todas las dependencias desde `requirements.txt`
-3. Copia `.env.example` a `.env` (si no existe)
-4. Aplica las migraciones de base de datos
+# Instalar dependencias
+pip install -r requirements.txt
+
+# Configurar variables de entorno
+cp .env.example .env
+# Editar .env con la configuración local
+
+# Aplicar migraciones
+alembic upgrade head
+```
 
 **Nota**: Si encuentras problemas, consulta `docs/TROUBLESHOOTING.md`
 
@@ -243,7 +249,8 @@ db.close()
 - `POST /login` - Login de usuario
 - `POST /logout` - Logout
 - `GET /me` - Usuario actual
-- `POST /password-reset` - Solicitar reset de contraseña
+- `POST /password-reset` - Solicitar reset (envía email con token vía SES)
+- `POST /password-reset/confirm` - Confirmar reset con token (expira en 1h)
 
 #### Cuentas (`/api/v1/accounts/`) - Solo Admin
 - `GET /` - Listar cuentas
@@ -412,60 +419,34 @@ grep ERROR logs/alwaysprint.log
 
 ## 🚀 Deployment
 
-### Producción con Uvicorn
+### Producción (Docker Compose en EC2)
+
+El deployment en producción es automático vía GitHub Actions. Al hacer push a `main`:
+1. Build de imagen Docker y push a ECR
+2. `aws ssm send-command` ejecuta `deploy.sh backend` en el EC2
+
+**Importante**: Producción usa **siempre 1 worker** — el `ConnectionManager` de WebSocket
+es un singleton en memoria. Múltiples workers rompen el broadcast entre conexiones.
 
 ```bash
-# Con workers múltiples
-uvicorn app.main:app \
-  --host 0.0.0.0 \
-  --port 8000 \
-  --workers 4 \
-  --log-level info
+# En el EC2 (vía sesión SSM)
+cd /opt/alwaysprint
+docker compose restart backend
+
+# Ver logs
+docker logs alwaysprint-backend-1 --tail 50 -f
 ```
 
-### Producción con Gunicorn
-
-```bash
-gunicorn app.main:app \
-  --workers 4 \
-  --worker-class uvicorn.workers.UvicornWorker \
-  --bind 0.0.0.0:8000 \
-  --log-level info
-```
-
-### Docker
+### Docker (imagen de producción)
 
 ```dockerfile
 FROM python:3.12-slim
-
 WORKDIR /app
-
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
 COPY . .
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-### Systemd Service
-
-```ini
-[Unit]
-Description=AlwaysPrint Cloud Management API
-After=network.target postgresql.service
-
-[Service]
-Type=notify
-User=alwaysprint
-Group=alwaysprint
-WorkingDirectory=/opt/alwaysprint/backend
-Environment="PATH=/opt/alwaysprint/backend/venv/bin"
-ExecStart=/opt/alwaysprint/backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
+# 1 worker — requerido por WebSocket singleton
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
 ```
 
 ---

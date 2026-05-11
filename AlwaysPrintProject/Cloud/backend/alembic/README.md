@@ -57,16 +57,37 @@ alembic revision -m "Descripción del cambio"
 
 ## Migraciones Existentes
 
+Cadena actual (en orden de aplicación):
+
+```
+001_initial_migration
+  └── d4a203945821_add_full_name_to_users
+        └── 002_add_timezone_fields
+              └── 003_add_public_ip_authorization
+                    └── 004_add_password_reset_token  ← HEAD
+```
+
 ### 001_initial_migration.py
 **Descripción:** Migración inicial que crea toda la estructura de base de datos
 
 **Incluye:**
-- 11 tablas principales (accounts, users, workstations, etc.)
+- Tablas principales: `accounts`, `public_ips`, `users`, `workstations`, `licenses`,
+  `vlans`, `global_configs`, `vlan_configs`, `workstation_configs`, `messages`, `audit_logs`
 - Índices para optimización de consultas
-- Triggers para actualización automática de `updated_at` (PostgreSQL)
-- Funciones auxiliares:
-  - `calculate_license_serial(ip_private)`: Calcula serial de licencia
-  - `detect_vlan_for_ip(account_id, ip_private)`: Detecta VLAN por IP
+- Triggers para `updated_at` automático (PostgreSQL)
+
+### d4a203945821_add_full_name_to_users.py
+Agrega columna `full_name` a la tabla `users`.
+
+### 002_add_timezone_fields.py
+Agrega campos de zona horaria a workstations.
+
+### 003_add_public_ip_authorization.py
+Agrega campos de autorización a `public_ips` (`is_authorized`, `account_id`).
+
+### 004_add_password_reset_token.py
+Agrega `password_reset_token` (String 255, indexado) y `password_reset_expires` (DateTime)
+a la tabla `users` para el flujo de recuperación de contraseña vía AWS SES.
 
 ## Flujo de Trabajo
 
