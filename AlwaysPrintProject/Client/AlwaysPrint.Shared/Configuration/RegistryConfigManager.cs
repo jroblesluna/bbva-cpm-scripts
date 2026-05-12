@@ -106,18 +106,24 @@ namespace AlwaysPrint.Shared.Configuration
 
             if (cfg.SearchTargets != null)
             {
+#nullable disable
+                // CS8602 es un falso positivo del analizador Roslyn en net48 —
+                // el if garantiza no-null pero el analizador no lo infiere en variables locales.
                 SearchTargetsConfig st = cfg.SearchTargets;
                 st.Ips    = Sanitize(st.Ips,    1024);
                 st.Ranges = Sanitize(st.Ranges, 1024);
                 cfg.SearchTargets = st;
+#nullable restore
             }
         }
 
         private static string Sanitize(string? value, int maxLength)
         {
             if (string.IsNullOrWhiteSpace(value)) return string.Empty;
-            value = value.Trim();
-            return value.Length > maxLength ? value.Substring(0, maxLength) : value;
+            // value no puede ser null aquí — IsNullOrWhiteSpace lo garantiza,
+            // pero el analizador de Roslyn en net48 no infiere el flujo de control.
+            string trimmed = value!.Trim();
+            return trimmed.Length > maxLength ? trimmed.Substring(0, maxLength) : trimmed;
         }
     }
 }
