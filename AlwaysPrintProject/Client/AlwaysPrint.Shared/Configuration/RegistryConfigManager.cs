@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Win32;
 using Newtonsoft.Json;
 using AlwaysPrint.Shared.Logging;
@@ -6,8 +7,8 @@ using AlwaysPrint.Shared.Logging;
 namespace AlwaysPrint.Shared.Configuration
 {
     /// <summary>
-    /// Reads and writes AlwaysPrint configuration from/to HKLM\SOFTWARE\Robles.AI\AlwaysPrint.
-    /// Writing requires the caller to have administrative privileges (the service).
+    /// Lee y escribe la configuración de AlwaysPrint en HKLM\SOFTWARE\Robles.AI\AlwaysPrint.
+    /// La escritura requiere que el caller tenga privilegios de administrador (el servicio).
     /// </summary>
     public class RegistryConfigManager
     {
@@ -22,6 +23,7 @@ namespace AlwaysPrint.Shared.Configuration
                 {
                     if (key == null) return cfg;
 
+                    // === CAMPOS EXISTENTES ===
                     cfg.CorporateQueueName  = key.GetValue("CorporateQueueName",  string.Empty) as string ?? string.Empty;
                     cfg.RoblesAiLicenseSerial = key.GetValue("RoblesAiLicenseSerial", string.Empty) as string ?? string.Empty;
                     cfg.BootstrapDomains    = key.GetValue("BootstrapDomains",    "robles.ai,iol.pe,sistemas.com.pe") as string
@@ -34,6 +36,37 @@ namespace AlwaysPrint.Shared.Configuration
                     if (!string.IsNullOrWhiteSpace(rawTargets))
                         cfg.SearchTargets = JsonConvert.DeserializeObject<SearchTargetsConfig>(rawTargets!)
                                             ?? new SearchTargetsConfig();
+
+                    // === CAMPOS CLOUD ===
+                    cfg.CloudEnabled = Convert.ToInt32(key.GetValue("CloudEnabled", 0)) == 1;
+                    cfg.CloudApiUrl  = key.GetValue("CloudApiUrl",  string.Empty) as string ?? string.Empty;
+                    cfg.CloudLocale  = key.GetValue("CloudLocale",  string.Empty) as string ?? string.Empty;
+
+                    var rawChecks = key.GetValue("ConnectivityChecks", null) as string;
+                    if (string.IsNullOrWhiteSpace(rawChecks))
+                    {
+                        cfg.ConnectivityChecks = new List<ConnectivityCheck>();
+                    }
+                    else
+                    {
+                        try
+                        {
+                            cfg.ConnectivityChecks =
+                                JsonConvert.DeserializeObject<List<ConnectivityCheck>>(rawChecks!)
+                                ?? new List<ConnectivityCheck>();
+                        }
+                        catch (JsonException exJson)
+                        {
+                            // JSON malformado: asignar lista vacía sin propagar la excepción.
+                            cfg.ConnectivityChecks = new List<ConnectivityCheck>();
+                            AlwaysPrintLogger.WriteWarning(
+                                $"RegistryConfigManager.Load: ConnectivityChecks contiene JSON malformado, se usará lista vacía. {exJson.Message}",
+                                AlwaysPrintLogger.EvtGenericWarning);
+                        }
+                    }
+
+                    cfg.TelemetryEnabled         = Convert.ToInt32(key.GetValue("TelemetryEnabled",         1)) == 1;
+                    cfg.TelemetryIntervalSeconds = Math.Max(60, Convert.ToInt32(key.GetValue("TelemetryIntervalSeconds", 300)));
                 }
             }
             catch (Exception ex)
@@ -47,18 +80,26 @@ namespace AlwaysPrint.Shared.Configuration
         }
 
         /// <summary>
-        /// Persists configuration. Caller must have HKLM write access (service running as LocalSystem).
+        /// Persiste la configuración. El caller debe tener acceso de escritura a HKLM
+        /// (servicio ejecutándose como LocalSystem).
+        /// Llama a cfg.Validate() antes de abrir la clave de registro; si lanza, no escribe nada.
         /// </summary>
         public void Save(AppConfiguration cfg)
         {
             if (cfg == null) throw new ArgumentNullException(nameof(cfg));
+
+            // Validar campos existentes (sanitización de strings, rangos, etc.)
             ValidateConfiguration(cfg);
+
+            // Validar campos Cloud — si lanza, la excepción se propaga al caller sin escribir nada.
+            cfg.Validate();
 
             using (var key = Registry.LocalMachine.CreateSubKey(RegistryPath, writable: true))
             {
                 if (key == null)
-                    throw new InvalidOperationException("Cannot create/open registry key – insufficient privileges.");
+                    throw new InvalidOperationException("No se puede crear/abrir la clave de registro — privilegios insuficientes.");
 
+                // === CAMPOS EXISTENTES ===
                 key.SetValue("CorporateQueueName",          cfg.CorporateQueueName  ?? string.Empty,            RegistryValueKind.String);
                 key.SetValue("PendingTaskPollingMinutes",    Math.Max(1, cfg.PendingTaskPollingMinutes),          RegistryValueKind.DWord);
                 key.SetValue("BootstrapDomains",             cfg.BootstrapDomains    ?? "robles.ai,iol.pe,sistemas.com.pe", RegistryValueKind.String);
@@ -66,12 +107,22 @@ namespace AlwaysPrint.Shared.Configuration
                 key.SetValue("SearchTargets",
                     JsonConvert.SerializeObject(cfg.SearchTargets ?? new SearchTargetsConfig()),
                     RegistryValueKind.String);
+
+                // === CAMPOS CLOUD ===
+                key.SetValue("CloudEnabled",             cfg.CloudEnabled  ? 1 : 0,                                                    RegistryValueKind.DWord);
+                key.SetValue("CloudApiUrl",              cfg.CloudApiUrl   ?? string.Empty,                                            RegistryValueKind.String);
+                key.SetValue("CloudLocale",              cfg.CloudLocale   ?? string.Empty,                                            RegistryValueKind.String);
+                key.SetValue("ConnectivityChecks",
+                    JsonConvert.SerializeObject(cfg.ConnectivityChecks ?? new List<ConnectivityCheck>()),
+                    RegistryValueKind.String);
+                key.SetValue("TelemetryEnabled",         cfg.TelemetryEnabled ? 1 : 0,                                                 RegistryValueKind.DWord);
+                key.SetValue("TelemetryIntervalSeconds", cfg.TelemetryIntervalSeconds,                                                  RegistryValueKind.DWord);
             }
         }
 
         /// <summary>
-        /// Creates the registry key and writes defaults for any missing values.
-        /// Safe to call on every service start.
+        /// Crea la clave de registro y escribe los valores por defecto para cualquier valor ausente.
+        /// Es seguro llamarlo en cada inicio del servicio (idempotente).
         /// </summary>
         public void EnsureDefaults()
         {
@@ -79,12 +130,21 @@ namespace AlwaysPrint.Shared.Configuration
             {
                 if (key == null) return;
 
+                // === CAMPOS EXISTENTES ===
                 SetIfMissing(key, "CorporateQueueName",       string.Empty,                                   RegistryValueKind.String);
                 SetIfMissing(key, "PendingTaskPollingMinutes", 3,                                              RegistryValueKind.DWord);
                 SetIfMissing(key, "BootstrapDomains",          "robles.ai,iol.pe,sistemas.com.pe",            RegistryValueKind.String);
                 SetIfMissing(key, "RoblesAiLicenseSerial",     string.Empty,                                  RegistryValueKind.String);
                 SetIfMissing(key, "SearchTargets",
                     JsonConvert.SerializeObject(new SearchTargetsConfig()),                                     RegistryValueKind.String);
+
+                // === CAMPOS CLOUD ===
+                SetIfMissing(key, "CloudEnabled",             0,             RegistryValueKind.DWord);
+                SetIfMissing(key, "CloudApiUrl",              string.Empty,  RegistryValueKind.String);
+                SetIfMissing(key, "CloudLocale",              string.Empty,  RegistryValueKind.String);
+                SetIfMissing(key, "ConnectivityChecks",       "[]",          RegistryValueKind.String);
+                SetIfMissing(key, "TelemetryEnabled",         1,             RegistryValueKind.DWord);
+                SetIfMissing(key, "TelemetryIntervalSeconds", 300,           RegistryValueKind.DWord);
             }
         }
 
@@ -97,9 +157,9 @@ namespace AlwaysPrint.Shared.Configuration
         private static void ValidateConfiguration(AppConfiguration cfg)
         {
             if (cfg.PendingTaskPollingMinutes < 1 || cfg.PendingTaskPollingMinutes > 1440)
-                throw new ArgumentOutOfRangeException("PendingTaskPollingMinutes must be between 1 and 1440.");
+                throw new ArgumentOutOfRangeException("PendingTaskPollingMinutes debe estar entre 1 y 1440.");
 
-            // Strip potential registry-injection characters from string fields.
+            // Eliminar caracteres potencialmente peligrosos de los campos de texto.
             cfg.CorporateQueueName    = Sanitize(cfg.CorporateQueueName,    64);
             cfg.RoblesAiLicenseSerial = Sanitize(cfg.RoblesAiLicenseSerial, 128);
             cfg.BootstrapDomains      = Sanitize(cfg.BootstrapDomains,       512);

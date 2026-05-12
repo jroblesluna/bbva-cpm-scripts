@@ -42,12 +42,13 @@ namespace AlwaysPrintService.Pipe
             {
                 return request.Type switch
                 {
-                    MessageType.Ping                 => HandlePing(request),
-                    MessageType.TrayInitialized      => HandleTrayInitialized(request),
-                    MessageType.UpdateConfiguration  => HandleUpdateConfiguration(request),
-                    MessageType.GetCurrentConfiguration => HandleGetConfig(request),
-                    MessageType.CheckCorporateQueue  => HandleCheckCorporateQueue(request),
-                    MessageType.CheckServiceStatus   => HandleCheckServiceStatus(request),
+                    MessageType.Ping                        => HandlePing(request),
+                    MessageType.TrayInitialized             => HandleTrayInitialized(request),
+                    MessageType.UpdateConfiguration         => HandleUpdateConfiguration(request),
+                    MessageType.GetCurrentConfiguration     => HandleGetConfig(request),
+                    MessageType.CheckCorporateQueue         => HandleCheckCorporateQueue(request),
+                    MessageType.CheckServiceStatus          => HandleCheckServiceStatus(request),
+                    MessageType.CloudConfigurationReceived  => HandleCloudConfigurationReceived(request),
                     _ => PipeMessage.Reply(request, MessageType.Error,
                             new ErrorPayload { Code = "UNKNOWN_TYPE", Message = $"Unknown message type: {request.Type}" })
                 };
@@ -129,6 +130,33 @@ namespace AlwaysPrintService.Pipe
 
             // Devuelve el payload tipado para que el Tray pueda leer State, BinaryPath, StartTime.
             return PipeMessage.Reply(req, MessageType.Ack, result.Data ?? new AckPayload { Success = result.Success, Message = result.Message });
+        }
+
+        private PipeMessage HandleCloudConfigurationReceived(PipeMessage req)
+        {
+            var payload = req.GetPayload<CloudConfigurationReceivedPayload>();
+            if (payload?.Configuration == null)
+                return PipeMessage.Reply(req, MessageType.Error,
+                    new ErrorPayload { Code = "INVALID_PAYLOAD", Message = "Payload de configuración Cloud ausente." });
+
+            try
+            {
+                // Save() llama cfg.Validate() internamente; si lanza, no escribe nada.
+                _registry.Save(payload.Configuration);
+                AlwaysPrintLogger.WriteInfo(
+                    $"Configuración Cloud aplicada correctamente. Hash={payload.ConfigHash}, Origen={payload.Source}",
+                    AlwaysPrintLogger.EvtConfigSaved);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = true, Message = "Configuración Cloud guardada." });
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"Error al guardar configuración Cloud. Hash={payload.ConfigHash}. {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Error,
+                    new ErrorPayload { Code = "SAVE_FAILED", Message = ex.Message });
+            }
         }
     }
 }

@@ -136,6 +136,13 @@
           <RegistryValue Name="RoblesAiLicenseSerial"    Type="string"  Value=""  />
           <RegistryValue Name="SearchTargets"            Type="string"
                          Value='{"ips":"","ranges":""}' />
+          <!-- Integración Cloud — valores por defecto -->
+          <RegistryValue Name="CloudEnabled"             Type="integer" Value="0"   />
+          <RegistryValue Name="CloudApiUrl"              Type="string"  Value=""    />
+          <RegistryValue Name="CloudLocale"              Type="string"  Value=""    />
+          <RegistryValue Name="ConnectivityChecks"       Type="string"  Value="[]"  />
+          <RegistryValue Name="TelemetryEnabled"         Type="integer" Value="1"   />
+          <RegistryValue Name="TelemetryIntervalSeconds" Type="integer" Value="300" />
         </RegistryKey>
       </Component>
 

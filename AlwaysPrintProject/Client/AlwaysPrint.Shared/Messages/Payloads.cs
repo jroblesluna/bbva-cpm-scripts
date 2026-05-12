@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using AlwaysPrint.Shared.Configuration;
 using Newtonsoft.Json;
 
@@ -87,5 +88,81 @@ namespace AlwaysPrint.Shared.Messages
 
         [JsonProperty("message")]
         public string Message { get; set; } = string.Empty;
+    }
+
+    // ── Cloud ────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Payload enviado del Tray al Service para aplicar una configuración
+    /// descargada de APCM.
+    /// </summary>
+    public class CloudConfigurationReceivedPayload
+    {
+        [JsonProperty("configuration")]
+        public AppConfiguration Configuration { get; set; } = new AppConfiguration();
+
+        [JsonProperty("configHash")]
+        public string ConfigHash { get; set; } = string.Empty;
+
+        /// <summary>Origen de la configuración: "cloud" o "cache".</summary>
+        [JsonProperty("source")]
+        public string Source { get; set; } = "cloud";
+    }
+
+    /// <summary>
+    /// Representa un evento de desconexión registrado en el log de telemetría.
+    /// </summary>
+    public class DisconnectionEvent
+    {
+        [JsonProperty("startedAt")]
+        public string StartedAt { get; set; } = string.Empty;
+
+        [JsonProperty("reconnectedAt")]
+        public string? ReconnectedAt { get; set; }
+
+        [JsonProperty("durationSeconds")]
+        public long? DurationSeconds { get; set; }
+    }
+
+    /// <summary>
+    /// Payload enviado del Service al Tray con datos de telemetría para
+    /// reenviar a APCM.
+    /// </summary>
+    public class TelemetryPayload
+    {
+        /// <summary>Estado de la cola corporativa: "ok", "missing" o "error".</summary>
+        [JsonProperty("queueStatus")]
+        public string QueueStatus { get; set; } = string.Empty;
+
+        [JsonProperty("contingencyActive")]
+        public bool ContingencyActive { get; set; }
+
+        [JsonProperty("jobsIdentified")]
+        public int JobsIdentified { get; set; }
+
+        [JsonProperty("avgReleaseTimeMs")]
+        public long? AvgReleaseTimeMs { get; set; }
+
+        [JsonProperty("disconnectionLog")]
+        public List<DisconnectionEvent> DisconnectionLog { get; set; } = new List<DisconnectionEvent>();
+    }
+
+    /// <summary>
+    /// Payload enviado del Service al Tray con el estado actual de la
+    /// conexión Cloud.
+    /// </summary>
+    public class CloudStatusResponsePayload
+    {
+        [JsonProperty("isConnected")]
+        public bool IsConnected { get; set; }
+
+        [JsonProperty("lastConnectedAt")]
+        public string? LastConnectedAt { get; set; }
+
+        [JsonProperty("configHash")]
+        public string? ConfigHash { get; set; }
+
+        [JsonProperty("usingCachedConfig")]
+        public bool UsingCachedConfig { get; set; }
     }
 }

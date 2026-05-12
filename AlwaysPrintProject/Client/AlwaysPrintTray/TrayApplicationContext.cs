@@ -7,7 +7,9 @@ using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
 using AlwaysPrintTray.Bootstrap;
+using AlwaysPrintTray.Cloud;
 using AlwaysPrintTray.Forms;
+using AlwaysPrintTray.Localization;
 using AlwaysPrintTray.Pipe;
 
 namespace AlwaysPrintTray
@@ -26,6 +28,9 @@ namespace AlwaysPrintTray
 
         // Capturado en el constructor (hilo UI) para hacer marshal seguro desde hilos de fondo.
         private readonly SynchronizationContext _uiContext;
+
+        // Integración Cloud (null si CloudEnabled=0 o CloudApiUrl vacía)
+        private CloudManager? _cloudManager;
 
         public TrayApplicationContext()
         {
@@ -46,14 +51,14 @@ namespace AlwaysPrintTray
             {
                 Icon    = LoadIconFromResource(),
                 Visible = true,
-                Text    = "AlwaysPrint"
+                Text    = LocalizationManager.Get("TrayTooltip")
             };
 
             var menu = new ContextMenuStrip();
-            menu.Items.Add("Acerca de",                null, (_, __) => ShowAbout());
-            menu.Items.Add("Configuración de Valores", null, (_, __) => ShowConfiguration());
+            menu.Items.Add(LocalizationManager.Get("MenuAbout"),         null, (_, __) => ShowAbout());
+            menu.Items.Add(LocalizationManager.Get("MenuConfiguration"), null, (_, __) => ShowConfiguration());
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Salir",                    null, (_, __) => ExitApplication());
+            menu.Items.Add(LocalizationManager.Get("MenuExit"),          null, (_, __) => ExitApplication());
 
             icon.ContextMenuStrip = menu;
             icon.DoubleClick     += (_, __) => ShowAbout();
@@ -93,7 +98,7 @@ namespace AlwaysPrintTray
 
                 if (!serviceRunning)
                 {
-                    ShowBalloon("AlwaysPrint", "El servicio AlwaysPrintService no está en ejecución.", ToolTipIcon.Error);
+                    ShowBalloon("AlwaysPrint", LocalizationManager.Get("BalloonServiceNotRunning"), ToolTipIcon.Error);
                     AlwaysPrintLogger.WriteTrayError("Tray: AlwaysPrintService no está en ejecución. Saliendo.",
                         AlwaysPrintLogger.EvtGenericError);
                     ExitApplication();
@@ -142,15 +147,38 @@ namespace AlwaysPrintTray
 
                 if (success)
                 {
-                    ShowBalloon("AlwaysPrint", $"Inicializado correctamente ({domain}).", ToolTipIcon.Info);
+                    ShowBalloon("AlwaysPrint", string.Format(LocalizationManager.Get("BalloonInitOk"), domain), ToolTipIcon.Info);
                     AlwaysPrintLogger.WriteTrayInfo($"Tray inicializado correctamente. Domain={domain}",
                         AlwaysPrintLogger.EvtTrayStarted);
                 }
                 else
                 {
                     ShowBalloon("AlwaysPrint",
-                        "No se pudo contactar el servidor de licencias. Operando en modo local.", ToolTipIcon.Warning);
+                        LocalizationManager.Get("BalloonInitFail"), ToolTipIcon.Warning);
                     AlwaysPrintLogger.WriteTrayWarning($"Tray: bootstrap fallido. {details}", AlwaysPrintLogger.EvtGenericWarning);
+                }
+
+                // 6. Iniciar integración Cloud si está habilitada
+                if (cfg.CloudEnabled && !string.IsNullOrWhiteSpace(cfg.CloudApiUrl))
+                {
+                    try
+                    {
+                        var credentials = new CloudCredentialsManager();
+                        _cloudManager = new CloudManager(cfg, credentials, _pipe, _uiContext);
+                        _cloudManager.Start();
+                        AlwaysPrintLogger.WriteTrayInfo("CloudManager iniciado correctamente.");
+                    }
+                    catch (Exception exCloud)
+                    {
+                        AlwaysPrintLogger.WriteTrayError(
+                            $"Error iniciando CloudManager. Operando en modo local. {exCloud.Message}");
+                        _cloudManager = null;
+                    }
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "Integración Cloud deshabilitada (CloudEnabled=0 o CloudApiUrl vacía).");
                 }
             }
             catch (OperationCanceledException) { /* shutdown normal */ }
@@ -241,6 +269,7 @@ namespace AlwaysPrintTray
             if (disposing)
             {
                 _cts.Cancel();
+                _cloudManager?.Dispose();
                 _trayIcon?.Dispose();
                 _pipe?.Dispose();
                 _cts.Dispose();

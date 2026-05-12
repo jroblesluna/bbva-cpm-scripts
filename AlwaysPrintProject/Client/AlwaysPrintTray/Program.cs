@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Windows.Forms;
 using AlwaysPrint.Shared.Logging;
+using AlwaysPrintTray.Localization;
 
 namespace AlwaysPrintTray
 {
@@ -30,6 +31,9 @@ namespace AlwaysPrintTray
             {
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
+
+                // Inicializar el sistema de localización antes de construir el contexto del Tray
+                LocalizationManager.Initialize();
 
                 AlwaysPrintLogger.WriteTrayInfo("AlwaysPrintTray started.", AlwaysPrintLogger.EvtServiceStarted);
                 Application.Run(new TrayApplicationContext());

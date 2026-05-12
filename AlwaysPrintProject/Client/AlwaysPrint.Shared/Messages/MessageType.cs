@@ -19,6 +19,12 @@ namespace AlwaysPrint.Shared.Messages
 
         // Responses
         Ack,
-        Error
+        Error,
+
+        // Integración Cloud
+        CloudConfigurationReceived,  // Tray → Service: aplicar config descargada de APCM
+        ReportTelemetry,             // Service → Tray: evento de telemetría para enviar
+        GetCloudStatus,              // Tray → Service: consultar estado Cloud
+        CloudStatusResponse          // Service → Tray: respuesta con estado Cloud
     }
 }

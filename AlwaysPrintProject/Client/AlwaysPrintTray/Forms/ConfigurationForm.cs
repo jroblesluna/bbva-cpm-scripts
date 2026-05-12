@@ -25,6 +25,11 @@ namespace AlwaysPrintTray.Forms
         private TextBox _txtSerial        = null!;
         private Label   _lblStatus        = null!;
 
+        // === CAMPOS CLOUD ===
+        private CheckBox _chkCloudEnabled = null!;
+        private TextBox  _txtCloudApiUrl  = null!;
+        private ComboBox _cmbCloudLocale  = null!;
+
         public ConfigurationForm(PipeClient pipe)
         {
             _pipe = pipe ?? throw new ArgumentNullException(nameof(pipe));
@@ -92,6 +97,48 @@ namespace AlwaysPrintTray.Forms
             Controls.Add(_txtSerial);
             y += 40;
 
+            // === SECCIÓN INTEGRACIÓN CLOUD ===
+
+            // Separador visual
+            Controls.Add(new Label
+            {
+                Text      = "─── Integración Cloud ───",
+                Location  = new Point(lx, y),
+                Size      = new Size(480, 20),
+                ForeColor = SystemColors.GrayText
+            });
+            y += 26;
+
+            // Checkbox: Cloud habilitado
+            _chkCloudEnabled = new CheckBox
+            {
+                Text     = "Integración Cloud habilitada",
+                Location = new Point(cx, y),
+                Size     = new Size(290, 22)
+            };
+            Controls.Add(new Label { Text = string.Empty, Location = new Point(lx, y + 3), Size = new Size(lw, 20) });
+            Controls.Add(_chkCloudEnabled);
+            y += 34;
+
+            // URL del servidor Cloud
+            Controls.Add(Lbl("URL del servidor Cloud (APCM):"));
+            _txtCloudApiUrl = Txt();
+            Controls.Add(_txtCloudApiUrl);
+            y += 34;
+
+            // Idioma (locale)
+            Controls.Add(Lbl("Idioma (locale):"));
+            _cmbCloudLocale = new ComboBox
+            {
+                Location      = new Point(cx, y),
+                Size          = new Size(150, 22),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            _cmbCloudLocale.Items.AddRange(new object[] { "Auto", "Español", "English" });
+            _cmbCloudLocale.SelectedIndex = 0;
+            Controls.Add(_cmbCloudLocale);
+            y += 40;
+
             // Status bar
             _lblStatus = new Label
             {
@@ -139,8 +186,14 @@ namespace AlwaysPrintTray.Forms
             }
             else
             {
+                // Si el pipe falla o devuelve null, mostrar error y dejar controles en estado default
                 _lblStatus.ForeColor = Color.Red;
                 _lblStatus.Text = "No se pudo cargar la configuración del servicio.";
+
+                // Dejar controles Cloud en estado default explícitamente
+                _chkCloudEnabled.Checked  = false;
+                _txtCloudApiUrl.Text      = string.Empty;
+                _cmbCloudLocale.SelectedIndex = 0;
             }
         }
 
@@ -152,21 +205,55 @@ namespace AlwaysPrintTray.Forms
             _numPoll.Value       = Math.Max(1, Math.Min(1440, cfg.PendingTaskPollingMinutes));
             _txtDomains.Text     = cfg.BootstrapDomains;
             _txtSerial.Text      = cfg.RoblesAiLicenseSerial;
+
+            // === CAMPOS CLOUD ===
+            _chkCloudEnabled.Checked = cfg.CloudEnabled;
+            _txtCloudApiUrl.Text     = cfg.CloudApiUrl ?? string.Empty;
+
+            // Seleccionar el item del ComboBox según el valor de CloudLocale
+            _cmbCloudLocale.SelectedIndex = cfg.CloudLocale switch
+            {
+                "es" => 1,
+                "en" => 2,
+                _    => 0   // "" o cualquier otro valor → "Auto"
+            };
         }
 
         private void BtnSave_Click(object? sender, EventArgs e)
         {
+            // Validar URL Cloud si no está vacía
+            string cloudApiUrl = _txtCloudApiUrl.Text.Trim();
+            if (!string.IsNullOrEmpty(cloudApiUrl) &&
+                !Uri.IsWellFormedUriString(cloudApiUrl, UriKind.Absolute))
+            {
+                _lblStatus.ForeColor = Color.Red;
+                _lblStatus.Text = "URL del servidor Cloud no es válida. Debe ser una URI absoluta (ej. https://...).";
+                return;
+            }
+
+            // Mapear el índice del ComboBox al valor de locale
+            string cloudLocale = _cmbCloudLocale.SelectedIndex switch
+            {
+                1 => "es",
+                2 => "en",
+                _ => string.Empty
+            };
+
             var cfg = new AppConfiguration
             {
-                CorporateQueueName      = _txtQueueName.Text.Trim(),
+                CorporateQueueName        = _txtQueueName.Text.Trim(),
                 PendingTaskPollingMinutes = (int)_numPoll.Value,
-                BootstrapDomains        = _txtDomains.Text.Trim(),
-                RoblesAiLicenseSerial   = _txtSerial.Text.Trim(),
+                BootstrapDomains          = _txtDomains.Text.Trim(),
+                RoblesAiLicenseSerial     = _txtSerial.Text.Trim(),
                 SearchTargets = new SearchTargetsConfig
                 {
                     Ips    = _txtIps.Text.Trim(),
                     Ranges = _txtRanges.Text.Trim()
-                }
+                },
+                // === CAMPOS CLOUD ===
+                CloudEnabled = _chkCloudEnabled.Checked,
+                CloudApiUrl  = cloudApiUrl,
+                CloudLocale  = cloudLocale
             };
 
             var payload  = new UpdateConfigurationPayload { Configuration = cfg };
