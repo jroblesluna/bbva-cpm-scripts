@@ -14,50 +14,73 @@ using Newtonsoft.Json.Linq;
 
 namespace AlwaysPrintTray.Cloud
 {
+    /// <summary>
+    /// Orquestador principal de la integración Cloud.
+    /// Gestiona el ciclo de vida completo de la conexión WebSocket hacia APCM:
+    /// inicio, registro de workstation, heartbeat (pong), y notificación al Service.
+    /// </summary>
     public sealed class CloudManager : IDisposable
     {
+        /// <summary>Estado actual de conexión Cloud.</summary>
         public bool IsConnected { get; private set; }
 
-        private readonly AppConfiguration        _config;
-        private readonly CloudCredentialsManager  _credentials;
-        private readonly PipeClient               _pipe;
-        private readonly SynchronizationContext   _uiContext;
+        private readonly AppConfiguration _config;
+        private readonly CloudCredentialsManager _credentials;
+        private readonly PipeClient _pipe;
+        private readonly SynchronizationContext _uiContext;
 
         private CloudWebSocketClient? _wsClient;
         private bool _disposed;
 
+        /// <summary>
+        /// Crea una nueva instancia de CloudManager.
+        /// </summary>
+        /// <param name="config">Configuración de la aplicación con CloudApiUrl.</param>
+        /// <param name="credentials">Gestor de credenciales Cloud en HKCU.</param>
+        /// <param name="pipe">Cliente Named Pipe para notificar al Service.</param>
+        /// <param name="uiContext">Contexto de sincronización del hilo UI.</param>
         public CloudManager(
             AppConfiguration config,
             CloudCredentialsManager credentials,
             PipeClient pipe,
             SynchronizationContext uiContext)
         {
-            _config      = config;
+            _config = config;
             _credentials = credentials;
-            _pipe        = pipe;
-            _uiContext   = uiContext;
+            _pipe = pipe;
+            _uiContext = uiContext;
         }
 
+        /// <summary>
+        /// Inicia la integración Cloud: carga credenciales, crea el cliente WebSocket,
+        /// suscribe eventos y conecta.
+        /// </summary>
         public void Start()
         {
             _credentials.Load();
 
             _wsClient = new CloudWebSocketClient(_config.CloudApiUrl);
-            _wsClient.Connected       += OnConnected;
-            _wsClient.Disconnected    += OnDisconnected;
+            _wsClient.Connected += OnConnected;
+            _wsClient.Disconnected += OnDisconnected;
             _wsClient.MessageReceived += OnMessageReceived;
-            _wsClient.Error           += OnError;
+            _wsClient.Error += OnError;
 
             _wsClient.Connect();
             AlwaysPrintLogger.WriteTrayInfo("CloudManager: conexión WebSocket iniciada.");
         }
 
+        /// <summary>
+        /// Detiene la integración Cloud: desconecta el WebSocket y actualiza el estado.
+        /// </summary>
         public void Stop()
         {
             _wsClient?.Disconnect();
             IsConnected = false;
         }
 
+        /// <summary>
+        /// Libera todos los recursos: detiene la conexión y dispone el cliente WebSocket.
+        /// </summary>
         public void Dispose()
         {
             if (_disposed) return;
@@ -115,11 +138,11 @@ namespace AlwaysPrintTray.Cloud
             {
                 var payload = new JObject
                 {
-                    ["ip_private"]     = GetPrivateIp(),
-                    ["hostname"]       = Environment.MachineName,
-                    ["os_serial"]      = GetOsSerial(),
-                    ["current_user"]   = Environment.UserName,
-                    ["locale"]         = LocalizationManager.CurrentLocale,
+                    ["ip_private"] = GetPrivateIp(),
+                    ["hostname"] = Environment.MachineName,
+                    ["os_serial"] = GetOsSerial(),
+                    ["current_user"] = Environment.UserName,
+                    ["locale"] = LocalizationManager.CurrentLocale,
                     ["client_version"] = Assembly.GetExecutingAssembly()
                                             .GetName().Version?.ToString() ?? "0.0.0.0",
                     ["workstation_id"] = _credentials.IsRegistered
@@ -146,7 +169,7 @@ namespace AlwaysPrintTray.Cloud
 
                 if (!string.IsNullOrEmpty(workstationId))
                 {
-                    _credentials.SaveWorkstationId(workstationId);
+                    _credentials.SaveWorkstationId(workstationId!);
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"CloudManager: WorkstationId registrado = {workstationId}");
                 }
@@ -190,11 +213,11 @@ namespace AlwaysPrintTray.Cloud
 
                 var payload = new CloudStatusResponsePayload
                 {
-                    IsConnected      = connected,
-                    LastConnectedAt  = connected
+                    IsConnected = connected,
+                    LastConnectedAt = connected
                         ? DateTime.UtcNow.ToString("o")
                         : _credentials.LastConnectedAt?.ToString("o"),
-                    ConfigHash       = _credentials.ConfigHash,
+                    ConfigHash = _credentials.ConfigHash,
                     UsingCachedConfig = !connected
                 };
 
@@ -219,7 +242,10 @@ namespace AlwaysPrintTray.Cloud
                     IsPrivateIp(a));
                 return privateIp?.ToString() ?? "0.0.0.0";
             }
-            catch { return "0.0.0.0"; }
+            catch
+            {
+                return "0.0.0.0";
+            }
         }
 
         private static bool IsPrivateIp(IPAddress ip)
@@ -234,13 +260,20 @@ namespace AlwaysPrintTray.Cloud
         {
             try
             {
-                using var searcher = new ManagementObjectSearcher(
-                    "SELECT SerialNumber FROM Win32_OperatingSystem");
-                foreach (var obj in searcher.Get())
-                    return obj["SerialNumber"]?.ToString() ?? "";
+                using (var searcher = new ManagementObjectSearcher(
+                    "SELECT SerialNumber FROM Win32_OperatingSystem"))
+                {
+                    foreach (var obj in searcher.Get())
+                    {
+                        return obj["SerialNumber"]?.ToString() ?? "";
+                    }
+                }
                 return "";
             }
-            catch { return ""; }
+            catch
+            {
+                return "";
+            }
         }
     }
 }

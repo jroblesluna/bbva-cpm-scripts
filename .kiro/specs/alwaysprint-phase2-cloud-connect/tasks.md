@@ -6,22 +6,22 @@ Implementar la conectividad WebSocket persistente entre AlwaysPrintTray y APCM. 
 
 ## Tasks
 
-- [ ] 1. Add WebSocket4Net NuGet dependency
-  - [ ] 1.1 Add WebSocket4Net PackageReference to AlwaysPrintTray.csproj
+- [x] 1. Add WebSocket4Net NuGet dependency
+  - [x] 1.1 Add WebSocket4Net PackageReference to AlwaysPrintTray.csproj
     - Verify `<PackageReference Include="WebSocket4Net" Version="0.15.2" />` exists in `AlwaysPrintProject/Client/AlwaysPrintTray/AlwaysPrintTray.csproj` (already present — confirm no version conflicts)
     - Ensure `System.Management` reference is present for WMI access (already present)
     - _Requirements: 9.1, 9.2, 9.3_
 
-- [ ] 2. Create ProxyHelper.cs
-  - [ ] 2.1 Implement ProxyHelper static class
+- [x] 2. Create ProxyHelper.cs
+  - [x] 2.1 Implement ProxyHelper static class
     - Create file `AlwaysPrintProject/Client/AlwaysPrintTray/Cloud/ProxyHelper.cs`
     - Implement `static HttpClientHandler CreateHandler()` — returns handler with `UseProxy=true`, system proxy, `DefaultCredentials`
     - Implement `static Uri? GetSystemProxyUri(Uri targetUri)` — returns proxy URI or null if bypassed
     - Use `AlwaysPrintLogger.WriteTrayInfo()` for proxy detection logging (messages in Spanish)
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7_
 
-- [ ] 3. Create CloudWebSocketClient.cs
-  - [ ] 3.1 Implement CloudWebSocketClient sealed class with full WebSocket lifecycle
+- [x] 3. Create CloudWebSocketClient.cs
+  - [x] 3.1 Implement CloudWebSocketClient sealed class with full WebSocket lifecycle
     - Create file `AlwaysPrintProject/Client/AlwaysPrintTray/Cloud/CloudWebSocketClient.cs`
     - Derive WSS URL: replace `https://` → `wss://`, append `/ws/workstation`
     - Configure WebSocket4Net proxy via `ProxyHelper.GetSystemProxyUri()` + `HttpConnectProxy`
@@ -44,8 +44,8 @@ Implementar la conectividad WebSocket persistente entre AlwaysPrintTray y APCM. 
     - **Property 4: Successful connection resets backoff state**
     - **Validates: Requirements 2.5, 2.8, 2.9, 8.2, 8.3, 8.4, 8.5**
 
-- [ ] 4. Create CloudManager.cs
-  - [ ] 4.1 Implement CloudManager sealed class with registration, heartbeat, and service notification
+- [x] 4. Create CloudManager.cs
+  - [x] 4.1 Implement CloudManager sealed class with registration, heartbeat, and service notification
     - Create file `AlwaysPrintProject/Client/AlwaysPrintTray/Cloud/CloudManager.cs`
     - Constructor accepts: `AppConfiguration`, `CloudCredentialsManager`, `PipeClient`, `SynchronizationContext`
     - Implement `Start()`: create `CloudWebSocketClient`, subscribe events, load credentials, connect
@@ -69,8 +69,8 @@ Implementar la conectividad WebSocket persistente entre AlwaysPrintTray y APCM. 
     - **Property 9: Cloud status notification payload is consistent with connection state**
     - **Validates: Requirements 2.12, 2.14, 4.3, 3.12, 5.1, 6.1, 6.2**
 
-- [ ] 5. Integrate CloudManager in TrayApplicationContext
-  - [ ] 5.1 Wire CloudManager into TrayApplicationContext lifecycle
+- [x] 5. Integrate CloudManager in TrayApplicationContext
+  - [x] 5.1 Wire CloudManager into TrayApplicationContext lifecycle
     - Add private field `CloudManager? _cloudManager` to `TrayApplicationContext`
     - In `BootstrapSequence()`, after health check success: check `cfg.CloudEnabled && !string.IsNullOrWhiteSpace(cfg.CloudApiUrl)`
     - If conditions met: instantiate `CloudCredentialsManager`, create `CloudManager(cfg, credentials, _pipe, _uiContext)`, call `Start()`
@@ -80,7 +80,7 @@ Implementar la conectividad WebSocket persistente entre AlwaysPrintTray y APCM. 
     - Ensure no behavioral change when `CloudEnabled=false`
     - _Requirements: 7.1–7.7, 10.8_
 
-- [ ] 6. Final checkpoint — Static code review and build verification
+- [x] 6. Final checkpoint — Static code review and build verification
   - Ensure all new files are in `AlwaysPrintTray/Cloud/` directory
   - Verify no `Console.WriteLine` usage in new code
   - Verify all log messages are in Spanish

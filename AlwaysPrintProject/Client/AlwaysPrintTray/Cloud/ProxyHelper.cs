@@ -34,7 +34,7 @@ namespace AlwaysPrintTray.Cloud
         /// </summary>
         /// <param name="targetUri">URI destino para la cual se busca el proxy.</param>
         /// <returns>URI del proxy, o null si el destino es directo (bypass).</returns>
-        public static Uri GetSystemProxyUri(Uri targetUri)
+        public static Uri? GetSystemProxyUri(Uri targetUri)
         {
             var proxy = WebRequest.GetSystemWebProxy();
 

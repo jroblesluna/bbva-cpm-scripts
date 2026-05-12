@@ -45,6 +45,10 @@ namespace AlwaysPrintTray.Cloud
             // Detectar proxy
             var targetUri = new Uri(cloudApiUrl);
             _proxyUri = ProxyHelper.GetSystemProxyUri(targetUri);
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"CloudWebSocketClient: URL WebSocket derivada = {_wsUrl}" +
+                (_proxyUri != null ? $" (proxy: {_proxyUri})" : " (conexión directa)"));
         }
 
         public void Connect()
@@ -52,6 +56,14 @@ namespace AlwaysPrintTray.Cloud
             lock (_lock)
             {
                 if (_disposed) return;
+
+                // Recrear CancellationTokenSource si fue cancelado previamente
+                if (_cts.IsCancellationRequested)
+                {
+                    _cts.Dispose();
+                    _cts = new CancellationTokenSource();
+                }
+
                 CreateAndOpenSocket();
             }
         }
@@ -129,6 +141,8 @@ namespace AlwaysPrintTray.Cloud
                 _currentDelayMs = InitialDelayMs;
                 _longRetryMode  = false;
             }
+            AlwaysPrintLogger.WriteTrayInfo(
+                "CloudWebSocketClient: conexión WebSocket establecida exitosamente.");
             Connected?.Invoke();
         }
 
@@ -142,7 +156,7 @@ namespace AlwaysPrintTray.Cloud
             }
 
             // Detectar código 1008 (IP no autorizada)
-            if (sender is WebSocket ws && ws.CloseStatusCode == 1008)
+            if (e is ClosedEventArgs closedArgs && closedArgs.Code == 1008)
             {
                 _longRetryMode = true;
                 AlwaysPrintLogger.WriteTrayWarning(
