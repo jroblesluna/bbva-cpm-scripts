@@ -5,6 +5,7 @@ using System.ServiceProcess;
 using System.Threading;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
+using AlwaysPrint.Shared.Messages;
 using AlwaysPrint.Shared.Models;
 using AlwaysPrintService.Pipe;
 using AlwaysPrintService.Queue;
@@ -46,6 +47,55 @@ namespace AlwaysPrintService
             base.CanHandleSessionChangeEvent = CanHandleSessionChangeEvent;
             base.CanPauseAndContinue         = false;
             base.AutoLog                     = false;
+        }
+
+        // ── Telemetría: envío de ReportTelemetry al Tray ────────────────────────
+
+        /// <summary>
+        /// Envía un mensaje ReportTelemetry al Tray vía Named Pipe con los datos
+        /// de un trabajo de impresión completado. Si el pipe está desconectado,
+        /// registra una advertencia y descarta el mensaje.
+        /// </summary>
+        /// <param name="releaseTimeMs">Tiempo de liberación del trabajo en milisegundos (no negativo).</param>
+        public void NotifyPrintJobCompleted(long releaseTimeMs)
+        {
+            try
+            {
+                if (_pipeServer == null || !_pipeServer.IsClientConnected)
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        "ReportTelemetry: pipe desconectado, no se puede enviar datos de telemetría al Tray. Mensaje descartado.",
+                        AlwaysPrintLogger.EvtGenericWarning);
+                    return;
+                }
+
+                var payload = new ReportTelemetryPayload
+                {
+                    JobCount = 1,
+                    ReleaseTimeMs = releaseTimeMs
+                };
+
+                var message = PipeMessage.Create(MessageType.ReportTelemetry, payload);
+                bool sent = _pipeServer.SendToClient(message);
+
+                if (!sent)
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        "ReportTelemetry: no se pudo enviar mensaje de telemetría al Tray. Pipe desconectado. Mensaje descartado.",
+                        AlwaysPrintLogger.EvtGenericWarning);
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteInfo(
+                        $"ReportTelemetry: datos de trabajo enviados al Tray. releaseTimeMs={releaseTimeMs}.");
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning(
+                    $"ReportTelemetry: error al enviar telemetría al Tray. {ex.Message}. Mensaje descartado.",
+                    AlwaysPrintLogger.EvtGenericWarning);
+            }
         }
 
         // ── Puntos de entrada del servicio ──────────────────────────────────────

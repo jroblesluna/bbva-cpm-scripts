@@ -11,7 +11,7 @@ La resolución de configuración sigue el orden: WorkstationConfig > VLANConfig 
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -45,6 +45,16 @@ class GlobalConfig(Base):
     bootstrap_domains = Column(String(1000), nullable=False, default="robles.ai,iol.pe,sistemas.com.pe")
     language = Column(String(2), nullable=False, server_default='en')
 
+    # === CAMPOS FASE 3: CONFIGURACIÓN EXTENDIDA ===
+    # Verificaciones de conectividad (lista JSON de objetos con id, type, url, timeout_ms)
+    connectivity_checks = Column(JSON, nullable=False, default=list)
+    # Locale para override de idioma en el Tray (ISO 639-1 o BCP 47, max 10 chars)
+    locale = Column(String(10), nullable=False, default="")
+    # Habilitar telemetría en la workstation
+    telemetry_enabled = Column(Boolean, nullable=False, default=True)
+    # Intervalo de envío de telemetría en segundos (rango: 10-86400)
+    telemetry_interval_seconds = Column(Integer, nullable=False, default=300)
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -75,6 +85,16 @@ class VLANConfig(Base):
     pending_task_polling_minutes = Column(Integer, nullable=True)
     bootstrap_domains = Column(String(1000), nullable=True)
     
+    # === CAMPOS FASE 3: CONFIGURACIÓN EXTENDIDA (NULLABLE PARA OVERRIDE SELECTIVO) ===
+    # Verificaciones de conectividad (NULL = usar valor de GlobalConfig)
+    connectivity_checks = Column(JSON, nullable=True)
+    # Locale para override de idioma (NULL = usar valor de GlobalConfig)
+    locale = Column(String(10), nullable=True)
+    # Habilitar telemetría (NULL = usar valor de GlobalConfig)
+    telemetry_enabled = Column(Boolean, nullable=True)
+    # Intervalo de telemetría en segundos (NULL = usar valor de GlobalConfig)
+    telemetry_interval_seconds = Column(Integer, nullable=True)
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -105,6 +125,16 @@ class WorkstationConfig(Base):
     pending_task_polling_minutes = Column(Integer, nullable=True)
     bootstrap_domains = Column(String(1000), nullable=True)
     
+    # === CAMPOS FASE 3: CONFIGURACIÓN EXTENDIDA (NULLABLE PARA OVERRIDE SELECTIVO) ===
+    # Verificaciones de conectividad (NULL = usar valor de VLANConfig o GlobalConfig)
+    connectivity_checks = Column(JSON, nullable=True)
+    # Locale para override de idioma (NULL = usar valor de VLANConfig o GlobalConfig)
+    locale = Column(String(10), nullable=True)
+    # Habilitar telemetría (NULL = usar valor de VLANConfig o GlobalConfig)
+    telemetry_enabled = Column(Boolean, nullable=True)
+    # Intervalo de telemetría en segundos (NULL = usar valor de VLANConfig o GlobalConfig)
+    telemetry_interval_seconds = Column(Integer, nullable=True)
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

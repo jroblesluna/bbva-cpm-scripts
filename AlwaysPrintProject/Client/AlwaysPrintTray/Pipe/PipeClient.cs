@@ -12,6 +12,7 @@ namespace AlwaysPrintTray.Pipe
     /// Named pipe client para el Tray.
     /// Mantiene una conexión persistente al pipe del servicio.
     /// Todos los envíos están serializados con un lock para que múltiples hilos UI puedan llamar de forma segura.
+    /// Soporta recepción de mensajes push (no solicitados) del Service vía el evento MessageReceived.
     /// </summary>
     public sealed class PipeClient : IDisposable
     {
@@ -22,6 +23,12 @@ namespace AlwaysPrintTray.Pipe
         private StreamReader? _reader;
         private StreamWriter? _writer;
         private bool _disposed;
+
+        /// <summary>
+        /// Evento disparado cuando se recibe un mensaje push (no solicitado) del Service.
+        /// Se invoca desde el hilo que llama a Send() o desde el hilo de escucha.
+        /// </summary>
+        public event Action<PipeMessage>? MessageReceived;
 
         public bool IsConnected => _pipe?.IsConnected == true;
 
@@ -69,13 +76,29 @@ namespace AlwaysPrintTray.Pipe
                 {
                     _writer!.WriteLine(request.Serialize());
 
-                    string? line = _reader!.ReadLine();
-                    if (line == null)
+                    // Leer líneas hasta obtener la respuesta correlacionada.
+                    // Mensajes push (sin correlationId o con tipo push) se despachan vía evento.
+                    while (true)
                     {
-                        DisposeTransport();
-                        return null;
+                        string? line = _reader!.ReadLine();
+                        if (line == null)
+                        {
+                            DisposeTransport();
+                            return null;
+                        }
+
+                        var msg = PipeMessage.Deserialize(line);
+                        if (msg == null) continue;
+
+                        // Si es un mensaje push del Service (sin correlationId que coincida con el request)
+                        if (IsPushMessage(msg, request.Id))
+                        {
+                            DispatchPushMessage(msg);
+                            continue;
+                        }
+
+                        return msg;
                     }
-                    return PipeMessage.Deserialize(line);
                 }
                 catch (Exception ex)
                 {
@@ -91,6 +114,45 @@ namespace AlwaysPrintTray.Pipe
         {
             var response = Send(PipeMessage.Create(MessageType.Ping));
             return response?.Type == MessageType.Pong;
+        }
+
+        /// <summary>
+        /// Determina si un mensaje es un push (no solicitado) del Service.
+        /// Un mensaje push no tiene correlationId o su correlationId no coincide con el request enviado.
+        /// Además, se identifica por tipos específicos de mensajes push (ReportTelemetry).
+        /// </summary>
+        private static bool IsPushMessage(PipeMessage msg, string requestId)
+        {
+            // Los mensajes ReportTelemetry siempre son push del Service
+            if (msg.Type == MessageType.ReportTelemetry)
+                return true;
+
+            // Si tiene correlationId que coincide con nuestro request, es una respuesta
+            if (!string.IsNullOrEmpty(msg.CorrelationId) && msg.CorrelationId == requestId)
+                return false;
+
+            // Si no tiene correlationId y no es un tipo de respuesta conocido, es push
+            if (string.IsNullOrEmpty(msg.CorrelationId))
+                return true;
+
+            return false;
+        }
+
+        /// <summary>
+        /// Despacha un mensaje push recibido del Service al evento MessageReceived.
+        /// </summary>
+        private void DispatchPushMessage(PipeMessage msg)
+        {
+            try
+            {
+                MessageReceived?.Invoke(msg);
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"PipeClient: error al despachar mensaje push tipo={msg.Type}. {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+            }
         }
 
         private bool EnsureConnected()

@@ -148,6 +148,19 @@ namespace AlwaysPrint.Shared.Messages
     }
 
     /// <summary>
+    /// Payload enviado del Service al Tray con datos de un trabajo completado
+    /// para acumular en el TelemetryReporter (IPC ReportTelemetry).
+    /// </summary>
+    public class ReportTelemetryPayload
+    {
+        [JsonProperty("jobCount")]
+        public int JobCount { get; set; }
+
+        [JsonProperty("releaseTimeMs")]
+        public long ReleaseTimeMs { get; set; }
+    }
+
+    /// <summary>
     /// Payload enviado del Service al Tray con el estado actual de la
     /// conexión Cloud.
     /// </summary>

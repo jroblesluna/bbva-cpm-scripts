@@ -84,6 +84,10 @@ from app.schemas.websocket import (
     StatusUpdateMessage,
     ConfigChangeReportMessage,
     CommandResultMessage,
+    # Workstation → Backend (Telemetría y Conectividad)
+    DisconnectionEventSchema,
+    TelemetryMessage,
+    ConnectivityResultMessage,
     # Backend → Workstation
     PingMessage,
     ConfigChangeMessage,
@@ -169,6 +173,9 @@ __all__ = [
     "StatusUpdateMessage",
     "ConfigChangeReportMessage",
     "CommandResultMessage",
+    "DisconnectionEventSchema",
+    "TelemetryMessage",
+    "ConnectivityResultMessage",
     "PingMessage",
     "ConfigChangeMessage",
     "CommandMessage",

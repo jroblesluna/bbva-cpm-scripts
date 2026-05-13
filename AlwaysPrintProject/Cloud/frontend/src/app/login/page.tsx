@@ -27,22 +27,38 @@ export default function LoginPage() {
 
   // Verificar si el sistema necesita setup
   useEffect(() => {
+    let cancelled = false
+
     const checkSetup = async () => {
       try {
-        const status = await setupApi.getStatus()
+        // Timeout corto para no bloquear la UI si el backend no responde
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+        const status = await setupApi.getStatus(controller.signal)
+        clearTimeout(timeoutId)
+
+        if (cancelled) return
+
         if (status.needs_setup) {
           // Redirigir a setup si no hay usuarios
           router.push('/setup')
         } else {
           setIsCheckingSetup(false)
         }
-      } catch (error) {
+      } catch (error: unknown) {
+        if (cancelled) return
+        // Si falla (timeout, red, backend caído), mostrar login igualmente
         console.error('Error al verificar setup:', error)
         setIsCheckingSetup(false)
       }
     }
 
     checkSetup()
+
+    return () => {
+      cancelled = true
+    }
   }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {

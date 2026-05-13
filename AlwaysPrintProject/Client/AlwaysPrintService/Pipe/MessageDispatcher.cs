@@ -136,15 +136,20 @@ namespace AlwaysPrintService.Pipe
         {
             var payload = req.GetPayload<CloudConfigurationReceivedPayload>();
             if (payload?.Configuration == null)
-                return PipeMessage.Reply(req, MessageType.Error,
-                    new ErrorPayload { Code = "INVALID_PAYLOAD", Message = "Payload de configuración Cloud ausente." });
+            {
+                AlwaysPrintLogger.WriteError(
+                    "Configuración Cloud recibida con payload inválido o ausente.",
+                    AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = "Payload de configuración Cloud ausente." });
+            }
 
             try
             {
                 // Save() llama cfg.Validate() internamente; si lanza, no escribe nada.
                 _registry.Save(payload.Configuration);
                 AlwaysPrintLogger.WriteInfo(
-                    $"Configuración Cloud aplicada correctamente. Hash={payload.ConfigHash}, Origen={payload.Source}",
+                    $"Configuración Cloud aplicada correctamente. Fuente={payload.Source}, Hash={payload.ConfigHash}",
                     AlwaysPrintLogger.EvtConfigSaved);
                 return PipeMessage.Reply(req, MessageType.Ack,
                     new AckPayload { Success = true, Message = "Configuración Cloud guardada." });
@@ -152,10 +157,10 @@ namespace AlwaysPrintService.Pipe
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteError(
-                    $"Error al guardar configuración Cloud. Hash={payload.ConfigHash}. {ex.Message}",
+                    $"Error al guardar configuración Cloud en registro. Hash={payload.ConfigHash}. {ex.Message}",
                     AlwaysPrintLogger.EvtGenericError);
-                return PipeMessage.Reply(req, MessageType.Error,
-                    new ErrorPayload { Code = "SAVE_FAILED", Message = ex.Message });
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = $"Error al persistir configuración: {ex.Message}" });
             }
         }
     }

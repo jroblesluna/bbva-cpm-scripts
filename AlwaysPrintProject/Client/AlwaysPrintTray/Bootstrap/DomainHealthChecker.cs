@@ -34,6 +34,12 @@ namespace AlwaysPrintTray.Bootstrap
             Timeout = TimeSpan.FromSeconds(TimeoutSecs)
         };
 
+        /// <summary>
+        /// Expone el HttpClient estático para reutilización por otros componentes del Tray
+        /// (ej: ConfigurationSync). Evita crear nuevas instancias y socket exhaustion.
+        /// </summary>
+        internal static HttpClient Http => _http;
+
         public static (bool Success, string? RespondingDomain, string? Details)
             CheckAll(string bootstrapDomains, CancellationToken ct = default)
         {

@@ -73,6 +73,15 @@ export const apiClient: AxiosInstance = axios.create({
  */
 apiClient.interceptors.request.use(
   (config) => {
+    // No enviar token si el header Authorization ya fue explícitamente seteado (incluso vacío)
+    if (config.headers.Authorization !== undefined) {
+      // Si se seteó explícitamente vacío, eliminarlo para no enviar header
+      if (!config.headers.Authorization) {
+        delete config.headers.Authorization
+      }
+      return config
+    }
+
     // Obtener token del localStorage
     const token = localStorage.getItem('access_token')
     
@@ -121,9 +130,14 @@ apiClient.interceptors.response.use(
 export const setupApi = {
   /**
    * Verificar si el sistema necesita configuración inicial.
+   * Acepta un AbortSignal opcional para cancelar la petición.
+   * No envía token de autenticación (endpoint público).
    */
-  getStatus: async (): Promise<{ needs_setup: boolean; message: string }> => {
-    const response = await apiClient.get<{ needs_setup: boolean; message: string }>('/setup/status')
+  getStatus: async (signal?: AbortSignal): Promise<{ needs_setup: boolean; message: string }> => {
+    const response = await apiClient.get<{ needs_setup: boolean; message: string }>('/setup/status', {
+      signal,
+      headers: { Authorization: '' },
+    })
     return response.data
   },
 

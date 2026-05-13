@@ -26,7 +26,6 @@ from app.schemas import (
     WorkstationStatsResponse,
     WorkstationConfigUpdate,
     WorkstationConfigResponse,
-    EffectiveConfigResponse,
 )
 from app.services.workstation import WorkstationService
 from app.services.config import ConfigService
@@ -342,53 +341,6 @@ def update_workstation(
 
 
 # === ENDPOINTS DE CONFIGURACIÓN ===
-
-@router.get("/{workstation_id}/config", response_model=EffectiveConfigResponse)
-def get_workstation_config(
-    workstation_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Obtener configuración efectiva de una workstation.
-    
-    Resuelve la jerarquía: WorkstationConfig > VLANConfig > GlobalConfig
-    
-    Args:
-        workstation_id: ID de la workstation
-        current_user: Usuario autenticado
-        db: Sesión de base de datos
-    
-    Returns:
-        EffectiveConfigResponse con configuración resuelta
-    
-    Raises:
-        HTTPException 403: Sin permisos
-        HTTPException 404: Workstation no encontrada
-    """
-    workstation_service = WorkstationService()
-    config_service = ConfigService()
-    
-    workstation = workstation_service.get_workstation_by_id(db, workstation_id)
-    
-    if not workstation:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Workstation con ID {workstation_id} no encontrada"
-        )
-    
-    # Verificar permisos
-    if current_user.role == UserRole.OPERATOR:
-        if workstation.account_id != current_user.account_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No tienes permisos para ver la configuración de esta workstation"
-            )
-    
-    # Obtener configuración efectiva
-    config = config_service.get_effective_config(db, workstation_id)
-    
-    return config
 
 
 @router.put("/{workstation_id}/config", response_model=WorkstationConfigResponse)

@@ -15,6 +15,7 @@ namespace AlwaysPrintService.Pipe
     /// Named pipe server. Spawns one handler thread per connected client.
     /// Security: pipe DACL grants Authenticated Users read/write access so
     /// the Tray (running as a regular user) can connect.
+    /// Soporta envío de mensajes push (no solicitados) al cliente conectado.
     /// </summary>
     public sealed class PipeServer : IDisposable
     {
@@ -25,9 +26,46 @@ namespace AlwaysPrintService.Pipe
         private Thread? _listenerThread;
         private bool _disposed;
 
+        // Referencia al writer del cliente conectado para envío de mensajes push.
+        private readonly object _clientLock = new object();
+        private StreamWriter? _activeClientWriter;
+
+        /// <summary>Indica si hay un cliente (Tray) conectado actualmente.</summary>
+        public bool IsClientConnected
+        {
+            get { lock (_clientLock) { return _activeClientWriter != null; } }
+        }
+
         public PipeServer(MessageDispatcher dispatcher)
         {
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
+        }
+
+        /// <summary>
+        /// Envía un mensaje push (no solicitado) al cliente conectado.
+        /// Retorna true si el envío fue exitoso, false si no hay cliente conectado o el envío falló.
+        /// </summary>
+        /// <param name="message">Mensaje a enviar al cliente.</param>
+        /// <returns>true si se envió correctamente; false si el pipe está desconectado.</returns>
+        public bool SendToClient(PipeMessage message)
+        {
+            lock (_clientLock)
+            {
+                if (_activeClientWriter == null)
+                    return false;
+
+                try
+                {
+                    _activeClientWriter.WriteLine(message.Serialize());
+                    return true;
+                }
+                catch (Exception)
+                {
+                    // El cliente se desconectó durante el envío
+                    _activeClientWriter = null;
+                    return false;
+                }
+            }
         }
 
         public void Start()
@@ -123,6 +161,9 @@ namespace AlwaysPrintService.Pipe
                     AutoFlush = true
                 };
 
+                // Registrar el writer del cliente para mensajes push
+                lock (_clientLock) { _activeClientWriter = writer; }
+
                 try
                 {
                     string? line;
@@ -153,6 +194,11 @@ namespace AlwaysPrintService.Pipe
                 catch (Exception ex)
                 {
                     AlwaysPrintLogger.WriteError("PipeServer client handler error.", ex);
+                }
+                finally
+                {
+                    // Limpiar referencia al desconectarse el cliente
+                    lock (_clientLock) { _activeClientWriter = null; }
                 }
             }
         }

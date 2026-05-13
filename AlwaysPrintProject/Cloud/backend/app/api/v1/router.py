@@ -52,6 +52,14 @@ api_router.include_router(
     tags=["Usuarios"]
 )
 
+# Configuración efectiva de workstation (autenticación por IP pública o token Bearer)
+# Registrado ANTES del router de workstations para que tome precedencia en GET /{id}/config
+api_router.include_router(
+    config.workstation_config_router,
+    prefix="/workstations",
+    tags=["Configuración Efectiva"]
+)
+
 # Workstations
 api_router.include_router(
     workstations.router,
@@ -66,7 +74,7 @@ api_router.include_router(
     tags=["VLANs"]
 )
 
-# Configuración
+# Configuración global
 api_router.include_router(
     config.router,
     prefix="/config",

@@ -157,6 +157,78 @@ namespace AlwaysPrint.Shared.Configuration
         }
 
         /// <summary>
+        /// Persiste el JSON crudo de configuración y su hash SHA-256 en HKCU.
+        /// También escribe ConfigCachedAt con la fecha UTC actual en formato ISO-8601 "O".
+        /// Si configJson es null o vacío, no escribe al registro y retorna sin excepción.
+        /// Si falla la escritura, loggea warning en español y deja propiedades in-memory sin cambios.
+        /// </summary>
+        /// <param name="configJson">JSON crudo de la configuración descargada (max 1 MB).</param>
+        /// <param name="configHash">Hash SHA-256 de 64 caracteres hexadecimales en minúsculas.</param>
+        public void SaveConfigCache(string configJson, string configHash)
+        {
+            // Si configJson es null o vacío, no escribir al registro (req. 3.8).
+            if (string.IsNullOrEmpty(configJson))
+                return;
+
+            try
+            {
+                var now = DateTime.UtcNow;
+
+                using (var key = Registry.CurrentUser.CreateSubKey(RegistryPath, writable: true))
+                {
+                    if (key == null)
+                        throw new InvalidOperationException("No se puede crear/abrir la clave HKCU para cache de configuración Cloud.");
+
+                    key.SetValue("ConfigJson",     configJson,          RegistryValueKind.String);
+                    key.SetValue("ConfigHash",     configHash ?? string.Empty, RegistryValueKind.String);
+                    key.SetValue("ConfigCachedAt", now.ToString("O"),   RegistryValueKind.String);
+                }
+
+                // Actualizar propiedades in-memory solo si la escritura fue exitosa.
+                ConfigHash     = configHash;
+                ConfigCachedAt = now;
+            }
+            catch (Exception ex)
+            {
+                // Error al escribir: loggear warning en español, dejar propiedades sin cambios (req. 3.7).
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"CloudCredentialsManager.SaveConfigCache: error guardando cache de configuración en HKCU. {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericWarning);
+            }
+        }
+
+        /// <summary>
+        /// Lee el valor ConfigJson almacenado en HKCU.
+        /// Retorna null si el valor no existe, está vacío, o es solo whitespace.
+        /// </summary>
+        /// <returns>El JSON crudo almacenado, o null si no hay cache válido.</returns>
+        public string? LoadConfigCache()
+        {
+            try
+            {
+                using (var key = Registry.CurrentUser.OpenSubKey(RegistryPath, writable: false))
+                {
+                    if (key == null)
+                        return null;
+
+                    var value = key.GetValue("ConfigJson", null) as string;
+
+                    if (string.IsNullOrWhiteSpace(value))
+                        return null;
+
+                    return value;
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"CloudCredentialsManager.LoadConfigCache: error leyendo cache de configuración desde HKCU. {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericWarning);
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Escribe la fecha de última conexión en HKCU y actualiza la propiedad en memoria.
         /// La fecha se serializa en formato ISO-8601 (round-trip, especificador "O").
         /// Si ocurre un error de registro, se loggea en español y no se propaga la excepción.

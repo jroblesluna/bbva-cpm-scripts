@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Management;
 using System.Net;
@@ -10,6 +11,7 @@ using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
 using AlwaysPrintTray.Localization;
 using AlwaysPrintTray.Pipe;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace AlwaysPrintTray.Cloud
@@ -30,6 +32,9 @@ namespace AlwaysPrintTray.Cloud
         private readonly SynchronizationContext _uiContext;
 
         private CloudWebSocketClient? _wsClient;
+        private ConfigurationSync? _configSync;
+        private TelemetryReporter? _telemetryReporter;
+        private ConnectivityMonitor? _connectivityMonitor;
         private bool _disposed;
 
         /// <summary>
@@ -53,7 +58,8 @@ namespace AlwaysPrintTray.Cloud
 
         /// <summary>
         /// Inicia la integración Cloud: carga credenciales, crea el cliente WebSocket,
-        /// suscribe eventos y conecta.
+        /// suscribe eventos y conecta. Instancia TelemetryReporter y ConnectivityMonitor
+        /// según la configuración actual.
         /// </summary>
         public void Start()
         {
@@ -65,17 +71,74 @@ namespace AlwaysPrintTray.Cloud
             _wsClient.MessageReceived += OnMessageReceived;
             _wsClient.Error += OnError;
 
+            _configSync = new ConfigurationSync(
+                _config.CloudApiUrl,
+                _credentials.WorkstationId!,
+                _credentials,
+                _pipe,
+                _wsClient);
+
+            // Instanciar y arrancar TelemetryReporter si la telemetría está habilitada
+            if (_config.TelemetryEnabled)
+            {
+                _telemetryReporter = new TelemetryReporter(
+                    _wsClient, _pipe, _config.TelemetryIntervalSeconds, contingencyActive: false);
+                _telemetryReporter.Start();
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "CloudManager: TelemetryReporter iniciado (TelemetryEnabled=true).");
+            }
+            else
+            {
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "CloudManager: TelemetryReporter no iniciado (TelemetryEnabled=false).");
+            }
+
+            // Instanciar y arrancar ConnectivityMonitor si hay checks configurados
+            if (_config.ConnectivityChecks != null && _config.ConnectivityChecks.Count > 0)
+            {
+                _connectivityMonitor = new ConnectivityMonitor(
+                    _wsClient, _config.ConnectivityChecks);
+                _connectivityMonitor.Start();
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: ConnectivityMonitor iniciado con {_config.ConnectivityChecks.Count} checks.");
+            }
+            else
+            {
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "CloudManager: ConnectivityMonitor no iniciado (ConnectivityChecks vacío).");
+            }
+
+            // Suscribir a mensajes push del Service vía Named Pipe (ej: ReportTelemetry)
+            _pipe.MessageReceived += OnPipeMessageReceived;
+
             _wsClient.Connect();
             AlwaysPrintLogger.WriteTrayInfo("CloudManager: conexión WebSocket iniciada.");
         }
 
         /// <summary>
-        /// Detiene la integración Cloud: desconecta el WebSocket y actualiza el estado.
+        /// Detiene la integración Cloud: detiene y libera TelemetryReporter y ConnectivityMonitor,
+        /// desconecta el WebSocket y actualiza el estado.
         /// </summary>
         public void Stop()
         {
+            // Desuscribir de mensajes push del pipe
+            _pipe.MessageReceived -= OnPipeMessageReceived;
+
+            // Detener y liberar TelemetryReporter
+            _telemetryReporter?.Stop();
+            _telemetryReporter?.Dispose();
+            _telemetryReporter = null;
+
+            // Detener y liberar ConnectivityMonitor
+            _connectivityMonitor?.Stop();
+            _connectivityMonitor?.Dispose();
+            _connectivityMonitor = null;
+
             _wsClient?.Disconnect();
             IsConnected = false;
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                "CloudManager: detenido. TelemetryReporter y ConnectivityMonitor liberados.");
         }
 
         /// <summary>
@@ -96,6 +159,9 @@ namespace AlwaysPrintTray.Cloud
             IsConnected = true;
             AlwaysPrintLogger.WriteTrayInfo("CloudManager: conectado a APCM.");
 
+            // Registrar reconexión en TelemetryReporter (si existe un evento de desconexión abierto)
+            _telemetryReporter?.RecordReconnection(DateTime.UtcNow);
+
             SendRegistration();
             NotifyServiceCloudStatus(connected: true);
         }
@@ -104,6 +170,10 @@ namespace AlwaysPrintTray.Cloud
         {
             IsConnected = false;
             AlwaysPrintLogger.WriteTrayWarning("CloudManager: desconectado de APCM.");
+
+            // Registrar evento de desconexión en TelemetryReporter
+            _telemetryReporter?.RecordDisconnection(DateTime.UtcNow);
+
             NotifyServiceCloudStatus(connected: false);
         }
 
@@ -117,6 +187,9 @@ namespace AlwaysPrintTray.Cloud
                 case "registered":
                     HandleRegistered(json);
                     break;
+                case "config_update":
+                    HandleConfigUpdate(json);
+                    break;
                 default:
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"CloudManager: mensaje recibido tipo='{type}' (sin handler).");
@@ -128,6 +201,60 @@ namespace AlwaysPrintTray.Cloud
         {
             AlwaysPrintLogger.WriteTrayError(
                 $"CloudManager: error en WebSocket. {ex.Message}");
+        }
+
+        // === Handler de mensajes push del Service vía Named Pipe ===
+
+        /// <summary>
+        /// Maneja mensajes push (no solicitados) recibidos del Service vía Named Pipe.
+        /// Actualmente procesa ReportTelemetry para acumular datos de trabajos de impresión.
+        /// </summary>
+        private void OnPipeMessageReceived(PipeMessage message)
+        {
+            try
+            {
+                switch (message.Type)
+                {
+                    case MessageType.ReportTelemetry:
+                        HandleReportTelemetry(message);
+                        break;
+                    default:
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"CloudManager: mensaje push del Service tipo='{message.Type}' no manejado.");
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error procesando mensaje push del Service tipo='{message.Type}'. {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Procesa un mensaje ReportTelemetry del Service: deserializa el payload
+        /// y acumula los datos del trabajo en el TelemetryReporter.
+        /// </summary>
+        private void HandleReportTelemetry(PipeMessage message)
+        {
+            var payload = message.GetPayload<ReportTelemetryPayload>();
+            if (payload == null)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    "CloudManager: mensaje ReportTelemetry recibido con payload inválido o ausente. Descartando.");
+                return;
+            }
+
+            if (_telemetryReporter == null)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    "CloudManager: mensaje ReportTelemetry recibido pero TelemetryReporter no está activo. Descartando.");
+                return;
+            }
+
+            _telemetryReporter.AccumulateJobData(payload.JobCount, payload.ReleaseTimeMs);
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"CloudManager: ReportTelemetry procesado. jobCount={payload.JobCount}, releaseTimeMs={payload.ReleaseTimeMs}.");
         }
 
         // === Registro ===
@@ -180,6 +307,142 @@ namespace AlwaysPrintTray.Cloud
             {
                 AlwaysPrintLogger.WriteTrayError(
                     $"CloudManager: error procesando respuesta de registro. {ex.Message}");
+            }
+        }
+
+        // === Config Update ===
+
+        private void HandleConfigUpdate(string json)
+        {
+            try
+            {
+                var obj = JObject.Parse(json);
+                var configHash = obj["config_hash"]?.ToString();
+
+                if (string.IsNullOrEmpty(configHash))
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "CloudManager: mensaje config_update recibido con config_hash ausente, nulo o vacío. Se ignora.");
+                    return;
+                }
+
+                bool result = _configSync!.SyncIfNeeded(configHash!);
+                if (!result)
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "CloudManager: la sincronización de configuración no pudo completarse.");
+                    return;
+                }
+
+                // Sincronización exitosa — aplicar cambios de telemetría y conectividad
+                ApplyTelemetryAndConnectivityChanges();
+            }
+            catch (JsonReaderException ex)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"CloudManager: error al parsear JSON del mensaje config_update — {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error procesando config_update — {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Aplica cambios de configuración relacionados con telemetría y conectividad
+        /// después de una sincronización exitosa. Lee la configuración actualizada del cache
+        /// y ajusta el estado de TelemetryReporter y ConnectivityMonitor según corresponda.
+        /// </summary>
+        private void ApplyTelemetryAndConnectivityChanges()
+        {
+            try
+            {
+                // Leer la configuración actualizada desde el cache
+                var updatedConfig = _configSync!.LoadFromCache();
+                if (updatedConfig == null)
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "CloudManager: no se pudo leer la configuración actualizada del cache para aplicar cambios de telemetría/conectividad.");
+                    return;
+                }
+
+                // === Gestión de TelemetryReporter ===
+                HandleTelemetryToggle(updatedConfig);
+
+                // === Gestión de ConnectivityMonitor ===
+                HandleConnectivityUpdate(updatedConfig);
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error al aplicar cambios de telemetría/conectividad — {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Gestiona el toggle de TelemetryEnabled: inicia o detiene el TelemetryReporter
+        /// según el nuevo valor de configuración.
+        /// </summary>
+        private void HandleTelemetryToggle(AppConfiguration updatedConfig)
+        {
+            if (updatedConfig.TelemetryEnabled && _telemetryReporter == null)
+            {
+                // TelemetryEnabled cambió de false a true: iniciar TelemetryReporter
+                _telemetryReporter = new TelemetryReporter(
+                    _wsClient!, _pipe, updatedConfig.TelemetryIntervalSeconds, contingencyActive: false);
+                _telemetryReporter.Start();
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "CloudManager: TelemetryReporter iniciado tras config_update (TelemetryEnabled=true).");
+            }
+            else if (!updatedConfig.TelemetryEnabled && _telemetryReporter != null)
+            {
+                // TelemetryEnabled cambió de true a false: detener y liberar TelemetryReporter
+                _telemetryReporter.Stop();
+                _telemetryReporter.Dispose();
+                _telemetryReporter = null;
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "CloudManager: TelemetryReporter detenido y liberado tras config_update (TelemetryEnabled=false).");
+            }
+        }
+
+        /// <summary>
+        /// Gestiona actualizaciones de ConnectivityChecks: actualiza la lista de checks,
+        /// inicia el monitor si no estaba activo, o lo detiene si la lista queda vacía.
+        /// </summary>
+        private void HandleConnectivityUpdate(AppConfiguration updatedConfig)
+        {
+            var newChecks = updatedConfig.ConnectivityChecks ?? new List<ConnectivityCheck>();
+
+            if (newChecks.Count > 0)
+            {
+                if (_connectivityMonitor == null)
+                {
+                    // No había monitor activo: crear e iniciar
+                    _connectivityMonitor = new ConnectivityMonitor(_wsClient!, newChecks);
+                    _connectivityMonitor.Start();
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: ConnectivityMonitor iniciado tras config_update con {newChecks.Count} checks.");
+                }
+                else
+                {
+                    // Monitor ya activo: actualizar lista de checks
+                    _connectivityMonitor.UpdateChecks(newChecks);
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: ConnectivityMonitor actualizado con {newChecks.Count} checks tras config_update.");
+                }
+            }
+            else
+            {
+                // Lista vacía: detener y liberar ConnectivityMonitor si estaba activo
+                if (_connectivityMonitor != null)
+                {
+                    _connectivityMonitor.Stop();
+                    _connectivityMonitor.Dispose();
+                    _connectivityMonitor = null;
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "CloudManager: ConnectivityMonitor detenido y liberado tras config_update (ConnectivityChecks vacío).");
+                }
             }
         }
 

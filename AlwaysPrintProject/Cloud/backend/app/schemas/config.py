@@ -8,9 +8,24 @@ Este módulo define los schemas de validación para los tres niveles de configur
 """
 
 from datetime import datetime
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
+
+
+# === SCHEMA DE CONNECTIVITY CHECK ===
+
+class ConnectivityCheckItem(BaseModel):
+    """
+    Schema para un elemento de verificación de conectividad.
+    
+    Cada item define un endpoint a verificar con su tipo de protocolo,
+    URL destino y timeout máximo de espera.
+    """
+    id: str = Field(..., max_length=64, description="Identificador único del check (máx 64 caracteres)")
+    type: Literal["http", "tcp"] = Field(..., description="Tipo de protocolo: http o tcp")
+    url: str = Field(..., max_length=2048, description="URL destino del check (máx 2048 caracteres)")
+    timeout_ms: int = Field(..., ge=100, le=30000, description="Timeout en milisegundos (100-30000)")
 
 
 # === SCHEMAS DE CONFIGURACIÓN GLOBAL ===
@@ -133,11 +148,34 @@ class EffectiveConfigResponse(BaseModel):
     
     Incluye los valores finales después de aplicar la jerarquía:
     WorkstationConfig > VLANConfig > GlobalConfig
+    
+    Los campos se serializan en orden alfabético fijo para garantizar
+    hash SHA-256 estable en el cliente.
     """
     corporate_queue_name: str
     search_targets: Optional[dict] = None
     pending_task_polling_minutes: int
     bootstrap_domains: str
+    connectivity_checks: List[ConnectivityCheckItem] = Field(
+        default_factory=list,
+        max_length=50,
+        description="Lista de verificaciones de conectividad (máximo 50 elementos)"
+    )
+    locale: str = Field(
+        default="",
+        max_length=10,
+        description="Locale para override de idioma (máx 10 caracteres, ej: 'es', 'en', 'es-PE')"
+    )
+    telemetry_enabled: bool = Field(
+        default=True,
+        description="Indica si la telemetría está habilitada"
+    )
+    telemetry_interval_seconds: int = Field(
+        default=300,
+        ge=10,
+        le=86400,
+        description="Intervalo de envío de telemetría en segundos (10-86400)"
+    )
     source: dict[str, Literal["global", "vlan", "workstation"]] = Field(
         ...,
         description="Origen de cada campo (global, vlan, workstation)"

@@ -6,7 +6,7 @@ intercambiados a través de WebSocket entre Tray Clients, Backend y Frontend.
 """
 
 from datetime import datetime
-from typing import Optional, Literal, Any
+from typing import Optional, List, Literal, Any
 from uuid import UUID
 from pydantic import BaseModel, Field
 
@@ -134,6 +134,37 @@ class ConnectionStatsMessage(BaseModel):
     online_workstations: int
     contingency_active_count: int
     timestamp: datetime
+
+
+# === SCHEMAS DE TELEMETRÍA Y CONECTIVIDAD (WORKSTATION → BACKEND) ===
+
+class DisconnectionEventSchema(BaseModel):
+    """Evento de desconexión WebSocket registrado por el Tray."""
+    started_at: str = Field(..., description="Timestamp UTC de inicio de desconexión (ISO 8601)")
+    reconnected_at: Optional[str] = Field(None, description="Timestamp UTC de reconexión (ISO 8601)")
+    duration_seconds: Optional[int] = Field(None, description="Duración de la desconexión en segundos")
+
+
+class TelemetryMessage(BaseModel):
+    """Mensaje de telemetría periódica enviado por el Tray."""
+    type: Literal["telemetry"] = "telemetry"
+    queue_status: str = Field(..., description="Estado de la cola de impresión (ok, missing, error)")
+    contingency_active: bool = Field(..., description="Si la contingencia está activa")
+    jobs_identified: int = Field(..., description="Cantidad de trabajos identificados en el intervalo")
+    avg_release_time_ms: Optional[int] = Field(None, description="Tiempo promedio de liberación en ms (null si no hay trabajos)")
+    disconnection_log: List[DisconnectionEventSchema] = Field(
+        default_factory=list,
+        description="Lista de eventos de desconexión acumulados en el intervalo"
+    )
+
+
+class ConnectivityResultMessage(BaseModel):
+    """Resultado individual de un chequeo de conectividad."""
+    type: Literal["connectivity_result"] = "connectivity_result"
+    check_id: str = Field(..., description="Identificador del chequeo de conectividad")
+    success: bool = Field(..., description="Si el chequeo fue exitoso")
+    latency_ms: Optional[int] = Field(None, description="Latencia en milisegundos (null si falló)")
+    error: Optional[str] = Field(None, description="Mensaje de error (null si fue exitoso)")
 
 
 # === SCHEMAS GENÉRICOS ===
