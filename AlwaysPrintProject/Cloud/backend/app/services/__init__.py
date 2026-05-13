@@ -9,6 +9,8 @@ from app.services.message import MessageService
 from app.services.audit import AuditService
 from app.services.email import send_password_reset_email
 from app.services.websocket_manager import ConnectionManager, connection_manager
+from app.services.connectivity import ConnectivityService
+from app.services.telemetry import TelemetryService
 
 __all__ = [
     "AuthService",
@@ -19,4 +21,6 @@ __all__ = [
     "send_password_reset_email",
     "ConnectionManager",
     "connection_manager",
+    "ConnectivityService",
+    "TelemetryService",
 ]

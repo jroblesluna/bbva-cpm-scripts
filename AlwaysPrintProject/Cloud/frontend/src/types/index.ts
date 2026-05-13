@@ -26,6 +26,9 @@ export * from './audit'
 // WebSocket types
 export * from './websocket'
 
+// Telemetry types
+export * from './telemetry'
+
 // ============================================================================
 // TIPOS COMUNES
 // ============================================================================

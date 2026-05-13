@@ -7,8 +7,13 @@ Este servicio implementa la lógica de resolución de configuración con tres ni
 - WorkstationConfig: configuración a nivel de estación (sobrescribe VLANConfig y GlobalConfig)
 
 La resolución sigue el orden de precedencia: WorkstationConfig > VLANConfig > GlobalConfig
+
+Incluye compute_config_hash() para generar un hash SHA-256 determinístico
+de la configuración efectiva, permitiendo al Client C# detectar cambios.
 """
 
+import hashlib
+import json
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -16,6 +21,28 @@ from sqlalchemy.exc import IntegrityError
 from app.models.config import GlobalConfig, VLANConfig, WorkstationConfig
 from app.models.workstation import Workstation
 from app.models.vlan import VLAN
+
+
+def compute_config_hash(config_dict: dict) -> str:
+    """
+    Computa SHA-256 del JSON de configuración efectiva.
+    
+    Excluye los campos 'source' y 'config_hash' del input antes de serializar.
+    Serializa con sort_keys=True y ensure_ascii=False para garantizar determinismo.
+    Los valores None se serializan como JSON null.
+    
+    Args:
+        config_dict: Diccionario con la configuración efectiva resuelta.
+        
+    Returns:
+        String de 64 caracteres hexadecimales en minúsculas (SHA-256 hex digest).
+    """
+    # Excluir campos no-hashables
+    hashable = {k: v for k, v in config_dict.items() if k not in ("source", "config_hash")}
+    # Serializar determinísticamente (None se convierte en JSON null automáticamente)
+    json_str = json.dumps(hashable, sort_keys=True, ensure_ascii=False)
+    # Computar SHA-256
+    return hashlib.sha256(json_str.encode("utf-8")).hexdigest()
 
 
 class ConfigService:
@@ -95,7 +122,11 @@ class ConfigService:
             "corporate_queue_name",
             "search_targets",
             "pending_task_polling_minutes",
-            "bootstrap_domains"
+            "bootstrap_domains",
+            "connectivity_checks",
+            "locale",
+            "telemetry_enabled",
+            "telemetry_interval_seconds",
         ]
         
         for field in fields:
@@ -109,6 +140,9 @@ class ConfigService:
             sources[field] = source
         
         config["source"] = sources
+        
+        # 6. Computar config_hash (excluye 'source' y 'config_hash')
+        config["config_hash"] = compute_config_hash(config)
         
         return config
     
@@ -149,7 +183,11 @@ class ConfigService:
         corporate_queue_name: str = "LexmarkRoblesAI",
         search_targets: Optional[Dict] = None,
         pending_task_polling_minutes: int = 3,
-        bootstrap_domains: str = "robles.ai,iol.pe,sistemas.com.pe"
+        bootstrap_domains: str = "robles.ai,iol.pe,sistemas.com.pe",
+        connectivity_checks: Optional[list] = None,
+        locale: str = "",
+        telemetry_enabled: bool = True,
+        telemetry_interval_seconds: int = 300
     ) -> GlobalConfig:
         """
         Crea una configuración global para una cuenta.
@@ -187,7 +225,11 @@ class ConfigService:
             corporate_queue_name=corporate_queue_name,
             search_targets=search_targets,
             pending_task_polling_minutes=pending_task_polling_minutes,
-            bootstrap_domains=bootstrap_domains
+            bootstrap_domains=bootstrap_domains,
+            connectivity_checks=connectivity_checks or [],
+            locale=locale,
+            telemetry_enabled=telemetry_enabled,
+            telemetry_interval_seconds=telemetry_interval_seconds
         )
         
         db.add(global_config)
@@ -203,7 +245,11 @@ class ConfigService:
         corporate_queue_name: Optional[str] = None,
         search_targets: Optional[Dict] = None,
         pending_task_polling_minutes: Optional[int] = None,
-        bootstrap_domains: Optional[str] = None
+        bootstrap_domains: Optional[str] = None,
+        connectivity_checks: Optional[list] = None,
+        locale: Optional[str] = None,
+        telemetry_enabled: Optional[bool] = None,
+        telemetry_interval_seconds: Optional[int] = None
     ) -> GlobalConfig:
         """
         Actualiza la configuración global de una cuenta.
@@ -244,6 +290,18 @@ class ConfigService:
         
         if bootstrap_domains is not None:
             global_config.bootstrap_domains = bootstrap_domains
+        
+        if connectivity_checks is not None:
+            global_config.connectivity_checks = connectivity_checks
+        
+        if locale is not None:
+            global_config.locale = locale
+        
+        if telemetry_enabled is not None:
+            global_config.telemetry_enabled = telemetry_enabled
+        
+        if telemetry_interval_seconds is not None:
+            global_config.telemetry_interval_seconds = telemetry_interval_seconds
         
         db.commit()
         db.refresh(global_config)

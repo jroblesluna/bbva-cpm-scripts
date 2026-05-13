@@ -14,6 +14,8 @@ from app.api.v1.endpoints import (
     messages,
     audit,
     setup,
+    telemetry,
+    connectivity,
 )
 
 __all__ = [
@@ -26,4 +28,6 @@ __all__ = [
     "messages",
     "audit",
     "setup",
+    "telemetry",
+    "connectivity",
 ]

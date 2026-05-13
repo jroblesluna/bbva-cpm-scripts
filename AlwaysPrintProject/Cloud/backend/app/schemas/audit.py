@@ -23,6 +23,7 @@ class AuditLogResponse(BaseModel):
     action_type: ActionType
     entity_type: str
     entity_id: UUID
+    entity_name: Optional[str] = None
     old_values: Optional[dict] = None
     new_values: Optional[dict] = None
     ip_address: Optional[str] = None

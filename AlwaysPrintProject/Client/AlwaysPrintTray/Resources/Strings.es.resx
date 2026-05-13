@@ -38,4 +38,9 @@
   <data name="BalloonInitFail" xml:space="preserve"><value>Operando en modo local.</value></data>
   <data name="BalloonServiceNotRunning" xml:space="preserve"><value>El servicio no está en ejecución.</value></data>
   <data name="BalloonOfflineWarning" xml:space="preserve"><value>Usando configuración guardada. Sin conexión a la nube.</value></data>
+  <data name="BalloonOfflineTitle" xml:space="preserve"><value>AlwaysPrint</value></data>
+  <data name="BalloonOfflineText" xml:space="preserve"><value>Usando configuración guardada. Sin conexión a la nube.</value></data>
+  <data name="BalloonOfflineNoConfig" xml:space="preserve"><value>Sin conexión a la nube y sin configuración guardada. Usando valores por defecto.</value></data>
+  <data name="BalloonReconnected" xml:space="preserve"><value>Conexión con la nube restaurada.</value></data>
+  <data name="TooltipOffline" xml:space="preserve"><value>AlwaysPrint (sin conexión)</value></data>
 </root>

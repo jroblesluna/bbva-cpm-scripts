@@ -9,10 +9,30 @@ Este servicio implementa la lógica de negocio para:
 
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
+from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 
 from app.models.audit import AuditLog, ActionType
+
+
+def _sanitize_for_json(data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Convierte valores no serializables (UUID, datetime, etc.) a strings para JSON."""
+    if data is None:
+        return None
+    result = {}
+    for key, value in data.items():
+        if isinstance(value, UUID):
+            result[key] = str(value)
+        elif isinstance(value, datetime):
+            result[key] = value.isoformat()
+        elif isinstance(value, dict):
+            result[key] = _sanitize_for_json(value)
+        elif isinstance(value, list):
+            result[key] = [str(v) if isinstance(v, UUID) else v for v in value]
+        else:
+            result[key] = value
+    return result
 
 
 class AuditService:
@@ -66,8 +86,8 @@ class AuditService:
             action_type=action_type,
             entity_type=entity_type,
             entity_id=entity_id,
-            old_values=old_values,
-            new_values=new_values,
+            old_values=_sanitize_for_json(old_values),
+            new_values=_sanitize_for_json(new_values),
             ip_address=ip_address,
             created_at=datetime.utcnow()
         )

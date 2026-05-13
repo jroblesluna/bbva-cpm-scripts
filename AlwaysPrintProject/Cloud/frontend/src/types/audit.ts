@@ -19,6 +19,7 @@ export interface AuditLog {
   action_type: ActionType
   entity_type: string
   entity_id: string
+  entity_name: string | null
   old_values: Record<string, any> | null
   new_values: Record<string, any> | null
   ip_address: string | null

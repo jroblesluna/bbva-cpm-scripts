@@ -37,7 +37,7 @@ router = APIRouter()
 @router.get("/", response_model=WorkstationListResponse)
 def list_workstations(
     page: int = Query(1, ge=1, description="Número de página"),
-    page_size: int = Query(50, ge=1, le=100, description="Tamaño de página"),
+    page_size: int = Query(50, ge=1, le=1000, description="Tamaño de página"),
     vlan_id: Optional[UUID] = Query(None, description="Filtrar por VLAN"),
     account_id: Optional[UUID] = Query(None, description="Filtrar por cuenta"),
     is_online: Optional[bool] = Query(None, description="Filtrar por estado online"),
@@ -145,11 +145,14 @@ def get_workstation_stats(
         
         # Determinar account_id según rol
         account_id = None
-        if current_user.role == UserRole.OPERATOR:
+        if current_user.role in (UserRole.OPERATOR, UserRole.READONLY):
             if not current_user.account_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Operador sin cuenta asignada"
+                # Devolver estadísticas vacías si no tiene cuenta asignada
+                return WorkstationStatsResponse(
+                    total=0,
+                    online=0,
+                    offline=0,
+                    contingency_active=0
                 )
             account_id = str(current_user.account_id) if current_user.account_id else None
         

@@ -1,127 +1,141 @@
 /**
  * Página de gestión de IPs públicas pendientes de autorización.
- * 
+ *
  * Solo accesible para administradores.
  * Permite autorizar o rechazar IPs desde las cuales clientes intentaron conectarse.
  */
 
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
-import { 
-  Globe, 
-  CheckCircle, 
-  XCircle, 
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import {
+  Globe,
+  CheckCircle,
+  XCircle,
   Clock,
   AlertCircle,
   RefreshCw,
   Search,
-  Building2
-} from 'lucide-react'
-import { useTranslations } from 'next-intl'
-import { formatDateWithTimezone } from '@/lib/dateUtils'
-import { useUserTimezone } from '@/hooks/useUserTimezone'
+  Building2,
+} from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { formatDateWithTimezone } from '@/lib/dateUtils';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 
 interface PendingIP {
-  id: string
-  ip_address: string
-  description: string | null
-  first_seen: string
-  created_at: string
+  id: string;
+  ip_address: string;
+  description: string | null;
+  first_seen: string;
+  created_at: string;
 }
 
 interface Account {
-  id: string
-  name: string
-  is_active: boolean
+  id: string;
+  name: string;
+  is_active: boolean;
 }
 
 export default function PendingIPsPage() {
-  const queryClient = useQueryClient()
-  const userTimezone = useUserTimezone()
-  const t = useTranslations('pendingIps')
-  const tCommon = useTranslations('common')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [authorizingIP, setAuthorizingIP] = useState<PendingIP | null>(null)
-  const [selectedAccountId, setSelectedAccountId] = useState('')
-  const [customDescription, setCustomDescription] = useState('')
+  const queryClient = useQueryClient();
+  const userTimezone = useUserTimezone();
+  const t = useTranslations('pendingIps');
+  const tCommon = useTranslations('common');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [authorizingIP, setAuthorizingIP] = useState<PendingIP | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [customDescription, setCustomDescription] = useState('');
 
   // Query para IPs pendientes
-  const { data: pendingIPs, isLoading, error } = useQuery({
+  const {
+    data: pendingIPs,
+    isLoading,
+    isFetching,
+    error,
+  } = useQuery({
     queryKey: ['pending-ips'],
     queryFn: async () => {
-      const response = await api.get('/accounts/public-ips/pending')
-      return response.data as PendingIP[]
+      const response = await api.get('/accounts/public-ips/pending');
+      return response.data as PendingIP[];
     },
-  })
+  });
 
   // Query para cuentas
   const { data: accountsData } = useQuery({
     queryKey: ['accounts'],
     queryFn: async () => {
-      const response = await api.get('/accounts/')
-      return response.data
+      const response = await api.get('/accounts/');
+      return response.data;
     },
-  })
+  });
 
   // Mutation para autorizar IP
   const authorizeMutation = useMutation({
-    mutationFn: async ({ ipId, accountId, description }: { ipId: string; accountId: string; description?: string }) => {
+    mutationFn: async ({
+      ipId,
+      accountId,
+      description,
+    }: {
+      ipId: string;
+      accountId: string;
+      description?: string;
+    }) => {
       const response = await api.post(`/accounts/public-ips/${ipId}/authorize`, {
         account_id: accountId,
         description: description || undefined,
-      })
-      return response.data
+      });
+      return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pending-ips'] })
-      queryClient.invalidateQueries({ queryKey: ['accounts'] })
-      setAuthorizingIP(null)
-      setSelectedAccountId('')
-      setCustomDescription('')
+      queryClient.invalidateQueries({ queryKey: ['pending-ips'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      setAuthorizingIP(null);
+      setSelectedAccountId('');
+      setCustomDescription('');
     },
-  })
+  });
 
   // Mutation para rechazar IP
   const rejectMutation = useMutation({
     mutationFn: async (ipId: string) => {
-      await api.delete(`/accounts/public-ips/${ipId}/reject`)
+      await api.delete(`/accounts/public-ips/${ipId}/reject`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pending-ips'] })
+      queryClient.invalidateQueries({ queryKey: ['pending-ips'] });
     },
-  })
+  });
 
   const handleAuthorize = () => {
-    if (!authorizingIP || !selectedAccountId) return
-    
+    if (!authorizingIP || !selectedAccountId) return;
+
     authorizeMutation.mutate({
       ipId: authorizingIP.id,
       accountId: selectedAccountId,
       description: customDescription || undefined,
-    })
-  }
+    });
+  };
 
   const handleReject = (ip: PendingIP) => {
     if (confirm(t('rejectConfirm', { ip: ip.ip_address }))) {
-      rejectMutation.mutate(ip.id)
+      rejectMutation.mutate(ip.id);
     }
-  }
+  };
 
   // Filtrar IPs por búsqueda
-  const filteredIPs = pendingIPs?.filter(ip =>
-    ip.ip_address.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || []
+  const filteredIPs =
+    pendingIPs?.filter((ip) =>
+      ip.ip_address.toLowerCase().includes(searchTerm.toLowerCase())
+    ) || [];
 
-  const accounts = accountsData?.items || []
+  const accounts = accountsData?.items || [];
 
   if (isLoading) {
     return (
@@ -133,7 +147,7 @@ export default function PendingIPsPage() {
           ))}
         </div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -147,7 +161,7 @@ export default function PendingIPsPage() {
           </AlertDescription>
         </Alert>
       </div>
-    )
+    );
   }
 
   return (
@@ -158,8 +172,11 @@ export default function PendingIPsPage() {
           <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
           <p className="text-gray-600 mt-2">{t('subtitle')}</p>
         </div>
-        <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['pending-ips'] })}>
-          <RefreshCw className="w-4 h-4 mr-2" />
+        <Button
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['pending-ips'] })}
+          disabled={isFetching}
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
           {tCommon('refresh')}
         </Button>
       </div>
@@ -183,7 +200,9 @@ export default function PendingIPsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">{t('activeAccounts')}</p>
-                <p className="text-3xl font-bold text-gray-900">{accounts.filter((a: Account) => a.is_active).length}</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {accounts.filter((a: Account) => a.is_active).length}
+                </p>
               </div>
               <Building2 className="w-12 h-12 text-blue-600" />
             </div>
@@ -248,7 +267,8 @@ export default function PendingIPsPage() {
                       <div className="flex items-center text-xs text-gray-500 space-x-4">
                         <div className="flex items-center">
                           <Clock className="w-3 h-3 mr-1" />
-                          {t('firstSeen')} {formatDateWithTimezone(ip.first_seen, userTimezone)}
+                          {t('firstSeen')}{' '}
+                          {formatDateWithTimezone(ip.first_seen, userTimezone)}
                         </div>
                       </div>
                     </div>
@@ -310,7 +330,8 @@ export default function PendingIPsPage() {
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    {(authorizeMutation.error as any)?.response?.data?.detail || 'Error al autorizar IP'}
+                    {(authorizeMutation.error as any)?.response?.data?.detail ||
+                      'Error al autorizar IP'}
                   </AlertDescription>
                 </Alert>
               )}
@@ -352,9 +373,9 @@ export default function PendingIPsPage() {
                   type="button"
                   variant="outline"
                   onClick={() => {
-                    setAuthorizingIP(null)
-                    setSelectedAccountId('')
-                    setCustomDescription('')
+                    setAuthorizingIP(null);
+                    setSelectedAccountId('');
+                    setCustomDescription('');
                   }}
                   disabled={authorizeMutation.isPending}
                 >
@@ -373,5 +394,5 @@ export default function PendingIPsPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

@@ -405,12 +405,12 @@ def update_global_config(
         audit_service = AuditService()
         audit_service.log_config_change(
             db=db,
-            user_id=current_user.id,
-            workstation_id=None,
-            account_id=target_account_id,
-            config_level="global",
-            old_values=old_values,
-            new_values=config_data.model_dump(exclude_unset=True)
+            entity_type="global_config",
+            entity_id=str(config.id),
+            user_id=str(current_user.id),
+            account_id=str(target_account_id),
+            old_config=old_values,
+            new_config=config_data.model_dump(exclude_unset=True)
         )
 
     return config

@@ -1,6 +1,6 @@
 /**
  * Cliente WebSocket para comunicación en tiempo real con el backend.
- * 
+ *
  * Características:
  * - Reconexión automática
  * - Manejo de eventos tipado
@@ -8,9 +8,7 @@
  * - Heartbeat automático
  */
 
-import {
-  WebSocketStatus,
-} from '@/types'
+import { WebSocketStatus } from '@/types';
 
 import type {
   OperatorMessage,
@@ -20,21 +18,21 @@ import type {
   MessageDeliveredMessage,
   CommandResultNotification,
   ConnectionStatsMessage,
-} from '@/types'
+} from '@/types';
 
 // ============================================================================
 // TIPOS
 // ============================================================================
 
-type MessageHandler = (message: OperatorMessage) => void
+type MessageHandler = (message: OperatorMessage) => void;
 
 interface WebSocketClientOptions {
-  url?: string
-  token?: string
-  reconnectInterval?: number
-  maxReconnectAttempts?: number
-  onStatusChange?: (status: WebSocketStatus) => void
-  onError?: (error: Error) => void
+  url?: string;
+  token?: string;
+  reconnectInterval?: number;
+  maxReconnectAttempts?: number;
+  onStatusChange?: (status: WebSocketStatus) => void;
+  onError?: (error: Error) => void;
 }
 
 // ============================================================================
@@ -42,27 +40,27 @@ interface WebSocketClientOptions {
 // ============================================================================
 
 export class WebSocketClient {
-  private ws: WebSocket | null = null
-  private url: string
-  private token: string | null
-  private reconnectInterval: number
-  private maxReconnectAttempts: number
-  private reconnectAttempts: number = 0
-  private reconnectTimeout: NodeJS.Timeout | null = null
-  private messageHandlers: Set<MessageHandler> = new Set()
-  private status: WebSocketStatus = WebSocketStatus.DISCONNECTED
-  private onStatusChange?: (status: WebSocketStatus) => void
-  private onError?: (error: Error) => void
-  private heartbeatInterval: NodeJS.Timeout | null = null
+  private ws: WebSocket | null = null;
+  private url: string;
+  private token: string | null;
+  private reconnectInterval: number;
+  private maxReconnectAttempts: number;
+  private reconnectAttempts: number = 0;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private messageHandlers: Set<MessageHandler> = new Set();
+  private status: WebSocketStatus = WebSocketStatus.DISCONNECTED;
+  private onStatusChange?: (status: WebSocketStatus) => void;
+  private onError?: (error: Error) => void;
+  private heartbeatInterval: NodeJS.Timeout | null = null;
 
   constructor(options: WebSocketClientOptions = {}) {
-    const wsUrl = options.url || process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000'
-    this.url = `${wsUrl}/ws/operator`
-    this.token = options.token || null
-    this.reconnectInterval = options.reconnectInterval || 5000
-    this.maxReconnectAttempts = options.maxReconnectAttempts || 10
-    this.onStatusChange = options.onStatusChange
-    this.onError = options.onError
+    const wsUrl = options.url || process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+    this.url = `${wsUrl}/ws/operator`;
+    this.token = options.token || null;
+    this.reconnectInterval = options.reconnectInterval || 5000;
+    this.maxReconnectAttempts = options.maxReconnectAttempts || 10;
+    this.onStatusChange = options.onStatusChange;
+    this.onError = options.onError;
   }
 
   /**
@@ -70,33 +68,33 @@ export class WebSocketClient {
    */
   connect(token?: string): void {
     if (token) {
-      this.token = token
+      this.token = token;
     }
 
     if (!this.token) {
-      const error = new Error('Token JWT requerido para conectar WebSocket')
-      this.handleError(error)
-      return
+      const error = new Error('Token JWT requerido para conectar WebSocket');
+      this.handleError(error);
+      return;
     }
 
     // Si ya está conectado, no hacer nada
     if (this.ws?.readyState === WebSocket.OPEN) {
-      return
+      return;
     }
 
-    this.setStatus(WebSocketStatus.CONNECTING)
+    this.setStatus(WebSocketStatus.CONNECTING);
 
     try {
       // Agregar token como query parameter
-      const wsUrlWithToken = `${this.url}?token=${this.token}`
-      this.ws = new WebSocket(wsUrlWithToken)
+      const wsUrlWithToken = `${this.url}?token=${this.token}`;
+      this.ws = new WebSocket(wsUrlWithToken);
 
-      this.ws.onopen = this.handleOpen.bind(this)
-      this.ws.onmessage = this.handleMessage.bind(this)
-      this.ws.onerror = this.handleWebSocketError.bind(this)
-      this.ws.onclose = this.handleClose.bind(this)
+      this.ws.onopen = this.handleOpen.bind(this);
+      this.ws.onmessage = this.handleMessage.bind(this);
+      this.ws.onerror = this.handleWebSocketError.bind(this);
+      this.ws.onclose = this.handleClose.bind(this);
     } catch (error) {
-      this.handleError(error as Error)
+      this.handleError(error as Error);
     }
   }
 
@@ -106,50 +104,50 @@ export class WebSocketClient {
   disconnect(): void {
     // Limpiar timeout de reconexión
     if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout)
-      this.reconnectTimeout = null
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
     }
 
     // Limpiar heartbeat
     if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval)
-      this.heartbeatInterval = null
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
     }
 
     // Cerrar conexión
     if (this.ws) {
-      this.ws.close()
-      this.ws = null
+      this.ws.close();
+      this.ws = null;
     }
 
-    this.reconnectAttempts = 0
-    this.setStatus(WebSocketStatus.DISCONNECTED)
+    this.reconnectAttempts = 0;
+    this.setStatus(WebSocketStatus.DISCONNECTED);
   }
 
   /**
    * Agregar handler de mensajes.
    */
   addMessageHandler(handler: MessageHandler): () => void {
-    this.messageHandlers.add(handler)
+    this.messageHandlers.add(handler);
 
     // Retornar función para remover el handler
     return () => {
-      this.messageHandlers.delete(handler)
-    }
+      this.messageHandlers.delete(handler);
+    };
   }
 
   /**
    * Obtener estado actual.
    */
   getStatus(): WebSocketStatus {
-    return this.status
+    return this.status;
   }
 
   /**
    * Verificar si está conectado.
    */
   isConnected(): boolean {
-    return this.status === WebSocketStatus.CONNECTED
+    return this.status === WebSocketStatus.CONNECTED;
   }
 
   // ==========================================================================
@@ -157,103 +155,104 @@ export class WebSocketClient {
   // ==========================================================================
 
   private handleOpen(): void {
-    console.log('[WebSocket] Conectado')
-    this.reconnectAttempts = 0
-    this.setStatus(WebSocketStatus.CONNECTED)
+    console.log('[WebSocket] Conectado');
+    this.reconnectAttempts = 0;
+    this.setStatus(WebSocketStatus.CONNECTED);
 
     // Iniciar heartbeat (ping cada 30s)
-    this.startHeartbeat()
+    this.startHeartbeat();
   }
 
   private handleMessage(event: MessageEvent): void {
     try {
-      const message: OperatorMessage = JSON.parse(event.data)
-      
+      const message: OperatorMessage = JSON.parse(event.data);
+
       // Notificar a todos los handlers
       this.messageHandlers.forEach((handler) => {
         try {
-          handler(message)
+          handler(message);
         } catch (error) {
-          console.error('[WebSocket] Error en handler:', error)
+          console.error('[WebSocket] Error en handler:', error);
         }
-      })
+      });
     } catch (error) {
-      console.error('[WebSocket] Error al parsear mensaje:', error)
+      console.error('[WebSocket] Error al parsear mensaje:', error);
     }
   }
 
   private handleWebSocketError(event: Event): void {
-    console.error('[WebSocket] Error:', event)
-    const error = new Error('Error de conexión WebSocket')
-    this.handleError(error)
+    const detail = event instanceof ErrorEvent ? event.message : `type=${event.type}`;
+    console.warn(`[WebSocket] Error de conexión: ${detail}`);
+    const error = new Error('Error de conexión WebSocket');
+    this.handleError(error);
   }
 
   private handleClose(event: CloseEvent): void {
-    console.log('[WebSocket] Desconectado:', event.code, event.reason)
-    
+    console.log('[WebSocket] Desconectado:', event.code, event.reason);
+
     // Limpiar heartbeat
     if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval)
-      this.heartbeatInterval = null
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
     }
 
-    this.setStatus(WebSocketStatus.DISCONNECTED)
+    this.setStatus(WebSocketStatus.DISCONNECTED);
 
     // Intentar reconectar si no fue cierre intencional
     if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.scheduleReconnect()
+      this.scheduleReconnect();
     }
   }
 
   private handleError(error: Error): void {
-    console.error('[WebSocket] Error:', error)
-    this.setStatus(WebSocketStatus.ERROR)
-    
+    console.warn('[WebSocket] Error:', error.message);
+    this.setStatus(WebSocketStatus.ERROR);
+
     if (this.onError) {
-      this.onError(error)
+      this.onError(error);
     }
   }
 
   private scheduleReconnect(): void {
     if (this.reconnectTimeout) {
-      return
+      return;
     }
 
-    this.reconnectAttempts++
-    const delay = this.reconnectInterval * Math.min(this.reconnectAttempts, 5)
+    this.reconnectAttempts++;
+    const delay = this.reconnectInterval * Math.min(this.reconnectAttempts, 5);
 
     console.log(
       `[WebSocket] Reconectando en ${delay}ms (intento ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
-    )
+    );
 
     this.reconnectTimeout = setTimeout(() => {
-      this.reconnectTimeout = null
-      this.connect()
-    }, delay)
+      this.reconnectTimeout = null;
+      this.connect();
+    }, delay);
   }
 
   private setStatus(status: WebSocketStatus): void {
     if (this.status !== status) {
-      this.status = status
-      
+      this.status = status;
+
       if (this.onStatusChange) {
-        this.onStatusChange(status)
+        this.onStatusChange(status);
       }
     }
   }
 
   private startHeartbeat(): void {
     if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval)
+      clearInterval(this.heartbeatInterval);
     }
 
     // Verifica que la conexión siga abierta cada 30s.
     // Si no lo está, fuerza reconexión (el backend ya hace ping propio).
     this.heartbeatInterval = setInterval(() => {
       if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
-        this.handleClose({ code: 1006, reason: 'heartbeat: connection lost' } as CloseEvent)
+        this.handleClose({ code: 1006, reason: 'heartbeat: connection lost' } as CloseEvent);
       }
-    }, 30000)
+    }, 30000);
   }
 }
 
@@ -261,16 +260,16 @@ export class WebSocketClient {
 // INSTANCIA SINGLETON
 // ============================================================================
 
-let wsClient: WebSocketClient | null = null
+let wsClient: WebSocketClient | null = null;
 
 /**
  * Obtener instancia singleton del cliente WebSocket.
  */
 export function getWebSocketClient(options?: WebSocketClientOptions): WebSocketClient {
   if (!wsClient) {
-    wsClient = new WebSocketClient(options)
+    wsClient = new WebSocketClient(options);
   }
-  return wsClient
+  return wsClient;
 }
 
 /**
@@ -278,8 +277,8 @@ export function getWebSocketClient(options?: WebSocketClientOptions): WebSocketC
  */
 export function destroyWebSocketClient(): void {
   if (wsClient) {
-    wsClient.disconnect()
-    wsClient = null
+    wsClient.disconnect();
+    wsClient = null;
   }
 }
 
@@ -290,35 +289,35 @@ export function destroyWebSocketClient(): void {
 export function isWorkstationConnected(
   message: OperatorMessage
 ): message is WorkstationConnectedMessage {
-  return message.type === 'workstation_connected'
+  return message.type === 'workstation_connected';
 }
 
 export function isWorkstationDisconnected(
   message: OperatorMessage
 ): message is WorkstationDisconnectedMessage {
-  return message.type === 'workstation_disconnected'
+  return message.type === 'workstation_disconnected';
 }
 
 export function isContingencyToggle(
   message: OperatorMessage
 ): message is ContingencyToggleMessage {
-  return message.type === 'contingency_toggle'
+  return message.type === 'contingency_toggle';
 }
 
 export function isMessageDelivered(
   message: OperatorMessage
 ): message is MessageDeliveredMessage {
-  return message.type === 'message_delivered'
+  return message.type === 'message_delivered';
 }
 
 export function isCommandResult(
   message: OperatorMessage
 ): message is CommandResultNotification {
-  return message.type === 'command_result'
+  return message.type === 'command_result';
 }
 
 export function isConnectionStats(
   message: OperatorMessage
 ): message is ConnectionStatsMessage {
-  return message.type === 'connection_stats'
+  return message.type === 'connection_stats';
 }

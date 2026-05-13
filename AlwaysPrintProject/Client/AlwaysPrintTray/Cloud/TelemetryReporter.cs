@@ -20,6 +20,7 @@ namespace AlwaysPrintTray.Cloud
         private const int MinIntervalSeconds = 60;
         private const int MaxIntervalSeconds = 3600;
         private const int MaxDisconnectionEvents = 1000;
+        private const int MaxPendingTelemetry = 100;
 
         // === Dependencias ===
         private readonly CloudWebSocketClient _wsClient;
@@ -34,6 +35,7 @@ namespace AlwaysPrintTray.Cloud
         private int _jobsIdentified;
         private readonly List<long> _releaseTimes = new List<long>();
         private bool _contingencyActive;
+        private readonly Queue<object> _pendingTelemetry = new Queue<object>();
 
         // === Timer ===
         private Timer? _timer;
@@ -260,6 +262,49 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
+        /// Envía todos los payloads de telemetría pendientes en orden FIFO vía WebSocket.
+        /// Se detiene si el WebSocket se desconecta durante el flush, reteniendo los payloads restantes.
+        /// Debe ser llamado por CloudManager al reconectar.
+        /// </summary>
+        public void FlushPending()
+        {
+            lock (_lock)
+            {
+                if (_pendingTelemetry.Count == 0)
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "TelemetryReporter: FlushPending invocado sin payloads pendientes.");
+                    return;
+                }
+
+                int totalPending = _pendingTelemetry.Count;
+                int sent = 0;
+
+                while (_pendingTelemetry.Count > 0 && _wsClient.IsConnected)
+                {
+                    var payload = _pendingTelemetry.Dequeue();
+                    _wsClient.Send("telemetry", payload);
+                    sent++;
+                }
+
+                int remaining = _pendingTelemetry.Count;
+
+                if (remaining > 0)
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"TelemetryReporter: flush parcial — WebSocket se desconectó durante el envío. " +
+                        $"Enviados: {sent}, pendientes retenidos: {remaining}.");
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"TelemetryReporter: flush completado exitosamente. " +
+                        $"Payloads enviados: {sent}, pendientes: 0.");
+                }
+            }
+        }
+
+        /// <summary>
         /// Actualiza el estado de contingencia.
         /// </summary>
         /// <param name="active">Nuevo estado de contingencia.</param>
@@ -280,8 +325,8 @@ namespace AlwaysPrintTray.Cloud
 
         /// <summary>
         /// Callback del timer. Recopila estado de cola, ensambla el payload de telemetría
-        /// y lo envía vía WebSocket. Si el WebSocket no está disponible, retiene los datos
-        /// acumulados para el siguiente ciclo.
+        /// y lo envía o encola según disponibilidad del WebSocket. Siempre limpia los
+        /// acumuladores después de ensamblar el payload.
         /// </summary>
         private void OnTimerElapsed(object? state)
         {
@@ -294,20 +339,12 @@ namespace AlwaysPrintTray.Cloud
                     // 1. Recopilar estado de cola desde el Service vía Named Pipe
                     string queueStatus = CollectQueueStatus();
 
-                    // 2. Verificar disponibilidad del WebSocket
-                    if (!_wsClient.IsConnected)
-                    {
-                        AlwaysPrintLogger.WriteTrayWarning(
-                            "TelemetryReporter: WebSocket no disponible. Se retienen datos acumulados para el próximo ciclo.");
-                        return;
-                    }
-
-                    // 3. Calcular avg_release_time_ms (null si no hay trabajos)
+                    // 2. Calcular avg_release_time_ms (null si no hay trabajos)
                     long? avgReleaseTimeMs = _releaseTimes.Count > 0
                         ? (long?)(_releaseTimes.Sum() / _releaseTimes.Count)
                         : null;
 
-                    // 4. Ensamblar el payload de telemetría
+                    // 3. Ensamblar el payload de telemetría
                     var disconnectionLogPayload = _disconnectionLog.Select(evt => new
                     {
                         started_at = evt.StartedAt.ToString("yyyy-MM-ddTHH:mm:ssZ"),
@@ -324,16 +361,16 @@ namespace AlwaysPrintTray.Cloud
                         disconnection_log = disconnectionLogPayload
                     };
 
-                    // 5. Enviar vía WebSocket con tipo "telemetry"
-                    _wsClient.Send("telemetry", payload);
+                    // 4. Enviar o encolar según disponibilidad del WebSocket
+                    SendOrQueue(payload);
 
-                    // 6. Envío exitoso: limpiar acumuladores
+                    // 5. Limpiar acumuladores independientemente del resultado
                     _disconnectionLog.Clear();
                     _jobsIdentified = 0;
                     _releaseTimes.Clear();
 
                     AlwaysPrintLogger.WriteTrayInfo(
-                        $"TelemetryReporter: telemetría enviada. queue_status={queueStatus}, " +
+                        $"TelemetryReporter: ciclo de telemetría completado. queue_status={queueStatus}, " +
                         $"contingencia={_contingencyActive}, trabajos={payload.jobs_identified}, " +
                         $"avg_release_ms={avgReleaseTimeMs?.ToString() ?? "null"}, " +
                         $"desconexiones={disconnectionLogPayload.Count}.");
@@ -343,6 +380,39 @@ namespace AlwaysPrintTray.Cloud
             {
                 AlwaysPrintLogger.WriteTrayError(
                     $"TelemetryReporter: error durante el ciclo de telemetría. {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Envía el payload de telemetría vía WebSocket si está conectado, o lo encola
+        /// en la cola de telemetría pendiente si no hay conexión. Si la cola está llena
+        /// (máximo 100 entradas), descarta el payload más antiguo antes de encolar el nuevo.
+        /// DEBE llamarse bajo lock(_lock).
+        /// </summary>
+        /// <param name="payload">Payload de telemetría a enviar o encolar.</param>
+        private void SendOrQueue(object payload)
+        {
+            if (_wsClient.IsConnected)
+            {
+                _wsClient.Send("telemetry", payload);
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "TelemetryReporter: telemetría enviada directamente vía WebSocket.");
+            }
+            else
+            {
+                // Si la cola está llena, descartar el más antiguo
+                if (_pendingTelemetry.Count >= MaxPendingTelemetry)
+                {
+                    _pendingTelemetry.Dequeue();
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "TelemetryReporter: cola de telemetría pendiente llena (100). " +
+                        "Se descartó el payload más antiguo.");
+                }
+
+                _pendingTelemetry.Enqueue(payload);
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"TelemetryReporter: telemetría encolada (WebSocket no disponible). " +
+                    $"Pendientes en cola: {_pendingTelemetry.Count}.");
             }
         }
 

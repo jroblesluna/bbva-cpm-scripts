@@ -17,6 +17,8 @@ from app.api.v1.endpoints import (
     messages,
     audit,
     setup,
+    telemetry,
+    connectivity,
 )
 
 # Router principal de la API v1
@@ -65,6 +67,24 @@ api_router.include_router(
     workstations.router,
     prefix="/workstations",
     tags=["Workstations"]
+)
+
+# Telemetría (historial por workstation)
+api_router.include_router(
+    telemetry.router,
+    tags=["Telemetría"]
+)
+
+# Telemetría (estadísticas por cuenta)
+api_router.include_router(
+    telemetry.accounts_router,
+    tags=["Telemetría"]
+)
+
+# Conectividad (historial de resultados por workstation)
+api_router.include_router(
+    connectivity.router,
+    tags=["Conectividad"]
 )
 
 # VLANs

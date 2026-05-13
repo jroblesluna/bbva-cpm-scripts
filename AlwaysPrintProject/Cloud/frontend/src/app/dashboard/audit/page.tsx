@@ -37,6 +37,7 @@ export default function AuditPage() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const pageSize = 50
+  const isInitialLoad = logs.length === 0 && loading
 
   useEffect(() => {
     loadLogs()
@@ -45,7 +46,8 @@ export default function AuditPage() {
 
   const loadLogs = async () => {
     try {
-      setLoading(true)
+      // Solo mostrar spinner en la carga inicial, no en filtros
+      if (logs.length === 0) setLoading(true)
       const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() })
       if (filterActionType) params.append('action_type', filterActionType)
       if (filterEntityType) params.append('entity_type', filterEntityType)
@@ -72,7 +74,7 @@ export default function AuditPage() {
 
   const filteredLogs = logs.filter((log) => {
     const s = searchTerm.toLowerCase()
-    return log.entity_type.toLowerCase().includes(s) || log.action_type.toLowerCase().includes(s) || log.entity_id.toLowerCase().includes(s)
+    return log.entity_type.toLowerCase().includes(s) || log.action_type.toLowerCase().includes(s) || log.entity_id.toLowerCase().includes(s) || (log.entity_name || '').toLowerCase().includes(s)
   })
 
   const getActionTypeLabel = (type: ActionType): string => {
@@ -101,7 +103,7 @@ export default function AuditPage() {
     return colors[type] || 'bg-gray-100 text-gray-800'
   }
 
-  if (loading && page === 1) {
+  if (isInitialLoad) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -233,10 +235,19 @@ export default function AuditPage() {
                       </Badge>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">{log.entity_type}</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{log.entity_type}</span>
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-500 font-mono">{log.entity_id.substring(0, 8)}...</span>
+                      {log.entity_name ? (
+                        <div>
+                          <span className="text-sm font-medium text-gray-900">{log.entity_name}</span>
+                          <span className="block text-xs text-gray-400 font-mono">{log.entity_id.substring(0, 8)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-500 font-mono">{log.entity_id.substring(0, 8)}...</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {log.ip_address || '-'}

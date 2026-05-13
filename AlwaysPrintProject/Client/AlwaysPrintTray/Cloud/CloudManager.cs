@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Threading;
+using System.Windows.Forms;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
@@ -30,11 +31,14 @@ namespace AlwaysPrintTray.Cloud
         private readonly CloudCredentialsManager _credentials;
         private readonly PipeClient _pipe;
         private readonly SynchronizationContext _uiContext;
+        private readonly NotifyIcon _trayIcon;
 
         private CloudWebSocketClient? _wsClient;
         private ConfigurationSync? _configSync;
         private TelemetryReporter? _telemetryReporter;
         private ConnectivityMonitor? _connectivityMonitor;
+        private OfflineStateManager? _offlineState;
+        private bool _noConfigWarningShown;
         private bool _disposed;
 
         /// <summary>
@@ -44,16 +48,19 @@ namespace AlwaysPrintTray.Cloud
         /// <param name="credentials">Gestor de credenciales Cloud en HKCU.</param>
         /// <param name="pipe">Cliente Named Pipe para notificar al Service.</param>
         /// <param name="uiContext">Contexto de sincronización del hilo UI.</param>
+        /// <param name="trayIcon">Referencia al NotifyIcon del system tray.</param>
         public CloudManager(
             AppConfiguration config,
             CloudCredentialsManager credentials,
             PipeClient pipe,
-            SynchronizationContext uiContext)
+            SynchronizationContext uiContext,
+            NotifyIcon trayIcon)
         {
             _config = config;
             _credentials = credentials;
             _pipe = pipe;
             _uiContext = uiContext;
+            _trayIcon = trayIcon;
         }
 
         /// <summary>
@@ -77,6 +84,31 @@ namespace AlwaysPrintTray.Cloud
                 _credentials,
                 _pipe,
                 _wsClient);
+
+            // Detectar condición sin configuración cacheada + offline al inicio
+            var cachedConfig = _configSync.LoadFromCache();
+            if (cachedConfig == null && !IsConnected && !_noConfigWarningShown)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    "CloudManager: sin conexión a la nube y sin configuración cacheada. Operando con valores por defecto.");
+                _uiContext.Post(_ =>
+                {
+                    try
+                    {
+                        _trayIcon.ShowBalloonTip(
+                            4000,
+                            LocalizationManager.Get("BalloonOfflineTitle"),
+                            LocalizationManager.Get("BalloonOfflineNoConfig"),
+                            ToolTipIcon.Warning);
+                    }
+                    catch (Exception ex)
+                    {
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            $"CloudManager: error mostrando balloon tip sin-config-offline. {ex.Message}");
+                    }
+                }, null);
+                _noConfigWarningShown = true;
+            }
 
             // Instanciar y arrancar TelemetryReporter si la telemetría está habilitada
             if (_config.TelemetryEnabled)
@@ -108,6 +140,11 @@ namespace AlwaysPrintTray.Cloud
                     "CloudManager: ConnectivityMonitor no iniciado (ConnectivityChecks vacío).");
             }
 
+            // Instanciar OfflineStateManager (CloudEnabled=true está garantizado por el caller)
+            _offlineState = new OfflineStateManager(_uiContext, _trayIcon);
+            AlwaysPrintLogger.WriteTrayInfo(
+                "CloudManager: OfflineStateManager instanciado.");
+
             // Suscribir a mensajes push del Service vía Named Pipe (ej: ReportTelemetry)
             _pipe.MessageReceived += OnPipeMessageReceived;
 
@@ -134,11 +171,15 @@ namespace AlwaysPrintTray.Cloud
             _connectivityMonitor?.Dispose();
             _connectivityMonitor = null;
 
+            // Liberar OfflineStateManager (detiene timer de verificación)
+            _offlineState?.Dispose();
+            _offlineState = null;
+
             _wsClient?.Disconnect();
             IsConnected = false;
 
             AlwaysPrintLogger.WriteTrayInfo(
-                "CloudManager: detenido. TelemetryReporter y ConnectivityMonitor liberados.");
+                "CloudManager: detenido. TelemetryReporter, ConnectivityMonitor y OfflineStateManager liberados.");
         }
 
         /// <summary>
@@ -159,8 +200,14 @@ namespace AlwaysPrintTray.Cloud
             IsConnected = true;
             AlwaysPrintLogger.WriteTrayInfo("CloudManager: conectado a APCM.");
 
+            // Notificar reconexión al OfflineStateManager (restaura icono y muestra balloon tip)
+            _offlineState?.OnReconnected();
+
             // Registrar reconexión en TelemetryReporter (si existe un evento de desconexión abierto)
             _telemetryReporter?.RecordReconnection(DateTime.UtcNow);
+
+            // Enviar telemetría pendiente acumulada durante la desconexión
+            _telemetryReporter?.FlushPending();
 
             SendRegistration();
             NotifyServiceCloudStatus(connected: true);
@@ -170,6 +217,9 @@ namespace AlwaysPrintTray.Cloud
         {
             IsConnected = false;
             AlwaysPrintLogger.WriteTrayWarning("CloudManager: desconectado de APCM.");
+
+            // Notificar desconexión al OfflineStateManager (inicia timer de verificación)
+            _offlineState?.OnDisconnected();
 
             // Registrar evento de desconexión en TelemetryReporter
             _telemetryReporter?.RecordDisconnection(DateTime.UtcNow);

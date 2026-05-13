@@ -62,6 +62,7 @@ def list_messages(
 @router.post("/", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 def send_message(
     message_data: MessageCreate,
+    account_id: Optional[UUID] = Query(None, description="ID de la cuenta destino (requerido para admin)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -69,24 +70,25 @@ def send_message(
     if current_user.role == UserRole.OPERATOR and not current_user.account_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
     
-    account_id = current_user.account_id if current_user.role == UserRole.OPERATOR else None
-    if not account_id:
+    # Determinar account_id: operador usa su cuenta, admin debe especificar
+    target_account_id = current_user.account_id if current_user.role == UserRole.OPERATOR else account_id
+    if not target_account_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="account_id requerido")
     
     message_service = MessageService()
     
     # Enviar mensaje según tipo de destinatario
     if message_data.target_type == TargetType.WORKSTATION:
-        message = message_service.send_to_workstation(
-            db, account_id, current_user.id, message_data.target_id, message_data.content
+        message = message_service.send_message_to_workstation(
+            db, target_account_id, current_user.id, message_data.target_id, message_data.content
         )
     elif message_data.target_type == TargetType.VLAN:
-        message = message_service.send_to_vlan(
-            db, account_id, current_user.id, message_data.target_id, message_data.content
+        message = message_service.send_message_to_vlan(
+            db, target_account_id, current_user.id, message_data.target_id, message_data.content
         )
     else:  # ACCOUNT
-        message = message_service.send_to_account(
-            db, account_id, current_user.id, message_data.content
+        message = message_service.send_message_to_account(
+            db, target_account_id, current_user.id, message_data.content
         )
     
     # Registrar en auditoría
@@ -95,7 +97,7 @@ def send_message(
         db=db,
         message_id=str(message.id),
         sender_id=str(current_user.id),
-        account_id=str(account_id),
+        account_id=str(target_account_id),
         target_type=message_data.target_type.value,
         target_id=str(message_data.target_id) if message_data.target_id else None,
         content_preview=message_data.content[:200]

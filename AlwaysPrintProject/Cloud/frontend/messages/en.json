@@ -32,6 +32,8 @@
   "nav": {
     "dashboard": "Dashboard",
     "workstations": "Workstations",
+    "telemetry": "Telemetry",
+    "connectivity": "Connectivity",
     "vlans": "VLANs",
     "config": "Configuration",
     "messages": "Messages",

@@ -29,14 +29,15 @@
     <!-- Incluir logo.ico y logo.png como recursos embebidos -->
     <EmbeddedResource Include="..\logo.ico" Link="Resources\logo.ico" />
     <EmbeddedResource Include="..\logo.png" Link="Resources\logo.png" />
+    <!-- Icono offline (versión grayscale/desaturada) para modo sin conexión -->
+    <EmbeddedResource Include="Resources\logo_offline.ico" />
   </ItemGroup>
   <PropertyGroup>
     <!-- Evitar inclusión automática de .resx por el SDK para controlar explícitamente -->
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Recursos de localización i18n (inglés default + español) -->
-    <EmbeddedResource Include="Resources\Strings.resx" />
-    <EmbeddedResource Include="Resources\Strings.es.resx" />
+    <!-- Los strings i18n se gestionan en LocalizationManager.cs (diccionarios en código) -->
+    <!-- Los .resx se mantienen como referencia pero no se usan en runtime -->
   </ItemGroup>
 </Project>

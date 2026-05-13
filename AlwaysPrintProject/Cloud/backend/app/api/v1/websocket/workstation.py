@@ -21,11 +21,14 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.workstation import Workstation
 from app.schemas.websocket import TelemetryMessage, ConnectivityResultMessage
+from app.schemas.telemetry import TelemetryMessagePayload, ConnectivityResultPayload
 from app.services.websocket_manager import connection_manager
 from app.services.workstation import WorkstationService
 from app.services.config import ConfigService
 from app.services.message import MessageService
 from app.services.audit import AuditService
+from app.services.telemetry import TelemetryService
+from app.services.connectivity import ConnectivityService
 
 
 logger = logging.getLogger(__name__)
@@ -299,11 +302,15 @@ async def _handle_telemetry(
 ) -> None:
     """
     Procesa un mensaje de telemetría recibido de una workstation.
-    
-    Valida el payload con el schema Pydantic TelemetryMessage.
-    Si es válido, actualiza el timestamp last_connection de la workstation.
-    Si es inválido, registra el error y descarta el mensaje sin cerrar el WebSocket.
-    
+
+    Flujo:
+    1. Valida el payload con TelemetryMessagePayload (Pydantic)
+    2. Persiste en BD usando TelemetryService (verifica tenant isolation)
+    3. Si persist exitoso, broadcast 'telemetry_received' a operadores de la cuenta
+    4. Si validación falla: log ERROR, descartar, NO cerrar conexión
+    5. Si workstation no existe para la cuenta: log WARNING, descartar, NO cerrar conexión
+    6. Si escritura BD falla: log ERROR, omitir broadcast, NO cerrar conexión
+
     Args:
         data: Datos crudos del mensaje WebSocket
         workstation_id: UUID de la workstation que envió el mensaje
@@ -311,45 +318,68 @@ async def _handle_telemetry(
         db: Sesión de base de datos
     """
     try:
-        # Validar payload con schema Pydantic
-        telemetry_msg = TelemetryMessage.model_validate(data)
-        
-        # Actualizar timestamp de última conexión filtrando por organization_id
-        workstation = db.query(Workstation).filter(
-            Workstation.id == workstation_id,
-            Workstation.account_id == organization_id
-        ).first()
-        
-        if workstation:
-            workstation.last_connection = datetime.utcnow()
-            db.commit()
-            
-            logger.info(
-                "[%s] Telemetría recibida - workstation_id=%s, queue_status=%s, "
-                "jobs_identified=%d, contingency_active=%s",
-                datetime.utcnow().isoformat(),
-                workstation_id,
-                telemetry_msg.queue_status,
-                telemetry_msg.jobs_identified,
-                telemetry_msg.contingency_active
-            )
-        else:
-            logger.warning(
-                "[%s] Telemetría descartada - workstation_id=%s no encontrada "
-                "para organization_id=%s",
-                datetime.utcnow().isoformat(),
-                workstation_id,
-                organization_id
-            )
-    
+        # Validar payload con schema Pydantic (excluir campo 'type' del mensaje WS)
+        payload_data = {k: v for k, v in data.items() if k != "type"}
+        payload = TelemetryMessagePayload(**payload_data)
     except ValidationError as e:
         # Payload inválido: registrar error y descartar mensaje (NO cerrar WebSocket)
         logger.error(
-            "[%s] Payload de telemetría inválido - workstation_id=%s, error=%s",
-            datetime.utcnow().isoformat(),
+            "Payload de telemetría inválido - workstation_id=%s, error=%s",
             workstation_id,
             str(e)
         )
+        return
+
+    # Persistir telemetría usando TelemetryService (incluye verificación de tenant)
+    telemetry_service = TelemetryService()
+    try:
+        telemetry_log = telemetry_service.persist_telemetry(
+            db=db,
+            workstation_id=workstation_id,
+            account_id=organization_id,
+            payload=payload
+        )
+    except Exception as e:
+        # Fallo de escritura en BD: log ERROR, omitir broadcast, NO cerrar conexión
+        logger.error(
+            "Error al persistir telemetría en BD - workstation_id=%s, error=%s",
+            workstation_id,
+            str(e)
+        )
+        return
+
+    if telemetry_log is None:
+        # workstation_id no existe para esta cuenta: log WARNING, descartar
+        logger.warning(
+            "Telemetría descartada - workstation_id=%s no encontrada para account_id=%s",
+            workstation_id,
+            organization_id
+        )
+        return
+
+    # Persistencia exitosa: broadcast 'telemetry_received' a operadores de la cuenta
+    await connection_manager.broadcast_to_account(
+        account_id=organization_id,
+        message={
+            "type": "telemetry_received",
+            "workstation_id": workstation_id,
+            "queue_status": payload.queue_status,
+            "contingency_active": payload.contingency_active,
+            "jobs_identified": payload.jobs_identified,
+            "avg_release_time_ms": payload.avg_release_time_ms,
+            "disconnection_count": len(payload.disconnection_log)
+        },
+        db=db
+    )
+
+    logger.info(
+        "Telemetría persistida y broadcast enviado - workstation_id=%s, "
+        "queue_status=%s, jobs_identified=%d, contingency_active=%s",
+        workstation_id,
+        payload.queue_status,
+        payload.jobs_identified,
+        payload.contingency_active
+    )
 
 
 async def _handle_connectivity_result(
@@ -361,10 +391,13 @@ async def _handle_connectivity_result(
     """
     Procesa un resultado de chequeo de conectividad recibido de una workstation.
     
-    Valida el payload con el schema Pydantic ConnectivityResultMessage.
-    Si es válido, actualiza el timestamp last_connection y asocia el resultado
-    con la workstation.
-    Si es inválido, registra el error y descarta el mensaje sin cerrar el WebSocket.
+    Flujo:
+    1. Validar payload con ConnectivityResultPayload (Pydantic)
+    2. Persistir resultado usando ConnectivityService (incluye tenant isolation)
+    3. Si persist retorna None (workstation no encontrada para la cuenta), log WARNING y continuar
+    4. Si persist exitoso, broadcast connectivity_result a operadores de la misma cuenta
+    5. Si error de BD, log ERROR, omitir broadcast, continuar
+    6. NUNCA cerrar la conexión WebSocket por errores
     
     Args:
         data: Datos crudos del mensaje WebSocket
@@ -372,30 +405,36 @@ async def _handle_connectivity_result(
         organization_id: UUID de la cuenta/organización (para tenant isolation)
         db: Sesión de base de datos
     """
+    connectivity_service = ConnectivityService()
+
     try:
-        # Validar payload con schema Pydantic
-        connectivity_msg = ConnectivityResultMessage.model_validate(data)
-        
-        # Actualizar timestamp de última conexión filtrando por organization_id
-        workstation = db.query(Workstation).filter(
-            Workstation.id == workstation_id,
-            Workstation.account_id == organization_id
-        ).first()
-        
-        if workstation:
-            workstation.last_connection = datetime.utcnow()
-            db.commit()
-            
-            logger.info(
-                "[%s] Resultado de conectividad recibido - workstation_id=%s, "
-                "check_id=%s, success=%s, latency_ms=%s",
-                datetime.utcnow().isoformat(),
-                workstation_id,
-                connectivity_msg.check_id,
-                connectivity_msg.success,
-                connectivity_msg.latency_ms
-            )
-        else:
+        # Extraer datos del payload (excluir campo 'type' del mensaje WebSocket)
+        payload_data = {k: v for k, v in data.items() if k != "type"}
+
+        # Validar payload con schema Pydantic ConnectivityResultPayload
+        payload = ConnectivityResultPayload(**payload_data)
+
+    except ValidationError as e:
+        # Payload inválido: registrar error y descartar mensaje (NO cerrar WebSocket)
+        logger.error(
+            "[%s] Payload de connectivity_result inválido - workstation_id=%s, error=%s",
+            datetime.utcnow().isoformat(),
+            workstation_id,
+            str(e)
+        )
+        return
+
+    try:
+        # Persistir resultado usando ConnectivityService (verifica tenant isolation internamente)
+        result = connectivity_service.persist_connectivity_result(
+            db=db,
+            workstation_id=workstation_id,
+            account_id=organization_id,
+            payload=payload
+        )
+
+        if result is None:
+            # Workstation no encontrada para la cuenta: ya logueado por el servicio como WARNING
             logger.warning(
                 "[%s] Resultado de conectividad descartado - workstation_id=%s "
                 "no encontrada para organization_id=%s",
@@ -403,13 +442,42 @@ async def _handle_connectivity_result(
                 workstation_id,
                 organization_id
             )
-    
-    except ValidationError as e:
-        # Payload inválido: registrar error y descartar mensaje (NO cerrar WebSocket)
-        logger.error(
-            "[%s] Payload de connectivity_result inválido - workstation_id=%s, error=%s",
+            return
+
+        # Persistencia exitosa: broadcast a operadores de la misma cuenta
+        await connection_manager.broadcast_to_account(
+            account_id=organization_id,
+            message={
+                "type": "connectivity_result",
+                "workstation_id": str(workstation_id),
+                "check_id": payload.check_id,
+                "check_type": payload.check_type,
+                "success": payload.success,
+                "latency_ms": payload.latency_ms,
+                "error": payload.error
+            },
+            db=db
+        )
+
+        logger.info(
+            "[%s] Resultado de conectividad persistido y broadcast - workstation_id=%s, "
+            "check_id=%s, check_type=%s, success=%s, latency_ms=%s",
             datetime.utcnow().isoformat(),
             workstation_id,
+            payload.check_id,
+            payload.check_type,
+            payload.success,
+            payload.latency_ms
+        )
+
+    except Exception as e:
+        # Error de BD u otro error inesperado: log ERROR, omitir broadcast, NO cerrar WebSocket
+        logger.error(
+            "[%s] Error al persistir resultado de conectividad - workstation_id=%s, "
+            "check_id=%s, error=%s",
+            datetime.utcnow().isoformat(),
+            workstation_id,
+            data.get("check_id", "desconocido"),
             str(e)
         )
 

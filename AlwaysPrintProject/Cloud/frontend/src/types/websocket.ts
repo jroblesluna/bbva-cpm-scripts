@@ -129,6 +129,26 @@ export interface ConnectionStatsMessage {
   by_account: Record<string, number>
 }
 
+export interface TelemetryReceivedMessage {
+  type: 'telemetry_received'
+  workstation_id: string
+  queue_status: string
+  contingency_active: boolean
+  jobs_identified: number
+  avg_release_time_ms: number | null
+  disconnection_count: number
+}
+
+export interface ConnectivityResultReceivedMessage {
+  type: 'connectivity_result'
+  workstation_id: string
+  check_id: string
+  check_type: string
+  success: boolean
+  latency_ms: number | null
+  error: string | null
+}
+
 export type OperatorMessage =
   | WorkstationConnectedMessage
   | WorkstationDisconnectedMessage
@@ -136,6 +156,8 @@ export type OperatorMessage =
   | MessageDeliveredMessage
   | CommandResultNotification
   | ConnectionStatsMessage
+  | TelemetryReceivedMessage
+  | ConnectivityResultReceivedMessage
 
 // ============================================================================
 // ESTADO DE CONEXIÓN

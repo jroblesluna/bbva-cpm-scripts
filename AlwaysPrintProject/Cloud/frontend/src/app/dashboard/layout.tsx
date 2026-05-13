@@ -27,6 +27,8 @@ import {
   Menu,
   X,
   Globe,
+  Activity,
+  Wifi,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -40,6 +42,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const navigation = [
     { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
     { key: 'workstations', href: '/dashboard/workstations', icon: Monitor },
+    { key: 'telemetry', href: '/dashboard/telemetry', icon: Activity },
+    { key: 'connectivity', href: '/dashboard/connectivity', icon: Wifi },
     { key: 'vlans', href: '/dashboard/vlans', icon: Network },
     { key: 'config', href: '/dashboard/config', icon: Settings },
     { key: 'messages', href: '/dashboard/messages', icon: MessageSquare },
@@ -55,6 +59,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.push('/login')
     }
   }, [isAuthenticated, isLoading, router])
+
+  // Redirigir a /no-account si es operador/readonly sin organización asignada
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user) {
+      const needsAccount = user.role !== 'admin' && !user.account_id
+      const isOnNoAccountPage = pathname === '/dashboard/no-account'
+
+      if (needsAccount && !isOnNoAccountPage) {
+        router.push('/dashboard/no-account')
+      } else if (!needsAccount && isOnNoAccountPage) {
+        router.push('/dashboard')
+      }
+    }
+  }, [isLoading, isAuthenticated, user, pathname, router])
 
   // Mostrar loading mientras verifica autenticación
   if (isLoading) {
@@ -126,29 +144,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               })}
             </nav>
             {/* Información de usuario y logout en móvil */}
-            <div className="flex-shrink-0 border-t border-gray-200 p-4">
-              <div className="flex items-center mb-3">
+            <div className="flex-shrink-0 border-t border-gray-200 p-3 space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center">
+                  <span className="text-sm font-medium text-white">
+                    {user?.full_name?.charAt(0)?.toUpperCase() || '?'}
+                  </span>
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{user?.full_name}</p>
                   <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                  <Badge variant="secondary" className="mt-1">
-                    {roleLabel}
-                  </Badge>
                 </div>
               </div>
-              <div className="flex items-center gap-2 mb-2">
-                <LanguageSelector />
-              </div>
+              <Badge variant="secondary" className="text-xs font-bold px-2 py-0.5 w-full justify-center">
+                {roleLabel}
+              </Badge>
+              <LanguageSelector />
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="w-full"
+                className="w-full text-gray-600 hover:text-red-600 hover:bg-red-50"
                 onClick={() => {
                   setSidebarOpen(false)
                   logout()
                 }}
               >
-                <LogOut className="mr-2 h-4 w-4" />
+                <LogOut className="mr-1.5 h-3.5 w-3.5" />
                 {t('logout')}
               </Button>
               <BuildInfo />
@@ -191,26 +212,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )
             })}
           </nav>
-          <div className="flex-shrink-0 border-t border-gray-200 p-4">
-            <div className="flex items-center mb-2">
+          <div className="flex-shrink-0 border-t border-gray-200 p-3 space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0 w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center">
+                <span className="text-sm font-medium text-white">
+                  {user?.full_name?.charAt(0)?.toUpperCase() || '?'}
+                </span>
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{user?.full_name}</p>
                 <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                <Badge variant="secondary" className="mt-1">
-                  {roleLabel}
-                </Badge>
               </div>
             </div>
-            <div className="mb-2">
-              <LanguageSelector />
-            </div>
+            <Badge variant="secondary" className="text-xs font-bold px-2 py-0.5 w-full justify-center">
+              {roleLabel}
+            </Badge>
+            <LanguageSelector />
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className="w-full mt-1"
+              className="w-full text-gray-600 hover:text-red-600 hover:bg-red-50"
               onClick={logout}
             >
-              <LogOut className="mr-2 h-4 w-4" />
+              <LogOut className="mr-1.5 h-3.5 w-3.5" />
               {t('logout')}
             </Button>
             <BuildInfo />

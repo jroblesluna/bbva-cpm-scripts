@@ -30,6 +30,76 @@ from app.services.audit import AuditService
 router = APIRouter()
 
 
+def _resolve_entity_names(db: Session, logs: list) -> list[dict]:
+    """
+    Resuelve el nombre legible de cada entidad según su tipo.
+    Agrupa las consultas por tipo para minimizar queries a la BD.
+    """
+    from app.models.user import User as UserModel
+    from app.models.account import Account
+    from app.models.workstation import Workstation
+    from app.models.vlan import VLAN
+    from app.models.message import Message
+
+    # Agrupar entity_ids por tipo
+    ids_by_type: dict[str, set] = {}
+    for log in logs:
+        entity_type = log.entity_type.lower()
+        entity_id = str(log.entity_id)
+        if entity_type not in ids_by_type:
+            ids_by_type[entity_type] = set()
+        ids_by_type[entity_type].add(entity_id)
+
+    # Resolver nombres por tipo
+    names: dict[str, str] = {}
+
+    if "user" in ids_by_type:
+        users = db.query(UserModel).filter(UserModel.id.in_(ids_by_type["user"])).all()
+        for u in users:
+            names[str(u.id)] = u.full_name or u.email
+
+    if "account" in ids_by_type:
+        accounts = db.query(Account).filter(Account.id.in_(ids_by_type["account"])).all()
+        for a in accounts:
+            names[str(a.id)] = a.name
+
+    if "workstation" in ids_by_type:
+        workstations = db.query(Workstation).filter(Workstation.id.in_(ids_by_type["workstation"])).all()
+        for w in workstations:
+            names[str(w.id)] = w.hostname or w.ip_private or str(w.id)[:8]
+
+    if "vlan" in ids_by_type:
+        vlans = db.query(VLAN).filter(VLAN.id.in_(ids_by_type["vlan"])).all()
+        for v in vlans:
+            names[str(v.id)] = v.name
+
+    if "message" in ids_by_type:
+        messages = db.query(Message).filter(Message.id.in_(ids_by_type["message"])).all()
+        for m in messages:
+            names[str(m.id)] = m.content[:40] + ("..." if len(m.content) > 40 else "")
+
+    # Construir respuesta con entity_name
+    result = []
+    for log in logs:
+        log_dict = {
+            "id": log.id,
+            "user_id": log.user_id,
+            "workstation_id": log.workstation_id,
+            "account_id": log.account_id,
+            "action_type": log.action_type,
+            "entity_type": log.entity_type,
+            "entity_id": log.entity_id,
+            "entity_name": names.get(str(log.entity_id)),
+            "old_values": log.old_values,
+            "new_values": log.new_values,
+            "ip_address": log.ip_address,
+            "created_at": log.created_at,
+        }
+        result.append(log_dict)
+
+    return result
+
+
 @router.get("/", response_model=AuditLogListResponse)
 def search_audit_logs(
     page: int = Query(1, ge=1),
@@ -81,7 +151,7 @@ def search_audit_logs(
         total=total,
         page=page,
         page_size=page_size,
-        logs=logs
+        logs=_resolve_entity_names(db, logs)
     )
 
 
@@ -190,7 +260,7 @@ def get_recent_activity(
         total=len(logs),
         page=1,
         page_size=limit,
-        logs=logs
+        logs=_resolve_entity_names(db, logs)
     )
 
 

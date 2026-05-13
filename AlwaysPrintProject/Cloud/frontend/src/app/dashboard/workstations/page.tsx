@@ -2,18 +2,18 @@
  * Página de gestión de workstations.
  */
 
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { workstationsApi, accountsApi } from '@/lib/api'
-import { useTranslations } from 'next-intl'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { workstationsApi, accountsApi } from '@/lib/api';
+import { useTranslations } from 'next-intl';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import {
   Monitor,
   Search,
@@ -26,54 +26,61 @@ import {
   Calendar,
   Activity,
   Edit,
-  RefreshCw
-} from 'lucide-react'
-import { formatDateWithTimezone } from '@/lib/dateUtils'
-import { useUserTimezone } from '@/hooks/useUserTimezone'
-import type { Workstation, WorkstationUpdate, Account } from '@/types'
+  RefreshCw,
+} from 'lucide-react';
+import { formatDateWithTimezone } from '@/lib/dateUtils';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
+import type { Workstation, WorkstationUpdate, Account } from '@/types';
 
 export default function WorkstationsPage() {
-  const queryClient = useQueryClient()
-  const userTimezone = useUserTimezone()
-  const t = useTranslations('workstations')
-  const tCommon = useTranslations('common')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterOnline, setFilterOnline] = useState<boolean | undefined>(undefined)
-  const [filterContingency, setFilterContingency] = useState<boolean | undefined>(undefined)
-  const [filterAccountId, setFilterAccountId] = useState<string | undefined>(undefined)
-  const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null)
-  const [editingWorkstation, setEditingWorkstation] = useState<Workstation | null>(null)
+  const queryClient = useQueryClient();
+  const userTimezone = useUserTimezone();
+  const t = useTranslations('workstations');
+  const tCommon = useTranslations('common');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterOnline, setFilterOnline] = useState<boolean | undefined>(undefined);
+  const [filterContingency, setFilterContingency] = useState<boolean | undefined>(undefined);
+  const [filterAccountId, setFilterAccountId] = useState<string | undefined>(undefined);
+  const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
+  const [editingWorkstation, setEditingWorkstation] = useState<Workstation | null>(null);
 
-  const { data: workstationsData, isLoading, error } = useQuery({
+  const {
+    data: workstationsData,
+    isLoading,
+    isFetching,
+    error,
+  } = useQuery({
     queryKey: ['workstations', searchTerm, filterOnline, filterContingency, filterAccountId],
-    queryFn: () => workstationsApi.list({
-      search: searchTerm || undefined,
-      is_online: filterOnline,
-      contingency_active: filterContingency,
-      account_id: filterAccountId,
-    }),
-  })
+    queryFn: () =>
+      workstationsApi.list({
+        search: searchTerm || undefined,
+        is_online: filterOnline,
+        contingency_active: filterContingency,
+        account_id: filterAccountId,
+      }),
+    placeholderData: (prev) => prev,
+  });
 
   const { data: stats } = useQuery({
     queryKey: ['workstations', 'stats'],
     queryFn: () => workstationsApi.stats(),
-  })
+  });
 
   const { data: accounts } = useQuery({
     queryKey: ['accounts'],
     queryFn: () => accountsApi.list(),
-  })
+  });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: WorkstationUpdate }) =>
       workstationsApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workstations'] })
-      setEditingWorkstation(null)
+      queryClient.invalidateQueries({ queryKey: ['workstations'] });
+      setEditingWorkstation(null);
     },
-  })
+  });
 
-  const workstations = workstationsData?.items || []
+  const workstations = workstationsData?.items || [];
 
   if (isLoading) {
     return (
@@ -85,7 +92,7 @@ export default function WorkstationsPage() {
           ))}
         </div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -97,7 +104,7 @@ export default function WorkstationsPage() {
           <AlertDescription>{tCommon('loading')}</AlertDescription>
         </Alert>
       </div>
-    )
+    );
   }
 
   return (
@@ -107,8 +114,11 @@ export default function WorkstationsPage() {
           <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
           <p className="text-gray-600 mt-2">{t('subtitle')}</p>
         </div>
-        <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['workstations'] })}>
-          <RefreshCw className="w-4 h-4 mr-2" />
+        <Button
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['workstations'] })}
+          disabled={isFetching}
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
           {tCommon('refresh')}
         </Button>
       </div>
@@ -153,7 +163,9 @@ export default function WorkstationsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{t('contingency')}</p>
-                  <p className="text-3xl font-bold text-amber-600">{stats.contingency_active}</p>
+                  <p className="text-3xl font-bold text-amber-600">
+                    {stats.contingency_active}
+                  </p>
                 </div>
                 <Activity className="w-12 h-12 text-amber-600" />
               </div>
@@ -179,10 +191,12 @@ export default function WorkstationsPage() {
             </div>
             <div>
               <select
-                value={filterOnline === undefined ? 'all' : filterOnline ? 'online' : 'offline'}
+                value={
+                  filterOnline === undefined ? 'all' : filterOnline ? 'online' : 'offline'
+                }
                 onChange={(e) => {
-                  const value = e.target.value
-                  setFilterOnline(value === 'all' ? undefined : value === 'online')
+                  const value = e.target.value;
+                  setFilterOnline(value === 'all' ? undefined : value === 'online');
                 }}
                 className="w-full px-3 py-2 border rounded-md"
               >
@@ -195,15 +209,18 @@ export default function WorkstationsPage() {
               <select
                 value={filterAccountId || 'all'}
                 onChange={(e) => {
-                  const value = e.target.value
-                  setFilterAccountId(value === 'all' ? undefined : value)
+                  const value = e.target.value;
+                  setFilterAccountId(value === 'all' ? undefined : value);
                 }}
                 className="w-full px-3 py-2 border rounded-md"
               >
                 <option value="all">{t('allAccounts')}</option>
-                {Array.isArray(accounts) && accounts.map((account) => (
-                  <option key={account.id} value={account.id}>{account.name}</option>
-                ))}
+                {Array.isArray(accounts) &&
+                  accounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
               </select>
             </div>
           </div>
@@ -217,15 +234,18 @@ export default function WorkstationsPage() {
               />
               <span className="text-sm text-gray-700">{t('onlyContingency')}</span>
             </label>
-            {(searchTerm || filterOnline !== undefined || filterContingency !== undefined || filterAccountId) && (
+            {(searchTerm ||
+              filterOnline !== undefined ||
+              filterContingency !== undefined ||
+              filterAccountId) && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  setSearchTerm('')
-                  setFilterOnline(undefined)
-                  setFilterContingency(undefined)
-                  setFilterAccountId(undefined)
+                  setSearchTerm('');
+                  setFilterOnline(undefined);
+                  setFilterContingency(undefined);
+                  setFilterAccountId(undefined);
                 }}
               >
                 {tCommon('clearFilters')}
@@ -260,52 +280,82 @@ export default function WorkstationsPage() {
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start flex-1">
-                    <div className={`rounded-full p-3 mr-4 ${workstation.is_online ? 'bg-green-100' : 'bg-gray-100'}`}>
-                      <Monitor className={`w-6 h-6 ${workstation.is_online ? 'text-green-600' : 'text-gray-400'}`} />
+                    <div
+                      className={`rounded-full p-3 mr-4 ${workstation.is_online ? 'bg-green-100' : 'bg-gray-100'}`}
+                    >
+                      <Monitor
+                        className={`w-6 h-6 ${workstation.is_online ? 'text-green-600' : 'text-gray-400'}`}
+                      />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center mb-2">
-                        <h3 className="text-xl font-semibold text-gray-900 mr-3">{workstation.ip_private}</h3>
+                        <h3 className="text-xl font-semibold text-gray-900 mr-3">
+                          {workstation.ip_private}
+                        </h3>
                         <Badge variant={workstation.is_online ? 'default' : 'secondary'}>
                           {workstation.is_online ? t('online') : t('offline')}
                         </Badge>
                         {workstation.contingency_active && (
-                          <Badge variant="destructive" className="ml-2">{t('contingency')}</Badge>
+                          <Badge variant="destructive" className="ml-2">
+                            {t('contingency')}
+                          </Badge>
                         )}
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
                         {workstation.hostname && (
-                          <div className="flex items-center"><Monitor className="w-4 h-4 mr-1" />{workstation.hostname}</div>
+                          <div className="flex items-center">
+                            <Monitor className="w-4 h-4 mr-1" />
+                            {workstation.hostname}
+                          </div>
                         )}
                         {workstation.current_user && (
-                          <div className="flex items-center"><User className="w-4 h-4 mr-1" />{workstation.current_user}</div>
+                          <div className="flex items-center">
+                            <User className="w-4 h-4 mr-1" />
+                            {workstation.current_user}
+                          </div>
                         )}
                         {workstation.vlan_id && (
-                          <div className="flex items-center"><Network className="w-4 h-4 mr-1" />VLAN: {workstation.vlan_id}</div>
+                          <div className="flex items-center">
+                            <Network className="w-4 h-4 mr-1" />
+                            VLAN: {workstation.vlan_id}
+                          </div>
                         )}
                         {workstation.account && (
-                          <div className="flex items-center"><Building2 className="w-4 h-4 mr-1" />{workstation.account.name}</div>
+                          <div className="flex items-center">
+                            <Building2 className="w-4 h-4 mr-1" />
+                            {workstation.account.name}
+                          </div>
                         )}
                       </div>
                       <div className="flex items-center text-xs text-gray-500 space-x-4">
                         <div className="flex items-center">
                           <Calendar className="w-3 h-3 mr-1" />
-                          {t('firstConnection')}: {formatDateWithTimezone(workstation.first_seen, userTimezone)}
+                          {t('firstConnection')}:{' '}
+                          {formatDateWithTimezone(workstation.first_seen, userTimezone)}
                         </div>
                         {workstation.last_connection && (
                           <div className="flex items-center">
                             <Activity className="w-3 h-3 mr-1" />
-                            {t('lastConnection')}: {formatDateWithTimezone(workstation.last_connection, userTimezone)}
+                            {t('lastConnection')}:{' '}
+                            {formatDateWithTimezone(workstation.last_connection, userTimezone)}
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2 ml-4">
-                    <Button variant="outline" size="sm" onClick={() => setSelectedWorkstation(workstation)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedWorkstation(workstation)}
+                    >
                       {t('viewDetails')}
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => setEditingWorkstation(workstation)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingWorkstation(workstation)}
+                    >
                       <Edit className="w-4 h-4" />
                     </Button>
                   </div>
@@ -319,7 +369,10 @@ export default function WorkstationsPage() {
               <Monitor className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">{t('emptyTitle')}</h3>
               <p className="text-gray-600 mb-4">
-                {searchTerm || filterOnline !== undefined || filterContingency !== undefined || filterAccountId
+                {searchTerm ||
+                filterOnline !== undefined ||
+                filterContingency !== undefined ||
+                filterAccountId
                   ? t('emptyFilterMessage')
                   : t('emptyMessage')}
               </p>
@@ -335,7 +388,7 @@ export default function WorkstationsPage() {
         />
       )}
     </div>
-  )
+  );
 }
 
 function WorkstationForm({
@@ -346,26 +399,26 @@ function WorkstationForm({
   isLoading,
   error,
 }: {
-  workstation: Workstation
-  accounts: Account[]
-  onSubmit: (data: WorkstationUpdate) => void
-  onCancel: () => void
-  isLoading: boolean
-  error?: string
+  workstation: Workstation;
+  accounts: Account[];
+  onSubmit: (data: WorkstationUpdate) => void;
+  onCancel: () => void;
+  isLoading: boolean;
+  error?: string;
 }) {
-  const t = useTranslations('workstations')
-  const tCommon = useTranslations('common')
+  const t = useTranslations('workstations');
+  const tCommon = useTranslations('common');
   const [formData, setFormData] = useState<WorkstationUpdate>({
     hostname: workstation.hostname || undefined,
     os_serial: workstation.os_serial || undefined,
     current_user: workstation.current_user || undefined,
     account_id: workstation.account_id || undefined,
-  })
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSubmit(formData)
-  }
+    e.preventDefault();
+    onSubmit(formData);
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -383,7 +436,9 @@ function WorkstationForm({
             type="text"
             placeholder={t('hostnamePlaceholder')}
             value={formData.hostname || ''}
-            onChange={(e) => setFormData({ ...formData, hostname: e.target.value || undefined })}
+            onChange={(e) =>
+              setFormData({ ...formData, hostname: e.target.value || undefined })
+            }
             disabled={isLoading}
           />
         </div>
@@ -394,7 +449,9 @@ function WorkstationForm({
             type="text"
             placeholder="XXXXX-XXXXX-XXXXX"
             value={formData.os_serial || ''}
-            onChange={(e) => setFormData({ ...formData, os_serial: e.target.value || undefined })}
+            onChange={(e) =>
+              setFormData({ ...formData, os_serial: e.target.value || undefined })
+            }
             disabled={isLoading}
           />
         </div>
@@ -405,7 +462,9 @@ function WorkstationForm({
             type="text"
             placeholder="usuario@dominio.com"
             value={formData.current_user || ''}
-            onChange={(e) => setFormData({ ...formData, current_user: e.target.value || undefined })}
+            onChange={(e) =>
+              setFormData({ ...formData, current_user: e.target.value || undefined })
+            }
             disabled={isLoading}
           />
         </div>
@@ -414,14 +473,19 @@ function WorkstationForm({
           <select
             id="account_id"
             value={formData.account_id || ''}
-            onChange={(e) => setFormData({ ...formData, account_id: e.target.value || undefined })}
+            onChange={(e) =>
+              setFormData({ ...formData, account_id: e.target.value || undefined })
+            }
             disabled={isLoading}
             className="w-full px-3 py-2 border rounded-md"
           >
             <option value="">{t('unassigned')}</option>
-            {Array.isArray(accounts) && accounts.map((account) => (
-              <option key={account.id} value={account.id}>{account.name}</option>
-            ))}
+            {Array.isArray(accounts) &&
+              accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
+                </option>
+              ))}
           </select>
         </div>
       </div>
@@ -438,19 +502,19 @@ function WorkstationForm({
         </Button>
       </div>
     </form>
-  )
+  );
 }
 
 function WorkstationDetailModal({
   workstation,
   onClose,
 }: {
-  workstation: Workstation
-  onClose: () => void
+  workstation: Workstation;
+  onClose: () => void;
 }) {
-  const userTimezone = useUserTimezone()
-  const t = useTranslations('workstations')
-  const tCommon = useTranslations('common')
+  const userTimezone = useUserTimezone();
+  const t = useTranslations('workstations');
+  const tCommon = useTranslations('common');
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -525,12 +589,16 @@ function WorkstationDetailModal({
             <dl className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <dt className="text-gray-600">{t('firstConnection')}</dt>
-                <dd className="font-medium">{formatDateWithTimezone(workstation.first_seen, userTimezone)}</dd>
+                <dd className="font-medium">
+                  {formatDateWithTimezone(workstation.first_seen, userTimezone)}
+                </dd>
               </div>
               {workstation.last_connection && (
                 <div>
                   <dt className="text-gray-600">{t('lastConnection')}</dt>
-                  <dd className="font-medium">{formatDateWithTimezone(workstation.last_connection, userTimezone)}</dd>
+                  <dd className="font-medium">
+                    {formatDateWithTimezone(workstation.last_connection, userTimezone)}
+                  </dd>
                 </div>
               )}
             </dl>
@@ -542,5 +610,5 @@ function WorkstationDetailModal({
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

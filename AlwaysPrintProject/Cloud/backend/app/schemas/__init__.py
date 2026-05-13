@@ -49,6 +49,7 @@ from app.schemas.vlan import (
 
 # === CONFIG SCHEMAS ===
 from app.schemas.config import (
+    ConnectivityCheckItem,
     GlobalConfigUpdate,
     GlobalConfigResponse,
     VLANConfigUpdate,
@@ -105,6 +106,17 @@ from app.schemas.websocket import (
     WebSocketError,
 )
 
+# === TELEMETRY SCHEMAS ===
+from app.schemas.telemetry import (
+    DisconnectionEventPayload,
+    TelemetryMessagePayload,
+    ConnectivityResultPayload,
+    TelemetryLogResponse,
+    ConnectivityResultResponse,
+    QueueStatusSummary,
+    TelemetryStatsResponse,
+)
+
 # === AUTH SCHEMAS ===
 from app.schemas.auth import (
     LoginRequest,
@@ -148,6 +160,7 @@ __all__ = [
     "VLANDetailResponse",
     "VLANListResponse",
     # Config
+    "ConnectivityCheckItem",
     "GlobalConfigUpdate",
     "GlobalConfigResponse",
     "VLANConfigUpdate",
@@ -188,6 +201,14 @@ __all__ = [
     "ConnectionStatsMessage",
     "WebSocketMessage",
     "WebSocketError",
+    # Telemetry
+    "DisconnectionEventPayload",
+    "TelemetryMessagePayload",
+    "ConnectivityResultPayload",
+    "TelemetryLogResponse",
+    "ConnectivityResultResponse",
+    "QueueStatusSummary",
+    "TelemetryStatsResponse",
     # Auth
     "LoginRequest",
     "TokenResponse",

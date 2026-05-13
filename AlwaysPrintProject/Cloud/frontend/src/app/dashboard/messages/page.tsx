@@ -272,7 +272,7 @@ export default function MessagesPage() {
 }
 
 function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const { getAuthHeaders } = useAuth()
+  const { user, getAuthHeaders } = useAuth()
   const t = useTranslations('messages')
   const tCommon = useTranslations('common')
   const [loading, setLoading] = useState(false)
@@ -281,6 +281,10 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
   const [content, setContent] = useState('')
   const [workstations, setWorkstations] = useState<Workstation[]>([])
   const [vlans, setVlans] = useState<VLAN[]>([])
+
+  // Selector de cuenta para admin
+  const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([])
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('')
 
   useEffect(() => {
     const loadWS = async () => {
@@ -295,14 +299,31 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
         setVlans(r.data.vlans || [])
       } catch (e) { console.error(e) }
     }
+    const loadAccounts = async () => {
+      try {
+        const r = await apiClient.get('/accounts/?skip=0&limit=1000')
+        const items = r.data.items || []
+        setAccounts(items)
+        if (items.length > 0) setSelectedAccountId(items[0].id)
+      } catch (e) { console.error(e) }
+    }
     loadWS()
     loadVLANs()
-  }, [])
+    // Admin necesita seleccionar cuenta destino
+    if (user?.role === 'admin') {
+      loadAccounts()
+    }
+  }, [user])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!content.trim()) return
     if (targetType !== 'account' && !targetId) return
+    // Admin debe seleccionar cuenta
+    if (user?.role === 'admin' && !selectedAccountId) {
+      alert('Debes seleccionar una organización destino')
+      return
+    }
     try {
       setLoading(true)
       const messageData: MessageCreate = {
@@ -310,11 +331,16 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
         target_id: targetType === 'account' ? null : targetId,
         content: content.trim(),
       }
-      await apiClient.post('/messages/', messageData)
+      // Construir URL con account_id para admin
+      let url = '/messages/'
+      if (user?.role === 'admin' && selectedAccountId) {
+        url += `?account_id=${selectedAccountId}`
+      }
+      await apiClient.post(url, messageData)
       onSuccess()
     } catch (error: any) {
       console.error('Error:', error)
-      alert(error.message)
+      alert(error.detail || error.message || 'Error al enviar mensaje')
     } finally {
       setLoading(false)
     }
@@ -326,6 +352,17 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
         <div className="p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('sendTitle')}</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Selector de cuenta para admin */}
+            {user?.role === 'admin' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Organización destino</label>
+                <select value={selectedAccountId} onChange={(e) => setSelectedAccountId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                  <option value="">Seleccionar organización...</option>
+                  {accounts.map((acc) => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                </select>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('sendTo')}</label>
               <select value={targetType} onChange={(e) => { setTargetType(e.target.value as TargetType); setTargetId('') }}

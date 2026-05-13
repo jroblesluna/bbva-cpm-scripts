@@ -164,7 +164,7 @@ namespace AlwaysPrintTray
                     try
                     {
                         var credentials = new CloudCredentialsManager();
-                        _cloudManager = new CloudManager(cfg, credentials, _pipe, _uiContext);
+                        _cloudManager = new CloudManager(cfg, credentials, _pipe, _uiContext, _trayIcon);
                         _cloudManager.Start();
                         AlwaysPrintLogger.WriteTrayInfo("CloudManager iniciado correctamente.");
                     }

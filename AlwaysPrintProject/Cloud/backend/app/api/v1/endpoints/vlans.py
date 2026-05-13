@@ -101,7 +101,14 @@ def create_vlan(
     db.refresh(vlan)
     
     audit_service = AuditService()
-    audit_service.log_create(db, current_user.id, "vlan", vlan.id, {"name": vlan.name})
+    audit_service.log_create(
+        db=db,
+        entity_type="vlan",
+        entity_id=str(vlan.id),
+        user_id=str(current_user.id),
+        account_id=str(vlan.account_id),
+        entity_data={"name": vlan.name}
+    )
     
     return vlan
 
@@ -149,7 +156,15 @@ def update_vlan(
     db.refresh(vlan)
     
     audit_service = AuditService()
-    audit_service.log_update(db, current_user.id, "vlan", vlan.id, old_values, update_data)
+    audit_service.log_update(
+        db=db,
+        entity_type="vlan",
+        entity_id=str(vlan.id),
+        user_id=str(current_user.id),
+        account_id=str(vlan.account_id),
+        old_data=old_values,
+        new_data=update_data
+    )
     
     return vlan
 
@@ -172,7 +187,14 @@ def delete_vlan(
     db.commit()
     
     audit_service = AuditService()
-    audit_service.log_delete(db, current_user.id, "vlan", vlan_id, {"name": vlan.name})
+    audit_service.log_delete(
+        db=db,
+        entity_type="vlan",
+        entity_id=str(vlan_id),
+        user_id=str(current_user.id),
+        account_id=str(vlan.account_id),
+        entity_data={"name": vlan.name}
+    )
     
     return None
 
@@ -236,7 +258,13 @@ def update_vlan_config(
     
     audit_service = AuditService()
     audit_service.log_config_change(
-        db, current_user.id, None, vlan.account_id, "vlan", {}, config_data.model_dump(exclude_unset=True)
+        db=db,
+        entity_type="vlan_config",
+        entity_id=str(vlan_id),
+        user_id=str(current_user.id),
+        account_id=str(vlan.account_id),
+        old_config={},
+        new_config=config_data.model_dump(exclude_unset=True)
     )
     
     return config
@@ -261,7 +289,13 @@ def delete_vlan_config(
     
     audit_service = AuditService()
     audit_service.log_config_change(
-        db, current_user.id, None, vlan.account_id, "vlan", {"action": "config_deleted"}, {}
+        db=db,
+        entity_type="vlan_config",
+        entity_id=str(vlan_id),
+        user_id=str(current_user.id),
+        account_id=str(vlan.account_id),
+        old_config={"action": "config_deleted"},
+        new_config={}
     )
     
     return None
