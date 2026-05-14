@@ -119,3 +119,12 @@ api_router.include_router(
 @api_router.get("/version", tags=["Sistema"])
 async def version():
     return {"build_tag": os.environ.get("BUILD_TAG", "dev")}
+
+
+@api_router.get("/health", tags=["Sistema"])
+async def health():
+    """Health check accesible desde el Client Tray y monitoreo externo."""
+    return {
+        "status": "healthy",
+        "build_tag": os.environ.get("BUILD_TAG", "dev"),
+    }

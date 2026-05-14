@@ -95,6 +95,7 @@ export default function TelemetryDashboardPage() {
   const accountId = user?.account_id ?? '';
   const userTimezone = useUserTimezone();
   const tCommon = useTranslations('common');
+  const t = useTranslations('telemetry');
   const [selectedWorkstationId, setSelectedWorkstationId] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
@@ -149,9 +150,9 @@ export default function TelemetryDashboardPage() {
       {/* Encabezado */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Telemetría</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
           <p className="text-gray-600 mt-2">
-            Monitoreo del estado operativo de las workstations
+            {t('subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -224,6 +225,8 @@ function StatsCards({
   isError: boolean;
   onRetry: () => void;
 }) {
+  const t = useTranslations('telemetry');
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -246,10 +249,10 @@ function StatsCards({
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
         <AlertDescription className="flex items-center justify-between">
-          <span>Error al cargar estadísticas de telemetría</span>
+          <span>{t('statsError')}</span>
           <Button variant="outline" size="sm" onClick={onRetry}>
             <RefreshCw className="w-3 h-3 mr-1" />
-            Reintentar
+            {t('retry')}
           </Button>
         </AlertDescription>
       </Alert>
@@ -267,11 +270,11 @@ function StatsCards({
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Reportando</p>
+              <p className="text-sm font-medium text-gray-600">{t('reporting')}</p>
               <p className="text-3xl font-bold text-gray-900">
                 {stats.workstations_reporting}
               </p>
-              <p className="text-xs text-gray-500 mt-1">de {stats.total_workstations} total</p>
+              <p className="text-xs text-gray-500 mt-1">{t('ofTotal', { total: stats.total_workstations })}</p>
             </div>
             <Monitor className="w-12 h-12 text-blue-600" />
           </div>
@@ -282,9 +285,9 @@ function StatsCards({
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Errores</p>
+              <p className="text-sm font-medium text-gray-600">{t('errors')}</p>
               <p className="text-3xl font-bold text-red-600">{errorCount}</p>
-              <p className="text-xs text-gray-500 mt-1">cola error o missing</p>
+              <p className="text-xs text-gray-500 mt-1">{t('errorsDetail')}</p>
             </div>
             <AlertCircle className="w-12 h-12 text-red-600" />
           </div>
@@ -295,7 +298,7 @@ function StatsCards({
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Contingencia activa</p>
+              <p className="text-sm font-medium text-gray-600">{t('contingencyActive')}</p>
               <p className="text-3xl font-bold text-amber-600">
                 {stats.contingency_active_count}
               </p>
@@ -309,11 +312,11 @@ function StatsCards({
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Tiempo promedio liberación</p>
+              <p className="text-sm font-medium text-gray-600">{t('avgRelease')}</p>
               <p className="text-3xl font-bold text-gray-900">
                 {stats.avg_jobs_identified > 0 ? `${stats.avg_jobs_identified}` : '—'}
               </p>
-              <p className="text-xs text-gray-500 mt-1">jobs identificados (prom.)</p>
+              <p className="text-xs text-gray-500 mt-1">{t('avgJobs')}</p>
             </div>
             <Clock className="w-12 h-12 text-indigo-600" />
           </div>
@@ -342,6 +345,7 @@ function WorkstationsTable({
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
+  const t = useTranslations('telemetry');
   // Obtener última telemetría por workstation
   // Nota: usamos una query separada para obtener la telemetría más reciente de cada ws
   // En este caso, la tabla de workstations muestra datos básicos y al seleccionar se carga el historial
@@ -350,7 +354,7 @@ function WorkstationsTable({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Workstations</CardTitle>
+          <CardTitle>{t('workstations')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="animate-pulse space-y-3">
@@ -367,16 +371,16 @@ function WorkstationsTable({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Workstations</CardTitle>
+          <CardTitle>{t('workstations')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="flex items-center justify-between">
-              <span>Error al cargar la lista de workstations</span>
+              <span>{t('loadError')}</span>
               <Button variant="outline" size="sm" onClick={onRetry}>
                 <RefreshCw className="w-3 h-3 mr-1" />
-                Reintentar
+                {t('retry')}
               </Button>
             </AlertDescription>
           </Alert>
@@ -389,14 +393,13 @@ function WorkstationsTable({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Workstations</CardTitle>
+          <CardTitle>{t('workstations')}</CardTitle>
         </CardHeader>
         <CardContent className="p-12 text-center">
           <Wifi className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Sin datos de telemetría</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">{t('noTelemetryTitle')}</h3>
           <p className="text-gray-600">
-            No se ha registrado telemetría aún. Las workstations comenzarán a reportar cuando
-            se conecten al sistema.
+            {t('noTelemetryMsg')}
           </p>
         </CardContent>
       </Card>
@@ -406,18 +409,18 @@ function WorkstationsTable({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Workstations — Última telemetría</CardTitle>
+        <CardTitle>{t('lastTelemetry')}</CardTitle>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Estado cola</TableHead>
-              <TableHead>Contingencia</TableHead>
-              <TableHead>Jobs identificados</TableHead>
-              <TableHead>Tiempo liberación</TableHead>
-              <TableHead>Desconexiones</TableHead>
+              <TableHead>{t('colName')}</TableHead>
+              <TableHead>{t('colQueueStatus')}</TableHead>
+              <TableHead>{t('colContingency')}</TableHead>
+              <TableHead>{t('colJobs')}</TableHead>
+              <TableHead>{t('colReleaseTime')}</TableHead>
+              <TableHead>{t('colDisconnections')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -449,6 +452,7 @@ function WorkstationRow({
   isSelected: boolean;
   onSelect: () => void;
 }) {
+  const t = useTranslations('telemetry');
   // Obtener la última telemetría de esta workstation
   const { data: telemetryData } = useQuery({
     queryKey: ['telemetry', 'latest', workstation.id],
@@ -476,7 +480,7 @@ function WorkstationRow({
         {latest ? (
           <QueueStatusBadge status={latest.queue_status} />
         ) : (
-          <Badge variant="secondary">Sin datos</Badge>
+          <Badge variant="secondary">{t('noData')}</Badge>
         )}
       </TableCell>
       <TableCell>
@@ -522,11 +526,13 @@ function TelemetryHistoryPanel({
   isError: boolean;
   onRetry: () => void;
 }) {
+  const t = useTranslations('telemetry');
+
   if (isLoading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Historial — {workstationName}</CardTitle>
+          <CardTitle>{t('history')} — {workstationName}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="animate-pulse space-y-3">
@@ -543,16 +549,16 @@ function TelemetryHistoryPanel({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Historial — {workstationName}</CardTitle>
+          <CardTitle>{t('history')} — {workstationName}</CardTitle>
         </CardHeader>
         <CardContent>
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="flex items-center justify-between">
-              <span>Error al cargar el historial de telemetría</span>
+              <span>{t('historyError')}</span>
               <Button variant="outline" size="sm" onClick={onRetry}>
                 <RefreshCw className="w-3 h-3 mr-1" />
-                Reintentar
+                {t('retry')}
               </Button>
             </AlertDescription>
           </Alert>
@@ -565,12 +571,12 @@ function TelemetryHistoryPanel({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Historial — {workstationName}</CardTitle>
+          <CardTitle>{t('history')} — {workstationName}</CardTitle>
         </CardHeader>
         <CardContent className="p-8 text-center">
           <Activity className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-600">
-            No hay registros de telemetría en las últimas 24 horas para esta workstation.
+            {t('noHistoryMsg')}
           </p>
         </CardContent>
       </Card>
@@ -581,9 +587,9 @@ function TelemetryHistoryPanel({
     <Card>
       <CardHeader>
         <CardTitle>
-          Historial — {workstationName}
+          {t('history')} — {workstationName}
           <span className="text-sm font-normal text-gray-500 ml-2">
-            (últimas 24h, máx. 100 entradas)
+            {t('last24h')}
           </span>
         </CardTitle>
       </CardHeader>
@@ -591,12 +597,12 @@ function TelemetryHistoryPanel({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Fecha/Hora</TableHead>
-              <TableHead>Estado cola</TableHead>
-              <TableHead>Contingencia</TableHead>
-              <TableHead>Jobs</TableHead>
-              <TableHead>Tiempo lib.</TableHead>
-              <TableHead>Desconexiones</TableHead>
+              <TableHead>{t('colDateTime')}</TableHead>
+              <TableHead>{t('colQueueStatus')}</TableHead>
+              <TableHead>{t('colContingency')}</TableHead>
+              <TableHead>{t('colJobs')}</TableHead>
+              <TableHead>{t('colReleaseTime')}</TableHead>
+              <TableHead>{t('colDisconnections')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -643,10 +649,11 @@ function QueueStatusBadge({ status }: { status: TelemetryEntry['queue_status'] }
 }
 
 function ContingencyBadge({ active }: { active: boolean }) {
+  const t = useTranslations('telemetry');
   if (active) {
-    return <Badge variant="destructive">Activa</Badge>;
+    return <Badge variant="destructive">{t('contingencyActive2')}</Badge>;
   }
-  return <Badge variant="secondary">Inactiva</Badge>;
+  return <Badge variant="secondary">{t('contingencyInactive')}</Badge>;
 }
 
 // ============================================================================

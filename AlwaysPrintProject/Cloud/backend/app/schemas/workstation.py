@@ -58,7 +58,7 @@ class AccountBasicResponse(BaseModel):
     id: UUID
     name: str
     is_active: bool
-    timezone: str
+    timezone: str = "UTC"
     
     class Config:
         from_attributes = True

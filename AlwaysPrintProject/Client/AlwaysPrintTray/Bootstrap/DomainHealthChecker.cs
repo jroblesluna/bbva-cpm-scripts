@@ -7,7 +7,7 @@ using AlwaysPrint.Shared.Logging;
 namespace AlwaysPrintTray.Bootstrap
 {
     /// <summary>
-    /// Realiza un HTTP GET a "https://alwaysprint.{dominio}/health" para cada dominio
+    /// Realiza un HTTP GET a "https://{dominio}/api/v1/health" para cada dominio
     /// configurado en BootstrapDomains. Devuelve el primer dominio que responda HTTP 200.
     ///
     /// Diseño:
@@ -19,7 +19,7 @@ namespace AlwaysPrintTray.Bootstrap
     /// </summary>
     public static class DomainHealthChecker
     {
-        private const string HealthPath  = "/health";
+        private const string HealthPath  = "/api/v1/health";
         private const int    TimeoutSecs = 10;
 
         // Opcional: el body debe contener este fragmento para considerarse saludable.
@@ -56,7 +56,7 @@ namespace AlwaysPrintTray.Bootstrap
                 string domain = raw.Trim();
                 if (string.IsNullOrWhiteSpace(domain)) continue;
 
-                string url = $"https://alwaysprint.{domain}{HealthPath}";
+                string url = $"https://{domain}{HealthPath}";
                 try
                 {
                     // Combina el timeout del HttpClient con el token de cancelación global.
