@@ -9,11 +9,12 @@ Este módulo define los endpoints para:
 
 from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.core.utils import get_client_ip
 from app.models.user import User, UserRole
 from app.models.message import Message, TargetType
 from app.schemas import (
@@ -61,6 +62,7 @@ def list_messages(
 
 @router.post("/", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 def send_message(
+    request: Request,
     message_data: MessageCreate,
     account_id: Optional[UUID] = Query(None, description="ID de la cuenta destino (requerido para admin)"),
     current_user: User = Depends(get_current_user),
@@ -100,7 +102,8 @@ def send_message(
         account_id=str(target_account_id),
         target_type=message_data.target_type.value,
         target_id=str(message_data.target_id) if message_data.target_id else None,
-        content_preview=message_data.content[:200]
+        content_preview=message_data.content[:200],
+        ip_address=get_client_ip(request)
     )
     
     return message

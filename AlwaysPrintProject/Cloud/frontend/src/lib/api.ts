@@ -53,6 +53,45 @@ import type {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ''
 const API_V1_PREFIX = '/api/v1'
 
+// ============================================================================
+// OBTENCIÓN DE IP PRIVADA DEL CLIENTE
+// ============================================================================
+
+let cachedPrivateIP: string | null = null
+
+/**
+ * Obtiene la IP privada del cliente usando WebRTC.
+ * Se cachea para no repetir la detección en cada request.
+ */
+function detectPrivateIP(): void {
+  if (typeof window === 'undefined' || typeof RTCPeerConnection === 'undefined') return
+
+  try {
+    const pc = new RTCPeerConnection({ iceServers: [] })
+    pc.createDataChannel('')
+    pc.createOffer().then((offer) => pc.setLocalDescription(offer)).catch(() => {})
+    pc.onicecandidate = (event) => {
+      if (!event || !event.candidate || !event.candidate.candidate) return
+      const parts = event.candidate.candidate.split(' ')
+      const ip = parts[4]
+      // Filtrar solo IPs privadas (10.x, 172.16-31.x, 192.168.x)
+      if (ip && /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(ip)) {
+        cachedPrivateIP = ip
+        pc.close()
+      }
+    }
+    // Timeout para cerrar la conexión si no se detecta IP
+    setTimeout(() => { try { pc.close() } catch {} }, 3000)
+  } catch {
+    // WebRTC no disponible, se usará la IP del servidor
+  }
+}
+
+// Iniciar detección al cargar el módulo
+if (typeof window !== 'undefined') {
+  detectPrivateIP()
+}
+
 /**
  * Instancia de axios configurada para el backend.
  */
@@ -79,14 +118,17 @@ apiClient.interceptors.request.use(
       if (!config.headers.Authorization) {
         delete config.headers.Authorization
       }
-      return config
+    } else {
+      // Obtener token del localStorage
+      const token = localStorage.getItem('access_token')
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+      }
     }
 
-    // Obtener token del localStorage
-    const token = localStorage.getItem('access_token')
-    
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+    // Enviar IP privada del cliente si está disponible
+    if (cachedPrivateIP) {
+      config.headers['X-Client-Private-IP'] = cachedPrivateIP
     }
     
     return config
@@ -550,7 +592,7 @@ export const messagesApi = {
 
 export const auditApi = {
   /**
-   * Buscar logs de auditoría con filtros.
+   * Buscar logs de auditoría con filtros y paginación por cursor.
    */
   search: async (filters?: AuditLogSearch): Promise<AuditLogListResponse> => {
     const response = await apiClient.get<AuditLogListResponse>('/audit/', {

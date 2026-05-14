@@ -291,10 +291,15 @@ namespace AlwaysPrintService
         private void OnTrayInitialized(bool success, string? details)
         {
             AlwaysPrintLogger.WriteInfo($"OnTrayInitialized: success={success}, details={details}");
-            if (success)
-                _trayInitGate.Set();
-            else
-                AlwaysPrintLogger.WriteWarning($"Tray reportó fallo de inicialización: {details}", AlwaysPrintLogger.EvtTrayError);
+            if (!success)
+                AlwaysPrintLogger.WriteWarning(
+                    $"Tray reportó fallo en health check bootstrap: {details}. El servicio continuará en modo local (offline-first).",
+                    AlwaysPrintLogger.EvtTrayError);
+
+            // El handshake se acepta siempre que el Tray se haya conectado y respondido,
+            // independientemente del resultado del health check de dominios bootstrap.
+            // Principio offline-first: el sistema funciona sin conectividad externa.
+            _trayInitGate.Set();
         }
 
         private void MonitoringLoop()

@@ -106,8 +106,8 @@ export default function AccountsPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
         <div className="animate-pulse space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
@@ -119,8 +119,8 @@ export default function AccountsPage() {
 
   if (error) {
     return (
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -132,14 +132,14 @@ export default function AccountsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{t('title')}</h1>
           <p className="text-gray-600 mt-2">{t('subtitle')}</p>
         </div>
-        <Button onClick={() => setShowCreateForm(true)}>
+        <Button onClick={() => setShowCreateForm(true)} className="w-full sm:w-auto">
           <Plus className="w-4 h-4 mr-2" />
           {t('new')}
         </Button>
@@ -226,15 +226,15 @@ export default function AccountsPage() {
         {filteredAccounts && filteredAccounts.length > 0 ? (
           filteredAccounts.map((account) => (
             <Card key={account.id} className="hover:shadow-md transition">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start flex-1">
-                    <div className="bg-blue-100 rounded-full p-3 mr-4">
-                      <Building2 className="w-6 h-6 text-blue-600" />
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                  <div className="flex items-start flex-1 min-w-0">
+                    <div className="bg-blue-100 rounded-full p-3 mr-3 sm:mr-4 shrink-0">
+                      <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center mb-2">
-                        <h3 className="text-xl font-semibold text-gray-900 mr-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
                           {account.name}
                         </h3>
                         <Badge variant={account.is_active ? 'default' : 'secondary'}>
@@ -246,22 +246,22 @@ export default function AccountsPage() {
                         <p className="text-gray-600 mb-3">{account.description}</p>
                       )}
 
-                      <div className="flex items-center text-sm text-gray-500 space-x-4">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-500">
                         <div className="flex items-center">
-                          <Globe className="w-4 h-4 mr-1" />
-                          {account.public_ips?.length || 0} {t('publicIps')}
+                          <Globe className="w-4 h-4 mr-1 shrink-0" />
+                          <span>{account.public_ips?.length || 0} {t('publicIps')}</span>
                         </div>
                         <div className="flex items-center">
-                          <Monitor className="w-4 h-4 mr-1" />
-                          Workstations (por implementar)
+                          <Monitor className="w-4 h-4 mr-1 shrink-0" />
+                          <span>Workstations (por implementar)</span>
                         </div>
                         <div className="flex items-center">
-                          <Users className="w-4 h-4 mr-1" />
-                          Usuarios (por implementar)
+                          <Users className="w-4 h-4 mr-1 shrink-0" />
+                          <span>Usuarios (por implementar)</span>
                         </div>
                         <div className="flex items-center">
-                          <CheckCircle className="w-4 h-4 mr-1" />
-                          Creada: {formatDateWithTimezone(account.created_at, userTimezone)}
+                          <CheckCircle className="w-4 h-4 mr-1 shrink-0" />
+                          <span>Creada: {formatDateWithTimezone(account.created_at, userTimezone)}</span>
                         </div>
                       </div>
 
@@ -278,7 +278,7 @@ export default function AccountsPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2 ml-4">
+                  <div className="flex items-center gap-2 sm:ml-4 shrink-0 self-end sm:self-start">
                     <Button
                       variant="outline"
                       size="sm"
@@ -286,7 +286,7 @@ export default function AccountsPage() {
                       title={t('manageIps')}
                     >
                       <Network className="w-4 h-4 mr-1" />
-                      {t('manageIps')}
+                      <span className="hidden sm:inline">{t('manageIps')}</span>
                     </Button>
                     <Button
                       variant="outline"

@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -53,6 +53,7 @@ export default function PendingIPsPage() {
   const [authorizingIP, setAuthorizingIP] = useState<PendingIP | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [customDescription, setCustomDescription] = useState('');
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   // Query para IPs pendientes
   const {
@@ -137,6 +138,17 @@ export default function PendingIPsPage() {
 
   const accounts = accountsData?.items || [];
 
+  // Actualizar timestamp cuando los datos se cargan exitosamente
+  useEffect(() => {
+    if (pendingIPs && !isFetching) {
+      setLastUpdated(new Date());
+    }
+  }, [pendingIPs, isFetching]);
+
+  const handleRefresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['pending-ips'] });
+  }, [queryClient]);
+
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto">
@@ -172,13 +184,18 @@ export default function PendingIPsPage() {
           <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
           <p className="text-gray-600 mt-2">{t('subtitle')}</p>
         </div>
-        <Button
-          onClick={() => queryClient.invalidateQueries({ queryKey: ['pending-ips'] })}
-          disabled={isFetching}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-          {tCommon('refresh')}
-        </Button>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-500">
+            {t('lastUpdated', { time: formatDateWithTimezone(lastUpdated, userTimezone) })}
+          </span>
+          <Button
+            onClick={handleRefresh}
+            disabled={isFetching}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+            {tCommon('refresh')}
+          </Button>
+        </div>
       </div>
 
       {/* Estadísticas */}

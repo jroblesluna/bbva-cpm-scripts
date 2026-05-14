@@ -8,11 +8,12 @@ Este módulo define los endpoints para:
 
 from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_admin
+from app.core.utils import get_client_ip
 from app.models.user import User, UserRole
 from app.schemas import (
     UserCreate,
@@ -96,6 +97,7 @@ def list_users(
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def create_user(
+    request: Request,
     user_data: UserCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -188,7 +190,8 @@ def create_user(
             "role": user.role.value,
             "account_id": str(user.account_id) if user.account_id else None,
             "timezone": user.timezone
-        }
+        },
+        ip_address=get_client_ip(request)
     )
     
     return user
@@ -270,6 +273,7 @@ def get_user(
 
 @router.put("/{user_id}", response_model=UserResponse)
 def update_user(
+    request: Request,
     user_id: UUID,
     user_data: UserUpdate,
     current_user: User = Depends(get_current_user),
@@ -360,7 +364,8 @@ def update_user(
         user_id=str(current_user.id),
         account_id=str(user.account_id) if user.account_id else None,
         old_data=old_values,
-        new_data=update_data
+        new_data=update_data,
+        ip_address=get_client_ip(request)
     )
     
     return user
@@ -368,6 +373,7 @@ def update_user(
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(
+    request: Request,
     user_id: UUID,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
@@ -418,7 +424,8 @@ def delete_user(
         entity_id=str(user_id),
         user_id=str(current_user.id),
         account_id=str(user.account_id) if user.account_id else None,
-        entity_data=old_values
+        entity_data=old_values,
+        ip_address=get_client_ip(request)
     )
     
     return None
@@ -426,6 +433,7 @@ def delete_user(
 
 @router.put("/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT)
 def change_password(
+    request: Request,
     user_id: UUID,
     password_data: UserPasswordUpdate,
     current_user: User = Depends(get_current_user),
@@ -489,7 +497,8 @@ def change_password(
         user_id=str(current_user.id),
         account_id=str(user.account_id) if user.account_id else None,
         old_values={"action": "password_change"},
-        new_values={"action": "password_changed"}
+        new_values={"action": "password_changed"},
+        ip_address=get_client_ip(request)
     )
     
     return None

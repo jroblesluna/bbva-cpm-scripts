@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.core.utils import get_client_ip
 from app.models.account import PublicIP
 from app.models.config import GlobalConfig, VLANConfig, WorkstationConfig
 from app.models.user import User, UserRole
@@ -32,29 +33,6 @@ workstation_config_router = APIRouter()
 
 
 # === FUNCIONES AUXILIARES PARA CONFIGURACIÓN EFECTIVA ===
-
-
-def _get_client_ip(request: Request) -> str:
-    """
-    Obtiene la IP pública del cliente desde la solicitud HTTP.
-
-    Verifica primero el header X-Forwarded-For (para proxies/load balancers),
-    luego usa la IP directa del cliente.
-
-    Args:
-        request: Objeto Request de FastAPI
-
-    Returns:
-        Dirección IP del cliente como string
-    """
-    # Verificar header X-Forwarded-For para proxies reversos
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        # El primer valor es la IP original del cliente
-        return forwarded_for.split(",")[0].strip()
-
-    # IP directa del cliente
-    return request.client.host if request.client else "unknown"
 
 
 def _resolve_effective_config(
@@ -252,7 +230,7 @@ def _authenticate_request(request: Request, db: Session):
             pass  # Si falla el token, intentar por IP
 
     # Autenticación por IP pública (Tray clients)
-    client_ip = _get_client_ip(request)
+    client_ip = get_client_ip(request)
 
     public_ip_record = db.query(PublicIP).filter(
         PublicIP.ip_address == client_ip,
@@ -333,6 +311,7 @@ def get_global_config(
 
 @router.put("/global", response_model=GlobalConfigResponse)
 def update_global_config(
+    request: Request,
     config_data: GlobalConfigUpdate,
     account_id: str = None,
     current_user: User = Depends(get_current_user),
@@ -410,7 +389,8 @@ def update_global_config(
             user_id=str(current_user.id),
             account_id=str(target_account_id),
             old_config=old_values,
-            new_config=config_data.model_dump(exclude_unset=True)
+            new_config=config_data.model_dump(exclude_unset=True),
+            ip_address=get_client_ip(request)
         )
 
     return config

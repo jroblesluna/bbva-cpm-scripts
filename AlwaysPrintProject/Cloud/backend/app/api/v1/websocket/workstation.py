@@ -68,6 +68,9 @@ async def workstation_websocket(
     audit_service = AuditService()
     
     try:
+        # Aceptar la conexión WebSocket antes de cualquier operación
+        await websocket.accept()
+        
         # Esperar mensaje de registro
         data = await websocket.receive_json()
         
@@ -129,6 +132,7 @@ async def workstation_websocket(
             
         except Exception as e:
             # Error en registro
+            logger.error(f"Error registrando workstation ip={ip_private}: {e}")
             await websocket.close(code=1011, reason=f"Error: {str(e)}")
             return
         
@@ -283,7 +287,7 @@ async def workstation_websocket(
     
     except Exception as e:
         # Error inesperado
-        print(f"WebSocket error: {e}")
+        logger.error(f"WebSocket error inesperado para workstation_id={workstation_id}: {e}", exc_info=True)
     
     finally:
         # Limpiar conexión

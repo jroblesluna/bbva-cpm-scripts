@@ -10,9 +10,10 @@ Este módulo define los endpoints para:
 from typing import Optional
 from uuid import UUID
 from datetime import datetime, timedelta
+import base64
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_, and_
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_admin
@@ -102,8 +103,10 @@ def _resolve_entity_names(db: Session, logs: list) -> list[dict]:
 
 @router.get("/", response_model=AuditLogListResponse)
 def search_audit_logs(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=100),
+    cursor: Optional[str] = Query(None, description="Cursor para paginación (formato: timestamp|uuid)"),
+    limit: int = Query(15, ge=1, le=100, description="Elementos por página"),
+    page: int = Query(1, ge=1, description="Página (legacy, ignorado si se usa cursor)"),
+    page_size: int = Query(50, ge=1, le=100, description="Tamaño de página (legacy, ignorado si se usa cursor)"),
     user_id: Optional[UUID] = Query(None),
     workstation_id: Optional[UUID] = Query(None),
     account_id: Optional[UUID] = Query(None),
@@ -116,7 +119,12 @@ def search_audit_logs(
     db: Session = Depends(get_db)
 ):
     """
-    Buscar logs de auditoría con filtros.
+    Buscar logs de auditoría con filtros y paginación por cursor.
+    
+    La paginación por cursor usa el parámetro `cursor` (formato: ISO_timestamp|uuid).
+    Si no se envía cursor, devuelve la primera página.
+    El campo `next_cursor` en la respuesta indica el cursor para la siguiente página.
+    El campo `has_more` indica si hay más resultados.
     
     - Admin: puede ver todos los logs
     - Operador: solo puede ver logs de su cuenta
@@ -129,29 +137,79 @@ def search_audit_logs(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
         account_id = current_user.account_id
     
-    # Calcular skip para paginación
-    skip = (page - 1) * page_size
+    # Construir query base con filtros
+    query = db.query(AuditLog)
     
-    # Buscar logs usando el servicio
-    logs, total = audit_service.search_audit_logs(
-        db=db,
-        account_id=str(account_id) if account_id else None,
-        user_id=str(user_id) if user_id else None,
-        workstation_id=str(workstation_id) if workstation_id else None,
-        action_type=action_type,
-        entity_type=entity_type,
-        entity_id=str(entity_id) if entity_id else None,
-        start_date=start_date,
-        end_date=end_date,
-        skip=skip,
-        limit=page_size
-    )
+    if account_id:
+        query = query.filter(AuditLog.account_id == str(account_id))
+    if user_id:
+        query = query.filter(AuditLog.user_id == str(user_id))
+    if workstation_id:
+        query = query.filter(AuditLog.workstation_id == str(workstation_id))
+    if action_type:
+        query = query.filter(AuditLog.action_type == action_type)
+    if entity_type:
+        query = query.filter(AuditLog.entity_type == entity_type)
+    if entity_id:
+        query = query.filter(AuditLog.entity_id == str(entity_id))
+    if start_date:
+        query = query.filter(AuditLog.created_at >= start_date)
+    if end_date:
+        query = query.filter(AuditLog.created_at <= end_date)
+    
+    # Contar total
+    total = query.count()
+    
+    # Aplicar cursor si se proporcionó
+    if cursor:
+        try:
+            decoded = base64.urlsafe_b64decode(cursor.encode()).decode()
+            cursor_ts_str, cursor_id = decoded.rsplit("|", 1)
+            cursor_ts = datetime.fromisoformat(cursor_ts_str)
+            # Filtrar registros anteriores al cursor (orden descendente por created_at)
+            query = query.filter(
+                or_(
+                    AuditLog.created_at < cursor_ts,
+                    and_(
+                        AuditLog.created_at == cursor_ts,
+                        AuditLog.id < cursor_id
+                    )
+                )
+            )
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cursor inválido"
+            )
+    
+    # Ordenar y limitar (pedimos limit+1 para saber si hay más)
+    logs = query.order_by(
+        AuditLog.created_at.desc(),
+        AuditLog.id.desc()
+    ).limit(limit + 1).all()
+    
+    # Determinar si hay más resultados
+    has_more = len(logs) > limit
+    if has_more:
+        logs = logs[:limit]
+    
+    # Generar next_cursor a partir del último elemento
+    next_cursor = None
+    if has_more and logs:
+        last_log = logs[-1]
+        cursor_value = f"{last_log.created_at.isoformat()}|{str(last_log.id)}"
+        next_cursor = base64.urlsafe_b64encode(cursor_value.encode()).decode()
+    
+    # Calcular página actual (para compatibilidad)
+    current_page = 1 if not cursor else page
     
     return AuditLogListResponse(
         total=total,
-        page=page,
-        page_size=page_size,
-        logs=_resolve_entity_names(db, logs)
+        page=current_page,
+        page_size=limit,
+        logs=_resolve_entity_names(db, logs),
+        next_cursor=next_cursor,
+        has_more=has_more
     )
 
 

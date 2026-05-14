@@ -62,11 +62,9 @@ class ConnectionManager:
         
         Args:
             workstation_id: UUID de la workstation
-            websocket: Conexión WebSocket
+            websocket: Conexión WebSocket (ya aceptada por el endpoint)
             db: Sesión de base de datos
         """
-        await websocket.accept()
-        
         async with self._lock:
             self.workstation_connections[workstation_id] = websocket
             self.last_pong[workstation_id] = datetime.utcnow()

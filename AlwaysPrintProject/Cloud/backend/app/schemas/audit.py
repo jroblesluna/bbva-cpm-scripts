@@ -53,8 +53,11 @@ class AuditLogSearch(BaseModel):
     entity_id: Optional[UUID] = Field(None, description="Filtrar por ID de entidad")
     start_date: Optional[datetime] = Field(None, description="Fecha de inicio")
     end_date: Optional[datetime] = Field(None, description="Fecha de fin")
-    page: int = Field(1, ge=1, description="Número de página")
-    page_size: int = Field(50, ge=1, le=100, description="Tamaño de página (1-100)")
+    cursor: Optional[str] = Field(None, description="Cursor para paginación (formato: timestamp|uuid)")
+    limit: int = Field(15, ge=1, le=100, description="Cantidad de elementos por página (1-100)")
+    # Campos legacy para compatibilidad
+    page: int = Field(1, ge=1, description="Número de página (legacy)")
+    page_size: int = Field(50, ge=1, le=100, description="Tamaño de página (legacy, 1-100)")
 
 
 class AuditLogListResponse(BaseModel):
@@ -63,6 +66,9 @@ class AuditLogListResponse(BaseModel):
     page: int
     page_size: int
     logs: list[AuditLogResponse]
+    # Campos de paginación por cursor
+    next_cursor: Optional[str] = Field(None, description="Cursor para obtener la siguiente página")
+    has_more: bool = Field(False, description="Indica si hay más resultados disponibles")
 
 
 class AuditLogStatsResponse(BaseModel):

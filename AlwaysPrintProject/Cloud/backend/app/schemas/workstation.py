@@ -104,5 +104,6 @@ class WorkstationStatsResponse(BaseModel):
     online: int
     offline: int
     contingency_active: int
+    total_vlans: int = Field(0, description="Total de VLANs creadas en la organización")
     by_vlan: Optional[Dict[str, int]] = Field(None, description="Distribución por VLAN")
     by_account: Optional[Dict[str, Dict[str, Any]]] = Field(None, description="Distribución por cuenta (solo admin)")

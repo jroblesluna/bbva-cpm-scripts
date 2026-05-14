@@ -536,7 +536,7 @@ class WorkstationService:
         Returns:
             Número de workstations online
         """
-        query = db.query(Workstation).filter(Workstation.is_online == True)
+        query = db.query(Workstation).filter(Workstation.is_online.is_(True))
         
         if account_id is not None:
             query = query.filter(Workstation.account_id == account_id)
@@ -554,7 +554,7 @@ class WorkstationService:
         Returns:
             Número de workstations en contingencia
         """
-        query = db.query(Workstation).filter(Workstation.contingency_active == True)
+        query = db.query(Workstation).filter(Workstation.contingency_active.is_(True))
         
         if account_id is not None:
             query = query.filter(Workstation.account_id == account_id)

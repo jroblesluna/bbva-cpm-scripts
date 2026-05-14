@@ -10,9 +10,9 @@ Este módulo implementa rate limiting para proteger la API contra:
 import time
 from typing import Dict, Tuple
 from collections import defaultdict
-from fastapi import Request, HTTPException, status
+from fastapi import Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
+from starlette.responses import Response, JSONResponse
 
 from app.core.config import settings
 
@@ -169,9 +169,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Verificar rate limit
         if not self._check_rate_limit(client_ip, path):
             max_requests, window_seconds = self._get_rate_limit(path)
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Demasiadas peticiones. Límite: {max_requests} por {window_seconds} segundos",
+                content={"detail": f"Demasiadas peticiones. Límite: {max_requests} por {window_seconds} segundos"},
                 headers={"Retry-After": str(window_seconds)}
             )
         

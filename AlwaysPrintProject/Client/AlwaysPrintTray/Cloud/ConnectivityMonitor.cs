@@ -227,31 +227,40 @@ namespace AlwaysPrintTray.Cloud
         {
             try
             {
+                ConnectivityCheckResult result;
                 switch (check.Type?.ToLowerInvariant())
                 {
                     case "http":
-                        return ExecuteHttpCheck(check);
+                        result = ExecuteHttpCheck(check);
+                        break;
                     case "tcp":
-                        return ExecuteTcpCheck(check);
+                        result = ExecuteTcpCheck(check);
+                        break;
                     case "dns":
-                        return ExecuteDnsCheck(check);
+                        result = ExecuteDnsCheck(check);
+                        break;
                     case "ping":
-                        return ExecutePingCheck(check);
+                        result = ExecutePingCheck(check);
+                        break;
                     default:
-                        return new ConnectivityCheckResult
+                        result = new ConnectivityCheckResult
                         {
                             CheckId = check.Id ?? string.Empty,
                             Success = false,
                             LatencyMs = null,
                             Error = $"Tipo de check no soportado: '{check.Type}'"
                         };
+                        break;
                 }
+                result.CheckType = check.Type?.ToLowerInvariant() ?? string.Empty;
+                return result;
             }
             catch (Exception ex)
             {
                 return new ConnectivityCheckResult
                 {
                     CheckId = check.Id ?? string.Empty,
+                    CheckType = check.Type?.ToLowerInvariant() ?? string.Empty,
                     Success = false,
                     LatencyMs = null,
                     Error = TruncateError(ex.Message)

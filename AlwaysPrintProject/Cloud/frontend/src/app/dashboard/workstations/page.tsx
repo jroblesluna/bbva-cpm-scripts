@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { workstationsApi, accountsApi } from '@/lib/api';
 import { useTranslations } from 'next-intl';
@@ -43,6 +43,7 @@ export default function WorkstationsPage() {
   const [filterAccountId, setFilterAccountId] = useState<string | undefined>(undefined);
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
   const [editingWorkstation, setEditingWorkstation] = useState<Workstation | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   const {
     data: workstationsData,
@@ -82,6 +83,17 @@ export default function WorkstationsPage() {
 
   const workstations = workstationsData?.items || [];
 
+  // Actualizar timestamp cuando los datos se cargan exitosamente
+  useEffect(() => {
+    if (workstationsData && !isFetching) {
+      setLastUpdated(new Date());
+    }
+  }, [workstationsData, isFetching]);
+
+  const handleRefresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['workstations'], refetchType: 'all' });
+  }, [queryClient]);
+
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto">
@@ -114,13 +126,18 @@ export default function WorkstationsPage() {
           <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
           <p className="text-gray-600 mt-2">{t('subtitle')}</p>
         </div>
-        <Button
-          onClick={() => queryClient.invalidateQueries({ queryKey: ['workstations'] })}
-          disabled={isFetching}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-          {tCommon('refresh')}
-        </Button>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-500">
+            {t('lastUpdated', { time: formatDateWithTimezone(lastUpdated, userTimezone) })}
+          </span>
+          <Button
+            onClick={handleRefresh}
+            disabled={isFetching}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+            {tCommon('refresh')}
+          </Button>
+        </div>
       </div>
 
       {stats && (

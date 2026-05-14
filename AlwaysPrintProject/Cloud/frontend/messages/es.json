@@ -27,7 +27,10 @@
     "saving": "Guardando...",
     "creating": "Creando...",
     "updating": "Actualizando...",
-    "deleting": "Eliminando..."
+    "deleting": "Eliminando...",
+    "lastUpdated": "Última actualización: {time}",
+    "first": "Primera",
+    "reset": "Limpiar"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -108,10 +111,11 @@
     "sessionExpired": "Sesión expirada. Por favor, cierra sesión y vuelve a iniciar sesión.",
     "connectionError": "Error de conexión. El backend no responde.",
     "retry": "Reintentar",
-    "loadError": "Error al cargar estadísticas. Por favor, intenta de nuevo."
+    "loadError": "Error al cargar estadísticas. Por favor, intenta de nuevo.",
+    "lastUpdated": "Última actualización: {time}"
   },
   "workstations": {
-    "title": "Workstations",
+    "title": "Estaciones",
     "subtitle": "Gestiona las estaciones de trabajo conectadas al sistema",
     "total": "Total",
     "online": "En Línea",
@@ -121,14 +125,14 @@
     "allStatuses": "Todos los estados",
     "allAccounts": "Todas las cuentas",
     "onlyContingency": "Solo en contingencia",
-    "editTitle": "Editar Workstation: {ip}",
+    "editTitle": "Editar Estación: {ip}",
     "hostname": "Hostname",
     "hostnamePlaceholder": "DESKTOP-ABC123",
     "osSerial": "Serial del SO",
     "currentUser": "Usuario Actual",
     "account": "Cuenta",
     "unassigned": "Sin asignar",
-    "accountAutoNote": "Nota: La asignación de cuenta también puede hacerse automáticamente cuando la workstation se conecta desde una IP pública registrada.",
+    "accountAutoNote": "Nota: La asignación de cuenta también puede hacerse automáticamente cuando la estación se conecta desde una IP pública registrada.",
     "viewDetails": "Ver Detalles",
     "networkInfo": "Información de Red",
     "privateIp": "IP Privada",
@@ -136,10 +140,11 @@
     "dates": "Fechas",
     "firstConnection": "Primera Conexión",
     "lastConnection": "Última Conexión",
-    "detailsTitle": "Detalles de Workstation",
-    "emptyTitle": "No hay workstations",
-    "emptyMessage": "Las workstations aparecerán aquí cuando se conecten al sistema.",
-    "emptyFilterMessage": "No se encontraron workstations con esos criterios de búsqueda."
+    "detailsTitle": "Detalles de Estación",
+    "emptyTitle": "No hay estaciones",
+    "emptyMessage": "Las estaciones aparecerán aquí cuando se conecten al sistema.",
+    "emptyFilterMessage": "No se encontraron estaciones con esos criterios de búsqueda.",
+    "lastUpdated": "Última actualización: {time}"
   },
   "vlans": {
     "title": "VLANs",
@@ -173,7 +178,7 @@
   },
   "messages": {
     "title": "Mensajes",
-    "subtitle": "Envía mensajes a workstations, VLANs o toda la organización",
+    "subtitle": "Envía mensajes a estaciones, VLANs o toda la organización",
     "send": "Enviar Mensaje",
     "totalSent": "Total Enviados",
     "delivered": "Entregados",
@@ -191,7 +196,7 @@
     "colSent": "Enviado",
     "colDelivered": "Entregado",
     "emptyTitle": "No hay mensajes",
-    "emptyMessage": "Comienza enviando un mensaje a tus workstations",
+    "emptyMessage": "Comienza enviando un mensaje a tus estaciones",
     "pagination": "Mostrando {start} a {end} de {total} mensajes",
     "sendTitle": "Enviar Mensaje",
     "sendTo": "Enviar a *",
@@ -212,19 +217,19 @@
     "tabOrg": "Configuración por Organización",
     "tabGlobal": "Configuración Global del Sistema",
     "orgTitle": "Configuración por Organización",
-    "orgDesc": "Configuración que se aplica a todas las workstations de una organización",
+    "orgDesc": "Configuración que se aplica a todas las estaciones de una organización",
     "discard": "Descartar",
     "save": "Guardar Cambios",
     "saving": "Guardando...",
     "selectOrg": "Seleccionar organización...",
     "selectOrgHelper": "Selecciona la organización para configurar",
     "hierarchyTitle": "Jerarquía de Configuración",
-    "hierarchyMsg": "Esta configuración se aplica a nivel de organización. Puede ser sobrescrita por configuración de VLAN o workstation.",
-    "hierarchy": "Sistema → Organización (aquí) → VLAN → Workstation",
+    "hierarchyMsg": "Esta configuración se aplica a nivel de organización. Puede ser sobrescrita por configuración de VLAN o estación.",
+    "hierarchy": "Sistema → Organización (aquí) → VLAN → Estación",
     "corpQueue": "Nombre de la Cola Corporativa *",
     "corpQueueHelper": "Nombre de la cola de impresión corporativa en Windows",
     "pollingInterval": "Intervalo de Polling (minutos) *",
-    "pollingHelper": "Frecuencia con la que las workstations consultan por tareas pendientes (1-1440 min)",
+    "pollingHelper": "Frecuencia con la que las estaciones consultan por tareas pendientes (1-1440 min)",
     "bootstrapDomains": "Dominios de Bootstrap",
     "printerIps": "IPs de Búsqueda de Impresoras",
     "addIp": "Agregar IP",
@@ -240,7 +245,7 @@
     "selectOrgMsg": "Selecciona una organización del selector superior para ver o editar su configuración.",
     "systemConfigTitle": "Configuración de Sistema",
     "systemConfigMsg": "Esta configuración se aplica a todas las organizaciones. Cada organización puede sobrescribir estos valores.",
-    "systemHierarchy": "Sistema (aquí) → Organización → VLAN → Workstation",
+    "systemHierarchy": "Sistema (aquí) → Organización → VLAN → Estación",
     "comingSoon": "Funcionalidad disponible en próximas versiones",
     "timezoneInherit": "(heredará {timezone} si no se especifica)"
   },
@@ -270,7 +275,8 @@
     "emptyTitle": "No hay registros",
     "emptyMessage": "Aún no hay actividad registrada",
     "emptyFilterMessage": "No se encontraron registros con ese criterio",
-    "pagination": "Mostrando {start} a {end} de {total} registros"
+    "pagination": "Mostrando {start} a {end} de {total} registros",
+    "pageNumber": "Página {page}"
   },
   "users": {
     "title": "Usuarios",
@@ -310,7 +316,7 @@
   },
   "accounts": {
     "title": "Organizaciones",
-    "subtitle": "Gestiona las organizaciones que usan el sistema (BBVA, Ripley, etc.)",
+    "subtitle": "Gestiona las organizaciones que usan el sistema",
     "new": "Nueva Organización",
     "searchPlaceholder": "Buscar por nombre o descripción...",
     "createTitle": "Nueva Organización",
@@ -340,10 +346,10 @@
     "addIpBtn": "Agregar IP",
     "registeredIps": "IPs Públicas Registradas ({count})",
     "noIps": "No hay IPs públicas registradas para esta cuenta.",
-    "noIpsSuggestion": "Agrega IPs para que las workstations se asignen automáticamente.",
-    "autoAssignNote": "Auto-asignación: Cuando una workstation se conecta desde una de estas IPs públicas, se asignará automáticamente a esta cuenta.",
-    "deleteAccountConfirm": "¿Eliminar la cuenta \"{name}\"? Esto eliminará todos los usuarios, workstations y configuraciones. No se puede deshacer.",
-    "deleteIpConfirm": "¿Eliminar la IP {ip}? Las workstations que se conecten desde esta IP ya no se asignarán automáticamente."
+    "noIpsSuggestion": "Agrega IPs para que las estaciones se asignen automáticamente.",
+    "autoAssignNote": "Auto-asignación: Cuando una estación se conecta desde una de estas IPs públicas, se asignará automáticamente a esta cuenta.",
+    "deleteAccountConfirm": "¿Eliminar la cuenta \"{name}\"? Esto eliminará todos los usuarios, estaciones y configuraciones. No se puede deshacer.",
+    "deleteIpConfirm": "¿Eliminar la IP {ip}? Las estaciones que se conecten desde esta IP ya no se asignarán automáticamente."
   },
   "pendingIps": {
     "title": "IPs Públicas Pendientes",
@@ -366,7 +372,8 @@
     "accountLabel": "Cuenta *",
     "selectAccount": "Selecciona una cuenta...",
     "descriptionLabel": "Descripción (opcional)",
-    "descriptionPlaceholder": "Ej: Oficina Principal Lima"
+    "descriptionPlaceholder": "Ej: Oficina Principal Lima",
+    "lastUpdated": "Última actualización: {time}"
   },
   "language": {
     "label": "Idioma",

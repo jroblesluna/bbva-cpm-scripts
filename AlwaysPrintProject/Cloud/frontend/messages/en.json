@@ -27,7 +27,10 @@
     "saving": "Saving...",
     "creating": "Creating...",
     "updating": "Updating...",
-    "deleting": "Deleting..."
+    "deleting": "Deleting...",
+    "lastUpdated": "Last updated: {time}",
+    "first": "First",
+    "reset": "Reset"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -108,7 +111,8 @@
     "sessionExpired": "Session expired. Please sign out and sign in again.",
     "connectionError": "Connection error. Backend is not responding.",
     "retry": "Retry",
-    "loadError": "Error loading statistics. Please try again."
+    "loadError": "Error loading statistics. Please try again.",
+    "lastUpdated": "Last updated: {time}"
   },
   "workstations": {
     "title": "Workstations",
@@ -139,7 +143,8 @@
     "detailsTitle": "Workstation Details",
     "emptyTitle": "No workstations",
     "emptyMessage": "Workstations will appear here when they connect to the system.",
-    "emptyFilterMessage": "No workstations found matching those search criteria."
+    "emptyFilterMessage": "No workstations found matching those search criteria.",
+    "lastUpdated": "Last updated: {time}"
   },
   "vlans": {
     "title": "VLANs",
@@ -270,7 +275,8 @@
     "emptyTitle": "No records",
     "emptyMessage": "No activity recorded yet",
     "emptyFilterMessage": "No records found matching that criteria",
-    "pagination": "Showing {start} to {end} of {total} records"
+    "pagination": "Showing {start} to {end} of {total} records",
+    "pageNumber": "Page {page}"
   },
   "users": {
     "title": "Users",
@@ -310,7 +316,7 @@
   },
   "accounts": {
     "title": "Organizations",
-    "subtitle": "Manage organizations using the system (BBVA, Ripley, etc.)",
+    "subtitle": "Manage organizations using the system",
     "new": "New Organization",
     "searchPlaceholder": "Search by name or description...",
     "createTitle": "New Organization",
@@ -366,7 +372,8 @@
     "accountLabel": "Account *",
     "selectAccount": "Select an account...",
     "descriptionLabel": "Description (optional)",
-    "descriptionPlaceholder": "e.g. Lima Main Office"
+    "descriptionPlaceholder": "e.g. Lima Main Office",
+    "lastUpdated": "Last updated: {time}"
   },
   "language": {
     "label": "Language",

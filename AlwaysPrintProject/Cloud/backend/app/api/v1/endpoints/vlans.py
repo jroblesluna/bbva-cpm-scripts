@@ -9,11 +9,12 @@ Este módulo define los endpoints para:
 
 from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.core.utils import get_client_ip
 from app.models.user import User, UserRole
 from app.models.vlan import VLAN
 from app.schemas import (
@@ -73,6 +74,7 @@ def list_vlans(
 
 @router.post("/", response_model=VLANResponse, status_code=status.HTTP_201_CREATED)
 def create_vlan(
+    request: Request,
     vlan_data: VLANCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -107,7 +109,8 @@ def create_vlan(
         entity_id=str(vlan.id),
         user_id=str(current_user.id),
         account_id=str(vlan.account_id),
-        entity_data={"name": vlan.name}
+        entity_data={"name": vlan.name},
+        ip_address=get_client_ip(request)
     )
     
     return vlan
@@ -133,6 +136,7 @@ def get_vlan(
 
 @router.put("/{vlan_id}", response_model=VLANResponse)
 def update_vlan(
+    request: Request,
     vlan_id: UUID,
     vlan_data: VLANUpdate,
     current_user: User = Depends(get_current_user),
@@ -163,7 +167,8 @@ def update_vlan(
         user_id=str(current_user.id),
         account_id=str(vlan.account_id),
         old_data=old_values,
-        new_data=update_data
+        new_data=update_data,
+        ip_address=get_client_ip(request)
     )
     
     return vlan
@@ -171,6 +176,7 @@ def update_vlan(
 
 @router.delete("/{vlan_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_vlan(
+    request: Request,
     vlan_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -193,7 +199,8 @@ def delete_vlan(
         entity_id=str(vlan_id),
         user_id=str(current_user.id),
         account_id=str(vlan.account_id),
-        entity_data={"name": vlan.name}
+        entity_data={"name": vlan.name},
+        ip_address=get_client_ip(request)
     )
     
     return None
@@ -238,6 +245,7 @@ def get_vlan_config(
 
 @router.put("/{vlan_id}/config", response_model=VLANConfigResponse)
 def update_vlan_config(
+    request: Request,
     vlan_id: UUID,
     config_data: VLANConfigUpdate,
     current_user: User = Depends(get_current_user),
@@ -264,7 +272,8 @@ def update_vlan_config(
         user_id=str(current_user.id),
         account_id=str(vlan.account_id),
         old_config={},
-        new_config=config_data.model_dump(exclude_unset=True)
+        new_config=config_data.model_dump(exclude_unset=True),
+        ip_address=get_client_ip(request)
     )
     
     return config
@@ -272,6 +281,7 @@ def update_vlan_config(
 
 @router.delete("/{vlan_id}/config", status_code=status.HTTP_204_NO_CONTENT)
 def delete_vlan_config(
+    request: Request,
     vlan_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -295,7 +305,8 @@ def delete_vlan_config(
         user_id=str(current_user.id),
         account_id=str(vlan.account_id),
         old_config={"action": "config_deleted"},
-        new_config={}
+        new_config={},
+        ip_address=get_client_ip(request)
     )
     
     return None

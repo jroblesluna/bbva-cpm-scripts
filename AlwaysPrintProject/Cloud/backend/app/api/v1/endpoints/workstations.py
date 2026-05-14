@@ -10,11 +10,12 @@ Este módulo define los endpoints para:
 
 from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.core.utils import get_client_ip
 from app.models.user import User, UserRole
 from app.models.workstation import Workstation
 from app.schemas import (
@@ -68,7 +69,11 @@ def list_workstations(
     """
     from sqlalchemy.orm import joinedload
     
-    query = db.query(Workstation).options(joinedload(Workstation.account))
+    # Forzar que la sesión vea los datos más recientes (importante con SQLite y WebSockets concurrentes)
+    db.expire_all()
+    
+    # Construir query base de filtros (sin joinedload para evitar problemas con count)
+    base_query = db.query(Workstation)
     
     # Operadores solo pueden ver workstations de su cuenta
     if current_user.role == UserRole.OPERATOR:
@@ -77,7 +82,7 @@ def list_workstations(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Operador sin cuenta asignada"
             )
-        query = query.filter(Workstation.account_id == current_user.account_id)
+        base_query = base_query.filter(Workstation.account_id == current_user.account_id)
     
     # Filtrar por cuenta si se proporciona (solo Admin)
     if account_id:
@@ -86,33 +91,39 @@ def list_workstations(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Solo Admin puede filtrar por cuenta"
             )
-        query = query.filter(Workstation.account_id == account_id)
+        base_query = base_query.filter(Workstation.account_id == account_id)
     
     # Filtrar por VLAN si se proporciona
     if vlan_id:
-        query = query.filter(Workstation.vlan_id == vlan_id)
+        base_query = base_query.filter(Workstation.vlan_id == vlan_id)
     
     # Filtrar por estado online si se proporciona
     if is_online is not None:
-        query = query.filter(Workstation.is_online == is_online)
+        base_query = base_query.filter(Workstation.is_online.is_(is_online))
     
     # Filtrar por contingencia activa si se proporciona
     if contingency_active is not None:
-        query = query.filter(Workstation.contingency_active == contingency_active)
+        base_query = base_query.filter(Workstation.contingency_active.is_(contingency_active))
     
     # Buscar por IP o hostname si se proporciona
     if search:
-        query = query.filter(
+        base_query = base_query.filter(
             (Workstation.ip_private.ilike(f"%{search}%")) |
             (Workstation.hostname.ilike(f"%{search}%"))
         )
     
-    # Contar total
-    total = query.count()
+    # Contar total (sin joinedload para query limpia)
+    total = base_query.count()
     
-    # Paginar
+    # Paginar y cargar relaciones
     offset = (page - 1) * page_size
-    workstations = query.offset(offset).limit(page_size).all()
+    workstations = (
+        base_query
+        .options(joinedload(Workstation.account))
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
     
     return WorkstationListResponse(
         items=workstations,
@@ -141,6 +152,9 @@ def get_workstation_stats(
         WorkstationStatsResponse con estadísticas
     """
     try:
+        # Forzar que la sesión vea los datos más recientes
+        db.expire_all()
+        
         workstation_service = WorkstationService()
         
         # Determinar account_id según rol
@@ -161,12 +175,21 @@ def get_workstation_stats(
         online = workstation_service.get_online_count(db, account_id)
         contingency = workstation_service.get_contingency_count(db, account_id)
         
+        # Contar VLANs totales de la organización
+        from app.models.vlan import VLAN
+        if account_id:
+            total_vlans = db.query(VLAN).filter(VLAN.account_id == account_id).count()
+        else:
+            # Admin: contar todas las VLANs
+            total_vlans = db.query(VLAN).count()
+        
         # Preparar respuesta base
         response = WorkstationStatsResponse(
             total=total,
             online=online,
             offline=total - online,
-            contingency_active=contingency
+            contingency_active=contingency,
+            total_vlans=total_vlans
         )
         
         # Si es admin, agregar estadísticas por cuenta
@@ -271,6 +294,7 @@ def get_workstation(
 
 @router.put("/{workstation_id}", response_model=WorkstationResponse)
 def update_workstation(
+    request: Request,
     workstation_id: UUID,
     workstation_data: WorkstationUpdate,
     current_user: User = Depends(get_current_user),
@@ -337,7 +361,8 @@ def update_workstation(
         user_id=str(current_user.id),
         account_id=str(workstation.account_id) if workstation.account_id else None,
         old_data=old_values,
-        new_data=update_data
+        new_data=update_data,
+        ip_address=get_client_ip(request)
     )
     
     return workstation
@@ -348,6 +373,7 @@ def update_workstation(
 
 @router.put("/{workstation_id}/config", response_model=WorkstationConfigResponse)
 def update_workstation_config(
+    request: Request,
     workstation_id: UUID,
     config_data: WorkstationConfigUpdate,
     current_user: User = Depends(get_current_user),
@@ -402,12 +428,13 @@ def update_workstation_config(
     audit_service = AuditService()
     audit_service.log_config_change(
         db=db,
-        user_id=current_user.id,
-        workstation_id=workstation_id,
-        account_id=workstation.account_id,
-        config_level="workstation",
-        old_values={},
-        new_values=config_data.model_dump(exclude_unset=True)
+        entity_type="workstation_config",
+        entity_id=str(workstation_id),
+        user_id=str(current_user.id),
+        account_id=str(workstation.account_id),
+        old_config={},
+        new_config=config_data.model_dump(exclude_unset=True),
+        ip_address=get_client_ip(request)
     )
     
     return config
@@ -415,6 +442,7 @@ def update_workstation_config(
 
 @router.delete("/{workstation_id}/config", status_code=status.HTTP_204_NO_CONTENT)
 def delete_workstation_config(
+    request: Request,
     workstation_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -459,12 +487,13 @@ def delete_workstation_config(
     audit_service = AuditService()
     audit_service.log_config_change(
         db=db,
-        user_id=current_user.id,
-        workstation_id=workstation_id,
-        account_id=workstation.account_id,
-        config_level="workstation",
-        old_values={"action": "config_deleted"},
-        new_values={}
+        entity_type="workstation_config",
+        entity_id=str(workstation_id),
+        user_id=str(current_user.id),
+        account_id=str(workstation.account_id),
+        old_config={"action": "config_deleted"},
+        new_config={},
+        ip_address=get_client_ip(request)
     )
     
     return None

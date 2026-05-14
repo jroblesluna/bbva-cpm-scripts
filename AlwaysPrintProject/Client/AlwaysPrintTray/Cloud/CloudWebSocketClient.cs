@@ -155,13 +155,26 @@ namespace AlwaysPrintTray.Cloud
                 IsConnected  = false;
             }
 
-            // Detectar código 1008 (IP no autorizada)
+            // Detectar código 1008 (IP no autorizada) — solo activar long retry
+            // si la razón indica explícitamente que la IP no está autorizada.
+            // Si ya estábamos registrados previamente, no entrar en long retry
+            // (podría ser un error transitorio del servidor).
             if (e is ClosedEventArgs closedArgs && closedArgs.Code == 1008)
             {
-                _longRetryMode = true;
-                AlwaysPrintLogger.WriteTrayWarning(
-                    "CloudWebSocketClient: conexión rechazada por APCM (código 1008 — IP no autorizada). " +
-                    $"Reintentando cada {LongRetryDelayMs / 1000}s.");
+                var reason = closedArgs.Reason ?? "";
+                if (reason.Contains("no autorizada") || reason.Contains("not authorized"))
+                {
+                    _longRetryMode = true;
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "CloudWebSocketClient: conexión rechazada por APCM (código 1008 — IP no autorizada). " +
+                        $"Reintentando cada {LongRetryDelayMs / 1000}s.");
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"CloudWebSocketClient: conexión cerrada con código 1008 pero razón no indica IP no autorizada " +
+                        $"(razón: '{reason}'). Usando backoff normal.");
+                }
             }
 
             if (wasConnected) Disconnected?.Invoke();

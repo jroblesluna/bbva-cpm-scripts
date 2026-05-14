@@ -1,10 +1,12 @@
 /**
  * Página de auditoría del sistema.
+ * Paginación basada en cursor con 15 elementos por página.
  */
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { apiClient } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
@@ -14,67 +16,161 @@ import { Badge } from '@/components/ui/badge'
 import {
   FileText,
   Search,
-  Calendar,
   User,
   Activity,
   TrendingUp,
+  ChevronRight,
+  RotateCcw,
 } from 'lucide-react'
 import type { AuditLog, AuditLogStats, ActionType } from '@/types/audit'
 import { formatDateWithTimezone } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 
+const PAGE_SIZE = 15
+
 export default function AuditPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { getAuthHeaders } = useAuth()
   const timezone = useUserTimezone()
   const t = useTranslations('audit')
   const tCommon = useTranslations('common')
+
+  // Estado de datos
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [stats, setStats] = useState<AuditLogStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [total, setTotal] = useState(0)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(false)
+
+  // Historial de cursores para navegación hacia atrás
+  const [cursorHistory, setCursorHistory] = useState<string[]>([])
+
+  // Filtros locales (búsqueda en cliente)
   const [searchTerm, setSearchTerm] = useState('')
+
+  // Filtros que se envían al servidor
   const [filterActionType, setFilterActionType] = useState<ActionType | null>(null)
   const [filterEntityType, setFilterEntityType] = useState<string>('')
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-  const pageSize = 50
+
+  // Leer cursor desde query params
+  const currentCursor = searchParams.get('cursor') || undefined
+
   const isInitialLoad = logs.length === 0 && loading
 
-  useEffect(() => {
-    loadLogs()
-    loadStats()
-  }, [page, filterActionType, filterEntityType])
-
-  const loadLogs = async () => {
+  /**
+   * Carga los logs de auditoría usando paginación por cursor.
+   */
+  const loadLogs = useCallback(async (cursor?: string) => {
     try {
-      // Solo mostrar spinner en la carga inicial, no en filtros
       if (logs.length === 0) setLoading(true)
-      const params = new URLSearchParams({ page: page.toString(), page_size: pageSize.toString() })
+
+      const params = new URLSearchParams({ limit: PAGE_SIZE.toString() })
+      if (cursor) params.append('cursor', cursor)
       if (filterActionType) params.append('action_type', filterActionType)
       if (filterEntityType) params.append('entity_type', filterEntityType)
+
       const response = await apiClient.get(`/audit/?${params.toString()}`)
       const data = response.data
+
       setLogs(data.logs || [])
       setTotal(data.total || 0)
+      setNextCursor(data.next_cursor || null)
+      setHasMore(data.has_more || false)
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error al cargar logs de auditoría:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [filterActionType, filterEntityType])
 
   const loadStats = async () => {
     try {
       const response = await apiClient.get('/audit/stats')
-      const data = response.data
-      setStats(data)
+      setStats(response.data)
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error al cargar estadísticas:', error)
     }
   }
 
+  // Cargar datos cuando cambian los filtros o el cursor en la URL
+  useEffect(() => {
+    loadLogs(currentCursor)
+  }, [currentCursor, filterActionType, filterEntityType, loadLogs])
+
+  useEffect(() => {
+    loadStats()
+  }, [])
+
+  /**
+   * Navegar a la siguiente página usando el cursor.
+   */
+  const goToNextPage = () => {
+    if (!nextCursor) return
+
+    // Guardar cursor actual en el historial para poder volver
+    const history = [...cursorHistory]
+    history.push(currentCursor || '')
+    setCursorHistory(history)
+
+    // Actualizar URL con el nuevo cursor
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('cursor', nextCursor)
+    router.push(`/dashboard/audit?${params.toString()}`)
+  }
+
+  /**
+   * Navegar a la página anterior usando el historial de cursores.
+   */
+  const goToPreviousPage = () => {
+    if (cursorHistory.length === 0) return
+
+    const history = [...cursorHistory]
+    const previousCursor = history.pop()!
+    setCursorHistory(history)
+
+    // Actualizar URL
+    const params = new URLSearchParams(searchParams.toString())
+    if (previousCursor) {
+      params.set('cursor', previousCursor)
+    } else {
+      params.delete('cursor')
+    }
+    router.push(`/dashboard/audit?${params.toString()}`)
+  }
+
+  /**
+   * Volver a la primera página (sin cursor).
+   */
+  const goToFirstPage = () => {
+    setCursorHistory([])
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('cursor')
+    router.push(`/dashboard/audit?${params.toString()}`)
+  }
+
+  /**
+   * Resetear filtros y volver a la primera página.
+   */
+  const resetFilters = () => {
+    setFilterActionType(null)
+    setFilterEntityType('')
+    setSearchTerm('')
+    setCursorHistory([])
+    router.push('/dashboard/audit')
+  }
+
+  // Filtrado local por término de búsqueda
   const filteredLogs = logs.filter((log) => {
     const s = searchTerm.toLowerCase()
-    return log.entity_type.toLowerCase().includes(s) || log.action_type.toLowerCase().includes(s) || log.entity_id.toLowerCase().includes(s) || (log.entity_name || '').toLowerCase().includes(s)
+    if (!s) return true
+    return (
+      log.entity_type.toLowerCase().includes(s) ||
+      log.action_type.toLowerCase().includes(s) ||
+      log.entity_id.toLowerCase().includes(s) ||
+      (log.entity_name || '').toLowerCase().includes(s)
+    )
   })
 
   const getActionTypeLabel = (type: ActionType): string => {
@@ -103,6 +199,9 @@ export default function AuditPage() {
     return colors[type] || 'bg-gray-100 text-gray-800'
   }
 
+  // Número de página actual (basado en historial)
+  const currentPageNumber = cursorHistory.length + 1
+
   if (isInitialLoad) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -121,6 +220,7 @@ export default function AuditPage() {
         <p className="mt-2 text-gray-600">{t('subtitle')}</p>
       </div>
 
+      {/* Tarjetas de estadísticas */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white rounded-lg shadow p-6">
@@ -162,6 +262,7 @@ export default function AuditPage() {
         </div>
       )}
 
+      {/* Distribución por tipo */}
       {stats && Object.keys(stats.actions_by_type).length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4">{t('distribution')}</h3>
@@ -178,16 +279,28 @@ export default function AuditPage() {
         </div>
       )}
 
+      {/* Filtros */}
       <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <Input type="text" placeholder={t('searchPlaceholder')} value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+            <Input
+              type="text"
+              placeholder={t('searchPlaceholder')}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
           </div>
-          <select value={filterActionType || 'all'}
-            onChange={(e) => { setFilterActionType(e.target.value === 'all' ? null : (e.target.value as ActionType)); setPage(1) }}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <select
+            value={filterActionType || 'all'}
+            onChange={(e) => {
+              setFilterActionType(e.target.value === 'all' ? null : (e.target.value as ActionType))
+              setCursorHistory([])
+              router.push('/dashboard/audit')
+            }}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
             <option value="all">{t('allTypes')}</option>
             <option value="create">{t('create')}</option>
             <option value="update">{t('update')}</option>
@@ -197,11 +310,24 @@ export default function AuditPage() {
             <option value="message_sent">{t('messageSent')}</option>
             <option value="command_sent">{t('commandSent')}</option>
           </select>
-          <Input type="text" placeholder={t('filterEntity')} value={filterEntityType}
-            onChange={(e) => { setFilterEntityType(e.target.value); setPage(1) }} />
+          <Input
+            type="text"
+            placeholder={t('filterEntity')}
+            value={filterEntityType}
+            onChange={(e) => {
+              setFilterEntityType(e.target.value)
+              setCursorHistory([])
+              router.push('/dashboard/audit')
+            }}
+          />
+          <Button variant="outline" onClick={resetFilters} className="flex items-center gap-2">
+            <RotateCcw className="h-4 w-4" />
+            {tCommon('reset')}
+          </Button>
         </div>
       </div>
 
+      {/* Tabla de logs */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {filteredLogs.length === 0 ? (
           <div className="text-center py-12">
@@ -259,15 +385,43 @@ export default function AuditPage() {
           </div>
         )}
 
-        {total > pageSize && (
+        {/* Paginación por cursor */}
+        {(hasMore || cursorHistory.length > 0) && (
           <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div className="flex-1 flex items-center justify-between">
               <p className="text-sm text-gray-700">
-                {t('pagination', { start: (page - 1) * pageSize + 1, end: Math.min(page * pageSize, total), total })}
+                {t('pagination', {
+                  start: (currentPageNumber - 1) * PAGE_SIZE + 1,
+                  end: Math.min(currentPageNumber * PAGE_SIZE, total),
+                  total,
+                })}
               </p>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setPage(page - 1)} disabled={page === 1}>{tCommon('previous')}</Button>
-                <Button variant="outline" onClick={() => setPage(page + 1)} disabled={page * pageSize >= total}>{tCommon('next')}</Button>
+              <div className="flex items-center gap-2">
+                {cursorHistory.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={goToFirstPage}>
+                    {tCommon('first')}
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPreviousPage}
+                  disabled={cursorHistory.length === 0}
+                >
+                  {tCommon('previous')}
+                </Button>
+                <span className="text-sm text-gray-600 px-2">
+                  {t('pageNumber', { page: currentPageNumber })}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextPage}
+                  disabled={!hasMore}
+                >
+                  {tCommon('next')}
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
               </div>
             </div>
           </div>

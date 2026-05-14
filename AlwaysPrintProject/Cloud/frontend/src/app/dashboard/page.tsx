@@ -1,25 +1,30 @@
 /**
  * Dashboard principal con estadísticas y métricas.
+ * Polling automático cada 10 segundos.
  */
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Monitor, CheckCircle, Building2, Network, AlertCircle, Globe } from 'lucide-react'
+import { Monitor, CheckCircle, Building2, Network, AlertCircle, Globe, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
+
+// Intervalo de polling en milisegundos (10 segundos)
+const POLLING_INTERVAL = 10_000
 
 interface WorkstationStats {
   total: number
   online: number
   offline: number
   contingency_active: number
+  total_vlans: number
   by_account?: Record<string, {
     name: string
     total: number
@@ -43,35 +48,74 @@ export default function DashboardPage() {
   const [pendingIPs, setPendingIPs] = useState<PendingIP[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
+  const loadStats = useCallback(async (silent = false) => {
+    if (!user) return
+    try {
+      if (!silent) setIsLoading(true)
+      setIsRefreshing(true)
+      const response = await apiClient.get('/workstations/stats')
+      setStats(response.data)
+      setLastUpdated(new Date())
+      setError(null)
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Error al cargar estadísticas'
+      if (!silent) setError(errorMessage)
+    } finally {
+      if (!silent) setIsLoading(false)
+      setIsRefreshing(false)
+    }
+  }, [user])
+
+  const loadPendingIPs = useCallback(async () => {
+    if (!user || !isAdmin()) return
+    try {
+      const response = await apiClient.get('/accounts/public-ips/pending')
+      setPendingIPs(Array.isArray(response.data) ? response.data : [])
+    } catch (err) {
+      console.error('Error loading pending IPs:', err)
+    }
+  }, [user])
+
+  // Carga inicial
   useEffect(() => {
     if (!user) return
-    const loadStats = async () => {
-      try {
-        setIsLoading(true)
-        const response = await apiClient.get('/workstations/stats')
-        setStats(response.data)
-      } catch (err: any) {
-        setError(err.message || 'Error al cargar estadísticas')
-      } finally {
-        setIsLoading(false)
-      }
-    }
     loadStats()
-  }, [user])
+    loadPendingIPs()
+  }, [user, loadStats, loadPendingIPs])
 
+  // Polling cada 10 segundos
   useEffect(() => {
-    if (!user || !isAdmin()) return
-    const loadPendingIPs = async () => {
-      try {
-        const response = await apiClient.get('/accounts/public-ips/pending')
-        setPendingIPs(Array.isArray(response.data) ? response.data : [])
-      } catch (err) {
-        console.error('Error loading pending IPs:', err)
+    if (!user) return
+
+    pollingRef.current = setInterval(() => {
+      loadStats(true) // silent = true para no mostrar skeleton
+      loadPendingIPs()
+    }, POLLING_INTERVAL)
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
       }
     }
-    loadPendingIPs()
-  }, [user])
+  }, [user, loadStats, loadPendingIPs])
+
+  /**
+   * Formatea la fecha/hora de última actualización según el locale del navegador.
+   */
+  const formatLastUpdated = (date: Date): string => {
+    return date.toLocaleTimeString([], {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  }
 
   if (isLoading) {
     return (
@@ -136,7 +180,19 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
+        <div className="flex items-center gap-3">
+          {lastUpdated && (
+            <span className="text-xs text-gray-500">
+              {t('lastUpdated', { time: formatLastUpdated(lastUpdated) })}
+            </span>
+          )}
+          <div className={`transition-opacity ${isRefreshing ? 'opacity-100' : 'opacity-0'}`}>
+            <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
+          </div>
+        </div>
+      </div>
 
       {/* Tarjetas de estadísticas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -211,7 +267,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm text-gray-600">{t('vlans')}</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    {stats?.by_vlan ? Object.keys(stats.by_vlan).length : 0}
+                    {stats?.total_vlans || 0}
                   </p>
                 </div>
                 <div className="bg-purple-100 rounded-full p-3">

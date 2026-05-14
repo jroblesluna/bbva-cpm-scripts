@@ -41,6 +41,9 @@ export interface AuditLogSearch {
   entity_id?: string
   start_date?: string
   end_date?: string
+  cursor?: string
+  limit?: number
+  // Legacy
   page?: number
   page_size?: number
 }
@@ -50,6 +53,8 @@ export interface AuditLogListResponse {
   page: number
   page_size: number
   logs: AuditLog[]
+  next_cursor: string | null
+  has_more: boolean
 }
 
 export interface AuditLogStats {

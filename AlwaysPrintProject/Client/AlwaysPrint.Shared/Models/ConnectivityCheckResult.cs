@@ -12,6 +12,10 @@ namespace AlwaysPrint.Shared.Models
         [JsonProperty("check_id")]
         public string CheckId { get; set; } = string.Empty;
 
+        /// <summary>Tipo de check ejecutado: http, tcp, ping, dns.</summary>
+        [JsonProperty("check_type")]
+        public string CheckType { get; set; } = string.Empty;
+
         /// <summary>Indica si la verificación fue exitosa.</summary>
         [JsonProperty("success")]
         public bool Success { get; set; }

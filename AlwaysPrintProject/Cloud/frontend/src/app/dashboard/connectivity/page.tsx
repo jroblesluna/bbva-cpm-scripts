@@ -8,10 +8,13 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useTranslations } from 'next-intl';
+import { formatDateWithTimezone } from '@/lib/dateUtils';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -72,6 +75,9 @@ async function fetchConnectivityHistory(workstationId: string): Promise<Connecti
 export default function ConnectivityDashboardPage() {
   const [selectedWorkstationId, setSelectedWorkstationId] = useState<string | null>(null);
   const [latestResults, setLatestResults] = useState<LatestResultsMap>({});
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const userTimezone = useUserTimezone();
+  const tCommon = useTranslations('common');
 
   // --- WebSocket para actualizaciones en tiempo real ---
   const handleWebSocketMessage = useCallback((message: OperatorMessage) => {
@@ -114,6 +120,20 @@ export default function ConnectivityDashboardPage() {
   // --- Render ---
   const isRefreshing = workstationsQuery.isFetching || historyQuery.isFetching;
 
+  // --- Actualizar timestamp cuando los datos se cargan exitosamente ---
+  useEffect(() => {
+    if (workstationsQuery.data && !isRefreshing) {
+      setLastUpdated(new Date());
+    }
+  }, [workstationsQuery.data, isRefreshing]);
+
+  const handleRefresh = useCallback(() => {
+    workstationsQuery.refetch();
+    if (selectedWorkstationId) {
+      historyQuery.refetch();
+    }
+  }, [workstationsQuery, historyQuery, selectedWorkstationId]);
+
   return (
     <div className="max-w-7xl mx-auto">
       {/* Encabezado */}
@@ -124,18 +144,18 @@ export default function ConnectivityDashboardPage() {
             Monitoreo en tiempo real de checks de conectividad
           </p>
         </div>
-        <Button
-          disabled={isRefreshing}
-          onClick={() => {
-            workstationsQuery.refetch();
-            if (selectedWorkstationId) {
-              historyQuery.refetch();
-            }
-          }}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-500">
+            {tCommon('lastUpdated', { time: formatDateWithTimezone(lastUpdated, userTimezone) })}
+          </span>
+          <Button
+            disabled={isRefreshing}
+            onClick={handleRefresh}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {tCommon('refresh')}
+          </Button>
+        </div>
       </div>
 
       {/* Lista de workstations con checks */}

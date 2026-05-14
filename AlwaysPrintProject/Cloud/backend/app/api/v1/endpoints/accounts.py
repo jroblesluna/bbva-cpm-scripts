@@ -8,11 +8,12 @@ Este módulo define los endpoints para:
 
 from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_admin
+from app.core.utils import get_client_ip
 from app.models.user import User, UserRole
 from app.models.account import Account, PublicIP
 from app.schemas import (
@@ -75,6 +76,7 @@ def list_accounts(
 
 @router.post("/", response_model=AccountResponse, status_code=status.HTTP_201_CREATED)
 def create_account(
+    request: Request,
     account_data: AccountCreate,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
@@ -124,7 +126,8 @@ def create_account(
             "name": account.name,
             "description": account.description,
             "timezone": account.timezone
-        }
+        },
+        ip_address=get_client_ip(request)
     )
     
     return account
@@ -175,6 +178,7 @@ def get_account(
 
 @router.put("/{account_id}", response_model=AccountResponse)
 def update_account(
+    request: Request,
     account_id: UUID,
     account_data: AccountUpdate,
     current_user: User = Depends(require_admin),
@@ -238,7 +242,8 @@ def update_account(
         user_id=str(current_user.id),
         account_id=str(account.id),
         old_data=old_values,
-        new_data=update_data
+        new_data=update_data,
+        ip_address=get_client_ip(request)
     )
     
     return account
@@ -246,6 +251,7 @@ def update_account(
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_account(
+    request: Request,
     account_id: UUID,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
@@ -291,7 +297,8 @@ def delete_account(
         entity_id=str(account_id),
         user_id=str(current_user.id),
         account_id=str(account_id),
-        entity_data=old_values
+        entity_data=old_values,
+        ip_address=get_client_ip(request)
     )
     
     return None
@@ -301,6 +308,7 @@ def delete_account(
 
 @router.post("/{account_id}/public-ips", response_model=PublicIPResponse, status_code=status.HTTP_201_CREATED)
 def add_public_ip(
+    request: Request,
     account_id: UUID,
     ip_data: PublicIPCreate,
     current_user: User = Depends(require_admin),
@@ -359,7 +367,8 @@ def add_public_ip(
         entity_data={
             "ip_address": public_ip.ip_address,
             "description": public_ip.description
-        }
+        },
+        ip_address=get_client_ip(request)
     )
     
     return public_ip
@@ -367,6 +376,7 @@ def add_public_ip(
 
 @router.delete("/{account_id}/public-ips/{ip_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_public_ip(
+    request: Request,
     account_id: UUID,
     ip_id: UUID,
     current_user: User = Depends(require_admin),
@@ -422,7 +432,8 @@ def remove_public_ip(
         entity_id=str(ip_id),
         user_id=str(current_user.id),
         account_id=str(account_id),
-        entity_data=old_values
+        entity_data=old_values,
+        ip_address=get_client_ip(request)
     )
     
     return None
@@ -457,6 +468,7 @@ def list_pending_public_ips(
 
 @router.post("/public-ips/{ip_id}/authorize", response_model=PublicIPResponse)
 def authorize_public_ip(
+    request: Request,
     ip_id: UUID,
     authorize_data: PublicIPAuthorizeRequest,
     current_user: User = Depends(require_admin),
@@ -525,7 +537,8 @@ def authorize_public_ip(
         user_id=str(current_user.id),
         account_id=str(authorize_data.account_id),
         old_values={"is_authorized": False, "account_id": None},
-        new_values={"is_authorized": True, "account_id": str(authorize_data.account_id)}
+        new_values={"is_authorized": True, "account_id": str(authorize_data.account_id)},
+        ip_address=get_client_ip(request)
     )
     
     return public_ip
@@ -533,6 +546,7 @@ def authorize_public_ip(
 
 @router.delete("/public-ips/{ip_id}/reject", status_code=status.HTTP_204_NO_CONTENT)
 def reject_public_ip(
+    request: Request,
     ip_id: UUID,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
@@ -578,7 +592,8 @@ def reject_public_ip(
         user_id=str(current_user.id),
         account_id=None,
         old_values={"ip_address": public_ip.ip_address, "is_authorized": False},
-        new_values={}
+        new_values={},
+        ip_address=get_client_ip(request)
     )
     
     return None

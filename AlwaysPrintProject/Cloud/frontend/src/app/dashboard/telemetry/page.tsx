@@ -7,10 +7,13 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslations } from 'next-intl';
+import { formatDateWithTimezone } from '@/lib/dateUtils';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -90,7 +93,10 @@ async function fetchWorkstations(): Promise<Workstation[]> {
 export default function TelemetryDashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const accountId = user?.account_id ?? '';
+  const userTimezone = useUserTimezone();
+  const tCommon = useTranslations('common');
   const [selectedWorkstationId, setSelectedWorkstationId] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   // --- Queries con auto-refresh cada 60s ---
 
@@ -126,6 +132,18 @@ export default function TelemetryDashboardPage() {
   // --- Render ---
   const isRefreshing = statsQuery.isFetching || workstationsQuery.isFetching;
 
+  // --- Actualizar timestamp cuando los datos se cargan exitosamente ---
+  useEffect(() => {
+    if ((statsQuery.data || workstationsQuery.data) && !isRefreshing) {
+      setLastUpdated(new Date());
+    }
+  }, [statsQuery.data, workstationsQuery.data, isRefreshing]);
+
+  const handleRefresh = useCallback(() => {
+    statsQuery.refetch();
+    workstationsQuery.refetch();
+  }, [statsQuery, workstationsQuery]);
+
   return (
     <div className="max-w-7xl mx-auto">
       {/* Encabezado */}
@@ -136,16 +154,18 @@ export default function TelemetryDashboardPage() {
             Monitoreo del estado operativo de las workstations
           </p>
         </div>
-        <Button
-          disabled={isRefreshing}
-          onClick={() => {
-            statsQuery.refetch();
-            workstationsQuery.refetch();
-          }}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-500">
+            {tCommon('lastUpdated', { time: formatDateWithTimezone(lastUpdated, userTimezone) })}
+          </span>
+          <Button
+            disabled={isRefreshing}
+            onClick={handleRefresh}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {tCommon('refresh')}
+          </Button>
+        </div>
       </div>
 
       {/* Cards de estadísticas */}
