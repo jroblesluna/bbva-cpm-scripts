@@ -82,10 +82,20 @@ server {
     listen 80;
     server_name ${domain_name};
 
+    # Configuración de logs con IP real del cliente
+    log_format main_ext '\$remote_addr - \$remote_user [\$time_local] "\$request" '
+                        '\$status \$body_bytes_sent "\$http_referer" '
+                        '"\$http_user_agent" "\$http_x_forwarded_for"';
+    
+    access_log /var/log/nginx/alwaysprint_access.log main_ext;
+    error_log /var/log/nginx/alwaysprint_error.log;
+
     location = /health {
         proxy_pass http://localhost:${backend_port};
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     location /api/ {
@@ -93,6 +103,7 @@ server {
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_read_timeout 300s;
     }
 
@@ -102,6 +113,9 @@ server {
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_read_timeout 3600s;
     }
 
@@ -109,6 +123,8 @@ server {
         proxy_pass http://localhost:${frontend_port};
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
 NGINX
