@@ -1,4 +1,5 @@
 using System;
+using System.Security.Authentication;
 using System.Threading;
 using AlwaysPrint.Shared.Logging;
 using Newtonsoft.Json;
@@ -111,18 +112,17 @@ namespace AlwaysPrintTray.Cloud
         {
             _ws?.Dispose();
 
+            // Crear WebSocket con TLS 1.2 explícito (WebSocket4Net usa SslProtocols.Default que no incluye TLS 1.2)
+            _ws = new WebSocket(_wsUrl, "", null, null, null, null,
+                WebSocketVersion.None, null, SslProtocols.Tls12, 0);
+
             if (_proxyUri != null)
             {
                 var endpoint = new SuperSocket.ClientEngine.Proxy.HttpConnectProxy(
                     new System.Net.IPEndPoint(
                         System.Net.Dns.GetHostAddresses(_proxyUri.Host)[0],
                         _proxyUri.Port));
-                _ws = new WebSocket(_wsUrl);
                 _ws.Proxy = endpoint;
-            }
-            else
-            {
-                _ws = new WebSocket(_wsUrl);
             }
 
             _ws.Opened          += OnOpened;

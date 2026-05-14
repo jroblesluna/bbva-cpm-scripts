@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Net;
 using System.Threading;
 using System.Windows.Forms;
 using AlwaysPrint.Shared.Logging;
@@ -15,6 +16,9 @@ namespace AlwaysPrintTray
         [STAThread]
         private static void Main()
         {
+            // Forzar TLS 1.2 para todas las conexiones (requerido por WebSocket4Net en .NET 4.8)
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+
             AlwaysPrintLogger.EnsureSourceExists();
 
             // Single-instance guard using a named mutex.
