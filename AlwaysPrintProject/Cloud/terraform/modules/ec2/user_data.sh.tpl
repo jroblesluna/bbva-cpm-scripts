@@ -82,12 +82,7 @@ server {
     listen 80;
     server_name ${domain_name};
 
-    # Configuración de logs con IP real del cliente
-    log_format main_ext '\$remote_addr - \$remote_user [\$time_local] "\$request" '
-                        '\$status \$body_bytes_sent "\$http_referer" '
-                        '"\$http_user_agent" "\$http_x_forwarded_for"';
-    
-    access_log /var/log/nginx/alwaysprint_access.log main_ext;
+    access_log /var/log/nginx/alwaysprint_access.log;
     error_log /var/log/nginx/alwaysprint_error.log;
 
     location = /health {
@@ -136,7 +131,16 @@ systemctl start nginx
 cat > $APP_DIR/deploy.sh <<'DEPLOY'
 #!/bin/bash
 SERVICE=$1  # backend | frontend | all
-AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+
+# Obtener región usando IMDSv2 (requiere token)
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+AWS_REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
+
+# Fallback si IMDSv2 falla
+if [ -z "$AWS_REGION" ]; then
+  AWS_REGION="us-west-2"
+fi
+
 ECR_REGISTRY=$(aws ecr describe-registry --region $AWS_REGION --query registryId --output text).dkr.ecr.$AWS_REGION.amazonaws.com
 
 aws ecr get-login-password --region $AWS_REGION \

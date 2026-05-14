@@ -88,8 +88,17 @@ async def workstation_websocket(
             await websocket.close(code=1008, reason="ip_private is required")
             return
         
-        # Obtener IP pública del cliente
-        client_host = websocket.client.host if websocket.client else None
+        # Obtener IP pública del cliente desde headers de Nginx (X-Forwarded-For o X-Real-IP)
+        # En WebSocket, los headers del handshake están disponibles en websocket.headers
+        forwarded_for = websocket.headers.get("x-forwarded-for")
+        real_ip = websocket.headers.get("x-real-ip")
+        
+        if forwarded_for:
+            client_host = forwarded_for.split(",")[0].strip()
+        elif real_ip:
+            client_host = real_ip.strip()
+        else:
+            client_host = websocket.client.host if websocket.client else None
         
         # Registrar workstation
         try:
