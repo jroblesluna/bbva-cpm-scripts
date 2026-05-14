@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Security.AccessControl;
+using System.Security.Principal;
 
 namespace AlwaysPrint.Shared.Logging
 {
@@ -88,7 +90,7 @@ namespace AlwaysPrint.Shared.Logging
         {
             try
             {
-                // Truncate to reasonable size
+                // Truncar a tamaño razonable
                 if (message != null && message.Length > 30000)
                     message = message.Substring(0, 30000) + "... [truncated]";
 
@@ -98,12 +100,74 @@ namespace AlwaysPrint.Shared.Logging
                 lock (LogLock)
                 {
                     Directory.CreateDirectory(LogDirectory);
-                    File.AppendAllText(logFile, logMessage + "\n");
+                    EnsureDirectoryPermissions();
+
+                    // Si el archivo no existe, crearlo con permisos para todos los usuarios
+                    if (!File.Exists(logFile))
+                    {
+                        File.WriteAllText(logFile, logMessage + "\n");
+                        EnsureFilePermissions(logFile);
+                    }
+                    else
+                    {
+                        File.AppendAllText(logFile, logMessage + "\n");
+                    }
                 }
             }
             catch
             {
-                // Ignore all logging errors - this is a last resort
+                // Ignorar errores de logging - último recurso
+            }
+        }
+
+        /// <summary>
+        /// Asegura que el directorio de logs tenga permisos de escritura para BUILTIN\Users.
+        /// Esto permite que tanto el servicio (SYSTEM) como el Tray (usuario) escriban.
+        /// </summary>
+        private static void EnsureDirectoryPermissions()
+        {
+            try
+            {
+                var dirInfo = new DirectoryInfo(LogDirectory);
+                var security = dirInfo.GetAccessControl();
+                var usersIdentity = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
+
+                security.AddAccessRule(new FileSystemAccessRule(
+                    usersIdentity,
+                    FileSystemRights.Modify | FileSystemRights.Synchronize,
+                    InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                    PropagationFlags.None,
+                    AccessControlType.Allow));
+
+                dirInfo.SetAccessControl(security);
+            }
+            catch
+            {
+                // Si no se pueden cambiar permisos (ej: el Tray no es admin), ignorar
+            }
+        }
+
+        /// <summary>
+        /// Asegura que el archivo de log tenga permisos de escritura para BUILTIN\Users.
+        /// </summary>
+        private static void EnsureFilePermissions(string filePath)
+        {
+            try
+            {
+                var fileInfo = new FileInfo(filePath);
+                var security = fileInfo.GetAccessControl();
+                var usersIdentity = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
+
+                security.AddAccessRule(new FileSystemAccessRule(
+                    usersIdentity,
+                    FileSystemRights.Modify | FileSystemRights.Synchronize,
+                    AccessControlType.Allow));
+
+                fileInfo.SetAccessControl(security);
+            }
+            catch
+            {
+                // Si no se pueden cambiar permisos, ignorar
             }
         }
 

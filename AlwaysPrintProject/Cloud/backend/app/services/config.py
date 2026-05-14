@@ -183,7 +183,7 @@ class ConfigService:
         corporate_queue_name: str = "LexmarkRoblesAI",
         search_targets: Optional[Dict] = None,
         pending_task_polling_minutes: int = 3,
-        bootstrap_domains: str = "robles.ai,iol.pe,sistemas.com.pe",
+        bootstrap_domains: str = "robles.ai,iol.pe,sistemas.com.pe,apps.iol.pe",
         connectivity_checks: Optional[list] = None,
         locale: str = "",
         telemetry_enabled: bool = True,

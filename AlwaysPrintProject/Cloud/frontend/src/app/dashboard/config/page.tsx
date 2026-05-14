@@ -112,7 +112,7 @@ export default function ConfigPage() {
       if (data.items && data.items.length > 0) {
         setSelectedAccountId(data.items[0].id);
       }
-    } catch (error) {
+    } catch (error: any) {
       const msg =
         error?.response?.data?.detail ||
         error?.response?.data?.message ||

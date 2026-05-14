@@ -46,6 +46,9 @@ namespace AlwaysPrintTray.Bootstrap
             if (string.IsNullOrWhiteSpace(bootstrapDomains))
                 return (false, null, "No hay dominios bootstrap configurados.");
 
+            // Acumula las URLs intentadas y su resultado para incluirlas en el mensaje de fallo.
+            var intentos = new System.Collections.Generic.List<string>();
+
             foreach (var raw in bootstrapDomains.Split(','))
             {
                 if (ct.IsCancellationRequested) break;
@@ -64,7 +67,9 @@ namespace AlwaysPrintTray.Bootstrap
 
                     if (response.StatusCode != HttpStatusCode.OK)
                     {
-                        AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {url} devolvió {(int)response.StatusCode}.");
+                        string motivo = $"{url} → HTTP {(int)response.StatusCode}";
+                        intentos.Add(motivo);
+                        AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {motivo}.");
                         continue;
                     }
 
@@ -73,7 +78,9 @@ namespace AlwaysPrintTray.Bootstrap
                         string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                         if (body.IndexOf(ExpectedBodyFragment, StringComparison.Ordinal) < 0)
                         {
-                            AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {url} no contiene el fragmento esperado.");
+                            string motivo = $"{url} → body no contiene fragmento esperado";
+                            intentos.Add(motivo);
+                            AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {motivo}.");
                             continue;
                         }
                     }
@@ -89,15 +96,22 @@ namespace AlwaysPrintTray.Bootstrap
                 catch (OperationCanceledException)
                 {
                     // Timeout del dominio individual — continuar con el siguiente.
-                    AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {url} timeout ({TimeoutSecs} s).");
+                    string motivo = $"{url} → timeout ({TimeoutSecs} s)";
+                    intentos.Add(motivo);
+                    AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {motivo}.");
                 }
                 catch (Exception ex)
                 {
-                    AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {url} error – {ex.Message}");
+                    string motivo = $"{url} → error: {ex.Message}";
+                    intentos.Add(motivo);
+                    AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {motivo}.");
                 }
             }
 
-            return (false, null, "Ningún dominio bootstrap respondió correctamente.");
+            string detalle = intentos.Count > 0
+                ? $"Ningún dominio bootstrap respondió correctamente. Intentos: [{string.Join("; ", intentos)}]"
+                : "Ningún dominio bootstrap respondió correctamente.";
+            return (false, null, detalle);
         }
     }
 }

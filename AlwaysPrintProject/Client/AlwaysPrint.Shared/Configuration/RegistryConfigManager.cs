@@ -24,10 +24,10 @@ namespace AlwaysPrint.Shared.Configuration
                     if (key == null) return cfg;
 
                     // === CAMPOS EXISTENTES ===
-                    cfg.CorporateQueueName  = key.GetValue("CorporateQueueName",  string.Empty) as string ?? string.Empty;
+                    cfg.CorporateQueueName  = key.GetValue("CorporateQueueName",  "LexmarkBBVA") as string ?? "LexmarkBBVA";
                     cfg.RoblesAiLicenseSerial = key.GetValue("RoblesAiLicenseSerial", string.Empty) as string ?? string.Empty;
-                    cfg.BootstrapDomains    = key.GetValue("BootstrapDomains",    "robles.ai,iol.pe,sistemas.com.pe") as string
-                                             ?? "robles.ai,iol.pe,sistemas.com.pe";
+                    cfg.BootstrapDomains    = key.GetValue("BootstrapDomains",    "alwaysprint.apps.iol.pe") as string
+                                             ?? "alwaysprint.apps.iol.pe";
 
                     var rawPoll = key.GetValue("PendingTaskPollingMinutes", 3);
                     cfg.PendingTaskPollingMinutes = Math.Max(1, Convert.ToInt32(rawPoll));
@@ -100,9 +100,9 @@ namespace AlwaysPrint.Shared.Configuration
                     throw new InvalidOperationException("No se puede crear/abrir la clave de registro — privilegios insuficientes.");
 
                 // === CAMPOS EXISTENTES ===
-                key.SetValue("CorporateQueueName",          cfg.CorporateQueueName  ?? string.Empty,            RegistryValueKind.String);
+                key.SetValue("CorporateQueueName",          cfg.CorporateQueueName  ?? "LexmarkBBVA",              RegistryValueKind.String);
                 key.SetValue("PendingTaskPollingMinutes",    Math.Max(1, cfg.PendingTaskPollingMinutes),          RegistryValueKind.DWord);
-                key.SetValue("BootstrapDomains",             cfg.BootstrapDomains    ?? "robles.ai,iol.pe,sistemas.com.pe", RegistryValueKind.String);
+                key.SetValue("BootstrapDomains",             cfg.BootstrapDomains    ?? "alwaysprint.apps.iol.pe", RegistryValueKind.String);
                 key.SetValue("RoblesAiLicenseSerial",        cfg.RoblesAiLicenseSerial ?? string.Empty,          RegistryValueKind.String);
                 key.SetValue("SearchTargets",
                     JsonConvert.SerializeObject(cfg.SearchTargets ?? new SearchTargetsConfig()),
@@ -131,9 +131,9 @@ namespace AlwaysPrint.Shared.Configuration
                 if (key == null) return;
 
                 // === CAMPOS EXISTENTES ===
-                SetIfMissing(key, "CorporateQueueName",       string.Empty,                                   RegistryValueKind.String);
+                SetIfMissing(key, "CorporateQueueName",       "LexmarkBBVA",                                    RegistryValueKind.String);
                 SetIfMissing(key, "PendingTaskPollingMinutes", 3,                                              RegistryValueKind.DWord);
-                SetIfMissing(key, "BootstrapDomains",          "robles.ai,iol.pe,sistemas.com.pe",            RegistryValueKind.String);
+                SetIfMissing(key, "BootstrapDomains",          "alwaysprint.apps.iol.pe",                      RegistryValueKind.String);
                 SetIfMissing(key, "RoblesAiLicenseSerial",     string.Empty,                                  RegistryValueKind.String);
                 SetIfMissing(key, "SearchTargets",
                     JsonConvert.SerializeObject(new SearchTargetsConfig()),                                     RegistryValueKind.String);
