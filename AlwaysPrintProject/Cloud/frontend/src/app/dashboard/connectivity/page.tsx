@@ -420,6 +420,8 @@ function ConnectivityHistoryPanel({
   isError: boolean;
   onRetry: () => void;
 }) {
+  const userTimezone = useUserTimezone();
+
   if (isLoading) {
     return (
       <Card>
@@ -504,7 +506,7 @@ function ConnectivityHistoryPanel({
                   <SuccessIndicator success={entry.success} />
                 </TableCell>
                 <TableCell className="text-sm text-gray-700">
-                  {formatRecordedAt(entry.recorded_at)}
+                  {formatRecordedAt(entry.recorded_at, userTimezone)}
                 </TableCell>
                 <TableCell className="font-mono text-sm">{entry.check_id}</TableCell>
                 <TableCell>
@@ -634,17 +636,9 @@ function getLatestByCheck(
 /**
  * Formatea una fecha ISO 8601 para mostrar en la tabla de historial.
  */
-function formatRecordedAt(isoDate: string): string {
+function formatRecordedAt(isoDate: string, timezone: string = 'UTC'): string {
   try {
-    const date = new Date(isoDate);
-    return date.toLocaleString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
+    return formatDateWithTimezone(isoDate, timezone);
   } catch {
     return isoDate;
   }

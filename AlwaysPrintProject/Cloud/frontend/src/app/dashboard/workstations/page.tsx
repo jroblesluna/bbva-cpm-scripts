@@ -27,6 +27,7 @@ import {
   Activity,
   Edit,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
@@ -80,6 +81,20 @@ export default function WorkstationsPage() {
       setEditingWorkstation(null);
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => workstationsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workstations'] });
+      setSelectedWorkstation(null);
+    },
+  });
+
+  const handleDelete = (workstation: Workstation) => {
+    if (confirm(`¿Eliminar workstation ${workstation.hostname || workstation.ip_private}? Esta acción no se puede deshacer.`)) {
+      deleteMutation.mutate(workstation.id);
+    }
+  };
 
   const workstations = workstationsData?.items || [];
 
@@ -374,6 +389,14 @@ export default function WorkstationsPage() {
                       onClick={() => setEditingWorkstation(workstation)}
                     >
                       <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDelete(workstation)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>

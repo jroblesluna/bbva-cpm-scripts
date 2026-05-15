@@ -47,7 +47,7 @@ export default function AccountsPage() {
 
   // Query para listar cuentas
   const { data: accounts, isLoading, error } = useQuery({
-    queryKey: ['accounts'],
+    queryKey: ['accounts', 'list'],
     queryFn: () => accountsApi.list(),
   })
 

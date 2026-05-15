@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { setupApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -20,8 +20,27 @@ export default function SetupPage() {
     language: 'en',
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [isChecking, setIsChecking] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+
+  // Verificar si el sistema ya está inicializado — redirigir a login si ya tiene usuarios
+  useEffect(() => {
+    const controller = new AbortController()
+    setupApi.getStatus(controller.signal)
+      .then((status) => {
+        if (!status.needs_setup) {
+          router.replace('/login')
+        } else {
+          setIsChecking(false)
+        }
+      })
+      .catch(() => {
+        // Si falla la verificación, mostrar el formulario (el backend validará al enviar)
+        setIsChecking(false)
+      })
+    return () => controller.abort()
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -83,6 +102,14 @@ export default function SetupPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+    )
+  }
+
+  if (isChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <p className="text-gray-500">Verifying system status...</p>
       </div>
     )
   }

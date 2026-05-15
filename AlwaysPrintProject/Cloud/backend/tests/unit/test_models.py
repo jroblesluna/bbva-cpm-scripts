@@ -165,7 +165,7 @@ class TestGlobalConfigModel:
             account_id=account_id,
             corporate_queue_name="LexmarkRoblesAI",
             pending_task_polling_minutes=3,
-            bootstrap_domains="robles.ai,iol.pe,sistemas.com.pe"
+            bootstrap_domains="apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai"
         )
         
         assert config.account_id == account_id
@@ -180,7 +180,7 @@ class TestGlobalConfigModel:
         
         assert config.corporate_queue_name == "LexmarkRoblesAI"
         assert config.pending_task_polling_minutes == 3
-        assert config.bootstrap_domains == "robles.ai,iol.pe,sistemas.com.pe"
+        assert config.bootstrap_domains == "apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai"
 
 
 class TestVLANConfigModel:

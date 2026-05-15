@@ -63,13 +63,17 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
   /**
    * Auto-conectar al montar si autoConnect es true.
+   * Delay de 100ms para evitar race condition con React Strict Mode (doble mount en dev).
    */
   useEffect(() => {
     if (autoConnect) {
-      connect()
+      const timer = setTimeout(() => connect(), 100)
+      return () => {
+        clearTimeout(timer)
+        disconnect()
+      }
     }
 
-    // Cleanup al desmontar
     return () => {
       disconnect()
     }

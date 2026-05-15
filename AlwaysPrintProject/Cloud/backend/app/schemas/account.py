@@ -90,6 +90,7 @@ class AccountResponse(AccountBase):
     is_active: bool
     timezone: str
     language: str
+    public_ips: list[PublicIPResponse] = []
     created_at: datetime
     updated_at: datetime
 

@@ -41,8 +41,8 @@ class GlobalConfig(Base):
     # Intervalo de polling de tareas pendientes en minutos (rango: 1-1440, default: 3)
     pending_task_polling_minutes = Column(Integer, nullable=False, default=3)
     
-    # Dominios de bootstrap separados por comas (default: "robles.ai,iol.pe,sistemas.com.pe")
-    bootstrap_domains = Column(String(1000), nullable=False, default="robles.ai,iol.pe,sistemas.com.pe")
+    # Dominios de bootstrap separados por comas (default: "apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai)
+    bootstrap_domains = Column(String(1000), nullable=False, default="apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai")
     language = Column(String(2), nullable=False, server_default='en')
 
     # === CAMPOS FASE 3: CONFIGURACIÓN EXTENDIDA ===

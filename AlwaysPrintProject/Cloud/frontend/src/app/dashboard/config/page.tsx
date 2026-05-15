@@ -15,6 +15,8 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import { formatDateWithTimezone } from '@/lib/dateUtils';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +52,7 @@ type ConfigTab = 'global' | 'organization';
 export default function ConfigPage() {
   const { user } = useAuth();
   const t = useTranslations('config');
+  const userTimezone = useUserTimezone();
   const tCommon = useTranslations('common');
   const [activeTab, setActiveTab] = useState<ConfigTab>('organization');
   const [config, setConfig] = useState<GlobalConfig | null>(null);
@@ -617,13 +620,13 @@ export default function ConfigPage() {
                 <div>
                   <span className="text-gray-600">{t('lastUpdated')}</span>
                   <span className="ml-2 text-gray-900">
-                    {new Date(config.updated_at).toLocaleString()}
+                    {formatDateWithTimezone(config.updated_at, userTimezone)}
                   </span>
                 </div>
                 <div>
                   <span className="text-gray-600">{t('created')}</span>
                   <span className="ml-2 text-gray-900">
-                    {new Date(config.created_at).toLocaleString()}
+                    {formatDateWithTimezone(config.created_at, userTimezone)}
                   </span>
                 </div>
               </div>

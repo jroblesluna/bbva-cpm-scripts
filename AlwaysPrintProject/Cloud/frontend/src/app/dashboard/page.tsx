@@ -15,6 +15,8 @@ import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
+import { formatDateWithTimezone } from '@/lib/dateUtils'
+import { useUserTimezone } from '@/hooks/useUserTimezone'
 
 // Intervalo de polling en milisegundos (10 segundos)
 const POLLING_INTERVAL = 10_000
@@ -44,6 +46,7 @@ interface PendingIP {
 export default function DashboardPage() {
   const { user, isAdmin } = useAuth()
   const t = useTranslations('dashboard')
+  const userTimezone = useUserTimezone()
   const [stats, setStats] = useState<WorkstationStats | null>(null)
   const [pendingIPs, setPendingIPs] = useState<PendingIP[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -104,17 +107,10 @@ export default function DashboardPage() {
   }, [user, loadStats, loadPendingIPs])
 
   /**
-   * Formatea la fecha/hora de última actualización según el locale del navegador.
+   * Formatea la fecha/hora de última actualización con timezone del usuario.
    */
   const formatLastUpdated = (date: Date): string => {
-    return date.toLocaleTimeString([], {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    })
+    return formatDateWithTimezone(date, userTimezone)
   }
 
   if (isLoading) {

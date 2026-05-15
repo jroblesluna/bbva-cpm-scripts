@@ -91,16 +91,24 @@ class ConfigService:
         if not workstation:
             raise ValueError(f"Workstation {workstation_id} no encontrada")
         
-        # 2. Obtener GlobalConfig (siempre debe existir)
+        # 2. Obtener GlobalConfig (puede no existir si la cuenta es nueva)
         global_config = db.query(GlobalConfig).filter_by(
             account_id=workstation.account_id
         ).first()
         
         if not global_config:
-            raise ValueError(
-                f"GlobalConfig no encontrada para account {workstation.account_id}. "
-                "Debe crearse al crear la cuenta."
+            # Crear una GlobalConfig por defecto para la cuenta
+            global_config = GlobalConfig(
+                account_id=workstation.account_id,
+                corporate_queue_name="LexmarkBBVA",
+                pending_task_polling_minutes=3,
+                bootstrap_domains="alwaysprint.apps.iol.pe",
+                telemetry_enabled=True,
+                telemetry_interval_seconds=300,
             )
+            db.add(global_config)
+            db.commit()
+            db.refresh(global_config)
         
         # 3. Obtener VLANConfig si existe
         vlan_config = None
@@ -183,7 +191,7 @@ class ConfigService:
         corporate_queue_name: str = "LexmarkRoblesAI",
         search_targets: Optional[Dict] = None,
         pending_task_polling_minutes: int = 3,
-        bootstrap_domains: str = "robles.ai,iol.pe,sistemas.com.pe,apps.iol.pe",
+        bootstrap_domains: str = "apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai",
         connectivity_checks: Optional[list] = None,
         locale: str = "",
         telemetry_enabled: bool = True,

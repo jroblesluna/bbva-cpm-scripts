@@ -69,7 +69,7 @@ Este documento define la estrategia completa para integrar el **AlwaysPrint Clie
 | `CorporateQueueName` | String | `""` | Cola de impresión corporativa |
 | `SearchTargets` | String (JSON) | `{"ips":"","ranges":""}` | IPs/CIDR de impresoras |
 | `PendingTaskPollingMinutes` | DWORD | `3` | Intervalo de monitoreo local |
-| `BootstrapDomains` | String (CSV) | `"robles.ai,iol.pe"` | Dominios para health check |
+| `BootstrapDomains` | String (CSV) | `"apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai"` | Dominios para health check |
 | `RoblesAiLicenseSerial` | String | `""` | Serial de licencia |
 | `CloudEnabled` | DWORD | `0` | 1 = integración Cloud activa |
 | `CloudApiUrl` | String | `""` | URL del backend APCM |

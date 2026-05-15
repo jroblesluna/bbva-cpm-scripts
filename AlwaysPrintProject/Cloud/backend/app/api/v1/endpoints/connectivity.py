@@ -75,10 +75,17 @@ async def get_workstation_connectivity(
         )
 
     # Verificar tenant isolation: workstation debe pertenecer a la cuenta del usuario
-    workstation = db.query(Workstation).filter(
-        Workstation.id == workstation_id,
-        Workstation.account_id == current_user.account_id
-    ).first()
+    # Admin puede ver cualquier workstation
+    if current_user.account_id:
+        workstation = db.query(Workstation).filter(
+            Workstation.id == workstation_id,
+            Workstation.account_id == current_user.account_id
+        ).first()
+    else:
+        # Admin sin account_id puede ver todas las workstations
+        workstation = db.query(Workstation).filter(
+            Workstation.id == workstation_id
+        ).first()
 
     if not workstation:
         raise HTTPException(
@@ -91,7 +98,7 @@ async def get_workstation_connectivity(
     records = connectivity_service.get_connectivity_history(
         db=db,
         workstation_id=str(workstation_id),
-        account_id=str(current_user.account_id),
+        account_id=str(workstation.account_id) if workstation.account_id else str(current_user.account_id or ""),
         check_id=check_id,
         from_dt=from_dt,
         to_dt=to_dt,

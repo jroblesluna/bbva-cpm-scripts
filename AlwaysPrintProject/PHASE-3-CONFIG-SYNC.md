@@ -113,7 +113,7 @@ namespace AlwaysPrintTray.Cloud
   "corporate_queue_name": "LexmarkBBVA",
   "search_targets": { "ips": "192.168.1.10", "ranges": "192.168.1.0/24" },
   "pending_task_polling_minutes": 3,
-  "bootstrap_domains": "robles.ai,iol.pe",
+  "bootstrap_domains": "apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai",
   "connectivity_checks": [
     { "id": "c1", "type": "http", "url": "https://servidor.org/health", "timeout_ms": 5000 }
   ],

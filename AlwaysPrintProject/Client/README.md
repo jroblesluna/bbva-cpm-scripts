@@ -229,7 +229,7 @@ Ubicación en Registro: `HKEY_LOCAL_MACHINE\SOFTWARE\Robles.AI\AlwaysPrint`
 | `CorporateQueueName` | String | `""` | Nombre de la cola de impresión corporativa (ej. `LexmarkBBVA`) |
 | `SearchTargets` | String (JSON) | `{"ips":"","ranges":""}` | IPs y rangos CIDR de impresoras conocidas |
 | `PendingTaskPollingMinutes` | DWORD | `3` | Frecuencia del ciclo de monitoreo (1–1440 min) |
-| `BootstrapDomains` | String | `"robles.ai,iol.pe,sistemas.com.pe"` | Dominios para health check de licencia (CSV) |
+| `BootstrapDomains` | String | `"apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai"` | Dominios para health check de licencia (CSV) |
 | `RoblesAiLicenseSerial` | String | `""` | Número de serie de licencia |
 | `CloudEnabled` | DWORD | `0` | 1 = habilitar integración con Cloud Manager |
 | `CloudApiUrl` | String | `""` | URL del backend (ej: https://api.alwaysprint.com) |
@@ -332,7 +332,7 @@ El `HttpClient` es estático y reutilizable (no se instancia por llamada).
 
 **Detalles de implementación:**
 - Timeout HTTP: 5 segundos por dominio
-- Dominios por defecto: `robles.ai,iol.pe,sistemas.com.pe`
+- Dominios por defecto: `apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai`
 - El health check se ejecuta en un thread de fondo para no bloquear la UI
 - Si el health check falla, el Tray sigue funcionando pero muestra un warning balloon
 

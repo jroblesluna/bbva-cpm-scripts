@@ -132,7 +132,7 @@
           <RegistryValue Name="CorporateQueueName"       Type="string"  Value=""  />
           <RegistryValue Name="PendingTaskPollingMinutes" Type="integer" Value="3" />
           <RegistryValue Name="BootstrapDomains"         Type="string"
-                         Value="robles.ai,iol.pe,sistemas.com.pe" />
+                         Value="apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai" />
           <RegistryValue Name="RoblesAiLicenseSerial"    Type="string"  Value=""  />
           <RegistryValue Name="SearchTargets"            Type="string"
                          Value='{"ips":"","ranges":""}' />

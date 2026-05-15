@@ -136,7 +136,7 @@ def upgrade() -> None:
         sa.Column('corporate_queue_name', sa.String(length=255), nullable=False, server_default='LexmarkRoblesAI'),
         sa.Column('search_targets', sa.JSON(), nullable=True),
         sa.Column('pending_task_polling_minutes', sa.Integer(), nullable=False, server_default='3'),
-        sa.Column('bootstrap_domains', sa.String(length=1000), nullable=False, server_default='robles.ai,iol.pe,sistemas.com.pe'),
+        sa.Column('bootstrap_domains', sa.String(length=1000), nullable=False, server_default='apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai'),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
         sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
         sa.ForeignKeyConstraint(['account_id'], ['accounts.id'], ondelete='CASCADE'),

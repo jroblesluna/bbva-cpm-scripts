@@ -1,3 +1,5 @@
+const path = require('path')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -5,6 +7,14 @@ const nextConfig = {
     domains: [],
   },
   output: 'standalone',
+  // Fijar el root del workspace para evitar que Next.js infiera incorrectamente
+  // cuando hay múltiples package-lock.json en el sistema
+  outputFileTracingRoot: path.join(__dirname, './'),
+  // Next.js 15 es incompatible con ESLint 9 flat config — desactivar linting integrado.
+  // Ejecutar ESLint por separado: npx eslint src/
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   async rewrites() {
     // En desarrollo, proxy /api/* al backend en localhost:8000
     // En producción nginx hace este proxy directamente

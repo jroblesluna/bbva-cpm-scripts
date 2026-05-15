@@ -446,6 +446,13 @@ export const workstationsApi = {
   deleteConfig: async (id: string): Promise<void> => {
     await apiClient.delete(`/workstations/${id}/config`)
   },
+
+  /**
+   * Eliminar workstation del sistema.
+   */
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/workstations/${id}`)
+  },
 }
 
 // ============================================================================

@@ -497,3 +497,71 @@ def delete_workstation_config(
     )
     
     return None
+
+
+@router.delete("/{workstation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_workstation(
+    request: Request,
+    workstation_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Eliminar una workstation del sistema.
+    
+    - Admin: puede eliminar cualquier workstation
+    - Operador: solo puede eliminar workstations de su cuenta
+    
+    Elimina la workstation y todos sus datos asociados (telemetría, conectividad, licencias).
+    
+    Args:
+        workstation_id: ID de la workstation a eliminar
+        current_user: Usuario autenticado
+        db: Sesión de base de datos
+    
+    Raises:
+        HTTPException 403: Sin permisos
+        HTTPException 404: Workstation no encontrada
+    """
+    workstation = db.query(Workstation).filter(Workstation.id == workstation_id).first()
+    
+    if not workstation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workstation con ID {workstation_id} no encontrada"
+        )
+    
+    # Verificar permisos
+    if current_user.role == UserRole.OPERATOR:
+        if workstation.account_id != current_user.account_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para eliminar esta workstation"
+            )
+    
+    # Guardar datos para auditoría
+    old_data = {
+        "ip_private": workstation.ip_private,
+        "hostname": workstation.hostname,
+        "account_id": str(workstation.account_id) if workstation.account_id else None,
+    }
+    
+    # Eliminar workstation (cascade elimina relaciones)
+    db.delete(workstation)
+    db.commit()
+    
+    # Registrar en auditoría
+    audit_service = AuditService()
+    audit_service.log_action(
+        db=db,
+        action_type="delete",
+        entity_type="Workstation",
+        entity_id=str(workstation_id),
+        user_id=str(current_user.id),
+        account_id=old_data["account_id"],
+        old_values=old_data,
+        new_values={},
+        ip_address=get_client_ip(request)
+    )
+    
+    return None

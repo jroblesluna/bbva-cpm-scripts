@@ -62,9 +62,16 @@ def list_accounts(
     # Contar total
     total = query.count()
     
-    # Paginar
+    # Paginar con eager loading de public_ips (solo autorizadas)
+    from sqlalchemy.orm import joinedload
     offset = (page - 1) * page_size
-    accounts = query.offset(offset).limit(page_size).all()
+    accounts = (
+        query
+        .options(joinedload(Account.public_ips.and_(PublicIP.is_authorized == True)))
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
     
     return AccountListResponse(
         items=accounts,

@@ -69,9 +69,9 @@ export default function PendingIPsPage() {
     },
   });
 
-  // Query para cuentas
+  // Query para cuentas (usada en el modal de autorización)
   const { data: accountsData } = useQuery({
-    queryKey: ['accounts'],
+    queryKey: ['accounts', 'list-for-pending-ips'],
     queryFn: async () => {
       const response = await api.get('/accounts/');
       return response.data;
@@ -98,6 +98,7 @@ export default function PendingIPsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-ips'] });
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts', 'list-for-pending-ips'] });
       setAuthorizingIP(null);
       setSelectedAccountId('');
       setCustomDescription('');
