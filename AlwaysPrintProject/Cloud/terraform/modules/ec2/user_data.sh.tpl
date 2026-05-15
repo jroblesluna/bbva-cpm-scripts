@@ -128,32 +128,25 @@ systemctl enable nginx
 systemctl start nginx
 
 # ── Script de deploy (usado por CI/CD) ────────────────────────────────
-cat > $APP_DIR/deploy.sh <<'DEPLOY'
+cat > $APP_DIR/deploy.sh <<DEPLOY
 #!/bin/bash
-SERVICE=$1  # backend | frontend | all
+SERVICE=\$1  # backend | frontend | all
 
-# Obtener región usando IMDSv2 (requiere token)
-TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-AWS_REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
+# Región y registry fijados durante provisión por Terraform
+AWS_REGION="${aws_region}"
+ECR_REGISTRY="${ecr_registry}"
 
-# Fallback si IMDSv2 falla
-if [ -z "$AWS_REGION" ]; then
-  AWS_REGION="us-west-2"
-fi
-
-ECR_REGISTRY=$(aws ecr describe-registry --region $AWS_REGION --query registryId --output text).dkr.ecr.$AWS_REGION.amazonaws.com
-
-aws ecr get-login-password --region $AWS_REGION \
-  | docker login --username AWS --password-stdin $ECR_REGISTRY
+aws ecr get-login-password --region \$AWS_REGION \\
+  | docker login --username AWS --password-stdin \$ECR_REGISTRY
 
 cd /opt/alwaysprint
 
-if [ "$SERVICE" = "backend" ] || [ "$SERVICE" = "all" ]; then
+if [ "\$SERVICE" = "backend" ] || [ "\$SERVICE" = "all" ]; then
   docker compose pull backend
   docker compose up -d backend
 fi
 
-if [ "$SERVICE" = "frontend" ] || [ "$SERVICE" = "all" ]; then
+if [ "\$SERVICE" = "frontend" ] || [ "\$SERVICE" = "all" ]; then
   docker compose pull frontend
   docker compose up -d frontend
 fi
