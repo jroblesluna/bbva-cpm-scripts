@@ -10,6 +10,7 @@ using System.Windows.Forms;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
+using AlwaysPrint.Shared.Network;
 using AlwaysPrintTray.Localization;
 using AlwaysPrintTray.Pipe;
 using Newtonsoft.Json;
@@ -549,14 +550,38 @@ namespace AlwaysPrintTray.Cloud
         {
             try
             {
+                // Usar NetworkHelper para obtener la IP de la interfaz con gateway (más confiable)
+                string localIP = NetworkHelper.GetOutboundLocalIP();
+                
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager.GetPrivateIp: IP detectada = {localIP}");
+                
+                if (!string.IsNullOrEmpty(localIP) && localIP != "unknown")
+                {
+                    return localIP;
+                }
+                
+                // Fallback al método antiguo si NetworkHelper falla
+                AlwaysPrintLogger.WriteWarning(
+                    "CloudManager.GetPrivateIp: NetworkHelper falló, usando método fallback",
+                    AlwaysPrintLogger.EvtGenericWarning);
+                
                 var addresses = Dns.GetHostAddresses(Dns.GetHostName());
                 var privateIp = addresses.FirstOrDefault(a =>
                     a.AddressFamily == AddressFamily.InterNetwork &&
                     IsPrivateIp(a));
-                return privateIp?.ToString() ?? "0.0.0.0";
+                
+                string fallbackIP = privateIp?.ToString() ?? "0.0.0.0";
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager.GetPrivateIp: IP fallback = {fallbackIP}");
+                
+                return fallbackIP;
             }
-            catch
+            catch (Exception ex)
             {
+                AlwaysPrintLogger.WriteError(
+                    $"CloudManager.GetPrivateIp: error detectando IP privada: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
                 return "0.0.0.0";
             }
         }

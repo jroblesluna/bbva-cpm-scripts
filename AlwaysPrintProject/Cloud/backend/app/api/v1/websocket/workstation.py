@@ -92,6 +92,7 @@ async def workstation_websocket(
         # En WebSocket, los headers del handshake están disponibles en websocket.headers
         forwarded_for = websocket.headers.get("x-forwarded-for")
         real_ip = websocket.headers.get("x-real-ip")
+        workstation_local_ip = websocket.headers.get("x-workstation-local-ip")
         
         if forwarded_for:
             client_host = forwarded_for.split(",")[0].strip()
@@ -99,6 +100,17 @@ async def workstation_websocket(
             client_host = real_ip.strip()
         else:
             client_host = websocket.client.host if websocket.client else None
+        
+        # Log detallado para debugging
+        logger.info(
+            f"[REGISTRO WS] Datos recibidos: "
+            f"ip_private={ip_private}, "
+            f"hostname={hostname}, "
+            f"X-Workstation-Local-IP={workstation_local_ip}, "
+            f"X-Forwarded-For={forwarded_for}, "
+            f"X-Real-IP={real_ip}, "
+            f"client_host={client_host}"
+        )
         
         # Registrar workstation
         try:

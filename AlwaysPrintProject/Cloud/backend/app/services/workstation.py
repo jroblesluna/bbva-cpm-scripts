@@ -10,6 +10,7 @@ Este servicio implementa la lógica de negocio para:
 
 import hashlib
 import ipaddress
+import logging
 from typing import Optional, List
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -18,6 +19,8 @@ from sqlalchemy import or_
 from app.models.workstation import Workstation, License
 from app.models.account import Account, PublicIP
 from app.models.vlan import VLAN
+
+logger = logging.getLogger(__name__)
 
 
 class WorkstationService:
@@ -212,12 +215,27 @@ class WorkstationService:
         Raises:
             ValueError: Si hay error en los datos
         """
+        # Log detallado para debugging
+        logger.info(
+            f"[REGISTRO] Intentando registrar workstation: "
+            f"ip_private={ip_private}, "
+            f"public_ip={public_ip}, "
+            f"hostname={hostname}"
+        )
+        
         # 1. Buscar workstation existente
         workstation = db.query(Workstation).filter_by(
             ip_private=ip_private
         ).first()
         
         if workstation:
+            logger.info(
+                f"[REGISTRO] Workstation existente encontrada: "
+                f"id={workstation.id}, "
+                f"ip_private={workstation.ip_private}, "
+                f"hostname={workstation.hostname}"
+            )
+            
             # Actualizar workstation existente
             if hostname:
                 workstation.hostname = hostname
@@ -240,22 +258,48 @@ class WorkstationService:
             db.commit()
             db.refresh(workstation)
             
+            logger.info(
+                f"[REGISTRO] Workstation actualizada exitosamente: "
+                f"id={workstation.id}"
+            )
+            
             return workstation, False, "authorized"
+        
+        logger.info(
+            f"[REGISTRO] Workstation nueva, verificando autorización de IP pública: {public_ip}"
+        )
         
         # 2. Workstation nueva: verificar autorización de IP pública
         account, is_authorized = self.register_or_queue_public_ip(db, public_ip)
         
         if not is_authorized:
+            logger.warning(
+                f"[REGISTRO] IP pública no autorizada: {public_ip}. "
+                f"Registro rechazado para ip_private={ip_private}"
+            )
             # IP no autorizada: rechazar conexión
             return None, False, "pending"
         
         if not account:
+            logger.warning(
+                f"[REGISTRO] No se encontró cuenta para IP pública: {public_ip}. "
+                f"Registro rechazado para ip_private={ip_private}"
+            )
             # No debería pasar, pero por seguridad
             return None, False, "pending"
         
         if not account.is_active:
+            logger.warning(
+                f"[REGISTRO] Cuenta desactivada: {account.name} (id={account.id}). "
+                f"Registro rechazado para ip_private={ip_private}"
+            )
             # Cuenta desactivada
             return None, False, "inactive_account"
+        
+        logger.info(
+            f"[REGISTRO] IP pública autorizada. Creando workstation para cuenta: "
+            f"{account.name} (id={account.id})"
+        )
         
         # 3. Crear workstation
         vlan_id = self.detect_vlan_for_ip(db, str(account.id), ip_private)
@@ -276,11 +320,23 @@ class WorkstationService:
         db.add(workstation)
         db.flush()  # Para obtener el ID antes de commit
         
+        logger.info(
+            f"[REGISTRO] Workstation creada: "
+            f"id={workstation.id}, "
+            f"ip_private={workstation.ip_private}, "
+            f"hostname={workstation.hostname}, "
+            f"account_id={workstation.account_id}"
+        )
+        
         # 4. Activar licencia
         self.activate_license(db, str(workstation.id))
         
         db.commit()
         db.refresh(workstation)
+        
+        logger.info(
+            f"[REGISTRO] Workstation registrada exitosamente: id={workstation.id}"
+        )
         
         return workstation, True, "authorized"
     
