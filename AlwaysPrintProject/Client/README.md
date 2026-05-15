@@ -323,18 +323,33 @@ Starting
 
 ## Bootstrap del Tray
 
-Al arrancar, el Tray realiza HTTP GET a `https://alwaysprint.{dominio}/health` para cada dominio en `BootstrapDomains`, en orden. El primero que devuelva HTTP 200 se considera válido.
+Al arrancar, el Tray realiza HTTP GET a `https://alwaysprint.{dominio}/api/v1/health` para cada dominio en `BootstrapDomains`, en orden. El primero que devuelva HTTP 200 con JSON válido se considera válido.
 
-- Si alguno responde: envía `TrayInitialized { success: true }` y muestra notificación de éxito.
+**IMPORTANTE**: Los dominios bootstrap deben ser **dominios base** (ej: `apps.iol.pe`, `iol.pe`). El prefijo `alwaysprint.` se añade automáticamente.
+
+**Ejemplo de configuración**:
+```
+BootstrapDomains = "apps.iol.pe,sistemas.com.pe,iol.pe,robles.ai"
+```
+
+**URLs generadas automáticamente**:
+- `https://alwaysprint.apps.iol.pe/api/v1/health`
+- `https://alwaysprint.sistemas.com.pe/api/v1/health`
+- `https://alwaysprint.iol.pe/api/v1/health`
+- `https://alwaysprint.robles.ai/api/v1/health`
+
+**Comportamiento**:
+- Si alguno responde con HTTP 200 y JSON válido: envía `TrayInitialized { success: true }` y muestra notificación de éxito.
 - Si ninguno responde: envía `TrayInitialized { success: false }` y continúa en modo local (las funciones de impresión locales siguen activas).
 
 El `HttpClient` es estático y reutilizable (no se instancia por llamada).
 
 **Detalles de implementación:**
-- Timeout HTTP: 5 segundos por dominio
+- Timeout HTTP: 10 segundos por dominio
 - Dominios por defecto: `apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai`
 - El health check se ejecuta en un thread de fondo para no bloquear la UI
 - Si el health check falla, el Tray sigue funcionando pero muestra un warning balloon
+- La respuesta debe ser JSON válido (se valida parseando el body)
 
 ---
 
