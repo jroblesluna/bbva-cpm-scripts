@@ -82,11 +82,19 @@ export default function AccountsPage() {
   const addIPMutation = useMutation({
     mutationFn: ({ accountId, data }: { accountId: string; data: PublicIPCreate }) =>
       accountsApi.addPublicIP(accountId, data),
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
       // Invalidar y refrescar inmediatamente las queries de accounts
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
-      // Forzar refetch inmediato
-      queryClient.refetchQueries({ queryKey: ['accounts'] })
+      await queryClient.refetchQueries({ queryKey: ['accounts'] })
+      
+      // Actualizar el estado local del modal con los datos frescos
+      if (managingIPsAccount && managingIPsAccount.id === variables.accountId) {
+        const updatedAccounts = queryClient.getQueryData<Account[]>(['accounts', 'list'])
+        const updatedAccount = updatedAccounts?.find(acc => acc.id === variables.accountId)
+        if (updatedAccount) {
+          setManagingIPsAccount(updatedAccount)
+        }
+      }
     },
   })
 
@@ -94,11 +102,19 @@ export default function AccountsPage() {
   const removeIPMutation = useMutation({
     mutationFn: ({ accountId, ipId }: { accountId: string; ipId: string }) =>
       accountsApi.removePublicIP(accountId, ipId),
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
       // Invalidar y refrescar inmediatamente las queries de accounts
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
-      // Forzar refetch inmediato
-      queryClient.refetchQueries({ queryKey: ['accounts'] })
+      await queryClient.refetchQueries({ queryKey: ['accounts'] })
+      
+      // Actualizar el estado local del modal con los datos frescos
+      if (managingIPsAccount && managingIPsAccount.id === variables.accountId) {
+        const updatedAccounts = queryClient.getQueryData<Account[]>(['accounts', 'list'])
+        const updatedAccount = updatedAccounts?.find(acc => acc.id === variables.accountId)
+        if (updatedAccount) {
+          setManagingIPsAccount(updatedAccount)
+        }
+      }
     },
   })
 
