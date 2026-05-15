@@ -39,6 +39,9 @@ namespace AlwaysPrintTray
                 // Inicializar el sistema de localización antes de construir el contexto del Tray
                 LocalizationManager.Initialize();
 
+                // Configurar headers HTTP con información de la workstation
+                Bootstrap.DomainHealthChecker.ConfigureWorkstationHeaders();
+
                 AlwaysPrintLogger.WriteTrayInfo("AlwaysPrintTray started.", AlwaysPrintLogger.EvtServiceStarted);
                 Application.Run(new TrayApplicationContext());
             }

@@ -3,6 +3,9 @@ using System.Net;
 using System.Net.Http;
 using System.Threading;
 using AlwaysPrint.Shared.Logging;
+using AlwaysPrint.Shared.Configuration;
+using AlwaysPrint.Shared.Network;
+using Microsoft.Win32;
 
 namespace AlwaysPrintTray.Bootstrap
 {
@@ -37,8 +40,47 @@ namespace AlwaysPrintTray.Bootstrap
         /// <summary>
         /// Expone el HttpClient estático para reutilización por otros componentes del Tray
         /// (ej: ConfigurationSync). Evita crear nuevas instancias y socket exhaustion.
+        /// 
+        /// IMPORTANTE: Antes de usar este HttpClient, asegúrate de agregar el header
+        /// X-Workstation-Local-IP con la IP privada de la workstation usando
+        /// ConfigureWorkstationHeaders().
         /// </summary>
         internal static HttpClient Http => _http;
+
+        /// <summary>
+        /// Configura los headers del HttpClient con la información de la workstation.
+        /// Debe llamarse una vez al inicio del Tray.
+        /// </summary>
+        public static void ConfigureWorkstationHeaders()
+        {
+            try
+            {
+                string localIP = NetworkHelper.GetOutboundLocalIP();
+                if (!string.IsNullOrEmpty(localIP) && localIP != "unknown")
+                {
+                    // Limpiar header existente si lo hay
+                    _http.DefaultRequestHeaders.Remove("X-Workstation-Local-IP");
+                    
+                    // Agregar nuevo header
+                    _http.DefaultRequestHeaders.Add("X-Workstation-Local-IP", localIP);
+                    
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"DomainHealthChecker: configurado header X-Workstation-Local-IP: {localIP}");
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        "DomainHealthChecker: no se pudo detectar IP local de la workstation",
+                        AlwaysPrintLogger.EvtGenericWarning);
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning(
+                    $"DomainHealthChecker: error al configurar headers de workstation: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericWarning);
+            }
+        }
 
         public static (bool Success, string? RespondingDomain, string? Details)
             CheckAll(string bootstrapDomains, CancellationToken ct = default)
