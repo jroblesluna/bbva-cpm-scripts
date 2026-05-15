@@ -83,7 +83,10 @@ export default function AccountsPage() {
     mutationFn: ({ accountId, data }: { accountId: string; data: PublicIPCreate }) =>
       accountsApi.addPublicIP(accountId, data),
     onSuccess: () => {
+      // Invalidar y refrescar inmediatamente las queries de accounts
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      // Forzar refetch inmediato
+      queryClient.refetchQueries({ queryKey: ['accounts'] })
     },
   })
 
@@ -92,7 +95,10 @@ export default function AccountsPage() {
     mutationFn: ({ accountId, ipId }: { accountId: string; ipId: string }) =>
       accountsApi.removePublicIP(accountId, ipId),
     onSuccess: () => {
+      // Invalidar y refrescar inmediatamente las queries de accounts
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      // Forzar refetch inmediato
+      queryClient.refetchQueries({ queryKey: ['accounts'] })
     },
   })
 
