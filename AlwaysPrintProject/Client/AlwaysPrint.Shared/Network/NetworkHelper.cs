@@ -18,18 +18,37 @@ namespace AlwaysPrint.Shared.Network
         /// Obtiene la IP privada de la interfaz de red que se usa para conectarse a Internet.
         /// 
         /// Estrategia:
-        /// 1. Crea un socket UDP hacia un servidor público (no envía datos reales)
-        /// 2. El sistema operativo selecciona automáticamente la interfaz correcta
-        /// 3. Obtiene la IP local del socket (la IP que se usaría para salir a Internet)
+        /// 1. Busca la interfaz con gateway predeterminado configurado (la que sale a Internet)
+        /// 2. Si falla, intenta con socket UDP hacia un servidor público
+        /// 3. Si falla, enumera interfaces y las prioriza
         /// 
-        /// Esta técnica es más confiable que enumerar interfaces porque:
-        /// - Ignora automáticamente interfaces virtuales inactivas
-        /// - Respeta las tablas de ruteo del sistema operativo
-        /// - Detecta la interfaz que realmente se usa para tráfico saliente
+        /// Esta técnica prioriza la interfaz con gateway porque:
+        /// - Es la que realmente se usa para tráfico saliente a Internet
+        /// - Funciona correctamente incluso con proxies corporativos
+        /// - Ignora automáticamente interfaces virtuales sin gateway
         /// </summary>
         /// <returns>IP privada de la interfaz principal, o "unknown" si no se puede detectar</returns>
         public static string GetOutboundLocalIP()
         {
+            // Estrategia 1: Buscar interfaz con gateway predeterminado
+            try
+            {
+                string? ipWithGateway = GetIPFromInterfaceWithGateway();
+                if (!string.IsNullOrEmpty(ipWithGateway) && ipWithGateway != "unknown")
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"NetworkHelper: IP local detectada (interfaz con gateway): {ipWithGateway}");
+                    return ipWithGateway;
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning(
+                    $"NetworkHelper: error al detectar IP con gateway: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericWarning);
+            }
+
+            // Estrategia 2: Usar socket UDP (puede fallar con proxies)
             try
             {
                 // Crear un socket UDP hacia un servidor público
@@ -37,17 +56,25 @@ namespace AlwaysPrint.Shared.Network
                 using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0))
                 {
                     // Conectar a un servidor DNS público (Google DNS)
-                    // El puerto y el servidor no importan, solo necesitamos que el SO
-                    // determine qué interfaz usaría para llegar a Internet
                     socket.Connect("8.8.8.8", 80);
                     
                     IPEndPoint? endPoint = socket.LocalEndPoint as IPEndPoint;
                     if (endPoint != null)
                     {
                         string localIP = endPoint.Address.ToString();
-                        AlwaysPrintLogger.WriteTrayInfo(
-                            $"NetworkHelper: IP local detectada (interfaz saliente): {localIP}");
-                        return localIP;
+                        
+                        // Verificar que no sea una interfaz virtual
+                        if (!IsVirtualIP(localIP))
+                        {
+                            AlwaysPrintLogger.WriteTrayInfo(
+                                $"NetworkHelper: IP local detectada (socket): {localIP}");
+                            return localIP;
+                        }
+                        else
+                        {
+                            AlwaysPrintLogger.WriteTrayInfo(
+                                $"NetworkHelper: socket retornó IP virtual ({localIP}), usando fallback");
+                        }
                     }
                 }
             }
@@ -58,7 +85,7 @@ namespace AlwaysPrint.Shared.Network
                     AlwaysPrintLogger.EvtGenericWarning);
             }
 
-            // Fallback: intentar con NetworkInterface (menos confiable)
+            // Estrategia 3: Fallback - enumerar interfaces
             try
             {
                 return GetOutboundLocalIPFromInterfaces();
@@ -71,6 +98,77 @@ namespace AlwaysPrint.Shared.Network
             }
 
             return "unknown";
+        }
+
+        /// <summary>
+        /// Obtiene la IP de la interfaz que tiene un gateway predeterminado configurado.
+        /// Esta es la interfaz que realmente se usa para salir a Internet.
+        /// </summary>
+        private static string? GetIPFromInterfaceWithGateway()
+        {
+            var interfaces = NetworkInterface.GetAllNetworkInterfaces()
+                .Where(ni => 
+                    ni.OperationalStatus == OperationalStatus.Up &&
+                    ni.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
+                    ni.NetworkInterfaceType != NetworkInterfaceType.Tunnel)
+                .OrderBy(ni => GetInterfacePriority(ni))
+                .ToList();
+
+            foreach (var ni in interfaces)
+            {
+                var ipProps = ni.GetIPProperties();
+                
+                // Verificar si tiene gateway configurado
+                var gateways = ipProps.GatewayAddresses
+                    .Where(g => g.Address.AddressFamily == AddressFamily.InterNetwork)
+                    .ToList();
+
+                if (!gateways.Any())
+                    continue; // Sin gateway, no es la interfaz principal
+
+                // Obtener la IP de esta interfaz
+                var unicastAddresses = ipProps.UnicastAddresses
+                    .Where(addr => 
+                        addr.Address.AddressFamily == AddressFamily.InterNetwork &&
+                        !IPAddress.IsLoopback(addr.Address))
+                    .ToList();
+
+                if (unicastAddresses.Any())
+                {
+                    string ip = unicastAddresses.First().Address.ToString();
+                    string gateway = gateways.First().Address.ToString();
+                    
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"NetworkHelper: interfaz con gateway encontrada - {ni.Name}: IP={ip}, Gateway={gateway}");
+                    
+                    return ip;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Verifica si una IP pertenece a una interfaz virtual basándose en su rango.
+        /// </summary>
+        private static bool IsVirtualIP(string ip)
+        {
+            // Rangos comunes de interfaces virtuales
+            // VMware: 192.168.x.1 (típicamente .23.1, .189.1, etc.)
+            // VirtualBox: 192.168.56.x
+            // Docker: 172.17.x.x, 172.18.x.x
+            // Hyper-V: 172.x.x.x
+            
+            if (ip.StartsWith("192.168.23.") || 
+                ip.StartsWith("192.168.189.") ||
+                ip.StartsWith("192.168.56.") ||
+                ip.StartsWith("172.17.") ||
+                ip.StartsWith("172.18."))
+            {
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>
