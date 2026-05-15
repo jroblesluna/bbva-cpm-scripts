@@ -50,11 +50,12 @@ logs/
 .env
 .env.local
 
-# Terraform — archivos locales generados
+# Terraform — archivos locales generados (NUNCA subir state ni plan al remoto)
 AlwaysPrintProject/Cloud/terraform/.terraform/
 AlwaysPrintProject/Cloud/terraform/.terraform.lock.hcl
-AlwaysPrintProject/Cloud/terraform/*.tfstate
-AlwaysPrintProject/Cloud/terraform/*.tfstate.*
-AlwaysPrintProject/Cloud/terraform/*.tfstate.backup
+AlwaysPrintProject/Cloud/terraform/terraform.tfstate
+AlwaysPrintProject/Cloud/terraform/terraform.tfstate.*
+AlwaysPrintProject/Cloud/terraform/tfplan
+AlwaysPrintProject/Cloud/terraform/*.backup
 
 !.kiro
