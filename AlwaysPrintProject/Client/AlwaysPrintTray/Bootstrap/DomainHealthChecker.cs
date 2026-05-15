@@ -10,8 +10,11 @@ using Microsoft.Win32;
 namespace AlwaysPrintTray.Bootstrap
 {
     /// <summary>
-    /// Realiza un HTTP GET a "https://{dominio}/api/v1/health" para cada dominio
+    /// Realiza un HTTP GET a "https://alwaysprint.{dominio}/api/v1/health" para cada dominio
     /// configurado en BootstrapDomains. Devuelve el primer dominio que responda HTTP 200.
+    ///
+    /// IMPORTANTE: Los dominios bootstrap deben ser dominios base (ej: "apps.iol.pe", "iol.pe").
+    /// El prefijo "alwaysprint." se añade automáticamente para construir la URL completa.
     ///
     /// Diseño:
     ///   - HttpClient es static readonly para reutilizar el pool de conexiones TCP y evitar
@@ -22,6 +25,7 @@ namespace AlwaysPrintTray.Bootstrap
     /// </summary>
     public static class DomainHealthChecker
     {
+        private const string SubdomainPrefix = "alwaysprint.";
         private const string HealthPath  = "/api/v1/health";
         private const int    TimeoutSecs = 10;
 
@@ -95,10 +99,17 @@ namespace AlwaysPrintTray.Bootstrap
             {
                 if (ct.IsCancellationRequested) break;
 
-                string domain = raw.Trim();
-                if (string.IsNullOrWhiteSpace(domain)) continue;
+                string baseDomain = raw.Trim();
+                if (string.IsNullOrWhiteSpace(baseDomain)) continue;
 
-                string url = $"https://{domain}{HealthPath}";
+                // Construir el dominio completo con el prefijo "alwaysprint."
+                // Ejemplo: "apps.iol.pe" → "alwaysprint.apps.iol.pe"
+                string fullDomain = $"{SubdomainPrefix}{baseDomain}";
+                string url = $"https://{fullDomain}{HealthPath}";
+                
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"Bootstrap: intentando {url} (dominio base: {baseDomain})");
+                
                 try
                 {
                     // Combina el timeout del HttpClient con el token de cancelación global.
@@ -115,20 +126,40 @@ namespace AlwaysPrintTray.Bootstrap
                         continue;
                     }
 
-                    if (ExpectedBodyFragment != null)
+                    // Validar que la respuesta sea JSON válido
+                    try
                     {
                         string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                        if (body.IndexOf(ExpectedBodyFragment, StringComparison.Ordinal) < 0)
+                        
+                        // Intentar parsear como JSON para validar
+                        var json = Newtonsoft.Json.Linq.JToken.Parse(body);
+                        
+                        // Validación adicional opcional del body
+                        if (ExpectedBodyFragment != null)
                         {
-                            string motivo = $"{url} → body no contiene fragmento esperado";
-                            intentos.Add(motivo);
-                            AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {motivo}.");
-                            continue;
+                            if (body.IndexOf(ExpectedBodyFragment, StringComparison.Ordinal) < 0)
+                            {
+                                string motivo = $"{url} → JSON válido pero no contiene fragmento esperado";
+                                intentos.Add(motivo);
+                                AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {motivo}.");
+                                continue;
+                            }
                         }
+                        
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"Bootstrap: {url} respondió OK con JSON válido.", 
+                            AlwaysPrintLogger.EvtServiceStarted);
+                        
+                        // Retornar el dominio completo (con prefijo) para uso posterior
+                        return (true, fullDomain, url);
                     }
-
-                    AlwaysPrintLogger.WriteTrayInfo($"Bootstrap: {url} respondió OK.", AlwaysPrintLogger.EvtServiceStarted);
-                    return (true, domain, url);
+                    catch (Newtonsoft.Json.JsonException ex)
+                    {
+                        string motivo = $"{url} → HTTP 200 pero respuesta no es JSON válido: {ex.Message}";
+                        intentos.Add(motivo);
+                        AlwaysPrintLogger.WriteTrayWarning($"Bootstrap: {motivo}.");
+                        continue;
+                    }
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
