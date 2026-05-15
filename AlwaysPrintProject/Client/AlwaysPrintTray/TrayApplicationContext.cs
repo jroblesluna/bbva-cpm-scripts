@@ -31,6 +31,7 @@ namespace AlwaysPrintTray
 
         // Integración Cloud (null si CloudEnabled=0 o CloudApiUrl vacía)
         private CloudManager? _cloudManager;
+        private CloudRegistration? _cloudRegistration;
 
         public TrayApplicationContext()
         {
@@ -178,7 +179,22 @@ namespace AlwaysPrintTray
                 else
                 {
                     AlwaysPrintLogger.WriteTrayInfo(
-                        "Integración Cloud deshabilitada (CloudEnabled=0 o CloudApiUrl vacía).");
+                        "Integración Cloud deshabilitada (CloudEnabled=0 o CloudApiUrl vacía). " +
+                        "Iniciando ciclo de registro automático...");
+                    
+                    // Iniciar ciclo de registro automático
+                    try
+                    {
+                        _cloudRegistration = new CloudRegistration(cfg);
+                        _cloudRegistration.RegistrationSuccessful += OnCloudRegistrationSuccessful;
+                        AlwaysPrintLogger.WriteTrayInfo("CloudRegistration iniciado correctamente.");
+                    }
+                    catch (Exception exReg)
+                    {
+                        AlwaysPrintLogger.WriteTrayError(
+                            $"Error iniciando CloudRegistration. {exReg.Message}");
+                        _cloudRegistration = null;
+                    }
                 }
             }
             catch (OperationCanceledException) { /* shutdown normal */ }
@@ -263,6 +279,85 @@ namespace AlwaysPrintTray
                 _trayIcon.ShowBalloonTip(5000);
             }, null);
         }
+        
+        /// <summary>
+        /// Callback que se ejecuta cuando el registro en la cloud es exitoso.
+        /// Activa CloudEnabled y CloudApiUrl, luego inicia CloudManager.
+        /// </summary>
+        private void OnCloudRegistrationSuccessful(string workstationId, string accountId, string accountName, string cloudApiUrl)
+        {
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"OnCloudRegistrationSuccessful: " +
+                $"workstation_id={workstationId}, " +
+                $"account_id={accountId}, " +
+                $"account_name={accountName}, " +
+                $"cloud_api_url={cloudApiUrl}");
+            
+            try
+            {
+                // 1. Actualizar configuración en registry
+                var cfg = _registry.Load();
+                cfg.CloudEnabled = true;
+                cfg.CloudApiUrl = cloudApiUrl;
+                
+                // Enviar actualización al servicio vía pipe
+                var updatePayload = new UpdateConfigurationPayload { Configuration = cfg };
+                var request = PipeMessage.Create(MessageType.UpdateConfiguration, updatePayload);
+                var response = _pipe.Send(request);
+                
+                if (response?.Type == MessageType.Ack)
+                {
+                    var ack = response.GetPayload<AckPayload>();
+                    if (ack?.Success == true)
+                    {
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            "OnCloudRegistrationSuccessful: configuración actualizada en registry");
+                        
+                        // 2. Detener CloudRegistration
+                        if (_cloudRegistration != null)
+                        {
+                            _cloudRegistration.RegistrationSuccessful -= OnCloudRegistrationSuccessful;
+                            _cloudRegistration.Dispose();
+                            _cloudRegistration = null;
+                            AlwaysPrintLogger.WriteTrayInfo(
+                                "OnCloudRegistrationSuccessful: CloudRegistration detenido");
+                        }
+                        
+                        // 3. Iniciar CloudManager
+                        var credentials = new CloudCredentialsManager();
+                        _cloudManager = new CloudManager(cfg, credentials, _pipe, _uiContext, _trayIcon);
+                        _cloudManager.Start();
+                        
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            "OnCloudRegistrationSuccessful: CloudManager iniciado correctamente");
+                        
+                        // 4. Mostrar notificación al usuario
+                        ShowBalloon(
+                            "AlwaysPrint",
+                            $"¡Registro exitoso! Conectado a {accountName}",
+                            ToolTipIcon.Info);
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteError(
+                            $"OnCloudRegistrationSuccessful: error al actualizar configuración: {ack?.Message}",
+                            AlwaysPrintLogger.EvtGenericError);
+                    }
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteError(
+                        "OnCloudRegistrationSuccessful: no se recibió confirmación del servicio",
+                        AlwaysPrintLogger.EvtGenericError);
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"OnCloudRegistrationSuccessful: error al activar integración cloud: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+            }
+        }
 
         protected override void Dispose(bool disposing)
         {
@@ -270,6 +365,7 @@ namespace AlwaysPrintTray
             {
                 _cts.Cancel();
                 _cloudManager?.Dispose();
+                _cloudRegistration?.Dispose();
                 _trayIcon?.Dispose();
                 _pipe?.Dispose();
                 _cts.Dispose();

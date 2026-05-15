@@ -334,7 +334,7 @@ No se usa SSH — el acceso al EC2 es exclusivamente vía **SSM Session Manager*
 
 ### Dominio y SSL
 
-- **Dominio**: `alwaysprint.apps.iol.pe` (zona `apps.iol.pe` — DNS en Hostinger, no Route53)
+- **Dominio**: `apps.iol.pe` (zona `apps.iol.pe` — DNS en Hostinger, no Route53)
 - **SSL**: Let's Encrypt (Certbot + nginx), renovación automática vía cron
 - **IP**: Elastic IP estática `34.213.90.95` (no cambia al reiniciar el EC2)
 
