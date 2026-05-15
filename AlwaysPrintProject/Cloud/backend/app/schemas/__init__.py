@@ -36,6 +36,9 @@ from app.schemas.workstation import (
     WorkstationListResponse,
     WorkstationStatsResponse,
     AccountBasicResponse,
+    WorkstationRegisterRequest,
+    WorkstationRegisterResponse,
+    WorkstationRegisterPendingResponse,
 )
 
 # === VLAN SCHEMAS ===
@@ -153,6 +156,9 @@ __all__ = [
     "WorkstationListResponse",
     "WorkstationStatsResponse",
     "AccountBasicResponse",
+    "WorkstationRegisterRequest",
+    "WorkstationRegisterResponse",
+    "WorkstationRegisterPendingResponse",
     # VLAN
     "VLANCreate",
     "VLANUpdate",

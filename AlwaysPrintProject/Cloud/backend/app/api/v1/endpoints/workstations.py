@@ -2,12 +2,14 @@
 Endpoints de gestión de workstations.
 
 Este módulo define los endpoints para:
+- Registro inicial de workstations (sin autenticación)
 - Listado de workstations con filtros
 - Actualización de workstations
 - Gestión de configuración específica
 - Estadísticas
 """
 
+import logging
 from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
@@ -15,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.core.utils import get_client_ip
+from app.core.utils import get_client_ip, get_workstation_local_ip
 from app.models.user import User, UserRole
 from app.models.workstation import Workstation
 from app.schemas import (
@@ -27,13 +29,188 @@ from app.schemas import (
     WorkstationStatsResponse,
     WorkstationConfigUpdate,
     WorkstationConfigResponse,
+    WorkstationRegisterRequest,
+    WorkstationRegisterResponse,
+    WorkstationRegisterPendingResponse,
 )
 from app.services.workstation import WorkstationService
 from app.services.config import ConfigService
 from app.services.audit import AuditService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
+
+# === ENDPOINT DE REGISTRO (SIN AUTENTICACIÓN) ===
+
+@router.post("/register", 
+             response_model=WorkstationRegisterResponse,
+             status_code=status.HTTP_201_CREATED,
+             responses={
+                 201: {"description": "Workstation registrada exitosamente"},
+                 403: {"model": WorkstationRegisterPendingResponse, "description": "IP pública pendiente de autorización"},
+                 500: {"description": "Error interno del servidor"}
+             })
+def register_workstation(
+    request: Request,
+    data: WorkstationRegisterRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Registrar una workstation nueva (endpoint sin autenticación).
+    
+    Este endpoint permite que workstations se registren automáticamente
+    sin necesidad de credenciales previas.
+    
+    Flujo:
+    1. Detecta la IP pública del cliente
+    2. Verifica si la IP pública está autorizada
+    3. Si NO autorizada: registra IP como pendiente y devuelve 403
+    4. Si autorizada: crea workstation y devuelve credenciales
+    
+    Args:
+        request: Request de FastAPI (para extraer IP)
+        data: Datos de la workstation
+        db: Sesión de base de datos
+    
+    Returns:
+        WorkstationRegisterResponse: Credenciales si registro exitoso
+        WorkstationRegisterPendingResponse: Info de espera si IP pendiente (403)
+    
+    Raises:
+        HTTPException 403: IP pública no autorizada (pendiente)
+        HTTPException 500: Error interno
+    """
+    # Detectar IP pública del cliente
+    public_ip = get_client_ip(request)
+    workstation_local_ip = get_workstation_local_ip(request)
+    
+    logger.info(
+        f"[REGISTRO HTTP] Solicitud de registro recibida: "
+        f"ip_private={data.ip_private}, "
+        f"hostname={data.hostname}, "
+        f"public_ip={public_ip}, "
+        f"workstation_local_ip={workstation_local_ip}"
+    )
+    
+    try:
+        workstation_service = WorkstationService()
+        
+        # Intentar registrar workstation
+        workstation, is_new, reg_status = workstation_service.register_workstation(
+            db=db,
+            ip_private=data.ip_private,
+            public_ip=public_ip,
+            hostname=data.hostname,
+            os_serial=data.os_serial,
+            current_user=data.current_user
+        )
+        
+        if reg_status == "pending":
+            # IP pública no autorizada
+            logger.warning(
+                f"[REGISTRO HTTP] IP pública no autorizada: {public_ip}. "
+                f"Registro rechazado para ip_private={data.ip_private}"
+            )
+            
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "status": "pending",
+                    "public_ip": public_ip,
+                    "message": (
+                        f"Tu IP pública ({public_ip}) no está autorizada. "
+                        "Un administrador debe autorizar esta IP antes de que puedas registrarte. "
+                        "La IP ha sido registrada y está pendiente de autorización. "
+                        "Por favor, reintenta en unos minutos."
+                    ),
+                    "retry_after_seconds": 300  # 5 minutos
+                }
+            )
+        
+        elif reg_status == "inactive_account":
+            # Cuenta desactivada
+            logger.warning(
+                f"[REGISTRO HTTP] Cuenta desactivada para IP pública: {public_ip}. "
+                f"Registro rechazado para ip_private={data.ip_private}"
+            )
+            
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="La cuenta asociada a esta IP está desactivada."
+            )
+        
+        elif reg_status == "authorized" and workstation:
+            # Registro exitoso
+            logger.info(
+                f"[REGISTRO HTTP] Workstation registrada exitosamente: "
+                f"id={workstation.id}, "
+                f"ip_private={workstation.ip_private}, "
+                f"hostname={workstation.hostname}, "
+                f"account_id={workstation.account_id}, "
+                f"is_new={is_new}"
+            )
+            
+            # Obtener información de la cuenta
+            from app.models.account import Account
+            account = db.query(Account).filter(Account.id == workstation.account_id).first()
+            
+            if not account:
+                logger.error(
+                    f"[REGISTRO HTTP] Cuenta no encontrada: {workstation.account_id}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Error interno: cuenta no encontrada"
+                )
+            
+            # Construir URL del servidor cloud
+            # Usar el host del request para construir la URL
+            cloud_api_url = f"{request.url.scheme}://{request.url.netloc}"
+            
+            logger.info(
+                f"[REGISTRO HTTP] Devolviendo credenciales: "
+                f"workstation_id={workstation.id}, "
+                f"account_id={account.id}, "
+                f"account_name={account.name}, "
+                f"cloud_api_url={cloud_api_url}"
+            )
+            
+            return WorkstationRegisterResponse(
+                workstation_id=workstation.id,
+                account_id=account.id,
+                account_name=account.name,
+                message="Workstation registrada exitosamente" if is_new else "Workstation actualizada exitosamente",
+                cloud_api_url=cloud_api_url
+            )
+        
+        else:
+            # Estado inesperado
+            logger.error(
+                f"[REGISTRO HTTP] Estado inesperado: reg_status={reg_status}, "
+                f"workstation={workstation}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error interno al registrar workstation"
+            )
+    
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Log el error y devolver un error 500
+        logger.error(
+            f"[REGISTRO HTTP] Error inesperado al registrar workstation: {e}",
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al registrar workstation: {str(e)}"
+        )
+
+
+# === ENDPOINTS AUTENTICADOS ===
 
 @router.get("/", response_model=WorkstationListResponse)
 def list_workstations(

@@ -102,7 +102,7 @@ class ConfigService:
                 account_id=workstation.account_id,
                 corporate_queue_name="LexmarkBBVA",
                 pending_task_polling_minutes=3,
-                bootstrap_domains="alwaysprint.apps.iol.pe",
+                bootstrap_domains="apps.iol.pe,sistemas.com.pe",
                 telemetry_enabled=True,
                 telemetry_interval_seconds=300,
             )

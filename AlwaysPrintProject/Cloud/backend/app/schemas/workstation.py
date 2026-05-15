@@ -29,6 +29,31 @@ class LicenseResponse(BaseModel):
 
 # === SCHEMAS DE WORKSTATION ===
 
+class WorkstationRegisterRequest(BaseModel):
+    """Schema para solicitud de registro de workstation (sin autenticación)."""
+    ip_private: str = Field(..., description="IP privada de la workstation")
+    hostname: Optional[str] = Field(None, max_length=255, description="Nombre del host Windows")
+    os_serial: Optional[str] = Field(None, max_length=255, description="Serial del sistema operativo")
+    current_user: Optional[str] = Field(None, max_length=255, description="Usuario actualmente logueado")
+
+
+class WorkstationRegisterResponse(BaseModel):
+    """Schema de respuesta para registro exitoso de workstation."""
+    workstation_id: UUID = Field(..., description="ID de la workstation registrada")
+    account_id: UUID = Field(..., description="ID de la cuenta asociada")
+    account_name: str = Field(..., description="Nombre de la cuenta")
+    message: str = Field(..., description="Mensaje de confirmación")
+    cloud_api_url: str = Field(..., description="URL del servidor cloud para uso futuro")
+
+
+class WorkstationRegisterPendingResponse(BaseModel):
+    """Schema de respuesta cuando la IP pública está pendiente de autorización."""
+    status: str = Field("pending", description="Estado del registro")
+    public_ip: str = Field(..., description="IP pública detectada")
+    message: str = Field(..., description="Mensaje explicativo")
+    retry_after_seconds: int = Field(300, description="Segundos recomendados antes de reintentar")
+
+
 class WorkstationResponse(BaseModel):
     """Schema de respuesta para workstation."""
     id: UUID
