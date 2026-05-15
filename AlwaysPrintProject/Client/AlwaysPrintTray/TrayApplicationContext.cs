@@ -282,7 +282,8 @@ namespace AlwaysPrintTray
         
         /// <summary>
         /// Callback que se ejecuta cuando el registro en la cloud es exitoso.
-        /// Activa CloudEnabled y CloudApiUrl, luego inicia CloudManager.
+        /// Envía actualización de configuración al Service vía Named Pipe para activar CloudEnabled y CloudApiUrl.
+        /// El Service es quien escribe en HKLM (tiene permisos administrativos).
         /// </summary>
         private void OnCloudRegistrationSuccessful(string workstationId, string accountId, string accountName, string cloudApiUrl)
         {
@@ -295,12 +296,19 @@ namespace AlwaysPrintTray
             
             try
             {
-                // 1. Actualizar configuración en registry
+                // 1. Leer configuración actual
                 var cfg = _registry.Load();
+                
+                // 2. Actualizar campos de Cloud
                 cfg.CloudEnabled = true;
                 cfg.CloudApiUrl = cloudApiUrl;
                 
-                // Enviar actualización al servicio vía pipe
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"OnCloudRegistrationSuccessful: enviando actualización al Service: " +
+                    $"CloudEnabled=1, CloudApiUrl={cloudApiUrl}");
+                
+                // 3. Enviar actualización al Service vía Named Pipe
+                // El Service es quien escribe en HKLM (tiene permisos administrativos)
                 var updatePayload = new UpdateConfigurationPayload { Configuration = cfg };
                 var request = PipeMessage.Create(MessageType.UpdateConfiguration, updatePayload);
                 var response = _pipe.Send(request);
@@ -311,9 +319,9 @@ namespace AlwaysPrintTray
                     if (ack?.Success == true)
                     {
                         AlwaysPrintLogger.WriteTrayInfo(
-                            "OnCloudRegistrationSuccessful: configuración actualizada en registry");
+                            "OnCloudRegistrationSuccessful: configuración actualizada por el Service en HKLM");
                         
-                        // 2. Detener CloudRegistration
+                        // 4. Detener CloudRegistration
                         if (_cloudRegistration != null)
                         {
                             _cloudRegistration.RegistrationSuccessful -= OnCloudRegistrationSuccessful;
@@ -323,7 +331,7 @@ namespace AlwaysPrintTray
                                 "OnCloudRegistrationSuccessful: CloudRegistration detenido");
                         }
                         
-                        // 3. Iniciar CloudManager
+                        // 5. Iniciar CloudManager con la configuración actualizada
                         var credentials = new CloudCredentialsManager();
                         _cloudManager = new CloudManager(cfg, credentials, _pipe, _uiContext, _trayIcon);
                         _cloudManager.Start();
@@ -331,7 +339,7 @@ namespace AlwaysPrintTray
                         AlwaysPrintLogger.WriteTrayInfo(
                             "OnCloudRegistrationSuccessful: CloudManager iniciado correctamente");
                         
-                        // 4. Mostrar notificación al usuario
+                        // 6. Mostrar notificación al usuario
                         ShowBalloon(
                             "AlwaysPrint",
                             $"¡Registro exitoso! Conectado a {accountName}",
@@ -340,15 +348,25 @@ namespace AlwaysPrintTray
                     else
                     {
                         AlwaysPrintLogger.WriteError(
-                            $"OnCloudRegistrationSuccessful: error al actualizar configuración: {ack?.Message}",
+                            $"OnCloudRegistrationSuccessful: error al actualizar configuración en Service: {ack?.Message}",
                             AlwaysPrintLogger.EvtGenericError);
+                        
+                        ShowBalloon(
+                            "AlwaysPrint",
+                            "Error al activar integración Cloud. Revise los logs.",
+                            ToolTipIcon.Error);
                     }
                 }
                 else
                 {
                     AlwaysPrintLogger.WriteError(
-                        "OnCloudRegistrationSuccessful: no se recibió confirmación del servicio",
+                        "OnCloudRegistrationSuccessful: no se recibió confirmación del Service",
                         AlwaysPrintLogger.EvtGenericError);
+                    
+                    ShowBalloon(
+                        "AlwaysPrint",
+                        "Error al comunicarse con el servicio. Revise los logs.",
+                        ToolTipIcon.Error);
                 }
             }
             catch (Exception ex)
@@ -356,6 +374,11 @@ namespace AlwaysPrintTray
                 AlwaysPrintLogger.WriteError(
                     $"OnCloudRegistrationSuccessful: error al activar integración cloud: {ex.Message}",
                     AlwaysPrintLogger.EvtGenericError);
+                
+                ShowBalloon(
+                    "AlwaysPrint",
+                    "Error inesperado al activar integración Cloud. Revise los logs.",
+                    ToolTipIcon.Error);
             }
         }
 
