@@ -7,6 +7,8 @@ obj/
 dist/
 *.user
 .vs/
+AlwaysPrintProject/Client/AlwaysPrint.msi
+AlwaysPrintProject/Client/AlwaysPrint.wixpdb
 
 # Python
 __pycache__/
@@ -58,4 +60,4 @@ AlwaysPrintProject/Cloud/terraform/terraform.tfstate.*
 AlwaysPrintProject/Cloud/terraform/tfplan
 AlwaysPrintProject/Cloud/terraform/*.backup
 
-!.kiro
+.kiro
