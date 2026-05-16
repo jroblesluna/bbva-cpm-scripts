@@ -134,4 +134,8 @@ resource "aws_instance" "main" {
   }))
 
   tags = { Name = "${local.prefix}-ec2" }
+
+  lifecycle {
+    ignore_changes = [ami, user_data, key_name]
+  }
 }
