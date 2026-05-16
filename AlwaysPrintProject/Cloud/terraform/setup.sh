@@ -42,7 +42,7 @@ echo "────────────────────────�
 
 # ── Gestión de clave SSH ──────────────────────────────────────────────────────
 SECRET_EXISTS=false
-if aws secretsmanager describe-secret \
+if aws secretsmanager get-secret-value \
      --secret-id "$SECRET_ID" --region "$REGION" &>/dev/null; then
   SECRET_EXISTS=true
 fi
