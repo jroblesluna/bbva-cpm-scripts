@@ -91,16 +91,14 @@ if [ -d "$TF_DIR/.terraform" ]; then
     TF_OUTPUT=$(terraform -chdir="$TF_DIR" output -json 2>/dev/null)
     
     if [ $? -eq 0 ] && [ -n "$TF_OUTPUT" ]; then
-        DOMAIN=$(echo "$TF_OUTPUT" | grep -o '"app_url":"[^"]*"' | cut -d'"' -f4 | sed 's|https://||')
-        INSTANCE_ID=$(echo "$TF_OUTPUT" | grep -o '"ec2_instance_id":"[^"]*"' | cut -d'"' -f4)
-        EC2_IP=$(echo "$TF_OUTPUT" | grep -o '"ec2_public_ip":"[^"]*"' | cut -d'"' -f4)
-        RDS_ENDPOINT=$(echo "$TF_OUTPUT" | grep -o '"rds_endpoint":"[^"]*"' | cut -d'"' -f4)
-        BACKEND_ECR=$(echo "$TF_OUTPUT" | grep -o '"backend_ecr_url":"[^"]*"' | cut -d'"' -f4)
-        FRONTEND_ECR=$(echo "$TF_OUTPUT" | grep -o '"frontend_ecr_url":"[^"]*"' | cut -d'"' -f4)
-        AWS_REGION=$(echo "$TF_OUTPUT" | grep -o '"value":"us-west-[0-9]"' | head -1 | cut -d'"' -f4)
-        
-        # Fallback para region
-        [ -z "$AWS_REGION" ] && AWS_REGION="us-west-2"
+        # Parsear outputs (formato: {"name": {"value": "..."}})
+        DOMAIN=$(echo "$TF_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('app_url',{}).get('value','').replace('https://',''))" 2>/dev/null)
+        INSTANCE_ID=$(echo "$TF_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('ec2_instance_id',{}).get('value',''))" 2>/dev/null)
+        EC2_IP=$(echo "$TF_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('ec2_public_ip',{}).get('value',''))" 2>/dev/null)
+        RDS_ENDPOINT=$(echo "$TF_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('rds_endpoint',{}).get('value',''))" 2>/dev/null)
+        BACKEND_ECR=$(echo "$TF_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('backend_ecr_url',{}).get('value',''))" 2>/dev/null)
+        FRONTEND_ECR=$(echo "$TF_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('frontend_ecr_url',{}).get('value',''))" 2>/dev/null)
+        AWS_REGION="us-west-2"
         
         check_ok "Terraform state leído correctamente"
         echo -e "  ${NC}  Domain:       ${DOMAIN:-no definido}"
