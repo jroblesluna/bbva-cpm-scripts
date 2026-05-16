@@ -1,0 +1,140 @@
+"""
+Schemas Pydantic para configuración de acciones administrativas.
+"""
+
+from datetime import datetime
+from typing import Optional
+from pydantic import BaseModel, Field, validator
+import hashlib
+
+
+# === SCHEMAS DE REQUEST ===
+
+class ActionConfigUpload(BaseModel):
+    """Schema para subir una nueva configuración de acciones."""
+    
+    config_json: str = Field(..., description="JSON completo del archivo .alwaysconfig")
+    is_active: bool = Field(default=True, description="Si la configuración debe estar activa")
+    
+    @validator('config_json')
+    def validate_json_not_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError("config_json no puede estar vacío")
+        return v
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "config_json": '{"version": "1.0", "name": "CPM_Compliant", ...}',
+                "is_active": True
+            }
+        }
+
+
+class ActionConfigUpdate(BaseModel):
+    """Schema para actualizar una configuración existente."""
+    
+    is_active: Optional[bool] = Field(None, description="Activar/desactivar propagación")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "is_active": False
+            }
+        }
+
+
+# === SCHEMAS DE RESPONSE ===
+
+class ActionConfigInfo(BaseModel):
+    """Schema con información básica de la configuración (sin JSON completo)."""
+    
+    id: int
+    organization_id: int
+    name: str
+    version: str
+    description: Optional[str]
+    config_hash: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    created_by_id: Optional[int]
+    
+    class Config:
+        orm_mode = True
+        schema_extra = {
+            "example": {
+                "id": 1,
+                "organization_id": 123,
+                "name": "CPM_Compliant",
+                "version": "1.0",
+                "description": "Configuración de cumplimiento para Lexmark CPM",
+                "config_hash": "a3f5c8d2",
+                "is_active": True,
+                "created_at": "2026-05-15T15:00:00Z",
+                "updated_at": "2026-05-15T15:00:00Z",
+                "created_by_id": 456
+            }
+        }
+
+
+class ActionConfigDetail(ActionConfigInfo):
+    """Schema con todos los detalles incluyendo el JSON completo."""
+    
+    config_json: str
+    storage_path: Optional[str]
+    
+    class Config:
+        orm_mode = True
+
+
+class ActionConfigDownloadInfo(BaseModel):
+    """Schema con información para descargar la configuración."""
+    
+    hash: str = Field(..., description="Hash SHA256 corto (8 chars)")
+    download_url: str = Field(..., description="URL relativa para descargar")
+    name: str
+    version: str
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "hash": "a3f5c8d2",
+                "download_url": "/api/v1/workstations/ws-123/config/download",
+                "name": "CPM_Compliant",
+                "version": "1.0"
+            }
+        }
+
+
+class ActionConfigSyncStatus(BaseModel):
+    """Schema con estado de sincronización de una workstation."""
+    
+    workstation_id: str
+    has_config: bool = Field(..., description="Si la workstation tiene configuración local")
+    local_hash: Optional[str] = Field(None, description="Hash de la configuración local")
+    cloud_hash: Optional[str] = Field(None, description="Hash de la configuración en Cloud")
+    is_synced: bool = Field(..., description="Si el hash local coincide con el de Cloud")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "workstation_id": "ws-abc123",
+                "has_config": True,
+                "local_hash": "a3f5c8d2",
+                "cloud_hash": "a3f5c8d2",
+                "is_synced": True
+            }
+        }
+
+
+# === UTILIDADES ===
+
+def calculate_config_hash(config_json: str) -> str:
+    """
+    Calcula el hash SHA256 de un JSON de configuración.
+    Retorna los primeros 8 caracteres en hexadecimal minúsculas.
+    """
+    hash_obj = hashlib.sha256(config_json.encode('utf-8'))
+    full_hash = hash_obj.hexdigest()
+    return full_hash[:8]

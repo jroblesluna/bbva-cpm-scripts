@@ -130,6 +130,17 @@ from app.schemas.auth import (
     PasswordResetConfirm,
 )
 
+# === ACTION CONFIG SCHEMAS ===
+from app.schemas.action_config import (
+    ActionConfigUpload,
+    ActionConfigUpdate,
+    ActionConfigInfo,
+    ActionConfigDetail,
+    ActionConfigDownloadInfo,
+    ActionConfigSyncStatus,
+    calculate_config_hash,
+)
+
 __all__ = [
     # User
     "UserCreate",
@@ -222,4 +233,12 @@ __all__ = [
     "RefreshTokenRequest",
     "PasswordResetRequest",
     "PasswordResetConfirm",
+    # Action Config
+    "ActionConfigUpload",
+    "ActionConfigUpdate",
+    "ActionConfigInfo",
+    "ActionConfigDetail",
+    "ActionConfigDownloadInfo",
+    "ActionConfigSyncStatus",
+    "calculate_config_hash",
 ]

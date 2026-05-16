@@ -19,6 +19,7 @@ from app.api.v1.endpoints import (
     setup,
     telemetry,
     connectivity,
+    action_config,
 )
 
 # Router principal de la API v1
@@ -113,6 +114,12 @@ api_router.include_router(
     audit.router,
     prefix="/audit",
     tags=["Auditoría"]
+)
+
+# Configuración de acciones administrativas
+api_router.include_router(
+    action_config.router,
+    tags=["Configuración de Acciones"]
 )
 
 

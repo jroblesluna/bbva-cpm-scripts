@@ -25,6 +25,9 @@ namespace AlwaysPrint.Shared.Messages
         CloudConfigurationReceived,  // Tray → Service: aplicar config descargada de APCM
         ReportTelemetry,             // Service → Tray: evento de telemetría para enviar
         GetCloudStatus,              // Tray → Service: consultar estado Cloud
-        CloudStatusResponse          // Service → Tray: respuesta con estado Cloud
+        CloudStatusResponse,         // Service → Tray: respuesta con estado Cloud
+        
+        // Configuración de Acciones
+        ActionConfigChanged          // Tray → Service: nueva configuración de acciones descargada
     }
 }

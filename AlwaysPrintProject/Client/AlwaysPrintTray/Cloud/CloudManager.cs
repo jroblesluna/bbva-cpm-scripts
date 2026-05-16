@@ -36,6 +36,7 @@ namespace AlwaysPrintTray.Cloud
 
         private CloudWebSocketClient? _wsClient;
         private ConfigurationSync? _configSync;
+        private ConfigManager? _configManager;
         private TelemetryReporter? _telemetryReporter;
         private ConnectivityMonitor? _connectivityMonitor;
         private OfflineStateManager? _offlineState;
@@ -85,6 +86,10 @@ namespace AlwaysPrintTray.Cloud
                 _credentials,
                 _pipe,
                 _wsClient);
+
+            // Inicializar ConfigManager para gestión de archivos de configuración de acciones
+            _configManager = new ConfigManager(_wsClient.HttpClient, _pipe);
+            AlwaysPrintLogger.WriteTrayInfo("CloudManager: ConfigManager inicializado.");
 
             // Detectar condición sin configuración cacheada + offline al inicio
             var cachedConfig = _configSync.LoadFromCache();
@@ -212,6 +217,9 @@ namespace AlwaysPrintTray.Cloud
 
             SendRegistration();
             NotifyServiceCloudStatus(connected: true);
+            
+            // Nota: CheckActionConfiguration() se llama en HandleRegistered() 
+            // después de recibir el WorkstationId del servidor
         }
 
         private void OnDisconnected()
@@ -350,6 +358,9 @@ namespace AlwaysPrintTray.Cloud
                     _credentials.SaveWorkstationId(workstationId!);
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"CloudManager: WorkstationId registrado = {workstationId}");
+                    
+                    // Verificar configuración de acciones ahora que tenemos WorkstationId
+                    CheckActionConfiguration();
                 }
 
                 _credentials.SaveLastConnected(DateTime.UtcNow);
@@ -611,6 +622,59 @@ namespace AlwaysPrintTray.Cloud
             catch
             {
                 return "";
+            }
+        }
+        
+        // === Gestión de Configuración de Acciones ===
+        
+        /// <summary>
+        /// Verifica y descarga la configuración de acciones desde la Cloud si es necesaria.
+        /// Se ejecuta automáticamente al conectarse a la Cloud.
+        /// </summary>
+        private async void CheckActionConfiguration()
+        {
+            try
+            {
+                if (_configManager == null || !_credentials.IsRegistered)
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "CloudManager: no se puede verificar configuración de acciones (ConfigManager no inicializado o workstation no registrada)");
+                    return;
+                }
+                
+                AlwaysPrintLogger.WriteTrayInfo("CloudManager: verificando configuración de acciones en Cloud");
+                
+                // Usar WorkstationId como API Key para autenticación
+                bool success = await _configManager.CheckAndDownloadConfigAsync(
+                    _config.CloudApiUrl,
+                    _credentials.WorkstationId!,
+                    _credentials.WorkstationId!);
+                
+                if (success)
+                {
+                    var localInfo = _configManager.GetLocalConfigInfo();
+                    if (localInfo != null)
+                    {
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"CloudManager: configuración de acciones actualizada. " +
+                            $"Nombre: {localInfo.Name}, Hash: {localInfo.Hash}");
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            "CloudManager: no hay configuración de acciones activa en Cloud");
+                    }
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "CloudManager: error verificando configuración de acciones");
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error en CheckActionConfiguration: {ex.Message}");
             }
         }
     }

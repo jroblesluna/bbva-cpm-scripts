@@ -88,6 +88,7 @@ class Account(Base):
     audit_logs = relationship("AuditLog", back_populates="account", foreign_keys="AuditLog.account_id")
     telemetry_logs = relationship("TelemetryLog", back_populates="account", cascade="all, delete-orphan")
     connectivity_results = relationship("ConnectivityResult", back_populates="account", cascade="all, delete-orphan")
+    action_configs = relationship("ActionConfig", back_populates="organization", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Account(id={self.id}, name={self.name}, is_active={self.is_active})>"

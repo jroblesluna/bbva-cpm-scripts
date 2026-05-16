@@ -13,6 +13,7 @@ from app.models.config import GlobalConfig, VLANConfig, WorkstationConfig
 from app.models.audit import AuditLog, ActionType
 from app.models.message import Message, TargetType
 from app.models.telemetry import TelemetryLog, ConnectivityResult
+from app.models.action_config import ActionConfig
 
 __all__ = [
     # User models
@@ -46,4 +47,7 @@ __all__ = [
     # Telemetry models
     "TelemetryLog",
     "ConnectivityResult",
+    
+    # Action config models
+    "ActionConfig",
 ]

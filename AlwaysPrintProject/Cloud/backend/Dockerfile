@@ -31,5 +31,10 @@ RUN mkdir -p logs
 # Exponer puerto
 EXPOSE 8000
 
+# Script de inicio que ejecuta migraciones antes de iniciar uvicorn
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 # Comando por defecto
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

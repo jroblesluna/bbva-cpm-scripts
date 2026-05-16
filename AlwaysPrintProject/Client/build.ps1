@@ -104,14 +104,22 @@ Write-Host "Version del paquete: $version ($($now.ToString('yyyy-MM-dd HH:mm')))
 
 Write-Host "=== Publicando AlwaysPrintService ===" -ForegroundColor Cyan
 dotnet publish .\AlwaysPrintService\AlwaysPrintService.csproj `
-    -c Release -f net48 -o .\dist --no-self-contained
+    -c Release -f net48 -o .\dist --no-self-contained `
+    /p:Version=$version `
+    /p:AssemblyVersion=$version `
+    /p:FileVersion=$version `
+    /p:InformationalVersion=$version
 if ($LASTEXITCODE -ne 0) { Write-Error "Fallo en publish de AlwaysPrintService."; exit 1 }
 
 # ── 5. Publicar AlwaysPrintTray ───────────────────────────────────────────────
 
 Write-Host "=== Publicando AlwaysPrintTray ===" -ForegroundColor Cyan
 dotnet publish .\AlwaysPrintTray\AlwaysPrintTray.csproj `
-    -c Release -f net48 -o .\dist --no-self-contained
+    -c Release -f net48 -o .\dist --no-self-contained `
+    /p:Version=$version `
+    /p:AssemblyVersion=$version `
+    /p:FileVersion=$version `
+    /p:InformationalVersion=$version
 if ($LASTEXITCODE -ne 0) { Write-Error "Fallo en publish de AlwaysPrintTray."; exit 1 }
 
 # ── 6. Verificar archivos requeridos en dist\ ─────────────────────────────────

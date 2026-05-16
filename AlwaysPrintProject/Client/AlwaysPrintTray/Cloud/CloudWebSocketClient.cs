@@ -18,6 +18,9 @@ namespace AlwaysPrintTray.Cloud
 
         // === Estado ===
         public bool IsConnected { get; private set; }
+        
+        // === HttpClient compartido para requests HTTP ===
+        public System.Net.Http.HttpClient HttpClient { get; private set; }
 
         // === Backoff ===
         private const int InitialDelayMs   = 1_000;
@@ -46,6 +49,18 @@ namespace AlwaysPrintTray.Cloud
             // Detectar proxy
             var targetUri = new Uri(cloudApiUrl);
             _proxyUri = ProxyHelper.GetSystemProxyUri(targetUri);
+            
+            // Inicializar HttpClient con proxy si es necesario
+            var handler = new System.Net.Http.HttpClientHandler();
+            if (_proxyUri != null)
+            {
+                handler.Proxy = new System.Net.WebProxy(_proxyUri);
+                handler.UseProxy = true;
+            }
+            HttpClient = new System.Net.Http.HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
 
             AlwaysPrintLogger.WriteTrayInfo(
                 $"CloudWebSocketClient: URL WebSocket derivada = {_wsUrl}" +
@@ -104,6 +119,7 @@ namespace AlwaysPrintTray.Cloud
             _disposed = true;
             Disconnect();
             _cts.Dispose();
+            HttpClient?.Dispose();
         }
 
         // === Privados ===

@@ -1,0 +1,112 @@
+{
+  "version": "1.0",
+  "name": "CPM_Compliant",
+  "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager",
+  "created_at": "2026-05-15T12:00:00Z",
+  "triggers": [
+    {
+      "event": "OnTrayLaunched",
+      "description": "Ejecutar después de que el Tray se haya iniciado correctamente",
+      "actions": [
+        {
+          "type": "PropagatePermissions",
+          "description": "Propagar permisos de C:\\ProgramData\\LPMC\\ a todas las subcarpetas",
+          "parameters": {
+            "path": "C:\\ProgramData\\LPMC\\",
+            "recursive": true,
+            "inherit": true,
+            "replace_child_permissions": true
+          }
+        },
+        {
+          "type": "GetLoggedInUsers",
+          "description": "Obtener lista de usuarios con sesión activa",
+          "parameters": {
+            "exclude_active_console_user": true
+          },
+          "store_result_in": "inactive_users"
+        },
+        {
+          "type": "Conditional",
+          "description": "Si hay usuarios inactivos con sesión, limpiar sus datos",
+          "condition": {
+            "variable": "inactive_users",
+            "operator": "count_greater_than",
+            "value": 0
+          },
+          "actions": [
+            {
+              "type": "StopService",
+              "description": "Detener servicio lpmc_universal_service",
+              "parameters": {
+                "service_name": "lpmc_universal_service",
+                "graceful_timeout_seconds": 30,
+                "force_kill_on_timeout": true
+              }
+            },
+            {
+              "type": "KillProcessesByName",
+              "description": "Cerrar procesos lpmc-systemtray-app.exe de usuarios inactivos",
+              "parameters": {
+                "process_name": "lpmc-systemtray-app.exe",
+                "filter_by_users": "{{inactive_users}}",
+                "force": true
+              }
+            },
+            {
+              "type": "DeleteFolderContents",
+              "description": "Eliminar contenido de carpetas pre de usuarios inactivos",
+              "parameters": {
+                "path_template": "C:\\ProgramData\\LPMC\\Jobs\\{{username}}\\CloudHybrid\\pre",
+                "iterate_users": "{{inactive_users}}",
+                "recursive": true,
+                "ignore_errors": true
+              }
+            },
+            {
+              "type": "DeleteFolderContents",
+              "description": "Eliminar contenido de carpetas post de usuarios inactivos",
+              "parameters": {
+                "path_template": "C:\\ProgramData\\LPMC\\Jobs\\{{username}}\\CloudHybrid\\post",
+                "iterate_users": "{{inactive_users}}",
+                "recursive": true,
+                "ignore_errors": true
+              }
+            },
+            {
+              "type": "StartService",
+              "description": "Iniciar servicio lpmc_universal_service",
+              "parameters": {
+                "service_name": "lpmc_universal_service",
+                "wait_for_running": true,
+                "timeout_seconds": 30
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "event": "OnConfigChange",
+      "description": "Ejecutar cuando se recibe una nueva configuración",
+      "actions": [
+        {
+          "type": "StopTray",
+          "description": "Detener App Tray actual",
+          "parameters": {
+            "graceful": true,
+            "timeout_seconds": 10
+          }
+        },
+        {
+          "type": "StartTray",
+          "description": "Iniciar App Tray con permisos de usuario loggedin",
+          "parameters": {
+            "wait_for_ready": true,
+            "timeout_seconds": 60
+          }
+        }
+      ]
+    }
+  ]
+}
