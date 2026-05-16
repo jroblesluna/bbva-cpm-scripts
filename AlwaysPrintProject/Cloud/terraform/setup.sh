@@ -56,6 +56,7 @@ if [ "$SECRET_EXISTS" = "false" ] || [ "$ROTATE_KEY" = "true" ]; then
   fi
 
   TMP_KEY=$(mktemp)
+  rm -f "$TMP_KEY"  # ssh-keygen necesita que el archivo NO exista
   ssh-keygen -t ed25519 -f "$TMP_KEY" -N "" -q
   PRIVATE_KEY=$(cat "$TMP_KEY")
   PUBLIC_KEY=$(cat "${TMP_KEY}.pub")
@@ -65,14 +66,14 @@ if [ "$SECRET_EXISTS" = "false" ] || [ "$ROTATE_KEY" = "true" ]; then
     aws secretsmanager put-secret-value \
       --secret-id "$SECRET_ID" \
       --secret-string "$PRIVATE_KEY" \
-      --region "$REGION" --output none
+      --region "$REGION" > /dev/null
     echo "✅ Secret SSH actualizado en Secrets Manager."
   else
     aws secretsmanager create-secret \
       --name "$SECRET_ID" \
       --description "Clave SSH privada para EC2 alwaysprint-prod" \
       --secret-string "$PRIVATE_KEY" \
-      --region "$REGION" --output none
+      --region "$REGION" > /dev/null
     echo "✅ Secret SSH creado en Secrets Manager."
   fi
 
