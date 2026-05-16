@@ -29,6 +29,7 @@ TIMEOUT=10
 PASS=0
 FAIL=0
 WARN=0
+SSL_AUTOFIX=false
 
 # Acumular recomendaciones
 RECOMMENDATIONS=()
@@ -411,7 +412,8 @@ if [ -n "$SSL_EXPIRY" ]; then
 else
     if [ "$DNS_OK" = "true" ]; then
         check_warn "SSL no disponible (certbot pendiente)"
-        recommend "Ejecutar certbot:\n    aws ssm send-command --instance-ids $INSTANCE_ID --document-name AWS-RunShellScript --parameters '{\"commands\":[\"certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m antonio@robles.ai && systemctl reload nginx\"]}' --region $AWS_REGION"
+        SSL_AUTOFIX=true
+        recommend "Ejecutar certbot (o responder 'y' abajo para aplicar automáticamente)"
     else
         check_warn "SSL no verificable (DNS no apunta al EC2)"
         recommend "Primero actualizar DNS ($DOMAIN → $EC2_IP), luego SSL se configurará automáticamente en ~2 min"
@@ -487,6 +489,45 @@ if [ ${#RECOMMENDATIONS[@]} -gt 0 ]; then
     for i in "${!RECOMMENDATIONS[@]}"; do
         echo -e "  ${CYAN}$((i+1)).${NC} ${RECOMMENDATIONS[$i]}"
     done
+    
+    # Ofrecer aplicar fixes automáticos
+    if [ "$SSL_AUTOFIX" = "true" ]; then
+        echo ""
+        echo -e -n "  ${BOLD}¿Ejecutar certbot automáticamente? [y/N]:${NC} "
+        read -r REPLY
+        if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+            echo -e "  ${CYAN}Ejecutando certbot vía SSM...${NC}"
+            FIX_CMD_ID=$(aws ssm send-command \
+                --instance-ids "$INSTANCE_ID" \
+                --document-name "AWS-RunShellScript" \
+                --parameters "{\"commands\":[\"certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m antonio@robles.ai && systemctl reload nginx\"]}" \
+                --query "Command.CommandId" \
+                --output text \
+                --region "$AWS_REGION" 2>/dev/null)
+            
+            if [ -n "$FIX_CMD_ID" ] && [ "$FIX_CMD_ID" != "None" ]; then
+                echo -e "  ${CYAN}Esperando resultado (15s)...${NC}"
+                sleep 15
+                FIX_RESULT=$(aws ssm get-command-invocation \
+                    --command-id "$FIX_CMD_ID" \
+                    --instance-id "$INSTANCE_ID" \
+                    --query '[Status, StandardOutputContent]' \
+                    --output text \
+                    --region "$AWS_REGION" 2>/dev/null)
+                
+                if echo "$FIX_RESULT" | grep -qi "Success\|Successfully"; then
+                    echo -e "  ${GREEN}✓ SSL configurado correctamente${NC}"
+                else
+                    echo -e "  ${RED}✗ Falló. Output:${NC}"
+                    echo "$FIX_RESULT" | tail -5 | while IFS= read -r line; do
+                        echo -e "    $line"
+                    done
+                fi
+            else
+                echo -e "  ${RED}✗ No se pudo enviar comando SSM${NC}"
+            fi
+        fi
+    fi
 fi
 
 echo ""
