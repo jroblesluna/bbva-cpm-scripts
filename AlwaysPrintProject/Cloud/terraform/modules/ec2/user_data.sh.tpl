@@ -159,31 +159,39 @@ cd $APP_DIR
 docker compose pull 2>/dev/null || true
 docker compose up -d redis 2>/dev/null || true
 
-# ── Certbot (HTTPS automatico) ────────────────────────────────────────
-# Se ejecuta en background con reintentos hasta que el DNS apunte al EC2
-cat > /opt/alwaysprint/setup_ssl.sh <<'SSL'
+# ── Certbot (HTTPS automático) ────────────────────────────────────────
+# Cron que verifica cada 2 minutos si SSL está configurado.
+# Si no lo está y el DNS apunta al EC2, ejecuta certbot automáticamente.
+# Una vez configurado, solo renueva cuando sea necesario.
+cat > /opt/alwaysprint/ensure_ssl.sh <<'SSL'
 #!/bin/bash
 DOMAIN=${domain_name}
 EMAIL=antonio@robles.ai
 
-for i in $(seq 1 30); do
-  PUBLIC_IP=$(curl -s http://checkip.amazonaws.com)
-  DNS_IP=$(dig +short $DOMAIN 2>/dev/null | tail -1)
-  # Fallback: intentar con getent si dig no funciona
-  [ -z "$DNS_IP" ] && DNS_IP=$(getent hosts $DOMAIN 2>/dev/null | awk '{print $1}')
-  if [ "$PUBLIC_IP" = "$DNS_IP" ]; then
+# Si ya tiene certificado válido, solo renovar si es necesario
+if [ -d "/etc/letsencrypt/live/$DOMAIN" ]; then
+    certbot renew --quiet && systemctl reload nginx 2>/dev/null
+    exit 0
+fi
+
+# No tiene SSL — verificar si DNS apunta a este EC2
+PUBLIC_IP=$(curl -s --max-time 5 http://checkip.amazonaws.com)
+DNS_IP=$(dig +short $DOMAIN 2>/dev/null | tail -1)
+[ -z "$DNS_IP" ] && DNS_IP=$(getent hosts $DOMAIN 2>/dev/null | awk '{print $1}')
+
+if [ "$PUBLIC_IP" = "$DNS_IP" ]; then
+    echo "$(date): DNS OK ($DOMAIN → $PUBLIC_IP). Ejecutando certbot..."
     certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $EMAIL
     systemctl reload nginx
-    echo "SSL configurado correctamente"
-    break
-  fi
-  echo "Esperando que $DOMAIN resuelva a $PUBLIC_IP (actual: $DNS_IP) (intento $i/30)..."
-  sleep 30
-done
+    echo "$(date): SSL configurado correctamente"
+else
+    echo "$(date): DNS no apunta al EC2 (DNS=$DNS_IP, EC2=$PUBLIC_IP). Esperando..."
+fi
 SSL
-chmod +x /opt/alwaysprint/setup_ssl.sh
-nohup /opt/alwaysprint/setup_ssl.sh >> /var/log/setup_ssl.log 2>&1 &
+chmod +x /opt/alwaysprint/ensure_ssl.sh
 
-# Auto-renovacion de Let's Encrypt
-echo "0 0,12 * * * root certbot renew --quiet && systemctl reload nginx" \
-  >> /etc/crontab
+# Ejecutar inmediatamente en background
+nohup /opt/alwaysprint/ensure_ssl.sh >> /var/log/ensure_ssl.log 2>&1 &
+
+# Cron: cada 2 minutos verificar SSL, y renovar cada 12 horas
+echo "*/2 * * * * root /opt/alwaysprint/ensure_ssl.sh >> /var/log/ensure_ssl.log 2>&1" >> /etc/crontab
