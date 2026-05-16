@@ -143,7 +143,6 @@ AlwaysPrintProject/Cloud/
 │   └── main.tf
 │
 ├── ARCHITECTURE.md            # Arquitectura detallada
-├── DEVELOPMENT.md             # Guía de desarrollo
 └── README.md                  # Este archivo
 ```
 
@@ -265,9 +264,6 @@ NEXT_PUBLIC_APP_NAME=AlwaysPrint Cloud Management
 ## 📚 Documentación Adicional
 
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Arquitectura detallada del sistema
-- **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Guía completa de desarrollo
-- **[Backend README](./backend/README.md)** - Documentación específica del backend
-- **[Frontend README](./frontend/README.md)** - Documentación específica del frontend
 
 ## URLs de Producción
 
