@@ -6,7 +6,7 @@ Define los esquemas de validación para operaciones con usuarios.
 
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from uuid import UUID
 
 from app.models.user import UserRole
@@ -38,7 +38,8 @@ class UserCreate(UserBase):
     """Schema para crear un usuario."""
     password: str = Field(..., min_length=8, max_length=100)
     
-    @validator('password')
+    @field_validator('password')
+    @classmethod
     def validate_password(cls, v):
         """Valida que la contraseña cumpla requisitos mínimos."""
         if not any(c.isupper() for c in v):
@@ -49,15 +50,14 @@ class UserCreate(UserBase):
             raise ValueError('La contraseña debe contener al menos un número')
         return v
     
-    @validator('account_id')
-    def validate_account_id(cls, v, values):
+    @model_validator(mode='after')
+    def validate_account_id(self):
         """Valida que Operador y ReadOnly tengan account_id."""
-        role = values.get('role')
-        if role in [UserRole.OPERATOR, UserRole.READONLY] and v is None:
-            raise ValueError(f'Los usuarios con rol {role.value} deben tener account_id')
-        if role == UserRole.ADMIN and v is not None:
+        if self.role in [UserRole.OPERATOR, UserRole.READONLY] and self.account_id is None:
+            raise ValueError(f'Los usuarios con rol {self.role.value} deben tener account_id')
+        if self.role == UserRole.ADMIN and self.account_id is not None:
             raise ValueError('Los usuarios Admin no deben tener account_id')
-        return v
+        return self
 
 
 class UserUpdate(BaseModel):
@@ -76,7 +76,8 @@ class UserPasswordUpdate(BaseModel):
     current_password: str
     new_password: str = Field(..., min_length=8, max_length=100)
     
-    @validator('new_password')
+    @field_validator('new_password')
+    @classmethod
     def validate_password(cls, v):
         """Valida que la contraseña cumpla requisitos mínimos."""
         if not any(c.isupper() for c in v):

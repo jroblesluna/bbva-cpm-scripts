@@ -7,7 +7,8 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 
-from app.api import deps
+from app.core.database import get_db
+from app.core.security import get_current_user
 from app.models.user import User
 from app.models.action_config import ActionConfig
 from app.schemas.action_config import (
@@ -36,8 +37,8 @@ router = APIRouter()
 def upload_action_config(
     organization_id: int,
     data: ActionConfigUpload,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Sube una nueva configuración de acciones para una organización.
@@ -80,8 +81,8 @@ def upload_action_config(
 )
 def get_active_action_config(
     organization_id: int,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Obtiene la configuración de acciones activa de una organización.
@@ -114,8 +115,8 @@ def get_active_action_config(
 )
 def list_action_configs(
     organization_id: int,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Lista todas las configuraciones de acciones de una organización.
@@ -142,8 +143,8 @@ def list_action_configs(
 def get_action_config_detail(
     organization_id: int,
     config_id: int,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Obtiene una configuración específica con todos sus detalles incluyendo el JSON completo.
@@ -176,8 +177,8 @@ def update_action_config(
     organization_id: int,
     config_id: int,
     data: ActionConfigUpdate,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Actualiza una configuración existente.
@@ -213,8 +214,8 @@ def update_action_config(
 def delete_action_config(
     organization_id: int,
     config_id: int,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Elimina una configuración de acciones.
@@ -250,7 +251,7 @@ def delete_action_config(
 )
 def get_workstation_config_info(
     workstation_id: str,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(get_db)
 ):
     """
     Obtiene información de la configuración activa para una workstation.
@@ -297,7 +298,7 @@ def get_workstation_config_info(
 )
 def download_workstation_config(
     workstation_id: str,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(get_db)
 ):
     """
     Descarga el JSON completo de la configuración activa para una workstation.

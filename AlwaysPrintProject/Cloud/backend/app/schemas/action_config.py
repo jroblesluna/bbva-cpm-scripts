@@ -4,7 +4,7 @@ Schemas Pydantic para configuración de acciones administrativas.
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 import hashlib
 
 
@@ -16,19 +16,21 @@ class ActionConfigUpload(BaseModel):
     config_json: str = Field(..., description="JSON completo del archivo .alwaysconfig")
     is_active: bool = Field(default=True, description="Si la configuración debe estar activa")
     
-    @validator('config_json')
+    @field_validator('config_json')
+    @classmethod
     def validate_json_not_empty(cls, v):
         if not v or not v.strip():
             raise ValueError("config_json no puede estar vacío")
         return v
     
-    class Config:
-        schema_extra = {
-            "example": {
+    model_config = {
+        "json_schema_extra": {
+            "examples": [{
                 "config_json": '{"version": "1.0", "name": "CPM_Compliant", ...}',
                 "is_active": True
-            }
+            }]
         }
+    }
 
 
 class ActionConfigUpdate(BaseModel):
@@ -36,12 +38,13 @@ class ActionConfigUpdate(BaseModel):
     
     is_active: Optional[bool] = Field(None, description="Activar/desactivar propagación")
     
-    class Config:
-        schema_extra = {
-            "example": {
+    model_config = {
+        "json_schema_extra": {
+            "examples": [{
                 "is_active": False
-            }
+            }]
         }
+    }
 
 
 # === SCHEMAS DE RESPONSE ===
@@ -53,17 +56,17 @@ class ActionConfigInfo(BaseModel):
     organization_id: int
     name: str
     version: str
-    description: Optional[str]
+    description: Optional[str] = None
     config_hash: str
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    created_by_id: Optional[int]
+    created_by_id: Optional[int] = None
     
-    class Config:
-        orm_mode = True
-        schema_extra = {
-            "example": {
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "examples": [{
                 "id": 1,
                 "organization_id": 123,
                 "name": "CPM_Compliant",
@@ -74,18 +77,16 @@ class ActionConfigInfo(BaseModel):
                 "created_at": "2026-05-15T15:00:00Z",
                 "updated_at": "2026-05-15T15:00:00Z",
                 "created_by_id": 456
-            }
+            }]
         }
+    }
 
 
 class ActionConfigDetail(ActionConfigInfo):
     """Schema con todos los detalles incluyendo el JSON completo."""
     
     config_json: str
-    storage_path: Optional[str]
-    
-    class Config:
-        orm_mode = True
+    storage_path: Optional[str] = None
 
 
 class ActionConfigDownloadInfo(BaseModel):
@@ -96,15 +97,16 @@ class ActionConfigDownloadInfo(BaseModel):
     name: str
     version: str
     
-    class Config:
-        schema_extra = {
-            "example": {
+    model_config = {
+        "json_schema_extra": {
+            "examples": [{
                 "hash": "a3f5c8d2",
                 "download_url": "/api/v1/workstations/ws-123/config/download",
                 "name": "CPM_Compliant",
                 "version": "1.0"
-            }
+            }]
         }
+    }
 
 
 class ActionConfigSyncStatus(BaseModel):
@@ -116,16 +118,17 @@ class ActionConfigSyncStatus(BaseModel):
     cloud_hash: Optional[str] = Field(None, description="Hash de la configuración en Cloud")
     is_synced: bool = Field(..., description="Si el hash local coincide con el de Cloud")
     
-    class Config:
-        schema_extra = {
-            "example": {
+    model_config = {
+        "json_schema_extra": {
+            "examples": [{
                 "workstation_id": "ws-abc123",
                 "has_config": True,
                 "local_hash": "a3f5c8d2",
                 "cloud_hash": "a3f5c8d2",
                 "is_synced": True
-            }
+            }]
         }
+    }
 
 
 # === UTILIDADES ===

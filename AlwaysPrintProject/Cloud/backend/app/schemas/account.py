@@ -6,7 +6,7 @@ Define los esquemas de validación para operaciones con cuentas e IPs públicas.
 
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from uuid import UUID
 import ipaddress
 
@@ -16,7 +16,8 @@ class PublicIPBase(BaseModel):
     ip_address: str
     description: Optional[str] = None
     
-    @validator('ip_address')
+    @field_validator('ip_address')
+    @classmethod
     def validate_ip(cls, v):
         """Valida que sea una IP válida."""
         try:
