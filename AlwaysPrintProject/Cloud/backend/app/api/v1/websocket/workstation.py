@@ -70,9 +70,11 @@ async def workstation_websocket(
     try:
         # Aceptar la conexión WebSocket antes de cualquier operación
         await websocket.accept()
+        print(f"[WS] Conexión aceptada", flush=True)
         
         # Esperar mensaje de registro
         data = await websocket.receive_json()
+        print(f"[WS] Mensaje recibido: type={data.get('type')}", flush=True)
         
         if data.get("type") != "register":
             await websocket.close(code=1008, reason="First message must be 'register'")
@@ -150,9 +152,11 @@ async def workstation_websocket(
                 return
             
             workstation_id = str(workstation.id)
+            print(f"[WS] Registro exitoso: id={workstation_id}, status={status}", flush=True)
             
         except Exception as e:
             # Error en registro
+            print(f"[WS] ERROR en registro: {type(e).__name__}: {e}", flush=True)
             logger.error(f"Error registrando workstation ip={ip_private}: {e}")
             await websocket.close(code=1011, reason=f"Error: {str(e)}")
             return
@@ -163,13 +167,16 @@ async def workstation_websocket(
             websocket=websocket,
             db=db
         )
+        print(f"[WS] Conectado al manager", flush=True)
         
         # Enviar configuración efectiva
         config = config_service.get_effective_config(db, workstation_id)
+        print(f"[WS] Config obtenida, enviando...", flush=True)
         await websocket.send_json({
             "type": "config_update",
             "config": config
         })
+        print(f"[WS] Config enviada, entrando al loop", flush=True)
         
         # Enviar mensajes pendientes
         pending_messages = message_service.get_pending_messages_for_workstation(
@@ -304,10 +311,11 @@ async def workstation_websocket(
     
     except WebSocketDisconnect:
         # Cliente desconectado
-        pass
+        print(f"[WS] WebSocketDisconnect para {workstation_id}", flush=True)
     
     except Exception as e:
         # Error inesperado
+        print(f"[WS] EXCEPCION INESPERADA: {type(e).__name__}: {e}", flush=True)
         logger.error(f"WebSocket error inesperado para workstation_id={workstation_id}: {e}", exc_info=True)
     
     finally:
