@@ -356,10 +356,10 @@ if [ "$DNS_OK" = "true" ]; then
         BUILD=$(echo "$HEALTH_RESP" | grep -o '"build_tag":"[^"]*"' | cut -d'"' -f4)
         check_ok "Backend HTTPS — OK (build: ${BUILD:-dev})"
     else
-        HEALTH_HTTP=$(curl -s --max-time $TIMEOUT "http://${EC2_IP}/api/v1/health" 2>/dev/null)
+        # Intentar HTTP si HTTPS falla
+    HEALTH_HTTP=$(curl -s --max-time $TIMEOUT "http://${EC2_IP}/api/v1/health" 2>/dev/null)
         if echo "$HEALTH_HTTP" | grep -q "healthy"; then
             check_warn "Backend responde en HTTP directo pero no HTTPS"
-            recommend "SSL pendiente. Después de actualizar DNS, ejecutar vía SSM:\n    certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m antonio@robles.ai"
         else
             check_fail "Backend no responde en HTTPS ni HTTP directo"
         fi
@@ -411,10 +411,10 @@ if [ -n "$SSL_EXPIRY" ]; then
 else
     if [ "$DNS_OK" = "true" ]; then
         check_warn "SSL no disponible (certbot pendiente)"
-        recommend "Ejecutar certbot vía SSM:\n    aws ssm send-command --instance-ids $INSTANCE_ID --document-name AWS-RunShellScript \\\n      --parameters '{\"commands\":[\"certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m antonio@robles.ai && systemctl reload nginx\"]}' --region $AWS_REGION"
+        recommend "Ejecutar certbot:\n    aws ssm send-command --instance-ids $INSTANCE_ID --document-name AWS-RunShellScript --parameters '{\"commands\":[\"certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m antonio@robles.ai && systemctl reload nginx\"]}' --region $AWS_REGION"
     else
         check_warn "SSL no verificable (DNS no apunta al EC2)"
-        recommend "Primero actualizar DNS ($DOMAIN → $EC2_IP), luego certbot se configurará automáticamente"
+        recommend "Primero actualizar DNS ($DOMAIN → $EC2_IP), luego SSL se configurará automáticamente en ~2 min"
     fi
 fi
 
