@@ -25,15 +25,18 @@ RUN pip install --upgrade pip && \
 # Copiar código de la aplicación
 COPY . .
 
+# Copiar y configurar script de inicio
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# Crear directorio para logs
+RUN mkdir -p logs
+
 # Crear directorio para logs
 RUN mkdir -p logs
 
 # Exponer puerto
 EXPOSE 8000
-
-# Script de inicio que ejecuta migraciones antes de iniciar uvicorn
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
 
 # Comando por defecto
 ENTRYPOINT ["/docker-entrypoint.sh"]
