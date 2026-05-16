@@ -4,6 +4,7 @@ Endpoints para gestión de configuraciones de acciones administrativas.
 
 import logging
 from typing import List
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 
@@ -35,7 +36,7 @@ router = APIRouter()
     description="Sube un nuevo archivo de configuración de acciones para una organización"
 )
 def upload_action_config(
-    organization_id: int,
+    organization_id: UUID,
     data: ActionConfigUpload,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -80,7 +81,7 @@ def upload_action_config(
     description="Obtiene la configuración de acciones activa de una organización"
 )
 def get_active_action_config(
-    organization_id: int,
+    organization_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -114,7 +115,7 @@ def get_active_action_config(
     description="Lista todas las configuraciones de acciones de una organización"
 )
 def list_action_configs(
-    organization_id: int,
+    organization_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -141,8 +142,8 @@ def list_action_configs(
     description="Obtiene una configuración específica con todos sus detalles"
 )
 def get_action_config_detail(
-    organization_id: int,
-    config_id: int,
+    organization_id: UUID,
+    config_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -174,8 +175,8 @@ def get_action_config_detail(
     description="Actualiza una configuración existente (activar/desactivar)"
 )
 def update_action_config(
-    organization_id: int,
-    config_id: int,
+    organization_id: UUID,
+    config_id: UUID,
     data: ActionConfigUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -212,8 +213,8 @@ def update_action_config(
     description="Elimina una configuración de acciones"
 )
 def delete_action_config(
-    organization_id: int,
-    config_id: int,
+    organization_id: UUID,
+    config_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):

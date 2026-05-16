@@ -20,8 +20,8 @@ def upgrade():
     """Crear tabla action_configs."""
     op.create_table(
         'action_configs',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('organization_id', sa.Integer(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('organization_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('name', sa.String(length=255), nullable=False, comment='Nombre de la configuración (ej: CPM_Compliant)'),
         sa.Column('version', sa.String(length=50), nullable=False, comment='Versión de la configuración (ej: 1.0)'),
         sa.Column('description', sa.Text(), nullable=True, comment='Descripción de la configuración'),
@@ -31,7 +31,7 @@ def upgrade():
         sa.Column('storage_path', sa.String(length=500), nullable=True, comment='Ruta en S3 o filesystem local'),
         sa.Column('created_at', sa.DateTime(), nullable=False),
         sa.Column('updated_at', sa.DateTime(), nullable=False),
-        sa.Column('created_by_id', sa.Integer(), nullable=True),
+        sa.Column('created_by_id', postgresql.UUID(as_uuid=True), nullable=True),
         sa.ForeignKeyConstraint(['created_by_id'], ['users.id'], ondelete='SET NULL'),
         sa.ForeignKeyConstraint(['organization_id'], ['accounts.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')

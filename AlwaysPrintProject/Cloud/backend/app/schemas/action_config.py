@@ -4,6 +4,7 @@ Schemas Pydantic para configuración de acciones administrativas.
 
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 import hashlib
 
@@ -52,8 +53,8 @@ class ActionConfigUpdate(BaseModel):
 class ActionConfigInfo(BaseModel):
     """Schema con información básica de la configuración (sin JSON completo)."""
     
-    id: int
-    organization_id: int
+    id: UUID
+    organization_id: UUID
     name: str
     version: str
     description: Optional[str] = None
@@ -61,14 +62,14 @@ class ActionConfigInfo(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    created_by_id: Optional[int] = None
+    created_by_id: Optional[UUID] = None
     
     model_config = {
         "from_attributes": True,
         "json_schema_extra": {
             "examples": [{
-                "id": 1,
-                "organization_id": 123,
+                "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "organization_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
                 "name": "CPM_Compliant",
                 "version": "1.0",
                 "description": "Configuración de cumplimiento para Lexmark CPM",
@@ -76,7 +77,7 @@ class ActionConfigInfo(BaseModel):
                 "is_active": True,
                 "created_at": "2026-05-15T15:00:00Z",
                 "updated_at": "2026-05-15T15:00:00Z",
-                "created_by_id": 456
+                "created_by_id": "c3d4e5f6-a7b8-9012-cdef-123456789012"
             }]
         }
     }

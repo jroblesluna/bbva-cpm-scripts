@@ -281,12 +281,18 @@ NEXT_PUBLIC_APP_NAME=AlwaysPrint Cloud Management
 El acceso al EC2 de producción es vía **AWS SSM Session Manager** (no SSH):
 
 ```bash
+# Obtener el Instance ID actual (busca por tag Name que contenga "alwaysprint")
+INSTANCE_ID=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=*alwaysprint*" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[0].Instances[0].InstanceId' \
+  --output text --profile Antonio-Robles-425642439683)
+
 # Acceso interactivo
-aws ssm start-session --target i-0177ed8ad554ffc08 --profile Antonio-Robles-425642439683
+aws ssm start-session --target $INSTANCE_ID --profile Antonio-Robles-425642439683
 
 # Ejecutar comando directo
 aws ssm send-command \
-  --instance-ids i-0177ed8ad554ffc08 \
+  --instance-ids $INSTANCE_ID \
   --document-name AWS-RunShellScript \
   --parameters commands=["docker compose -f /opt/alwaysprint/docker-compose.yml ps"]
 ```

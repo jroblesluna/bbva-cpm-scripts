@@ -402,7 +402,13 @@ cd AlwaysPrintProject/Cloud/terraform
 ./setup.sh apply   # aplica — gestiona la clave SSH automáticamente
 
 # Acceso interactivo al servidor (SSM, sin SSH)
-aws ssm start-session --target i-0177ed8ad554ffc08 --profile Antonio-Robles-425642439683
+# Obtener Instance ID dinámicamente:
+INSTANCE_ID=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=*alwaysprint*" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[0].Instances[0].InstanceId' \
+  --output text --profile Antonio-Robles-425642439683)
+
+aws ssm start-session --target $INSTANCE_ID --profile Antonio-Robles-425642439683
 
 # Recuperar clave SSH (solo para emergencias)
 aws secretsmanager get-secret-value \

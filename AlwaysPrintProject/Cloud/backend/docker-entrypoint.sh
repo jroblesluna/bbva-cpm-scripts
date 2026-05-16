@@ -8,6 +8,15 @@ echo "=========================================="
 
 # Esperar a que PostgreSQL esté disponible
 echo "Verificando conexión a base de datos..."
+
+# Extraer host y puerto de DATABASE_URL si DB_HOST no está definido
+if [ -z "$DB_HOST" ] && [ -n "$DATABASE_URL" ]; then
+    # Parsear DATABASE_URL: postgresql://user:pass@host:port/dbname
+    DB_HOST=$(echo "$DATABASE_URL" | sed -n 's|.*@\([^:/]*\).*|\1|p')
+    DB_PORT=$(echo "$DATABASE_URL" | sed -n 's|.*@[^:]*:\([0-9]*\).*|\1|p')
+    DB_USER=$(echo "$DATABASE_URL" | sed -n 's|.*://\([^:]*\):.*|\1|p')
+fi
+
 max_retries=30
 retry_count=0
 

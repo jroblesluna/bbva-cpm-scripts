@@ -136,13 +136,19 @@ El EC2 no tiene puerto 22 abierto. Acceso vía AWS SSM Session Manager:
 
 ```bash
 # Sesión interactiva (terminal)
+# Obtener Instance ID dinámicamente:
+INSTANCE_ID=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=*alwaysprint*" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[0].Instances[0].InstanceId' \
+  --output text --profile Antonio-Robles-425642439683)
+
 aws ssm start-session \
-  --target i-0177ed8ad554ffc08 \
+  --target $INSTANCE_ID \
   --profile Antonio-Robles-425642439683
 
 # Ejecutar comando puntual
 aws ssm send-command \
-  --instance-ids i-0177ed8ad554ffc08 \
+  --instance-ids $INSTANCE_ID \
   --document-name AWS-RunShellScript \
   --parameters file:///tmp/params.json \
   --profile Antonio-Robles-425642439683

@@ -5,10 +5,12 @@ Este modelo almacena archivos de configuración (.alwaysconfig) que definen
 acciones administrativas a ejecutar en las workstations en respuesta a eventos.
 """
 
+import uuid
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Index
+from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from app.core.database import Base
+from app.models.account import GUID
 
 
 class ActionConfig(Base):
@@ -20,10 +22,10 @@ class ActionConfig(Base):
     """
     __tablename__ = "action_configs"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
     
     # Relación con organización (Account)
-    organization_id = Column(Integer, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    organization_id = Column(GUID, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
     
     # Metadatos de la configuración
     name = Column(String(255), nullable=False, comment="Nombre de la configuración (ej: CPM_Compliant)")
@@ -45,7 +47,7 @@ class ActionConfig(Base):
     # Auditoría
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_by_id = Column(GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     
     # Relaciones
     organization = relationship("Account", back_populates="action_configs")
