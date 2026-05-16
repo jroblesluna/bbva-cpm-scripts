@@ -1,5 +1,5 @@
 locals {
-  prefix = "${var.project_name}-${var.environment}"
+  prefix       = "${var.project_name}-${var.environment}"
   ecr_registry = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
   public_url   = "https://${var.domain_name}"
   ws_url       = "wss://${var.domain_name}"
@@ -26,12 +26,6 @@ data "aws_ami" "amazon_linux_2023" {
     name   = "state"
     values = ["available"]
   }
-}
-
-# Key pair para SSH
-resource "aws_key_pair" "main" {
-  key_name   = "${local.prefix}-keypair"
-  public_key = var.ssh_public_key
 }
 
 # IAM role para el EC2
@@ -95,14 +89,13 @@ resource "aws_eip_association" "main" {
   allocation_id = aws_eip.main.id
 }
 
-# EC2 Instance
+# EC2 Instance (acceso exclusivo via SSM, sin SSH key pair)
 resource "aws_instance" "main" {
   ami                    = data.aws_ami.amazon_linux_2023.id
   instance_type          = var.instance_type
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [var.security_group_id]
   iam_instance_profile   = aws_iam_instance_profile.ec2.name
-  key_name               = aws_key_pair.main.key_name
 
   root_block_device {
     volume_size = 20
@@ -110,8 +103,6 @@ resource "aws_instance" "main" {
     encrypted   = true
   }
 
-  # No reemplazar el EC2 automáticamente al cambiar user_data —
-  # los cambios al script solo aplican en el próximo reemplazo manual.
   user_data_replace_on_change = false
 
   user_data = base64encode(templatefile("${path.module}/user_data.sh.tpl", {
@@ -136,6 +127,6 @@ resource "aws_instance" "main" {
   tags = { Name = "${local.prefix}-ec2" }
 
   lifecycle {
-    ignore_changes = [ami, user_data, key_name]
+    ignore_changes = [ami, user_data]
   }
 }

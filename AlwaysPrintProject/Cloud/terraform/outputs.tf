@@ -30,10 +30,9 @@ output "ses_dns_records" {
 }
 
 output "ssh_access" {
-  description = "Acceso al servidor via SSM (recomendado) o SSH (emergencias)"
+  description = "Acceso al servidor via SSM (recomendado)"
   value = {
-    ssm     = "aws ssm start-session --target ${module.ec2.instance_id} --region ${var.aws_region}"
-    ssh_key = "aws secretsmanager get-secret-value --secret-id /${var.project_name}/${var.environment}/ssh_private_key --region ${var.aws_region} --query SecretString --output text > server.pem && chmod 600 server.pem && ssh -i server.pem ec2-user@${module.ec2.public_ip}"
+    ssm = "aws ssm start-session --target ${module.ec2.instance_id} --region ${var.aws_region}"
   }
 }
 

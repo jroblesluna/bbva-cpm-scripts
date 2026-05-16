@@ -1,9 +1,5 @@
 aws_region   = "us-west-2"
 
-# Clave SSH estable — generada una vez, privada guardada en Secrets Manager.
-# Para rotar: generar nuevo par, actualizar este valor y el secret manualmente.
-ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPi573dXupBRcYRSHy0ywk7NPMjluQPlx1gb+LqPO5Tk antoniorobles@antonioroblesai.local"
-
 project_name = "alwaysprint"
 environment  = "prod"
 
