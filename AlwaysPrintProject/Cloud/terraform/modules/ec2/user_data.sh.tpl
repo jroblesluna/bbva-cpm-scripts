@@ -166,17 +166,19 @@ cat > /opt/alwaysprint/setup_ssl.sh <<'SSL'
 DOMAIN=${domain_name}
 EMAIL=antonio@robles.ai
 
-for i in $(seq 1 20); do
+for i in $(seq 1 30); do
   PUBLIC_IP=$(curl -s http://checkip.amazonaws.com)
-  DNS_IP=$(nslookup $DOMAIN 2>/dev/null | awk '/^Address: /{print $2}' | tail -1)
+  DNS_IP=$(dig +short $DOMAIN 2>/dev/null | tail -1)
+  # Fallback: intentar con getent si dig no funciona
+  [ -z "$DNS_IP" ] && DNS_IP=$(getent hosts $DOMAIN 2>/dev/null | awk '{print $1}')
   if [ "$PUBLIC_IP" = "$DNS_IP" ]; then
     certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $EMAIL
     systemctl reload nginx
     echo "SSL configurado correctamente"
     break
   fi
-  echo "Esperando que $DOMAIN resuelva a $PUBLIC_IP (intento $i/20)..."
-  sleep 60
+  echo "Esperando que $DOMAIN resuelva a $PUBLIC_IP (actual: $DNS_IP) (intento $i/30)..."
+  sleep 30
 done
 SSL
 chmod +x /opt/alwaysprint/setup_ssl.sh
