@@ -364,7 +364,7 @@ class AuthService:
             "sub": str(user.id),
             "email": user.email,
             "role": user.role.value,
-            "account_id": str(user.account_id) if user.account_id else None
+            "account_id": str(user.organization_id) if user.organization_id else None
         }
         
         # Crear access token

@@ -202,8 +202,8 @@ class TestAuthenticateUser:
     def test_authenticate_user_retorna_usuario_para_credenciales_validas(self, db: Session):
         """WHEN se autentican credenciales válidas, THEN retorna el usuario."""
         # Crear cuenta de prueba (requerida por FK)
-        from app.models.account import Account
-        account = Account(
+        from app.models.organization import Organization
+        account = Organization(
             id=uuid.uuid4(),
             name="Test Account",
             is_active=True
@@ -219,7 +219,7 @@ class TestAuthenticateUser:
             password_hash=AuthService.hash_password(password),
             full_name="Operador Test",
             role=UserRole.OPERATOR,
-            account_id=account.id,
+            organization_id=account.id,
             is_active=True
         )
         db.add(user)
@@ -372,7 +372,7 @@ class TestCreateTokensForUser:
             email="operator@bbva.com",
             password_hash=AuthService.hash_password("password"),
             role=UserRole.OPERATOR,
-            account_id=uuid.uuid4(),
+            organization_id=uuid.uuid4(),
             is_active=True
         )
         
@@ -391,7 +391,7 @@ class TestCreateTokensForUser:
             email="admin@system.com",
             password_hash=AuthService.hash_password("password"),
             role=UserRole.ADMIN,
-            account_id=None,  # Admin no tiene account_id
+            organization_id=None,  # Admin no tiene organization_id
             is_active=True
         )
         
