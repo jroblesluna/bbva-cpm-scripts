@@ -90,6 +90,7 @@ class OrganizationResponse(OrganizationBase):
     timezone: str
     language: str
     auto_update_enabled: bool
+    target_version: Optional[str] = None
     public_ips: list[PublicIPResponse] = []
     created_at: datetime
     updated_at: datetime
@@ -110,6 +111,20 @@ class OrganizationListResponse(BaseModel):
     total: int
     skip: int
     limit: int
+
+
+class TargetVersionRequest(BaseModel):
+    """Schema de request para establecer la versión objetivo de actualización."""
+    version: Optional[str] = Field(None, max_length=50, description="Versión objetivo (null para usar latest)")
+
+
+class TargetVersionResponse(BaseModel):
+    """Schema de response para la versión objetivo de actualización."""
+    target_version: Optional[str] = Field(None, description="Versión objetivo actual (null = latest)")
+    organization_id: str = Field(..., description="ID de la organización")
+    updated_at: datetime = Field(..., description="Fecha de última actualización")
+
+    model_config = {"from_attributes": True}
 
 
 class AutoUpdateToggleRequest(BaseModel):

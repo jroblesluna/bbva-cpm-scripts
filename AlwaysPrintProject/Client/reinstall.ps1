@@ -271,16 +271,34 @@ try {
         Write-Step "Preparando subida al bucket S3..." "Info"
         $buildDate = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
         $shortCommit = $afterCommit.Substring(0, 7)
-        $metadata = "version=$shortCommit,build-date=$buildDate,commit-hash=$afterCommit"
+
+        # Extraer versión del assembly desde el DLL compilado
+        $serviceDll = Join-Path $clientPath "AlwaysPrintService\bin\Release\net48\AlwaysPrintService.exe"
+        if (Test-Path $serviceDll) {
+            $assemblyVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($serviceDll).FileVersion
+        } else {
+            # Fallback: usar formato fecha como versión
+            $assemblyVersion = Get-Date -Format "yyyy.M.d.HHmm"
+        }
+        Write-Step "Versión del assembly: $assemblyVersion" "Info"
+
+        $metadata = "version=$assemblyVersion,build-date=$buildDate,commit-hash=$shortCommit"
 
         try {
+            # Subir a latest/ (siempre la más reciente)
             Write-Step "Destino: $s3Destination" "Info"
-            Write-Step "Metadata: version=$shortCommit, build-date=$buildDate" "Info"
+            Write-Step "Metadata: version=$assemblyVersion, build-date=$buildDate, commit=$shortCommit" "Info"
             $s3Output = aws s3 cp $msiPath $s3Destination --metadata $metadata 2>&1
             if ($LASTEXITCODE -ne 0) {
                 throw "aws s3 cp fallo con codigo $LASTEXITCODE`: $s3Output"
             }
-            Write-Step "MSI subido exitosamente a S3" "Success"
+
+            # Subir también a versions/{version}/ para histórico
+            $s3VersionDest = "s3://alwaysprint-artifacts/versions/$assemblyVersion/AlwaysPrint.msi"
+            Write-Step "Guardando copia en histórico: $s3VersionDest" "Info"
+            aws s3 cp $msiPath $s3VersionDest --metadata $metadata 2>&1 | Out-Null
+
+            Write-Step "MSI subido exitosamente a S3 (latest + versions/$assemblyVersion/)" "Success"
         } catch {
             Write-Step "Error al subir MSI a S3: $($_.Exception.Message)" "Warning"
             $respuesta = Read-Host "¿Desea continuar con la instalacion? (S/N)"

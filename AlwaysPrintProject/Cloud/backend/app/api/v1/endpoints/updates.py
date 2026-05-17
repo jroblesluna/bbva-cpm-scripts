@@ -206,9 +206,16 @@ def check_update(
     auto_update_enabled = account.auto_update_enabled
 
     # 3. Obtener metadata del MSI desde S3
+    # Si la organización tiene target_version, usar esa versión específica
     try:
         s3_service = S3UpdateService()
-        msi_metadata = s3_service.get_msi_metadata()
+        if account.target_version:
+            # Usar versión específica configurada para la organización
+            target_key = f"versions/{account.target_version}/AlwaysPrint.msi"
+            msi_metadata = s3_service.get_msi_metadata(key=target_key)
+        else:
+            # Usar latest por defecto
+            msi_metadata = s3_service.get_msi_metadata()
     except ClientError:
         logger.error(
             "S3 no disponible al verificar actualización: "
@@ -232,8 +239,9 @@ def check_update(
         )
 
     # 4. Construir respuesta
+    # Si hay target_version, el campo version refleja la versión objetivo
     response = UpdateCheckResponse(
-        version=msi_metadata['version'],
+        version=account.target_version if account.target_version else msi_metadata['version'],
         auto_update_enabled=auto_update_enabled,
         file_size=msi_metadata['file_size'],
         build_date=msi_metadata['build_date'],
@@ -320,9 +328,14 @@ def download_update(
         )
 
     # 4. Generar presigned URL para descarga del MSI
+    # Si la organización tiene target_version, usar esa versión específica
     try:
         s3_service = S3UpdateService()
-        presigned_url = s3_service.generate_download_url()
+        if account.target_version:
+            target_key = f"versions/{account.target_version}/AlwaysPrint.msi"
+            presigned_url = s3_service.generate_download_url(key=target_key)
+        else:
+            presigned_url = s3_service.generate_download_url()
     except ClientError:
         logger.error(
             "Error de S3 al generar URL de descarga: "

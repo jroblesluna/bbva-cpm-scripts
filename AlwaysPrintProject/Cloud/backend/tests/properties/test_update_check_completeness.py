@@ -72,6 +72,7 @@ def _create_mock_db_session(auto_update_enabled: bool):
     mock_account.id = account_id
     mock_account.name = "Organización Test"
     mock_account.auto_update_enabled = auto_update_enabled
+    mock_account.target_version = None  # Usar latest por defecto
 
     # Mock de la sesión de BD
     mock_db = MagicMock()

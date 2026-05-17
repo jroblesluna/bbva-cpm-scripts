@@ -78,6 +78,10 @@ class Organization(Base):
     # Controla si las workstations de esta organización pueden actualizarse automáticamente
     auto_update_enabled = Column(Boolean, nullable=False, default=False, server_default='false')
 
+    # Versión objetivo para actualizaciones (nullable = usar latest)
+    # Cuando se establece, las workstations se actualizan a esta versión específica
+    target_version = Column(String(50), nullable=True)
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

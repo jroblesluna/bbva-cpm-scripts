@@ -41,6 +41,7 @@ def upgrade() -> None:
         sa.Column('timezone', sa.String(length=50), nullable=False, server_default='UTC'),
         sa.Column('language', sa.String(length=2), nullable=False, server_default='en'),
         sa.Column('auto_update_enabled', sa.Boolean(), nullable=False, server_default='false'),
+        sa.Column('target_version', sa.String(length=50), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
         sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
         sa.PrimaryKeyConstraint('id'),

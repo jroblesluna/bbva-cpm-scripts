@@ -35,12 +35,15 @@ class S3UpdateService:
         self._bucket = 'alwaysprint-artifacts'
         self._key = 'latest/AlwaysPrint.msi'
 
-    def get_msi_metadata(self) -> dict:
+    def get_msi_metadata(self, key: str = None) -> dict:
         """
         Obtiene metadata del MSI desde S3 usando HeadObject.
 
         Extrae la metadata personalizada del objeto S3 (version, build-date,
         commit-hash) y el tamaño del archivo (ContentLength).
+
+        Args:
+            key: Clave S3 del objeto. Si es None, usa la clave por defecto (latest/AlwaysPrint.msi)
 
         Returns:
             dict con claves: version, build_date, commit_hash, file_size
@@ -49,16 +52,19 @@ class S3UpdateService:
             ClientError: Si el objeto no existe o S3 no está disponible.
                 Se loggea el error antes de propagar la excepción.
         """
+        # Usar la clave proporcionada o la clave por defecto
+        effective_key = key if key is not None else self._key
+
         try:
             logger.info(
                 "Consultando metadata del MSI en S3: bucket=%s, key=%s",
                 self._bucket,
-                self._key
+                effective_key
             )
 
             response = self._client.head_object(
                 Bucket=self._bucket,
-                Key=self._key
+                Key=effective_key
             )
 
             metadata = response.get('Metadata', {})
@@ -89,11 +95,11 @@ class S3UpdateService:
                 error_code,
                 error_message,
                 self._bucket,
-                self._key
+                effective_key
             )
             raise
 
-    def generate_download_url(self, expires_in: int = 3600) -> str:
+    def generate_download_url(self, key: str = None, expires_in: int = 3600) -> str:
         """
         Genera una URL presigned para descargar el MSI desde S3.
 
@@ -101,6 +107,7 @@ class S3UpdateService:
         con una expiración configurable (por defecto 1 hora).
 
         Args:
+            key: Clave S3 del objeto. Si es None, usa la clave por defecto (latest/AlwaysPrint.msi)
             expires_in: Tiempo de expiración en segundos (default: 3600 = 1 hora)
 
         Returns:
@@ -110,18 +117,21 @@ class S3UpdateService:
             ClientError: Si no se puede generar la URL presigned.
                 Se loggea el error antes de propagar la excepción.
         """
+        # Usar la clave proporcionada o la clave por defecto
+        effective_key = key if key is not None else self._key
+
         try:
             logger.info(
                 "Generando URL presigned para descarga del MSI: "
                 "bucket=%s, key=%s, expiración=%d segundos",
                 self._bucket,
-                self._key,
+                effective_key,
                 expires_in
             )
 
             url = self._client.generate_presigned_url(
                 'get_object',
-                Params={'Bucket': self._bucket, 'Key': self._key},
+                Params={'Bucket': self._bucket, 'Key': effective_key},
                 ExpiresIn=expires_in
             )
 
@@ -141,6 +151,6 @@ class S3UpdateService:
                 error_code,
                 error_message,
                 self._bucket,
-                self._key
+                effective_key
             )
             raise

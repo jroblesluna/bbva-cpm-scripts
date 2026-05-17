@@ -30,6 +30,8 @@ from app.schemas.organization import (
     PublicIPAuthorizeRequest,
     AutoUpdateToggleRequest,
     AutoUpdateToggleResponse,
+    TargetVersionRequest,
+    TargetVersionResponse,
 )
 from app.services.audit import AuditService
 
@@ -560,6 +562,63 @@ def toggle_auto_update(
 
     return AutoUpdateToggleResponse(
         auto_update_enabled=organization.auto_update_enabled,
+        organization_id=str(organization.id),
+        updated_at=organization.updated_at,
+    )
+
+
+# === TARGET VERSION ===
+
+@router.patch(
+    "/{org_id}/target-version",
+    response_model=TargetVersionResponse,
+    summary="Establecer versión objetivo de actualización",
+    description=(
+        "Permite a un administrador establecer una versión específica a la que "
+        "las workstations de la organización deben actualizarse. "
+        "Enviar null para volver a usar la última versión disponible (latest)."
+    )
+)
+def set_target_version(
+    org_id: UUID,
+    body: TargetVersionRequest,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Establecer o limpiar la versión objetivo de actualización para una organización.
+
+    Si version es un string (ej: "1.26.517.1430"), las workstations se actualizarán
+    a esa versión específica. Si version es null, se usa la última versión disponible.
+    """
+    # Buscar la organización por ID
+    organization = db.query(Organization).filter(Organization.id == org_id).first()
+
+    if not organization:
+        logger.warning(
+            "Intento de set target-version en organización inexistente: org_id=%s, user_id=%s",
+            org_id,
+            current_user.id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organización no encontrada"
+        )
+
+    # Actualizar la versión objetivo
+    organization.target_version = body.version
+    db.commit()
+    db.refresh(organization)
+
+    logger.info(
+        "Target version actualizada: org_id=%s, target_version=%s, admin_id=%s",
+        org_id,
+        body.version,
+        current_user.id,
+    )
+
+    return TargetVersionResponse(
+        target_version=organization.target_version,
         organization_id=str(organization.id),
         updated_at=organization.updated_at,
     )

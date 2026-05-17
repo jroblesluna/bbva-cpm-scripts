@@ -10,6 +10,7 @@ export interface Organization {
   timezone: string
   language: string
   auto_update_enabled: boolean
+  target_version: string | null
   created_at: string
   updated_at: string
   public_ips?: PublicIP[]
