@@ -3,24 +3,30 @@ using System.Diagnostics;
 using System.IO;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
-using AlwaysPrintService.UserSession;
 
 namespace AlwaysPrintService.Tasks
 {
     /// <summary>
     /// Maneja la instalación silenciosa del MSI de actualización.
-    /// Ejecuta en contexto de LocalSystem (permisos de administrador).
+    /// Genera un script .cmd temporal que:
+    /// 1. Detiene el servicio AlwaysPrintService
+    /// 2. Mata procesos AlwaysPrintTray
+    /// 3. Ejecuta msiexec /i silencioso
+    /// 4. Reinicia el servicio
+    /// 5. Lanza el Tray
+    /// 6. Se auto-elimina
     /// </summary>
     public sealed class UpdateInstallHandler
     {
-        // Timeout de 10 minutos para la ejecución de msiexec
-        private const int InstallTimeoutMs = 10 * 60 * 1000;
+        private const string ServiceName = "AlwaysPrintService";
+        private const string TrayProcessName = "AlwaysPrintTray";
 
         /// <summary>
         /// Ejecuta la instalación silenciosa del MSI especificado.
+        /// Genera un script externo que detiene el servicio antes de instalar.
         /// </summary>
         /// <param name="msiFilePath">Ruta completa al archivo MSI a instalar.</param>
-        /// <returns>Resultado de la instalación con éxito/fallo, mensaje y código de salida.</returns>
+        /// <returns>Resultado de la instalación (éxito indica que el script fue lanzado).</returns>
         public InstallUpdateResponsePayload Execute(string msiFilePath)
         {
             AlwaysPrintLogger.WriteInfo(
@@ -42,90 +48,66 @@ namespace AlwaysPrintService.Tasks
                     };
                 }
 
-                // 2. Ejecutar msiexec con instalación silenciosa
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = "msiexec",
-                    Arguments = $"/i \"{msiFilePath}\" /quiet /norestart",
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
+                // 2. Obtener ruta del ejecutable del Tray (mismo directorio que el Service)
+                string serviceDir = Path.GetDirectoryName(
+                    Process.GetCurrentProcess().MainModule!.FileName)!;
+                string trayExePath = Path.Combine(serviceDir, "AlwaysPrintTray.exe");
+
+                // 3. Generar script de instalación temporal
+                string scriptPath = Path.Combine(
+                    Path.GetTempPath(), "AlwaysPrint", "Updates",
+                    $"install_{DateTime.Now:yyyyMMdd_HHmmss}.cmd");
+
+                // Asegurar que el directorio existe
+                Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
+
+                string scriptContent = GenerateInstallScript(msiFilePath, trayExePath, scriptPath);
+                File.WriteAllText(scriptPath, scriptContent);
 
                 AlwaysPrintLogger.WriteInfo(
-                    $"InstallUpdate: ejecutando msiexec /i \"{msiFilePath}\" /quiet /norestart",
+                    $"InstallUpdate: script de instalación generado en {scriptPath}",
                     AlwaysPrintLogger.EvtTaskDispatched);
 
-                using (var process = Process.Start(startInfo))
+                // 4. Lanzar el script como proceso independiente (no hijo del servicio)
+                var startInfo = new ProcessStartInfo
                 {
-                    if (process == null)
+                    FileName = "cmd.exe",
+                    Arguments = $"/c \"{scriptPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = Path.GetTempPath()
+                };
+
+                var process = Process.Start(startInfo);
+                if (process == null)
+                {
+                    string errorMsg = "InstallUpdate: no se pudo lanzar el script de instalación.";
+                    AlwaysPrintLogger.WriteError(errorMsg, AlwaysPrintLogger.EvtTaskFailed);
+                    return new InstallUpdateResponsePayload
                     {
-                        string errorMsg = "InstallUpdate: no se pudo iniciar el proceso msiexec.";
-                        AlwaysPrintLogger.WriteError(errorMsg, AlwaysPrintLogger.EvtTaskFailed);
-                        return new InstallUpdateResponsePayload
-                        {
-                            Success = false,
-                            Message = errorMsg,
-                            ExitCode = -1
-                        };
-                    }
-
-                    // 3. Esperar finalización con timeout de 10 minutos
-                    bool exited = process.WaitForExit(InstallTimeoutMs);
-
-                    if (!exited)
-                    {
-                        // Timeout excedido: matar proceso y retornar error
-                        try { process.Kill(); } catch { /* proceso ya terminó */ }
-
-                        string errorMsg = "InstallUpdate: instalación excedió timeout de 10 minutos. Proceso terminado.";
-                        AlwaysPrintLogger.WriteError(errorMsg, AlwaysPrintLogger.EvtTaskFailed);
-                        return new InstallUpdateResponsePayload
-                        {
-                            Success = false,
-                            Message = errorMsg,
-                            ExitCode = -1
-                        };
-                    }
-
-                    int exitCode = process.ExitCode;
-
-                    // 4. Evaluar resultado según código de salida
-                    if (exitCode == 0)
-                    {
-                        AlwaysPrintLogger.WriteInfo(
-                            "InstallUpdate: instalación completada exitosamente (ExitCode=0).",
-                            AlwaysPrintLogger.EvtTaskCompleted);
-
-                        // Eliminar archivo MSI temporal
-                        TryDeleteMsi(msiFilePath);
-
-                        // Reiniciar proceso Tray
-                        RestartTray();
-
-                        return new InstallUpdateResponsePayload
-                        {
-                            Success = true,
-                            Message = "Actualización instalada exitosamente.",
-                            ExitCode = 0
-                        };
-                    }
-                    else
-                    {
-                        // Instalación fallida con código de error
-                        string errorMsg = $"InstallUpdate: instalación fallida. msiexec exit code={exitCode}.";
-                        AlwaysPrintLogger.WriteError(errorMsg, AlwaysPrintLogger.EvtTaskFailed);
-                        return new InstallUpdateResponsePayload
-                        {
-                            Success = false,
-                            Message = errorMsg,
-                            ExitCode = exitCode
-                        };
-                    }
+                        Success = false,
+                        Message = errorMsg,
+                        ExitCode = -1
+                    };
                 }
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"InstallUpdate: script de instalación lanzado (PID={process.Id}). " +
+                    "El servicio se detendrá en breve para permitir la actualización.",
+                    AlwaysPrintLogger.EvtTaskCompleted);
+
+                // Retornar éxito — el script se encargará del resto
+                // (detener servicio, instalar, reiniciar)
+                return new InstallUpdateResponsePayload
+                {
+                    Success = true,
+                    Message = "Script de actualización lanzado. El servicio se reiniciará automáticamente.",
+                    ExitCode = 0
+                };
             }
             catch (Exception ex)
             {
-                string errorMsg = $"InstallUpdate: no se pudo iniciar msiexec: {ex.Message}";
+                string errorMsg = $"InstallUpdate: error al preparar la instalación: {ex.Message}";
                 AlwaysPrintLogger.WriteError(errorMsg, ex, AlwaysPrintLogger.EvtTaskFailed);
                 return new InstallUpdateResponsePayload
                 {
@@ -137,74 +119,80 @@ namespace AlwaysPrintService.Tasks
         }
 
         /// <summary>
-        /// Intenta eliminar el archivo MSI temporal. No es crítico si falla.
+        /// Genera el contenido del script .cmd que ejecuta la actualización.
+        /// El script:
+        /// 1. Espera 3 segundos (para que el Service termine de responder al Tray)
+        /// 2. Mata procesos del Tray
+        /// 3. Detiene el servicio
+        /// 4. Ejecuta msiexec silencioso
+        /// 5. Inicia el servicio
+        /// 6. Lanza el Tray
+        /// 7. Elimina el MSI temporal
+        /// 8. Se auto-elimina
         /// </summary>
-        private static void TryDeleteMsi(string msiFilePath)
+        private static string GenerateInstallScript(string msiFilePath, string trayExePath, string scriptPath)
         {
-            try
-            {
-                File.Delete(msiFilePath);
-                AlwaysPrintLogger.WriteInfo(
-                    $"InstallUpdate: archivo MSI temporal eliminado: {msiFilePath}",
-                    AlwaysPrintLogger.EvtTaskCompleted);
-            }
-            catch (Exception ex)
-            {
-                AlwaysPrintLogger.WriteWarning(
-                    $"InstallUpdate: no se pudo eliminar MSI temporal: {ex.Message}",
-                    AlwaysPrintLogger.EvtGenericWarning);
-            }
-        }
+            // Usar log en el mismo directorio del MSI para diagnóstico
+            string logPath = Path.Combine(
+                Path.GetDirectoryName(msiFilePath)!,
+                $"install_{DateTime.Now:yyyyMMdd_HHmmss}.log");
 
-        /// <summary>
-        /// Reinicia el proceso Tray: mata instancias existentes y lanza una nueva
-        /// en la sesión interactiva del usuario.
-        /// </summary>
-        private static void RestartTray()
-        {
-            try
-            {
-                // Matar instancias existentes del Tray
-                int killed = KillExistingTray();
-                if (killed > 0)
-                    AlwaysPrintLogger.WriteInfo(
-                        $"InstallUpdate: se eliminaron {killed} instancia(s) del Tray para reinicio post-actualización.",
-                        AlwaysPrintLogger.EvtTrayKilled);
+            return $@"@echo off
+REM ============================================================
+REM Script de actualización automática de AlwaysPrint
+REM Generado: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
+REM MSI: {msiFilePath}
+REM ============================================================
 
-                // Lanzar nueva instancia del Tray en la sesión del usuario
-                string trayExe = Path.Combine(
-                    Path.GetDirectoryName(Process.GetCurrentProcess().MainModule!.FileName)!,
-                    "AlwaysPrintTray.exe");
+echo [%date% %time%] Iniciando actualización de AlwaysPrint... >> ""{logPath}""
 
-                bool launched = InteractiveProcessLauncher.Launch(trayExe);
-                if (launched)
-                    AlwaysPrintLogger.WriteInfo(
-                        "InstallUpdate: Tray reiniciado exitosamente post-actualización.",
-                        AlwaysPrintLogger.EvtTrayStarted);
-                else
-                    AlwaysPrintLogger.WriteError(
-                        "InstallUpdate: error al reiniciar Tray post-actualización.",
-                        AlwaysPrintLogger.EvtTrayError);
-            }
-            catch (Exception ex)
-            {
-                AlwaysPrintLogger.WriteError(
-                    $"InstallUpdate: error al reiniciar Tray post-actualización: {ex.Message}",
-                    ex, AlwaysPrintLogger.EvtTrayError);
-            }
-        }
+REM Esperar 3 segundos para que el Service termine de responder
+timeout /t 3 /nobreak > nul
 
-        /// <summary>
-        /// Mata todas las instancias del proceso AlwaysPrintTray.
-        /// </summary>
-        private static int KillExistingTray()
-        {
-            int count = 0;
-            foreach (var p in Process.GetProcessesByName("AlwaysPrintTray"))
-            {
-                try { p.Kill(); count++; } catch { /* proceso ya terminó */ }
-            }
-            return count;
+REM Matar procesos del Tray
+echo [%date% %time%] Deteniendo AlwaysPrintTray... >> ""{logPath}""
+taskkill /f /im {TrayProcessName}.exe > nul 2>&1
+
+REM Detener el servicio
+echo [%date% %time%] Deteniendo servicio {ServiceName}... >> ""{logPath}""
+net stop {ServiceName} > nul 2>&1
+timeout /t 2 /nobreak > nul
+
+REM Ejecutar instalación silenciosa
+echo [%date% %time%] Ejecutando msiexec... >> ""{logPath}""
+msiexec /i ""{msiFilePath}"" /quiet /norestart /l*v ""{logPath}.msiexec.log""
+set INSTALL_EXIT=%errorlevel%
+echo [%date% %time%] msiexec finalizado con código: %INSTALL_EXIT% >> ""{logPath}""
+
+REM Verificar resultado
+if %INSTALL_EXIT% neq 0 (
+    echo [%date% %time%] ERROR: Instalación fallida. Reiniciando servicio anterior... >> ""{logPath}""
+    net start {ServiceName} > nul 2>&1
+    timeout /t 2 /nobreak > nul
+    start """" ""{trayExePath}""
+    goto :cleanup
+)
+
+echo [%date% %time%] Instalación exitosa. Reiniciando servicio... >> ""{logPath}""
+
+REM Iniciar el servicio actualizado
+net start {ServiceName} > nul 2>&1
+timeout /t 3 /nobreak > nul
+
+REM Lanzar el Tray actualizado
+echo [%date% %time%] Lanzando AlwaysPrintTray... >> ""{logPath}""
+start """" ""{trayExePath}""
+
+REM Eliminar MSI temporal
+echo [%date% %time%] Eliminando MSI temporal... >> ""{logPath}""
+del /f /q ""{msiFilePath}"" > nul 2>&1
+
+:cleanup
+echo [%date% %time%] Actualización finalizada. >> ""{logPath}""
+
+REM Auto-eliminar este script (con delay para que cmd lo suelte)
+(goto) 2>nul & del /f /q ""{scriptPath}""
+";
         }
     }
 }
