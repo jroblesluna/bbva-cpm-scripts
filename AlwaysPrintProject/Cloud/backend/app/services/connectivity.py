@@ -34,47 +34,47 @@ class ConnectivityService:
         self,
         db: Session,
         workstation_id: str,
-        account_id: str,
+        organization_id: str,
         payload: ConnectivityResultPayload
     ) -> Optional[ConnectivityResult]:
         """
         Persiste un resultado de check de conectividad en la base de datos.
 
-        Verifica que la workstation exista y pertenezca a la cuenta indicada
+        Verifica que la workstation exista y pertenezca a la organización indicada
         (tenant isolation) antes de crear el registro.
 
         Args:
             db: Sesión de base de datos
             workstation_id: UUID de la workstation que reporta el resultado
-            account_id: UUID de la cuenta del sender (para tenant isolation)
+            organization_id: UUID de la organización del sender (para tenant isolation)
             payload: Payload validado con los datos del resultado de conectividad
 
         Returns:
             ConnectivityResult creado si la operación fue exitosa, None si la
-            workstation no existe o no pertenece a la cuenta
+            workstation no existe o no pertenece a la organización
 
         Raises:
             Exception: Si ocurre un error de escritura en BD (se propaga al caller)
         """
-        # Verificar tenant isolation: workstation debe existir para la cuenta
+        # Verificar tenant isolation: workstation debe existir para la organización
         workstation = db.query(Workstation).filter(
             Workstation.id == workstation_id,
-            Workstation.organization_id == account_id
+            Workstation.organization_id == organization_id
         ).first()
 
         if not workstation:
             logger.warning(
-                "Workstation %s no encontrada para cuenta %s. "
+                "Workstation %s no encontrada para organización %s. "
                 "Descartando resultado de conectividad.",
                 workstation_id,
-                account_id
+                organization_id
             )
             return None
 
         # Crear registro de resultado de conectividad
         connectivity_result = ConnectivityResult(
             workstation_id=workstation_id,
-            organization_id=account_id,
+            organization_id=organization_id,
             check_id=payload.check_id,
             check_type=payload.check_type,
             success=payload.success,
@@ -102,7 +102,7 @@ class ConnectivityService:
         self,
         db: Session,
         workstation_id: str,
-        account_id: str,
+        organization_id: str,
         check_id: Optional[str] = None,
         from_dt: Optional[datetime] = None,
         to_dt: Optional[datetime] = None,
@@ -111,14 +111,14 @@ class ConnectivityService:
         """
         Consulta el historial de resultados de conectividad con filtrado.
 
-        Aplica tenant isolation filtrando por workstation_id Y account_id.
+        Aplica tenant isolation filtrando por workstation_id Y organization_id.
         Soporta filtrado opcional por check_id, rango temporal y límite.
         Los resultados se ordenan por recorded_at en orden descendente.
 
         Args:
             db: Sesión de base de datos
             workstation_id: UUID de la workstation a consultar
-            account_id: UUID de la cuenta (tenant isolation)
+            organization_id: UUID de la organización (tenant isolation)
             check_id: Filtrar por identificador de check específico (opcional)
             from_dt: Fecha/hora mínima de recorded_at (opcional, inclusivo)
             to_dt: Fecha/hora máxima de recorded_at (opcional, inclusivo)
@@ -128,10 +128,10 @@ class ConnectivityService:
             Lista de ConnectivityResult ordenados por recorded_at DESC,
             limitados al número especificado
         """
-        # Query base con tenant isolation: filtrar por workstation_id Y account_id
+        # Query base con tenant isolation: filtrar por workstation_id Y organization_id
         query = db.query(ConnectivityResult).filter(
             ConnectivityResult.workstation_id == workstation_id,
-            ConnectivityResult.organization_id == account_id
+            ConnectivityResult.organization_id == organization_id
         )
 
         # Filtro opcional por check_id

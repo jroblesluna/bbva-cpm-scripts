@@ -6,7 +6,7 @@ Este módulo exporta todos los routers de endpoints.
 
 from app.api.v1.endpoints import (
     auth,
-    accounts,
+    organizations,
     users,
     workstations,
     vlans,
@@ -20,7 +20,7 @@ from app.api.v1.endpoints import (
 
 __all__ = [
     "auth",
-    "accounts",
+    "organizations",
     "users",
     "workstations",
     "vlans",

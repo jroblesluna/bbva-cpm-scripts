@@ -90,7 +90,7 @@ class TestJWTTokens:
             "sub": user_id,
             "email": "operator@bbva.com",
             "role": "operator",
-            "account_id": str(uuid.uuid4())
+            "organization_id": str(uuid.uuid4())
         }
         
         token = AuthService.create_access_token(data)
@@ -100,7 +100,7 @@ class TestJWTTokens:
         assert payload["sub"] == user_id
         assert payload["email"] == "operator@bbva.com"
         assert payload["role"] == "operator"
-        assert "account_id" in payload
+        assert "organization_id" in payload
         assert "exp" in payload
         assert "iat" in payload
     
@@ -402,7 +402,7 @@ class TestCreateTokensForUser:
         assert payload["sub"] == str(user.id)
         assert payload["email"] == user.email
         assert payload["role"] == "admin"
-        assert payload["account_id"] is None
+        assert payload["organization_id"] is None
     
     def test_create_tokens_for_user_refresh_token_es_valido(self):
         """WHEN se crea refresh token, THEN es válido y contiene type=refresh."""

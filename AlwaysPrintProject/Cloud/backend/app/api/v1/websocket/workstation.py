@@ -135,8 +135,8 @@ async def workstation_websocket(
                 )
                 return
             
-            elif status == "inactive_account":
-                # Cuenta desactivada
+            elif status == "inactive_organization":
+                # Organización desactivada
                 await websocket.close(
                     code=1008,
                     reason="La cuenta asociada a esta IP está desactivada."
@@ -220,7 +220,7 @@ async def workstation_websocket(
                     audit_service.log_contingency_toggle(
                         db=db,
                         workstation_id=workstation_id,
-                        account_id=str(workstation.account_id),
+                        organization_id=str(workstation.organization_id),
                         user_id=None,  # Cambio automático
                         activated=contingency_active,
                         ip_address=client_host
@@ -235,8 +235,8 @@ async def workstation_websocket(
                     )
                 
                 # Notificar a operadores
-                await connection_manager.broadcast_to_account(
-                    account_id=str(workstation.account_id),
+                await connection_manager.broadcast_to_organization(
+                    organization_id=str(workstation.organization_id),
                     message={
                         "type": "workstation_status_change",
                         "workstation_id": workstation_id,
@@ -259,7 +259,7 @@ async def workstation_websocket(
                     entity_type="WorkstationConfig",
                     entity_id=workstation_id,
                     workstation_id=workstation_id,
-                    account_id=str(workstation.account_id),
+                    organization_id=str(workstation.organization_id),
                     old_values={field: old_value},
                     new_values={field: new_value},
                     ip_address=client_host
@@ -272,8 +272,8 @@ async def workstation_websocket(
                 output = data.get("output")
                 
                 # Notificar a operadores
-                await connection_manager.broadcast_to_account(
-                    account_id=str(workstation.account_id),
+                await connection_manager.broadcast_to_organization(
+                    organization_id=str(workstation.organization_id),
                     message={
                         "type": "command_result",
                         "workstation_id": workstation_id,
@@ -289,7 +289,7 @@ async def workstation_websocket(
                 await _handle_telemetry(
                     data=data,
                     workstation_id=workstation_id,
-                    organization_id=str(workstation.account_id),
+                    organization_id=str(workstation.organization_id),
                     db=db
                 )
             
@@ -298,7 +298,7 @@ async def workstation_websocket(
                 await _handle_connectivity_result(
                     data=data,
                     workstation_id=workstation_id,
-                    organization_id=str(workstation.account_id),
+                    organization_id=str(workstation.organization_id),
                     db=db
                 )
             
@@ -369,7 +369,7 @@ async def _handle_telemetry(
         telemetry_log = telemetry_service.persist_telemetry(
             db=db,
             workstation_id=workstation_id,
-            account_id=organization_id,
+            organization_id=organization_id,
             payload=payload
         )
     except Exception as e:
@@ -384,15 +384,15 @@ async def _handle_telemetry(
     if telemetry_log is None:
         # workstation_id no existe para esta cuenta: log WARNING, descartar
         logger.warning(
-            "Telemetría descartada - workstation_id=%s no encontrada para account_id=%s",
+            "Telemetría descartada - workstation_id=%s no encontrada para organization_id=%s",
             workstation_id,
             organization_id
         )
         return
 
-    # Persistencia exitosa: broadcast 'telemetry_received' a operadores de la cuenta
-    await connection_manager.broadcast_to_account(
-        account_id=organization_id,
+    # Persistencia exitosa: broadcast 'telemetry_received' a operadores de la organización
+    await connection_manager.broadcast_to_organization(
+        organization_id=organization_id,
         message={
             "type": "telemetry_received",
             "workstation_id": workstation_id,
@@ -462,7 +462,7 @@ async def _handle_connectivity_result(
         result = connectivity_service.persist_connectivity_result(
             db=db,
             workstation_id=workstation_id,
-            account_id=organization_id,
+            organization_id=organization_id,
             payload=payload
         )
 
@@ -477,9 +477,9 @@ async def _handle_connectivity_result(
             )
             return
 
-        # Persistencia exitosa: broadcast a operadores de la misma cuenta
-        await connection_manager.broadcast_to_account(
-            account_id=organization_id,
+        # Persistencia exitosa: broadcast a operadores de la misma organización
+        await connection_manager.broadcast_to_organization(
+            organization_id=organization_id,
             message={
                 "type": "connectivity_result",
                 "workstation_id": str(workstation_id),

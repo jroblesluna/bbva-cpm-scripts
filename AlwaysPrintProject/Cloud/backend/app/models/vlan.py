@@ -43,4 +43,4 @@ class VLAN(Base):
     vlan_config = relationship("VLANConfig", back_populates="vlan", uselist=False, cascade="all, delete-orphan")
     
     def __repr__(self):
-        return f"<VLAN(id={self.id}, name={self.name}, account_id={self.account_id})>"
+        return f"<VLAN(id={self.id}, name={self.name}, organization_id={self.organization_id})>"

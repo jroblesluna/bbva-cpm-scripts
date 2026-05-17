@@ -64,7 +64,7 @@ export default function PendingIPsPage() {
   } = useQuery({
     queryKey: ['pending-ips'],
     queryFn: async () => {
-      const response = await api.get('/accounts/public-ips/pending');
+      const response = await api.get('/organizations/public-ips/pending');
       return response.data as PendingIP[];
     },
   });
@@ -73,7 +73,7 @@ export default function PendingIPsPage() {
   const { data: accountsData } = useQuery({
     queryKey: ['accounts', 'list-for-pending-ips'],
     queryFn: async () => {
-      const response = await api.get('/accounts/');
+      const response = await api.get('/organizations/');
       return response.data;
     },
   });
@@ -89,8 +89,8 @@ export default function PendingIPsPage() {
       accountId: string;
       description?: string;
     }) => {
-      const response = await api.post(`/accounts/public-ips/${ipId}/authorize`, {
-        account_id: accountId,
+      const response = await api.post(`/organizations/public-ips/${ipId}/authorize`, {
+        organization_id: accountId,
         description: description || undefined,
       });
       return response.data;
@@ -108,7 +108,7 @@ export default function PendingIPsPage() {
   // Mutation para rechazar IP
   const rejectMutation = useMutation({
     mutationFn: async (ipId: string) => {
-      await api.delete(`/accounts/public-ips/${ipId}/reject`);
+      await api.delete(`/organizations/public-ips/${ipId}/reject`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-ips'] });

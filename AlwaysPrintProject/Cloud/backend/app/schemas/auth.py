@@ -31,7 +31,7 @@ class TokenPayload(BaseModel):
     sub: str = Field(..., description="Subject (user_id)")
     email: str = Field(..., description="Email del usuario")
     role: UserRole = Field(..., description="Rol del usuario")
-    account_id: Optional[str] = Field(None, description="ID de la cuenta (solo para operadores)")
+    organization_id: Optional[str] = Field(None, description="ID de la organización (solo para operadores)")
     exp: int = Field(..., description="Timestamp de expiración")
 
 

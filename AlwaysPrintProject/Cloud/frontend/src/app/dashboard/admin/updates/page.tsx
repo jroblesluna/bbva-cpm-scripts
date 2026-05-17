@@ -28,8 +28,8 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { apiClient, accountsApi } from '@/lib/api';
-import type { Account } from '@/types';
+import { apiClient, organizationsApi } from '@/lib/api';
+import type { Organization } from '@/types';
 
 // ============================================================================
 // TIPOS
@@ -136,18 +136,18 @@ export default function UpdatesPage() {
 
       // Obtener lista de organizaciones con su estado de auto-update
       if (isAdmin) {
-        const accounts = await accountsApi.list();
-        const orgStates: OrgAutoUpdateState[] = accounts.map((acc: Account) => ({
+        const accounts = await organizationsApi.list();
+        const orgStates: OrgAutoUpdateState[] = accounts.map((acc: Organization) => ({
           orgId: acc.id,
           orgName: acc.name,
           autoUpdateEnabled: acc.auto_update_enabled ?? false,
           isToggling: false,
         }));
         setOrganizations(orgStates);
-      } else if (user?.account_id) {
+      } else if (user?.organization_id) {
         // Operador: solo su organización
         try {
-          const acc = await accountsApi.get(user.account_id);
+          const acc = await organizationsApi.get(user.organization_id);
           setOrganizations([{
             orgId: acc.id,
             orgName: acc.name,
@@ -167,7 +167,7 @@ export default function UpdatesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [isAdmin, user?.account_id]);
+  }, [isAdmin, user?.organization_id]);
 
   useEffect(() => {
     fetchData();

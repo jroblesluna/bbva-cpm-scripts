@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
-from app.models.account import PublicIP
+from app.models.organization import PublicIP
 
 
 def is_private_ip(ip: str) -> bool:
@@ -89,7 +89,7 @@ def main():
         print("IPs privadas que serán eliminadas:")
         for ip in private_ips:
             status = "Autorizada" if ip.is_authorized else "Pendiente"
-            account = f"Account {ip.account_id}" if ip.account_id else "Sin cuenta"
+            account = f"Organización {ip.organization_id}" if ip.organization_id else "Sin organización"
             print(f"  - {ip.ip_address} ({status}, {account})")
         
         # Confirmar eliminación

@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { workstationsApi, accountsApi } from '@/lib/api';
+import { workstationsApi, organizationsApi } from '@/lib/api';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -70,7 +70,7 @@ export default function WorkstationsPage() {
 
   const { data: accounts } = useQuery({
     queryKey: ['accounts'],
-    queryFn: () => accountsApi.list(),
+    queryFn: () => organizationsApi.list(),
   });
 
   const updateMutation = useMutation({
@@ -452,7 +452,7 @@ function WorkstationForm({
     hostname: workstation.hostname || undefined,
     os_serial: workstation.os_serial || undefined,
     current_user: workstation.current_user || undefined,
-    account_id: workstation.account_id || undefined,
+    account_id: workstation.organization_id || undefined,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -509,10 +509,10 @@ function WorkstationForm({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="account_id">{t('account')}</Label>
+          <Label htmlFor="organization_id">{t('account')}</Label>
           <select
-            id="account_id"
-            value={formData.account_id || ''}
+            id="organization_id"
+            value={formData.organization_id || ''}
             onChange={(e) =>
               setFormData({ ...formData, account_id: e.target.value || undefined })
             }

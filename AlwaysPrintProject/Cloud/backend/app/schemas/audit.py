@@ -19,7 +19,7 @@ class AuditLogResponse(BaseModel):
     id: UUID
     user_id: Optional[UUID] = None
     workstation_id: Optional[UUID] = None
-    account_id: Optional[UUID] = None
+    organization_id: Optional[UUID] = None
     action_type: ActionType
     entity_type: str
     entity_id: UUID
@@ -47,7 +47,7 @@ class AuditLogSearch(BaseModel):
     """Schema para búsqueda avanzada de registros de auditoría."""
     user_id: Optional[UUID] = Field(None, description="Filtrar por usuario")
     workstation_id: Optional[UUID] = Field(None, description="Filtrar por workstation")
-    account_id: Optional[UUID] = Field(None, description="Filtrar por cuenta")
+    organization_id: Optional[UUID] = Field(None, description="Filtrar por organización")
     action_type: Optional[ActionType] = Field(None, description="Filtrar por tipo de acción")
     entity_type: Optional[str] = Field(None, description="Filtrar por tipo de entidad")
     entity_id: Optional[UUID] = Field(None, description="Filtrar por ID de entidad")

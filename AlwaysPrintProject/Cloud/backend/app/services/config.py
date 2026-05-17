@@ -91,15 +91,15 @@ class ConfigService:
         if not workstation:
             raise ValueError(f"Workstation {workstation_id} no encontrada")
         
-        # 2. Obtener GlobalConfig (puede no existir si la cuenta es nueva)
+        # 2. Obtener GlobalConfig (puede no existir si la organización es nueva)
         global_config = db.query(GlobalConfig).filter_by(
-            account_id=workstation.account_id
+            organization_id=workstation.organization_id
         ).first()
         
         if not global_config:
-            # Crear una GlobalConfig por defecto para la cuenta
+            # Crear una GlobalConfig por defecto para la organización
             global_config = GlobalConfig(
-                account_id=workstation.account_id,
+                organization_id=workstation.organization_id,
                 corporate_queue_name="LexmarkBBVA",
                 pending_task_polling_minutes=3,
                 bootstrap_domains="apps.iol.pe,sistemas.com.pe",
@@ -187,7 +187,7 @@ class ConfigService:
     def create_global_config(
         self,
         db: Session,
-        account_id: str,
+        organization_id: str,
         corporate_queue_name: str = "LexmarkRoblesAI",
         search_targets: Optional[Dict] = None,
         pending_task_polling_minutes: int = 3,
@@ -198,11 +198,11 @@ class ConfigService:
         telemetry_interval_seconds: int = 300
     ) -> GlobalConfig:
         """
-        Crea una configuración global para una cuenta.
+        Crea una configuración global para una organización.
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             corporate_queue_name: Nombre de la cola corporativa
             search_targets: Objetivos de búsqueda de impresoras
             pending_task_polling_minutes: Intervalo de polling (1-1440)
@@ -223,13 +223,13 @@ class ConfigService:
             )
         
         # Verificar que no exista ya una GlobalConfig
-        existing = db.query(GlobalConfig).filter_by(account_id=account_id).first()
+        existing = db.query(GlobalConfig).filter_by(organization_id=organization_id).first()
         if existing:
-            raise ValueError(f"Ya existe una GlobalConfig para account {account_id}")
+            raise ValueError(f"Ya existe una GlobalConfig para organización {organization_id}")
         
         # Crear GlobalConfig
         global_config = GlobalConfig(
-            account_id=account_id,
+            organization_id=organization_id,
             corporate_queue_name=corporate_queue_name,
             search_targets=search_targets,
             pending_task_polling_minutes=pending_task_polling_minutes,
@@ -249,7 +249,7 @@ class ConfigService:
     def update_global_config(
         self,
         db: Session,
-        account_id: str,
+        organization_id: str,
         corporate_queue_name: Optional[str] = None,
         search_targets: Optional[Dict] = None,
         pending_task_polling_minutes: Optional[int] = None,
@@ -260,11 +260,11 @@ class ConfigService:
         telemetry_interval_seconds: Optional[int] = None
     ) -> GlobalConfig:
         """
-        Actualiza la configuración global de una cuenta.
+        Actualiza la configuración global de una organización.
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             corporate_queue_name: Nuevo nombre de cola (opcional)
             search_targets: Nuevos objetivos de búsqueda (opcional)
             pending_task_polling_minutes: Nuevo intervalo de polling (opcional)
@@ -277,9 +277,9 @@ class ConfigService:
             ValueError: Si no existe GlobalConfig para la cuenta
             ValueError: Si pending_task_polling_minutes está fuera de rango
         """
-        global_config = db.query(GlobalConfig).filter_by(account_id=account_id).first()
+        global_config = db.query(GlobalConfig).filter_by(organization_id=organization_id).first()
         if not global_config:
-            raise ValueError(f"GlobalConfig no encontrada para account {account_id}")
+            raise ValueError(f"GlobalConfig no encontrada para organización {organization_id}")
         
         # Actualizar campos si se proporcionan
         if corporate_queue_name is not None:

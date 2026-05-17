@@ -68,7 +68,7 @@ export default function ActionConfigsPage() {
   const [isActive, setIsActive] = useState(true);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   
-  const organizationId = 1; // TODO: Obtener del usuario autenticado (session?.user?.account_id)
+  const organizationId = 1; // TODO: Obtener del usuario autenticado (session?.user?.organization_id)
   
   // Query para listar configuraciones
   const { data: configs, isLoading } = useQuery({

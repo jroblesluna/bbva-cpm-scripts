@@ -23,7 +23,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
 from app.core.security import require_admin
-from app.models.account import Account
+from app.models.organization import Organization as Account
 from app.models.user import User, UserRole
 from app.main import app
 

@@ -36,18 +36,18 @@ router = APIRouter()
 
 @router.get("/", response_model=VLANListResponse)
 def list_vlans(
-    account_id: Optional[str] = Query(None, description="Filtrar por ID de cuenta (solo Admin)"),
+    organization_id: Optional[str] = Query(None, description="Filtrar por ID de organización (solo Admin)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Listar VLANs.
     
-    - Admin: puede ver todas las VLANs o filtrar por account_id
+    - Admin: puede ver todas las VLANs o filtrar por organization_id
     - Operador: solo puede ver VLANs de su cuenta
     
     Args:
-        account_id: ID de cuenta para filtrar (opcional, solo Admin)
+        organization_id: ID de organización para filtrar (opcional, solo Admin)
         current_user: Usuario autenticado
         db: Sesión de base de datos
     
@@ -62,10 +62,10 @@ def list_vlans(
     # Aplicar filtros según rol
     if current_user.role == UserRole.OPERATOR:
         # Operadores solo ven su cuenta
-        query = query.filter(VLAN.account_id == current_user.organization_id)
-    elif current_user.role == UserRole.ADMIN and account_id:
-        # Admins pueden filtrar por cuenta específica
-        query = query.filter(VLAN.account_id == account_id)
+        query = query.filter(VLAN.organization_id == current_user.organization_id)
+    elif current_user.role == UserRole.ADMIN and organization_id:
+        # Admins pueden filtrar por organización específica
+        query = query.filter(VLAN.organization_id == organization_id)
     # Si es Admin sin filtro, ve todas las VLANs
     
     vlans = query.all()
@@ -80,20 +80,20 @@ def create_vlan(
     db: Session = Depends(get_db)
 ):
     """Crear una nueva VLAN."""
-    # Determinar account_id
+    # Determinar organization_id
     if current_user.role == UserRole.OPERATOR:
         # Operadores solo pueden crear VLANs en su propia cuenta
-        account_id = current_user.organization_id
-        if not account_id:
+        org_id = current_user.organization_id
+        if not org_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
     else:
-        # Admins deben especificar el account_id
-        account_id = vlan_data.account_id
-        if not account_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="account_id requerido para administradores")
+        # Admins deben especificar el organization_id
+        org_id = vlan_data.organization_id
+        if not org_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="organization_id requerido para administradores")
     
     vlan = VLAN(
-        account_id=account_id,
+        organization_id=org_id,
         name=vlan_data.name,
         description=vlan_data.description,
         cidr_ranges=vlan_data.cidr_ranges
@@ -108,7 +108,7 @@ def create_vlan(
         entity_type="vlan",
         entity_id=str(vlan.id),
         user_id=str(current_user.id),
-        account_id=str(vlan.account_id),
+        organization_id=str(vlan.organization_id),
         entity_data={"name": vlan.name},
         ip_address=get_client_ip(request)
     )
@@ -127,7 +127,7 @@ def get_vlan(
     if not vlan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
     
-    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.organization_id:
+    if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     workstation_count = len(vlan.workstations)
@@ -147,7 +147,7 @@ def update_vlan(
     if not vlan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
     
-    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.organization_id:
+    if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     old_values = {"name": vlan.name, "cidr_ranges": vlan.cidr_ranges}
@@ -165,7 +165,7 @@ def update_vlan(
         entity_type="vlan",
         entity_id=str(vlan.id),
         user_id=str(current_user.id),
-        account_id=str(vlan.account_id),
+        organization_id=str(vlan.organization_id),
         old_data=old_values,
         new_data=update_data,
         ip_address=get_client_ip(request)
@@ -186,7 +186,7 @@ def delete_vlan(
     if not vlan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
     
-    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.organization_id:
+    if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     db.delete(vlan)
@@ -198,7 +198,7 @@ def delete_vlan(
         entity_type="vlan",
         entity_id=str(vlan_id),
         user_id=str(current_user.id),
-        account_id=str(vlan.account_id),
+        organization_id=str(vlan.organization_id),
         entity_data={"name": vlan.name},
         ip_address=get_client_ip(request)
     )
@@ -219,7 +219,7 @@ def list_vlan_workstations(
     if not vlan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
     
-    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.organization_id:
+    if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     workstation_service = WorkstationService()
@@ -237,7 +237,7 @@ def get_vlan_config(
     if not vlan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
     
-    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.organization_id:
+    if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     return vlan.vlan_config if vlan.vlan_config else VLANConfigResponse(vlan_id=vlan_id)
@@ -256,7 +256,7 @@ def update_vlan_config(
     if not vlan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
     
-    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.organization_id:
+    if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     config_service = ConfigService()
@@ -270,7 +270,7 @@ def update_vlan_config(
         entity_type="vlan_config",
         entity_id=str(vlan_id),
         user_id=str(current_user.id),
-        account_id=str(vlan.account_id),
+        organization_id=str(vlan.organization_id),
         old_config={},
         new_config=config_data.model_dump(exclude_unset=True),
         ip_address=get_client_ip(request)
@@ -291,7 +291,7 @@ def delete_vlan_config(
     if not vlan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
     
-    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.organization_id:
+    if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     config_service = ConfigService()
@@ -303,7 +303,7 @@ def delete_vlan_config(
         entity_type="vlan_config",
         entity_id=str(vlan_id),
         user_id=str(current_user.id),
-        account_id=str(vlan.account_id),
+        organization_id=str(vlan.organization_id),
         old_config={"action": "config_deleted"},
         new_config={},
         ip_address=get_client_ip(request)

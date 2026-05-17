@@ -110,7 +110,7 @@ class AuthService:
         - sub: ID del usuario
         - email: Email del usuario
         - role: Rol del usuario (admin, operator, readonly)
-        - account_id: ID de la cuenta (null para admin)
+        - organization_id: ID de la organización (null para admin)
         - exp: Timestamp de expiración (24 horas por defecto)
         - iat: Timestamp de emisión
         
@@ -126,7 +126,7 @@ class AuthService:
             ...     "sub": str(user.id),
             ...     "email": user.email,
             ...     "role": user.role.value,
-            ...     "account_id": str(user.account_id) if user.account_id else None
+            ...     "organization_id": str(user.organization_id) if user.organization_id else None
             ... })
         """
         to_encode = data.copy()
@@ -364,7 +364,7 @@ class AuthService:
             "sub": str(user.id),
             "email": user.email,
             "role": user.role.value,
-            "account_id": str(user.organization_id) if user.organization_id else None
+            "organization_id": str(user.organization_id) if user.organization_id else None
         }
         
         # Crear access token

@@ -301,7 +301,7 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
     }
     const loadAccounts = async () => {
       try {
-        const r = await apiClient.get('/accounts/?skip=0&limit=1000')
+        const r = await apiClient.get('/organizations/?skip=0&limit=1000')
         const items = r.data.items || []
         setAccounts(items)
         if (items.length > 0) setSelectedAccountId(items[0].id)

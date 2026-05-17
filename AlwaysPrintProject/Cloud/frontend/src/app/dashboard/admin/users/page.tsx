@@ -9,7 +9,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { usersApi, accountsApi } from '@/lib/api'
+import { usersApi, organizationsApi } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -61,7 +61,7 @@ export default function UsersPage() {
   // Query para organizaciones
   const { data: accounts } = useQuery({
     queryKey: ['accounts'],
-    queryFn: () => accountsApi.list(),
+    queryFn: () => organizationsApi.list(),
   })
 
   // Mutation para crear usuario
@@ -316,7 +316,7 @@ function UserForm({
     password: '',
     full_name: user?.full_name || '',
     role: user?.role || 'operator',
-    account_id: user?.account_id || '',
+    organization_id: user?.organization_id || '',
     timezone: user?.timezone || '',
     language: user?.language || 'en',
     is_active: user?.is_active ?? true,
@@ -330,7 +330,7 @@ function UserForm({
       email: formData.email,
       full_name: formData.full_name,
       role: formData.role,
-      account_id: formData.account_id || undefined,
+      organization_id: formData.organization_id || undefined,
       timezone: formData.timezone || undefined,
       language: formData.language || 'en',
     }
@@ -351,7 +351,7 @@ function UserForm({
 
   // Obtener timezone de la organización seleccionada
   const accountList = Array.isArray(accounts) ? accounts : []
-  const selectedAccount = accountList.find(a => a.id === formData.account_id)
+  const selectedAccount = accountList.find(a => a.id === formData.organization_id)
   const inheritedTimezone = selectedAccount?.timezone || 'UTC'
 
   return (
@@ -427,10 +427,10 @@ function UserForm({
 
         {/* Organización */}
         <div className="space-y-2">
-          <Label htmlFor="account_id">{t('orgLabel')}</Label>
+          <Label htmlFor="organization_id">{t('orgLabel')}</Label>
           <select
-            id="account_id"
-            value={formData.account_id}
+            id="organization_id"
+            value={formData.organization_id}
             onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
             disabled={isLoading}
             className="w-full px-3 py-2 border rounded-md"
@@ -446,7 +446,7 @@ function UserForm({
         <div className="space-y-2">
           <Label htmlFor="timezone">
             {t('timezoneLabel')}
-            {formData.account_id && (
+            {formData.organization_id && (
               <span className="text-xs text-gray-500 ml-2">
                 {t('timezoneInherit', { timezone: inheritedTimezone })}
               </span>

@@ -6,7 +6,7 @@ su importación desde otros módulos.
 """
 
 from app.models.user import User, UserRole
-from app.models.organization import Organization, Account, PublicIP
+from app.models.organization import Organization, PublicIP
 from app.models.vlan import VLAN
 from app.models.workstation import Workstation, License
 from app.models.config import GlobalConfig, VLANConfig, WorkstationConfig
@@ -22,7 +22,6 @@ __all__ = [
     
     # Organization models
     "Organization",
-    "Account",  # Alias de compatibilidad
     "PublicIP",
     
     # VLAN models

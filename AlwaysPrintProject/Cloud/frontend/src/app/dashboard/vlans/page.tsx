@@ -48,7 +48,7 @@ export default function VLANsPage() {
 
   const loadAccounts = async () => {
     try {
-      const response = await apiClient.get('/accounts/?skip=0&limit=1000')
+      const response = await apiClient.get('/organizations/?skip=0&limit=1000')
       setAccounts(response.data.items || [])
     } catch (error) {
       console.error('Error loading accounts:', error)
@@ -283,7 +283,7 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   const [loading, setLoading] = useState(false)
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
   const [formData, setFormData] = useState<VLANCreate>({
-    account_id: user?.account_id || '',
+    organization_id: user?.organization_id || '',
     name: '',
     description: '',
     cidr_ranges: [''],
@@ -293,7 +293,7 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
     if (!isAdmin()) return
     const load = async () => {
       try {
-        const response = await apiClient.get('/accounts/')
+        const response = await apiClient.get('/organizations/')
         setAccounts(response.data.items || [])
       } catch (error) { console.error(error) }
     }
@@ -303,7 +303,7 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const validCidrs = formData.cidr_ranges.filter((c) => c.trim())
-    if (!formData.name.trim() || !formData.account_id || validCidrs.length === 0) return
+    if (!formData.name.trim() || !formData.organization_id || validCidrs.length === 0) return
 
     try {
       setLoading(true)
@@ -332,7 +332,7 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
             {isAdmin() && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('organization')}</label>
-                <select value={formData.account_id || ''} onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
+                <select value={formData.organization_id || ''} onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
                   <option value="">{t('selectOrg')}</option>
                   {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}

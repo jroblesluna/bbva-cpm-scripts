@@ -30,7 +30,7 @@ class Message(Base):
     Los mensajes pueden dirigirse a:
     - Una estación específica (target_type=workstation, target_id=workstation_id)
     - Todas las estaciones de una VLAN (target_type=vlan, target_id=vlan_id)
-    - Todas las estaciones de una cuenta (target_type=account, target_id=NULL)
+    - Todas las estaciones de una organización (target_type=account, target_id=NULL)
     """
     __tablename__ = "messages"
     

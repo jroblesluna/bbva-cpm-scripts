@@ -37,7 +37,7 @@ def _resolve_entity_names(db: Session, logs: list) -> list[dict]:
     Agrupa las consultas por tipo para minimizar queries a la BD.
     """
     from app.models.user import User as UserModel
-    from app.models.organization import Organization, Account
+    from app.models.organization import Organization
     from app.models.workstation import Workstation
     from app.models.vlan import VLAN
     from app.models.message import Message
@@ -59,10 +59,12 @@ def _resolve_entity_names(db: Session, logs: list) -> list[dict]:
         for u in users:
             names[str(u.id)] = u.full_name or u.email
 
-    if "account" in ids_by_type:
-        accounts = db.query(Account).filter(Account.id.in_(ids_by_type["account"])).all()
-        for a in accounts:
-            names[str(a.id)] = a.name
+    # Soportar tanto "organization" (nuevo) como "account" (legacy en BD)
+    org_ids = ids_by_type.get("organization", set()) | ids_by_type.get("account", set())
+    if org_ids:
+        orgs = db.query(Organization).filter(Organization.id.in_(org_ids)).all()
+        for o in orgs:
+            names[str(o.id)] = o.name
 
     if "workstation" in ids_by_type:
         workstations = db.query(Workstation).filter(Workstation.id.in_(ids_by_type["workstation"])).all()
@@ -86,7 +88,7 @@ def _resolve_entity_names(db: Session, logs: list) -> list[dict]:
             "id": log.id,
             "user_id": log.user_id,
             "workstation_id": log.workstation_id,
-            "account_id": log.account_id,
+            "organization_id": log.organization_id,
             "action_type": log.action_type,
             "entity_type": log.entity_type,
             "entity_id": log.entity_id,
@@ -109,7 +111,7 @@ def search_audit_logs(
     page_size: int = Query(50, ge=1, le=100, description="Tamaño de página (legacy, ignorado si se usa cursor)"),
     user_id: Optional[UUID] = Query(None),
     workstation_id: Optional[UUID] = Query(None),
-    account_id: Optional[UUID] = Query(None),
+    organization_id: Optional[UUID] = Query(None),
     action_type: Optional[ActionType] = Query(None),
     entity_type: Optional[str] = Query(None),
     entity_id: Optional[UUID] = Query(None),
@@ -135,13 +137,13 @@ def search_audit_logs(
     if current_user.role == UserRole.OPERATOR:
         if not current_user.organization_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
-        account_id = current_user.organization_id
+        organization_id = current_user.organization_id
     
     # Construir query base con filtros
     query = db.query(AuditLog)
     
-    if account_id:
-        query = query.filter(AuditLog.account_id == str(account_id))
+    if organization_id:
+        query = query.filter(AuditLog.organization_id == str(organization_id))
     if user_id:
         query = query.filter(AuditLog.user_id == str(user_id))
     if workstation_id:
@@ -221,29 +223,29 @@ def get_audit_stats(
     """
     Obtener estadísticas de auditoría.
     
-    - Admin: estadísticas de todas las cuentas
-    - Operador: estadísticas de su cuenta
+    - Admin: estadísticas de todas las organizaciones
+    - Operador: estadísticas de su organización
     """
     audit_service = AuditService()
     
-    # Determinar account_id según rol
-    account_id = None
+    # Determinar organization_id según rol
+    org_id = None
     if current_user.role == UserRole.OPERATOR:
         if not current_user.organization_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
-        account_id = current_user.organization_id
+        org_id = current_user.organization_id
     
     # Obtener estadísticas
     query = db.query(AuditLog)
-    if account_id:
-        query = query.filter(AuditLog.account_id == account_id)
+    if org_id:
+        query = query.filter(AuditLog.organization_id == org_id)
     
     total_actions = query.count()
     
-    # Acciones por tipo - solo si hay account_id
+    # Acciones por tipo - solo si hay org_id
     actions_by_type = {}
-    if account_id:
-        actions_by_type = audit_service.get_action_count_by_type(db, str(account_id))
+    if org_id:
+        actions_by_type = audit_service.get_action_count_by_type(db, str(org_id))
     else:
         # Para admin sin filtro, contar todos los tipos
         all_logs = db.query(AuditLog).all()
@@ -256,8 +258,8 @@ def get_audit_stats(
         AuditLog.user_id,
         func.count(AuditLog.id).label("count")
     )
-    if account_id:
-        most_active_query = most_active_query.filter(AuditLog.account_id == account_id)
+    if org_id:
+        most_active_query = most_active_query.filter(AuditLog.organization_id == org_id)
     
     most_active = most_active_query.group_by(AuditLog.user_id).order_by(
         func.count(AuditLog.id).desc()
@@ -290,23 +292,23 @@ def get_recent_activity(
     """
     Obtener actividad reciente.
     
-    - Admin: actividad de todas las cuentas
-    - Operador: actividad de su cuenta
+    - Admin: actividad de todas las organizaciones
+    - Operador: actividad de su organización
     """
     audit_service = AuditService()
     
-    # Determinar account_id según rol
-    account_id = None
+    # Determinar organization_id según rol
+    org_id = None
     if current_user.role == UserRole.OPERATOR:
         if not current_user.organization_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
-        account_id = current_user.organization_id
+        org_id = current_user.organization_id
     
     # Obtener actividad reciente
-    if account_id:
-        logs = audit_service.get_recent_activity(db, str(account_id), hours=24, limit=limit)
+    if org_id:
+        logs = audit_service.get_recent_activity(db, str(org_id), hours=24, limit=limit)
     else:
-        # Para admin, obtener actividad reciente de todas las cuentas
+        # Para admin, obtener actividad reciente de todas las organizaciones
         recent_date = datetime.utcnow() - timedelta(hours=24)
         logs = db.query(AuditLog).filter(
             AuditLog.created_at >= recent_date
@@ -336,7 +338,7 @@ def get_audit_log(
     
     # Verificar permisos
     if current_user.role == UserRole.OPERATOR:
-        if log.account_id != current_user.organization_id:
+        if log.organization_id != current_user.organization_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     # Agregar información adicional

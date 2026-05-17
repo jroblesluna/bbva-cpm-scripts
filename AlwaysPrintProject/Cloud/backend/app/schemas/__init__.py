@@ -15,6 +15,7 @@ from app.schemas.user import (
 
 # === ORGANIZATION SCHEMAS ===
 from app.schemas.organization import (
+    OrganizationBase,
     OrganizationCreate,
     OrganizationUpdate,
     OrganizationResponse,
@@ -26,12 +27,6 @@ from app.schemas.organization import (
     PublicIPAuthorizeRequest,
     AutoUpdateToggleRequest,
     AutoUpdateToggleResponse,
-    # Aliases de compatibilidad
-    AccountCreate,
-    AccountUpdate,
-    AccountResponse,
-    AccountDetailResponse,
-    AccountListResponse,
 )
 
 # === WORKSTATION SCHEMAS ===
@@ -43,7 +38,7 @@ from app.schemas.workstation import (
     WorkstationStatusUpdate,
     WorkstationListResponse,
     WorkstationStatsResponse,
-    AccountBasicResponse,
+    OrganizationBasicResponse,
     WorkstationRegisterRequest,
     WorkstationRegisterResponse,
     WorkstationRegisterPendingResponse,
@@ -162,16 +157,12 @@ __all__ = [
     "UserResponse",
     "UserListResponse",
     # Organization
+    "OrganizationBase",
     "OrganizationCreate",
     "OrganizationUpdate",
     "OrganizationResponse",
     "OrganizationDetailResponse",
     "OrganizationListResponse",
-    "AccountCreate",
-    "AccountUpdate",
-    "AccountResponse",
-    "AccountDetailResponse",
-    "AccountListResponse",
     "PublicIPCreate",
     "PublicIPResponse",
     "PublicIPPendingResponse",
@@ -186,7 +177,7 @@ __all__ = [
     "WorkstationStatusUpdate",
     "WorkstationListResponse",
     "WorkstationStatsResponse",
-    "AccountBasicResponse",
+    "OrganizationBasicResponse",
     "WorkstationRegisterRequest",
     "WorkstationRegisterResponse",
     "WorkstationRegisterPendingResponse",

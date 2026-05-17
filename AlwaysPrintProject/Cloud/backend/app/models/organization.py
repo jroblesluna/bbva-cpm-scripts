@@ -98,9 +98,6 @@ class Organization(Base):
         return f"<Organization(id={self.id}, name={self.name}, is_active={self.is_active})>"
 
 
-# Alias de compatibilidad para código que aún use Account
-Account = Organization
-
 
 class PublicIP(Base):
     """

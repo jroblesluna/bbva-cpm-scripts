@@ -323,8 +323,6 @@ export const organizationsApi = {
   },
 }
 
-// Alias de compatibilidad
-export const accountsApi = organizationsApi
 
 // ============================================================================
 // USUARIOS

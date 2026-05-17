@@ -41,7 +41,7 @@ class MessageCreate(BaseModel):
 class MessageResponse(BaseModel):
     """Schema de respuesta para mensaje."""
     id: UUID
-    account_id: UUID
+    organization_id: UUID
     sender_id: Optional[UUID] = None
     target_type: TargetType
     target_id: Optional[UUID] = None

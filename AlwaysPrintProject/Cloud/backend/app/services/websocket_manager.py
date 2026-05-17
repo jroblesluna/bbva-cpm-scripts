@@ -212,23 +212,23 @@ class ConnectionManager:
             if not self.operator_connections[user_id]:
                 del self.operator_connections[user_id]
     
-    async def broadcast_to_account(
+    async def broadcast_to_organization(
         self, 
-        account_id: str, 
+        organization_id: str, 
         message: dict,
         db: Session
     ):
         """
-        Envía mensaje a todos los operadores de una cuenta.
+        Envía mensaje a todos los operadores de una organización.
         
         Args:
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             message: Mensaje a enviar
             db: Sesión de base de datos
         """
-        # Obtener todos los usuarios de la cuenta
+        # Obtener todos los usuarios de la organización
         from app.models.user import User
-        users = db.query(User).filter_by(organization_id=account_id).all()
+        users = db.query(User).filter_by(organization_id=organization_id).all()
         
         # Enviar a cada usuario
         for user in users:

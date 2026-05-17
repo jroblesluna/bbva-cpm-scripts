@@ -128,7 +128,7 @@ def register_workstation(
                 }
             )
         
-        elif reg_status == "inactive_account":
+        elif reg_status == "inactive_organization":
             # Cuenta desactivada
             logger.warning(
                 f"[REGISTRO HTTP] Cuenta desactivada para IP pública: {public_ip}. "
@@ -147,7 +147,7 @@ def register_workstation(
                 f"id={workstation.id}, "
                 f"ip_private={workstation.ip_private}, "
                 f"hostname={workstation.hostname}, "
-                f"account_id={workstation.organization_id}, "
+                f"organization_id={workstation.organization_id}, "
                 f"is_new={is_new}"
             )
             
@@ -171,15 +171,15 @@ def register_workstation(
             logger.info(
                 f"[REGISTRO HTTP] Devolviendo credenciales: "
                 f"workstation_id={workstation.id}, "
-                f"account_id={account.id}, "
-                f"account_name={account.name}, "
+                f"organization_id={account.id}, "
+                f"organization_name={account.name}, "
                 f"cloud_api_url={cloud_api_url}"
             )
             
             return WorkstationRegisterResponse(
                 workstation_id=workstation.id,
                 organization_id=account.id,
-                account_name=account.name,
+                organization_name=account.name,
                 message="Workstation registrada exitosamente" if is_new else "Workstation actualizada exitosamente",
                 cloud_api_url=cloud_api_url
             )
@@ -217,7 +217,7 @@ def list_workstations(
     page: int = Query(1, ge=1, description="Número de página"),
     page_size: int = Query(50, ge=1, le=1000, description="Tamaño de página"),
     vlan_id: Optional[UUID] = Query(None, description="Filtrar por VLAN"),
-    account_id: Optional[UUID] = Query(None, description="Filtrar por cuenta"),
+    organization_id: Optional[UUID] = Query(None, description="Filtrar por organización"),
     is_online: Optional[bool] = Query(None, description="Filtrar por estado online"),
     contingency_active: Optional[bool] = Query(None, description="Filtrar por contingencia activa"),
     search: Optional[str] = Query(None, description="Buscar por IP o hostname"),
@@ -227,14 +227,14 @@ def list_workstations(
     """
     Listar workstations con filtros.
     
-    - Admin: puede ver workstations de todas las cuentas
-    - Operador: solo puede ver workstations de su cuenta
+    - Admin: puede ver workstations de todas las organizaciones
+    - Operador: solo puede ver workstations de su organización
     
     Args:
         page: Número de página
         page_size: Tamaño de página (1-100)
         vlan_id: Filtrar por VLAN opcional
-        account_id: Filtrar por cuenta opcional
+        organization_id: Filtrar por organización opcional
         is_online: Filtrar por estado online opcional
         contingency_active: Filtrar por contingencia activa opcional
         search: Buscar por IP o hostname opcional
@@ -261,14 +261,14 @@ def list_workstations(
             )
         base_query = base_query.filter(Workstation.organization_id == current_user.organization_id)
     
-    # Filtrar por cuenta si se proporciona (solo Admin)
-    if account_id:
+    # Filtrar por organización si se proporciona (solo Admin)
+    if organization_id:
         if current_user.role != UserRole.ADMIN:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Solo Admin puede filtrar por cuenta"
+                detail="Solo Admin puede filtrar por organización"
             )
-        base_query = base_query.filter(Workstation.organization_id == account_id)
+        base_query = base_query.filter(Workstation.organization_id == organization_id)
     
     # Filtrar por VLAN si se proporciona
     if vlan_id:
@@ -334,8 +334,8 @@ def get_workstation_stats(
         
         workstation_service = WorkstationService()
         
-        # Determinar account_id según rol
-        account_id = None
+        # Determinar organization_id según rol
+        org_id = None
         if current_user.role in (UserRole.OPERATOR, UserRole.READONLY):
             if not current_user.organization_id:
                 # Devolver estadísticas vacías si no tiene cuenta asignada
@@ -345,17 +345,17 @@ def get_workstation_stats(
                     offline=0,
                     contingency_active=0
                 )
-            account_id = str(current_user.organization_id) if current_user.organization_id else None
+            org_id = str(current_user.organization_id) if current_user.organization_id else None
         
         # Obtener estadísticas generales
-        total = workstation_service.get_total_count(db, account_id)
-        online = workstation_service.get_online_count(db, account_id)
-        contingency = workstation_service.get_contingency_count(db, account_id)
+        total = workstation_service.get_total_count(db, org_id)
+        online = workstation_service.get_online_count(db, org_id)
+        contingency = workstation_service.get_contingency_count(db, org_id)
         
         # Contar VLANs totales de la organización
         from app.models.vlan import VLAN
-        if account_id:
-            total_vlans = db.query(VLAN).filter(VLAN.organization_id == account_id).count()
+        if org_id:
+            total_vlans = db.query(VLAN).filter(VLAN.organization_id == org_id).count()
         else:
             # Admin: contar todas las VLANs
             total_vlans = db.query(VLAN).count()
@@ -377,28 +377,28 @@ def get_workstation_stats(
             # Obtener todas las cuentas
             accounts = db.query(Account).all()
             
-            by_account = {}
+            by_organization = {}
             for account in accounts:
                 try:
                     # Convertir account.id a string de manera segura
                     # El tipo GUID puede devolver UUID o str dependiendo del dialecto
                     if isinstance(account.id, uuid.UUID):
-                        account_id_str = str(account.id)
+                        org_id_str = str(account.id)
                     elif isinstance(account.id, str):
-                        account_id_str = account.id
+                        org_id_str = account.id
                     else:
-                        account_id_str = str(account.id)
+                        org_id_str = str(account.id)
                     
-                    account_total = workstation_service.get_total_count(db, account_id_str)
-                    account_online = workstation_service.get_online_count(db, account_id_str)
-                    account_contingency = workstation_service.get_contingency_count(db, account_id_str)
+                    org_total = workstation_service.get_total_count(db, org_id_str)
+                    org_online = workstation_service.get_online_count(db, org_id_str)
+                    org_contingency = workstation_service.get_contingency_count(db, org_id_str)
                     
-                    by_account[account_id_str] = {
+                    by_organization[org_id_str] = {
                         "name": account.name,
-                        "total": account_total,
-                        "online": account_online,
-                        "offline": account_total - account_online,
-                        "contingency": account_contingency
+                        "total": org_total,
+                        "online": org_online,
+                        "offline": org_total - org_online,
+                        "contingency": org_contingency
                     }
                 except Exception as e:
                     # Si falla para una cuenta específica, continuar con las demás
@@ -407,7 +407,7 @@ def get_workstation_stats(
                     traceback.print_exc()
                     continue
             
-            response.by_account = by_account
+            response.by_organization = by_organization
         
         return response
     except HTTPException:
@@ -517,7 +517,7 @@ def update_workstation(
         "hostname": workstation.hostname,
         "os_serial": workstation.os_serial,
         "current_user": workstation.current_user,
-        "account_id": str(workstation.organization_id) if workstation.organization_id else None
+        "organization_id": str(workstation.organization_id) if workstation.organization_id else None
     }
     
     # Actualizar campos
@@ -536,7 +536,7 @@ def update_workstation(
         entity_type="workstation",
         entity_id=str(workstation.id),
         user_id=str(current_user.id),
-        account_id=str(workstation.organization_id) if workstation.organization_id else None,
+        organization_id=str(workstation.organization_id) if workstation.organization_id else None,
         old_data=old_values,
         new_data=update_data,
         ip_address=get_client_ip(request)
@@ -608,7 +608,7 @@ def update_workstation_config(
         entity_type="workstation_config",
         entity_id=str(workstation_id),
         user_id=str(current_user.id),
-        account_id=str(workstation.organization_id),
+        organization_id=str(workstation.organization_id),
         old_config={},
         new_config=config_data.model_dump(exclude_unset=True),
         ip_address=get_client_ip(request)
@@ -667,7 +667,7 @@ def delete_workstation_config(
         entity_type="workstation_config",
         entity_id=str(workstation_id),
         user_id=str(current_user.id),
-        account_id=str(workstation.organization_id),
+        organization_id=str(workstation.organization_id),
         old_config={"action": "config_deleted"},
         new_config={},
         ip_address=get_client_ip(request)
@@ -720,7 +720,7 @@ def delete_workstation(
     old_data = {
         "ip_private": workstation.ip_private,
         "hostname": workstation.hostname,
-        "account_id": str(workstation.organization_id) if workstation.organization_id else None,
+        "organization_id": str(workstation.organization_id) if workstation.organization_id else None,
     }
     
     # Eliminar workstation (cascade elimina relaciones)
@@ -735,7 +735,7 @@ def delete_workstation(
         entity_type="Workstation",
         entity_id=str(workstation_id),
         user_id=str(current_user.id),
-        account_id=old_data["account_id"],
+        organization_id=old_data["organization_id"],
         old_values=old_data,
         new_values={},
         ip_address=get_client_ip(request)

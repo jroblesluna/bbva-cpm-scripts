@@ -4,9 +4,9 @@ Servicio de persistencia y consulta de telemetría.
 Este servicio implementa la lógica de negocio para:
 - Persistir registros de telemetría recibidos por WebSocket
 - Consultar historial de telemetría por workstation con filtrado temporal
-- Computar estadísticas agregadas de telemetría por cuenta (últimas 24h)
+- Computar estadísticas agregadas de telemetría por organización (últimas 24h)
 
-Todas las queries aplican tenant isolation filtrando por account_id.
+Todas las queries aplican tenant isolation filtrando por organization_id.
 """
 
 from datetime import datetime, timedelta
@@ -33,13 +33,13 @@ class TelemetryService:
         self,
         db: Session,
         workstation_id: str,
-        account_id: str,
+        organization_id: str,
         payload: TelemetryMessagePayload
     ) -> Optional[TelemetryLog]:
         """
         Persiste un registro de telemetría en la base de datos.
 
-        Verifica que la workstation exista y pertenezca a la cuenta indicada
+        Verifica que la workstation exista y pertenezca a la organización indicada
         (tenant isolation) antes de crear el registro.
 
         El campo disconnection_count se calcula como la longitud del array
@@ -48,17 +48,17 @@ class TelemetryService:
         Args:
             db: Sesión de base de datos
             workstation_id: UUID de la workstation que envía la telemetría
-            account_id: UUID de la cuenta del sender (tenant isolation)
+            organization_id: UUID de la organización del sender (tenant isolation)
             payload: Payload validado con los datos de telemetría
 
         Returns:
             TelemetryLog creado si la persistencia fue exitosa, None si la
-            workstation no existe o no pertenece a la cuenta
+            workstation no existe o no pertenece a la organización
         """
-        # Verificar que la workstation existe para esta cuenta (tenant isolation)
+        # Verificar que la workstation existe para esta organización (tenant isolation)
         workstation = db.query(Workstation).filter(
             Workstation.id == workstation_id,
-            Workstation.organization_id == account_id
+            Workstation.organization_id == organization_id
         ).first()
 
         if not workstation:
@@ -70,7 +70,7 @@ class TelemetryService:
         # Crear registro de telemetría
         telemetry_log = TelemetryLog(
             workstation_id=workstation_id,
-            organization_id=account_id,
+            organization_id=organization_id,
             queue_status=payload.queue_status,
             contingency_active=payload.contingency_active,
             jobs_identified=payload.jobs_identified,
@@ -89,7 +89,7 @@ class TelemetryService:
         self,
         db: Session,
         workstation_id: str,
-        account_id: str,
+        organization_id: str,
         from_dt: Optional[datetime] = None,
         to_dt: Optional[datetime] = None,
         limit: int = 100
@@ -97,14 +97,14 @@ class TelemetryService:
         """
         Consulta el historial de telemetría de una workstation.
 
-        Filtra por workstation_id Y account_id (tenant isolation).
+        Filtra por workstation_id Y organization_id (tenant isolation).
         Soporta filtrado temporal opcional con from_dt y to_dt.
         Ordena por recorded_at descendente (más reciente primero).
 
         Args:
             db: Sesión de base de datos
             workstation_id: UUID de la workstation a consultar
-            account_id: UUID de la cuenta del usuario autenticado (tenant isolation)
+            organization_id: UUID de la organización del usuario autenticado (tenant isolation)
             from_dt: Fecha/hora mínima de filtrado (opcional, inclusivo)
             to_dt: Fecha/hora máxima de filtrado (opcional, inclusivo)
             limit: Número máximo de registros a devolver (default 100)
@@ -115,7 +115,7 @@ class TelemetryService:
         # Query base con tenant isolation
         query = db.query(TelemetryLog).filter(
             TelemetryLog.workstation_id == workstation_id,
-            TelemetryLog.organization_id == account_id
+            TelemetryLog.organization_id == organization_id
         )
 
         # Aplicar filtros temporales opcionales
@@ -133,14 +133,14 @@ class TelemetryService:
     def get_telemetry_stats(
         self,
         db: Session,
-        account_id: str
+        organization_id: str
     ) -> TelemetryStatsResponse:
         """
-        Computa estadísticas agregadas de telemetría para una cuenta.
+        Computa estadísticas agregadas de telemetría para una organización.
 
         Todas las estadísticas se calculan sobre registros de las últimas
         24 horas UTC. Incluye:
-        - total_workstations: todas las workstations registradas para la cuenta
+        - total_workstations: todas las workstations registradas para la organización
         - workstations_reporting: workstations con al menos un registro en 24h
         - avg_jobs_identified: promedio aritmético de jobs_identified en 24h
         - contingency_active_count: workstations cuyo registro más reciente
@@ -151,7 +151,7 @@ class TelemetryService:
 
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta (tenant isolation)
+            organization_id: UUID de la organización (tenant isolation)
 
         Returns:
             TelemetryStatsResponse con las estadísticas agregadas
@@ -160,14 +160,14 @@ class TelemetryService:
         now = datetime.utcnow()
         since = now - timedelta(hours=24)
 
-        # Total de workstations registradas para la cuenta
+        # Total de workstations registradas para la organización
         total_workstations = db.query(Workstation).filter(
-            Workstation.organization_id == account_id
+            Workstation.organization_id == organization_id
         ).count()
 
-        # Registros de telemetría en las últimas 24h para esta cuenta
+        # Registros de telemetría en las últimas 24h para esta organización
         recent_logs = db.query(TelemetryLog).filter(
-            TelemetryLog.organization_id == account_id,
+            TelemetryLog.organization_id == organization_id,
             TelemetryLog.recorded_at >= since
         )
 
@@ -175,7 +175,7 @@ class TelemetryService:
         workstations_reporting = db.query(
             distinct(TelemetryLog.workstation_id)
         ).filter(
-            TelemetryLog.organization_id == account_id,
+            TelemetryLog.organization_id == organization_id,
             TelemetryLog.recorded_at >= since
         ).count()
 
@@ -183,7 +183,7 @@ class TelemetryService:
         avg_result = db.query(
             func.avg(TelemetryLog.jobs_identified)
         ).filter(
-            TelemetryLog.organization_id == account_id,
+            TelemetryLog.organization_id == organization_id,
             TelemetryLog.recorded_at >= since,
             TelemetryLog.jobs_identified.isnot(None)
         ).scalar()
@@ -194,7 +194,7 @@ class TelemetryService:
         last_updated = db.query(
             func.max(TelemetryLog.recorded_at)
         ).filter(
-            TelemetryLog.organization_id == account_id,
+            TelemetryLog.organization_id == organization_id,
             TelemetryLog.recorded_at >= since
         ).scalar()
 
@@ -205,7 +205,7 @@ class TelemetryService:
             TelemetryLog.workstation_id,
             func.max(TelemetryLog.recorded_at).label("max_recorded_at")
         ).filter(
-            TelemetryLog.organization_id == account_id,
+            TelemetryLog.organization_id == organization_id,
             TelemetryLog.recorded_at >= since
         ).group_by(TelemetryLog.workstation_id).subquery()
 
@@ -215,7 +215,7 @@ class TelemetryService:
             (TelemetryLog.workstation_id == latest_per_ws.c.workstation_id) &
             (TelemetryLog.recorded_at == latest_per_ws.c.max_recorded_at)
         ).filter(
-            TelemetryLog.organization_id == account_id
+            TelemetryLog.organization_id == organization_id
         ).all()
 
         # Contar workstations con contingency_active=True en su registro más reciente

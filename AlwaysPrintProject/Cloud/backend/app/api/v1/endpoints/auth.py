@@ -94,7 +94,7 @@ def logout(
         entity_type="session",
         entity_id=str(current_user.id),
         user_id=str(current_user.id),
-        account_id=str(current_user.organization_id) if current_user.organization_id else None,
+        organization_id=str(current_user.organization_id) if current_user.organization_id else None,
         old_values={"action": "logout", "email": current_user.email},
         ip_address=get_client_ip(request)
     )
@@ -115,12 +115,12 @@ def get_current_user_info(
         db: Sesión de base de datos
     
     Returns:
-        UserResponse con información del usuario (incluye relación con account)
+        UserResponse con información del usuario (incluye relación con organización)
     """
     from sqlalchemy.orm import joinedload
     
-    # Recargar usuario con la relación account
-    user = db.query(User).options(joinedload(User.account)).filter(User.id == current_user.id).first()
+    # Recargar usuario con la relación organization
+    user = db.query(User).options(joinedload(User.organization)).filter(User.id == current_user.id).first()
     
     return user
 

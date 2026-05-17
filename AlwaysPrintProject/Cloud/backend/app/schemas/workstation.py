@@ -40,8 +40,8 @@ class WorkstationRegisterRequest(BaseModel):
 class WorkstationRegisterResponse(BaseModel):
     """Schema de respuesta para registro exitoso de workstation."""
     workstation_id: UUID = Field(..., description="ID de la workstation registrada")
-    account_id: UUID = Field(..., description="ID de la cuenta asociada")
-    account_name: str = Field(..., description="Nombre de la cuenta")
+    organization_id: UUID = Field(..., description="ID de la organización asociada")
+    organization_name: str = Field(..., description="Nombre de la organización")
     message: str = Field(..., description="Mensaje de confirmación")
     cloud_api_url: str = Field(..., description="URL del servidor cloud para uso futuro")
 
@@ -57,7 +57,7 @@ class WorkstationRegisterPendingResponse(BaseModel):
 class WorkstationResponse(BaseModel):
     """Schema de respuesta para workstation."""
     id: UUID
-    account_id: UUID
+    organization_id: UUID
     vlan_id: Optional[UUID] = None
     ip_private: str = Field(..., description="IP privada (identificador único)")
     hostname: Optional[str] = None
@@ -70,16 +70,16 @@ class WorkstationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    # Relación con cuenta (anidada)
-    account: Optional['AccountBasicResponse'] = None
+    # Relación con organización (anidada)
+    organization: Optional['OrganizationBasicResponse'] = None
     
     class Config:
         from_attributes = True
 
 
-# Schema básico de cuenta para relaciones anidadas
-class AccountBasicResponse(BaseModel):
-    """Schema básico de cuenta para relaciones anidadas."""
+# Schema básico de organización para relaciones anidadas
+class OrganizationBasicResponse(BaseModel):
+    """Schema básico de organización para relaciones anidadas."""
     id: UUID
     name: str
     is_active: bool
@@ -131,4 +131,4 @@ class WorkstationStatsResponse(BaseModel):
     contingency_active: int
     total_vlans: int = Field(0, description="Total de VLANs creadas en la organización")
     by_vlan: Optional[Dict[str, int]] = Field(None, description="Distribución por VLAN")
-    by_account: Optional[Dict[str, Dict[str, Any]]] = Field(None, description="Distribución por cuenta (solo admin)")
+    by_organization: Optional[Dict[str, Dict[str, Any]]] = Field(None, description="Distribución por organización (solo admin)")

@@ -117,7 +117,7 @@ def initialize_system(
             password_hash=AuthService.hash_password(setup_data.password),
             full_name=setup_data.full_name,
             role=UserRole.ADMIN,
-            account_id=None,  # Admin no pertenece a ninguna cuenta
+            organization_id=None,  # Admin no pertenece a ninguna organización
             is_active=True,
             language=setup_data.language if setup_data.language in ('en', 'es') else 'en',
         )

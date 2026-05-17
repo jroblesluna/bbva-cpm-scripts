@@ -128,12 +128,3 @@ class AutoUpdateToggleResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
-
-# === ALIASES DE COMPATIBILIDAD ===
-# Para código que aún use los nombres antiguos
-AccountBase = OrganizationBase
-AccountCreate = OrganizationCreate
-AccountUpdate = OrganizationUpdate
-AccountResponse = OrganizationResponse
-AccountDetailResponse = OrganizationDetailResponse
-AccountListResponse = OrganizationListResponse

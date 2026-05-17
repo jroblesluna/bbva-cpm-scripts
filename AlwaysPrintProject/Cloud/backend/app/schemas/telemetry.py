@@ -132,7 +132,7 @@ class ConnectivityResultResponse(BaseModel):
 # === SCHEMAS DE RESPUESTA REST — ESTADÍSTICAS ===
 
 class QueueStatusSummary(BaseModel):
-    """Resumen de estados de cola por cuenta."""
+    """Resumen de estados de cola por organización."""
     ok: int = Field(0, description="Cantidad de workstations con estado 'ok'")
     missing: int = Field(0, description="Cantidad de workstations con estado 'missing'")
     error: int = Field(0, description="Cantidad de workstations con estado 'error'")
@@ -140,14 +140,14 @@ class QueueStatusSummary(BaseModel):
 
 class TelemetryStatsResponse(BaseModel):
     """
-    Schema de respuesta para estadísticas agregadas de telemetría por cuenta.
+    Schema de respuesta para estadísticas agregadas de telemetría por organización.
 
-    Usado en el endpoint GET /api/v1/accounts/{id}/telemetry/stats.
+    Usado en el endpoint GET /api/v1/organizations/{id}/telemetry/stats.
     Todas las estadísticas se computan sobre registros de las últimas 24 horas UTC.
     """
     total_workstations: int = Field(
         ...,
-        description="Total de workstations registradas para la cuenta"
+        description="Total de workstations registradas para la organización"
     )
     workstations_reporting: int = Field(
         ...,

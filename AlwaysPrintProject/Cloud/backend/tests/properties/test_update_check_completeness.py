@@ -21,7 +21,7 @@ from hypothesis import strategies as st
 
 from app.main import app
 from app.core.database import get_db
-from app.models.account import Account
+from app.models.organization import Organization as Account
 from app.models.workstation import Workstation
 
 
@@ -64,7 +64,7 @@ def _create_mock_db_session(auto_update_enabled: bool):
     # Mock de la workstation
     mock_workstation = MagicMock(spec=Workstation)
     mock_workstation.id = workstation_id
-    mock_workstation.account_id = account_id
+    mock_workstation.organization_id = account_id
     mock_workstation.ip_private = "192.168.1.100"
 
     # Mock de la cuenta con el flag configurado

@@ -79,7 +79,7 @@ api_router.include_router(
 
 # Telemetría (estadísticas por organización)
 api_router.include_router(
-    telemetry.accounts_router,
+    telemetry.organizations_telemetry_router,
     tags=["Telemetría"]
 )
 

@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from app.models.workstation import Workstation, License
-from app.models.organization import Organization, Account, PublicIP
+from app.models.organization import Organization, PublicIP
 from app.models.vlan import VLAN
 
 logger = logging.getLogger(__name__)
@@ -56,27 +56,27 @@ class WorkstationService:
     def detect_vlan_for_ip(
         self, 
         db: Session, 
-        account_id: str, 
+        organization_id: str, 
         ip_private: str
     ) -> Optional[str]:
         """
         Detecta la VLAN a la que pertenece una IP privada.
         
-        Busca en todas las VLANs de la cuenta y verifica si la IP
+        Busca en todas las VLANs de la organización y verifica si la IP
         está dentro de alguno de los rangos CIDR definidos.
         
         Si la IP pertenece a múltiples VLANs, devuelve la más reciente.
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             ip_private: Dirección IP privada a verificar
             
         Returns:
             UUID de la VLAN si se encuentra, None si no pertenece a ninguna
         """
-        # Obtener todas las VLANs de la cuenta
-        vlans = db.query(VLAN).filter_by(account_id=account_id).order_by(
+        # Obtener todas las VLANs de la organización
+        vlans = db.query(VLAN).filter_by(organization_id=organization_id).order_by(
             VLAN.created_at.desc()
         ).all()
         
@@ -103,20 +103,20 @@ class WorkstationService:
         
         return None
     
-    def get_account_by_public_ip(
+    def get_organization_by_public_ip(
         self, 
         db: Session, 
         public_ip: str
-    ) -> Optional[Account]:
+    ) -> Optional[Organization]:
         """
-        Obtiene la cuenta asociada a una IP pública.
+        Obtiene la organización asociada a una IP pública.
         
         Args:
             db: Sesión de base de datos
             public_ip: Dirección IP pública
             
         Returns:
-            Account si la IP está autorizada, None si no
+            Organization si la IP está autorizada, None si no
         """
         public_ip_record = db.query(PublicIP).filter_by(
             ip_address=public_ip
@@ -125,19 +125,19 @@ class WorkstationService:
         if not public_ip_record:
             return None
         
-        return public_ip_record.account
+        return public_ip_record.organization
     
     def register_or_queue_public_ip(
         self,
         db: Session,
         public_ip: str
-    ) -> tuple[Optional[Account], bool]:
+    ) -> tuple[Optional[Organization], bool]:
         """
         Registra una IP pública o la pone en cola de autorización.
         
         Flujo:
         1. Buscar si la IP ya está registrada
-        2. Si está autorizada, devolver la cuenta
+        2. Si está autorizada, devolver la organización
         3. Si está pendiente, devolver None (en cola)
         4. Si no existe, crearla como pendiente
         
@@ -146,11 +146,11 @@ class WorkstationService:
             public_ip: Dirección IP pública
             
         Returns:
-            Tupla (account, is_authorized) donde:
-            - account: Account si está autorizada, None si está pendiente
+            Tupla (organization, is_authorized) donde:
+            - organization: Organization si está autorizada, None si está pendiente
             - is_authorized: True si está autorizada, False si está pendiente
         """
-        from app.models.account import PublicIP
+        from app.models.organization import PublicIP
         
         # Buscar IP existente
         public_ip_record = db.query(PublicIP).filter_by(
@@ -159,9 +159,9 @@ class WorkstationService:
         
         if public_ip_record:
             # IP ya registrada
-            if public_ip_record.is_authorized and public_ip_record.account_id:
-                # Autorizada: devolver cuenta
-                return public_ip_record.account, True
+            if public_ip_record.is_authorized and public_ip_record.organization_id:
+                # Autorizada: devolver organización
+                return public_ip_record.organization, True
             else:
                 # Pendiente de autorización
                 return None, False
@@ -170,7 +170,7 @@ class WorkstationService:
         new_public_ip = PublicIP(
             ip_address=public_ip,
             is_authorized=False,
-            account_id=None,
+            organization_id=None,
             description=f"Detectada automáticamente el {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}"
         )
         
@@ -210,7 +210,7 @@ class WorkstationService:
             Tupla (workstation, is_new, status) donde:
             - workstation: Objeto Workstation creado/actualizado, o None si IP no autorizada
             - is_new: True si es nueva, False si se actualizó existente
-            - status: "authorized", "pending", "inactive_account"
+            - status: "authorized", "pending", "inactive_organization"
             
         Raises:
             ValueError: Si hay error en los datos
@@ -250,7 +250,7 @@ class WorkstationService:
             # Detectar VLAN (puede haber cambiado)
             vlan_id = self.detect_vlan_for_ip(
                 db, 
-                str(workstation.account_id), 
+                str(workstation.organization_id), 
                 ip_private
             )
             workstation.vlan_id = vlan_id
@@ -294,7 +294,7 @@ class WorkstationService:
                 f"Registro rechazado para ip_private={ip_private}"
             )
             # Cuenta desactivada
-            return None, False, "inactive_account"
+            return None, False, "inactive_organization"
         
         logger.info(
             f"[REGISTRO] IP pública autorizada. Creando workstation para cuenta: "
@@ -305,7 +305,7 @@ class WorkstationService:
         vlan_id = self.detect_vlan_for_ip(db, str(account.id), ip_private)
         
         workstation = Workstation(
-            account_id=account.id,
+            organization_id=account.id,
             vlan_id=vlan_id,
             ip_private=ip_private,
             hostname=hostname,
@@ -325,7 +325,7 @@ class WorkstationService:
             f"id={workstation.id}, "
             f"ip_private={workstation.ip_private}, "
             f"hostname={workstation.hostname}, "
-            f"account_id={workstation.account_id}"
+            f"organization_id={workstation.organization_id}"
         )
         
         # 4. Activar licencia
@@ -491,10 +491,10 @@ class WorkstationService:
         """
         return db.query(Workstation).filter_by(id=workstation_id).first()
     
-    def get_workstations_by_account(
+    def get_workstations_by_organization(
         self,
         db: Session,
-        account_id: str,
+        organization_id: str,
         is_online: Optional[bool] = None,
         contingency_active: Optional[bool] = None,
         vlan_id: Optional[str] = None,
@@ -503,11 +503,11 @@ class WorkstationService:
         limit: int = 100
     ) -> tuple[List[Workstation], int]:
         """
-        Obtiene workstations de una cuenta con filtros opcionales.
+        Obtiene workstations de una organización con filtros opcionales.
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             is_online: Filtrar por estado online (opcional)
             contingency_active: Filtrar por contingencia (opcional)
             vlan_id: Filtrar por VLAN (opcional)
@@ -520,7 +520,7 @@ class WorkstationService:
             - workstations: Lista de workstations
             - total: Número total de workstations (sin paginación)
         """
-        query = db.query(Workstation).filter_by(account_id=account_id)
+        query = db.query(Workstation).filter_by(organization_id=organization_id)
         
         # Aplicar filtros
         if is_online is not None:
@@ -581,57 +581,57 @@ class WorkstationService:
         
         return workstations, total
     
-    def get_online_count(self, db: Session, account_id: Optional[str] = None) -> int:
+    def get_online_count(self, db: Session, organization_id: Optional[str] = None) -> int:
         """
         Obtiene el número de workstations online.
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta (None para admin = todas las cuentas)
+            organization_id: UUID de la organización (None para admin = todas)
             
         Returns:
             Número de workstations online
         """
         query = db.query(Workstation).filter(Workstation.is_online.is_(True))
         
-        if account_id is not None:
-            query = query.filter(Workstation.organization_id == account_id)
+        if organization_id is not None:
+            query = query.filter(Workstation.organization_id == organization_id)
         
         return query.count()
     
-    def get_contingency_count(self, db: Session, account_id: Optional[str] = None) -> int:
+    def get_contingency_count(self, db: Session, organization_id: Optional[str] = None) -> int:
         """
         Obtiene el número de workstations en contingencia.
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta (None para admin = todas las cuentas)
+            organization_id: UUID de la organización (None para admin = todas)
             
         Returns:
             Número de workstations en contingencia
         """
         query = db.query(Workstation).filter(Workstation.contingency_active.is_(True))
         
-        if account_id is not None:
-            query = query.filter(Workstation.organization_id == account_id)
+        if organization_id is not None:
+            query = query.filter(Workstation.organization_id == organization_id)
         
         return query.count()
     
-    def get_total_count(self, db: Session, account_id: Optional[str] = None) -> int:
+    def get_total_count(self, db: Session, organization_id: Optional[str] = None) -> int:
         """
         Obtiene el número total de workstations.
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta (None para admin = todas las cuentas)
+            organization_id: UUID de la organización (None para admin = todas)
             
         Returns:
             Número total de workstations
         """
         query = db.query(Workstation)
         
-        if account_id is not None:
-            query = query.filter(Workstation.organization_id == account_id)
+        if organization_id is not None:
+            query = query.filter(Workstation.organization_id == organization_id)
         
         return query.count()
     

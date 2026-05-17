@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.core.utils import get_client_ip
-from app.models.organization import Organization, Account, PublicIP
+from app.models.organization import Organization, PublicIP
 from app.models.user import User, UserRole
 from app.models.workstation import Workstation
 from app.schemas.updates import UpdateCheckResponse
@@ -70,12 +70,12 @@ def _identify_workstation(request: Request, db: Session) -> Workstation:
             user_id = payload.get("sub")
             if user_id:
                 user = db.query(User).filter(User.id == user_id).first()
-                if user and user.account_id:
+                if user and user.organization_id:
                     # Buscar workstation por IP privada dentro de la cuenta
                     local_ip = request.headers.get("X-Workstation-Local-IP")
                     if local_ip:
                         workstation = db.query(Workstation).filter(
-                            Workstation.organization_id == user.account_id,
+                            Workstation.organization_id == user.organization_id,
                             Workstation.ip_private == local_ip.strip()
                         ).first()
                         if workstation:
@@ -91,21 +91,21 @@ def _identify_workstation(request: Request, db: Session) -> Workstation:
         PublicIP.is_authorized == True,
     ).first()
 
-    if public_ip_record and public_ip_record.account_id:
-        # Buscar workstation por IP privada dentro de la cuenta
+    if public_ip_record and public_ip_record.organization_id:
+        # Buscar workstation por IP privada dentro de la organización
         local_ip = request.headers.get("X-Workstation-Local-IP")
         if local_ip:
             workstation = db.query(Workstation).filter(
-                Workstation.organization_id == public_ip_record.account_id,
+                Workstation.organization_id == public_ip_record.organization_id,
                 Workstation.ip_private == local_ip.strip()
             ).first()
             if workstation:
                 return workstation
 
-        # Si no hay IP privada, buscar la primera workstation de la cuenta
+        # Si no hay IP privada, buscar la primera workstation de la organización
         # (caso de una sola workstation por IP pública)
         workstation = db.query(Workstation).filter(
-            Workstation.organization_id == public_ip_record.account_id
+            Workstation.organization_id == public_ip_record.organization_id
         ).first()
         if workstation:
             return workstation
@@ -156,16 +156,16 @@ def check_update(
     # 1. Identificar workstation
     workstation = _identify_workstation(request, db)
 
-    # 2. Obtener account_id y leer auto_update_enabled
-    account = db.query(Account).filter(
-        Account.id == workstation.account_id
+    # 2. Obtener organization_id y leer auto_update_enabled
+    account = db.query(Organization).filter(
+        Organization.id == workstation.organization_id
     ).first()
 
     if not account:
         logger.error(
-            "Cuenta no encontrada para workstation: workstation_id=%s, account_id=%s",
+            "Organización no encontrada para workstation: workstation_id=%s, organization_id=%s",
             workstation.id,
-            workstation.account_id,
+            workstation.organization_id,
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -258,16 +258,16 @@ def download_update(
     workstation = _identify_workstation(request, db)
 
     # 2. Obtener cuenta y verificar flag de auto-actualización
-    account = db.query(Account).filter(
-        Account.id == workstation.account_id
+    account = db.query(Organization).filter(
+        Organization.id == workstation.organization_id
     ).first()
 
     if not account:
         logger.error(
-            "Cuenta no encontrada para workstation en descarga: "
-            "workstation_id=%s, account_id=%s",
+            "Organización no encontrada para workstation en descarga: "
+            "workstation_id=%s, organization_id=%s",
             workstation.id,
-            workstation.account_id,
+            workstation.organization_id,
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -278,9 +278,9 @@ def download_update(
     if not account.auto_update_enabled:
         logger.warning(
             "Descarga denegada - auto-actualizaciones deshabilitadas: "
-            "workstation_id=%s, account_id=%s, organización=%s",
+            "workstation_id=%s, organization_id=%s, organización=%s",
             workstation.id,
-            workstation.account_id,
+            workstation.organization_id,
             getattr(account, 'name', 'desconocida'),
         )
         raise HTTPException(
@@ -295,9 +295,9 @@ def download_update(
     except ClientError:
         logger.error(
             "Error de S3 al generar URL de descarga: "
-            "workstation_id=%s, account_id=%s",
+            "workstation_id=%s, organization_id=%s",
             workstation.id,
-            workstation.account_id,
+            workstation.organization_id,
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -318,10 +318,10 @@ def download_update(
     # 5. Loggear descarga exitosa y redirigir
     logger.info(
         "Descarga de actualización autorizada: workstation_id=%s, "
-        "ip_private=%s, account_id=%s, status=302",
+        "ip_private=%s, organization_id=%s, status=302",
         workstation.id,
         workstation.ip_private,
-        workstation.account_id,
+        workstation.organization_id,
     )
 
     return RedirectResponse(url=presigned_url, status_code=302)

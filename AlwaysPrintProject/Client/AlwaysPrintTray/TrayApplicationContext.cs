@@ -420,8 +420,8 @@ namespace AlwaysPrintTray
             AlwaysPrintLogger.WriteTrayInfo(
                 $"OnCloudRegistrationSuccessful: " +
                 $"workstation_id={workstationId}, " +
-                $"account_id={accountId}, " +
-                $"account_name={accountName}, " +
+                $"organization_id={accountId}, " +
+                $"organization_name={accountName}, " +
                 $"cloud_api_url={cloudApiUrl}");
             
             try

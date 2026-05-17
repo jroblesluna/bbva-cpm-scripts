@@ -51,8 +51,3 @@ export interface OrganizationStats {
   total_users: number
 }
 
-// === ALIASES DE COMPATIBILIDAD ===
-export type Account = Organization
-export type AccountCreate = OrganizationCreate
-export type AccountUpdate = OrganizationUpdate
-export type AccountStats = OrganizationStats

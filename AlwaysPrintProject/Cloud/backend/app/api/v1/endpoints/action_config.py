@@ -276,7 +276,7 @@ def get_workstation_config_info(
         )
     
     # Obtener configuración activa de la organización
-    config = ActionConfigService.get_active_config(db, workstation.account_id)
+    config = ActionConfigService.get_active_config(db, workstation.organization_id)
     
     if not config:
         raise HTTPException(
@@ -320,7 +320,7 @@ def download_workstation_config(
         )
     
     # Obtener configuración activa de la organización
-    config = ActionConfigService.get_active_config(db, workstation.account_id)
+    config = ActionConfigService.get_active_config(db, workstation.organization_id)
     
     if not config:
         raise HTTPException(

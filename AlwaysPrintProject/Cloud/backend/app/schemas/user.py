@@ -12,8 +12,8 @@ from uuid import UUID
 from app.models.user import UserRole
 
 
-# === SCHEMA ANIDADO PARA ACCOUNT ===
-class AccountInUser(BaseModel):
+# === SCHEMA ANIDADO PARA ORGANIZACIÓN ===
+class OrganizationInUser(BaseModel):
     """Schema anidado para mostrar información de la organización en el usuario."""
     id: UUID
     name: str
@@ -29,7 +29,7 @@ class UserBase(BaseModel):
     email: EmailStr
     full_name: str = Field(..., min_length=1, max_length=255)
     role: UserRole
-    account_id: Optional[UUID] = None
+    organization_id: Optional[UUID] = None
     timezone: Optional[str] = Field(None, max_length=50, description="Zona horaria del usuario (hereda de la organización si es NULL)")
     language: str = 'en'
 
@@ -51,12 +51,12 @@ class UserCreate(UserBase):
         return v
     
     @model_validator(mode='after')
-    def validate_account_id(self):
-        """Valida que Operador y ReadOnly tengan account_id."""
-        if self.role in [UserRole.OPERATOR, UserRole.READONLY] and self.account_id is None:
-            raise ValueError(f'Los usuarios con rol {self.role.value} deben tener account_id')
-        if self.role == UserRole.ADMIN and self.account_id is not None:
-            raise ValueError('Los usuarios Admin no deben tener account_id')
+    def validate_organization_id(self):
+        """Valida que Operador y ReadOnly tengan organization_id."""
+        if self.role in [UserRole.OPERATOR, UserRole.READONLY] and self.organization_id is None:
+            raise ValueError(f'Los usuarios con rol {self.role.value} deben tener organization_id')
+        if self.role == UserRole.ADMIN and self.organization_id is not None:
+            raise ValueError('Los usuarios Admin no deben tener organization_id')
         return self
 
 
@@ -65,7 +65,7 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     full_name: Optional[str] = Field(None, min_length=1, max_length=255)
     role: Optional[UserRole] = None
-    account_id: Optional[UUID] = None
+    organization_id: Optional[UUID] = None
     is_active: Optional[bool] = None
     timezone: Optional[str] = Field(None, max_length=50, description="Zona horaria del usuario")
     language: Optional[str] = Field(None, max_length=2, description="Idioma del usuario (en, es)")
@@ -97,7 +97,7 @@ class UserResponse(UserBase):
     language: str
     created_at: datetime
     updated_at: datetime
-    account: Optional[AccountInUser] = None
+    organization: Optional[OrganizationInUser] = None
 
     class Config:
         from_attributes = True
@@ -109,4 +109,3 @@ class UserListResponse(BaseModel):
     total: int
     skip: int
     limit: int
-

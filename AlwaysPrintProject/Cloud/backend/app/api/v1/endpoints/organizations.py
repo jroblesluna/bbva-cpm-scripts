@@ -123,7 +123,7 @@ def create_organization(
         entity_type="organization",
         entity_id=str(organization.id),
         user_id=str(current_user.id),
-        account_id=str(organization.id),
+        organization_id=str(organization.id),
         entity_data={
             "name": organization.name,
             "description": organization.description,
@@ -218,7 +218,7 @@ def update_organization(
         entity_type="organization",
         entity_id=str(organization.id),
         user_id=str(current_user.id),
-        account_id=str(organization.id),
+        organization_id=str(organization.id),
         old_data=old_values,
         new_data=update_data,
         ip_address=get_client_ip(request)
@@ -266,7 +266,7 @@ def delete_organization(
         entity_type="organization",
         entity_id=str(org_id),
         user_id=str(current_user.id),
-        account_id=str(org_id),
+        organization_id=str(org_id),
         entity_data=old_values,
         ip_address=get_client_ip(request)
     )
@@ -320,7 +320,7 @@ def add_public_ip(
         entity_type="public_ip",
         entity_id=str(public_ip.id),
         user_id=str(current_user.id),
-        account_id=str(org_id),
+        organization_id=str(org_id),
         entity_data={
             "ip_address": public_ip.ip_address,
             "description": public_ip.description
@@ -379,7 +379,7 @@ def remove_public_ip(
         entity_type="public_ip",
         entity_id=str(ip_id),
         user_id=str(current_user.id),
-        account_id=str(org_id),
+        organization_id=str(org_id),
         entity_data=old_values,
         ip_address=get_client_ip(request)
     )
@@ -460,7 +460,7 @@ def authorize_public_ip(
         entity_type="PublicIP",
         entity_id=str(public_ip.id),
         user_id=str(current_user.id),
-        account_id=str(authorize_data.organization_id),
+        organization_id=str(authorize_data.organization_id),
         old_values={"is_authorized": False, "organization_id": None},
         new_values={"is_authorized": True, "organization_id": str(authorize_data.organization_id)},
         ip_address=get_client_ip(request)
@@ -506,7 +506,7 @@ def reject_public_ip(
         entity_type="PublicIP",
         entity_id=str(public_ip.id),
         user_id=str(current_user.id),
-        account_id=None,
+        organization_id=None,
         old_values={"ip_address": public_ip.ip_address, "is_authorized": False},
         new_values={},
         ip_address=get_client_ip(request)

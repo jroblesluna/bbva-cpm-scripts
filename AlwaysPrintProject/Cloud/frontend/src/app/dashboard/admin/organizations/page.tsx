@@ -9,7 +9,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { accountsApi } from '@/lib/api'
+import { organizationsApi } from '@/lib/api'
 import { useTranslations } from 'next-intl'
 import { COMMON_TIMEZONES, formatDateWithTimezone, getTimezoneName } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
@@ -33,7 +33,7 @@ import {
   Users,
   Monitor
 } from 'lucide-react'
-import type { Account, AccountCreate, AccountUpdate, PublicIPCreate } from '@/types'
+import type { Organization, OrganizationCreate, OrganizationUpdate, PublicIPCreate } from '@/types'
 
 export default function AccountsPage() {
   const queryClient = useQueryClient()
@@ -42,18 +42,18 @@ export default function AccountsPage() {
   const tCommon = useTranslations('common')
   const [searchTerm, setSearchTerm] = useState('')
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [editingAccount, setEditingAccount] = useState<Account | null>(null)
-  const [managingIPsAccount, setManagingIPsAccount] = useState<Account | null>(null)
+  const [editingAccount, setEditingAccount] = useState<Organization | null>(null)
+  const [managingIPsAccount, setManagingIPsAccount] = useState<Organization | null>(null)
 
   // Query para listar cuentas
   const { data: accounts, isLoading, error } = useQuery({
     queryKey: ['accounts', 'list'],
-    queryFn: () => accountsApi.list(),
+    queryFn: () => organizationsApi.list(),
   })
 
   // Mutation para crear cuenta
   const createMutation = useMutation({
-    mutationFn: (data: AccountCreate) => accountsApi.create(data),
+    mutationFn: (data: OrganizationCreate) => organizationsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       setShowCreateForm(false)
@@ -62,8 +62,8 @@ export default function AccountsPage() {
 
   // Mutation para actualizar cuenta
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: AccountUpdate }) => 
-      accountsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: OrganizationUpdate }) => 
+      organizationsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       setEditingAccount(null)
@@ -72,7 +72,7 @@ export default function AccountsPage() {
 
   // Mutation para eliminar cuenta
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => accountsApi.delete(id),
+    mutationFn: (id: string) => organizationsApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
     },
@@ -81,7 +81,7 @@ export default function AccountsPage() {
   // Mutation para agregar IP pública
   const addIPMutation = useMutation({
     mutationFn: ({ accountId, data }: { accountId: string; data: PublicIPCreate }) =>
-      accountsApi.addPublicIP(accountId, data),
+      organizationsApi.addPublicIP(accountId, data),
     onSuccess: async (_, variables) => {
       // Invalidar y refrescar inmediatamente las queries de accounts
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
@@ -89,7 +89,7 @@ export default function AccountsPage() {
       
       // Actualizar el estado local del modal con los datos frescos
       if (managingIPsAccount && managingIPsAccount.id === variables.accountId) {
-        const updatedAccounts = queryClient.getQueryData<Account[]>(['accounts', 'list'])
+        const updatedAccounts = queryClient.getQueryData<Organization[]>(['accounts', 'list'])
         const updatedAccount = updatedAccounts?.find(acc => acc.id === variables.accountId)
         if (updatedAccount) {
           setManagingIPsAccount(updatedAccount)
@@ -101,7 +101,7 @@ export default function AccountsPage() {
   // Mutation para eliminar IP pública
   const removeIPMutation = useMutation({
     mutationFn: ({ accountId, ipId }: { accountId: string; ipId: string }) =>
-      accountsApi.removePublicIP(accountId, ipId),
+      organizationsApi.removePublicIP(accountId, ipId),
     onSuccess: async (_, variables) => {
       // Invalidar y refrescar inmediatamente las queries de accounts
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
@@ -109,7 +109,7 @@ export default function AccountsPage() {
       
       // Actualizar el estado local del modal con los datos frescos
       if (managingIPsAccount && managingIPsAccount.id === variables.accountId) {
-        const updatedAccounts = queryClient.getQueryData<Account[]>(['accounts', 'list'])
+        const updatedAccounts = queryClient.getQueryData<Organization[]>(['accounts', 'list'])
         const updatedAccount = updatedAccounts?.find(acc => acc.id === variables.accountId)
         if (updatedAccount) {
           setManagingIPsAccount(updatedAccount)
@@ -191,7 +191,7 @@ export default function AccountsPage() {
           </CardHeader>
           <CardContent>
             <AccountForm
-              onSubmit={(data) => createMutation.mutate(data as AccountCreate)}
+              onSubmit={(data) => createMutation.mutate(data as OrganizationCreate)}
               onCancel={() => setShowCreateForm(false)}
               isLoading={createMutation.isPending}
               error={(createMutation.error as any)?.detail}
@@ -367,14 +367,14 @@ function AccountForm({
   error,
 }: {
   initialData?: Account
-  onSubmit: (data: AccountCreate | AccountUpdate) => void
+  onSubmit: (data: OrganizationCreate | OrganizationUpdate) => void
   onCancel: () => void
   isLoading: boolean
   error?: string
 }) {
   const t = useTranslations('accounts')
   const tCommon = useTranslations('common')
-  const [formData, setFormData] = useState<AccountCreate>({
+  const [formData, setFormData] = useState<OrganizationCreate>({
     name: initialData?.name || '',
     description: initialData?.description || '',
     is_active: initialData?.is_active ?? true,
@@ -487,7 +487,7 @@ function IPManagementForm({
   isLoading,
   error,
 }: {
-  account: Account
+  organization: Organization
   onAddIP: (data: PublicIPCreate) => void
   onRemoveIP: (ipId: string) => void
   isLoading: boolean

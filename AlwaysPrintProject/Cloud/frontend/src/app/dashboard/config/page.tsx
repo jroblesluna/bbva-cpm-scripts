@@ -108,7 +108,7 @@ export default function ConfigPage() {
   const loadAccounts = async () => {
     try {
       setLoadingAccounts(true);
-      const response = await apiClient.get('/accounts/?skip=0&limit=1000');
+      const response = await apiClient.get('/organizations/?skip=0&limit=1000');
 
       const data = response.data;
       setAccounts(data.items || []);
