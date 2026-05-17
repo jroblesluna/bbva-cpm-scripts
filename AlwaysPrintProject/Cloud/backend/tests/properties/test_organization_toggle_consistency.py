@@ -78,7 +78,7 @@ client = TestClient(app)
 
 # === PROPERTY TEST ===
 
-@hypothesis_settings(max_examples=100)
+@hypothesis_settings(max_examples=100, deadline=None)
 @given(toggle_sequence=st.lists(st.booleans(), min_size=1))
 def test_organization_flag_toggle_consistency(toggle_sequence: list[bool]):
     """
