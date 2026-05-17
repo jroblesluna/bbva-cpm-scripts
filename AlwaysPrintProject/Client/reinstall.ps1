@@ -227,12 +227,21 @@ try {
         Write-Step "No se detectaron cambios" "Info"
     }
 
-    # PASO 8: Compilar si hubo cambios
+    # PASO 8: Compilar si hubo cambios o si no existe el MSI
     Write-Step "`nPASO 8: Compilando proyecto..." "Info"
     $clientPath = Join-Path $repoPath "AlwaysPrintProject\Client"
     Set-Location $clientPath
-    if ($hasChanges) {
-        Write-Step "Compilando debido a cambios..." "Info"
+    $msiPath = Join-Path $clientPath "AlwaysPrint.msi"
+    $msiExists = Test-Path $msiPath
+    $needsBuild = $hasChanges -or (-not $msiExists)
+    if ($needsBuild) {
+        if ($hasChanges -and -not $msiExists) {
+            Write-Step "Compilando: se detectaron cambios y el MSI no existe..." "Info"
+        } elseif ($hasChanges) {
+            Write-Step "Compilando debido a cambios en el repositorio..." "Info"
+        } else {
+            Write-Step "Compilando: MSI no encontrado aunque no hay cambios nuevos..." "Warning"
+        }
         $buildScript = Join-Path $clientPath "build.ps1"
         if (-not (Test-Path $buildScript)) {
             throw "No se encontro build.ps1 en $clientPath"
@@ -244,9 +253,8 @@ try {
         }
         Write-Step "Compilacion completada" "Success"
     } else {
-        Write-Step "Omitiendo compilacion (sin cambios)" "Info"
+        Write-Step "Omitiendo compilacion (sin cambios y MSI existente)" "Info"
     }
-    $msiPath = Join-Path $clientPath "AlwaysPrint.msi"
     if (-not (Test-Path $msiPath)) {
         throw "No se encontro el MSI en $msiPath"
     }
@@ -259,7 +267,7 @@ try {
     $s3HttpUrl = "https://alwaysprint-artifacts.s3.us-west-2.amazonaws.com/latest/AlwaysPrint.msi"
     Write-Step "`nPASO 8.5: Subiendo MSI al bucket S3..." "Info"
     Write-Step "Descarga: $s3HttpUrl" "Info"
-    if ($hasChanges -and (Test-Path $msiPath)) {
+    if ($needsBuild -and (Test-Path $msiPath)) {
         Write-Step "Preparando subida al bucket S3..." "Info"
         $buildDate = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
         $shortCommit = $afterCommit.Substring(0, 7)
@@ -282,8 +290,8 @@ try {
             Write-Step "Continuando sin subida a S3 por decision del usuario..." "Warning"
         }
     } else {
-        if (-not $hasChanges) {
-            Write-Step "Omitiendo subida a S3 (sin cambios detectados)" "Info"
+        if (-not $needsBuild) {
+            Write-Step "Omitiendo subida a S3 (sin cambios y MSI existente)" "Info"
         } else {
             Write-Step "Omitiendo subida a S3 (MSI no encontrado)" "Warning"
         }
@@ -345,7 +353,7 @@ try {
     Write-Step "Resumen:" "Info"
     Write-Step "  - Desinstalacion: Completada" "Success"
     Write-Step "  - Git pull: Completado" "Success"
-    Write-Step "  - Compilacion: $(if ($hasChanges) {'Ejecutada'} else {'Omitida'})" "Success"
+    Write-Step "  - Compilacion: $(if ($needsBuild) {'Ejecutada'} else {'Omitida'})" "Success"
     Write-Step "  - Instalacion: Completada" "Success"
     if ($hasChanges) {
         Write-Host "`nCambios aplicados:" -ForegroundColor Cyan
