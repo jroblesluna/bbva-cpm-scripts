@@ -13,17 +13,25 @@ from app.schemas.user import (
     UserListResponse,
 )
 
-# === ACCOUNT SCHEMAS ===
-from app.schemas.account import (
+# === ORGANIZATION SCHEMAS ===
+from app.schemas.organization import (
+    OrganizationCreate,
+    OrganizationUpdate,
+    OrganizationResponse,
+    OrganizationDetailResponse,
+    OrganizationListResponse,
+    PublicIPCreate,
+    PublicIPResponse,
+    PublicIPPendingResponse,
+    PublicIPAuthorizeRequest,
+    AutoUpdateToggleRequest,
+    AutoUpdateToggleResponse,
+    # Aliases de compatibilidad
     AccountCreate,
     AccountUpdate,
     AccountResponse,
     AccountDetailResponse,
     AccountListResponse,
-    PublicIPCreate,
-    PublicIPResponse,
-    PublicIPPendingResponse,
-    PublicIPAuthorizeRequest,
 )
 
 # === WORKSTATION SCHEMAS ===
@@ -146,12 +154,6 @@ from app.schemas.updates import (
     UpdateCheckResponse,
 )
 
-# === ORGANIZATION SCHEMAS ===
-from app.schemas.organization import (
-    AutoUpdateToggleRequest,
-    AutoUpdateToggleResponse,
-)
-
 __all__ = [
     # User
     "UserCreate",
@@ -159,7 +161,12 @@ __all__ = [
     "UserPasswordUpdate",
     "UserResponse",
     "UserListResponse",
-    # Account
+    # Organization
+    "OrganizationCreate",
+    "OrganizationUpdate",
+    "OrganizationResponse",
+    "OrganizationDetailResponse",
+    "OrganizationListResponse",
     "AccountCreate",
     "AccountUpdate",
     "AccountResponse",
@@ -169,6 +176,8 @@ __all__ = [
     "PublicIPResponse",
     "PublicIPPendingResponse",
     "PublicIPAuthorizeRequest",
+    "AutoUpdateToggleRequest",
+    "AutoUpdateToggleResponse",
     # Workstation
     "LicenseResponse",
     "WorkstationResponse",
@@ -252,9 +261,6 @@ __all__ = [
     "ActionConfigDownloadInfo",
     "ActionConfigSyncStatus",
     "calculate_config_hash",
-    # Organization
-    "AutoUpdateToggleRequest",
-    "AutoUpdateToggleResponse",
     # Updates
     "UpdateCheckResponse",
 ]

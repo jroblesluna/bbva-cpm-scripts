@@ -141,7 +141,7 @@ def get_effective_config_by_ip(
         # Buscar la workstation verificando que pertenece a la cuenta
         workstation = db.query(Workstation).filter(
             Workstation.id == workstation_id,
-            Workstation.account_id == account_id,
+            Workstation.organization_id == account_id,
         ).first()
     else:
         # Sin cuenta resuelta → 404
@@ -282,12 +282,12 @@ def get_global_config(
         target_account_id = account_id
     else:
         # Operador o ReadOnly: usar su cuenta asignada
-        if not current_user.account_id:
+        if not current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Usuario sin cuenta asignada"
             )
-        target_account_id = str(current_user.account_id)
+        target_account_id = str(current_user.organization_id)
 
     config = db.query(GlobalConfig).filter(GlobalConfig.account_id == target_account_id).first()
 
@@ -346,12 +346,12 @@ def update_global_config(
         target_account_id = account_id
     else:
         # Operador o ReadOnly: usar su cuenta asignada
-        if not current_user.account_id:
+        if not current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Usuario sin cuenta asignada"
             )
-        target_account_id = str(current_user.account_id)
+        target_account_id = str(current_user.organization_id)
 
     config_service = ConfigService()
 

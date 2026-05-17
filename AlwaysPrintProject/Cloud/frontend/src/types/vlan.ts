@@ -4,7 +4,7 @@
 
 export interface VLAN {
   id: string
-  account_id: string
+  organization_id: string
   name: string
   description: string | null
   cidr_ranges: string[]
@@ -17,7 +17,7 @@ export interface VLANDetail extends VLAN {
 }
 
 export interface VLANCreate {
-  account_id?: string  // Opcional para operadores (se usa su cuenta automáticamente)
+  organization_id?: string  // Opcional para operadores (se usa su organización automáticamente)
   name: string
   description?: string | null
   cidr_ranges: string[]

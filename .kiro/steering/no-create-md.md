@@ -1,4 +1,5 @@
 ---
+description: Evita la creación de archivos Markdown sin autorización explícita del usuario
 inclusion: auto
 ---
 

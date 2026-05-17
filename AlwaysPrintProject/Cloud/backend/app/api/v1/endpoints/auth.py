@@ -94,7 +94,7 @@ def logout(
         entity_type="session",
         entity_id=str(current_user.id),
         user_id=str(current_user.id),
-        account_id=str(current_user.account_id) if current_user.account_id else None,
+        account_id=str(current_user.organization_id) if current_user.organization_id else None,
         old_values={"action": "logout", "email": current_user.email},
         ip_address=get_client_ip(request)
     )

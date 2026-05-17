@@ -147,17 +147,17 @@ def register_workstation(
                 f"id={workstation.id}, "
                 f"ip_private={workstation.ip_private}, "
                 f"hostname={workstation.hostname}, "
-                f"account_id={workstation.account_id}, "
+                f"account_id={workstation.organization_id}, "
                 f"is_new={is_new}"
             )
             
             # Obtener información de la cuenta
-            from app.models.account import Account
-            account = db.query(Account).filter(Account.id == workstation.account_id).first()
+            from app.models.organization import Organization, Account
+            account = db.query(Account).filter(Account.id == workstation.organization_id).first()
             
             if not account:
                 logger.error(
-                    f"[REGISTRO HTTP] Cuenta no encontrada: {workstation.account_id}"
+                    f"[REGISTRO HTTP] Cuenta no encontrada: {workstation.organization_id}"
                 )
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -178,7 +178,7 @@ def register_workstation(
             
             return WorkstationRegisterResponse(
                 workstation_id=workstation.id,
-                account_id=account.id,
+                organization_id=account.id,
                 account_name=account.name,
                 message="Workstation registrada exitosamente" if is_new else "Workstation actualizada exitosamente",
                 cloud_api_url=cloud_api_url
@@ -254,12 +254,12 @@ def list_workstations(
     
     # Operadores solo pueden ver workstations de su cuenta
     if current_user.role == UserRole.OPERATOR:
-        if not current_user.account_id:
+        if not current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Operador sin cuenta asignada"
             )
-        base_query = base_query.filter(Workstation.account_id == current_user.account_id)
+        base_query = base_query.filter(Workstation.organization_id == current_user.organization_id)
     
     # Filtrar por cuenta si se proporciona (solo Admin)
     if account_id:
@@ -268,7 +268,7 @@ def list_workstations(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Solo Admin puede filtrar por cuenta"
             )
-        base_query = base_query.filter(Workstation.account_id == account_id)
+        base_query = base_query.filter(Workstation.organization_id == account_id)
     
     # Filtrar por VLAN si se proporciona
     if vlan_id:
@@ -296,7 +296,7 @@ def list_workstations(
     offset = (page - 1) * page_size
     workstations = (
         base_query
-        .options(joinedload(Workstation.account))
+        .options(joinedload(Workstation.organization))
         .offset(offset)
         .limit(page_size)
         .all()
@@ -337,7 +337,7 @@ def get_workstation_stats(
         # Determinar account_id según rol
         account_id = None
         if current_user.role in (UserRole.OPERATOR, UserRole.READONLY):
-            if not current_user.account_id:
+            if not current_user.organization_id:
                 # Devolver estadísticas vacías si no tiene cuenta asignada
                 return WorkstationStatsResponse(
                     total=0,
@@ -345,7 +345,7 @@ def get_workstation_stats(
                     offline=0,
                     contingency_active=0
                 )
-            account_id = str(current_user.account_id) if current_user.account_id else None
+            account_id = str(current_user.organization_id) if current_user.organization_id else None
         
         # Obtener estadísticas generales
         total = workstation_service.get_total_count(db, account_id)
@@ -355,7 +355,7 @@ def get_workstation_stats(
         # Contar VLANs totales de la organización
         from app.models.vlan import VLAN
         if account_id:
-            total_vlans = db.query(VLAN).filter(VLAN.account_id == account_id).count()
+            total_vlans = db.query(VLAN).filter(VLAN.organization_id == account_id).count()
         else:
             # Admin: contar todas las VLANs
             total_vlans = db.query(VLAN).count()
@@ -371,7 +371,7 @@ def get_workstation_stats(
         
         # Si es admin, agregar estadísticas por cuenta
         if current_user.role == UserRole.ADMIN:
-            from app.models.account import Account
+            from app.models.organization import Organization, Account
             import uuid
             
             # Obtener todas las cuentas
@@ -450,7 +450,7 @@ def get_workstation(
     """
     from sqlalchemy.orm import joinedload
     
-    workstation = db.query(Workstation).options(joinedload(Workstation.account)).filter(Workstation.id == workstation_id).first()
+    workstation = db.query(Workstation).options(joinedload(Workstation.organization)).filter(Workstation.id == workstation_id).first()
     
     if not workstation:
         raise HTTPException(
@@ -460,7 +460,7 @@ def get_workstation(
     
     # Verificar permisos
     if current_user.role == UserRole.OPERATOR:
-        if workstation.account_id != current_user.account_id:
+        if workstation.organization_id != current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para ver esta workstation"
@@ -506,7 +506,7 @@ def update_workstation(
     
     # Verificar permisos
     if current_user.role == UserRole.OPERATOR:
-        if workstation.account_id != current_user.account_id:
+        if workstation.organization_id != current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para actualizar esta workstation"
@@ -517,7 +517,7 @@ def update_workstation(
         "hostname": workstation.hostname,
         "os_serial": workstation.os_serial,
         "current_user": workstation.current_user,
-        "account_id": str(workstation.account_id) if workstation.account_id else None
+        "account_id": str(workstation.organization_id) if workstation.organization_id else None
     }
     
     # Actualizar campos
@@ -536,7 +536,7 @@ def update_workstation(
         entity_type="workstation",
         entity_id=str(workstation.id),
         user_id=str(current_user.id),
-        account_id=str(workstation.account_id) if workstation.account_id else None,
+        account_id=str(workstation.organization_id) if workstation.organization_id else None,
         old_data=old_values,
         new_data=update_data,
         ip_address=get_client_ip(request)
@@ -588,7 +588,7 @@ def update_workstation_config(
     
     # Verificar permisos
     if current_user.role == UserRole.OPERATOR:
-        if workstation.account_id != current_user.account_id:
+        if workstation.organization_id != current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para actualizar la configuración de esta workstation"
@@ -608,7 +608,7 @@ def update_workstation_config(
         entity_type="workstation_config",
         entity_id=str(workstation_id),
         user_id=str(current_user.id),
-        account_id=str(workstation.account_id),
+        account_id=str(workstation.organization_id),
         old_config={},
         new_config=config_data.model_dump(exclude_unset=True),
         ip_address=get_client_ip(request)
@@ -651,7 +651,7 @@ def delete_workstation_config(
     
     # Verificar permisos
     if current_user.role == UserRole.OPERATOR:
-        if workstation.account_id != current_user.account_id:
+        if workstation.organization_id != current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para eliminar la configuración de esta workstation"
@@ -667,7 +667,7 @@ def delete_workstation_config(
         entity_type="workstation_config",
         entity_id=str(workstation_id),
         user_id=str(current_user.id),
-        account_id=str(workstation.account_id),
+        account_id=str(workstation.organization_id),
         old_config={"action": "config_deleted"},
         new_config={},
         ip_address=get_client_ip(request)
@@ -710,7 +710,7 @@ def delete_workstation(
     
     # Verificar permisos
     if current_user.role == UserRole.OPERATOR:
-        if workstation.account_id != current_user.account_id:
+        if workstation.organization_id != current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para eliminar esta workstation"
@@ -720,7 +720,7 @@ def delete_workstation(
     old_data = {
         "ip_private": workstation.ip_private,
         "hostname": workstation.hostname,
-        "account_id": str(workstation.account_id) if workstation.account_id else None,
+        "account_id": str(workstation.organization_id) if workstation.organization_id else None,
     }
     
     # Eliminar workstation (cascade elimina relaciones)

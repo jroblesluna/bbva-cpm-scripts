@@ -228,7 +228,7 @@ class ConnectionManager:
         """
         # Obtener todos los usuarios de la cuenta
         from app.models.user import User
-        users = db.query(User).filter_by(account_id=account_id).all()
+        users = db.query(User).filter_by(organization_id=account_id).all()
         
         # Enviar a cada usuario
         for user in users:

@@ -82,7 +82,7 @@ class AuditService:
         audit_log = AuditLog(
             user_id=user_id,
             workstation_id=workstation_id,
-            account_id=account_id,
+            organization_id=account_id,
             action_type=action_type,
             entity_type=entity_type,
             entity_id=entity_id,
@@ -406,7 +406,7 @@ class AuditService:
         
         # Aplicar filtros
         if account_id is not None:
-            query = query.filter_by(account_id=account_id)
+            query = query.filter_by(organization_id=account_id)
         
         if user_id is not None:
             query = query.filter_by(user_id=user_id)
@@ -498,7 +498,7 @@ class AuditService:
         cutoff_date = datetime.utcnow() - timedelta(hours=hours)
         
         logs = db.query(AuditLog).filter(
-            AuditLog.account_id == account_id,
+            AuditLog.organization_id == account_id,
             AuditLog.created_at >= cutoff_date
         ).order_by(
             AuditLog.created_at.desc()
@@ -591,7 +591,7 @@ class AuditService:
         Returns:
             Diccionario {action_type: count}
         """
-        query = db.query(AuditLog).filter_by(account_id=account_id)
+        query = db.query(AuditLog).filter_by(organization_id=account_id)
         
         if start_date:
             query = query.filter(AuditLog.created_at >= start_date)

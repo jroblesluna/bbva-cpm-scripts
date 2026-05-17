@@ -54,7 +54,7 @@ def list_vlans(
     Returns:
         VLANListResponse con lista de VLANs
     """
-    if current_user.role == UserRole.OPERATOR and not current_user.account_id:
+    if current_user.role == UserRole.OPERATOR and not current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
     
     query = db.query(VLAN)
@@ -62,7 +62,7 @@ def list_vlans(
     # Aplicar filtros según rol
     if current_user.role == UserRole.OPERATOR:
         # Operadores solo ven su cuenta
-        query = query.filter(VLAN.account_id == current_user.account_id)
+        query = query.filter(VLAN.account_id == current_user.organization_id)
     elif current_user.role == UserRole.ADMIN and account_id:
         # Admins pueden filtrar por cuenta específica
         query = query.filter(VLAN.account_id == account_id)
@@ -83,7 +83,7 @@ def create_vlan(
     # Determinar account_id
     if current_user.role == UserRole.OPERATOR:
         # Operadores solo pueden crear VLANs en su propia cuenta
-        account_id = current_user.account_id
+        account_id = current_user.organization_id
         if not account_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
     else:
@@ -127,7 +127,7 @@ def get_vlan(
     if not vlan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
     
-    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.account_id:
+    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     workstation_count = len(vlan.workstations)
@@ -147,7 +147,7 @@ def update_vlan(
     if not vlan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
     
-    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.account_id:
+    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     old_values = {"name": vlan.name, "cidr_ranges": vlan.cidr_ranges}
@@ -186,7 +186,7 @@ def delete_vlan(
     if not vlan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
     
-    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.account_id:
+    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     db.delete(vlan)
@@ -219,7 +219,7 @@ def list_vlan_workstations(
     if not vlan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
     
-    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.account_id:
+    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     workstation_service = WorkstationService()
@@ -237,7 +237,7 @@ def get_vlan_config(
     if not vlan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
     
-    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.account_id:
+    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     return vlan.vlan_config if vlan.vlan_config else VLANConfigResponse(vlan_id=vlan_id)
@@ -256,7 +256,7 @@ def update_vlan_config(
     if not vlan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
     
-    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.account_id:
+    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     config_service = ConfigService()
@@ -291,7 +291,7 @@ def delete_vlan_config(
     if not vlan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
     
-    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.account_id:
+    if current_user.role == UserRole.OPERATOR and vlan.account_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     config_service = ConfigService()

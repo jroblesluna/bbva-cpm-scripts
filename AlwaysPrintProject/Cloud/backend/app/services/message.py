@@ -64,7 +64,7 @@ class MessageService:
         # Verificar que la workstation existe y pertenece a la cuenta
         workstation = db.query(Workstation).filter_by(
             id=workstation_id,
-            account_id=account_id
+            organization_id=account_id
         ).first()
         
         if not workstation:
@@ -75,7 +75,7 @@ class MessageService:
         
         # Crear mensaje
         message = Message(
-            account_id=account_id,
+            organization_id=account_id,
             sender_id=sender_id,
             target_type=TargetType.WORKSTATION,
             target_id=workstation_id,
@@ -125,7 +125,7 @@ class MessageService:
         # Verificar que la VLAN existe y pertenece a la cuenta
         vlan = db.query(VLAN).filter_by(
             id=vlan_id,
-            account_id=account_id
+            organization_id=account_id
         ).first()
         
         if not vlan:
@@ -135,7 +135,7 @@ class MessageService:
         
         # Crear mensaje
         message = Message(
-            account_id=account_id,
+            organization_id=account_id,
             sender_id=sender_id,
             target_type=TargetType.VLAN,
             target_id=vlan_id,
@@ -181,7 +181,7 @@ class MessageService:
         
         # Crear mensaje (target_id es NULL para broadcast a cuenta)
         message = Message(
-            account_id=account_id,
+            organization_id=account_id,
             sender_id=sender_id,
             target_type=TargetType.ACCOUNT,
             target_id=None,
@@ -259,7 +259,7 @@ class MessageService:
         
         # 1. Mensajes dirigidos a la workstation específica
         ws_messages = db.query(Message).filter(
-            Message.account_id == workstation.account_id,
+            Message.organization_id == workstation.organization_id,
             Message.target_type == TargetType.WORKSTATION,
             Message.target_id == workstation_id,
             Message.is_delivered == False
@@ -269,7 +269,7 @@ class MessageService:
         # 2. Mensajes dirigidos a la VLAN (si la workstation pertenece a una)
         if workstation.vlan_id:
             vlan_messages = db.query(Message).filter(
-                Message.account_id == workstation.account_id,
+                Message.organization_id == workstation.organization_id,
                 Message.target_type == TargetType.VLAN,
                 Message.target_id == workstation.vlan_id,
                 Message.is_delivered == False
@@ -278,7 +278,7 @@ class MessageService:
         
         # 3. Mensajes broadcast a la cuenta
         account_messages = db.query(Message).filter(
-            Message.account_id == workstation.account_id,
+            Message.organization_id == workstation.organization_id,
             Message.target_type == TargetType.ACCOUNT,
             Message.is_delivered == False
         ).order_by(Message.sent_at.asc()).all()
@@ -316,7 +316,7 @@ class MessageService:
             - messages: Lista de mensajes
             - total: Número total de mensajes (sin paginación)
         """
-        query = db.query(Message).filter_by(account_id=account_id)
+        query = db.query(Message).filter_by(organization_id=account_id)
         
         # Aplicar filtros
         if target_type is not None:
@@ -367,7 +367,7 @@ class MessageService:
             Número de mensajes pendientes
         """
         return db.query(Message).filter_by(
-            account_id=account_id,
+            organization_id=account_id,
             is_delivered=False
         ).count()
     
@@ -383,7 +383,7 @@ class MessageService:
             Número de mensajes entregados
         """
         return db.query(Message).filter_by(
-            account_id=account_id,
+            organization_id=account_id,
             is_delivered=True
         ).count()
     
@@ -412,7 +412,7 @@ class MessageService:
         
         # Buscar mensajes antiguos entregados
         old_messages = db.query(Message).filter(
-            Message.account_id == account_id,
+            Message.organization_id == account_id,
             Message.is_delivered == True,
             Message.delivered_at < cutoff_date
         ).all()
@@ -466,7 +466,7 @@ class MessageService:
         elif message.target_type == TargetType.ACCOUNT:
             # Mensaje broadcast a toda la cuenta
             workstations = db.query(Workstation).filter_by(
-                account_id=message.account_id
+                account_id=message.organization_id
             ).all()
         
         return workstations

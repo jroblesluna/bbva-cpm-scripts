@@ -49,7 +49,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { key: 'config', href: '/dashboard/config', icon: Settings },
     { key: 'messages', href: '/dashboard/messages', icon: MessageSquare },
     { key: 'audit', href: '/dashboard/audit', icon: FileText },
-    { key: 'accounts', href: '/dashboard/admin/accounts', icon: Building2, adminOnly: true },
+    { key: 'accounts', href: '/dashboard/admin/organizations', icon: Building2, adminOnly: true },
     { key: 'users', href: '/dashboard/admin/users', icon: Users, adminOnly: true },
     { key: 'pendingIps', href: '/dashboard/admin/pending-ips', icon: Globe, adminOnly: true },
     { key: 'updates', href: '/dashboard/admin/updates', icon: Download, adminOnly: true },
@@ -65,11 +65,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Redirigir a /no-account si es operador/readonly sin organización asignada
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
-      const needsAccount = user.role !== 'admin' && !user.account_id
-      const isOnNoAccountPage = pathname === '/dashboard/no-account'
+      const needsAccount = user.role !== 'admin' && !user.organization_id
+      const isOnNoAccountPage = pathname === '/dashboard/no-organization'
 
       if (needsAccount && !isOnNoAccountPage) {
-        router.push('/dashboard/no-account')
+        router.push('/dashboard/no-organization')
       } else if (!needsAccount && isOnNoAccountPage) {
         router.push('/dashboard')
       }

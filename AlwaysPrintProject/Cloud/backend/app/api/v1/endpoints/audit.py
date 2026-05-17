@@ -37,7 +37,7 @@ def _resolve_entity_names(db: Session, logs: list) -> list[dict]:
     Agrupa las consultas por tipo para minimizar queries a la BD.
     """
     from app.models.user import User as UserModel
-    from app.models.account import Account
+    from app.models.organization import Organization, Account
     from app.models.workstation import Workstation
     from app.models.vlan import VLAN
     from app.models.message import Message
@@ -133,9 +133,9 @@ def search_audit_logs(
     
     # Operadores solo pueden ver logs de su cuenta
     if current_user.role == UserRole.OPERATOR:
-        if not current_user.account_id:
+        if not current_user.organization_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
-        account_id = current_user.account_id
+        account_id = current_user.organization_id
     
     # Construir query base con filtros
     query = db.query(AuditLog)
@@ -229,9 +229,9 @@ def get_audit_stats(
     # Determinar account_id según rol
     account_id = None
     if current_user.role == UserRole.OPERATOR:
-        if not current_user.account_id:
+        if not current_user.organization_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
-        account_id = current_user.account_id
+        account_id = current_user.organization_id
     
     # Obtener estadísticas
     query = db.query(AuditLog)
@@ -298,9 +298,9 @@ def get_recent_activity(
     # Determinar account_id según rol
     account_id = None
     if current_user.role == UserRole.OPERATOR:
-        if not current_user.account_id:
+        if not current_user.organization_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
-        account_id = current_user.account_id
+        account_id = current_user.organization_id
     
     # Obtener actividad reciente
     if account_id:
@@ -336,7 +336,7 @@ def get_audit_log(
     
     # Verificar permisos
     if current_user.role == UserRole.OPERATOR:
-        if log.account_id != current_user.account_id:
+        if log.account_id != current_user.organization_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     # Agregar información adicional

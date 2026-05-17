@@ -80,9 +80,9 @@ class User(Base):
     role = Column(SQLEnum(UserRole), nullable=False, default=UserRole.READONLY)
     is_active = Column(Boolean, nullable=False, default=True)
     
-    # === RELACIÓN CON CUENTA ===
+    # === RELACIÓN CON ORGANIZACIÓN ===
     # NULL para Admin (acceso global), requerido para Operador/ReadOnly
-    account_id = Column(GUID, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=True)
+    organization_id = Column(GUID, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True)
     
     timezone = Column(String(50), nullable=True)
     language = Column(String(2), nullable=False, server_default='en')
@@ -96,7 +96,7 @@ class User(Base):
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # === RELACIONES ===
-    account = relationship("Account", back_populates="users")
+    organization = relationship("Organization", back_populates="users")
     sent_messages = relationship("Message", back_populates="sender", foreign_keys="Message.sender_id")
     audit_logs = relationship("AuditLog", back_populates="user", foreign_keys="AuditLog.user_id")
     

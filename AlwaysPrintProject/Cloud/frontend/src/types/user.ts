@@ -12,13 +12,13 @@ export interface User {
   email: string
   full_name: string
   role: UserRole
-  account_id: string | null
+  organization_id: string | null
   timezone?: string | null
   language: string
   is_active: boolean
   created_at: string
   updated_at: string
-  account?: {
+  organization?: {
     id: string
     name: string
     timezone: string
@@ -31,7 +31,7 @@ export interface UserCreate {
   password: string
   full_name: string
   role: UserRole
-  account_id?: string | null
+  organization_id?: string | null
   timezone?: string | null
   language?: string
 }
@@ -40,7 +40,7 @@ export interface UserUpdate {
   email?: string
   full_name?: string
   role?: UserRole
-  account_id?: string | null
+  organization_id?: string | null
   is_active?: boolean
   timezone?: string | null
   language?: string

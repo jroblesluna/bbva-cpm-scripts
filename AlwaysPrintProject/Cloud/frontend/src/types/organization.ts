@@ -1,8 +1,8 @@
 /**
- * Tipos relacionados con cuentas multi-tenant.
+ * Tipos relacionados con organizaciones multi-tenant.
  */
 
-export interface Account {
+export interface Organization {
   id: string
   name: string
   description?: string | null
@@ -17,13 +17,13 @@ export interface Account {
 
 export interface PublicIP {
   id: string
-  account_id: string
+  organization_id: string
   ip_address: string
   description: string | null
   created_at: string
 }
 
-export interface AccountCreate {
+export interface OrganizationCreate {
   name: string
   description?: string | null
   is_active?: boolean
@@ -31,7 +31,7 @@ export interface AccountCreate {
   language?: string
 }
 
-export interface AccountUpdate {
+export interface OrganizationUpdate {
   name?: string
   description?: string | null
   is_active?: boolean
@@ -44,9 +44,15 @@ export interface PublicIPCreate {
   description?: string | null
 }
 
-export interface AccountStats {
+export interface OrganizationStats {
   total_workstations: number
   online_workstations: number
   total_vlans: number
   total_users: number
 }
+
+// === ALIASES DE COMPATIBILIDAD ===
+export type Account = Organization
+export type AccountCreate = OrganizationCreate
+export type AccountUpdate = OrganizationUpdate
+export type AccountStats = OrganizationStats

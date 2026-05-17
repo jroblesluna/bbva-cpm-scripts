@@ -51,7 +51,7 @@ def upload_action_config(
     Si is_active=True, desactiva automáticamente cualquier configuración activa previa.
     """
     # Verificar que el usuario pertenece a la organización
-    if current_user.account_id != organization_id:
+    if current_user.organization_id != organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para gestionar configuraciones de esta organización"
@@ -91,7 +91,7 @@ def get_active_action_config(
     Retorna 404 si no hay configuración activa.
     """
     # Verificar que el usuario pertenece a la organización
-    if current_user.account_id != organization_id:
+    if current_user.organization_id != organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para acceder a configuraciones de esta organización"
@@ -125,7 +125,7 @@ def list_action_configs(
     Incluye tanto activas como inactivas, ordenadas por fecha de creación descendente.
     """
     # Verificar que el usuario pertenece a la organización
-    if current_user.account_id != organization_id:
+    if current_user.organization_id != organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para acceder a configuraciones de esta organización"
@@ -151,7 +151,7 @@ def get_action_config_detail(
     Obtiene una configuración específica con todos sus detalles incluyendo el JSON completo.
     """
     # Verificar que el usuario pertenece a la organización
-    if current_user.account_id != organization_id:
+    if current_user.organization_id != organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para acceder a configuraciones de esta organización"
@@ -188,7 +188,7 @@ def update_action_config(
     Si se activa una configuración, las demás se desactivan automáticamente.
     """
     # Verificar que el usuario pertenece a la organización
-    if current_user.account_id != organization_id:
+    if current_user.organization_id != organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para gestionar configuraciones de esta organización"
@@ -224,7 +224,7 @@ def delete_action_config(
     Esta operación es irreversible.
     """
     # Verificar que el usuario pertenece a la organización
-    if current_user.account_id != organization_id:
+    if current_user.organization_id != organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para gestionar configuraciones de esta organización"

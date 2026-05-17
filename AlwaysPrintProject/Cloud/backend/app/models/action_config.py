@@ -10,7 +10,7 @@ from datetime import datetime
 from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from app.core.database import Base
-from app.models.account import GUID
+from app.models.organization import GUID
 
 
 class ActionConfig(Base):
@@ -24,8 +24,8 @@ class ActionConfig(Base):
     
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
     
-    # Relación con organización (Account)
-    organization_id = Column(GUID, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    # Relación con organización (Organization)
+    organization_id = Column(GUID, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
     
     # Metadatos de la configuración
     name = Column(String(255), nullable=False, comment="Nombre de la configuración (ej: CPM_Compliant)")
@@ -50,7 +50,7 @@ class ActionConfig(Base):
     created_by_id = Column(GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     
     # Relaciones
-    organization = relationship("Account", back_populates="action_configs")
+    organization = relationship("Organization", back_populates="action_configs")
     created_by = relationship("User", foreign_keys=[created_by_id])
     
     # Índices compuestos

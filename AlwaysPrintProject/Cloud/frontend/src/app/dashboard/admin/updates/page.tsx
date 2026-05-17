@@ -5,13 +5,12 @@
  *
  * Permite a los administradores:
  * - Ver la versión actual del MSI disponible en S3
- * - Ver fecha de build y commit hash
- * - Habilitar/deshabilitar auto-updates para la organización
+ * - Habilitar/deshabilitar auto-updates por organización
  * - Confirmación antes de habilitar auto-updates
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Package, Calendar, GitCommit, HardDrive, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Package, Calendar, GitCommit, HardDrive, AlertTriangle, Building2 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -29,18 +28,18 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { apiClient } from '@/lib/api';
+import { apiClient, accountsApi } from '@/lib/api';
+import type { Account } from '@/types';
 
 // ============================================================================
 // TIPOS
 // ============================================================================
 
-interface UpdateInfo {
+interface MsiInfo {
   version: string;
   buildDate: string;
   commitHash: string;
   fileSize: number;
-  autoUpdateEnabled: boolean;
 }
 
 interface UpdateCheckResponse {
@@ -57,13 +56,17 @@ interface AutoUpdateToggleResponse {
   updated_at: string;
 }
 
+interface OrgAutoUpdateState {
+  orgId: string;
+  orgName: string;
+  autoUpdateEnabled: boolean;
+  isToggling: boolean;
+}
+
 // ============================================================================
 // HELPERS
 // ============================================================================
 
-/**
- * Formatea el tamaño de archivo en unidades legibles.
- */
 function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
@@ -72,9 +75,6 @@ function formatFileSize(bytes: number): string {
   return `${size} ${units[i]}`;
 }
 
-/**
- * Formatea una fecha ISO a formato legible en español.
- */
 function formatDate(isoDate: string): string {
   if (!isoDate) return 'No disponible';
   try {
@@ -98,30 +98,66 @@ export default function UpdatesPage() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [msiInfo, setMsiInfo] = useState<MsiInfo | null>(null);
+  const [organizations, setOrganizations] = useState<OrgAutoUpdateState[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isToggling, setIsToggling] = useState(false);
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; orgId: string; orgName: string }>({
+    open: false,
+    orgId: '',
+    orgName: '',
+  });
 
-  const organizationId = user?.account_id;
+  const isAdmin = user?.role === 'admin';
 
-  // Obtener información de actualización desde el backend
-  const fetchUpdateInfo = useCallback(async () => {
+  // Cargar información del MSI y organizaciones
+  const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await apiClient.get<UpdateCheckResponse>('/updates/check');
-      const data = response.data;
+      // Obtener info del MSI desde el endpoint de check
+      // (para admin sin account_id, usamos el endpoint directamente con headers de workstation simulados)
+      let msiData: MsiInfo | null = null;
+      try {
+        const checkResponse = await apiClient.get<UpdateCheckResponse>('/updates/check');
+        const data = checkResponse.data;
+        msiData = {
+          version: data.version,
+          buildDate: data.build_date,
+          commitHash: data.commit_hash,
+          fileSize: data.file_size,
+        };
+      } catch {
+        // Si falla (ej. admin sin workstation), no es crítico
+        msiData = null;
+      }
+      setMsiInfo(msiData);
 
-      setUpdateInfo({
-        version: data.version,
-        buildDate: data.build_date,
-        commitHash: data.commit_hash,
-        fileSize: data.file_size,
-        autoUpdateEnabled: data.auto_update_enabled,
-      });
+      // Obtener lista de organizaciones con su estado de auto-update
+      if (isAdmin) {
+        const accounts = await accountsApi.list();
+        const orgStates: OrgAutoUpdateState[] = accounts.map((acc: Account) => ({
+          orgId: acc.id,
+          orgName: acc.name,
+          autoUpdateEnabled: acc.auto_update_enabled ?? false,
+          isToggling: false,
+        }));
+        setOrganizations(orgStates);
+      } else if (user?.account_id) {
+        // Operador: solo su organización
+        try {
+          const acc = await accountsApi.get(user.account_id);
+          setOrganizations([{
+            orgId: acc.id,
+            orgName: acc.name,
+            autoUpdateEnabled: acc.auto_update_enabled ?? false,
+            isToggling: false,
+          }]);
+        } catch {
+          setOrganizations([]);
+        }
+      }
     } catch (err: unknown) {
       const errorMessage =
         err && typeof err === 'object' && 'detail' in err
@@ -131,53 +167,49 @@ export default function UpdatesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isAdmin, user?.account_id]);
 
   useEffect(() => {
-    fetchUpdateInfo();
-  }, [fetchUpdateInfo]);
+    fetchData();
+  }, [fetchData]);
 
-  // Manejar toggle de auto-updates
-  const handleToggleAutoUpdate = (checked: boolean) => {
+  // Manejar toggle de auto-updates por organización
+  const handleToggle = (orgId: string, orgName: string, checked: boolean) => {
     if (checked) {
       // Mostrar diálogo de confirmación antes de habilitar
-      setConfirmDialogOpen(true);
+      setConfirmDialog({ open: true, orgId, orgName });
     } else {
-      // Deshabilitar directamente sin confirmación
-      performToggle(false);
+      // Deshabilitar directamente
+      performToggle(orgId, false);
     }
   };
 
   // Ejecutar el toggle contra el backend
-  const performToggle = async (enabled: boolean) => {
-    if (!organizationId) {
-      toast({
-        title: 'Error',
-        description: 'No se pudo determinar la organización del usuario',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsToggling(true);
+  const performToggle = async (orgId: string, enabled: boolean) => {
+    // Marcar como toggling
+    setOrganizations((prev) =>
+      prev.map((org) => (org.orgId === orgId ? { ...org, isToggling: true } : org))
+    );
 
     try {
       await apiClient.patch<AutoUpdateToggleResponse>(
-        `/organizations/${organizationId}/auto-update`,
+        `/organizations/${orgId}/auto-update`,
         { enabled }
       );
 
-      setUpdateInfo((prev) =>
-        prev ? { ...prev, autoUpdateEnabled: enabled } : prev
+      // Actualizar estado local
+      setOrganizations((prev) =>
+        prev.map((org) =>
+          org.orgId === orgId ? { ...org, autoUpdateEnabled: enabled, isToggling: false } : org
+        )
       );
 
+      const orgName = organizations.find((o) => o.orgId === orgId)?.orgName ?? orgId;
       toast({
         title: enabled
           ? 'Actualizaciones automáticas habilitadas'
           : 'Actualizaciones automáticas deshabilitadas',
-        description: enabled
-          ? 'Las workstations de la organización se actualizarán automáticamente'
-          : 'Las workstations no recibirán actualizaciones automáticas',
+        description: `Organización: ${orgName}`,
       });
     } catch (err: unknown) {
       const errorMessage =
@@ -189,15 +221,13 @@ export default function UpdatesPage() {
         description: errorMessage,
         variant: 'destructive',
       });
+      // Revertir toggling state
+      setOrganizations((prev) =>
+        prev.map((org) => (org.orgId === orgId ? { ...org, isToggling: false } : org))
+      );
     } finally {
-      setIsToggling(false);
-      setConfirmDialogOpen(false);
+      setConfirmDialog({ open: false, orgId: '', orgName: '' });
     }
-  };
-
-  // Confirmar habilitación desde el diálogo
-  const handleConfirmEnable = () => {
-    performToggle(true);
   };
 
   // ============================================================================
@@ -211,15 +241,11 @@ export default function UpdatesPage() {
         <div>
           <h1 className="text-3xl font-bold">Actualizaciones Automáticas</h1>
           <p className="text-muted-foreground mt-1">
-            Gestiona las actualizaciones del cliente AlwaysPrint para la organización
+            Gestiona las actualizaciones del cliente AlwaysPrint por organización
           </p>
         </div>
 
-        <Button
-          variant="outline"
-          onClick={fetchUpdateInfo}
-          disabled={isLoading}
-        >
+        <Button variant="outline" onClick={fetchData} disabled={isLoading}>
           <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           Actualizar
         </Button>
@@ -234,7 +260,7 @@ export default function UpdatesPage() {
       )}
 
       {/* Estado de carga */}
-      {isLoading && !updateInfo && (
+      {isLoading && (
         <Card>
           <CardContent className="py-12">
             <p className="text-center text-muted-foreground">
@@ -244,114 +270,112 @@ export default function UpdatesPage() {
         </Card>
       )}
 
-      {/* Información del MSI actual */}
-      {updateInfo && (
+      {!isLoading && (
         <>
+          {/* Información del MSI actual */}
+          {msiInfo && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-5 w-5 text-primary" />
+                    <CardTitle>Versión Actual del Instalador</CardTitle>
+                  </div>
+                  <Badge variant="default">v{msiInfo.version}</Badge>
+                </div>
+                <CardDescription>
+                  Información del MSI disponible en S3 para las workstations
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="flex items-start gap-3">
+                    <Package className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Versión</p>
+                      <p className="font-medium text-lg">{msiInfo.version}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Fecha de Build</p>
+                      <p className="font-medium">{formatDate(msiInfo.buildDate)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <GitCommit className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Commit Hash</p>
+                      <p className="font-mono text-sm">{msiInfo.commitHash}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <HardDrive className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Tamaño</p>
+                      <p className="font-medium">{formatFileSize(msiInfo.fileSize)}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Toggle por organización */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-primary" />
-                  <CardTitle>Versión Actual del Instalador</CardTitle>
-                </div>
-                <Badge variant="default">v{updateInfo.version}</Badge>
+              <div className="flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                <CardTitle>Auto-Actualización por Organización</CardTitle>
               </div>
               <CardDescription>
-                Información del MSI disponible para las workstations
+                Habilita o deshabilita las actualizaciones automáticas para cada organización.
+                Las workstations solo se actualizarán si tanto el flag de organización como el flag local están habilitados.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Versión */}
-                <div className="flex items-start gap-3">
-                  <Package className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Versión</p>
-                    <p className="font-medium text-lg">{updateInfo.version}</p>
-                  </div>
+              {organizations.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">
+                  No se encontraron organizaciones.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {organizations.map((org) => (
+                    <div
+                      key={org.orgId}
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
+                      <div className="space-y-1">
+                        <Label className="text-base font-medium">{org.orgName}</Label>
+                        <p className="text-sm text-muted-foreground">
+                          {org.autoUpdateEnabled
+                            ? 'Actualizaciones automáticas habilitadas'
+                            : 'Actualizaciones automáticas deshabilitadas'}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={org.autoUpdateEnabled}
+                        onCheckedChange={(checked) => handleToggle(org.orgId, org.orgName, checked)}
+                        disabled={org.isToggling}
+                      />
+                    </div>
+                  ))}
                 </div>
-
-                {/* Fecha de build */}
-                <div className="flex items-start gap-3">
-                  <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Fecha de Build</p>
-                    <p className="font-medium">{formatDate(updateInfo.buildDate)}</p>
-                  </div>
-                </div>
-
-                {/* Commit hash */}
-                <div className="flex items-start gap-3">
-                  <GitCommit className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Commit Hash</p>
-                    <p className="font-mono text-sm">{updateInfo.commitHash}</p>
-                  </div>
-                </div>
-
-                {/* Tamaño del archivo */}
-                <div className="flex items-start gap-3">
-                  <HardDrive className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Tamaño del Archivo</p>
-                    <p className="font-medium">{formatFileSize(updateInfo.fileSize)}</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Toggle de auto-updates */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Configuración de Auto-Actualización</CardTitle>
-              <CardDescription>
-                Controla si las workstations de la organización se actualizan automáticamente
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="space-y-1">
-                  <Label htmlFor="auto-update-toggle" className="text-base font-medium">
-                    Actualizaciones Automáticas
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    {updateInfo.autoUpdateEnabled
-                      ? 'Las workstations descargarán e instalarán actualizaciones automáticamente'
-                      : 'Las workstations no recibirán actualizaciones automáticas'}
-                  </p>
-                </div>
-                <Switch
-                  id="auto-update-toggle"
-                  checked={updateInfo.autoUpdateEnabled}
-                  onCheckedChange={handleToggleAutoUpdate}
-                  disabled={isToggling}
-                />
-              </div>
-
-              {updateInfo.autoUpdateEnabled && (
-                <Alert className="mt-4">
-                  <AlertDescription>
-                    Las workstations verificarán actualizaciones cada 24 horas. La actualización
-                    se aplicará de forma silenciosa cuando ambos flags (organización y local) estén
-                    habilitados.
-                  </AlertDescription>
-                </Alert>
               )}
             </CardContent>
           </Card>
         </>
       )}
 
-      {/* Diálogo de confirmación para habilitar auto-updates */}
-      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+      {/* Diálogo de confirmación */}
+      <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Confirmar Habilitación de Auto-Actualizaciones</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que deseas habilitar las actualizaciones automáticas para toda la
-              organización? Las workstations que tengan el flag local habilitado comenzarán a
-              actualizarse automáticamente.
+              ¿Estás seguro de que deseas habilitar las actualizaciones automáticas para
+              <strong> {confirmDialog.orgName}</strong>?
             </DialogDescription>
           </DialogHeader>
 
@@ -359,9 +383,9 @@ export default function UpdatesPage() {
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Esta acción afectará a todas las workstations de la organización que tengan
-                habilitadas las actualizaciones automáticas localmente. Asegúrate de que la
-                versión actual del MSI ha sido probada correctamente.
+                Las workstations de esta organización que tengan habilitado el flag local
+                comenzarán a actualizarse automáticamente. Asegúrate de que la versión actual
+                del MSI ha sido probada correctamente.
               </AlertDescription>
             </Alert>
           </div>
@@ -369,16 +393,12 @@ export default function UpdatesPage() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setConfirmDialogOpen(false)}
-              disabled={isToggling}
+              onClick={() => setConfirmDialog({ open: false, orgId: '', orgName: '' })}
             >
               Cancelar
             </Button>
-            <Button
-              onClick={handleConfirmEnable}
-              disabled={isToggling}
-            >
-              {isToggling ? 'Habilitando...' : 'Confirmar'}
+            <Button onClick={() => performToggle(confirmDialog.orgId, true)}>
+              Confirmar
             </Button>
           </DialogFooter>
         </DialogContent>

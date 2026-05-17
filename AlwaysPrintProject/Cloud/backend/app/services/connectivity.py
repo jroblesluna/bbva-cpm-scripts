@@ -59,7 +59,7 @@ class ConnectivityService:
         # Verificar tenant isolation: workstation debe existir para la cuenta
         workstation = db.query(Workstation).filter(
             Workstation.id == workstation_id,
-            Workstation.account_id == account_id
+            Workstation.organization_id == account_id
         ).first()
 
         if not workstation:
@@ -74,7 +74,7 @@ class ConnectivityService:
         # Crear registro de resultado de conectividad
         connectivity_result = ConnectivityResult(
             workstation_id=workstation_id,
-            account_id=account_id,
+            organization_id=account_id,
             check_id=payload.check_id,
             check_type=payload.check_type,
             success=payload.success,
@@ -131,7 +131,7 @@ class ConnectivityService:
         # Query base con tenant isolation: filtrar por workstation_id Y account_id
         query = db.query(ConnectivityResult).filter(
             ConnectivityResult.workstation_id == workstation_id,
-            ConnectivityResult.account_id == account_id
+            ConnectivityResult.organization_id == account_id
         )
 
         # Filtro opcional por check_id

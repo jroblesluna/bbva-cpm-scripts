@@ -60,12 +60,12 @@ def list_users(
     
     # Operadores solo pueden ver usuarios de su cuenta
     if current_user.role == UserRole.OPERATOR:
-        if not current_user.account_id:
+        if not current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Operador sin cuenta asignada"
             )
-        query = query.filter(User.account_id == current_user.account_id)
+        query = query.filter(User.account_id == current_user.organization_id)
     
     # Filtrar por rol si se proporciona
     if role:
@@ -121,7 +121,7 @@ def create_user(
         HTTPException 403: Sin permisos
         HTTPException 409: Email ya existe
     """
-    from app.models.account import Account
+    from app.models.organization import Organization, Account
     
     auth_service = AuthService()
     
@@ -133,7 +133,7 @@ def create_user(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Operadores solo pueden crear otros operadores"
             )
-        if user_data.account_id != current_user.account_id:
+        if user_data.account_id != current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Operadores solo pueden crear usuarios de su misma cuenta"
@@ -262,7 +262,7 @@ def get_user(
     # Verificar permisos
     if current_user.role == UserRole.OPERATOR:
         # Operadores solo pueden ver usuarios de su cuenta o a sí mismos
-        if user.id != current_user.id and user.account_id != current_user.account_id:
+        if user.id != current_user.id and user.account_id != current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para ver este usuario"

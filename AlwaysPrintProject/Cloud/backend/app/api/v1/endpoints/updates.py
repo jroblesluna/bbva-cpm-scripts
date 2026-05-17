@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.core.utils import get_client_ip
-from app.models.account import Account, PublicIP
+from app.models.organization import Organization, Account, PublicIP
 from app.models.user import User, UserRole
 from app.models.workstation import Workstation
 from app.schemas.updates import UpdateCheckResponse
@@ -75,7 +75,7 @@ def _identify_workstation(request: Request, db: Session) -> Workstation:
                     local_ip = request.headers.get("X-Workstation-Local-IP")
                     if local_ip:
                         workstation = db.query(Workstation).filter(
-                            Workstation.account_id == user.account_id,
+                            Workstation.organization_id == user.account_id,
                             Workstation.ip_private == local_ip.strip()
                         ).first()
                         if workstation:
@@ -96,7 +96,7 @@ def _identify_workstation(request: Request, db: Session) -> Workstation:
         local_ip = request.headers.get("X-Workstation-Local-IP")
         if local_ip:
             workstation = db.query(Workstation).filter(
-                Workstation.account_id == public_ip_record.account_id,
+                Workstation.organization_id == public_ip_record.account_id,
                 Workstation.ip_private == local_ip.strip()
             ).first()
             if workstation:
@@ -105,7 +105,7 @@ def _identify_workstation(request: Request, db: Session) -> Workstation:
         # Si no hay IP privada, buscar la primera workstation de la cuenta
         # (caso de una sola workstation por IP pública)
         workstation = db.query(Workstation).filter(
-            Workstation.account_id == public_ip_record.account_id
+            Workstation.organization_id == public_ip_record.account_id
         ).first()
         if workstation:
             return workstation

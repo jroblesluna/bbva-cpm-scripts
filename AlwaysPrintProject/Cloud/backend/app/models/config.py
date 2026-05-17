@@ -15,7 +15,7 @@ from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, J
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
-from app.models.account import GUID  # Importar tipo GUID para consistencia
+from app.models.organization import GUID  # Importar tipo GUID para consistencia
 
 
 class GlobalConfig(Base):
@@ -29,7 +29,7 @@ class GlobalConfig(Base):
     
     # === CAMPOS PRINCIPALES ===
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
-    account_id = Column(GUID, ForeignKey("accounts.id", ondelete="CASCADE"), unique=True, nullable=False)
+    organization_id = Column(GUID, ForeignKey("organizations.id", ondelete="CASCADE"), unique=True, nullable=False)
     
     # === PARÁMETROS DE CONFIGURACIÓN ===
     # Nombre de la cola corporativa (default: "LexmarkRoblesAI")
@@ -60,10 +60,10 @@ class GlobalConfig(Base):
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # === RELACIONES ===
-    account = relationship("Account", back_populates="global_config")
+    organization = relationship("Organization", back_populates="global_config")
     
     def __repr__(self):
-        return f"<GlobalConfig(id={self.id}, account_id={self.account_id})>"
+        return f"<GlobalConfig(id={self.id}, organization_id={self.organization_id})>"
 
 
 class VLANConfig(Base):

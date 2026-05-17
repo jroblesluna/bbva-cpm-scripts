@@ -76,7 +76,7 @@ async def get_workstation_telemetry(
     # Verificar tenant isolation: workstation debe pertenecer a la cuenta del usuario
     workstation = db.query(Workstation).filter(
         Workstation.id == workstation_id,
-        Workstation.account_id == current_user.account_id
+        Workstation.organization_id == current_user.organization_id
     ).first()
 
     if not workstation:
@@ -90,7 +90,7 @@ async def get_workstation_telemetry(
     records = telemetry_service.get_telemetry_history(
         db=db,
         workstation_id=str(workstation_id),
-        account_id=str(current_user.account_id),
+        account_id=str(current_user.organization_id),
         from_dt=from_dt,
         to_dt=to_dt,
         limit=limit
@@ -139,7 +139,7 @@ async def get_account_telemetry_stats(
     # Los usuarios admin pueden consultar cualquier cuenta
     if current_user.role != UserRole.ADMIN:
         # Para usuarios no-admin, su account_id debe coincidir con el solicitado
-        if current_user.account_id is None or str(current_user.account_id) != str(account_id):
+        if current_user.organization_id is None or str(current_user.organization_id) != str(account_id):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Cuenta no encontrada"

@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from app.models.workstation import Workstation, License
-from app.models.account import Account, PublicIP
+from app.models.organization import Organization, Account, PublicIP
 from app.models.vlan import VLAN
 
 logger = logging.getLogger(__name__)
@@ -595,7 +595,7 @@ class WorkstationService:
         query = db.query(Workstation).filter(Workstation.is_online.is_(True))
         
         if account_id is not None:
-            query = query.filter(Workstation.account_id == account_id)
+            query = query.filter(Workstation.organization_id == account_id)
         
         return query.count()
     
@@ -613,7 +613,7 @@ class WorkstationService:
         query = db.query(Workstation).filter(Workstation.contingency_active.is_(True))
         
         if account_id is not None:
-            query = query.filter(Workstation.account_id == account_id)
+            query = query.filter(Workstation.organization_id == account_id)
         
         return query.count()
     
@@ -631,7 +631,7 @@ class WorkstationService:
         query = db.query(Workstation)
         
         if account_id is not None:
-            query = query.filter(Workstation.account_id == account_id)
+            query = query.filter(Workstation.organization_id == account_id)
         
         return query.count()
     

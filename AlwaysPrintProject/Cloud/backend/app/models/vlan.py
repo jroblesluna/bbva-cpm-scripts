@@ -11,7 +11,7 @@ from sqlalchemy import Column, String, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
-from app.models.account import GUID  # Importar tipo GUID para consistencia
+from app.models.organization import GUID  # Importar tipo GUID para consistencia
 
 
 class VLAN(Base):
@@ -26,7 +26,7 @@ class VLAN(Base):
     
     # === CAMPOS PRINCIPALES ===
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
-    account_id = Column(GUID, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    organization_id = Column(GUID, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
     description = Column(String(1000), nullable=True)
     
@@ -38,7 +38,7 @@ class VLAN(Base):
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # === RELACIONES ===
-    account = relationship("Account", back_populates="vlans")
+    organization = relationship("Organization", back_populates="vlans")
     workstations = relationship("Workstation", back_populates="vlan")
     vlan_config = relationship("VLANConfig", back_populates="vlan", uselist=False, cascade="all, delete-orphan")
     

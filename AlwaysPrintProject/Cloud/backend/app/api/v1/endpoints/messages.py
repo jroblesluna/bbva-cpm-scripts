@@ -40,10 +40,10 @@ def list_messages(
     db: Session = Depends(get_db)
 ):
     """Listar mensajes de la cuenta."""
-    if current_user.role == UserRole.OPERATOR and not current_user.account_id:
+    if current_user.role == UserRole.OPERATOR and not current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
     
-    account_id = current_user.account_id if current_user.role == UserRole.OPERATOR else None
+    account_id = current_user.organization_id if current_user.role == UserRole.OPERATOR else None
     
     query = db.query(Message)
     if account_id:
@@ -69,11 +69,11 @@ def send_message(
     db: Session = Depends(get_db)
 ):
     """Enviar un mensaje a workstation(s)."""
-    if current_user.role == UserRole.OPERATOR and not current_user.account_id:
+    if current_user.role == UserRole.OPERATOR and not current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
     
     # Determinar account_id: operador usa su cuenta, admin debe especificar
-    target_account_id = current_user.account_id if current_user.role == UserRole.OPERATOR else account_id
+    target_account_id = current_user.organization_id if current_user.role == UserRole.OPERATOR else account_id
     if not target_account_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="account_id requerido")
     
@@ -115,10 +115,10 @@ def get_message_stats(
     db: Session = Depends(get_db)
 ):
     """Obtener estadísticas de mensajes."""
-    if current_user.role == UserRole.OPERATOR and not current_user.account_id:
+    if current_user.role == UserRole.OPERATOR and not current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
     
-    account_id = current_user.account_id if current_user.role == UserRole.OPERATOR else None
+    account_id = current_user.organization_id if current_user.role == UserRole.OPERATOR else None
     
     # Query base
     base_query = db.query(Message)
@@ -157,7 +157,7 @@ def get_message(
     if not message:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mensaje no encontrado")
     
-    if current_user.role == UserRole.OPERATOR and message.account_id != current_user.account_id:
+    if current_user.role == UserRole.OPERATOR and message.account_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     # Agregar información del remitente

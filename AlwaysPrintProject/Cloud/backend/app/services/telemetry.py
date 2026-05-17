@@ -58,7 +58,7 @@ class TelemetryService:
         # Verificar que la workstation existe para esta cuenta (tenant isolation)
         workstation = db.query(Workstation).filter(
             Workstation.id == workstation_id,
-            Workstation.account_id == account_id
+            Workstation.organization_id == account_id
         ).first()
 
         if not workstation:
@@ -70,7 +70,7 @@ class TelemetryService:
         # Crear registro de telemetría
         telemetry_log = TelemetryLog(
             workstation_id=workstation_id,
-            account_id=account_id,
+            organization_id=account_id,
             queue_status=payload.queue_status,
             contingency_active=payload.contingency_active,
             jobs_identified=payload.jobs_identified,
@@ -115,7 +115,7 @@ class TelemetryService:
         # Query base con tenant isolation
         query = db.query(TelemetryLog).filter(
             TelemetryLog.workstation_id == workstation_id,
-            TelemetryLog.account_id == account_id
+            TelemetryLog.organization_id == account_id
         )
 
         # Aplicar filtros temporales opcionales
@@ -162,12 +162,12 @@ class TelemetryService:
 
         # Total de workstations registradas para la cuenta
         total_workstations = db.query(Workstation).filter(
-            Workstation.account_id == account_id
+            Workstation.organization_id == account_id
         ).count()
 
         # Registros de telemetría en las últimas 24h para esta cuenta
         recent_logs = db.query(TelemetryLog).filter(
-            TelemetryLog.account_id == account_id,
+            TelemetryLog.organization_id == account_id,
             TelemetryLog.recorded_at >= since
         )
 
@@ -175,7 +175,7 @@ class TelemetryService:
         workstations_reporting = db.query(
             distinct(TelemetryLog.workstation_id)
         ).filter(
-            TelemetryLog.account_id == account_id,
+            TelemetryLog.organization_id == account_id,
             TelemetryLog.recorded_at >= since
         ).count()
 
@@ -183,7 +183,7 @@ class TelemetryService:
         avg_result = db.query(
             func.avg(TelemetryLog.jobs_identified)
         ).filter(
-            TelemetryLog.account_id == account_id,
+            TelemetryLog.organization_id == account_id,
             TelemetryLog.recorded_at >= since,
             TelemetryLog.jobs_identified.isnot(None)
         ).scalar()
@@ -194,7 +194,7 @@ class TelemetryService:
         last_updated = db.query(
             func.max(TelemetryLog.recorded_at)
         ).filter(
-            TelemetryLog.account_id == account_id,
+            TelemetryLog.organization_id == account_id,
             TelemetryLog.recorded_at >= since
         ).scalar()
 
@@ -205,7 +205,7 @@ class TelemetryService:
             TelemetryLog.workstation_id,
             func.max(TelemetryLog.recorded_at).label("max_recorded_at")
         ).filter(
-            TelemetryLog.account_id == account_id,
+            TelemetryLog.organization_id == account_id,
             TelemetryLog.recorded_at >= since
         ).group_by(TelemetryLog.workstation_id).subquery()
 
@@ -215,7 +215,7 @@ class TelemetryService:
             (TelemetryLog.workstation_id == latest_per_ws.c.workstation_id) &
             (TelemetryLog.recorded_at == latest_per_ws.c.max_recorded_at)
         ).filter(
-            TelemetryLog.account_id == account_id
+            TelemetryLog.organization_id == account_id
         ).all()
 
         # Contar workstations con contingency_active=True en su registro más reciente

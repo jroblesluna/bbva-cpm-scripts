@@ -15,7 +15,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user, require_admin
 from app.core.utils import get_client_ip
 from app.models.user import User, UserRole
-from app.models.account import Account, PublicIP
+from app.models.organization import Organization, Account, PublicIP
 from app.schemas import (
     AccountCreate,
     AccountUpdate,
