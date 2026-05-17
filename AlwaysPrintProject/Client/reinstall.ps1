@@ -1,5 +1,10 @@
 ﻿# Script de reinstalacion completa de AlwaysPrint
 # Autor: Robles.AI - Mayo 2026
+# Uso: .\reinstall.ps1 [-ForceUpload]
+
+param(
+    [switch]$ForceUpload
+)
 
 # Auto-elevacion si no es administrador
 $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -10,7 +15,8 @@ if (-not $isAdmin) {
     Write-Host "Solicitando elevacion...`n" -ForegroundColor Yellow
     
     $scriptPath = $MyInvocation.MyCommand.Path
-    $arguments = "-NoProfile -ExecutionPolicy Bypass -NoExit -File `"$scriptPath`""
+    $extraArgs = if ($ForceUpload) { " -ForceUpload" } else { "" }
+    $arguments = "-NoProfile -ExecutionPolicy Bypass -NoExit -File `"$scriptPath`"$extraArgs"
     
     try {
         Start-Process PowerShell.exe -Verb RunAs -ArgumentList $arguments
@@ -262,30 +268,67 @@ try {
     Write-Step "MSI: $($msiInfo.Name) ($([math]::Round($msiInfo.Length/1MB,2)) MB)" "Info"
     Write-Step "Modificado: $($msiInfo.LastWriteTime)" "Info"
 
-    # PASO 8.5: Subir MSI a S3
+    # PASO 8.5: Subir MSI a S3 (si el MSI local es mas reciente que el de S3, o -ForceUpload)
     $s3Destination = "s3://alwaysprint-artifacts/latest/AlwaysPrint.msi"
     $s3HttpUrl = "https://alwaysprint-artifacts.s3.us-west-2.amazonaws.com/latest/AlwaysPrint.msi"
     Write-Step "`nPASO 8.5: Subiendo MSI al bucket S3..." "Info"
     Write-Step "Descarga: $s3HttpUrl" "Info"
-    if ($needsBuild -and (Test-Path $msiPath)) {
+
+    # Determinar si necesitamos subir comparando fecha local vs S3
+    $needsUpload = $false
+    if ($ForceUpload) {
+        Write-Step "Subida forzada por parametro -ForceUpload" "Info"
+        $needsUpload = $true
+    } else {
+        # Consultar fecha del objeto en S3
+        $prevEAP2 = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $s3LastModified = $null
+        try {
+            $s3Head = aws s3api head-object --bucket "alwaysprint-artifacts" --key "latest/AlwaysPrint.msi" 2>$null | ConvertFrom-Json
+            if ($s3Head -and $s3Head.LastModified) {
+                $s3LastModified = [DateTime]::Parse($s3Head.LastModified)
+            }
+        } catch {
+            # Si no existe en S3 o hay error, subir
+            $s3LastModified = $null
+        }
+        $ErrorActionPreference = $prevEAP2
+
+        if (-not $s3LastModified) {
+            Write-Step "No se encontro MSI en S3 o no se pudo consultar, se subira" "Info"
+            $needsUpload = $true
+        } else {
+            $msiLocalDate = $msiInfo.LastWriteTime
+            Write-Step "MSI local: $msiLocalDate | MSI en S3: $s3LastModified" "Info"
+            if ($msiLocalDate -gt $s3LastModified) {
+                Write-Step "MSI local es mas reciente que el de S3, se subira" "Info"
+                $needsUpload = $true
+            } else {
+                Write-Step "MSI en S3 ya esta actualizado (igual o mas reciente)" "Info"
+            }
+        }
+    }
+
+    if ($needsUpload -and (Test-Path $msiPath)) {
         Write-Step "Preparando subida al bucket S3..." "Info"
         $buildDate = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
         $shortCommit = $afterCommit.Substring(0, 7)
 
-        # Extraer versión del assembly desde el DLL compilado
+        # Extraer version del assembly desde el EXE compilado
         $serviceDll = Join-Path $clientPath "AlwaysPrintService\bin\Release\net48\AlwaysPrintService.exe"
         if (Test-Path $serviceDll) {
             $assemblyVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($serviceDll).FileVersion
         } else {
-            # Fallback: usar formato fecha como versión
+            # Fallback: usar formato fecha como version
             $assemblyVersion = Get-Date -Format "yyyy.M.d.HHmm"
         }
-        Write-Step "Versión del assembly: $assemblyVersion" "Info"
+        Write-Step "Version del assembly: $assemblyVersion" "Info"
 
         $metadata = "version=$assemblyVersion,build-date=$buildDate,commit-hash=$shortCommit"
 
         try {
-            # Subir a latest/ (siempre la más reciente)
+            # Subir a latest/ (siempre la mas reciente)
             Write-Step "Destino: $s3Destination" "Info"
             Write-Step "Metadata: version=$assemblyVersion, build-date=$buildDate, commit=$shortCommit" "Info"
             $s3Output = aws s3 cp $msiPath $s3Destination --metadata $metadata 2>&1
@@ -293,26 +336,24 @@ try {
                 throw "aws s3 cp fallo con codigo $LASTEXITCODE`: $s3Output"
             }
 
-            # Subir también a versions/{version}/ para histórico
+            # Subir tambien a versions/{version}/ para historico
             $s3VersionDest = "s3://alwaysprint-artifacts/versions/$assemblyVersion/AlwaysPrint.msi"
-            Write-Step "Guardando copia en histórico: $s3VersionDest" "Info"
+            Write-Step "Guardando copia en historico: $s3VersionDest" "Info"
             aws s3 cp $msiPath $s3VersionDest --metadata $metadata 2>&1 | Out-Null
 
             Write-Step "MSI subido exitosamente a S3 (latest + versions/$assemblyVersion/)" "Success"
         } catch {
             Write-Step "Error al subir MSI a S3: $($_.Exception.Message)" "Warning"
-            $respuesta = Read-Host "¿Desea continuar con la instalacion? (S/N)"
+            $respuesta = Read-Host "Desea continuar con la instalacion? (S/N)"
             if ($respuesta -notin @("S", "s", "Si", "si", "SI")) {
                 throw "Instalacion abortada por el usuario tras fallo de subida a S3"
             }
             Write-Step "Continuando sin subida a S3 por decision del usuario..." "Warning"
         }
+    } elseif (-not (Test-Path $msiPath)) {
+        Write-Step "Omitiendo subida a S3 (MSI no encontrado)" "Warning"
     } else {
-        if (-not $needsBuild) {
-            Write-Step "Omitiendo subida a S3 (sin cambios y MSI existente)" "Info"
-        } else {
-            Write-Step "Omitiendo subida a S3 (MSI no encontrado)" "Warning"
-        }
+        Write-Step "Omitiendo subida a S3 (MSI en S3 ya actualizado)" "Info"
     }
 
     # PASO 9: Instalar MSI
@@ -372,6 +413,7 @@ try {
     Write-Step "  - Desinstalacion: Completada" "Success"
     Write-Step "  - Git pull: Completado" "Success"
     Write-Step "  - Compilacion: $(if ($needsBuild) {'Ejecutada'} else {'Omitida'})" "Success"
+    Write-Step "  - Subida S3: $(if ($needsUpload) {'Completada'} else {'Omitida (ya actualizado)'})" "Success"
     Write-Step "  - Instalacion: Completada" "Success"
     if ($hasChanges) {
         Write-Host "`nCambios aplicados:" -ForegroundColor Cyan
