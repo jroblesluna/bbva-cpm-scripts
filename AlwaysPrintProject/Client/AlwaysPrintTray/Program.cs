@@ -42,7 +42,7 @@ namespace AlwaysPrintTray
                 // Configurar headers HTTP con información de la workstation
                 Bootstrap.DomainHealthChecker.ConfigureWorkstationHeaders();
 
-                AlwaysPrintLogger.WriteTrayInfo("AlwaysPrintTray started.", AlwaysPrintLogger.EvtServiceStarted);
+                AlwaysPrintLogger.WriteTrayInfo($"AlwaysPrintTray started. Versión: {System.Reflection.Assembly.GetExecutingAssembly().GetName().Version}", AlwaysPrintLogger.EvtServiceStarted);
                 Application.Run(new TrayApplicationContext());
             }
             catch (Exception ex)

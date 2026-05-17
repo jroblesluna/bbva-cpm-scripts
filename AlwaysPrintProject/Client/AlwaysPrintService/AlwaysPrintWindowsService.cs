@@ -166,6 +166,7 @@ namespace AlwaysPrintService
             try
             {
                 AlwaysPrintLogger.WriteInfo("AlwaysPrintService iniciando...", AlwaysPrintLogger.EvtServiceStarted);
+                AlwaysPrintLogger.WriteInfo($"Versión: {System.Reflection.Assembly.GetExecutingAssembly().GetName().Version}", AlwaysPrintLogger.EvtServiceStarted);
                 _state.Transition(ServiceState.Starting);
 
                 // 1. Guardia contra instancias duplicadas.
