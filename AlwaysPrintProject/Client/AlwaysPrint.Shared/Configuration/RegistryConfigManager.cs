@@ -145,6 +145,59 @@ namespace AlwaysPrint.Shared.Configuration
                 SetIfMissing(key, "ConnectivityChecks",       "[]",          RegistryValueKind.String);
                 SetIfMissing(key, "TelemetryEnabled",         1,             RegistryValueKind.DWord);
                 SetIfMissing(key, "TelemetryIntervalSeconds", 300,           RegistryValueKind.DWord);
+
+                // === AUTO-ACTUALIZACIÓN ===
+                SetIfMissing(key, "AutoUpdateEnabled", 0, RegistryValueKind.DWord);
+            }
+        }
+
+        /// <summary>
+        /// Lee el flag local de auto-actualización desde el registro.
+        /// Este campo es independiente de AppConfiguration para evitar que la
+        /// sincronización Cloud lo sobreescriba.
+        /// </summary>
+        /// <returns>true si auto-actualización está habilitada, false en caso contrario.</returns>
+        public bool LoadAutoUpdateEnabled()
+        {
+            try
+            {
+                using (var key = Registry.LocalMachine.OpenSubKey(RegistryPath, writable: false))
+                {
+                    if (key == null) return false;
+                    return Convert.ToInt32(key.GetValue("AutoUpdateEnabled", 0)) == 1;
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning(
+                    $"RegistryConfigManager.LoadAutoUpdateEnabled: error leyendo flag de auto-actualización, retornando deshabilitado. {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericWarning);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Persiste el flag local de auto-actualización en el registro.
+        /// Este campo es independiente de AppConfiguration para evitar que la
+        /// sincronización Cloud lo sobreescriba.
+        /// Requiere privilegios de administrador (servicio o elevación).
+        /// </summary>
+        /// <param name="enabled">true para habilitar, false para deshabilitar.</param>
+        public void SaveAutoUpdateEnabled(bool enabled)
+        {
+            try
+            {
+                using (var key = Registry.LocalMachine.CreateSubKey(RegistryPath, writable: true))
+                {
+                    key?.SetValue("AutoUpdateEnabled", enabled ? 1 : 0, RegistryValueKind.DWord);
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning(
+                    $"RegistryConfigManager.SaveAutoUpdateEnabled: error escribiendo flag de auto-actualización. {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericWarning);
+                throw;
             }
         }
 

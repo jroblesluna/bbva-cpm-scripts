@@ -237,10 +237,12 @@ try {
     Write-Step "Modificado: $($msiInfo.LastWriteTime)" "Info"
 
     # PASO 8.5: Subir MSI a S3
+    $s3Destination = "s3://alwaysprint-artifacts/latest/AlwaysPrint.msi"
+    $s3HttpUrl = "https://alwaysprint-artifacts.s3.us-west-2.amazonaws.com/latest/AlwaysPrint.msi"
     Write-Step "`nPASO 8.5: Subiendo MSI al bucket S3..." "Info"
+    Write-Step "Descarga: $s3HttpUrl" "Info"
     if ($hasChanges -and (Test-Path $msiPath)) {
         Write-Step "Preparando subida al bucket S3..." "Info"
-        $s3Destination = "s3://alwaysprint-artifacts/latest/AlwaysPrint.msi"
         $buildDate = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
         $shortCommit = $afterCommit.Substring(0, 7)
         $metadata = "version=$shortCommit,build-date=$buildDate,commit-hash=$afterCommit"

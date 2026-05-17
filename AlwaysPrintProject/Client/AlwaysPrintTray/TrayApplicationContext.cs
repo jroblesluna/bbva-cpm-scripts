@@ -33,6 +33,9 @@ namespace AlwaysPrintTray
         private CloudManager? _cloudManager;
         private CloudRegistration? _cloudRegistration;
 
+        // Integración de auto-actualización
+        private UpdateChecker? _updateChecker;
+
         public TrayApplicationContext()
         {
             _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
@@ -196,11 +199,138 @@ namespace AlwaysPrintTray
                         _cloudRegistration = null;
                     }
                 }
+
+                // 7. Iniciar flujo de auto-actualización (fire-and-forget, no bloqueante)
+                InitializeAutoUpdate(cfg);
             }
             catch (OperationCanceledException) { /* shutdown normal */ }
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteTrayError("Tray bootstrap sequence falló.", ex, AlwaysPrintLogger.EvtGenericError);
+            }
+        }
+
+        /// <summary>
+        /// Inicializa el flujo de auto-actualización. Crea el UpdateChecker, se suscribe
+        /// al evento UpdateAvailable y arranca la verificación periódica.
+        /// Este método es fire-and-forget: los errores se loggean sin interrumpir el Tray.
+        /// </summary>
+        private void InitializeAutoUpdate(AppConfiguration cfg)
+        {
+            try
+            {
+                // Se requiere CloudApiUrl para verificar actualizaciones
+                if (string.IsNullOrWhiteSpace(cfg.CloudApiUrl))
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "AutoUpdate: no se inicia verificación de actualizaciones (CloudApiUrl no configurada).");
+                    return;
+                }
+
+                string currentVersion = System.Reflection.Assembly.GetExecutingAssembly()
+                    .GetName().Version?.ToString() ?? "0.0.0.0";
+
+                _updateChecker = new UpdateChecker(_registry, cfg.CloudApiUrl, currentVersion);
+                _updateChecker.UpdateAvailable += OnUpdateAvailable;
+                _updateChecker.Start();
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"AutoUpdate: flujo de auto-actualización inicializado. Versión actual: {currentVersion}.");
+            }
+            catch (Exception ex)
+            {
+                // Los errores de auto-actualización no deben crashear el Tray
+                AlwaysPrintLogger.WriteTrayError(
+                    $"AutoUpdate: error al inicializar flujo de auto-actualización: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+                _updateChecker = null;
+            }
+        }
+
+        /// <summary>
+        /// Callback del evento UpdateAvailable. Inicia la descarga del MSI y, al completar,
+        /// envía el mensaje InstallUpdate al Service via Named Pipe.
+        /// Se ejecuta de forma asíncrona (fire-and-forget) para no bloquear el Tray.
+        /// </summary>
+        private async void OnUpdateAvailable(UpdateInfo updateInfo)
+        {
+            try
+            {
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"AutoUpdate: actualización disponible detectada. Versión: {updateInfo.Version}, " +
+                    $"tamaño: {updateInfo.FileSize} bytes. Iniciando descarga...");
+
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+                // Obtener CloudApiUrl de la configuración actual
+                var cfg = _registry.Load();
+                var downloader = new UpdateDownloader(cfg.CloudApiUrl);
+
+                // Descargar MSI (asíncrono, no bloqueante)
+                string? msiPath = await downloader.DownloadAsync(updateInfo.FileSize);
+
+                stopwatch.Stop();
+
+                if (string.IsNullOrEmpty(msiPath))
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"AutoUpdate: descarga fallida para versión {updateInfo.Version}. " +
+                        $"Se reintentará en el próximo ciclo de verificación.");
+                    return;
+                }
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"AutoUpdate: descarga completada. Archivo: '{msiPath}', " +
+                    $"tamaño: {updateInfo.FileSize} bytes, duración: {stopwatch.Elapsed.TotalSeconds:F1}s.");
+
+                // Enviar mensaje InstallUpdate al Service via Named Pipe
+                var installPayload = new InstallUpdatePayload { MsiFilePath = msiPath };
+                var request = PipeMessage.Create(MessageType.InstallUpdate, installPayload);
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"AutoUpdate: enviando solicitud InstallUpdate al Service. Ruta MSI: '{msiPath}'.");
+
+                var response = _pipe.Send(request);
+
+                if (response == null)
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        "AutoUpdate: no se recibió respuesta del Service al enviar InstallUpdate.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    return;
+                }
+
+                if (response.Type == MessageType.InstallUpdateResponse)
+                {
+                    var result = response.GetPayload<InstallUpdateResponsePayload>();
+                    if (result?.Success == true)
+                    {
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"AutoUpdate: instalación iniciada exitosamente por el Service. " +
+                            $"Versión: {updateInfo.Version}.");
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteTrayError(
+                            $"AutoUpdate: el Service reportó error en la instalación. " +
+                            $"ExitCode: {result?.ExitCode}, Mensaje: {result?.Message}",
+                            AlwaysPrintLogger.EvtGenericError);
+                    }
+                }
+                else if (response.Type == MessageType.Error)
+                {
+                    var error = response.GetPayload<ErrorPayload>();
+                    AlwaysPrintLogger.WriteTrayError(
+                        $"AutoUpdate: el Service retornó error. Código: {error?.Code}, Mensaje: {error?.Message}",
+                        AlwaysPrintLogger.EvtGenericError);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Los errores de auto-actualización nunca deben crashear el Tray
+                AlwaysPrintLogger.WriteTrayError(
+                    $"AutoUpdate: error inesperado durante el flujo de descarga/instalación: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
             }
         }
 
@@ -387,6 +517,7 @@ namespace AlwaysPrintTray
             if (disposing)
             {
                 _cts.Cancel();
+                _updateChecker?.Dispose();
                 _cloudManager?.Dispose();
                 _cloudRegistration?.Dispose();
                 _trayIcon?.Dispose();

@@ -114,7 +114,7 @@ class TestJWTTokens:
         
         assert payload is not None
         # Verificar que la expiración está aproximadamente en 30 minutos
-        exp_time = datetime.fromtimestamp(payload["exp"])
+        exp_time = datetime.utcfromtimestamp(payload["exp"])
         expected_time = datetime.utcnow() + expires_delta
         # Permitir 5 segundos de diferencia por tiempo de ejecución
         assert abs((exp_time - expected_time).total_seconds()) < 5
@@ -201,14 +201,25 @@ class TestAuthenticateUser:
     
     def test_authenticate_user_retorna_usuario_para_credenciales_validas(self, db: Session):
         """WHEN se autentican credenciales válidas, THEN retorna el usuario."""
+        # Crear cuenta de prueba (requerida por FK)
+        from app.models.account import Account
+        account = Account(
+            id=uuid.uuid4(),
+            name="Test Account",
+            is_active=True
+        )
+        db.add(account)
+        db.commit()
+
         # Crear usuario de prueba
         password = "contraseña_segura_123"
         user = User(
             id=uuid.uuid4(),
             email="operator@bbva.com",
             password_hash=AuthService.hash_password(password),
+            full_name="Operador Test",
             role=UserRole.OPERATOR,
-            account_id=uuid.uuid4(),
+            account_id=account.id,
             is_active=True
         )
         db.add(user)
@@ -238,6 +249,7 @@ class TestAuthenticateUser:
             id=uuid.uuid4(),
             email="test@example.com",
             password_hash=AuthService.hash_password("contraseña_correcta"),
+            full_name="Test User",
             role=UserRole.OPERATOR,
             is_active=True
         )
@@ -259,6 +271,7 @@ class TestAuthenticateUser:
             id=uuid.uuid4(),
             email="inactivo@example.com",
             password_hash=AuthService.hash_password(password),
+            full_name="Inactivo User",
             role=UserRole.OPERATOR,
             is_active=False  # Usuario desactivado
         )
@@ -283,6 +296,7 @@ class TestGetUserFromToken:
             id=uuid.uuid4(),
             email="test@example.com",
             password_hash=AuthService.hash_password("password"),
+            full_name="Test User",
             role=UserRole.OPERATOR,
             is_active=True
         )
@@ -330,6 +344,7 @@ class TestGetUserFromToken:
             id=uuid.uuid4(),
             email="inactivo@example.com",
             password_hash=AuthService.hash_password("password"),
+            full_name="Inactivo User",
             role=UserRole.OPERATOR,
             is_active=False
         )
