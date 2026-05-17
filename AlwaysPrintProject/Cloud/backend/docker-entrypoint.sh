@@ -35,6 +35,25 @@ echo "✓ Conexión a base de datos establecida"
 # Ejecutar migraciones de Alembic
 echo ""
 echo "Ejecutando migraciones de base de datos..."
+
+# Verificar si la BD tiene una revisión que ya no existe en el código
+# (ocurre después de consolidar migraciones). En ese caso, recrear desde cero.
+current_rev=$(alembic current 2>&1 || true)
+if echo "$current_rev" | grep -q "Can't locate revision"; then
+    echo "⚠ Revisión obsoleta detectada en la BD. Recreando esquema desde cero..."
+    # Eliminar todas las tablas y la tabla alembic_version
+    python -c "
+from app.core.database import engine
+from sqlalchemy import text
+with engine.connect() as conn:
+    conn.execute(text('DROP SCHEMA public CASCADE'))
+    conn.execute(text('CREATE SCHEMA public'))
+    conn.commit()
+print('Schema recreado')
+" 2>/dev/null || true
+    echo "✓ Schema limpio. Aplicando migración consolidada..."
+fi
+
 alembic upgrade head
 
 if [ $? -eq 0 ]; then
