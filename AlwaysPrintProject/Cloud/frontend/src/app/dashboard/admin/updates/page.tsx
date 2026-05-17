@@ -120,16 +120,22 @@ export default function UpdatesPage() {
       // (para admin sin account_id, usamos el endpoint directamente con headers de workstation simulados)
       let msiData: MsiInfo | null = null;
       try {
-        const checkResponse = await apiClient.get<UpdateCheckResponse>('/updates/check');
-        const data = checkResponse.data;
-        msiData = {
-          version: data.version,
-          buildDate: data.build_date,
-          commitHash: data.commit_hash,
-          fileSize: data.file_size,
-        };
+        // Usar validateStatus para evitar que el interceptor de 401 cierre la sesión
+        // (este endpoint es para workstations, puede fallar para admins sin workstation)
+        const checkResponse = await apiClient.get<UpdateCheckResponse>('/updates/check', {
+          validateStatus: (status) => status < 500,
+        });
+        if (checkResponse.status === 200) {
+          const data = checkResponse.data;
+          msiData = {
+            version: data.version,
+            buildDate: data.build_date,
+            commitHash: data.commit_hash,
+            fileSize: data.file_size,
+          };
+        }
       } catch {
-        // Si falla (ej. admin sin workstation), no es crítico
+        // Si falla (ej. S3 no disponible), no es crítico
         msiData = null;
       }
       setMsiInfo(msiData);
