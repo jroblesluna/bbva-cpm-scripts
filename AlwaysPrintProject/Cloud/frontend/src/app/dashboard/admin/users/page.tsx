@@ -32,7 +32,7 @@ import { useTranslations } from 'next-intl'
 import { formatDateWithTimezone, COMMON_TIMEZONES } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 import { useAuth } from '@/hooks/useAuth'
-import type { User, UserCreate, UserUpdate, Account } from '@/types'
+import type { User, UserCreate, UserUpdate, Organization } from '@/types'
 
 function formatApiError(error: any): string | undefined {
   if (!error) return undefined
@@ -211,10 +211,10 @@ export default function UsersPage() {
                           <Mail className="w-4 h-4 mr-1" />
                           {user.email}
                         </div>
-                        {user.account && (
+                        {user.organization && (
                           <div className="flex items-center">
                             <Building2 className="w-4 h-4 mr-1" />
-                            {user.account.name}
+                            {user.organization.name}
                           </div>
                         )}
                         {user.timezone && (
@@ -299,7 +299,7 @@ function UserForm({
   error,
 }: {
   user?: User
-  accounts: Account[]
+  accounts: Organization[]
   onSubmit: (data: UserCreate | UserUpdate) => void
   onCancel: () => void
   isLoading: boolean
@@ -431,7 +431,7 @@ function UserForm({
           <select
             id="organization_id"
             value={formData.organization_id}
-            onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
             disabled={isLoading}
             className="w-full px-3 py-2 border rounded-md"
           >

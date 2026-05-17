@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
-import type { Workstation, WorkstationUpdate, Account } from '@/types';
+import type { Workstation, WorkstationUpdate, Organization } from '@/types';
 
 export default function WorkstationsPage() {
   const queryClient = useQueryClient();
@@ -440,7 +440,7 @@ function WorkstationForm({
   error,
 }: {
   workstation: Workstation;
-  accounts: Account[];
+  accounts: Organization[];
   onSubmit: (data: WorkstationUpdate) => void;
   onCancel: () => void;
   isLoading: boolean;
