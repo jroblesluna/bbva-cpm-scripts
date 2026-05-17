@@ -23,7 +23,7 @@ export interface ConnectivityCheck {
 
 export interface GlobalConfig {
   id: string | null  // null indica que no existe en BD (valores por defecto)
-  account_id: string
+  organization_id: string
   corporate_queue_name: string
   search_targets: SearchTargets | null
   pending_task_polling_minutes: number

@@ -139,7 +139,7 @@ export default function ConfigPage() {
           setLoading(false);
           return;
         }
-        url += `?account_id=${selectedAccountId}`;
+        url += `?organization_id=${selectedAccountId}`;
       }
 
       const response = await apiClient.get(url);
@@ -243,7 +243,7 @@ export default function ConfigPage() {
       // Construir URL con account_id si es Admin
       let url = '/config/global';
       if (user?.role === 'admin') {
-        url += `?account_id=${selectedAccountId}`;
+        url += `?organization_id=${selectedAccountId}`;
       }
 
       const response = await apiClient.put(url, updateData);

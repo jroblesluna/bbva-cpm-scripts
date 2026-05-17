@@ -58,7 +58,7 @@ export default function VLANsPage() {
   const loadVlans = async () => {
     try {
       setLoading(true)
-      const params = filterAccountId ? `?account_id=${filterAccountId}` : ''
+      const params = filterAccountId ? `?organization_id=${filterAccountId}` : ''
       const response = await apiClient.get(`/vlans/${params}`)
       setVlans(response.data.vlans || [])
     } catch (error) {
@@ -332,7 +332,7 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
             {isAdmin() && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('organization')}</label>
-                <select value={formData.organization_id || ''} onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
+                <select value={formData.organization_id || ''} onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
                   <option value="">{t('selectOrg')}</option>
                   {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}

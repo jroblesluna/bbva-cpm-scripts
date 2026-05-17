@@ -334,7 +334,7 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
       // Construir URL con account_id para admin
       let url = '/messages/'
       if (user?.role === 'admin' && selectedAccountId) {
-        url += `?account_id=${selectedAccountId}`
+        url += `?organization_id=${selectedAccountId}`
       }
       await apiClient.post(url, messageData)
       onSuccess()

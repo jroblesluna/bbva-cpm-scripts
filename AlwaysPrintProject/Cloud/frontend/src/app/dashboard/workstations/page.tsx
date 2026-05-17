@@ -58,7 +58,7 @@ export default function WorkstationsPage() {
         search: searchTerm || undefined,
         is_online: filterOnline,
         contingency_active: filterContingency,
-        account_id: filterAccountId,
+        organization_id: filterAccountId,
       }),
     placeholderData: (prev) => prev,
   });
@@ -514,7 +514,7 @@ function WorkstationForm({
             id="organization_id"
             value={formData.organization_id || ''}
             onChange={(e) =>
-              setFormData({ ...formData, account_id: e.target.value || undefined })
+              setFormData({ ...formData, organization_id: e.target.value || undefined })
             }
             disabled={isLoading}
             className="w-full px-3 py-2 border rounded-md"
