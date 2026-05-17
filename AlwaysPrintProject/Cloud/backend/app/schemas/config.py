@@ -97,8 +97,7 @@ class GlobalConfigResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # === SCHEMAS DE CONFIGURACIÓN DE VLAN ===
@@ -144,8 +143,7 @@ class VLANConfigResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # === SCHEMAS DE CONFIGURACIÓN DE WORKSTATION ===
@@ -191,8 +189,7 @@ class WorkstationConfigResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # === SCHEMA DE CONFIGURACIÓN EFECTIVA ===

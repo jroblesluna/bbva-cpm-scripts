@@ -50,8 +50,7 @@ class MessageResponse(BaseModel):
     sent_at: datetime
     delivered_at: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class MessageDetailResponse(MessageResponse):
@@ -59,8 +58,7 @@ class MessageDetailResponse(MessageResponse):
     sender_name: Optional[str] = Field(None, description="Nombre del usuario que envió el mensaje")
     sender_email: Optional[str] = Field(None, description="Email del usuario que envió el mensaje")
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class MessageListResponse(BaseModel):

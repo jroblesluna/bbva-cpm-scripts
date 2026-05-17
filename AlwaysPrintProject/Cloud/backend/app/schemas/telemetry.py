@@ -105,8 +105,7 @@ class TelemetryLogResponse(BaseModel):
     disconnection_count: Optional[int] = Field(None, description="Cantidad de desconexiones registradas")
     recorded_at: datetime = Field(..., description="Timestamp UTC del registro")
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # === SCHEMAS DE RESPUESTA REST — CONECTIVIDAD ===
@@ -125,8 +124,7 @@ class ConnectivityResultResponse(BaseModel):
     error: Optional[str] = Field(None, description="Mensaje de error si el check falló")
     recorded_at: datetime = Field(..., description="Timestamp UTC del registro")
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # === SCHEMAS DE RESPUESTA REST — ESTADÍSTICAS ===

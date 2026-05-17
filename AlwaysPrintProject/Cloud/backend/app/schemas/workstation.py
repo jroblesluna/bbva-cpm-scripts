@@ -23,8 +23,7 @@ class LicenseResponse(BaseModel):
     activated_at: datetime
     deactivated_at: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # === SCHEMAS DE WORKSTATION ===
@@ -73,8 +72,7 @@ class WorkstationResponse(BaseModel):
     # Relación con organización (anidada)
     organization: Optional['OrganizationBasicResponse'] = None
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # Schema básico de organización para relaciones anidadas
@@ -85,8 +83,7 @@ class OrganizationBasicResponse(BaseModel):
     is_active: bool
     timezone: str = "UTC"
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # Actualizar forward reference
@@ -97,8 +94,7 @@ class WorkstationDetailResponse(WorkstationResponse):
     """Schema de respuesta detallada para workstation (incluye licencia activa)."""
     active_license: Optional[LicenseResponse] = None
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class WorkstationUpdate(BaseModel):

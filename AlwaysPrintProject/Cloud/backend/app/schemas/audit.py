@@ -29,8 +29,7 @@ class AuditLogResponse(BaseModel):
     ip_address: Optional[str] = None
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class AuditLogDetailResponse(AuditLogResponse):
@@ -39,8 +38,7 @@ class AuditLogDetailResponse(AuditLogResponse):
     user_email: Optional[str] = Field(None, description="Email del usuario que realizó la acción")
     workstation_ip: Optional[str] = Field(None, description="IP de la workstation afectada")
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class AuditLogSearch(BaseModel):

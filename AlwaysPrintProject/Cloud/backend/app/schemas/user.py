@@ -20,8 +20,7 @@ class OrganizationInUser(BaseModel):
     timezone: str
     language: str = 'en'
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class UserBase(BaseModel):
@@ -99,8 +98,7 @@ class UserResponse(UserBase):
     updated_at: datetime
     organization: Optional[OrganizationInUser] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class UserListResponse(BaseModel):
