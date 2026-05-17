@@ -452,7 +452,7 @@ function WorkstationForm({
     hostname: workstation.hostname || undefined,
     os_serial: workstation.os_serial || undefined,
     current_user: workstation.current_user || undefined,
-    account_id: workstation.organization_id || undefined,
+    organization_id: workstation.organization_id || undefined,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
