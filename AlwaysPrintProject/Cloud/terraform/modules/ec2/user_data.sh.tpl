@@ -60,7 +60,7 @@ services:
       - "127.0.0.1:${backend_port}:${backend_port}"
     command: >
       sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port ${backend_port} --workers 1 --ws-ping-interval 0 --ws-ping-timeout 0"
+             uvicorn app.main:app --host 0.0.0.0 --port ${backend_port} --workers 1"
     networks: [app]
     depends_on: [redis]
 

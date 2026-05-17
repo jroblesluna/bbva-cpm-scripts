@@ -3,6 +3,7 @@
 
 # === CORE FRAMEWORK ===
 fastapi>=0.115.0
+websockets>=12.0,<14.0  # Pinned: v14+ tiene incompatibilidad con WebSocket4Net (control frame too long)
 uvicorn[standard]>=0.32.0
 python-multipart>=0.0.12
 
