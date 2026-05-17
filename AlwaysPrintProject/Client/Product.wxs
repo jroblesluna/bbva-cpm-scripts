@@ -154,16 +154,6 @@
               KeyPath="yes" />
       </Component>
 
-      <!-- ── Componente WebSocket: DLLs de WebSocket4Net y SuperSocket ── -->
-      <Component Id="cmpWebSocket" Directory="INSTALLFOLDER"
-                 Guid="C7A4B5D6-E500-4E00-8F00-0BBA00000005">
-        <File Id="filWebSocket4Net"
-              Source="$(var.ProjectDir)dist\WebSocket4Net.dll"
-              KeyPath="yes" />
-        <File Id="filSuperSocketClientEngine"
-              Source="$(var.ProjectDir)dist\SuperSocket.ClientEngine.dll" />
-      </Component>
-
       <!-- ── Componente para carpeta de logs (se preserva al desinstalar) ── -->
       <Component Id="cmpLogsFolder" Directory="LOGSFOLDER"
                  Guid="C7A4B5D6-D400-4E00-8F00-0BBA00000004"
