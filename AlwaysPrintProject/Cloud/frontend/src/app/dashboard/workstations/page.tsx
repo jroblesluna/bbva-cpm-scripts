@@ -352,10 +352,10 @@ export default function WorkstationsPage() {
                             VLAN: {workstation.vlan_id}
                           </div>
                         )}
-                        {workstation.account && (
+                        {workstation.organization && (
                           <div className="flex items-center">
                             <Building2 className="w-4 h-4 mr-1" />
-                            {workstation.account.name}
+                            {workstation.organization.name}
                           </div>
                         )}
                       </div>
@@ -615,12 +615,12 @@ function WorkstationDetailModal({
               )}
             </dl>
           </div>
-          {workstation.account && (
+          {workstation.organization && (
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-2">{t('account')}</h3>
               <div className="flex items-center">
                 <Building2 className="w-5 h-5 text-blue-600 mr-2" />
-                <span className="font-medium">{workstation.account.name}</span>
+                <span className="font-medium">{workstation.organization.name}</span>
               </div>
             </div>
           )}
