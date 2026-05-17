@@ -28,6 +28,24 @@ from app.services.config import ConfigService
 from app.services.message import MessageService
 from app.services.audit import AuditService
 from app.services.telemetry import TelemetryService
+
+
+async def _safe_close(websocket: WebSocket, code: int, reason: str) -> None:
+    """
+    Cierra un WebSocket de forma segura:
+    - Trunca el reason a 123 bytes (límite del protocolo WebSocket para control frames)
+    - Captura errores si el socket ya se cerró
+    """
+    # El protocolo WebSocket limita control frames (close/ping/pong) a 125 bytes de payload.
+    # 2 bytes son para el código de cierre, quedan 123 para el reason.
+    truncated_reason = reason[:123]
+    try:
+        await websocket.close(code=code, reason=truncated_reason)
+    except RuntimeError:
+        # "Cannot call send once a close message has been sent"
+        pass
+    except Exception:
+        pass
 from app.services.connectivity import ConnectivityService
 
 
@@ -77,7 +95,7 @@ async def workstation_websocket(
         print(f"[WS] Mensaje recibido: type={data.get('type')}", flush=True)
         
         if data.get("type") != "register":
-            await websocket.close(code=1008, reason="First message must be 'register'")
+            await _safe_close(websocket, 1008, "First message must be register")
             return
         
         # Extraer datos de registro
@@ -87,7 +105,7 @@ async def workstation_websocket(
         current_user = data.get("current_user")
         
         if not ip_private:
-            await websocket.close(code=1008, reason="ip_private is required")
+            await _safe_close(websocket, 1008, "ip_private is required")
             return
         
         # Obtener IP pública del cliente desde headers de Nginx (X-Forwarded-For o X-Real-IP)
@@ -127,28 +145,17 @@ async def workstation_websocket(
             
             if status == "pending":
                 # IP pública no autorizada
-                await websocket.close(
-                    code=1008, 
-                    reason=f"IP pública {client_host} no está autorizada. "
-                           "Un administrador debe autorizar esta IP antes de que puedas conectarte. "
-                           "La IP ha sido registrada y está pendiente de autorización."
-                )
+                await _safe_close(websocket, 1008, f"IP {client_host} no autorizada")
                 return
             
             elif status == "inactive_organization":
                 # Organización desactivada
-                await websocket.close(
-                    code=1008,
-                    reason="La cuenta asociada a esta IP está desactivada."
-                )
+                await _safe_close(websocket, 1008, "Organizacion desactivada")
                 return
             
             elif status != "authorized" or not workstation:
                 # Error inesperado
-                await websocket.close(
-                    code=1011,
-                    reason="Error al registrar workstation."
-                )
+                await _safe_close(websocket, 1011, "Error al registrar")
                 return
             
             workstation_id = str(workstation.id)
@@ -158,7 +165,7 @@ async def workstation_websocket(
             # Error en registro
             print(f"[WS] ERROR en registro: {type(e).__name__}: {e}", flush=True)
             logger.error(f"Error registrando workstation ip={ip_private}: {e}")
-            await websocket.close(code=1011, reason=f"Error: {str(e)}")
+            await _safe_close(websocket, 1011, f"Error: {str(e)}")
             return
         
         # Conectar WebSocket
