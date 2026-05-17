@@ -43,7 +43,7 @@ export default function AccountsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Organization | null>(null)
-  const [managingIPsAccount, setManagingIPsAccount] = useState<Organization | null>(null)
+  const [managingIPsOrg, setManagingIPsOrg] = useState<Organization | null>(null)
 
   // Query para listar cuentas
   const { data: accounts, isLoading, error } = useQuery({
@@ -80,19 +80,19 @@ export default function AccountsPage() {
 
   // Mutation para agregar IP pública
   const addIPMutation = useMutation({
-    mutationFn: ({ accountId, data }: { accountId: string; data: PublicIPCreate }) =>
-      organizationsApi.addPublicIP(accountId, data),
+    mutationFn: ({ orgId, data }: { orgId: string; data: PublicIPCreate }) =>
+      organizationsApi.addPublicIP(orgId, data),
     onSuccess: async (_, variables) => {
       // Invalidar y refrescar inmediatamente las queries de accounts
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       await queryClient.refetchQueries({ queryKey: ['accounts'] })
       
       // Actualizar el estado local del modal con los datos frescos
-      if (managingIPsAccount && managingIPsAccount.id === variables.accountId) {
-        const updatedAccounts = queryClient.getQueryData<Organization[]>(['accounts', 'list'])
-        const updatedAccount = updatedAccounts?.find(acc => acc.id === variables.accountId)
-        if (updatedAccount) {
-          setManagingIPsAccount(updatedAccount)
+      if (managingIPsOrg && managingIPsOrg.id === variables.orgId) {
+        const updatedOrgs = queryClient.getQueryData<Organization[]>(['accounts', 'list'])
+        const updatedOrg = updatedOrgs?.find(acc => acc.id === variables.orgId)
+        if (updatedOrg) {
+          setManagingIPsOrg(updatedOrg)
         }
       }
     },
@@ -100,19 +100,19 @@ export default function AccountsPage() {
 
   // Mutation para eliminar IP pública
   const removeIPMutation = useMutation({
-    mutationFn: ({ accountId, ipId }: { accountId: string; ipId: string }) =>
-      organizationsApi.removePublicIP(accountId, ipId),
+    mutationFn: ({ orgId, ipId }: { orgId: string; ipId: string }) =>
+      organizationsApi.removePublicIP(orgId, ipId),
     onSuccess: async (_, variables) => {
       // Invalidar y refrescar inmediatamente las queries de accounts
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       await queryClient.refetchQueries({ queryKey: ['accounts'] })
       
       // Actualizar el estado local del modal con los datos frescos
-      if (managingIPsAccount && managingIPsAccount.id === variables.accountId) {
-        const updatedAccounts = queryClient.getQueryData<Organization[]>(['accounts', 'list'])
-        const updatedAccount = updatedAccounts?.find(acc => acc.id === variables.accountId)
-        if (updatedAccount) {
-          setManagingIPsAccount(updatedAccount)
+      if (managingIPsOrg && managingIPsOrg.id === variables.orgId) {
+        const updatedOrgs = queryClient.getQueryData<Organization[]>(['accounts', 'list'])
+        const updatedOrg = updatedOrgs?.find(acc => acc.id === variables.orgId)
+        if (updatedOrg) {
+          setManagingIPsOrg(updatedOrg)
         }
       }
     },
@@ -219,23 +219,23 @@ export default function AccountsPage() {
       )}
 
       {/* Modal de gestión de IPs */}
-      {managingIPsAccount && (
+      {managingIPsOrg && (
         <Card className="mb-6 border-green-200 bg-green-50">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>{t('manageIpsTitle', { name: managingIPsAccount.name })}</CardTitle>
+            <CardTitle>{t('manageIpsTitle', { name: managingIPsOrg.name })}</CardTitle>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setManagingIPsAccount(null)}
+              onClick={() => setManagingIPsOrg(null)}
             >
               <X className="w-4 h-4" />
             </Button>
           </CardHeader>
           <CardContent>
             <IPManagementForm
-              account={managingIPsAccount}
-              onAddIP={(data) => addIPMutation.mutate({ accountId: managingIPsAccount.id, data })}
-              onRemoveIP={(ipId) => removeIPMutation.mutate({ accountId: managingIPsAccount.id, ipId })}
+              organization={managingIPsOrg}
+              onAddIP={(data) => addIPMutation.mutate({ orgId: managingIPsOrg.id, data })}
+              onRemoveIP={(ipId) => removeIPMutation.mutate({ orgId: managingIPsOrg.id, ipId })}
               isLoading={addIPMutation.isPending || removeIPMutation.isPending}
               error={(addIPMutation.error as any)?.detail || (removeIPMutation.error as any)?.detail}
             />
@@ -304,7 +304,7 @@ export default function AccountsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setManagingIPsAccount(account)}
+                      onClick={() => setManagingIPsOrg(account)}
                       title={t('manageIps')}
                     >
                       <Network className="w-4 h-4 mr-1" />
@@ -366,7 +366,7 @@ function AccountForm({
   isLoading,
   error,
 }: {
-  initialData?: Account
+  initialData?: Organization
   onSubmit: (data: OrganizationCreate | OrganizationUpdate) => void
   onCancel: () => void
   isLoading: boolean
@@ -481,7 +481,7 @@ function AccountForm({
 
 // Componente de gestión de IPs públicas
 function IPManagementForm({
-  account,
+  organization,
   onAddIP,
   onRemoveIP,
   isLoading,
@@ -568,12 +568,12 @@ function IPManagementForm({
       {/* Lista de IPs existentes */}
       <div>
         <h3 className="text-sm font-medium text-gray-900 mb-3">
-          {t('registeredIps', { count: account.public_ips?.length || 0 })}
+          {t('registeredIps', { count: organization.public_ips?.length || 0 })}
         </h3>
         
-        {account.public_ips && account.public_ips.length > 0 ? (
+        {organization.public_ips && organization.public_ips.length > 0 ? (
           <div className="space-y-2">
-            {account.public_ips.map((ip) => (
+            {organization.public_ips.map((ip) => (
               <div
                 key={ip.id}
                 className="flex items-center justify-between p-3 bg-white border rounded-lg hover:shadow-sm transition"
