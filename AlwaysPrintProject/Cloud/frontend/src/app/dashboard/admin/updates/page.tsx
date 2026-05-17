@@ -116,26 +116,17 @@ export default function UpdatesPage() {
     setError(null);
 
     try {
-      // Obtener info del MSI desde el endpoint de check
-      // (para admin sin account_id, usamos el endpoint directamente con headers de workstation simulados)
+      // Obtener info del MSI desde S3 via el endpoint de check
       let msiData: MsiInfo | null = null;
       try {
-        // Este endpoint es para workstations. Para admins puede retornar 401/403.
-        // Usamos fetch directo para evitar el log de error en consola de axios.
-        const token = localStorage.getItem('access_token');
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-        const res = await fetch(`${baseUrl}/api/v1/updates/check`, {
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        });
-        if (res.ok) {
-          const data: UpdateCheckResponse = await res.json();
-          msiData = {
-            version: data.version,
-            buildDate: data.build_date,
-            commitHash: data.commit_hash,
-            fileSize: data.file_size,
-          };
-        }
+        const checkResponse = await apiClient.get<UpdateCheckResponse>('/updates/check');
+        const data = checkResponse.data;
+        msiData = {
+          version: data.version,
+          buildDate: data.build_date,
+          commitHash: data.commit_hash,
+          fileSize: data.file_size,
+        };
       } catch {
         // Si falla (ej. S3 no disponible), no es crítico
         msiData = null;

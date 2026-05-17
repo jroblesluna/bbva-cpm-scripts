@@ -144,16 +144,47 @@ def check_update(
     """
     Verificar si hay una actualización disponible.
 
-    Identifica la workstation por IP pública o token, obtiene el flag
-    de auto-actualización de la organización, y consulta la metadata
-    del MSI más reciente en S3.
+    Soporta dos modos:
+    - Admin (Bearer token con rol admin): retorna metadata del MSI sin requerir workstation
+    - Workstation (IP pública o X-Workstation-ID): retorna metadata + flag de organización
 
     Retorna:
         - 200: UpdateCheckResponse con versión, flag, tamaño, fecha y commit
-        - 401: Workstation no autenticada
+        - 401: No autenticado
         - 503: S3 no disponible
     """
-    # 1. Identificar workstation
+    # Verificar si es un admin autenticado por Bearer token
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        try:
+            token = auth_header[7:]
+            payload = decode_access_token(token)
+            user_id = payload.get("sub")
+            if user_id:
+                user = db.query(User).filter(User.id == user_id).first()
+                if user and user.role == UserRole.ADMIN:
+                    # Admin: retornar solo metadata del MSI (sin requerir workstation)
+                    try:
+                        s3_service = S3UpdateService()
+                        msi_metadata = s3_service.get_msi_metadata()
+                    except (ClientError, Exception) as e:
+                        logger.error("S3 no disponible para admin check: %s", str(e))
+                        raise HTTPException(
+                            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="No se puede determinar la versión disponible"
+                        )
+
+                    return UpdateCheckResponse(
+                        version=msi_metadata['version'],
+                        auto_update_enabled=False,
+                        file_size=msi_metadata['file_size'],
+                        build_date=msi_metadata['build_date'],
+                        commit_hash=msi_metadata['commit_hash'],
+                    )
+        except Exception:
+            pass  # Si falla el token de admin, intentar como workstation
+
+    # Flujo normal: identificar workstation
     workstation = _identify_workstation(request, db)
 
     # 2. Obtener organization_id y leer auto_update_enabled
