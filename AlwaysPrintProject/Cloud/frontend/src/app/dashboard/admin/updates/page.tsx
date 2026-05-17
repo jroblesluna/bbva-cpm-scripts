@@ -120,13 +120,15 @@ export default function UpdatesPage() {
       // (para admin sin account_id, usamos el endpoint directamente con headers de workstation simulados)
       let msiData: MsiInfo | null = null;
       try {
-        // Usar validateStatus para evitar que el interceptor de 401 cierre la sesión
-        // (este endpoint es para workstations, puede fallar para admins sin workstation)
-        const checkResponse = await apiClient.get<UpdateCheckResponse>('/updates/check', {
-          validateStatus: (status) => status < 500,
+        // Este endpoint es para workstations. Para admins puede retornar 401/403.
+        // Usamos fetch directo para evitar el log de error en consola de axios.
+        const token = localStorage.getItem('access_token');
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+        const res = await fetch(`${baseUrl}/api/v1/updates/check`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         });
-        if (checkResponse.status === 200) {
-          const data = checkResponse.data;
+        if (res.ok) {
+          const data: UpdateCheckResponse = await res.json();
           msiData = {
             version: data.version,
             buildDate: data.build_date,
