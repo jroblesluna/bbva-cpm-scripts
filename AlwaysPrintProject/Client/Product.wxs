@@ -20,7 +20,7 @@
            UpgradeCode="C7A4B5D6-A100-4E00-8F00-0BBA00000001"
            Compressed="yes">
 
-    <Property Id="ARPCopyright"    Value="© 2025 Robles.AI - antonio@robles.ai" />
+    <Property Id="ARPCopyright"    Value="© 2026 Robles.AI - antonio@robles.ai" />
     <Property Id="ARPCONTACT"      Value="antonio@robles.ai" />
     <Property Id="ARPURLINFOABOUT" Value="https://robles.ai" />
     <Property Id="ARPNOREPAIR"     Value="1" />
@@ -95,7 +95,7 @@
             Id="svcInstall"
             Name="AlwaysPrintService"
             DisplayName="AlwaysPrint Service"
-            Description="Gestión corporativa de colas de impresión AlwaysPrint. (c) 2025 Robles.AI"
+            Description="Gestión corporativa de colas de impresión AlwaysPrint. (c) 2026 Robles.AI"
             Type="ownProcess"
             Start="auto"
             ErrorControl="normal"

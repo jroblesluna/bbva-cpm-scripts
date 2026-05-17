@@ -46,7 +46,7 @@ namespace AlwaysPrintTray.Forms
 
             var lblCopyright = new Label
             {
-                Text     = "© 2025 Robles.AI – Lexmark International",
+                Text     = "© 2026 Robles.AI",
                 Location = new Point(20, 120),
                 AutoSize = true,
                 Font     = new Font("Segoe UI", 9)
@@ -54,7 +54,7 @@ namespace AlwaysPrintTray.Forms
 
             var lblDesc = new Label
             {
-                Text      = "Servicio de impresión corporativa para BBVA.",
+                Text      = "Servicio de impresión corporativa.",
                 Location  = new Point(20, 145),
                 AutoSize  = true,
                 ForeColor = SystemColors.GrayText,
