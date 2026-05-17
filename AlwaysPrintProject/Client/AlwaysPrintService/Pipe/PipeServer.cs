@@ -151,55 +151,64 @@ namespace AlwaysPrintService.Pipe
 
         private void HandleClient(NamedPipeServerStream pipe)
         {
-            using (pipe)
+            try
             {
-                pipe.ReadMode = PipeTransmissionMode.Byte;
-                using var reader = new StreamReader(pipe, Encoding.UTF8, detectEncodingFromByteOrderMarks: false,
-                    bufferSize: 65536, leaveOpen: true);
-                using var writer = new StreamWriter(pipe, Encoding.UTF8, bufferSize: 65536, leaveOpen: true)
+                using (pipe)
                 {
-                    AutoFlush = true
-                };
-
-                // Registrar el writer del cliente para mensajes push
-                lock (_clientLock) { _activeClientWriter = writer; }
-
-                try
-                {
-                    string? line;
-                    while (!_cts.IsCancellationRequested && (line = reader.ReadLine()) != null)
+                    pipe.ReadMode = PipeTransmissionMode.Byte;
+                    using var reader = new StreamReader(pipe, Encoding.UTF8, detectEncodingFromByteOrderMarks: false,
+                        bufferSize: 65536, leaveOpen: true);
+                    using var writer = new StreamWriter(pipe, Encoding.UTF8, bufferSize: 65536, leaveOpen: true)
                     {
-                        if (string.IsNullOrWhiteSpace(line)) continue;
+                        AutoFlush = true
+                    };
 
-                        PipeMessage? request;
-                        try
+                    // Registrar el writer del cliente para mensajes push
+                    lock (_clientLock) { _activeClientWriter = writer; }
+
+                    try
+                    {
+                        string? line;
+                        while (!_cts.IsCancellationRequested && (line = reader.ReadLine()) != null)
                         {
-                            request = PipeMessage.Deserialize(line);
-                        }
-                        catch (JsonException)
-                        {
-                            var errReply = PipeMessage.Create(MessageType.Error,
-                                new ErrorPayload { Code = "PARSE_ERROR", Message = "Invalid JSON." });
-                            writer.WriteLine(errReply.Serialize());
-                            continue;
-                        }
+                            if (string.IsNullOrWhiteSpace(line)) continue;
 
-                        if (request == null) continue;
+                            PipeMessage? request;
+                            try
+                            {
+                                request = PipeMessage.Deserialize(line);
+                            }
+                            catch (JsonException)
+                            {
+                                var errReply = PipeMessage.Create(MessageType.Error,
+                                    new ErrorPayload { Code = "PARSE_ERROR", Message = "Invalid JSON." });
+                                writer.WriteLine(errReply.Serialize());
+                                continue;
+                            }
 
-                        var response = _dispatcher.Dispatch(request);
-                        writer.WriteLine(response.Serialize());
+                            if (request == null) continue;
+
+                            var response = _dispatcher.Dispatch(request);
+                            writer.WriteLine(response.Serialize());
+                        }
+                    }
+                    catch (IOException) { /* cliente desconectado */ }
+                    catch (Exception ex)
+                    {
+                        AlwaysPrintLogger.WriteError("PipeServer client handler error.", ex);
+                    }
+                    finally
+                    {
+                        // Limpiar referencia al desconectarse el cliente
+                        lock (_clientLock) { _activeClientWriter = null; }
                     }
                 }
-                catch (IOException) { /* cliente desconectado */ }
-                catch (Exception ex)
-                {
-                    AlwaysPrintLogger.WriteError("PipeServer client handler error.", ex);
-                }
-                finally
-                {
-                    // Limpiar referencia al desconectarse el cliente
-                    lock (_clientLock) { _activeClientWriter = null; }
-                }
+            }
+            catch (Exception ex)
+            {
+                // Capturar cualquier excepción durante dispose del pipe/reader/writer
+                AlwaysPrintLogger.WriteWarning($"PipeServer: error al cerrar conexión de cliente. {ex.Message}");
+                lock (_clientLock) { _activeClientWriter = null; }
             }
         }
 

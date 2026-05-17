@@ -109,6 +109,15 @@ namespace AlwaysPrintService
 
         protected override void OnStart(string[] args)
         {
+            // Capturar excepciones no manejadas en threads de background para evitar crash silencioso
+            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+            {
+                var ex = e.ExceptionObject as Exception;
+                AlwaysPrintLogger.WriteError(
+                    $"EXCEPCIÓN NO MANEJADA (IsTerminating={e.IsTerminating}): {ex?.GetType().Name}: {ex?.Message}\n{ex?.StackTrace}",
+                    AlwaysPrintLogger.EvtGenericError);
+            };
+
             _startupThread = new Thread(RunStartupSequence)
             {
                 IsBackground = true,
