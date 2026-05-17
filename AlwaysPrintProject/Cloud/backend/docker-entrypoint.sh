@@ -37,11 +37,39 @@ echo ""
 echo "Ejecutando migraciones de base de datos..."
 
 # Verificar si la BD tiene una revisión que ya no existe en el código
-# (ocurre después de consolidar migraciones). En ese caso, recrear desde cero.
+# o si el schema está desactualizado (columnas faltantes por migración consolidada modificada)
 current_rev=$(alembic current 2>&1 || true)
+needs_recreate=false
+
 if echo "$current_rev" | grep -q "Can't locate revision"; then
-    echo "⚠ Revisión obsoleta detectada en la BD. Recreando esquema desde cero..."
-    # Eliminar todas las tablas y la tabla alembic_version
+    echo "⚠ Revisión obsoleta detectada en la BD."
+    needs_recreate=true
+fi
+
+# Verificar si la tabla organizations tiene la columna target_version
+# (detecta cuando la migración consolidada fue modificada después de aplicarse)
+if [ "$needs_recreate" = "false" ]; then
+    column_check=$(python -c "
+from app.core.database import engine
+from sqlalchemy import text, inspect
+insp = inspect(engine)
+if insp.has_table('organizations'):
+    cols = [c['name'] for c in insp.get_columns('organizations')]
+    if 'target_version' not in cols:
+        print('MISSING')
+    else:
+        print('OK')
+else:
+    print('OK')
+" 2>/dev/null || echo "OK")
+    if [ "$column_check" = "MISSING" ]; then
+        echo "⚠ Schema desactualizado (columnas faltantes). Recreando..."
+        needs_recreate=true
+    fi
+fi
+
+if [ "$needs_recreate" = "true" ]; then
+    echo "Recreando esquema desde cero..."
     python -c "
 from app.core.database import engine
 from sqlalchemy import text
