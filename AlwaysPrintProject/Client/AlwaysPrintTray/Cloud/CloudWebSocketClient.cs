@@ -11,8 +11,8 @@ using Newtonsoft.Json.Linq;
 namespace AlwaysPrintTray.Cloud
 {
     /// <summary>
-    /// Cliente WebSocket para la conexión con AlwaysPrint Cloud Manager.
-    /// Usa System.Net.WebSockets.ClientWebSocket nativo de .NET Framework 4.8.
+    /// Cliente WebSocket para comunicación con AlwaysPrint Cloud Manager.
+    /// Usa System.Net.WebSockets.ClientWebSocket nativo de .NET 4.8.
     /// ClientWebSocket maneja ping/pong RFC 6455 automáticamente a nivel de protocolo.
     /// </summary>
     public sealed class CloudWebSocketClient : IDisposable
@@ -39,21 +39,18 @@ namespace AlwaysPrintTray.Cloud
 
         // === Internos ===
         private readonly string _wsUrl;
-        private readonly Uri    _wsUri;
         private readonly Uri?   _proxyUri;
         private readonly object _lock = new object();
-        private readonly object _sendLock = new object();  // Lock dedicado para envíos thread-safe
-
         private ClientWebSocket?        _ws;
-        private CancellationTokenSource _cts = new CancellationTokenSource();
+        private CancellationTokenSource  _cts = new CancellationTokenSource();
         private bool _disposed;
 
-        // Tamaño del buffer de recepción (64 KB — suficiente para mensajes JSON)
-        private const int ReceiveBufferSize = 65_536;
+        // Tamaño del buffer de recepción (16 KB)
+        private const int ReceiveBufferSize = 16 * 1024;
 
         public CloudWebSocketClient(string cloudApiUrl)
         {
-            // Forzar TLS 1.2 a nivel de proceso (necesario en .NET 4.8)
+            // Forzar TLS 1.2 para conexiones seguras
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
 
             // Derivar URL WSS: https://host → wss://host/ws/workstation
@@ -61,7 +58,6 @@ namespace AlwaysPrintTray.Cloud
                 .Replace("https://", "wss://")
                 .Replace("http://", "ws://")
                 .TrimEnd('/') + "/ws/workstation";
-            _wsUri = new Uri(_wsUrl);
 
             // Detectar proxy del sistema
             var targetUri = new Uri(cloudApiUrl);
@@ -71,7 +67,7 @@ namespace AlwaysPrintTray.Cloud
             var handler = new System.Net.Http.HttpClientHandler();
             if (_proxyUri != null)
             {
-                handler.Proxy = new WebProxy(_proxyUri);
+                handler.Proxy = new System.Net.WebProxy(_proxyUri);
                 handler.UseProxy = true;
             }
             HttpClient = new System.Net.Http.HttpClient(handler)
@@ -85,7 +81,8 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
-        /// Inicia la conexión WebSocket. Si ya estaba cancelado, recrea el CancellationTokenSource.
+        /// Inicia la conexión WebSocket. Dispara el evento Connected al establecerse.
+        /// Usa fire-and-forget internamente (los llamadores usan eventos, no await).
         /// </summary>
         public void Connect()
         {
@@ -99,52 +96,47 @@ namespace AlwaysPrintTray.Cloud
                     _cts.Dispose();
                     _cts = new CancellationTokenSource();
                 }
-
-                ConnectAndReceiveAsync();
             }
+
+            // Lanzar conexión asíncrona sin bloquear (fire-and-forget)
+            Task.Run(() => ConnectInternalAsync());
         }
 
         /// <summary>
-        /// Envía un mensaje JSON al servidor. Thread-safe.
+        /// Envía un mensaje JSON al servidor con el tipo y payload especificados.
         /// </summary>
         public void Send(string type, object? payload)
         {
-            // Capturar referencia local para evitar race conditions
-            var ws = _ws;
-            if (ws == null || ws.State != WebSocketState.Open) return;
+            ClientWebSocket? ws;
+            lock (_lock)
+            {
+                ws = _ws;
+                if (ws?.State != WebSocketState.Open) return;
+            }
 
             var msg = payload != null
                 ? JObject.FromObject(payload)
                 : new JObject();
             msg["type"] = type;
 
-            var json  = msg.ToString(Formatting.None);
+            var json = msg.ToString(Formatting.None);
             var bytes = Encoding.UTF8.GetBytes(json);
-            var segment = new ArraySegment<byte>(bytes);
 
-            // Lock dedicado para serializar envíos (ClientWebSocket no permite envíos concurrentes)
-            lock (_sendLock)
+            // Enviar de forma asíncrona sin bloquear
+            Task.Run(async () =>
             {
                 try
                 {
-                    // Verificar estado de nuevo dentro del lock
-                    if (ws.State != WebSocketState.Open) return;
-
-                    // SendAsync con Wait() — seguro porque los mensajes JSON son pequeños
-                    ws.SendAsync(segment, WebSocketMessageType.Text, true, _cts.Token)
-                      .GetAwaiter().GetResult();
-                }
-                catch (OperationCanceledException)
-                {
-                    // Desconexión solicitada, ignorar
+                    var segment = new ArraySegment<byte>(bytes);
+                    await ws.SendAsync(segment, WebSocketMessageType.Text, true, _cts.Token)
+                        .ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
-                    AlwaysPrintLogger.WriteTrayError(
+                    AlwaysPrintLogger.WriteTrayWarning(
                         $"CloudWebSocketClient: error enviando mensaje. {ex.Message}");
-                    Error?.Invoke(ex);
                 }
-            }
+            });
         }
 
         /// <summary>
@@ -155,7 +147,7 @@ namespace AlwaysPrintTray.Cloud
             lock (_lock)
             {
                 _cts.Cancel();
-                CloseSocketGracefully();
+                CloseSocketSafe();
                 IsConnected = false;
             }
         }
@@ -169,157 +161,196 @@ namespace AlwaysPrintTray.Cloud
             HttpClient?.Dispose();
         }
 
-        // === Métodos privados ===
+        // === Métodos privados asíncronos ===
 
         /// <summary>
-        /// Lanza la conexión y el bucle de recepción en un Task en background.
-        /// No bloquea el hilo llamante.
+        /// Lógica interna de conexión asíncrona.
+        /// Crea el ClientWebSocket, conecta, y lanza el bucle de recepción.
         /// </summary>
-        private void ConnectAndReceiveAsync()
+        private async Task ConnectInternalAsync()
         {
-            var token = _cts.Token;
+            ClientWebSocket ws;
+            CancellationToken token;
 
-            Task.Run(async () =>
-            {
-                try
-                {
-                    await ConnectInternalAsync(token).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    // Desconexión solicitada
-                }
-                catch (Exception ex)
-                {
-                    AlwaysPrintLogger.WriteTrayError(
-                        $"CloudWebSocketClient: error en conexión/recepción. {ex.Message}");
-                    Error?.Invoke(ex);
-                    HandleDisconnection(null, null);
-                }
-            });
-        }
-
-        /// <summary>
-        /// Conecta al servidor WebSocket y ejecuta el bucle de recepción.
-        /// </summary>
-        private async Task ConnectInternalAsync(CancellationToken token)
-        {
-            // Crear nueva instancia de ClientWebSocket
-            var ws = new ClientWebSocket();
-
-            // Configurar proxy si es necesario
-            if (_proxyUri != null)
-            {
-                ws.Options.Proxy = new WebProxy(_proxyUri);
-            }
-
-            // Asignar al campo de instancia
             lock (_lock)
             {
-                _ws?.Dispose();
+                if (_disposed || _cts.IsCancellationRequested) return;
+
+                // Limpiar socket anterior si existe
+                CloseSocketSafe();
+
+                // Crear nuevo ClientWebSocket
+                ws = new ClientWebSocket();
+
+                // Configurar proxy si se detectó uno
+                if (_proxyUri != null)
+                {
+                    ws.Options.Proxy = new WebProxy(_proxyUri);
+                }
+
                 _ws = ws;
+                token = _cts.Token;
             }
 
-            // Conectar
-            await ws.ConnectAsync(_wsUri, token).ConfigureAwait(false);
-
-            // Conexión exitosa
-            lock (_lock)
+            try
             {
-                IsConnected     = true;
-                _currentDelayMs = InitialDelayMs;
-                _longRetryMode  = false;
+                // Conectar al servidor WebSocket
+                await ws.ConnectAsync(new Uri(_wsUrl), token).ConfigureAwait(false);
+
+                lock (_lock)
+                {
+                    IsConnected     = true;
+                    _currentDelayMs = InitialDelayMs;
+                    _longRetryMode  = false;
+                }
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "CloudWebSocketClient: conexión WebSocket establecida exitosamente.");
+                Connected?.Invoke();
+
+                // Iniciar bucle de recepción de mensajes
+                await ReceiveLoopAsync(ws, token).ConfigureAwait(false);
             }
+            catch (OperationCanceledException)
+            {
+                // Desconexión intencional, no reconectar
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudWebSocketClient: error al conectar. {ex.Message}");
+                Error?.Invoke(ex);
 
-            AlwaysPrintLogger.WriteTrayInfo(
-                "CloudWebSocketClient: conexión WebSocket establecida exitosamente.");
-            Connected?.Invoke();
-
-            // Bucle de recepción
-            await ReceiveLoopAsync(ws, token).ConfigureAwait(false);
+                // Programar reconexión
+                ScheduleReconnect();
+            }
         }
 
         /// <summary>
-        /// Bucle de recepción de mensajes. Se ejecuta hasta que el servidor cierra
-        /// la conexión o se cancela el token.
+        /// Bucle de recepción continua de mensajes.
+        /// Lee mensajes completos y dispara el evento MessageReceived.
+        /// Al cerrarse la conexión, dispara Disconnected y programa reconexión.
         /// </summary>
         private async Task ReceiveLoopAsync(ClientWebSocket ws, CancellationToken token)
         {
             var buffer = new byte[ReceiveBufferSize];
-            var messageBuffer = new StringBuilder();
+            var messageBuilder = new StringBuilder();
 
             try
             {
                 while (ws.State == WebSocketState.Open && !token.IsCancellationRequested)
                 {
-                    var segment = new ArraySegment<byte>(buffer);
+                    messageBuilder.Clear();
                     WebSocketReceiveResult result;
 
-                    try
+                    // Leer fragmentos hasta obtener el mensaje completo
+                    do
                     {
+                        var segment = new ArraySegment<byte>(buffer);
                         result = await ws.ReceiveAsync(segment, token).ConfigureAwait(false);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        break;
-                    }
-                    catch (WebSocketException ex)
-                    {
-                        AlwaysPrintLogger.WriteTrayError(
-                            $"CloudWebSocketClient: error en recepción WebSocket. {ex.Message}");
-                        Error?.Invoke(ex);
-                        break;
-                    }
 
-                    if (result.MessageType == WebSocketMessageType.Close)
-                    {
-                        // El servidor cerró la conexión
-                        var closeStatus = result.CloseStatus;
-                        var closeDescription = result.CloseStatusDescription;
-
-                        AlwaysPrintLogger.WriteTrayWarning(
-                            $"CloudWebSocketClient: servidor cerró conexión. " +
-                            $"Código: {(int?)closeStatus}, Razón: '{closeDescription ?? ""}'");
-
-                        HandleDisconnection(closeStatus, closeDescription);
-                        return;
-                    }
-
-                    if (result.MessageType == WebSocketMessageType.Text)
-                    {
-                        // Acumular fragmentos del mensaje
-                        messageBuffer.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
-
-                        if (result.EndOfMessage)
+                        if (result.MessageType == WebSocketMessageType.Close)
                         {
-                            var json = messageBuffer.ToString();
-                            messageBuffer.Clear();
-                            ProcessMessage(json);
+                            // El servidor cerró la conexión
+                            HandleRemoteClose(ws, result);
+                            return;
+                        }
+
+                        if (result.MessageType == WebSocketMessageType.Text)
+                        {
+                            messageBuilder.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
                         }
                     }
-                    // Nota: WebSocketMessageType.Binary se ignora (no se usa en este protocolo)
+                    while (!result.EndOfMessage);
+
+                    // Procesar mensaje completo
+                    if (messageBuilder.Length > 0)
+                    {
+                        ProcessMessage(messageBuilder.ToString());
+                    }
                 }
             }
             catch (OperationCanceledException)
             {
-                // Desconexión solicitada
+                // Desconexión intencional
+            }
+            catch (WebSocketException ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudWebSocketClient: error en bucle de recepción. {ex.Message}");
+                Error?.Invoke(ex);
             }
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteTrayError(
-                    $"CloudWebSocketClient: error inesperado en bucle de recepción. {ex.Message}");
+                    $"CloudWebSocketClient: error inesperado en recepción. {ex.Message}");
                 Error?.Invoke(ex);
             }
-
-            // Si salimos del bucle sin haber procesado un Close explícito
-            if (!token.IsCancellationRequested)
+            finally
             {
-                HandleDisconnection(null, null);
+                // Notificar desconexión y programar reconexión
+                bool wasConnected;
+                lock (_lock)
+                {
+                    wasConnected = IsConnected;
+                    IsConnected = false;
+                }
+
+                if (wasConnected)
+                {
+                    Disconnected?.Invoke();
+                }
+
+                if (!token.IsCancellationRequested)
+                {
+                    ScheduleReconnect();
+                }
             }
         }
 
         /// <summary>
-        /// Procesa un mensaje JSON recibido del servidor.
+        /// Maneja el cierre remoto del WebSocket.
+        /// Detecta código 1008 (IP no autorizada) para activar modo de reintento largo.
+        /// </summary>
+        private void HandleRemoteClose(ClientWebSocket ws, WebSocketReceiveResult result)
+        {
+            var closeStatus = result.CloseStatus ?? WebSocketCloseStatus.Empty;
+            var closeDescription = result.CloseStatusDescription ?? "";
+
+            // Código 1008 = Policy Violation (IP no autorizada en APCM)
+            if ((int)closeStatus == 1008)
+            {
+                if (closeDescription.Contains("no autorizada") || closeDescription.Contains("not authorized"))
+                {
+                    _longRetryMode = true;
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "CloudWebSocketClient: conexión rechazada por APCM (código 1008 — IP no autorizada). " +
+                        $"Reintentando cada {LongRetryDelayMs / 1000}s.");
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"CloudWebSocketClient: conexión cerrada con código 1008 pero razón no indica IP no autorizada " +
+                        $"(razón: '{closeDescription}'). Usando backoff normal.");
+                }
+            }
+            else
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"CloudWebSocketClient: servidor cerró conexión. Código: {(int)closeStatus}, Razón: '{closeDescription}'");
+            }
+
+            // Intentar cerrar limpiamente desde nuestro lado
+            try
+            {
+                ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Cierre confirmado", CancellationToken.None)
+                    .GetAwaiter().GetResult();
+            }
+            catch { /* Ignorar errores al confirmar cierre */ }
+        }
+
+        /// <summary>
+        /// Parsea el mensaje JSON recibido y dispara el evento MessageReceived.
         /// </summary>
         private void ProcessMessage(string json)
         {
@@ -337,43 +368,9 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
-        /// Maneja la desconexión: detecta código 1008, notifica evento y programa reconexión.
-        /// </summary>
-        private void HandleDisconnection(WebSocketCloseStatus? closeStatus, string? closeDescription)
-        {
-            bool wasConnected;
-            lock (_lock)
-            {
-                wasConnected = IsConnected;
-                IsConnected  = false;
-            }
-
-            // Detectar código 1008 (IP no autorizada) — solo activar long retry
-            // si la razón indica explícitamente que la IP no está autorizada.
-            if (closeStatus.HasValue && (int)closeStatus.Value == 1008)
-            {
-                var reason = closeDescription ?? "";
-                if (reason.Contains("no autorizada") || reason.Contains("not authorized"))
-                {
-                    _longRetryMode = true;
-                    AlwaysPrintLogger.WriteTrayWarning(
-                        "CloudWebSocketClient: conexión rechazada por APCM (código 1008 — IP no autorizada). " +
-                        $"Reintentando cada {LongRetryDelayMs / 1000}s.");
-                }
-                else
-                {
-                    AlwaysPrintLogger.WriteTrayWarning(
-                        $"CloudWebSocketClient: conexión cerrada con código 1008 pero razón no indica IP no autorizada " +
-                        $"(razón: '{reason}'). Usando backoff normal.");
-                }
-            }
-
-            if (wasConnected) Disconnected?.Invoke();
-            ScheduleReconnect();
-        }
-
-        /// <summary>
         /// Programa la reconexión con backoff exponencial.
+        /// En modo normal: 1s, 2s, 4s, 8s... hasta 60s.
+        /// En modo largo (código 1008): cada 5 minutos.
         /// </summary>
         private void ScheduleReconnect()
         {
@@ -388,60 +385,43 @@ namespace AlwaysPrintTray.Cloud
             if (!_longRetryMode)
                 _currentDelayMs = Math.Min(_currentDelayMs * 2, MaxDelayMs);
 
-            var token = _cts.Token;
-
-            Task.Run(async () =>
+            // Programar reconexión en el ThreadPool
+            ThreadPool.QueueUserWorkItem(_ =>
             {
                 try
                 {
-                    await Task.Delay(delay, token).ConfigureAwait(false);
-                    if (!token.IsCancellationRequested)
+                    _cts.Token.WaitHandle.WaitOne(delay);
+                    if (!_cts.IsCancellationRequested && !_disposed)
                     {
-                        await ConnectInternalAsync(token).ConfigureAwait(false);
+                        Task.Run(() => ConnectInternalAsync());
                     }
                 }
-                catch (OperationCanceledException)
-                {
-                    // Desconexión solicitada durante espera
-                }
-                catch (Exception ex)
-                {
-                    AlwaysPrintLogger.WriteTrayError(
-                        $"CloudWebSocketClient: error en reconexión. {ex.Message}");
-                    Error?.Invoke(ex);
-                    HandleDisconnection(null, null);
-                }
+                catch (ObjectDisposedException) { /* Token ya fue disposed */ }
             });
         }
 
         /// <summary>
-        /// Cierra el WebSocket de forma ordenada (envía Close frame si es posible).
+        /// Cierra el socket actual de forma segura sin lanzar excepciones.
+        /// Debe llamarse dentro del lock.
         /// </summary>
-        private void CloseSocketGracefully()
+        private void CloseSocketSafe()
         {
-            var ws = _ws;
-            if (ws == null) return;
-
-            try
+            if (_ws != null)
             {
-                if (ws.State == WebSocketState.Open || ws.State == WebSocketState.CloseReceived)
+                try
                 {
-                    // Intentar cierre ordenado con timeout corto
-                    using (var closeCts = new CancellationTokenSource(TimeSpan.FromSeconds(3)))
+                    if (_ws.State == WebSocketState.Open || _ws.State == WebSocketState.CloseReceived)
                     {
-                        ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Desconexión solicitada", closeCts.Token)
-                          .GetAwaiter().GetResult();
+                        _ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Desconexión solicitada", CancellationToken.None)
+                            .GetAwaiter().GetResult();
                     }
                 }
-            }
-            catch
-            {
-                // Ignorar errores durante cierre — puede que ya esté cerrado
-            }
-            finally
-            {
-                ws.Dispose();
-                _ws = null;
+                catch { /* Ignorar errores al cerrar */ }
+                finally
+                {
+                    _ws.Dispose();
+                    _ws = null;
+                }
             }
         }
     }
