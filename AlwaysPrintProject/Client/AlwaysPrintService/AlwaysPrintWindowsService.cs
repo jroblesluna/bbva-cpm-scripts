@@ -329,6 +329,16 @@ namespace AlwaysPrintService
         {
             while (!_cts.IsCancellationRequested && _state.Is(ServiceState.Running))
             {
+                // Verificar si el Tray sigue vivo
+                if (!IsTrayRunning())
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        "Tray no está corriendo. Relanzando...",
+                        AlwaysPrintLogger.EvtTrayKilled);
+                    // Salir del MonitoringLoop para que RunSessionLoop relance el Tray
+                    break;
+                }
+
                 var cfg = _registry.Load();
                 int interval = Math.Max(1, cfg.PendingTaskPollingMinutes);
 
@@ -360,6 +370,11 @@ namespace AlwaysPrintService
             foreach (var p in Process.GetProcessesByName("AlwaysPrintTray"))
                 try { p.Kill(); count++; } catch { /* already gone */ }
             return count;
+        }
+
+        private static bool IsTrayRunning()
+        {
+            return Process.GetProcessesByName("AlwaysPrintTray").Length > 0;
         }
 
         public void TestStartFromConsole()  => OnStart(Array.Empty<string>());
