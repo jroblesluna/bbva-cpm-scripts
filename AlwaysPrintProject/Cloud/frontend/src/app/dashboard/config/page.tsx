@@ -62,7 +62,7 @@ export default function ConfigPage() {
 
   // Selector de organización (solo para Admin en tab de organización)
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('');
   const [loadingAccounts, setLoadingAccounts] = useState(false);
 
   // Form state
@@ -76,8 +76,8 @@ export default function ConfigPage() {
 
   // Obtener nombre de la organización seleccionada para placeholders
   const getSelectedAccountName = (): string => {
-    if (user?.role === 'admin' && selectedAccountId) {
-      const account = accounts.find((a) => a.id === selectedAccountId);
+    if (user?.role === 'admin' && selectedOrgId) {
+      const account = accounts.find((a) => a.id === selectedOrgId);
       return account?.name || 'Organización';
     }
     // Para operadores, obtener el nombre de su cuenta desde user (si está disponible)
@@ -100,10 +100,10 @@ export default function ConfigPage() {
 
   // Cargar configuración cuando se selecciona una organización (solo Admin)
   useEffect(() => {
-    if (user?.role === 'admin' && selectedAccountId) {
+    if (user?.role === 'admin' && selectedOrgId) {
       loadConfig();
     }
-  }, [selectedAccountId]);
+  }, [selectedOrgId]);
 
   const loadAccounts = async () => {
     try {
@@ -113,7 +113,7 @@ export default function ConfigPage() {
       const data = response.data;
       setAccounts(data.items || []);
       if (data.items && data.items.length > 0) {
-        setSelectedAccountId(data.items[0].id);
+        setSelectedOrgId(data.items[0].id);
       }
     } catch (error: any) {
       const msg =
@@ -135,11 +135,11 @@ export default function ConfigPage() {
       // Construir URL con account_id si es Admin
       let url = '/config/global';
       if (user?.role === 'admin') {
-        if (!selectedAccountId) {
+        if (!selectedOrgId) {
           setLoading(false);
           return;
         }
-        url += `?organization_id=${selectedAccountId}`;
+        url += `?organization_id=${selectedOrgId}`;
       }
 
       const response = await apiClient.get(url);
@@ -211,7 +211,7 @@ export default function ConfigPage() {
     }
 
     // Validar que Admin haya seleccionado organización
-    if (user?.role === 'admin' && !selectedAccountId) {
+    if (user?.role === 'admin' && !selectedOrgId) {
       alert('Debes seleccionar una organización');
       return;
     }
@@ -243,7 +243,7 @@ export default function ConfigPage() {
       // Construir URL con account_id si es Admin
       let url = '/config/global';
       if (user?.role === 'admin') {
-        url += `?organization_id=${selectedAccountId}`;
+        url += `?organization_id=${selectedOrgId}`;
       }
 
       const response = await apiClient.put(url, updateData);
@@ -394,7 +394,7 @@ export default function ConfigPage() {
               <Button
                 onClick={handleSave}
                 disabled={
-                  saving || !hasChanges || (user?.role === 'admin' && !selectedAccountId)
+                  saving || !hasChanges || (user?.role === 'admin' && !selectedOrgId)
                 }
               >
                 <Save className="mr-2 h-4 w-4" />
@@ -410,9 +410,9 @@ export default function ConfigPage() {
                 {t('selectOrg')}
               </label>
               <select
-                value={selectedAccountId}
+                value={selectedOrgId}
                 onChange={(e) => {
-                  setSelectedAccountId(e.target.value);
+                  setSelectedOrgId(e.target.value);
                   setHasChanges(false);
                 }}
                 className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -457,7 +457,7 @@ export default function ConfigPage() {
                   }}
                   placeholder={`Ej: ${queuePlaceholder}`}
                   className="max-w-md"
-                  disabled={user?.role === 'admin' && !selectedAccountId}
+                  disabled={user?.role === 'admin' && !selectedOrgId}
                 />
                 <p className="mt-1 text-sm text-gray-500">{t('corpQueueHelper')}</p>
               </div>
@@ -477,7 +477,7 @@ export default function ConfigPage() {
                     setHasChanges(true);
                   }}
                   className="max-w-xs"
-                  disabled={user?.role === 'admin' && !selectedAccountId}
+                  disabled={user?.role === 'admin' && !selectedOrgId}
                 />
                 <p className="mt-1 text-sm text-gray-500">{t('pollingHelper')}</p>
               </div>
@@ -496,7 +496,7 @@ export default function ConfigPage() {
                   }}
                   placeholder={`Ej: ${domainPlaceholder}`}
                   className="max-w-md"
-                  disabled={user?.role === 'admin' && !selectedAccountId}
+                  disabled={user?.role === 'admin' && !selectedOrgId}
                 />
               </div>
 
@@ -514,7 +514,7 @@ export default function ConfigPage() {
                         onChange={(e) => updateSearchIp(index, e.target.value)}
                         placeholder="Ej: 192.168.1.100"
                         className="max-w-md"
-                        disabled={user?.role === 'admin' && !selectedAccountId}
+                        disabled={user?.role === 'admin' && !selectedOrgId}
                       />
                       {searchIps.length > 1 && (
                         <Button
@@ -522,7 +522,7 @@ export default function ConfigPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => removeSearchIp(index)}
-                          disabled={user?.role === 'admin' && !selectedAccountId}
+                          disabled={user?.role === 'admin' && !selectedOrgId}
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -536,7 +536,7 @@ export default function ConfigPage() {
                   size="sm"
                   onClick={addSearchIp}
                   className="mt-2"
-                  disabled={user?.role === 'admin' && !selectedAccountId}
+                  disabled={user?.role === 'admin' && !selectedOrgId}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   {t('addIp')}
@@ -558,7 +558,7 @@ export default function ConfigPage() {
                         onChange={(e) => updateSearchRange(index, e.target.value)}
                         placeholder="Ej: 192.168.1.0/24"
                         className="max-w-md"
-                        disabled={user?.role === 'admin' && !selectedAccountId}
+                        disabled={user?.role === 'admin' && !selectedOrgId}
                       />
                       {searchRanges.length > 1 && (
                         <Button
@@ -566,7 +566,7 @@ export default function ConfigPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => removeSearchRange(index)}
-                          disabled={user?.role === 'admin' && !selectedAccountId}
+                          disabled={user?.role === 'admin' && !selectedOrgId}
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -580,7 +580,7 @@ export default function ConfigPage() {
                   size="sm"
                   onClick={addSearchRange}
                   className="mt-2"
-                  disabled={user?.role === 'admin' && !selectedAccountId}
+                  disabled={user?.role === 'admin' && !selectedOrgId}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   {t('addRange')}
@@ -634,7 +634,7 @@ export default function ConfigPage() {
           )}
 
           {/* Advertencia si no hay configuración */}
-          {!config && selectedAccountId && (
+          {!config && selectedOrgId && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <div className="flex">
                 <AlertCircle className="h-5 w-5 text-yellow-600 mr-3 flex-shrink-0 mt-0.5" />
@@ -647,7 +647,7 @@ export default function ConfigPage() {
           )}
 
           {/* Mensaje cuando Admin no ha seleccionado organización */}
-          {user?.role === 'admin' && !selectedAccountId && !loadingAccounts && (
+          {user?.role === 'admin' && !selectedOrgId && !loadingAccounts && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex">
                 <Info className="h-5 w-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" />

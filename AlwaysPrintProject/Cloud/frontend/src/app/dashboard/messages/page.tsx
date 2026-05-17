@@ -284,7 +284,7 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
 
   // Selector de cuenta para admin
   const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([])
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('')
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('')
 
   useEffect(() => {
     const loadWS = async () => {
@@ -304,7 +304,7 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
         const r = await apiClient.get('/organizations/?skip=0&limit=1000')
         const items = r.data.items || []
         setAccounts(items)
-        if (items.length > 0) setSelectedAccountId(items[0].id)
+        if (items.length > 0) setSelectedOrgId(items[0].id)
       } catch (e) { console.error(e) }
     }
     loadWS()
@@ -320,7 +320,7 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
     if (!content.trim()) return
     if (targetType !== 'account' && !targetId) return
     // Admin debe seleccionar cuenta
-    if (user?.role === 'admin' && !selectedAccountId) {
+    if (user?.role === 'admin' && !selectedOrgId) {
       alert('Debes seleccionar una organización destino')
       return
     }
@@ -333,8 +333,8 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
       }
       // Construir URL con account_id para admin
       let url = '/messages/'
-      if (user?.role === 'admin' && selectedAccountId) {
-        url += `?organization_id=${selectedAccountId}`
+      if (user?.role === 'admin' && selectedOrgId) {
+        url += `?organization_id=${selectedOrgId}`
       }
       await apiClient.post(url, messageData)
       onSuccess()
@@ -356,7 +356,7 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
             {user?.role === 'admin' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Organización destino</label>
-                <select value={selectedAccountId} onChange={(e) => setSelectedAccountId(e.target.value)}
+                <select value={selectedOrgId} onChange={(e) => setSelectedOrgId(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
                   <option value="">Seleccionar organización...</option>
                   {accounts.map((acc) => <option key={acc.id} value={acc.id}>{acc.name}</option>)}

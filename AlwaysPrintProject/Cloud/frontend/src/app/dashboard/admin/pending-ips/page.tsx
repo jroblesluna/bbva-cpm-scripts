@@ -51,7 +51,7 @@ export default function PendingIPsPage() {
   const tCommon = useTranslations('common');
   const [searchTerm, setSearchTerm] = useState('');
   const [authorizingIP, setAuthorizingIP] = useState<PendingIP | null>(null);
-  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [selectedOrgId, setSelectedOrgId] = useState('');
   const [customDescription, setCustomDescription] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
@@ -100,7 +100,7 @@ export default function PendingIPsPage() {
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
       queryClient.invalidateQueries({ queryKey: ['accounts', 'list-for-pending-ips'] });
       setAuthorizingIP(null);
-      setSelectedAccountId('');
+      setSelectedOrgId('');
       setCustomDescription('');
     },
   });
@@ -116,11 +116,11 @@ export default function PendingIPsPage() {
   });
 
   const handleAuthorize = () => {
-    if (!authorizingIP || !selectedAccountId) return;
+    if (!authorizingIP || !selectedOrgId) return;
 
     authorizeMutation.mutate({
       ipId: authorizingIP.id,
-      accountId: selectedAccountId,
+      accountId: selectedOrgId,
       description: customDescription || undefined,
     });
   };
@@ -358,8 +358,8 @@ export default function PendingIPsPage() {
                 <Label htmlFor="account">{t('accountLabel')}</Label>
                 <select
                   id="account"
-                  value={selectedAccountId}
-                  onChange={(e) => setSelectedAccountId(e.target.value)}
+                  value={selectedOrgId}
+                  onChange={(e) => setSelectedOrgId(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md"
                   disabled={authorizeMutation.isPending}
                 >
@@ -392,7 +392,7 @@ export default function PendingIPsPage() {
                   variant="outline"
                   onClick={() => {
                     setAuthorizingIP(null);
-                    setSelectedAccountId('');
+                    setSelectedOrgId('');
                     setCustomDescription('');
                   }}
                   disabled={authorizeMutation.isPending}
@@ -402,7 +402,7 @@ export default function PendingIPsPage() {
                 <Button
                   type="button"
                   onClick={handleAuthorize}
-                  disabled={!selectedAccountId || authorizeMutation.isPending}
+                  disabled={!selectedOrgId || authorizeMutation.isPending}
                 >
                   {authorizeMutation.isPending ? t('authorizing') : t('authorize')}
                 </Button>

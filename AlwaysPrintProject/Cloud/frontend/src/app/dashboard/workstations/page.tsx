@@ -41,7 +41,7 @@ export default function WorkstationsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOnline, setFilterOnline] = useState<boolean | undefined>(undefined);
   const [filterContingency, setFilterContingency] = useState<boolean | undefined>(undefined);
-  const [filterAccountId, setFilterAccountId] = useState<string | undefined>(undefined);
+  const [filterOrgId, setFilterOrgId] = useState<string | undefined>(undefined);
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
   const [editingWorkstation, setEditingWorkstation] = useState<Workstation | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -52,13 +52,13 @@ export default function WorkstationsPage() {
     isFetching,
     error,
   } = useQuery({
-    queryKey: ['workstations', searchTerm, filterOnline, filterContingency, filterAccountId],
+    queryKey: ['workstations', searchTerm, filterOnline, filterContingency, filterOrgId],
     queryFn: () =>
       workstationsApi.list({
         search: searchTerm || undefined,
         is_online: filterOnline,
         contingency_active: filterContingency,
-        organization_id: filterAccountId,
+        organization_id: filterOrgId,
       }),
     placeholderData: (prev) => prev,
   });
@@ -239,10 +239,10 @@ export default function WorkstationsPage() {
             </div>
             <div>
               <select
-                value={filterAccountId || 'all'}
+                value={filterOrgId || 'all'}
                 onChange={(e) => {
                   const value = e.target.value;
-                  setFilterAccountId(value === 'all' ? undefined : value);
+                  setFilterOrgId(value === 'all' ? undefined : value);
                 }}
                 className="w-full px-3 py-2 border rounded-md"
               >
@@ -269,7 +269,7 @@ export default function WorkstationsPage() {
             {(searchTerm ||
               filterOnline !== undefined ||
               filterContingency !== undefined ||
-              filterAccountId) && (
+              filterOrgId) && (
               <Button
                 variant="outline"
                 size="sm"
@@ -277,7 +277,7 @@ export default function WorkstationsPage() {
                   setSearchTerm('');
                   setFilterOnline(undefined);
                   setFilterContingency(undefined);
-                  setFilterAccountId(undefined);
+                  setFilterOrgId(undefined);
                 }}
               >
                 {tCommon('clearFilters')}
@@ -412,7 +412,7 @@ export default function WorkstationsPage() {
                 {searchTerm ||
                 filterOnline !== undefined ||
                 filterContingency !== undefined ||
-                filterAccountId
+                filterOrgId
                   ? t('emptyFilterMessage')
                   : t('emptyMessage')}
               </p>

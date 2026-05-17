@@ -33,7 +33,7 @@ export default function VLANsPage() {
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterAccountId, setFilterAccountId] = useState<string | undefined>(undefined)
+  const [filterOrgId, setFilterOrgId] = useState<string | undefined>(undefined)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -44,7 +44,7 @@ export default function VLANsPage() {
     if (!user) return
     if (user.role === 'admin') loadAccounts()
     loadVlans()
-  }, [user, filterAccountId])
+  }, [user, filterOrgId])
 
   const loadAccounts = async () => {
     try {
@@ -58,7 +58,7 @@ export default function VLANsPage() {
   const loadVlans = async () => {
     try {
       setLoading(true)
-      const params = filterAccountId ? `?organization_id=${filterAccountId}` : ''
+      const params = filterOrgId ? `?organization_id=${filterOrgId}` : ''
       const response = await apiClient.get(`/vlans/${params}`)
       setVlans(response.data.vlans || [])
     } catch (error) {
@@ -166,8 +166,8 @@ export default function VLANsPage() {
           </div>
           {user?.role === 'admin' && (
             <select
-              value={filterAccountId || 'all'}
-              onChange={(e) => setFilterAccountId(e.target.value === 'all' ? undefined : e.target.value)}
+              value={filterOrgId || 'all'}
+              onChange={(e) => setFilterOrgId(e.target.value === 'all' ? undefined : e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">{t('allOrganizations')}</option>
@@ -177,9 +177,9 @@ export default function VLANsPage() {
             </select>
           )}
         </div>
-        {(searchTerm || filterAccountId) && (
+        {(searchTerm || filterOrgId) && (
           <div className="mt-4">
-            <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterAccountId(undefined) }}>
+            <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterOrgId(undefined) }}>
               <X className="mr-2 h-4 w-4" />
               {tCommon('clearFilters')}
             </Button>
