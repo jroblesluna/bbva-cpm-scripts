@@ -28,6 +28,10 @@ namespace AlwaysPrint.Shared.Messages
         CloudStatusResponse,         // Service → Tray: respuesta con estado Cloud
         
         // Configuración de Acciones
-        ActionConfigChanged          // Tray → Service: nueva configuración de acciones descargada
+        ActionConfigChanged,         // Tray → Service: nueva configuración de acciones descargada
+
+        // Actualizaciones automáticas
+        InstallUpdate,               // Tray → Service: solicitar instalación de MSI
+        InstallUpdateResponse        // Service → Tray: resultado de la instalación
     }
 }

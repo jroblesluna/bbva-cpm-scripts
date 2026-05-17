@@ -20,6 +20,8 @@ from app.api.v1.endpoints import (
     telemetry,
     connectivity,
     action_config,
+    organizations,
+    updates,
 )
 
 # Router principal de la API v1
@@ -120,6 +122,19 @@ api_router.include_router(
 api_router.include_router(
     action_config.router,
     tags=["Configuración de Acciones"]
+)
+
+# Organizaciones (toggle auto-update, solo Admin)
+api_router.include_router(
+    organizations.router,
+    prefix="/organizations",
+    tags=["Organizaciones"]
+)
+
+# Actualizaciones automáticas (autenticación por IP pública o workstation ID)
+api_router.include_router(
+    updates.router,
+    tags=["Actualizaciones"]
 )
 
 

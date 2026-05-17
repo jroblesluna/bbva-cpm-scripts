@@ -74,6 +74,10 @@ class Account(Base):
     timezone = Column(String(50), nullable=False, default="UTC")
     language = Column(String(2), nullable=False, server_default='en')
 
+    # Flag de auto-actualización a nivel de organización
+    # Controla si las workstations de esta organización pueden actualizarse automáticamente
+    auto_update_enabled = Column(Boolean, nullable=False, default=False, server_default='false')
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

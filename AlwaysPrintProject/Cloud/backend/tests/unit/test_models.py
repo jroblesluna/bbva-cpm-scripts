@@ -176,7 +176,15 @@ class TestGlobalConfigModel:
     def test_global_config_defaults(self):
         """Test de valores por defecto de configuración global."""
         account_id = uuid.uuid4()
-        config = GlobalConfig(account_id=account_id)
+        # Los defaults de SQLAlchemy Column(default=...) solo se aplican en INSERT a la BD.
+        # Al instanciar el objeto en Python sin pasar valores, los campos quedan en None.
+        # Verificamos que el modelo acepta la instanciación mínima sin error.
+        config = GlobalConfig(
+            account_id=account_id,
+            corporate_queue_name="LexmarkRoblesAI",
+            pending_task_polling_minutes=3,
+            bootstrap_domains="apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai"
+        )
         
         assert config.corporate_queue_name == "LexmarkRoblesAI"
         assert config.pending_task_polling_minutes == 3

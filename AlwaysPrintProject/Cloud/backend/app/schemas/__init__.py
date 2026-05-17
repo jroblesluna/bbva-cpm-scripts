@@ -141,6 +141,17 @@ from app.schemas.action_config import (
     calculate_config_hash,
 )
 
+# === UPDATE SCHEMAS ===
+from app.schemas.updates import (
+    UpdateCheckResponse,
+)
+
+# === ORGANIZATION SCHEMAS ===
+from app.schemas.organization import (
+    AutoUpdateToggleRequest,
+    AutoUpdateToggleResponse,
+)
+
 __all__ = [
     # User
     "UserCreate",
@@ -241,4 +252,9 @@ __all__ = [
     "ActionConfigDownloadInfo",
     "ActionConfigSyncStatus",
     "calculate_config_hash",
+    # Organization
+    "AutoUpdateToggleRequest",
+    "AutoUpdateToggleResponse",
+    # Updates
+    "UpdateCheckResponse",
 ]

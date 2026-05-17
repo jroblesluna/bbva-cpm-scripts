@@ -8,11 +8,13 @@ namespace AlwaysPrintService.Tasks
     {
         private readonly AppConfiguration _newConfig;
         private readonly RegistryConfigManager _registry;
+        private readonly bool? _autoUpdateEnabled;
 
-        public UpdateConfigurationTask(AppConfiguration newConfig, RegistryConfigManager registry)
+        public UpdateConfigurationTask(AppConfiguration newConfig, RegistryConfigManager registry, bool? autoUpdateEnabled = null)
         {
             _newConfig = newConfig ?? throw new ArgumentNullException(nameof(newConfig));
             _registry  = registry  ?? throw new ArgumentNullException(nameof(registry));
+            _autoUpdateEnabled = autoUpdateEnabled;
         }
 
         public ServiceTaskResult Execute()
@@ -20,6 +22,16 @@ namespace AlwaysPrintService.Tasks
             try
             {
                 _registry.Save(_newConfig);
+
+                // Persistir flag de auto-actualización si fue enviado por el Tray
+                if (_autoUpdateEnabled.HasValue)
+                {
+                    _registry.SaveAutoUpdateEnabled(_autoUpdateEnabled.Value);
+                    AlwaysPrintLogger.WriteInfo(
+                        $"Flag de auto-actualización actualizado: {_autoUpdateEnabled.Value}",
+                        AlwaysPrintLogger.EvtConfigSaved);
+                }
+
                 AlwaysPrintLogger.WriteInfo(
                     $"Configuration updated. CorporateQueueName='{_newConfig.CorporateQueueName}' " +
                     $"PollMinutes={_newConfig.PendingTaskPollingMinutes}",

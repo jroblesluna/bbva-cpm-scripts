@@ -53,6 +53,7 @@ namespace AlwaysPrintService.Pipe
                     MessageType.CheckServiceStatus          => HandleCheckServiceStatus(request),
                     MessageType.CloudConfigurationReceived  => HandleCloudConfigurationReceived(request),
                     MessageType.ActionConfigChanged         => HandleActionConfigChanged(request),
+                    MessageType.InstallUpdate               => HandleInstallUpdate(request),
                     _ => PipeMessage.Reply(request, MessageType.Error,
                             new ErrorPayload { Code = "UNKNOWN_TYPE", Message = $"Unknown message type: {request.Type}" })
                 };
@@ -85,7 +86,7 @@ namespace AlwaysPrintService.Pipe
                 return PipeMessage.Reply(req, MessageType.Error,
                     new ErrorPayload { Code = "INVALID_PAYLOAD", Message = "Configuration payload missing." });
 
-            var task = new UpdateConfigurationTask(payload.Configuration, _registry);
+            var task = new UpdateConfigurationTask(payload.Configuration, _registry, payload.AutoUpdateEnabled);
             bool queued = _taskQueue.Enqueue(task);
 
             return PipeMessage.Reply(req, MessageType.Ack,
@@ -168,6 +169,31 @@ namespace AlwaysPrintService.Pipe
             }
         }
         
+        /// <summary>
+        /// Maneja la solicitud de instalación de actualización MSI desde el Tray.
+        /// Valida el payload y delega la ejecución al UpdateInstallHandler.
+        /// </summary>
+        private PipeMessage HandleInstallUpdate(PipeMessage req)
+        {
+            AlwaysPrintLogger.WriteInfo(
+                "InstallUpdate: solicitud de instalación de actualización recibida del Tray.",
+                AlwaysPrintLogger.EvtTaskDispatched);
+
+            var payload = req.GetPayload<InstallUpdatePayload>();
+            if (string.IsNullOrWhiteSpace(payload?.MsiFilePath))
+            {
+                AlwaysPrintLogger.WriteError(
+                    "InstallUpdate: payload inválido — MsiFilePath es vacío o nulo.",
+                    AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Error,
+                    new ErrorPayload { Code = "INVALID_PAYLOAD", Message = "MsiFilePath es obligatorio." });
+            }
+
+            var handler = new UpdateInstallHandler();
+            var result = handler.Execute(payload.MsiFilePath);
+            return PipeMessage.Reply(req, MessageType.InstallUpdateResponse, result);
+        }
+
         private PipeMessage HandleActionConfigChanged(PipeMessage req)
         {
             try
