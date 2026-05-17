@@ -9,7 +9,7 @@ Este módulo define los endpoints para:
 
 from typing import Optional
 from uuid import UUID
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import base64
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -271,7 +271,7 @@ def get_audit_stats(
     ]
     
     # Actividad reciente (últimas 24 horas)
-    recent_date = datetime.utcnow() - timedelta(hours=24)
+    recent_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=24)
     recent_query = query.filter(AuditLog.created_at >= recent_date)
     recent_activity_count = recent_query.count()
     
@@ -309,7 +309,7 @@ def get_recent_activity(
         logs = audit_service.get_recent_activity(db, str(org_id), hours=24, limit=limit)
     else:
         # Para admin, obtener actividad reciente de todas las organizaciones
-        recent_date = datetime.utcnow() - timedelta(hours=24)
+        recent_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=24)
         logs = db.query(AuditLog).filter(
             AuditLog.created_at >= recent_date
         ).order_by(

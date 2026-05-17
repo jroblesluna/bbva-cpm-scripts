@@ -9,7 +9,7 @@ Este servicio implementa la lógica de negocio para:
 """
 
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.message import Message, TargetType
@@ -81,7 +81,7 @@ class MessageService:
             target_id=workstation_id,
             content=content,
             is_delivered=False,
-            sent_at=datetime.utcnow()
+            sent_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         
         db.add(message)
@@ -141,7 +141,7 @@ class MessageService:
             target_id=vlan_id,
             content=content,
             is_delivered=False,
-            sent_at=datetime.utcnow()
+            sent_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         
         db.add(message)
@@ -187,7 +187,7 @@ class MessageService:
             target_id=None,
             content=content,
             is_delivered=False,
-            sent_at=datetime.utcnow()
+            sent_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         
         db.add(message)
@@ -219,7 +219,7 @@ class MessageService:
             raise ValueError(f"Mensaje {message_id} no encontrado")
         
         message.is_delivered = True
-        message.delivered_at = datetime.utcnow()
+        message.delivered_at = datetime.now(timezone.utc).replace(tzinfo=None)
         
         db.commit()
         db.refresh(message)
@@ -408,7 +408,7 @@ class MessageService:
         """
         from datetime import timedelta
         
-        cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+        cutoff_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days_old)
         
         # Buscar mensajes antiguos entregados
         old_messages = db.query(Message).filter(

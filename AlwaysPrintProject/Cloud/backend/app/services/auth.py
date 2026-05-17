@@ -10,7 +10,7 @@ Este módulo proporciona funcionalidades de:
 Requisitos implementados: 5.1, 5.2, 5.3, 5.4, 5.5
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -133,17 +133,17 @@ class AuthService:
         
         # Calcular tiempo de expiración
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now(timezone.utc).replace(tzinfo=None) + expires_delta
         else:
             # Por defecto: 24 horas (1440 minutos) según requisito 5.3
-            expire = datetime.utcnow() + timedelta(
+            expire = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
                 minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
             )
         
         # Agregar claims estándar
         to_encode.update({
             "exp": expire,
-            "iat": datetime.utcnow()
+            "iat": datetime.now(timezone.utc).replace(tzinfo=None)
         })
         
         # Codificar token
@@ -183,15 +183,15 @@ class AuthService:
         
         # Calcular tiempo de expiración
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now(timezone.utc).replace(tzinfo=None) + expires_delta
         else:
             # Por defecto: 7 días para refresh tokens
-            expire = datetime.utcnow() + timedelta(days=7)
+            expire = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=7)
         
         # Agregar claims estándar
         to_encode.update({
             "exp": expire,
-            "iat": datetime.utcnow(),
+            "iat": datetime.now(timezone.utc).replace(tzinfo=None),
             "type": "refresh"  # Identificar como refresh token
         })
         

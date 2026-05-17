@@ -9,7 +9,7 @@ Este módulo define los endpoints para:
 """
 
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
@@ -140,7 +140,7 @@ def request_password_reset(
     if user and user.is_active:
         token = secrets.token_urlsafe(32)
         user.password_reset_token = token
-        user.password_reset_expires = datetime.utcnow() + timedelta(hours=1)
+        user.password_reset_expires = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=1)
         db.commit()
 
         reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
@@ -167,7 +167,7 @@ def confirm_password_reset(
     if not user or not user.password_reset_expires:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token inválido.")
 
-    if datetime.utcnow() > user.password_reset_expires:
+    if datetime.now(timezone.utc).replace(tzinfo=None) > user.password_reset_expires:
         user.password_reset_token = None
         user.password_reset_expires = None
         db.commit()

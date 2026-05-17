@@ -12,7 +12,7 @@ Este módulo maneja la comunicación bidireccional con las workstations:
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from pydantic import ValidationError
@@ -458,7 +458,7 @@ async def _handle_connectivity_result(
         # Payload inválido: registrar error y descartar mensaje (NO cerrar WebSocket)
         logger.error(
             "[%s] Payload de connectivity_result inválido - workstation_id=%s, error=%s",
-            datetime.utcnow().isoformat(),
+            datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             workstation_id,
             str(e)
         )
@@ -478,7 +478,7 @@ async def _handle_connectivity_result(
             logger.warning(
                 "[%s] Resultado de conectividad descartado - workstation_id=%s "
                 "no encontrada para organization_id=%s",
-                datetime.utcnow().isoformat(),
+                datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 workstation_id,
                 organization_id
             )
@@ -502,7 +502,7 @@ async def _handle_connectivity_result(
         logger.info(
             "[%s] Resultado de conectividad persistido y broadcast - workstation_id=%s, "
             "check_id=%s, check_type=%s, success=%s, latency_ms=%s",
-            datetime.utcnow().isoformat(),
+            datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             workstation_id,
             payload.check_id,
             payload.check_type,
@@ -515,7 +515,7 @@ async def _handle_connectivity_result(
         logger.error(
             "[%s] Error al persistir resultado de conectividad - workstation_id=%s, "
             "check_id=%s, error=%s",
-            datetime.utcnow().isoformat(),
+            datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             workstation_id,
             data.get("check_id", "desconocido"),
             str(e)

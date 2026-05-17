@@ -8,7 +8,7 @@ Este servicio implementa la lógica de negocio para:
 """
 
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
@@ -89,7 +89,7 @@ class AuditService:
             old_values=_sanitize_for_json(old_values),
             new_values=_sanitize_for_json(new_values),
             ip_address=ip_address,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         
         db.add(audit_log)
@@ -495,7 +495,7 @@ class AuditService:
         Returns:
             Lista de AuditLog recientes
         """
-        cutoff_date = datetime.utcnow() - timedelta(hours=hours)
+        cutoff_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
         
         logs = db.query(AuditLog).filter(
             AuditLog.organization_id == organization_id,
@@ -553,7 +553,7 @@ class AuditService:
         Returns:
             Número de logs eliminados
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=retention_months * 30)
+        cutoff_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=retention_months * 30)
         
         # Buscar logs antiguos
         old_logs = db.query(AuditLog).filter(

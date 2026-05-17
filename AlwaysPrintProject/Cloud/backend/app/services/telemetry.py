@@ -9,7 +9,7 @@ Este servicio implementa la lógica de negocio para:
 Todas las queries aplican tenant isolation filtrando por organization_id.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct, desc
@@ -76,7 +76,7 @@ class TelemetryService:
             jobs_identified=payload.jobs_identified,
             avg_release_time_ms=payload.avg_release_time_ms,
             disconnection_count=disconnection_count,
-            recorded_at=datetime.utcnow()
+            recorded_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
 
         db.add(telemetry_log)
@@ -157,7 +157,7 @@ class TelemetryService:
             TelemetryStatsResponse con las estadísticas agregadas
         """
         # Ventana temporal: últimas 24 horas UTC
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         since = now - timedelta(hours=24)
 
         # Total de workstations registradas para la organización

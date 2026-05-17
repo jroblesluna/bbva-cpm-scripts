@@ -12,7 +12,7 @@ Este módulo implementa el ConnectionManager que gestiona:
 import asyncio
 import json
 from typing import Dict, List, Optional, Set
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import WebSocket
 from sqlalchemy.orm import Session
 
@@ -67,7 +67,7 @@ class ConnectionManager:
         """
         async with self._lock:
             self.workstation_connections[workstation_id] = websocket
-            self.last_pong[workstation_id] = datetime.utcnow()
+            self.last_pong[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
         
         # Actualizar estado en base de datos
         workstation_service = WorkstationService()
@@ -273,7 +273,7 @@ class ConnectionManager:
             workstation_id: UUID de la workstation
         """
         async with self._lock:
-            self.last_pong[workstation_id] = datetime.utcnow()
+            self.last_pong[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
     
     async def start_ping_loop(self, db_session_factory):
         """
@@ -290,7 +290,7 @@ class ConnectionManager:
         while self._ping_loop_running:
             await asyncio.sleep(30)  # Ping cada 30 segundos
             
-            current_time = datetime.utcnow()
+            current_time = datetime.now(timezone.utc).replace(tzinfo=None)
             dead_workstations = []
             
             async with self._lock:

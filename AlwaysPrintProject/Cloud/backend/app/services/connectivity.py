@@ -9,7 +9,7 @@ Este servicio implementa la lógica de negocio para:
 
 import logging
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.telemetry import ConnectivityResult
@@ -80,7 +80,7 @@ class ConnectivityService:
             success=payload.success,
             latency_ms=payload.latency_ms,
             error=payload.error,
-            recorded_at=datetime.utcnow()
+            recorded_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
 
         db.add(connectivity_result)

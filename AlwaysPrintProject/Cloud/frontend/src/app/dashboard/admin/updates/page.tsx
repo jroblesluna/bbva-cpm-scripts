@@ -280,40 +280,33 @@ export default function UpdatesPage() {
                     <Package className="h-5 w-5 text-primary" />
                     <CardTitle>Versión Actual del Instalador</CardTitle>
                   </div>
-                  <Badge variant="default">v{msiInfo.version}</Badge>
+                  <Badge variant="default">{msiInfo.version}</Badge>
                 </div>
                 <CardDescription>
                   Información del MSI disponible en S3 para las workstations
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div className="flex items-start gap-3">
-                    <Package className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex items-start gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Versión</p>
-                      <p className="font-medium text-lg">{msiInfo.version}</p>
+                      <p className="text-xs text-muted-foreground">Fecha de Build</p>
+                      <p className="text-sm font-medium">{msiInfo.buildDate || 'N/A'}</p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div className="flex items-start gap-2">
+                    <GitCommit className="h-4 w-4 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Fecha de Build</p>
-                      <p className="font-medium">{formatDate(msiInfo.buildDate)}</p>
+                      <p className="text-xs text-muted-foreground">Commit</p>
+                      <p className="text-sm font-mono">{msiInfo.commitHash ? msiInfo.commitHash.substring(0, 8) : 'N/A'}</p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <GitCommit className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div className="flex items-start gap-2">
+                    <HardDrive className="h-4 w-4 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Commit Hash</p>
-                      <p className="font-mono text-sm">{msiInfo.commitHash}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <HardDrive className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Tamaño</p>
-                      <p className="font-medium">{formatFileSize(msiInfo.fileSize)}</p>
+                      <p className="text-xs text-muted-foreground">Tamaño</p>
+                      <p className="text-sm font-medium">{formatFileSize(msiInfo.fileSize)}</p>
                     </div>
                   </div>
                 </div>

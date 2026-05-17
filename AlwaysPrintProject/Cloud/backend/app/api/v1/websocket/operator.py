@@ -76,7 +76,7 @@ async def operator_websocket(
         await websocket.send_json({
             "type": "connected",
             "user_id": user_id,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
         })
         
         # Enviar estado inicial de workstations online
@@ -129,5 +129,5 @@ async def operator_websocket(
             )
 
 
-from datetime import datetime
+from datetime import datetime, timezone
 

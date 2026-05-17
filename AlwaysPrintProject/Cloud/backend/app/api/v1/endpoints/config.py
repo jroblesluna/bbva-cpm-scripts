@@ -294,7 +294,7 @@ def get_global_config(
     if not config:
         # Retornar configuración con valores por defecto en lugar de 404
         # Esto evita errores en consola del navegador
-        from datetime import datetime
+        from datetime import datetime, timezone
         return GlobalConfigResponse(
             id=None,  # Indica que no existe en BD
             organization_id=target_organization_id,
@@ -302,8 +302,8 @@ def get_global_config(
             search_targets=None,
             pending_task_polling_minutes=5,
             bootstrap_domains="",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            updated_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
 
     return config

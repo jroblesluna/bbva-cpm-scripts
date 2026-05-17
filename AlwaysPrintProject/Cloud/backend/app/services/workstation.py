@@ -12,7 +12,7 @@ import hashlib
 import ipaddress
 import logging
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
@@ -171,7 +171,7 @@ class WorkstationService:
             ip_address=public_ip,
             is_authorized=False,
             organization_id=None,
-            description=f"Detectada automáticamente el {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}"
+            description=f"Detectada automáticamente el {datetime.now(timezone.utc).replace(tzinfo=None).strftime('%Y-%m-%d %H:%M:%S')}"
         )
         
         db.add(new_public_ip)
@@ -245,7 +245,7 @@ class WorkstationService:
                 workstation.current_user = current_user
             
             workstation.is_online = True
-            workstation.last_connection = datetime.utcnow()
+            workstation.last_connection = datetime.now(timezone.utc).replace(tzinfo=None)
             
             # Detectar VLAN (puede haber cambiado)
             vlan_id = self.detect_vlan_for_ip(
@@ -313,8 +313,8 @@ class WorkstationService:
             current_user=current_user,
             is_online=True,
             contingency_active=False,
-            last_connection=datetime.utcnow(),
-            first_seen=datetime.utcnow()
+            last_connection=datetime.now(timezone.utc).replace(tzinfo=None),
+            first_seen=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         
         db.add(workstation)
@@ -368,7 +368,7 @@ class WorkstationService:
         
         for lic in active_licenses:
             lic.is_active = False
-            lic.deactivated_at = datetime.utcnow()
+            lic.deactivated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         
         # Calcular serial
         serial_number = self.calculate_license_serial(workstation.ip_private)
@@ -378,7 +378,7 @@ class WorkstationService:
             workstation_id=workstation_id,
             serial_number=serial_number,
             is_active=True,
-            activated_at=datetime.utcnow()
+            activated_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         
         db.add(license)
@@ -416,7 +416,7 @@ class WorkstationService:
         workstation.is_online = is_online
         
         if is_online:
-            workstation.last_connection = datetime.utcnow()
+            workstation.last_connection = datetime.now(timezone.utc).replace(tzinfo=None)
         
         if current_user is not None:
             workstation.current_user = current_user

@@ -415,7 +415,7 @@ def authorize_public_ip(
     """
     Autorizar una IP pública y asignarla a una organización (solo Admin).
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
     
     # Buscar IP
     public_ip = db.query(PublicIP).filter(PublicIP.id == ip_id).first()
@@ -444,7 +444,7 @@ def authorize_public_ip(
     # Autorizar IP
     public_ip.is_authorized = True
     public_ip.organization_id = authorize_data.organization_id
-    public_ip.authorized_at = datetime.utcnow()
+    public_ip.authorized_at = datetime.now(timezone.utc).replace(tzinfo=None)
     
     if authorize_data.description:
         public_ip.description = authorize_data.description

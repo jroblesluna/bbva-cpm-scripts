@@ -9,7 +9,7 @@ Verifica:
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 import uuid
 
@@ -114,8 +114,8 @@ class TestJWTTokens:
         
         assert payload is not None
         # Verificar que la expiración está aproximadamente en 30 minutos
-        exp_time = datetime.utcfromtimestamp(payload["exp"])
-        expected_time = datetime.utcnow() + expires_delta
+        exp_time = datetime.fromtimestamp(payload["exp"], tz=timezone.utc).replace(tzinfo=None)
+        expected_time = datetime.now(timezone.utc).replace(tzinfo=None) + expires_delta
         # Permitir 5 segundos de diferencia por tiempo de ejecución
         assert abs((exp_time - expected_time).total_seconds()) < 5
     

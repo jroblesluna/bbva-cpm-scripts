@@ -11,7 +11,7 @@ Feature: auto-update, Property 7: Organization flag toggle consistency
 """
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from hypothesis import given, settings as hypothesis_settings
@@ -106,8 +106,8 @@ def test_organization_flag_toggle_consistency(toggle_sequence: list[bool]):
         name=f"test-org-{org_id}",
         is_active=True,
         auto_update_enabled=False,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     db.add(account)
     db.commit()

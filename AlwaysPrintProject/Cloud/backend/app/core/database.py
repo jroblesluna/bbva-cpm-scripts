@@ -7,8 +7,7 @@ para SQLAlchemy, soportando SQLite, PostgreSQL y SQL Server.
 
 from typing import Generator
 from sqlalchemy import create_engine, event, text, Engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from sqlalchemy.pool import StaticPool, NullPool
 
 from app.core.config import settings
