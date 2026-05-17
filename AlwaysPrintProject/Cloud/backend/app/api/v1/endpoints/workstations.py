@@ -151,17 +151,17 @@ def register_workstation(
                 f"is_new={is_new}"
             )
             
-            # Obtener información de la cuenta
-            from app.models.organization import Organization, Account
-            account = db.query(Account).filter(Account.id == workstation.organization_id).first()
+            # Obtener información de la organización
+            from app.models.organization import Organization
+            org = db.query(Organization).filter(Organization.id == workstation.organization_id).first()
             
-            if not account:
+            if not org:
                 logger.error(
-                    f"[REGISTRO HTTP] Cuenta no encontrada: {workstation.organization_id}"
+                    f"[REGISTRO HTTP] Organización no encontrada: {workstation.organization_id}"
                 )
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Error interno: cuenta no encontrada"
+                    detail="Error interno: organización no encontrada"
                 )
             
             # Construir URL del servidor cloud
@@ -171,15 +171,15 @@ def register_workstation(
             logger.info(
                 f"[REGISTRO HTTP] Devolviendo credenciales: "
                 f"workstation_id={workstation.id}, "
-                f"organization_id={account.id}, "
-                f"organization_name={account.name}, "
+                f"organization_id={org.id}, "
+                f"organization_name={org.name}, "
                 f"cloud_api_url={cloud_api_url}"
             )
             
             return WorkstationRegisterResponse(
                 workstation_id=workstation.id,
-                organization_id=account.id,
-                organization_name=account.name,
+                organization_id=org.id,
+                organization_name=org.name,
                 message="Workstation registrada exitosamente" if is_new else "Workstation actualizada exitosamente",
                 cloud_api_url=cloud_api_url
             )
@@ -371,38 +371,38 @@ def get_workstation_stats(
         
         # Si es admin, agregar estadísticas por cuenta
         if current_user.role == UserRole.ADMIN:
-            from app.models.organization import Organization, Account
+            from app.models.organization import Organization
             import uuid
             
-            # Obtener todas las cuentas
-            accounts = db.query(Account).all()
+            # Obtener todas las organizaciones
+            organizations = db.query(Organization).all()
             
             by_organization = {}
-            for account in accounts:
+            for org in organizations:
                 try:
-                    # Convertir account.id a string de manera segura
+                    # Convertir org.id a string de manera segura
                     # El tipo GUID puede devolver UUID o str dependiendo del dialecto
-                    if isinstance(account.id, uuid.UUID):
-                        org_id_str = str(account.id)
-                    elif isinstance(account.id, str):
-                        org_id_str = account.id
+                    if isinstance(org.id, uuid.UUID):
+                        org_id_str = str(org.id)
+                    elif isinstance(org.id, str):
+                        org_id_str = org.id
                     else:
-                        org_id_str = str(account.id)
+                        org_id_str = str(org.id)
                     
                     org_total = workstation_service.get_total_count(db, org_id_str)
                     org_online = workstation_service.get_online_count(db, org_id_str)
                     org_contingency = workstation_service.get_contingency_count(db, org_id_str)
                     
                     by_organization[org_id_str] = {
-                        "name": account.name,
+                        "name": org.name,
                         "total": org_total,
                         "online": org_online,
                         "offline": org_total - org_online,
                         "contingency": org_contingency
                     }
                 except Exception as e:
-                    # Si falla para una cuenta específica, continuar con las demás
-                    print(f"Error al obtener estadísticas para cuenta {account.id}: {e}")
+                    # Si falla para una organización específica, continuar con las demás
+                    print(f"Error al obtener estadísticas para organización {org.id}: {e}")
                     import traceback
                     traceback.print_exc()
                     continue
