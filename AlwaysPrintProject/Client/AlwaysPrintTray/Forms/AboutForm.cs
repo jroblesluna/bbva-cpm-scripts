@@ -74,7 +74,7 @@ namespace AlwaysPrintTray.Forms
             {
                 Text          = "Cerrar",
                 DialogResult  = DialogResult.OK,
-                Location      = new Point(345, 205),
+                Location      = new Point(330, 195),
                 Size          = new Size(80, 30)
             };
 

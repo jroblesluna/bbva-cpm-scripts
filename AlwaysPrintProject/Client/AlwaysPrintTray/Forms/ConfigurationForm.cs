@@ -300,8 +300,8 @@ namespace AlwaysPrintTray.Forms
                 var ack = response.GetPayload<AckPayload>();
                 if (ack?.Success == true)
                 {
-                    _lblStatus.ForeColor = Color.DarkGreen;
-                    _lblStatus.Text = "Configuración guardada correctamente.";
+                    DialogResult = DialogResult.OK;
+                    Close();
                 }
                 else
                 {
