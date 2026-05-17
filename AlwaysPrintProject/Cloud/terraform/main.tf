@@ -110,4 +110,13 @@ module "ec2" {
   depends_on = [aws_secretsmanager_secret_version.database_url, module.ses]
 }
 
+module "s3" {
+  source       = "./modules/s3"
+  project_name = var.project_name
+  environment  = var.environment
+  ec2_role_arn = module.ec2.role_arn
+
+  depends_on = [module.ec2]
+}
+
 # CI/CD manejado por GitHub Actions (ver .github/workflows/)

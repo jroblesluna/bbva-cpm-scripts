@@ -236,6 +236,39 @@ try {
     Write-Step "MSI: $($msiInfo.Name) ($([math]::Round($msiInfo.Length/1MB,2)) MB)" "Info"
     Write-Step "Modificado: $($msiInfo.LastWriteTime)" "Info"
 
+    # PASO 8.5: Subir MSI a S3
+    Write-Step "`nPASO 8.5: Subiendo MSI al bucket S3..." "Info"
+    if ($hasChanges -and (Test-Path $msiPath)) {
+        Write-Step "Preparando subida al bucket S3..." "Info"
+        $s3Destination = "s3://alwaysprint-artifacts/latest/AlwaysPrint.msi"
+        $buildDate = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
+        $shortCommit = $afterCommit.Substring(0, 7)
+        $metadata = "version=$shortCommit,build-date=$buildDate,commit-hash=$afterCommit"
+
+        try {
+            Write-Step "Destino: $s3Destination" "Info"
+            Write-Step "Metadata: version=$shortCommit, build-date=$buildDate" "Info"
+            $s3Output = aws s3 cp $msiPath $s3Destination --metadata $metadata 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                throw "aws s3 cp fallo con codigo $LASTEXITCODE`: $s3Output"
+            }
+            Write-Step "MSI subido exitosamente a S3" "Success"
+        } catch {
+            Write-Step "Error al subir MSI a S3: $($_.Exception.Message)" "Warning"
+            $respuesta = Read-Host "¿Desea continuar con la instalacion? (S/N)"
+            if ($respuesta -notin @("S", "s", "Si", "si", "SI")) {
+                throw "Instalacion abortada por el usuario tras fallo de subida a S3"
+            }
+            Write-Step "Continuando sin subida a S3 por decision del usuario..." "Warning"
+        }
+    } else {
+        if (-not $hasChanges) {
+            Write-Step "Omitiendo subida a S3 (sin cambios detectados)" "Info"
+        } else {
+            Write-Step "Omitiendo subida a S3 (MSI no encontrado)" "Warning"
+        }
+    }
+
     # PASO 9: Instalar MSI
     Write-Step "`nPASO 9: Instalando AlwaysPrint..." "Info"
     $installLog = "$env:TEMP\AlwaysPrint_Install_$(Get-Date -Format yyyyMMdd_HHmmss).log"

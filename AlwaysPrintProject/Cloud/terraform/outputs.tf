@@ -29,10 +29,10 @@ output "ses_dns_records" {
   value       = module.ses.ses_dns_records
 }
 
-output "ssh_access" {
+output "ssm_access" {
   description = "Acceso al servidor via SSM (recomendado)"
   value = {
-    ssm = "aws ssm start-session --target ${module.ec2.instance_id} --region ${var.aws_region}"
+    comando = "aws ssm start-session --target ${module.ec2.instance_id} --region ${var.aws_region}"
   }
 }
 
@@ -42,4 +42,14 @@ output "github_actions_secrets" {
     AWS_ACCESS_KEY_ID     = "(IAM Access Key ID con permisos ECR + SSM)"
     AWS_SECRET_ACCESS_KEY = "(IAM Secret Access Key correspondiente)"
   }
+}
+
+output "s3_bucket_name" {
+  description = "Nombre del bucket S3 de artefactos MSI"
+  value       = module.s3.bucket_name
+}
+
+output "s3_bucket_arn" {
+  description = "ARN del bucket S3 de artefactos MSI"
+  value       = module.s3.bucket_arn
 }
