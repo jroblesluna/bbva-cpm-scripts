@@ -36,7 +36,8 @@
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Los strings i18n se gestionan en LocalizationManager.cs (diccionarios en código) -->
-    <!-- Los .resx se mantienen como referencia pero no se usan en runtime -->
+    <!-- Los strings i18n se gestionan desde archivos JSON embebidos -->
+    <EmbeddedResource Include="Localization\en.json" />
+    <EmbeddedResource Include="Localization\es.json" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,15 @@
+{
+  "TrayTooltip": "AlwaysPrint",
+  "MenuAbout": "Acerca de",
+  "MenuConfiguration": "Configuración de Valores",
+  "MenuExit": "Salir",
+  "BalloonInitOk": "Inicializado correctamente ({0}).",
+  "BalloonInitFail": "Operando en modo local.",
+  "BalloonServiceNotRunning": "El servicio no está en ejecución.",
+  "BalloonOfflineWarning": "Usando configuración guardada. Sin conexión a la nube.",
+  "BalloonOfflineTitle": "AlwaysPrint",
+  "BalloonOfflineText": "Usando configuración guardada. Sin conexión a la nube.",
+  "BalloonOfflineNoConfig": "Sin conexión a la nube y sin configuración guardada. Usando valores por defecto.",
+  "BalloonReconnected": "Conexión con la nube restaurada.",
+  "TooltipOffline": "AlwaysPrint (sin conexión)"
+}
