@@ -190,6 +190,16 @@ try {
     }
     $beforeCommit = git rev-parse HEAD
     Write-Step "Commit actual: $beforeCommit" "Info"
+
+    # Descartar cambios locales para evitar conflictos en el pull
+    # (archivos de build, .msi, etc. que no deben bloquear la actualización)
+    $localChanges = git status --porcelain
+    if ($localChanges) {
+        Write-Step "Descartando cambios locales para actualizar..." "Info"
+        git reset --hard HEAD 2>&1 | Out-Null
+        git clean -fd 2>&1 | Out-Null
+    }
+
     Write-Step "Ejecutando git pull..." "Info"
     $gitOutput = git pull 2>&1
     if ($LASTEXITCODE -ne 0) {
