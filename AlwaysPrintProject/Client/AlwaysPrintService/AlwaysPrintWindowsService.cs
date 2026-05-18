@@ -39,10 +39,12 @@ namespace AlwaysPrintService
         private Thread? _startupThread;
         private CancellationTokenSource _cts = new CancellationTokenSource();
         
-        // Ruta del archivo de configuración de acciones
+        // Ruta del archivo de configuración de acciones.
+        // Se usa ProgramData para que tanto el Tray (usuario normal) como el Service (LocalSystem)
+        // puedan acceder al mismo archivo sin problemas de permisos.
         private string ConfigFilePath => Path.Combine(
-            Path.GetDirectoryName(Process.GetCurrentProcess().MainModule!.FileName)!,
-            "active.alwaysconfig");
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "Robles.AI", "AlwaysPrint", "active.alwaysconfig");
 
         private new const bool CanHandleSessionChangeEvent = true;
 

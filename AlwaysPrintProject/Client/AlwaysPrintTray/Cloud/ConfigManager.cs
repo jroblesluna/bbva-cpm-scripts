@@ -27,10 +27,17 @@ namespace AlwaysPrintTray.Cloud
             _httpClient = httpClient;
             _pipeClient = pipeClient;
             
-            // Ruta donde se guarda la configuración activa
-            string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-            string exeDir = Path.GetDirectoryName(exePath) ?? "";
-            _configFilePath = Path.Combine(exeDir, "active.alwaysconfig");
+            // Ruta donde se guarda la configuración activa.
+            // Se usa ProgramData porque el Tray corre como usuario normal y no puede
+            // escribir en Program Files. El Service (LocalSystem) también puede leer desde aquí.
+            string configDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "Robles.AI", "AlwaysPrint");
+            
+            if (!Directory.Exists(configDir))
+                Directory.CreateDirectory(configDir);
+            
+            _configFilePath = Path.Combine(configDir, "active.alwaysconfig");
         }
         
         // ═══════════════════════════════════════════════════════════════════════
