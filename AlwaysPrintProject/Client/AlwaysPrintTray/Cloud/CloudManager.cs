@@ -413,7 +413,10 @@ namespace AlwaysPrintTray.Cloud
             try
             {
                 var obj = JObject.Parse(json);
-                var configHash = obj["config_hash"]?.ToString();
+                
+                // El config_hash está dentro del objeto "config" del mensaje
+                var configObj = obj["config"] as JObject;
+                var configHash = configObj?["config_hash"]?.ToString();
 
                 if (string.IsNullOrEmpty(configHash))
                 {

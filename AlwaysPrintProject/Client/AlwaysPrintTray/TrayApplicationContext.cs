@@ -161,8 +161,13 @@ namespace AlwaysPrintTray
                 }
                 else
                 {
-                    ShowBalloon("AlwaysPrint",
-                        LocalizationManager.Get("BalloonInitFail"), ToolTipIcon.Warning);
+                    // Si Cloud está habilitada, no mostrar balloon de "modo local" aquí
+                    // porque CloudManager mostrará su propio estado al conectar/fallar
+                    if (!cfg.CloudEnabled || string.IsNullOrWhiteSpace(cfg.CloudApiUrl))
+                    {
+                        ShowBalloon("AlwaysPrint",
+                            LocalizationManager.Get("BalloonInitFail"), ToolTipIcon.Warning);
+                    }
                     AlwaysPrintLogger.WriteTrayWarning($"Tray: bootstrap fallido. {details}", AlwaysPrintLogger.EvtGenericWarning);
                 }
 
