@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -362,9 +363,32 @@ namespace AlwaysPrintService.Actions
         
         private bool ExecuteStartTray(ActionConfig action)
         {
-            AlwaysPrintLogger.WriteWarning("ActionEngine: StartTray no implementado (debe ser manejado por el Service)");
-            // Esta acción debe ser manejada por el Service, no por AdminActions
-            return true;
+            try
+            {
+                string trayExe = Path.Combine(
+                    Path.GetDirectoryName(System.Diagnostics.Process.GetCurrentProcess().MainModule!.FileName)!,
+                    "AlwaysPrintTray.exe");
+                
+                AlwaysPrintLogger.WriteInfo($"ActionEngine: StartTray - lanzando {trayExe} en sesión interactiva");
+                
+                bool ok = UserSession.InteractiveProcessLauncher.Launch(trayExe);
+                
+                if (ok)
+                {
+                    AlwaysPrintLogger.WriteInfo("ActionEngine: StartTray - Tray lanzado exitosamente");
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteWarning("ActionEngine: StartTray - no se pudo lanzar el Tray");
+                }
+                
+                return ok;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"ActionEngine: StartTray - error: {ex.Message}", ex);
+                return false;
+            }
         }
         
         // ═══════════════════════════════════════════════════════════════════════
