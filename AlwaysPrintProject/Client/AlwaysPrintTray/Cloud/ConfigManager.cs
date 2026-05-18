@@ -138,7 +138,10 @@ namespace AlwaysPrintTray.Cloud
                 
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    // No hay configuración activa
+                    // Leer detalle del 404 para diagnóstico
+                    string detail = "";
+                    try { detail = await response.Content.ReadAsStringAsync(); } catch { }
+                    AlwaysPrintLogger.WriteInfo($"ConfigManager: endpoint retornó 404. Detalle: {detail}");
                     return null;
                 }
                 

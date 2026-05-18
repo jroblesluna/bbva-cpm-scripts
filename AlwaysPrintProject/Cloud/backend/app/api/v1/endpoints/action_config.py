@@ -270,24 +270,41 @@ def get_workstation_config_info(
     """
     # Obtener workstation
     from app.models.workstation import Workstation
+    
+    logger.info(f"[ACTION_CONFIG] Buscando workstation con id={workstation_id}")
+    
     workstation = db.query(Workstation).filter(
         Workstation.id == workstation_id
     ).first()
     
     if not workstation:
+        logger.warning(f"[ACTION_CONFIG] Workstation no encontrada: id={workstation_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Workstation no encontrada"
         )
     
+    logger.info(
+        f"[ACTION_CONFIG] Workstation encontrada: id={workstation.id}, "
+        f"organization_id={workstation.organization_id}"
+    )
+    
     # Obtener configuración activa de la organización
     config = ActionConfigService.get_active_config(db, workstation.organization_id)
     
     if not config:
+        logger.warning(
+            f"[ACTION_CONFIG] No hay configuración activa para organization_id={workstation.organization_id}"
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No hay configuración activa"
         )
+    
+    logger.info(
+        f"[ACTION_CONFIG] Configuración activa encontrada: id={config.id}, "
+        f"name={config.name}, hash={config.config_hash}"
+    )
     
     return ActionConfigDownloadInfo(
         hash=config.config_hash,
