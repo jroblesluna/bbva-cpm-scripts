@@ -117,7 +117,8 @@ namespace AlwaysPrintService.Actions
         // ═══════════════════════════════════════════════════════════════════════
         
         /// <summary>
-        /// Obtiene la lista de usuarios con sesión activa.
+        /// Obtiene la lista de usuarios con sesión activa usando WTS API.
+        /// Más confiable que WMI en todas las versiones de Windows.
         /// </summary>
         public static List<string> GetLoggedInUsers(bool excludeActiveConsoleUser = false)
         {
@@ -135,64 +136,69 @@ namespace AlwaysPrintService.Actions
                     AlwaysPrintLogger.WriteInfo($"GetLoggedInUsers: usuario de consola activa: {activeConsoleUser ?? "ninguno"}");
                 }
                 
-                // Usar WMI para obtener sesiones activas
-                using (var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_LogonSession WHERE LogonType = 2 OR LogonType = 10"))
+                // Usar WTS API para enumerar sesiones (más confiable que WMI)
+                IntPtr serverHandle = IntPtr.Zero; // Local server
+                IntPtr pSessionInfo = IntPtr.Zero;
+                int sessionCount = 0;
+                
+                if (!WTSEnumerateSessions(serverHandle, 0, 1, ref pSessionInfo, ref sessionCount))
                 {
-                    foreach (ManagementObject session in searcher.Get())
+                    AlwaysPrintLogger.WriteWarning("GetLoggedInUsers: WTSEnumerateSessions falló");
+                    return users;
+                }
+                
+                try
+                {
+                    int structSize = Marshal.SizeOf(typeof(WTS_SESSION_INFO));
+                    
+                    for (int i = 0; i < sessionCount; i++)
                     {
-                        try
+                        IntPtr currentPtr = new IntPtr(pSessionInfo.ToInt64() + (i * structSize));
+                        var sessionInfo = (WTS_SESSION_INFO)Marshal.PtrToStructure(currentPtr, typeof(WTS_SESSION_INFO))!;
+                        
+                        // Solo sesiones activas o desconectadas (no listener, idle, etc.)
+                        if (sessionInfo.State != WTS_CONNECTSTATE_CLASS.WTSActive &&
+                            sessionInfo.State != WTS_CONNECTSTATE_CLASS.WTSDisconnected)
                         {
-                            string logonId = session["LogonId"]?.ToString() ?? "";
+                            continue;
+                        }
+                        
+                        // Obtener nombre de usuario de la sesión
+                        IntPtr buffer = IntPtr.Zero;
+                        uint bytesReturned = 0;
+                        
+                        if (WTSQuerySessionInformation(serverHandle, (uint)sessionInfo.SessionId,
+                            WTS_INFO_CLASS.WTSUserName, out buffer, out bytesReturned))
+                        {
+                            string username = Marshal.PtrToStringAnsi(buffer) ?? "";
+                            WTSFreeMemory(buffer);
                             
-                            if (string.IsNullOrEmpty(logonId))
+                            if (string.IsNullOrEmpty(username))
                                 continue;
                             
-                            // Obtener usuario asociado a la sesión
-                            using (var userSearcher = new ManagementObjectSearcher($"SELECT * FROM Win32_LoggedOnUser WHERE Dependent LIKE '%LogonId=\"{logonId}\"%'"))
+                            // Evitar duplicados
+                            if (users.Contains(username, StringComparer.OrdinalIgnoreCase))
+                                continue;
+                            
+                            // Excluir usuario de consola activa si se solicita
+                            if (excludeActiveConsoleUser &&
+                                !string.IsNullOrEmpty(activeConsoleUser) &&
+                                username.Equals(activeConsoleUser, StringComparison.OrdinalIgnoreCase))
                             {
-                                foreach (ManagementObject user in userSearcher.Get())
-                                {
-                                    try
-                                    {
-                                        string antecedent = user["Antecedent"]?.ToString() ?? "";
-                                        
-                                        // Extraer nombre de usuario del path WMI
-                                        // Formato: \\MACHINE\root\cimv2:Win32_Account.Domain="DOMAIN",Name="USERNAME"
-                                        int nameStart = antecedent.IndexOf("Name=\"") + 6;
-                                        int nameEnd = antecedent.IndexOf("\"", nameStart);
-                                        
-                                        if (nameStart > 5 && nameEnd > nameStart)
-                                        {
-                                            string username = antecedent.Substring(nameStart, nameEnd - nameStart);
-                                            
-                                            if (!string.IsNullOrEmpty(username) && 
-                                                !users.Contains(username, StringComparer.OrdinalIgnoreCase))
-                                            {
-                                                // Excluir usuario de consola activa si se solicita
-                                                if (excludeActiveConsoleUser && 
-                                                    !string.IsNullOrEmpty(activeConsoleUser) &&
-                                                    username.Equals(activeConsoleUser, StringComparison.OrdinalIgnoreCase))
-                                                {
-                                                    AlwaysPrintLogger.WriteInfo($"GetLoggedInUsers: excluyendo usuario de consola activa: {username}");
-                                                    continue;
-                                                }
-                                                
-                                                users.Add(username);
-                                            }
-                                        }
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        AlwaysPrintLogger.WriteWarning($"GetLoggedInUsers: error procesando usuario: {ex.Message}");
-                                    }
-                                }
+                                AlwaysPrintLogger.WriteInfo($"GetLoggedInUsers: excluyendo usuario de consola activa: {username}");
+                                continue;
                             }
-                        }
-                        catch (Exception ex)
-                        {
-                            AlwaysPrintLogger.WriteWarning($"GetLoggedInUsers: error procesando sesión: {ex.Message}");
+                            
+                            users.Add(username);
+                            AlwaysPrintLogger.WriteInfo(
+                                $"GetLoggedInUsers: sesión encontrada - usuario={username}, " +
+                                $"sessionId={sessionInfo.SessionId}, estado={sessionInfo.State}");
                         }
                     }
+                }
+                finally
+                {
+                    WTSFreeMemory(pSessionInfo);
                 }
                 
                 AlwaysPrintLogger.WriteInfo($"GetLoggedInUsers: encontrados {users.Count} usuarios: {string.Join(", ", users)}");
@@ -500,6 +506,14 @@ namespace AlwaysPrintService.Actions
         private static extern uint WTSGetActiveConsoleSessionId();
         
         [DllImport("wtsapi32.dll", SetLastError = true)]
+        private static extern bool WTSEnumerateSessions(
+            IntPtr hServer,
+            int reserved,
+            int version,
+            ref IntPtr ppSessionInfo,
+            ref int pCount);
+        
+        [DllImport("wtsapi32.dll", SetLastError = true)]
         private static extern bool WTSQuerySessionInformation(
             IntPtr hServer,
             uint sessionId,
@@ -513,6 +527,29 @@ namespace AlwaysPrintService.Actions
         private enum WTS_INFO_CLASS
         {
             WTSUserName = 5,
+        }
+        
+        private enum WTS_CONNECTSTATE_CLASS
+        {
+            WTSActive,
+            WTSConnected,
+            WTSConnectQuery,
+            WTSShadow,
+            WTSDisconnected,
+            WTSIdle,
+            WTSListen,
+            WTSReset,
+            WTSDown,
+            WTSInit
+        }
+        
+        [StructLayout(LayoutKind.Sequential)]
+        private struct WTS_SESSION_INFO
+        {
+            public int SessionId;
+            [MarshalAs(UnmanagedType.LPStr)]
+            public string pWinStationName;
+            public WTS_CONNECTSTATE_CLASS State;
         }
     }
 }
