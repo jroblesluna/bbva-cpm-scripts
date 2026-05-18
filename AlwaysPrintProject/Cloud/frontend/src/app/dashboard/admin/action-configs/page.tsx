@@ -11,27 +11,27 @@
  * - Ver estado de sincronización con workstations
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { organizationsApi } from '@/lib/api';
 import {
   Upload,
   FileText,
   CheckCircle2,
-  XCircle,
   Trash2,
   Eye,
   Download,
   AlertCircle,
   Power,
   PowerOff,
+  Building2,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -51,13 +51,13 @@ import {
   getActionConfigDetail,
   updateActionConfig,
   deleteActionConfig,
-  calculateConfigHash,
   validateAlwaysConfig,
 } from '@/lib/api/action-config';
 import type { ActionConfig, ActionConfigDetail } from '@/types/action-config';
+import type { Organization } from '@/types/organization';
 
 export default function ActionConfigsPage() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -67,8 +67,28 @@ export default function ActionConfigsPage() {
   const [configJson, setConfigJson] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  
-  const organizationId = user?.organization_id ?? null;
+
+  // Organización seleccionada: admin puede cambiarla, operario usa la suya fija
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(
+    user?.organization_id ?? null
+  );
+
+  // Para admin: cargar lista de organizaciones
+  const { data: organizations } = useQuery<Organization[]>({
+    queryKey: ['organizations-list'],
+    queryFn: () => organizationsApi.list(),
+    enabled: isAdmin(),
+  });
+
+  // Cuando carguen las organizaciones y el admin no tiene org seleccionada, preseleccionar la primera
+  useEffect(() => {
+    if (isAdmin() && !selectedOrgId && organizations && organizations.length > 0) {
+      setSelectedOrgId(organizations[0].id);
+    }
+  }, [organizations, isAdmin, selectedOrgId]);
+
+  // La organización efectiva para todas las operaciones
+  const organizationId = isAdmin() ? selectedOrgId : (user?.organization_id ?? null);
   
   // Query para listar configuraciones
   const { data: configs, isLoading } = useQuery({
@@ -210,6 +230,11 @@ export default function ActionConfigsPage() {
   };
   
   const activeConfig = configs?.find(c => c.is_active);
+
+  // Nombre de la organización seleccionada (para mostrar al operario)
+  const selectedOrgName = isAdmin()
+    ? organizations?.find(o => o.id === selectedOrgId)?.name
+    : user?.organization?.name ?? user?.organization_id ?? '';
   
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -226,6 +251,46 @@ export default function ActionConfigsPage() {
           Subir Configuración
         </Button>
       </div>
+
+      {/* Selector / indicador de organización */}
+      <Card>
+        <CardContent className="py-4">
+          <div className="flex items-center gap-3">
+            <Building2 className="h-5 w-5 text-muted-foreground shrink-0" />
+            <div className="flex-1">
+              {isAdmin() ? (
+                <div className="flex items-center gap-3">
+                  <Label htmlFor="org-select" className="shrink-0 font-medium">
+                    Organización:
+                  </Label>
+                  <select
+                    id="org-select"
+                    value={selectedOrgId ?? ''}
+                    onChange={(e) => setSelectedOrgId(e.target.value || null)}
+                    className="flex-1 max-w-xs px-3 py-1.5 border rounded-md text-sm bg-background"
+                  >
+                    {!organizations || organizations.length === 0 ? (
+                      <option value="">Cargando organizaciones...</option>
+                    ) : (
+                      organizations.map((org) => (
+                        <option key={org.id} value={org.id}>
+                          {org.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <span className="font-medium text-sm">Organización:</span>
+                  <span className="text-sm text-muted-foreground">{selectedOrgName}</span>
+                  <Badge variant="secondary">Tu organización</Badge>
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       
       {/* Configuración activa */}
       {activeConfig && (
@@ -390,6 +455,44 @@ export default function ActionConfigsPage() {
           </DialogHeader>
           
           <div className="space-y-4">
+            {/* Selector de organización (solo admin) o indicador (operario) */}
+            <div>
+              <Label className="font-medium">Organización destino</Label>
+              {isAdmin() ? (
+                <select
+                  value={selectedOrgId ?? ''}
+                  onChange={(e) => setSelectedOrgId(e.target.value || null)}
+                  className="mt-2 w-full px-3 py-2 border rounded-md text-sm bg-background"
+                >
+                  {!organizations || organizations.length === 0 ? (
+                    <option value="">Cargando organizaciones...</option>
+                  ) : (
+                    organizations.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              ) : (
+                <div className="mt-2 flex items-center gap-2 px-3 py-2 border rounded-md bg-muted/50">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">{selectedOrgName}</span>
+                  <Badge variant="secondary" className="ml-auto">Tu organización</Badge>
+                </div>
+              )}
+            </div>
+
+            {/* Aviso si no hay organización seleccionada */}
+            {!organizationId && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Debes seleccionar una organización antes de subir la configuración.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Upload de archivo */}
             <div>
               <Label htmlFor="file-upload">Archivo .alwaysconfig</Label>
@@ -462,6 +565,7 @@ export default function ActionConfigsPage() {
               onClick={handleUpload}
               disabled={
                 !configJson ||
+                !organizationId ||
                 validationErrors.length > 0 ||
                 uploadMutation.isPending
               }

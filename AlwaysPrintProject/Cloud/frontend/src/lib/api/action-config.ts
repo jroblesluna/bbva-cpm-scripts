@@ -2,7 +2,7 @@
  * Cliente API para configuraciones de acciones administrativas.
  */
 
-import { apiClient } from './client';
+import { apiClient } from '@/lib/api';
 import type {
   ActionConfig,
   ActionConfigDetail,
