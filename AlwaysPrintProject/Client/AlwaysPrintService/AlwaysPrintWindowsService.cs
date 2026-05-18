@@ -150,7 +150,6 @@ namespace AlwaysPrintService
 
             var reason = changeDescription.Reason;
             bool userArrived = reason == SessionChangeReason.SessionLogon   ||
-                               reason == SessionChangeReason.ConsoleConnect  ||
                                reason == SessionChangeReason.SessionUnlock;
 
             bool userLeft = reason == SessionChangeReason.SessionLogoff     ||

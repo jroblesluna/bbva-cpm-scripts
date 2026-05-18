@@ -23,6 +23,20 @@ namespace AlwaysPrintTray
 
             AlwaysPrintLogger.EnsureSourceExists();
 
+            // Protección: si el Tray fue lanzado como SYSTEM (session 0), salir inmediatamente.
+            // Esto puede ocurrir si CreateProcessAsUser falla silenciosamente o si el proceso
+            // se hereda del contexto del Service en lugar de la sesión interactiva del usuario.
+            var currentIdentity = WindowsIdentity.GetCurrent();
+            if (currentIdentity.IsSystem ||
+                currentIdentity.User?.Value == "S-1-5-18") // NT AUTHORITY\SYSTEM
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    "AlwaysPrintTray: detectado ejecución como SYSTEM (session 0). " +
+                    "El Tray debe ejecutarse en la sesión interactiva del usuario. Saliendo.",
+                    AlwaysPrintLogger.EvtGenericError);
+                return;
+            }
+
             // Single-instance guard using a named mutex.
             // Se configura MutexSecurity para permitir acceso a todos los usuarios,
             // evitando UnauthorizedAccessException cuando el Service (LocalSystem) lanza el Tray
