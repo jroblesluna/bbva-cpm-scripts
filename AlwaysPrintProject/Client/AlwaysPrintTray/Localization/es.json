@@ -11,5 +11,6 @@
   "BalloonOfflineText": "Usando configuración guardada. Sin conexión a la nube.",
   "BalloonOfflineNoConfig": "Sin conexión a la nube y sin configuración guardada. Usando valores por defecto.",
   "BalloonReconnected": "Conexión con la nube restaurada.",
+  "BalloonConnectedOk": "Conectado a la nube exitosamente.",
   "TooltipOffline": "AlwaysPrint (sin conexión)"
 }

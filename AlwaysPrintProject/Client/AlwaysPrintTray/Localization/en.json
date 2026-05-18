@@ -11,5 +11,6 @@
   "BalloonOfflineText": "Using cached config. No cloud connection.",
   "BalloonOfflineNoConfig": "No cloud connection and no cached config. Using defaults.",
   "BalloonReconnected": "Cloud connection restored.",
+  "BalloonConnectedOk": "Connected to cloud successfully.",
   "TooltipOffline": "AlwaysPrint (offline)"
 }
