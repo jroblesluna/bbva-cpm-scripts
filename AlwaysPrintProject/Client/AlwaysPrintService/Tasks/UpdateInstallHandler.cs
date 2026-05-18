@@ -158,9 +158,9 @@ echo [%date% %time%] Deteniendo servicio {ServiceName}... >> ""{logPath}""
 net stop {ServiceName} > nul 2>&1
 timeout /t 2 /nobreak > nul
 
-REM Ejecutar instalación silenciosa
+REM Ejecutar instalación silenciosa (REINSTALLMODE=amus fuerza copia de archivos incluso en downgrade)
 echo [%date% %time%] Ejecutando msiexec... >> ""{logPath}""
-msiexec /i ""{msiFilePath}"" /quiet /norestart /l*v ""{logPath}.msiexec.log""
+msiexec /i ""{msiFilePath}"" /quiet /norestart REINSTALLMODE=amus /l*v ""{logPath}.msiexec.log""
 set INSTALL_EXIT=%errorlevel%
 echo [%date% %time%] msiexec finalizado con código: %INSTALL_EXIT% >> ""{logPath}""
 
