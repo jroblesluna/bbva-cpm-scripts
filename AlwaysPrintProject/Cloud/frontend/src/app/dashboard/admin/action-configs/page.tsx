@@ -15,6 +15,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { organizationsApi } from '@/lib/api';
+import { useTranslations } from 'next-intl';
 import {
   Upload,
   FileText,
@@ -51,6 +52,7 @@ import {
   getActionConfigDetail,
   updateActionConfig,
   deleteActionConfig,
+  calculateConfigHash,
   validateAlwaysConfig,
 } from '@/lib/api/action-config';
 import type { ActionConfig, ActionConfigDetail } from '@/types/action-config';
@@ -60,6 +62,8 @@ export default function ActionConfigsPage() {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const t = useTranslations('actionConfigs');
+  const tCommon = useTranslations('common');
   
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -67,6 +71,7 @@ export default function ActionConfigsPage() {
   const [configJson, setConfigJson] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Organización seleccionada: admin puede cambiarla, operario usa la suya fija
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(
@@ -89,7 +94,7 @@ export default function ActionConfigsPage() {
 
   // La organización efectiva para todas las operaciones
   const organizationId = isAdmin() ? selectedOrgId : (user?.organization_id ?? null);
-  
+
   // Query para listar configuraciones
   const { data: configs, isLoading } = useQuery({
     queryKey: ['action-configs', organizationId],
@@ -104,26 +109,32 @@ export default function ActionConfigsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['action-configs', organizationId] });
       toast({
-        title: 'Configuración subida',
-        description: 'La configuración se ha subido exitosamente',
+        title: t('uploadSuccess'),
+        description: t('uploadSuccessDesc'),
       });
       setUploadDialogOpen(false);
       setConfigJson('');
       setValidationErrors([]);
+      setUploadError(null);
     },
-    onError: (error: any) => {
+    onError: async (error: any) => {
       const status = error?.status || error?.response?.status;
-      const detail = error?.detail || error?.response?.data?.detail || 'Error subiendo configuración';
+      const detail = error?.detail || error?.response?.data?.detail || t('errorUpload');
       
       if (status === 409) {
+        // Extraer hash del JSON actual para mostrar en el mensaje
+        const hash = await calculateConfigHash(configJson);
+        const msg = t('duplicateDesc', { hash });
+        setUploadError(msg);
         toast({
-          title: 'Configuración duplicada',
-          description: detail,
+          title: t('duplicateTitle'),
+          description: msg,
           variant: 'destructive',
         });
       } else {
+        setUploadError(detail);
         toast({
-          title: 'Error',
+          title: t('errorTitle'),
           description: detail,
           variant: 'destructive',
         });
@@ -138,14 +149,14 @@ export default function ActionConfigsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['action-configs', organizationId] });
       toast({
-        title: 'Configuración actualizada',
-        description: 'El estado de la configuración se ha actualizado',
+        title: t('updateSuccess'),
+        description: t('updateSuccessDesc'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
-        description: error.response?.data?.detail || 'Error actualizando configuración',
+        title: t('errorTitle'),
+        description: error?.detail || t('errorUpdate'),
         variant: 'destructive',
       });
     },
@@ -157,14 +168,14 @@ export default function ActionConfigsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['action-configs', organizationId] });
       toast({
-        title: 'Configuración eliminada',
-        description: 'La configuración se ha eliminado exitosamente',
+        title: t('deleteSuccess'),
+        description: t('deleteSuccessDesc'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Error',
-        description: error.response?.data?.detail || 'Error eliminando configuración',
+        title: t('errorTitle'),
+        description: error?.detail || t('errorDelete'),
         variant: 'destructive',
       });
     },
@@ -179,6 +190,7 @@ export default function ActionConfigsPage() {
     reader.onload = (e) => {
       const content = e.target?.result as string;
       setConfigJson(content);
+      setUploadError(null);
       
       // Validar automáticamente
       const validation = validateAlwaysConfig(content);
@@ -188,6 +200,8 @@ export default function ActionConfigsPage() {
   };
   
   const handleUpload = async () => {
+    setUploadError(null);
+    
     // Validar antes de subir
     const validation = validateAlwaysConfig(configJson);
     if (!validation.valid) {
@@ -209,7 +223,7 @@ export default function ActionConfigsPage() {
   };
   
   const handleDelete = (configId: number) => {
-    if (confirm('¿Estás seguro de eliminar esta configuración? Esta acción no se puede deshacer.')) {
+    if (confirm(t('deleteConfirm'))) {
       deleteMutation.mutate(configId);
     }
   };
@@ -221,8 +235,8 @@ export default function ActionConfigsPage() {
       setDetailDialogOpen(true);
     } catch (error: any) {
       toast({
-        title: 'Error',
-        description: 'Error cargando detalles de la configuración',
+        title: t('errorTitle'),
+        description: t('errorLoadDetail'),
         variant: 'destructive',
       });
     }
@@ -246,20 +260,20 @@ export default function ActionConfigsPage() {
   const selectedOrgName = isAdmin()
     ? organizations?.find(o => o.id === selectedOrgId)?.name
     : user?.organization?.name ?? user?.organization_id ?? '';
-  
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Configuraciones de Acciones</h1>
+          <h1 className="text-3xl font-bold">{t('title')}</h1>
           <p className="text-muted-foreground mt-1">
-            Gestiona las acciones administrativas que se ejecutan en las workstations
+            {t('subtitle')}
           </p>
         </div>
         
-        <Button onClick={() => setUploadDialogOpen(true)}>
+        <Button onClick={() => { setUploadDialogOpen(true); setUploadError(null); }}>
           <Upload className="mr-2 h-4 w-4" />
-          Subir Configuración
+          {t('uploadBtn')}
         </Button>
       </div>
 
@@ -272,7 +286,7 @@ export default function ActionConfigsPage() {
               {isAdmin() ? (
                 <div className="flex items-center gap-3">
                   <Label htmlFor="org-select" className="shrink-0 font-medium">
-                    Organización:
+                    {t('organization')}:
                   </Label>
                   <select
                     id="org-select"
@@ -281,7 +295,7 @@ export default function ActionConfigsPage() {
                     className="flex-1 max-w-xs px-3 py-1.5 border rounded-md text-sm bg-background"
                   >
                     {!organizations || organizations.length === 0 ? (
-                      <option value="">Cargando organizaciones...</option>
+                      <option value="">{t('loadingOrgs')}</option>
                     ) : (
                       organizations.map((org) => (
                         <option key={org.id} value={org.id}>
@@ -293,9 +307,9 @@ export default function ActionConfigsPage() {
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
-                  <span className="font-medium text-sm">Organización:</span>
+                  <span className="font-medium text-sm">{t('organization')}:</span>
                   <span className="text-sm text-muted-foreground">{selectedOrgName}</span>
-                  <Badge variant="secondary">Tu organización</Badge>
+                  <Badge variant="secondary">{t('yourOrganization')}</Badge>
                 </div>
               )}
             </div>
@@ -310,32 +324,32 @@ export default function ActionConfigsPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-green-600" />
-                <CardTitle>Configuración Activa</CardTitle>
+                <CardTitle>{t('activeConfig')}</CardTitle>
               </div>
               <Badge variant="default" className="bg-green-600">
-                Activa
+                {t('active')}
               </Badge>
             </div>
             <CardDescription>
-              Esta configuración se está propagando a las workstations
+              {t('activeConfigDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">Nombre</p>
+                <p className="text-sm text-muted-foreground">{t('name')}</p>
                 <p className="font-medium">{activeConfig.name}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Versión</p>
+                <p className="text-sm text-muted-foreground">{t('version')}</p>
                 <p className="font-medium">{activeConfig.version}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Hash</p>
+                <p className="text-sm text-muted-foreground">{t('hash')}</p>
                 <p className="font-mono text-sm">{activeConfig.config_hash}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Creada</p>
+                <p className="text-sm text-muted-foreground">{t('created')}</p>
                 <p className="text-sm">
                   {new Date(activeConfig.created_at).toLocaleDateString()}
                 </p>
@@ -349,7 +363,7 @@ export default function ActionConfigsPage() {
                 onClick={() => handleViewDetail(activeConfig)}
               >
                 <Eye className="mr-2 h-4 w-4" />
-                Ver Detalles
+                {t('viewDetails')}
               </Button>
               <Button
                 variant="outline"
@@ -357,7 +371,7 @@ export default function ActionConfigsPage() {
                 onClick={() => handleToggleActive(activeConfig)}
               >
                 <PowerOff className="mr-2 h-4 w-4" />
-                Desactivar
+                {t('deactivate')}
               </Button>
             </div>
           </CardContent>
@@ -367,24 +381,24 @@ export default function ActionConfigsPage() {
       {/* Lista de configuraciones */}
       <Card>
         <CardHeader>
-          <CardTitle>Todas las Configuraciones</CardTitle>
+          <CardTitle>{t('allConfigs')}</CardTitle>
           <CardDescription>
-            Historial de configuraciones subidas
+            {t('allConfigsDesc')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-center text-muted-foreground py-8">Cargando...</p>
+            <p className="text-center text-muted-foreground py-8">{tCommon('loading')}</p>
           ) : !configs || configs.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No hay configuraciones</p>
+              <p className="text-muted-foreground">{t('noConfigs')}</p>
               <Button
                 variant="outline"
                 className="mt-4"
                 onClick={() => setUploadDialogOpen(true)}
               >
-                Subir Primera Configuración
+                {t('uploadFirst')}
               </Button>
             </div>
           ) : (
@@ -398,7 +412,7 @@ export default function ActionConfigsPage() {
                     <div className="flex items-center gap-3">
                       <h3 className="font-medium">{config.name}</h3>
                       <Badge variant={config.is_active ? 'default' : 'secondary'}>
-                        {config.is_active ? 'Activa' : 'Inactiva'}
+                        {config.is_active ? t('active') : t('inactive')}
                       </Badge>
                       <span className="text-sm text-muted-foreground">
                         v{config.version}
@@ -410,9 +424,9 @@ export default function ActionConfigsPage() {
                       </p>
                     )}
                     <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                      <span>Hash: {config.config_hash}</span>
+                      <span>{t('hash')}: {config.config_hash}</span>
                       <span>
-                        Creada: {new Date(config.created_at).toLocaleDateString()}
+                        {t('created')}: {new Date(config.created_at).toLocaleDateString()}
                       </span>
                     </div>
                   </div>
@@ -454,21 +468,21 @@ export default function ActionConfigsPage() {
           )}
         </CardContent>
       </Card>
-      
+
       {/* Dialog para subir configuración */}
-      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+      <Dialog open={uploadDialogOpen} onOpenChange={(open) => { setUploadDialogOpen(open); if (!open) setUploadError(null); }}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Subir Configuración de Acciones</DialogTitle>
+            <DialogTitle>{t('uploadTitle')}</DialogTitle>
             <DialogDescription>
-              Sube un archivo .alwaysconfig con las acciones administrativas
+              {t('uploadDescription')}
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
             {/* Selector de organización (solo admin) o indicador (operario) */}
             <div>
-              <Label className="font-medium">Organización destino</Label>
+              <Label className="font-medium">{t('organizationTarget')}</Label>
               {isAdmin() ? (
                 <select
                   value={selectedOrgId ?? ''}
@@ -476,7 +490,7 @@ export default function ActionConfigsPage() {
                   className="mt-2 w-full px-3 py-2 border rounded-md text-sm bg-background"
                 >
                   {!organizations || organizations.length === 0 ? (
-                    <option value="">Cargando organizaciones...</option>
+                    <option value="">{t('loadingOrgs')}</option>
                   ) : (
                     organizations.map((org) => (
                       <option key={org.id} value={org.id}>
@@ -489,7 +503,7 @@ export default function ActionConfigsPage() {
                 <div className="mt-2 flex items-center gap-2 px-3 py-2 border rounded-md bg-muted/50">
                   <Building2 className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">{selectedOrgName}</span>
-                  <Badge variant="secondary" className="ml-auto">Tu organización</Badge>
+                  <Badge variant="secondary" className="ml-auto">{t('yourOrganization')}</Badge>
                 </div>
               )}
             </div>
@@ -499,14 +513,25 @@ export default function ActionConfigsPage() {
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Debes seleccionar una organización antes de subir la configuración.
+                  {t('selectOrgWarning')}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Error de subida (duplicado u otro) */}
+            {uploadError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <p className="font-semibold mb-1">{t('duplicateTitle')}</p>
+                  <p>{uploadError}</p>
                 </AlertDescription>
               </Alert>
             )}
 
             {/* Upload de archivo */}
             <div>
-              <Label htmlFor="file-upload">Archivo .alwaysconfig</Label>
+              <Label htmlFor="file-upload">{t('fileLabel')}</Label>
               <input
                 id="file-upload"
                 type="file"
@@ -523,16 +548,17 @@ export default function ActionConfigsPage() {
             
             {/* Editor de JSON */}
             <div>
-              <Label htmlFor="config-json">JSON de Configuración</Label>
+              <Label htmlFor="config-json">{t('jsonLabel')}</Label>
               <Textarea
                 id="config-json"
                 value={configJson}
                 onChange={(e) => {
                   setConfigJson(e.target.value);
+                  setUploadError(null);
                   const validation = validateAlwaysConfig(e.target.value);
                   setValidationErrors(validation.errors);
                 }}
-                placeholder='{"version": "1.0", "name": "Mi Configuración", ...}'
+                placeholder={t('jsonPlaceholder')}
                 className="mt-2 font-mono text-sm min-h-[300px]"
               />
             </div>
@@ -542,7 +568,7 @@ export default function ActionConfigsPage() {
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  <p className="font-semibold mb-2">Errores de validación:</p>
+                  <p className="font-semibold mb-2">{t('validationErrors')}</p>
                   <ul className="list-disc list-inside space-y-1">
                     {validationErrors.map((error, index) => (
                       <li key={index}>{error}</li>
@@ -560,7 +586,7 @@ export default function ActionConfigsPage() {
                 onCheckedChange={setIsActive}
               />
               <Label htmlFor="is-active">
-                Activar inmediatamente (desactiva configuración previa)
+                {t('activateImmediately')}
               </Label>
             </div>
           </div>
@@ -570,7 +596,7 @@ export default function ActionConfigsPage() {
               variant="outline"
               onClick={() => setUploadDialogOpen(false)}
             >
-              Cancelar
+              {tCommon('cancel')}
             </Button>
             <Button
               onClick={handleUpload}
@@ -581,7 +607,7 @@ export default function ActionConfigsPage() {
                 uploadMutation.isPending
               }
             >
-              {uploadMutation.isPending ? 'Subiendo...' : 'Subir'}
+              {uploadMutation.isPending ? t('uploading') : t('upload')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -593,7 +619,7 @@ export default function ActionConfigsPage() {
           <DialogHeader>
             <DialogTitle>{selectedConfig?.name}</DialogTitle>
             <DialogDescription>
-              Versión {selectedConfig?.version} • Hash: {selectedConfig?.config_hash}
+              {t('version')} {selectedConfig?.version} • {t('hash')}: {selectedConfig?.config_hash}
             </DialogDescription>
           </DialogHeader>
           
@@ -606,7 +632,7 @@ export default function ActionConfigsPage() {
               )}
               
               <div>
-                <Label>JSON de Configuración</Label>
+                <Label>{t('jsonLabel')}</Label>
                 <pre className="mt-2 p-4 bg-muted rounded-lg overflow-x-auto text-xs">
                   {JSON.stringify(JSON.parse(selectedConfig.config_json), null, 2)}
                 </pre>
@@ -618,7 +644,7 @@ export default function ActionConfigsPage() {
                   onClick={() => handleDownloadConfig(selectedConfig)}
                 >
                   <Download className="mr-2 h-4 w-4" />
-                  Descargar
+                  {t('download')}
                 </Button>
               </div>
             </div>
