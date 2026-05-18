@@ -293,12 +293,27 @@ def get_workstation_config_info(
     config = ActionConfigService.get_active_config(db, workstation.organization_id)
     
     if not config:
+        # Diagnóstico adicional: verificar si hay ALGUNA config para esta org
+        from sqlalchemy import func
+        total_configs = db.query(func.count(ActionConfig.id)).filter(
+            ActionConfig.organization_id == workstation.organization_id
+        ).scalar()
+        active_configs = db.query(func.count(ActionConfig.id)).filter(
+            ActionConfig.organization_id == workstation.organization_id,
+            ActionConfig.is_active == True
+        ).scalar()
+        
         logger.warning(
-            f"[ACTION_CONFIG] No hay configuración activa para organization_id={workstation.organization_id}"
+            f"[ACTION_CONFIG] No hay configuración activa para organization_id={workstation.organization_id}. "
+            f"Total configs en org: {total_configs}, activas: {active_configs}"
         )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No hay configuración activa"
+            detail=(
+                f"No hay configuración activa. "
+                f"org_id={workstation.organization_id}, "
+                f"configs_total={total_configs}, configs_activas={active_configs}"
+            )
         )
     
     logger.info(
