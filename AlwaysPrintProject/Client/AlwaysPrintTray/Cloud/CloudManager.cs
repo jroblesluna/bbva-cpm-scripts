@@ -374,27 +374,24 @@ namespace AlwaysPrintTray.Cloud
 
                 _credentials.SaveLastConnected(DateTime.UtcNow);
 
-                // Si se mostró el warning de sin-config-offline al inicio, confirmar conexión al usuario
-                if (_noConfigWarningShown)
+                // Mostrar notificación de conexión exitosa al usuario
+                _uiContext.Post(_ =>
                 {
-                    _uiContext.Post(_ =>
+                    try
                     {
-                        try
-                        {
-                            _trayIcon.ShowBalloonTip(
-                                3000,
-                                LocalizationManager.Get("BalloonOfflineTitle"),
-                                LocalizationManager.Get("BalloonConnectedOk"),
-                                ToolTipIcon.Info);
-                        }
-                        catch (Exception ex)
-                        {
-                            AlwaysPrintLogger.WriteTrayWarning(
-                                $"CloudManager: error mostrando balloon tip de conexión exitosa. {ex.Message}");
-                        }
-                    }, null);
-                    _noConfigWarningShown = false;
-                }
+                        _trayIcon.ShowBalloonTip(
+                            3000,
+                            "AlwaysPrint",
+                            LocalizationManager.Get("BalloonConnectedOk"),
+                            ToolTipIcon.Info);
+                    }
+                    catch (Exception ex)
+                    {
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            $"CloudManager: error mostrando balloon tip de conexión exitosa. {ex.Message}");
+                    }
+                }, null);
+                _noConfigWarningShown = false;
 
                 // Notificar que el registro fue exitoso (para que UpdateChecker pueda iniciar)
                 Registered?.Invoke();
