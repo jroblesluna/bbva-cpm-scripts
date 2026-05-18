@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace AlwaysPrint.Shared.Configuration
 {
@@ -54,10 +55,50 @@ namespace AlwaysPrint.Shared.Configuration
     public class SearchTargetsConfig
     {
         [JsonProperty("ips")]
+        [JsonConverter(typeof(StringOrArrayConverter))]
         public string Ips { get; set; } = string.Empty;
 
         [JsonProperty("ranges")]
+        [JsonConverter(typeof(StringOrArrayConverter))]
         public string Ranges { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Converter que acepta tanto un string CSV como un array JSON ["a","b"]
+    /// y lo convierte a string CSV separado por comas.
+    /// Esto permite compatibilidad entre el formato del backend (arrays) y el cliente (CSV).
+    /// </summary>
+    public class StringOrArrayConverter : JsonConverter<string>
+    {
+        public override string ReadJson(JsonReader reader, Type objectType, string existingValue, bool hasExistingValue, JsonSerializer serializer)
+        {
+            var token = JToken.Load(reader);
+
+            if (token.Type == JTokenType.Array)
+            {
+                // Convertir array ["a", "b"] → "a,b"
+                var items = token.ToObject<List<string>>();
+                return items != null ? string.Join(",", items) : string.Empty;
+            }
+
+            if (token.Type == JTokenType.String)
+            {
+                return token.ToString();
+            }
+
+            if (token.Type == JTokenType.Null)
+            {
+                return string.Empty;
+            }
+
+            return string.Empty;
+        }
+
+        public override void WriteJson(JsonWriter writer, string value, JsonSerializer serializer)
+        {
+            // Escribir siempre como string CSV
+            writer.WriteValue(value ?? string.Empty);
+        }
     }
 
     /// <summary>
