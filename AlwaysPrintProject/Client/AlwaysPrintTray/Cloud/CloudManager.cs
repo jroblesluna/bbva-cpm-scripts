@@ -412,6 +412,9 @@ namespace AlwaysPrintTray.Cloud
         {
             try
             {
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "CloudManager: procesando mensaje config_update recibido del servidor.");
+
                 var obj = JObject.Parse(json);
                 
                 // El config_hash está dentro del objeto "config" del mensaje
@@ -424,6 +427,9 @@ namespace AlwaysPrintTray.Cloud
                         "CloudManager: mensaje config_update recibido con config_hash ausente, nulo o vacío. Se ignora.");
                     return;
                 }
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: config_update con hash={configHash}. Iniciando sincronización...");
 
                 bool result = _configSync!.SyncIfNeeded(configHash!);
                 if (!result)
