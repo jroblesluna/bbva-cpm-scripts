@@ -13,7 +13,7 @@
   "BalloonOfflineNoConfig": "Sin conexión a la nube y sin configuración guardada. Usando valores por defecto.",
   "BalloonReconnected": "Conexión con la nube restaurada.",
   "BalloonConnectedOk": "Conectado a la nube exitosamente.",
-  "TooltipOffline": "AlwaysPrint (sin conexión)",
+  "TooltipOffline": "AlwaysPrint (sin conexión).",
   "BalloonCheckingUpdates": "Buscando actualizaciones...",
   "BalloonUpdating": "AlwaysPrint se está actualizando a la versión {0}.",
   "BalloonNoUpdates": "No hay actualizaciones disponibles. Ya tienes la última versión.",
