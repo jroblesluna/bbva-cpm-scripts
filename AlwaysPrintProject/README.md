@@ -129,20 +129,13 @@ Ver [Client/README.md](Client/README.md) para más detalles.
 
 ## 📚 Documentación
 
-### General
-- [SYSTEM-OVERVIEW.md](../SYSTEM-OVERVIEW.md) - Visión general del ecosistema completo
-
 ### Cloud Manager
 - [Cloud/README.md](Cloud/README.md) - Instalación y configuración
 - [Cloud/ARCHITECTURE.md](Cloud/ARCHITECTURE.md) - Arquitectura detallada
-- [Cloud/backend/README.md](Cloud/backend/README.md) - Backend FastAPI
-- [Cloud/frontend/README.md](Cloud/frontend/README.md) - Frontend Next.js
 
 ### Client
-- [Client/README.md](Client/README.md) - Instalación y configuración
+- [Client/README.md](Client/README.md) - Instalación, compilación y operación
 - [Client/AlwaysPrint.Shared/README.md](Client/AlwaysPrint.Shared/README.md) - Biblioteca compartida
-- [Client/AlwaysPrintService/README.md](Client/AlwaysPrintService/README.md) - Servicio Windows
-- [Client/AlwaysPrintTray/README.md](Client/AlwaysPrintTray/README.md) - Aplicación de bandeja
 
 ---
 
@@ -236,16 +229,12 @@ Ver [Client/README.md](Client/README.md) para más detalles.
 
 ## 📝 Estado del Proyecto
 
-### ✅ Completado
-- ✅ Client: Service, Tray, Named Pipe, instalador MSI
-- ✅ Cloud Manager: Backend multi-tenant, Frontend dashboard
-- ✅ Documentación completa
-- ✅ Build system automatizado
-
-### ⏳ En Desarrollo
-- ⏳ Integración Cloud en Client (CloudApiClient, HeartbeatManager)
-- ⏳ Endpoints de dispositivos en Backend
-- ⏳ Testing end-to-end
+- ✅ Client: Service, Tray, Named Pipe, instalador MSI, sistema de acciones administrativas
+- ✅ Cloud Manager: Backend multi-tenant, Frontend dashboard, telemetría, conectividad
+- ✅ Configuración jerárquica (Global → VLAN → Workstation)
+- ✅ Sistema de configuración de acciones remotas (.alwaysconfig)
+- ✅ CI/CD via GitHub Actions + AWS SSM
+- ⏳ Integración completa Cloud ↔ Client (heartbeat, config sync)
 
 ---
 

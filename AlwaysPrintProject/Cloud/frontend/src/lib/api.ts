@@ -16,9 +16,9 @@ import type {
   UserPasswordChange,
   LoginRequest,
   TokenResponse,
-  Account,
-  AccountCreate,
-  AccountUpdate,
+  Organization,
+  OrganizationCreate,
+  OrganizationUpdate,
   PublicIPCreate,
   Workstation,
   WorkstationUpdate,
@@ -241,77 +241,77 @@ export const authApi = {
 }
 
 // ============================================================================
-// CUENTAS
+// ORGANIZACIONES
 // ============================================================================
 
-export const accountsApi = {
+export const organizationsApi = {
   /**
-   * Listar todas las cuentas (solo Admin).
+   * Listar todas las organizaciones (solo Admin).
    */
-  list: async (): Promise<Account[]> => {
-    const response = await apiClient.get<{ items: Account[] }>('/accounts/')
+  list: async (): Promise<Organization[]> => {
+    const response = await apiClient.get<{ items: Organization[] }>('/organizations/')
     return response.data.items
   },
 
   /**
-   * Obtener cuenta por ID.
+   * Obtener organización por ID.
    */
-  get: async (id: string): Promise<Account> => {
-    const response = await apiClient.get<Account>(`/accounts/${id}`)
+  get: async (id: string): Promise<Organization> => {
+    const response = await apiClient.get<Organization>(`/organizations/${id}`)
     return response.data
   },
 
   /**
-   * Crear nueva cuenta (solo Admin).
+   * Crear nueva organización (solo Admin).
    */
-  create: async (data: AccountCreate): Promise<Account> => {
-    const response = await apiClient.post<Account>('/accounts/', data)
+  create: async (data: OrganizationCreate): Promise<Organization> => {
+    const response = await apiClient.post<Organization>('/organizations/', data)
     return response.data
   },
 
   /**
-   * Actualizar cuenta (solo Admin).
+   * Actualizar organización (solo Admin).
    */
-  update: async (id: string, data: AccountUpdate): Promise<Account> => {
-    const response = await apiClient.put<Account>(`/accounts/${id}`, data)
+  update: async (id: string, data: OrganizationUpdate): Promise<Organization> => {
+    const response = await apiClient.put<Organization>(`/organizations/${id}`, data)
     return response.data
   },
 
   /**
-   * Eliminar cuenta (solo Admin).
+   * Eliminar organización (solo Admin).
    */
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/accounts/${id}`)
+    await apiClient.delete(`/organizations/${id}`)
   },
 
   /**
-   * Agregar IP pública a cuenta.
+   * Agregar IP pública a organización.
    */
-  addPublicIP: async (id: string, data: PublicIPCreate): Promise<Account> => {
-    const response = await apiClient.post<Account>(`/accounts/${id}/public-ips`, data)
+  addPublicIP: async (id: string, data: PublicIPCreate): Promise<Organization> => {
+    const response = await apiClient.post<Organization>(`/organizations/${id}/public-ips`, data)
     return response.data
   },
 
   /**
-   * Eliminar IP pública de cuenta.
+   * Eliminar IP pública de organización.
    */
-  removePublicIP: async (accountId: string, ipId: string): Promise<void> => {
-    await apiClient.delete(`/accounts/${accountId}/public-ips/${ipId}`)
+  removePublicIP: async (organizationId: string, ipId: string): Promise<void> => {
+    await apiClient.delete(`/organizations/${organizationId}/public-ips/${ipId}`)
   },
 
   /**
    * Listar IPs públicas pendientes de autorización (solo Admin).
    */
   listPendingIPs: async (): Promise<any[]> => {
-    const response = await apiClient.get<any[]>('/accounts/public-ips/pending')
+    const response = await apiClient.get<any[]>('/organizations/public-ips/pending')
     return response.data
   },
 
   /**
-   * Autorizar IP pública y asignarla a una cuenta (solo Admin).
+   * Autorizar IP pública y asignarla a una organización (solo Admin).
    */
-  authorizeIP: async (ipId: string, data: { account_id: string; description?: string }): Promise<any> => {
-    const response = await apiClient.post<any>(`/accounts/public-ips/${ipId}/authorize`, data)
+  authorizeIP: async (ipId: string, data: { organization_id: string; description?: string }): Promise<any> => {
+    const response = await apiClient.post<any>(`/organizations/public-ips/${ipId}/authorize`, data)
     return response.data
   },
 
@@ -319,9 +319,10 @@ export const accountsApi = {
    * Rechazar IP pública pendiente (solo Admin).
    */
   rejectIP: async (ipId: string): Promise<void> => {
-    await apiClient.delete(`/accounts/public-ips/${ipId}/reject`)
+    await apiClient.delete(`/organizations/public-ips/${ipId}/reject`)
   },
 }
+
 
 // ============================================================================
 // USUARIOS

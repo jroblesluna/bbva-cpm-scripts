@@ -12,7 +12,7 @@ Este módulo implementa el ConnectionManager que gestiona:
 import asyncio
 import json
 from typing import Dict, List, Optional, Set
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import WebSocket
 from sqlalchemy.orm import Session
 
@@ -67,7 +67,7 @@ class ConnectionManager:
         """
         async with self._lock:
             self.workstation_connections[workstation_id] = websocket
-            self.last_pong[workstation_id] = datetime.utcnow()
+            self.last_pong[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
         
         # Actualizar estado en base de datos
         workstation_service = WorkstationService()
@@ -212,23 +212,23 @@ class ConnectionManager:
             if not self.operator_connections[user_id]:
                 del self.operator_connections[user_id]
     
-    async def broadcast_to_account(
+    async def broadcast_to_organization(
         self, 
-        account_id: str, 
+        organization_id: str, 
         message: dict,
         db: Session
     ):
         """
-        Envía mensaje a todos los operadores de una cuenta.
+        Envía mensaje a todos los operadores de una organización.
         
         Args:
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             message: Mensaje a enviar
             db: Sesión de base de datos
         """
-        # Obtener todos los usuarios de la cuenta
+        # Obtener todos los usuarios de la organización
         from app.models.user import User
-        users = db.query(User).filter_by(account_id=account_id).all()
+        users = db.query(User).filter_by(organization_id=organization_id).all()
         
         # Enviar a cada usuario
         for user in users:
@@ -273,7 +273,7 @@ class ConnectionManager:
             workstation_id: UUID de la workstation
         """
         async with self._lock:
-            self.last_pong[workstation_id] = datetime.utcnow()
+            self.last_pong[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
     
     async def start_ping_loop(self, db_session_factory):
         """
@@ -290,7 +290,7 @@ class ConnectionManager:
         while self._ping_loop_running:
             await asyncio.sleep(30)  # Ping cada 30 segundos
             
-            current_time = datetime.utcnow()
+            current_time = datetime.now(timezone.utc).replace(tzinfo=None)
             dead_workstations = []
             
             async with self._lock:

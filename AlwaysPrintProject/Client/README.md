@@ -436,6 +436,5 @@ Prohibida la utilización sin autorización de Inversiones On Line SAC
 
 ## Documentación Adicional
 
-- [AlwaysPrint Cloud Manager](../../Cloud/README.md) - Plataforma SaaS de gestión centralizada
-- [Visión General del Sistema](../../SYSTEM-OVERVIEW.md) - Ecosistema completo
+- [AlwaysPrint Cloud Manager](../Cloud/README.md) - Plataforma SaaS de gestión centralizada
 - [Proyecto Principal](../README.md) - AlwaysPrint Project

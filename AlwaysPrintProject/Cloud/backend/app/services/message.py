@@ -9,7 +9,7 @@ Este servicio implementa la lógica de negocio para:
 """
 
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.message import Message, TargetType
@@ -32,7 +32,7 @@ class MessageService:
     def send_message_to_workstation(
         self,
         db: Session,
-        account_id: str,
+        organization_id: str,
         sender_id: str,
         workstation_id: str,
         content: str
@@ -42,7 +42,7 @@ class MessageService:
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             sender_id: UUID del usuario que envía el mensaje
             workstation_id: UUID de la workstation destinataria
             content: Contenido del mensaje (máx 5000 caracteres)
@@ -51,7 +51,7 @@ class MessageService:
             Message creado
             
         Raises:
-            ValueError: Si la workstation no existe o no pertenece a la cuenta
+            ValueError: Si la workstation no existe o no pertenece a la organización
             ValueError: Si el contenido excede 5000 caracteres
         """
         # Validar longitud del contenido
@@ -61,27 +61,27 @@ class MessageService:
                 f"(actual: {len(content)})"
             )
         
-        # Verificar que la workstation existe y pertenece a la cuenta
+        # Verificar que la workstation existe y pertenece a la organización
         workstation = db.query(Workstation).filter_by(
             id=workstation_id,
-            account_id=account_id
+            organization_id=organization_id
         ).first()
         
         if not workstation:
             raise ValueError(
                 f"Workstation {workstation_id} no encontrada o no pertenece "
-                f"a la cuenta {account_id}"
+                f"a la organización {organization_id}"
             )
         
         # Crear mensaje
         message = Message(
-            account_id=account_id,
+            organization_id=organization_id,
             sender_id=sender_id,
             target_type=TargetType.WORKSTATION,
             target_id=workstation_id,
             content=content,
             is_delivered=False,
-            sent_at=datetime.utcnow()
+            sent_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         
         db.add(message)
@@ -93,7 +93,7 @@ class MessageService:
     def send_message_to_vlan(
         self,
         db: Session,
-        account_id: str,
+        organization_id: str,
         sender_id: str,
         vlan_id: str,
         content: str
@@ -103,7 +103,7 @@ class MessageService:
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             sender_id: UUID del usuario que envía el mensaje
             vlan_id: UUID de la VLAN destinataria
             content: Contenido del mensaje (máx 5000 caracteres)
@@ -112,7 +112,7 @@ class MessageService:
             Message creado
             
         Raises:
-            ValueError: Si la VLAN no existe o no pertenece a la cuenta
+            ValueError: Si la VLAN no existe o no pertenece a la organización
             ValueError: Si el contenido excede 5000 caracteres
         """
         # Validar longitud del contenido
@@ -122,26 +122,26 @@ class MessageService:
                 f"(actual: {len(content)})"
             )
         
-        # Verificar que la VLAN existe y pertenece a la cuenta
+        # Verificar que la VLAN existe y pertenece a la organización
         vlan = db.query(VLAN).filter_by(
             id=vlan_id,
-            account_id=account_id
+            organization_id=organization_id
         ).first()
         
         if not vlan:
             raise ValueError(
-                f"VLAN {vlan_id} no encontrada o no pertenece a la cuenta {account_id}"
+                f"VLAN {vlan_id} no encontrada o no pertenece a la organización {organization_id}"
             )
         
         # Crear mensaje
         message = Message(
-            account_id=account_id,
+            organization_id=organization_id,
             sender_id=sender_id,
             target_type=TargetType.VLAN,
             target_id=vlan_id,
             content=content,
             is_delivered=False,
-            sent_at=datetime.utcnow()
+            sent_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         
         db.add(message)
@@ -150,19 +150,19 @@ class MessageService:
         
         return message
     
-    def send_message_to_account(
+    def send_message_to_organization(
         self,
         db: Session,
-        account_id: str,
+        organization_id: str,
         sender_id: str,
         content: str
     ) -> Message:
         """
-        Envía un mensaje a todas las workstations de una cuenta (broadcast).
+        Envía un mensaje a todas las workstations de una organización (broadcast).
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             sender_id: UUID del usuario que envía el mensaje
             content: Contenido del mensaje (máx 5000 caracteres)
             
@@ -179,15 +179,15 @@ class MessageService:
                 f"(actual: {len(content)})"
             )
         
-        # Crear mensaje (target_id es NULL para broadcast a cuenta)
+        # Crear mensaje (target_id es NULL para broadcast a organización)
         message = Message(
-            account_id=account_id,
+            organization_id=organization_id,
             sender_id=sender_id,
             target_type=TargetType.ACCOUNT,
             target_id=None,
             content=content,
             is_delivered=False,
-            sent_at=datetime.utcnow()
+            sent_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         
         db.add(message)
@@ -219,7 +219,7 @@ class MessageService:
             raise ValueError(f"Mensaje {message_id} no encontrado")
         
         message.is_delivered = True
-        message.delivered_at = datetime.utcnow()
+        message.delivered_at = datetime.now(timezone.utc).replace(tzinfo=None)
         
         db.commit()
         db.refresh(message)
@@ -259,7 +259,7 @@ class MessageService:
         
         # 1. Mensajes dirigidos a la workstation específica
         ws_messages = db.query(Message).filter(
-            Message.account_id == workstation.account_id,
+            Message.organization_id == workstation.organization_id,
             Message.target_type == TargetType.WORKSTATION,
             Message.target_id == workstation_id,
             Message.is_delivered == False
@@ -269,7 +269,7 @@ class MessageService:
         # 2. Mensajes dirigidos a la VLAN (si la workstation pertenece a una)
         if workstation.vlan_id:
             vlan_messages = db.query(Message).filter(
-                Message.account_id == workstation.account_id,
+                Message.organization_id == workstation.organization_id,
                 Message.target_type == TargetType.VLAN,
                 Message.target_id == workstation.vlan_id,
                 Message.is_delivered == False
@@ -277,22 +277,22 @@ class MessageService:
             messages.extend(vlan_messages)
         
         # 3. Mensajes broadcast a la cuenta
-        account_messages = db.query(Message).filter(
-            Message.account_id == workstation.account_id,
+        org_messages = db.query(Message).filter(
+            Message.organization_id == workstation.organization_id,
             Message.target_type == TargetType.ACCOUNT,
             Message.is_delivered == False
         ).order_by(Message.sent_at.asc()).all()
-        messages.extend(account_messages)
+        messages.extend(org_messages)
         
         # Ordenar por fecha de envío
         messages.sort(key=lambda m: m.sent_at)
         
         return messages
     
-    def get_messages_by_account(
+    def get_messages_by_organization(
         self,
         db: Session,
-        account_id: str,
+        organization_id: str,
         target_type: Optional[TargetType] = None,
         is_delivered: Optional[bool] = None,
         sender_id: Optional[str] = None,
@@ -300,11 +300,11 @@ class MessageService:
         limit: int = 100
     ) -> tuple[List[Message], int]:
         """
-        Obtiene mensajes de una cuenta con filtros opcionales.
+        Obtiene mensajes de una organización con filtros opcionales.
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             target_type: Filtrar por tipo de destinatario (opcional)
             is_delivered: Filtrar por estado de entrega (opcional)
             sender_id: Filtrar por remitente (opcional)
@@ -316,7 +316,7 @@ class MessageService:
             - messages: Lista de mensajes
             - total: Número total de mensajes (sin paginación)
         """
-        query = db.query(Message).filter_by(account_id=account_id)
+        query = db.query(Message).filter_by(organization_id=organization_id)
         
         # Aplicar filtros
         if target_type is not None:
@@ -355,42 +355,42 @@ class MessageService:
         """
         return db.query(Message).filter_by(id=message_id).first()
     
-    def get_pending_count(self, db: Session, account_id: str) -> int:
+    def get_pending_count(self, db: Session, organization_id: str) -> int:
         """
-        Obtiene el número de mensajes pendientes de una cuenta.
+        Obtiene el número de mensajes pendientes de una organización.
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             
         Returns:
             Número de mensajes pendientes
         """
         return db.query(Message).filter_by(
-            account_id=account_id,
+            organization_id=organization_id,
             is_delivered=False
         ).count()
     
-    def get_delivered_count(self, db: Session, account_id: str) -> int:
+    def get_delivered_count(self, db: Session, organization_id: str) -> int:
         """
-        Obtiene el número de mensajes entregados de una cuenta.
+        Obtiene el número de mensajes entregados de una organización.
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             
         Returns:
             Número de mensajes entregados
         """
         return db.query(Message).filter_by(
-            account_id=account_id,
+            organization_id=organization_id,
             is_delivered=True
         ).count()
     
     def delete_old_delivered_messages(
         self,
         db: Session,
-        account_id: str,
+        organization_id: str,
         days_old: int = 30
     ) -> int:
         """
@@ -400,7 +400,7 @@ class MessageService:
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             days_old: Número de días de antigüedad (default: 30)
             
         Returns:
@@ -408,11 +408,11 @@ class MessageService:
         """
         from datetime import timedelta
         
-        cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+        cutoff_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days_old)
         
         # Buscar mensajes antiguos entregados
         old_messages = db.query(Message).filter(
-            Message.account_id == account_id,
+            Message.organization_id == organization_id,
             Message.is_delivered == True,
             Message.delivered_at < cutoff_date
         ).all()
@@ -464,9 +464,9 @@ class MessageService:
             ).all()
         
         elif message.target_type == TargetType.ACCOUNT:
-            # Mensaje broadcast a toda la cuenta
+            # Mensaje broadcast a toda la organización
             workstations = db.query(Workstation).filter_by(
-                account_id=message.account_id
+                organization_id=message.organization_id
             ).all()
         
         return workstations

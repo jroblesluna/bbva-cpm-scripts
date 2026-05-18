@@ -7,6 +7,7 @@ using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
 using AlwaysPrint.Shared.Models;
+using AlwaysPrintService.Actions;
 using AlwaysPrintService.Pipe;
 using AlwaysPrintService.Queue;
 using AlwaysPrintService.UserSession;
@@ -25,6 +26,7 @@ namespace AlwaysPrintService
         private readonly ServiceStateMachine   _state     = new ServiceStateMachine();
         private readonly RegistryConfigManager _registry  = new RegistryConfigManager();
         private readonly TaskQueueManager      _taskQueue = new TaskQueueManager();
+        private readonly ActionEngine          _actionEngine = new ActionEngine();
         private MessageDispatcher?   _dispatcher;
         private PipeServer?          _pipeServer;
 
@@ -36,6 +38,11 @@ namespace AlwaysPrintService
 
         private Thread? _startupThread;
         private CancellationTokenSource _cts = new CancellationTokenSource();
+        
+        // Ruta del archivo de configuración de acciones
+        private string ConfigFilePath => Path.Combine(
+            Path.GetDirectoryName(Process.GetCurrentProcess().MainModule!.FileName)!,
+            "active.alwaysconfig");
 
         private new const bool CanHandleSessionChangeEvent = true;
 
@@ -102,6 +109,15 @@ namespace AlwaysPrintService
 
         protected override void OnStart(string[] args)
         {
+            // Capturar excepciones no manejadas en threads de background para evitar crash silencioso
+            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+            {
+                var ex = e.ExceptionObject as Exception;
+                AlwaysPrintLogger.WriteError(
+                    $"EXCEPCIÓN NO MANEJADA (IsTerminating={e.IsTerminating}): {ex?.GetType().Name}: {ex?.Message}\n{ex?.StackTrace}",
+                    AlwaysPrintLogger.EvtGenericError);
+            };
+
             _startupThread = new Thread(RunStartupSequence)
             {
                 IsBackground = true,
@@ -159,6 +175,7 @@ namespace AlwaysPrintService
             try
             {
                 AlwaysPrintLogger.WriteInfo("AlwaysPrintService iniciando...", AlwaysPrintLogger.EvtServiceStarted);
+                AlwaysPrintLogger.WriteInfo($"Versión: {System.Reflection.Assembly.GetExecutingAssembly().GetName().Version}", AlwaysPrintLogger.EvtServiceStarted);
                 _state.Transition(ServiceState.Starting);
 
                 // 1. Guardia contra instancias duplicadas.
@@ -181,6 +198,9 @@ namespace AlwaysPrintService
                 // 3. Asegurar valores por defecto en registro.
                 _registry.EnsureDefaults();
 
+                // 3.5. Cargar configuración de acciones si existe.
+                LoadActionConfiguration();
+
                 // 4. Inicializar cola de tareas.
                 _taskQueue.Start();
                 int cleared = _taskQueue.ClearAll();
@@ -191,7 +211,7 @@ namespace AlwaysPrintService
                     AlwaysPrintLogger.WriteInfo("Cola de tareas inicializada vacía.", AlwaysPrintLogger.EvtQueueCleared);
 
                 // 5. Iniciar servidor Named Pipe.
-                _dispatcher = new MessageDispatcher(_registry, _taskQueue, _state);
+                _dispatcher = new MessageDispatcher(_registry, _taskQueue, _state, ReloadActionConfiguration);
                 _dispatcher.TrayInitializedReceived += OnTrayInitialized;
                 _pipeServer = new PipeServer(_dispatcher);
                 _pipeServer.Start();
@@ -300,12 +320,25 @@ namespace AlwaysPrintService
             // independientemente del resultado del health check de dominios bootstrap.
             // Principio offline-first: el sistema funciona sin conectividad externa.
             _trayInitGate.Set();
+            
+            // Ejecutar trigger OnTrayLaunched después de que el Tray se haya inicializado
+            ExecuteActionTrigger(TriggerEvents.OnTrayLaunched);
         }
 
         private void MonitoringLoop()
         {
             while (!_cts.IsCancellationRequested && _state.Is(ServiceState.Running))
             {
+                // Verificar si el Tray sigue vivo
+                if (!IsTrayRunning())
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        "Tray no está corriendo. Relanzando...",
+                        AlwaysPrintLogger.EvtTrayKilled);
+                    // Salir del MonitoringLoop para que RunSessionLoop relance el Tray
+                    break;
+                }
+
                 var cfg = _registry.Load();
                 int interval = Math.Max(1, cfg.PendingTaskPollingMinutes);
 
@@ -339,7 +372,98 @@ namespace AlwaysPrintService
             return count;
         }
 
+        private static bool IsTrayRunning()
+        {
+            return Process.GetProcessesByName("AlwaysPrintTray").Length > 0;
+        }
+
         public void TestStartFromConsole()  => OnStart(Array.Empty<string>());
         public void TestStopFromConsole()   => OnStop();
+        
+        // ── Gestión de Configuración de Acciones ────────────────────────────────
+        
+        /// <summary>
+        /// Carga la configuración de acciones desde el archivo active.alwaysconfig.
+        /// </summary>
+        private void LoadActionConfiguration()
+        {
+            try
+            {
+                if (File.Exists(ConfigFilePath))
+                {
+                    AlwaysPrintLogger.WriteInfo($"Cargando configuración de acciones desde {ConfigFilePath}");
+                    
+                    bool loaded = _actionEngine.LoadConfiguration(ConfigFilePath);
+                    
+                    if (loaded)
+                    {
+                        AlwaysPrintLogger.WriteInfo($"Configuración de acciones cargada: {_actionEngine.GetConfigurationInfo()}");
+                        
+                        // Ejecutar trigger OnServiceStart si existe
+                        ExecuteActionTrigger(TriggerEvents.OnServiceStart);
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteWarning("No se pudo cargar la configuración de acciones");
+                    }
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteInfo($"No existe archivo de configuración de acciones: {ConfigFilePath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"Error cargando configuración de acciones: {ex.Message}", ex);
+            }
+        }
+        
+        /// <summary>
+        /// Recarga la configuración de acciones desde el archivo.
+        /// </summary>
+        public void ReloadActionConfiguration()
+        {
+            try
+            {
+                AlwaysPrintLogger.WriteInfo("Recargando configuración de acciones");
+                LoadActionConfiguration();
+                
+                // Ejecutar trigger OnConfigChange si existe
+                ExecuteActionTrigger(TriggerEvents.OnConfigChange);
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"Error recargando configuración de acciones: {ex.Message}", ex);
+            }
+        }
+        
+        /// <summary>
+        /// Ejecuta un trigger de acciones si está configurado.
+        /// </summary>
+        private void ExecuteActionTrigger(string eventName)
+        {
+            try
+            {
+                if (_actionEngine.HasTrigger(eventName))
+                {
+                    AlwaysPrintLogger.WriteInfo($"Ejecutando trigger de acciones para evento: {eventName}");
+                    
+                    bool success = _actionEngine.ExecuteTrigger(eventName);
+                    
+                    if (success)
+                    {
+                        AlwaysPrintLogger.WriteInfo($"Trigger '{eventName}' ejecutado exitosamente");
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteWarning($"Trigger '{eventName}' completado con errores");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"Error ejecutando trigger '{eventName}': {ex.Message}", ex);
+            }
+        }
     }
 }

@@ -8,7 +8,7 @@ Este servicio implementa la lógica de negocio para:
 """
 
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
@@ -56,7 +56,7 @@ class AuditService:
         entity_id: str,
         user_id: Optional[str] = None,
         workstation_id: Optional[str] = None,
-        account_id: Optional[str] = None,
+        organization_id: Optional[str] = None,
         old_values: Optional[Dict[str, Any]] = None,
         new_values: Optional[Dict[str, Any]] = None,
         ip_address: Optional[str] = None
@@ -71,7 +71,7 @@ class AuditService:
             entity_id: UUID de la entidad afectada
             user_id: UUID del usuario que realizó la acción (None para sistema)
             workstation_id: UUID de la workstation afectada (opcional)
-            account_id: UUID de la cuenta afectada (opcional)
+            organization_id: UUID de la organización afectada (opcional)
             old_values: Valores anteriores (para UPDATE)
             new_values: Valores nuevos (para CREATE/UPDATE)
             ip_address: IP desde donde se realizó la acción
@@ -82,14 +82,14 @@ class AuditService:
         audit_log = AuditLog(
             user_id=user_id,
             workstation_id=workstation_id,
-            account_id=account_id,
+            organization_id=organization_id,
             action_type=action_type,
             entity_type=entity_type,
             entity_id=entity_id,
             old_values=_sanitize_for_json(old_values),
             new_values=_sanitize_for_json(new_values),
             ip_address=ip_address,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         
         db.add(audit_log)
@@ -104,7 +104,7 @@ class AuditService:
         entity_type: str,
         entity_id: str,
         user_id: str,
-        account_id: str,
+        organization_id: str,
         old_config: Dict[str, Any],
         new_config: Dict[str, Any],
         ip_address: Optional[str] = None
@@ -117,7 +117,7 @@ class AuditService:
             entity_type: Tipo de configuración ("GlobalConfig", "VLANConfig", "WorkstationConfig")
             entity_id: UUID de la configuración
             user_id: UUID del usuario que realizó el cambio
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             old_config: Configuración anterior
             new_config: Configuración nueva
             ip_address: IP desde donde se realizó el cambio
@@ -131,7 +131,7 @@ class AuditService:
             entity_type=entity_type,
             entity_id=entity_id,
             user_id=user_id,
-            account_id=account_id,
+            organization_id=organization_id,
             old_values=old_config,
             new_values=new_config,
             ip_address=ip_address
@@ -141,7 +141,7 @@ class AuditService:
         self,
         db: Session,
         workstation_id: str,
-        account_id: str,
+        organization_id: str,
         user_id: Optional[str],
         activated: bool,
         ip_address: Optional[str] = None
@@ -152,7 +152,7 @@ class AuditService:
         Args:
             db: Sesión de base de datos
             workstation_id: UUID de la workstation
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             user_id: UUID del usuario (None si fue automático)
             activated: True si se activó, False si se desactivó
             ip_address: IP desde donde se realizó la acción
@@ -167,7 +167,7 @@ class AuditService:
             entity_id=workstation_id,
             user_id=user_id,
             workstation_id=workstation_id,
-            account_id=account_id,
+            organization_id=organization_id,
             new_values={"contingency_active": activated},
             ip_address=ip_address
         )
@@ -177,7 +177,7 @@ class AuditService:
         db: Session,
         message_id: str,
         sender_id: str,
-        account_id: str,
+        organization_id: str,
         target_type: str,
         target_id: Optional[str],
         content_preview: str,
@@ -190,7 +190,7 @@ class AuditService:
             db: Sesión de base de datos
             message_id: UUID del mensaje
             sender_id: UUID del usuario que envió el mensaje
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             target_type: Tipo de destinatario ("workstation", "vlan", "account")
             target_id: UUID del destinatario (None para broadcast)
             content_preview: Preview del contenido (primeros 200 caracteres)
@@ -205,7 +205,7 @@ class AuditService:
             entity_type="Message",
             entity_id=message_id,
             user_id=sender_id,
-            account_id=account_id,
+            organization_id=organization_id,
             new_values={
                 "target_type": target_type,
                 "target_id": target_id,
@@ -219,7 +219,7 @@ class AuditService:
         db: Session,
         command_type: str,
         workstation_id: str,
-        account_id: str,
+        organization_id: str,
         user_id: str,
         command_params: Dict[str, Any],
         ip_address: Optional[str] = None
@@ -231,7 +231,7 @@ class AuditService:
             db: Sesión de base de datos
             command_type: Tipo de comando ("restart_service", "update_config", etc.)
             workstation_id: UUID de la workstation destinataria
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             user_id: UUID del usuario que envió el comando
             command_params: Parámetros del comando
             ip_address: IP desde donde se envió
@@ -246,7 +246,7 @@ class AuditService:
             entity_id=workstation_id,  # Usamos workstation_id como entity_id
             user_id=user_id,
             workstation_id=workstation_id,
-            account_id=account_id,
+            organization_id=organization_id,
             new_values={
                 "command_type": command_type,
                 "params": command_params
@@ -260,7 +260,7 @@ class AuditService:
         entity_type: str,
         entity_id: str,
         user_id: str,
-        account_id: Optional[str],
+        organization_id: Optional[str],
         entity_data: Dict[str, Any],
         ip_address: Optional[str] = None
     ) -> AuditLog:
@@ -272,7 +272,7 @@ class AuditService:
             entity_type: Tipo de entidad ("Account", "User", "VLAN", etc.)
             entity_id: UUID de la entidad creada
             user_id: UUID del usuario que creó la entidad
-            account_id: UUID de la cuenta (si aplica)
+            organization_id: UUID de la organización (si aplica)
             entity_data: Datos de la entidad creada
             ip_address: IP desde donde se creó
             
@@ -285,7 +285,7 @@ class AuditService:
             entity_type=entity_type,
             entity_id=entity_id,
             user_id=user_id,
-            account_id=account_id,
+            organization_id=organization_id,
             new_values=entity_data,
             ip_address=ip_address
         )
@@ -296,7 +296,7 @@ class AuditService:
         entity_type: str,
         entity_id: str,
         user_id: str,
-        account_id: Optional[str],
+        organization_id: Optional[str],
         old_data: Dict[str, Any],
         new_data: Dict[str, Any],
         ip_address: Optional[str] = None
@@ -309,7 +309,7 @@ class AuditService:
             entity_type: Tipo de entidad
             entity_id: UUID de la entidad actualizada
             user_id: UUID del usuario que actualizó
-            account_id: UUID de la cuenta (si aplica)
+            organization_id: UUID de la organización (si aplica)
             old_data: Datos anteriores
             new_data: Datos nuevos
             ip_address: IP desde donde se actualizó
@@ -323,7 +323,7 @@ class AuditService:
             entity_type=entity_type,
             entity_id=entity_id,
             user_id=user_id,
-            account_id=account_id,
+            organization_id=organization_id,
             old_values=old_data,
             new_values=new_data,
             ip_address=ip_address
@@ -335,7 +335,7 @@ class AuditService:
         entity_type: str,
         entity_id: str,
         user_id: str,
-        account_id: Optional[str],
+        organization_id: Optional[str],
         entity_data: Dict[str, Any],
         ip_address: Optional[str] = None
     ) -> AuditLog:
@@ -347,7 +347,7 @@ class AuditService:
             entity_type: Tipo de entidad
             entity_id: UUID de la entidad eliminada
             user_id: UUID del usuario que eliminó
-            account_id: UUID de la cuenta (si aplica)
+            organization_id: UUID de la organización (si aplica)
             entity_data: Datos de la entidad antes de eliminar
             ip_address: IP desde donde se eliminó
             
@@ -360,7 +360,7 @@ class AuditService:
             entity_type=entity_type,
             entity_id=entity_id,
             user_id=user_id,
-            account_id=account_id,
+            organization_id=organization_id,
             old_values=entity_data,
             ip_address=ip_address
         )
@@ -368,7 +368,7 @@ class AuditService:
     def search_audit_logs(
         self,
         db: Session,
-        account_id: Optional[str] = None,
+        organization_id: Optional[str] = None,
         user_id: Optional[str] = None,
         workstation_id: Optional[str] = None,
         action_type: Optional[ActionType] = None,
@@ -385,7 +385,7 @@ class AuditService:
         
         Args:
             db: Sesión de base de datos
-            account_id: Filtrar por cuenta (opcional)
+            organization_id: Filtrar por organización (opcional)
             user_id: Filtrar por usuario (opcional)
             workstation_id: Filtrar por workstation (opcional)
             action_type: Filtrar por tipo de acción (opcional)
@@ -405,8 +405,8 @@ class AuditService:
         query = db.query(AuditLog)
         
         # Aplicar filtros
-        if account_id is not None:
-            query = query.filter_by(account_id=account_id)
+        if organization_id is not None:
+            query = query.filter_by(organization_id=organization_id)
         
         if user_id is not None:
             query = query.filter_by(user_id=user_id)
@@ -479,26 +479,26 @@ class AuditService:
     def get_recent_activity(
         self,
         db: Session,
-        account_id: str,
+        organization_id: str,
         hours: int = 24,
         limit: int = 50
     ) -> List[AuditLog]:
         """
-        Obtiene actividad reciente de una cuenta.
+        Obtiene actividad reciente de una organización.
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             hours: Número de horas hacia atrás (default: 24)
             limit: Número máximo de registros
             
         Returns:
             Lista de AuditLog recientes
         """
-        cutoff_date = datetime.utcnow() - timedelta(hours=hours)
+        cutoff_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
         
         logs = db.query(AuditLog).filter(
-            AuditLog.account_id == account_id,
+            AuditLog.organization_id == organization_id,
             AuditLog.created_at >= cutoff_date
         ).order_by(
             AuditLog.created_at.desc()
@@ -553,7 +553,7 @@ class AuditService:
         Returns:
             Número de logs eliminados
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=retention_months * 30)
+        cutoff_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=retention_months * 30)
         
         # Buscar logs antiguos
         old_logs = db.query(AuditLog).filter(
@@ -573,7 +573,7 @@ class AuditService:
     def get_action_count_by_type(
         self,
         db: Session,
-        account_id: str,
+        organization_id: str,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None
     ) -> Dict[str, int]:
@@ -584,14 +584,14 @@ class AuditService:
         
         Args:
             db: Sesión de base de datos
-            account_id: UUID de la cuenta
+            organization_id: UUID de la organización
             start_date: Fecha de inicio (opcional)
             end_date: Fecha de fin (opcional)
             
         Returns:
             Diccionario {action_type: count}
         """
-        query = db.query(AuditLog).filter_by(account_id=account_id)
+        query = db.query(AuditLog).filter_by(organization_id=organization_id)
         
         if start_date:
             query = query.filter(AuditLog.created_at >= start_date)

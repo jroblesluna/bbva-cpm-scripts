@@ -22,6 +22,7 @@ namespace AlwaysPrintService.Pipe
         private readonly RegistryConfigManager _registry;
         private readonly TaskQueueManager _taskQueue;
         private readonly ServiceStateMachine _stateMachine;
+        private readonly Action? _reloadActionConfigCallback;
 
         // Raised when the Tray sends TrayInitialized.
         public event Action<bool, string?>? TrayInitializedReceived;
@@ -29,11 +30,13 @@ namespace AlwaysPrintService.Pipe
         public MessageDispatcher(
             RegistryConfigManager registry,
             TaskQueueManager taskQueue,
-            ServiceStateMachine stateMachine)
+            ServiceStateMachine stateMachine,
+            Action? reloadActionConfigCallback = null)
         {
             _registry     = registry     ?? throw new ArgumentNullException(nameof(registry));
             _taskQueue    = taskQueue    ?? throw new ArgumentNullException(nameof(taskQueue));
             _stateMachine = stateMachine ?? throw new ArgumentNullException(nameof(stateMachine));
+            _reloadActionConfigCallback = reloadActionConfigCallback;
         }
 
         public PipeMessage Dispatch(PipeMessage request)
@@ -49,6 +52,8 @@ namespace AlwaysPrintService.Pipe
                     MessageType.CheckCorporateQueue         => HandleCheckCorporateQueue(request),
                     MessageType.CheckServiceStatus          => HandleCheckServiceStatus(request),
                     MessageType.CloudConfigurationReceived  => HandleCloudConfigurationReceived(request),
+                    MessageType.ActionConfigChanged         => HandleActionConfigChanged(request),
+                    MessageType.InstallUpdate               => HandleInstallUpdate(request),
                     _ => PipeMessage.Reply(request, MessageType.Error,
                             new ErrorPayload { Code = "UNKNOWN_TYPE", Message = $"Unknown message type: {request.Type}" })
                 };
@@ -81,7 +86,7 @@ namespace AlwaysPrintService.Pipe
                 return PipeMessage.Reply(req, MessageType.Error,
                     new ErrorPayload { Code = "INVALID_PAYLOAD", Message = "Configuration payload missing." });
 
-            var task = new UpdateConfigurationTask(payload.Configuration, _registry);
+            var task = new UpdateConfigurationTask(payload.Configuration, _registry, payload.AutoUpdateEnabled);
             bool queued = _taskQueue.Enqueue(task);
 
             return PipeMessage.Reply(req, MessageType.Ack,
@@ -161,6 +166,75 @@ namespace AlwaysPrintService.Pipe
                     AlwaysPrintLogger.EvtGenericError);
                 return PipeMessage.Reply(req, MessageType.Ack,
                     new AckPayload { Success = false, Message = $"Error al persistir configuración: {ex.Message}" });
+            }
+        }
+        
+        /// <summary>
+        /// Maneja la solicitud de instalación de actualización MSI desde el Tray.
+        /// Valida el payload y delega la ejecución al UpdateInstallHandler.
+        /// </summary>
+        private PipeMessage HandleInstallUpdate(PipeMessage req)
+        {
+            AlwaysPrintLogger.WriteInfo(
+                "InstallUpdate: solicitud de instalación de actualización recibida del Tray.",
+                AlwaysPrintLogger.EvtTaskDispatched);
+
+            var payload = req.GetPayload<InstallUpdatePayload>();
+            if (string.IsNullOrWhiteSpace(payload?.MsiFilePath))
+            {
+                AlwaysPrintLogger.WriteError(
+                    "InstallUpdate: payload inválido — MsiFilePath es vacío o nulo.",
+                    AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Error,
+                    new ErrorPayload { Code = "INVALID_PAYLOAD", Message = "MsiFilePath es obligatorio." });
+            }
+
+            var handler = new UpdateInstallHandler();
+            var result = handler.Execute(payload.MsiFilePath);
+            return PipeMessage.Reply(req, MessageType.InstallUpdateResponse, result);
+        }
+
+        private PipeMessage HandleActionConfigChanged(PipeMessage req)
+        {
+            try
+            {
+                AlwaysPrintLogger.WriteInfo(
+                    "Notificación de cambio de configuración de acciones recibida del Tray",
+                    AlwaysPrintLogger.EvtConfigSaved);
+                
+                if (_reloadActionConfigCallback == null)
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        "No se configuró callback de recarga de configuración de acciones",
+                        AlwaysPrintLogger.EvtGenericWarning);
+                    return PipeMessage.Reply(req, MessageType.Ack,
+                        new AckPayload { Success = false, Message = "Callback no configurado." });
+                }
+                
+                // Encolar tarea para recargar configuración y ejecutar trigger OnConfigChange
+                var task = new ReloadActionConfigTask(_reloadActionConfigCallback);
+                bool queued = _taskQueue.Enqueue(task);
+                
+                if (queued)
+                {
+                    AlwaysPrintLogger.WriteInfo("Tarea de recarga de configuración de acciones encolada");
+                    return PipeMessage.Reply(req, MessageType.Ack,
+                        new AckPayload { Success = true, Message = "Recarga de configuración encolada." });
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteWarning("Cola llena, no se pudo encolar recarga de configuración");
+                    return PipeMessage.Reply(req, MessageType.Ack,
+                        new AckPayload { Success = false, Message = "Cola llena; intente más tarde." });
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"Error procesando cambio de configuración de acciones: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = $"Error: {ex.Message}" });
             }
         }
     }

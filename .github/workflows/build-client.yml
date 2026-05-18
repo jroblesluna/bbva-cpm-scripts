@@ -1,0 +1,138 @@
+name: Build and Deploy Client
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'AlwaysPrintProject/Client/**'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+
+      - name: Install .NET Framework 4.8 Targeting Pack
+        shell: pwsh
+        run: |
+          # Windows runners ya incluyen el targeting pack de .NET 4.8
+          # Verificar que existe
+          $refPath = "C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
+          if (-not (Test-Path $refPath)) {
+            Write-Error ".NET Framework 4.8 Targeting Pack no encontrado"
+            exit 1
+          }
+          Write-Host "Targeting Pack encontrado: $refPath"
+
+      - name: Install WiX CLI v4
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 4.0.5
+          wix extension add "WixToolset.Util.wixext/4.0.5" --global
+
+      - name: Generate version
+        id: version
+        shell: pwsh
+        run: |
+          $now = [DateTime]::UtcNow
+          $major = 1
+          $minor = [int]$now.ToString("yy")
+          $build = [int]$now.ToString("MMdd")
+          $revision = [int]$now.ToString("HHmm")
+          $version = "$major.$minor.$build.$revision"
+          Write-Host "Version: $version"
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Publish AlwaysPrintService
+        shell: pwsh
+        working-directory: AlwaysPrintProject/Client
+        run: |
+          $v = "${{ steps.version.outputs.VERSION }}"
+          dotnet publish .\AlwaysPrintService\AlwaysPrintService.csproj `
+            -c Release -f net48 -o .\dist --no-self-contained `
+            /p:Version=$v /p:AssemblyVersion=$v /p:FileVersion=$v /p:InformationalVersion=$v
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Publish AlwaysPrintTray
+        shell: pwsh
+        working-directory: AlwaysPrintProject/Client
+        run: |
+          $v = "${{ steps.version.outputs.VERSION }}"
+          dotnet publish .\AlwaysPrintTray\AlwaysPrintTray.csproj `
+            -c Release -f net48 -o .\dist --no-self-contained `
+            /p:Version=$v /p:AssemblyVersion=$v /p:FileVersion=$v /p:InformationalVersion=$v
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Verify dist contents
+        shell: pwsh
+        working-directory: AlwaysPrintProject/Client
+        run: |
+          $required = @(
+            "dist\AlwaysPrintService.exe",
+            "dist\AlwaysPrintTray.exe",
+            "dist\AlwaysPrint.Shared.dll",
+            "dist\Newtonsoft.Json.dll"
+          )
+          foreach ($f in $required) {
+            if (-not (Test-Path $f)) {
+              Write-Error "Archivo requerido no encontrado: $f"
+              exit 1
+            }
+          }
+          Write-Host "Todos los archivos presentes en dist\"
+
+      - name: Build MSI
+        shell: pwsh
+        working-directory: AlwaysPrintProject/Client
+        run: |
+          $v = "${{ steps.version.outputs.VERSION }}"
+          $projectDir = (Get-Location).Path + "\"
+          wix build .\Product.wxs `
+            -o .\AlwaysPrint.msi `
+            -ext WixToolset.Util.wixext `
+            -d "ProductVersion=$v" `
+            -d "ProjectDir=$projectDir"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Write-Host "MSI generado: AlwaysPrint.msi"
+          Get-Item .\AlwaysPrint.msi | Select-Object Name, Length, LastWriteTime
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Upload MSI to S3
+        shell: pwsh
+        working-directory: AlwaysPrintProject/Client
+        run: |
+          $v = "${{ steps.version.outputs.VERSION }}"
+          $buildDate = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
+          $shortCommit = "${{ github.sha }}".Substring(0, 7)
+          $metadata = "version=$v,build-date=$buildDate,commit-hash=$shortCommit"
+
+          # Subir a latest/
+          aws s3 cp .\AlwaysPrint.msi "s3://alwaysprint-artifacts/latest/AlwaysPrint.msi" `
+            --metadata $metadata
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          # Subir a versions/{version}/ para historico
+          aws s3 cp .\AlwaysPrint.msi "s3://alwaysprint-artifacts/versions/$v/AlwaysPrint.msi" `
+            --metadata $metadata
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          Write-Host "MSI subido a S3 (latest + versions/$v/)"
+          Write-Host "URL: https://alwaysprint-artifacts.s3.us-west-2.amazonaws.com/latest/AlwaysPrint.msi"
+
+

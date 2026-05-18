@@ -12,7 +12,7 @@ from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship, foreign
 
 from app.core.database import Base
-from app.models.account import GUID  # Importar tipo GUID para consistencia
+from app.models.organization import GUID  # Importar tipo GUID para consistencia
 
 
 class Workstation(Base):
@@ -26,7 +26,7 @@ class Workstation(Base):
     
     # === CAMPOS PRINCIPALES ===
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
-    account_id = Column(GUID, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    organization_id = Column(GUID, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
     vlan_id = Column(GUID, ForeignKey("vlans.id", ondelete="SET NULL"), nullable=True)
     
     # IP privada es el identificador único de la estación
@@ -48,7 +48,7 @@ class Workstation(Base):
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # === RELACIONES ===
-    account = relationship("Account", back_populates="workstations")
+    organization = relationship("Organization", back_populates="workstations")
     vlan = relationship("VLAN", back_populates="workstations")
     licenses = relationship("License", back_populates="workstation", cascade="all, delete-orphan")
     workstation_config = relationship("WorkstationConfig", back_populates="workstation", uselist=False, cascade="all, delete-orphan")

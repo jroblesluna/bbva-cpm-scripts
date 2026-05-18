@@ -13,17 +13,20 @@ from app.schemas.user import (
     UserListResponse,
 )
 
-# === ACCOUNT SCHEMAS ===
-from app.schemas.account import (
-    AccountCreate,
-    AccountUpdate,
-    AccountResponse,
-    AccountDetailResponse,
-    AccountListResponse,
+# === ORGANIZATION SCHEMAS ===
+from app.schemas.organization import (
+    OrganizationBase,
+    OrganizationCreate,
+    OrganizationUpdate,
+    OrganizationResponse,
+    OrganizationDetailResponse,
+    OrganizationListResponse,
     PublicIPCreate,
     PublicIPResponse,
     PublicIPPendingResponse,
     PublicIPAuthorizeRequest,
+    AutoUpdateToggleRequest,
+    AutoUpdateToggleResponse,
 )
 
 # === WORKSTATION SCHEMAS ===
@@ -35,7 +38,7 @@ from app.schemas.workstation import (
     WorkstationStatusUpdate,
     WorkstationListResponse,
     WorkstationStatsResponse,
-    AccountBasicResponse,
+    OrganizationBasicResponse,
     WorkstationRegisterRequest,
     WorkstationRegisterResponse,
     WorkstationRegisterPendingResponse,
@@ -130,6 +133,22 @@ from app.schemas.auth import (
     PasswordResetConfirm,
 )
 
+# === ACTION CONFIG SCHEMAS ===
+from app.schemas.action_config import (
+    ActionConfigUpload,
+    ActionConfigUpdate,
+    ActionConfigInfo,
+    ActionConfigDetail,
+    ActionConfigDownloadInfo,
+    ActionConfigSyncStatus,
+    calculate_config_hash,
+)
+
+# === UPDATE SCHEMAS ===
+from app.schemas.updates import (
+    UpdateCheckResponse,
+)
+
 __all__ = [
     # User
     "UserCreate",
@@ -137,16 +156,19 @@ __all__ = [
     "UserPasswordUpdate",
     "UserResponse",
     "UserListResponse",
-    # Account
-    "AccountCreate",
-    "AccountUpdate",
-    "AccountResponse",
-    "AccountDetailResponse",
-    "AccountListResponse",
+    # Organization
+    "OrganizationBase",
+    "OrganizationCreate",
+    "OrganizationUpdate",
+    "OrganizationResponse",
+    "OrganizationDetailResponse",
+    "OrganizationListResponse",
     "PublicIPCreate",
     "PublicIPResponse",
     "PublicIPPendingResponse",
     "PublicIPAuthorizeRequest",
+    "AutoUpdateToggleRequest",
+    "AutoUpdateToggleResponse",
     # Workstation
     "LicenseResponse",
     "WorkstationResponse",
@@ -155,7 +177,7 @@ __all__ = [
     "WorkstationStatusUpdate",
     "WorkstationListResponse",
     "WorkstationStatsResponse",
-    "AccountBasicResponse",
+    "OrganizationBasicResponse",
     "WorkstationRegisterRequest",
     "WorkstationRegisterResponse",
     "WorkstationRegisterPendingResponse",
@@ -222,4 +244,14 @@ __all__ = [
     "RefreshTokenRequest",
     "PasswordResetRequest",
     "PasswordResetConfirm",
+    # Action Config
+    "ActionConfigUpload",
+    "ActionConfigUpdate",
+    "ActionConfigInfo",
+    "ActionConfigDetail",
+    "ActionConfigDownloadInfo",
+    "ActionConfigSyncStatus",
+    "calculate_config_hash",
+    # Updates
+    "UpdateCheckResponse",
 ]

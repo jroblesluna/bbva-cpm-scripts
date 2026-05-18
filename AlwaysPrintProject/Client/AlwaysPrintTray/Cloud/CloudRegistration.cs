@@ -150,15 +150,15 @@ namespace AlwaysPrintTray.Cloud
                     // Registro exitoso
                     var result = JObject.Parse(responseBody);
                     string workstationId = result["workstation_id"]?.ToString() ?? "";
-                    string accountId = result["account_id"]?.ToString() ?? "";
-                    string accountName = result["account_name"]?.ToString() ?? "";
+                    string accountId = result["organization_id"]?.ToString() ?? "";
+                    string accountName = result["organization_name"]?.ToString() ?? "";
                     string message = result["message"]?.ToString() ?? "";
                     
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"CloudRegistration: ¡Registro exitoso! " +
                         $"workstation_id={workstationId}, " +
-                        $"account_id={accountId}, " +
-                        $"account_name={accountName}, " +
+                        $"organization_id={accountId}, " +
+                        $"organization_name={accountName}, " +
                         $"message={message}",
                         AlwaysPrintLogger.EvtServiceStarted);
                     

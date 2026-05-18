@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.core.database import Base
 
 from app.models.user import User, UserRole
-from app.models.account import Account, PublicIP
+from app.models.organization import Organization, PublicIP
 from app.models.workstation import Workstation, License
 from app.models.vlan import VLAN
 from app.models.config import GlobalConfig, VLANConfig, WorkstationConfig

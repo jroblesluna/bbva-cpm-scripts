@@ -60,7 +60,7 @@ interface WorkstationTelemetryRow {
 async function fetchTelemetryStats(accountId: string): Promise<TelemetryStats> {
   if (!accountId) throw new Error('Sin cuenta asignada');
   const response = await apiClient.get<TelemetryStats>(
-    `/accounts/${accountId}/telemetry/stats`
+    `/organizations/${accountId}/telemetry/stats`
   );
   return response.data;
 }
@@ -92,7 +92,7 @@ async function fetchWorkstations(): Promise<Workstation[]> {
 
 export default function TelemetryDashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
-  const accountId = user?.account_id ?? '';
+  const accountId = user?.organization_id ?? '';
   const userTimezone = useUserTimezone();
   const tCommon = useTranslations('common');
   const t = useTranslations('telemetry');

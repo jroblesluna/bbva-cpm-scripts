@@ -9,7 +9,7 @@ Este módulo define los endpoints para:
 """
 
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
@@ -94,7 +94,7 @@ def logout(
         entity_type="session",
         entity_id=str(current_user.id),
         user_id=str(current_user.id),
-        account_id=str(current_user.account_id) if current_user.account_id else None,
+        organization_id=str(current_user.organization_id) if current_user.organization_id else None,
         old_values={"action": "logout", "email": current_user.email},
         ip_address=get_client_ip(request)
     )
@@ -115,12 +115,12 @@ def get_current_user_info(
         db: Sesión de base de datos
     
     Returns:
-        UserResponse con información del usuario (incluye relación con account)
+        UserResponse con información del usuario (incluye relación con organización)
     """
     from sqlalchemy.orm import joinedload
     
-    # Recargar usuario con la relación account
-    user = db.query(User).options(joinedload(User.account)).filter(User.id == current_user.id).first()
+    # Recargar usuario con la relación organization
+    user = db.query(User).options(joinedload(User.organization)).filter(User.id == current_user.id).first()
     
     return user
 
@@ -140,7 +140,7 @@ def request_password_reset(
     if user and user.is_active:
         token = secrets.token_urlsafe(32)
         user.password_reset_token = token
-        user.password_reset_expires = datetime.utcnow() + timedelta(hours=1)
+        user.password_reset_expires = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=1)
         db.commit()
 
         reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
@@ -167,7 +167,7 @@ def confirm_password_reset(
     if not user or not user.password_reset_expires:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token inválido.")
 
-    if datetime.utcnow() > user.password_reset_expires:
+    if datetime.now(timezone.utc).replace(tzinfo=None) > user.password_reset_expires:
         user.password_reset_token = None
         user.password_reset_expires = None
         db.commit()

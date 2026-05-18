@@ -15,7 +15,7 @@ export interface AuditLog {
   id: string
   user_id: string | null
   workstation_id: string | null
-  account_id: string | null
+  organization_id: string | null
   action_type: ActionType
   entity_type: string
   entity_id: string
@@ -35,7 +35,7 @@ export interface AuditLogDetail extends AuditLog {
 export interface AuditLogSearch {
   user_id?: string
   workstation_id?: string
-  account_id?: string
+  organization_id?: string
   action_type?: ActionType
   entity_type?: string
   entity_id?: string

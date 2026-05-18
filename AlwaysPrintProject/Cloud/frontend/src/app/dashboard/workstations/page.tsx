@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { workstationsApi, accountsApi } from '@/lib/api';
+import { workstationsApi, organizationsApi } from '@/lib/api';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
-import type { Workstation, WorkstationUpdate, Account } from '@/types';
+import type { Workstation, WorkstationUpdate, Organization } from '@/types';
 
 export default function WorkstationsPage() {
   const queryClient = useQueryClient();
@@ -41,7 +41,7 @@ export default function WorkstationsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOnline, setFilterOnline] = useState<boolean | undefined>(undefined);
   const [filterContingency, setFilterContingency] = useState<boolean | undefined>(undefined);
-  const [filterAccountId, setFilterAccountId] = useState<string | undefined>(undefined);
+  const [filterOrgId, setFilterOrgId] = useState<string | undefined>(undefined);
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
   const [editingWorkstation, setEditingWorkstation] = useState<Workstation | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -52,13 +52,13 @@ export default function WorkstationsPage() {
     isFetching,
     error,
   } = useQuery({
-    queryKey: ['workstations', searchTerm, filterOnline, filterContingency, filterAccountId],
+    queryKey: ['workstations', searchTerm, filterOnline, filterContingency, filterOrgId],
     queryFn: () =>
       workstationsApi.list({
         search: searchTerm || undefined,
         is_online: filterOnline,
         contingency_active: filterContingency,
-        account_id: filterAccountId,
+        organization_id: filterOrgId,
       }),
     placeholderData: (prev) => prev,
   });
@@ -70,7 +70,7 @@ export default function WorkstationsPage() {
 
   const { data: accounts } = useQuery({
     queryKey: ['accounts'],
-    queryFn: () => accountsApi.list(),
+    queryFn: () => organizationsApi.list(),
   });
 
   const updateMutation = useMutation({
@@ -239,10 +239,10 @@ export default function WorkstationsPage() {
             </div>
             <div>
               <select
-                value={filterAccountId || 'all'}
+                value={filterOrgId || 'all'}
                 onChange={(e) => {
                   const value = e.target.value;
-                  setFilterAccountId(value === 'all' ? undefined : value);
+                  setFilterOrgId(value === 'all' ? undefined : value);
                 }}
                 className="w-full px-3 py-2 border rounded-md"
               >
@@ -269,7 +269,7 @@ export default function WorkstationsPage() {
             {(searchTerm ||
               filterOnline !== undefined ||
               filterContingency !== undefined ||
-              filterAccountId) && (
+              filterOrgId) && (
               <Button
                 variant="outline"
                 size="sm"
@@ -277,7 +277,7 @@ export default function WorkstationsPage() {
                   setSearchTerm('');
                   setFilterOnline(undefined);
                   setFilterContingency(undefined);
-                  setFilterAccountId(undefined);
+                  setFilterOrgId(undefined);
                 }}
               >
                 {tCommon('clearFilters')}
@@ -352,10 +352,10 @@ export default function WorkstationsPage() {
                             VLAN: {workstation.vlan_id}
                           </div>
                         )}
-                        {workstation.account && (
+                        {workstation.organization && (
                           <div className="flex items-center">
                             <Building2 className="w-4 h-4 mr-1" />
-                            {workstation.account.name}
+                            {workstation.organization.name}
                           </div>
                         )}
                       </div>
@@ -412,7 +412,7 @@ export default function WorkstationsPage() {
                 {searchTerm ||
                 filterOnline !== undefined ||
                 filterContingency !== undefined ||
-                filterAccountId
+                filterOrgId
                   ? t('emptyFilterMessage')
                   : t('emptyMessage')}
               </p>
@@ -440,7 +440,7 @@ function WorkstationForm({
   error,
 }: {
   workstation: Workstation;
-  accounts: Account[];
+  accounts: Organization[];
   onSubmit: (data: WorkstationUpdate) => void;
   onCancel: () => void;
   isLoading: boolean;
@@ -452,7 +452,7 @@ function WorkstationForm({
     hostname: workstation.hostname || undefined,
     os_serial: workstation.os_serial || undefined,
     current_user: workstation.current_user || undefined,
-    account_id: workstation.account_id || undefined,
+    organization_id: workstation.organization_id || undefined,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -509,12 +509,12 @@ function WorkstationForm({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="account_id">{t('account')}</Label>
+          <Label htmlFor="organization_id">{t('account')}</Label>
           <select
-            id="account_id"
-            value={formData.account_id || ''}
+            id="organization_id"
+            value={formData.organization_id || ''}
             onChange={(e) =>
-              setFormData({ ...formData, account_id: e.target.value || undefined })
+              setFormData({ ...formData, organization_id: e.target.value || undefined })
             }
             disabled={isLoading}
             className="w-full px-3 py-2 border rounded-md"
@@ -615,12 +615,12 @@ function WorkstationDetailModal({
               )}
             </dl>
           </div>
-          {workstation.account && (
+          {workstation.organization && (
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-2">{t('account')}</h3>
               <div className="flex items-center">
                 <Building2 className="w-5 h-5 text-blue-600 mr-2" />
-                <span className="font-medium">{workstation.account.name}</span>
+                <span className="font-medium">{workstation.organization.name}</span>
               </div>
             </div>
           )}

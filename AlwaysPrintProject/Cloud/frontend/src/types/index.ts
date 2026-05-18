@@ -5,8 +5,8 @@
 // User types
 export * from './user'
 
-// Account types
-export * from './account'
+// Organization types
+export * from './organization'
 
 // Workstation types
 export * from './workstation'

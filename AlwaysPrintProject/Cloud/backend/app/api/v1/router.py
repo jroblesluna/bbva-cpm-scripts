@@ -9,7 +9,6 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     auth,
-    accounts,
     users,
     workstations,
     vlans,
@@ -19,6 +18,9 @@ from app.api.v1.endpoints import (
     setup,
     telemetry,
     connectivity,
+    action_config,
+    organizations,
+    updates,
 )
 
 # Router principal de la API v1
@@ -40,11 +42,11 @@ api_router.include_router(
     tags=["Autenticación"]
 )
 
-# Cuentas (solo Admin)
+# Organizaciones (CRUD + IPs públicas + auto-update, solo Admin)
 api_router.include_router(
-    accounts.router,
-    prefix="/accounts",
-    tags=["Cuentas"]
+    organizations.router,
+    prefix="/organizations",
+    tags=["Organizaciones"]
 )
 
 # Usuarios
@@ -75,9 +77,9 @@ api_router.include_router(
     tags=["Telemetría"]
 )
 
-# Telemetría (estadísticas por cuenta)
+# Telemetría (estadísticas por organización)
 api_router.include_router(
-    telemetry.accounts_router,
+    telemetry.organizations_telemetry_router,
     tags=["Telemetría"]
 )
 
@@ -113,6 +115,18 @@ api_router.include_router(
     audit.router,
     prefix="/audit",
     tags=["Auditoría"]
+)
+
+# Configuración de acciones administrativas
+api_router.include_router(
+    action_config.router,
+    tags=["Configuración de Acciones"]
+)
+
+# Actualizaciones automáticas (autenticación por IP pública o workstation ID)
+api_router.include_router(
+    updates.router,
+    tags=["Actualizaciones"]
 )
 
 

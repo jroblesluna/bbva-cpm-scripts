@@ -60,7 +60,7 @@ services:
       - "127.0.0.1:${backend_port}:${backend_port}"
     command: >
       sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port ${backend_port} --workers 1"
+             uvicorn app.main:app --host 0.0.0.0 --port ${backend_port} --workers 1 --ws-ping-interval 300 --ws-ping-timeout 300"
     networks: [app]
     depends_on: [redis]
 
@@ -159,29 +159,7 @@ cd $APP_DIR
 docker compose pull 2>/dev/null || true
 docker compose up -d redis 2>/dev/null || true
 
-# ── Certbot (HTTPS automatico) ────────────────────────────────────────
-# Se ejecuta en background con reintentos hasta que el DNS apunte al EC2
-cat > /opt/alwaysprint/setup_ssl.sh <<'SSL'
-#!/bin/bash
-DOMAIN=${domain_name}
-EMAIL=antonio@robles.ai
-
-for i in $(seq 1 20); do
-  PUBLIC_IP=$(curl -s http://checkip.amazonaws.com)
-  DNS_IP=$(nslookup $DOMAIN 2>/dev/null | awk '/^Address: /{print $2}' | tail -1)
-  if [ "$PUBLIC_IP" = "$DNS_IP" ]; then
-    certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m $EMAIL
-    systemctl reload nginx
-    echo "SSL configurado correctamente"
-    break
-  fi
-  echo "Esperando que $DOMAIN resuelva a $PUBLIC_IP (intento $i/20)..."
-  sleep 60
-done
-SSL
-chmod +x /opt/alwaysprint/setup_ssl.sh
-nohup /opt/alwaysprint/setup_ssl.sh >> /var/log/setup_ssl.log 2>&1 &
-
-# Auto-renovacion de Let's Encrypt
-echo "0 0,12 * * * root certbot renew --quiet && systemctl reload nginx" \
-  >> /etc/crontab
+# ── Certbot (HTTPS) ───────────────────────────────────────────────────
+# SSL se configura manualmente vía check-status.sh después de actualizar DNS.
+# Auto-renovación de certificados existentes cada 12 horas.
+echo "0 0,12 * * * root certbot renew --quiet && systemctl reload nginx" >> /etc/crontab

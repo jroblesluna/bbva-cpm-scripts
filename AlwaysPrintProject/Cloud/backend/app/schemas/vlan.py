@@ -15,10 +15,10 @@ import ipaddress
 
 class VLANCreate(BaseModel):
     """Schema para crear una VLAN."""
-    account_id: Optional[UUID] = Field(None, description="ID de la cuenta (opcional para operadores)")
+    organization_id: Optional[UUID] = Field(None, description="ID de la organización (opcional para operadores)")
     name: str = Field(..., min_length=1, max_length=255, description="Nombre de la VLAN")
     description: Optional[str] = Field(None, max_length=1000, description="Descripción de la VLAN")
-    cidr_ranges: list[str] = Field(..., min_items=1, description="Rangos CIDR (ej: ['192.168.1.0/24'])")
+    cidr_ranges: list[str] = Field(..., min_length=1, description="Rangos CIDR (ej: ['192.168.1.0/24'])")
     
     @field_validator("cidr_ranges")
     @classmethod
@@ -39,7 +39,7 @@ class VLANUpdate(BaseModel):
     """Schema para actualizar una VLAN."""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=1000)
-    cidr_ranges: Optional[list[str]] = Field(None, min_items=1)
+    cidr_ranges: Optional[list[str]] = Field(None, min_length=1)
     
     @field_validator("cidr_ranges")
     @classmethod
@@ -60,23 +60,21 @@ class VLANUpdate(BaseModel):
 class VLANResponse(BaseModel):
     """Schema de respuesta para VLAN."""
     id: UUID
-    account_id: UUID
+    organization_id: UUID
     name: str
     description: Optional[str] = None
     cidr_ranges: list[str]
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class VLANDetailResponse(VLANResponse):
     """Schema de respuesta detallada para VLAN (incluye conteo de workstations)."""
     workstation_count: int = Field(0, description="Número de workstations en esta VLAN")
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class VLANListResponse(BaseModel):

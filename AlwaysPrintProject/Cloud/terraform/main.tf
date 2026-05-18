@@ -38,10 +38,9 @@ module "ecr" {
 }
 
 module "secrets" {
-  source         = "./modules/secrets"
-  project_name   = var.project_name
-  environment    = var.environment
-  ssh_public_key = var.ssh_public_key
+  source       = "./modules/secrets"
+  project_name = var.project_name
+  environment  = var.environment
 }
 
 module "rds" {
@@ -107,9 +106,17 @@ module "ec2" {
   ses_send_policy_arn     = module.ses.ses_send_policy_arn
   database_url_secret_arn = aws_secretsmanager_secret.database_url.arn
   secret_key_arn          = module.secrets.secret_key_arn
-  ssh_public_key          = module.secrets.ssh_public_key
 
   depends_on = [aws_secretsmanager_secret_version.database_url, module.ses]
+}
+
+module "s3" {
+  source       = "./modules/s3"
+  project_name = var.project_name
+  environment  = var.environment
+  ec2_role_arn = module.ec2.role_arn
+
+  depends_on = [module.ec2]
 }
 
 # CI/CD manejado por GitHub Actions (ver .github/workflows/)

@@ -12,7 +12,7 @@ from sqlalchemy.orm import relationship
 import enum
 
 from app.core.database import Base
-from app.models.account import GUID  # Importar tipo GUID para consistencia
+from app.models.organization import GUID  # Importar tipo GUID para consistencia
 
 
 class TargetType(str, enum.Enum):
@@ -30,13 +30,13 @@ class Message(Base):
     Los mensajes pueden dirigirse a:
     - Una estación específica (target_type=workstation, target_id=workstation_id)
     - Todas las estaciones de una VLAN (target_type=vlan, target_id=vlan_id)
-    - Todas las estaciones de una cuenta (target_type=account, target_id=NULL)
+    - Todas las estaciones de una organización (target_type=account, target_id=NULL)
     """
     __tablename__ = "messages"
     
     # === CAMPOS PRINCIPALES ===
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
-    account_id = Column(GUID, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    organization_id = Column(GUID, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
     sender_id = Column(GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     
     # === DESTINATARIO ===
@@ -55,7 +55,7 @@ class Message(Base):
     delivered_at = Column(DateTime, nullable=True)
     
     # === RELACIONES ===
-    account = relationship("Account", back_populates="messages")
+    organization = relationship("Organization", back_populates="messages")
     sender = relationship("User", back_populates="sent_messages", foreign_keys=[sender_id])
     
     # Relación condicional con Workstation (solo cuando target_type=workstation)

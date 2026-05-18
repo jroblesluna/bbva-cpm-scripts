@@ -76,7 +76,7 @@ export default function DashboardPage() {
   const loadPendingIPs = useCallback(async () => {
     if (!user || !isAdmin()) return
     try {
-      const response = await apiClient.get('/accounts/public-ips/pending')
+      const response = await apiClient.get('/organizations/public-ips/pending')
       setPendingIPs(Array.isArray(response.data) ? response.data : [])
     } catch (err) {
       console.error('Error loading pending IPs:', err)

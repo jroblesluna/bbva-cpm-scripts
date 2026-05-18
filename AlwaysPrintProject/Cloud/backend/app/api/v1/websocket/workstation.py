@@ -12,7 +12,7 @@ Este módulo maneja la comunicación bidireccional con las workstations:
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from pydantic import ValidationError
@@ -28,6 +28,24 @@ from app.services.config import ConfigService
 from app.services.message import MessageService
 from app.services.audit import AuditService
 from app.services.telemetry import TelemetryService
+
+
+async def _safe_close(websocket: WebSocket, code: int, reason: str) -> None:
+    """
+    Cierra un WebSocket de forma segura:
+    - Trunca el reason a 123 bytes (límite del protocolo WebSocket para control frames)
+    - Captura errores si el socket ya se cerró
+    """
+    # El protocolo WebSocket limita control frames (close/ping/pong) a 125 bytes de payload.
+    # 2 bytes son para el código de cierre, quedan 123 para el reason.
+    truncated_reason = reason[:123]
+    try:
+        await websocket.close(code=code, reason=truncated_reason)
+    except RuntimeError:
+        # "Cannot call send once a close message has been sent"
+        pass
+    except Exception:
+        pass
 from app.services.connectivity import ConnectivityService
 
 
@@ -70,12 +88,14 @@ async def workstation_websocket(
     try:
         # Aceptar la conexión WebSocket antes de cualquier operación
         await websocket.accept()
+        print(f"[WS] Conexión aceptada", flush=True)
         
         # Esperar mensaje de registro
         data = await websocket.receive_json()
+        print(f"[WS] Mensaje recibido: type={data.get('type')}", flush=True)
         
         if data.get("type") != "register":
-            await websocket.close(code=1008, reason="First message must be 'register'")
+            await _safe_close(websocket, 1008, "First message must be register")
             return
         
         # Extraer datos de registro
@@ -85,7 +105,7 @@ async def workstation_websocket(
         current_user = data.get("current_user")
         
         if not ip_private:
-            await websocket.close(code=1008, reason="ip_private is required")
+            await _safe_close(websocket, 1008, "ip_private is required")
             return
         
         # Obtener IP pública del cliente desde headers de Nginx (X-Forwarded-For o X-Real-IP)
@@ -125,36 +145,27 @@ async def workstation_websocket(
             
             if status == "pending":
                 # IP pública no autorizada
-                await websocket.close(
-                    code=1008, 
-                    reason=f"IP pública {client_host} no está autorizada. "
-                           "Un administrador debe autorizar esta IP antes de que puedas conectarte. "
-                           "La IP ha sido registrada y está pendiente de autorización."
-                )
+                await _safe_close(websocket, 1008, f"IP {client_host} no autorizada")
                 return
             
-            elif status == "inactive_account":
-                # Cuenta desactivada
-                await websocket.close(
-                    code=1008,
-                    reason="La cuenta asociada a esta IP está desactivada."
-                )
+            elif status == "inactive_organization":
+                # Organización desactivada
+                await _safe_close(websocket, 1008, "Organizacion desactivada")
                 return
             
             elif status != "authorized" or not workstation:
                 # Error inesperado
-                await websocket.close(
-                    code=1011,
-                    reason="Error al registrar workstation."
-                )
+                await _safe_close(websocket, 1011, "Error al registrar")
                 return
             
             workstation_id = str(workstation.id)
+            print(f"[WS] Registro exitoso: id={workstation_id}, status={status}", flush=True)
             
         except Exception as e:
             # Error en registro
+            print(f"[WS] ERROR en registro: {type(e).__name__}: {e}", flush=True)
             logger.error(f"Error registrando workstation ip={ip_private}: {e}")
-            await websocket.close(code=1011, reason=f"Error: {str(e)}")
+            await _safe_close(websocket, 1011, f"Error: {str(e)}")
             return
         
         # Conectar WebSocket
@@ -163,13 +174,24 @@ async def workstation_websocket(
             websocket=websocket,
             db=db
         )
+        print(f"[WS] Conectado al manager", flush=True)
         
         # Enviar configuración efectiva
         config = config_service.get_effective_config(db, workstation_id)
+        print(f"[WS] Config obtenida, enviando...", flush=True)
+        
+        # Enviar confirmación de registro con workstation_id
+        await websocket.send_json({
+            "type": "registered",
+            "workstation_id": workstation_id
+        })
+        print(f"[WS] Mensaje registered enviado: {workstation_id}", flush=True)
+        
         await websocket.send_json({
             "type": "config_update",
             "config": config
         })
+        print(f"[WS] Config enviada, entrando al loop", flush=True)
         
         # Enviar mensajes pendientes
         pending_messages = message_service.get_pending_messages_for_workstation(
@@ -213,7 +235,7 @@ async def workstation_websocket(
                     audit_service.log_contingency_toggle(
                         db=db,
                         workstation_id=workstation_id,
-                        account_id=str(workstation.account_id),
+                        organization_id=str(workstation.organization_id),
                         user_id=None,  # Cambio automático
                         activated=contingency_active,
                         ip_address=client_host
@@ -228,8 +250,8 @@ async def workstation_websocket(
                     )
                 
                 # Notificar a operadores
-                await connection_manager.broadcast_to_account(
-                    account_id=str(workstation.account_id),
+                await connection_manager.broadcast_to_organization(
+                    organization_id=str(workstation.organization_id),
                     message={
                         "type": "workstation_status_change",
                         "workstation_id": workstation_id,
@@ -252,7 +274,7 @@ async def workstation_websocket(
                     entity_type="WorkstationConfig",
                     entity_id=workstation_id,
                     workstation_id=workstation_id,
-                    account_id=str(workstation.account_id),
+                    organization_id=str(workstation.organization_id),
                     old_values={field: old_value},
                     new_values={field: new_value},
                     ip_address=client_host
@@ -265,8 +287,8 @@ async def workstation_websocket(
                 output = data.get("output")
                 
                 # Notificar a operadores
-                await connection_manager.broadcast_to_account(
-                    account_id=str(workstation.account_id),
+                await connection_manager.broadcast_to_organization(
+                    organization_id=str(workstation.organization_id),
                     message={
                         "type": "command_result",
                         "workstation_id": workstation_id,
@@ -282,7 +304,7 @@ async def workstation_websocket(
                 await _handle_telemetry(
                     data=data,
                     workstation_id=workstation_id,
-                    organization_id=str(workstation.account_id),
+                    organization_id=str(workstation.organization_id),
                     db=db
                 )
             
@@ -291,7 +313,7 @@ async def workstation_websocket(
                 await _handle_connectivity_result(
                     data=data,
                     workstation_id=workstation_id,
-                    organization_id=str(workstation.account_id),
+                    organization_id=str(workstation.organization_id),
                     db=db
                 )
             
@@ -304,10 +326,11 @@ async def workstation_websocket(
     
     except WebSocketDisconnect:
         # Cliente desconectado
-        pass
+        print(f"[WS] WebSocketDisconnect para {workstation_id}", flush=True)
     
     except Exception as e:
         # Error inesperado
+        print(f"[WS] EXCEPCION INESPERADA: {type(e).__name__}: {e}", flush=True)
         logger.error(f"WebSocket error inesperado para workstation_id={workstation_id}: {e}", exc_info=True)
     
     finally:
@@ -361,7 +384,7 @@ async def _handle_telemetry(
         telemetry_log = telemetry_service.persist_telemetry(
             db=db,
             workstation_id=workstation_id,
-            account_id=organization_id,
+            organization_id=organization_id,
             payload=payload
         )
     except Exception as e:
@@ -376,15 +399,15 @@ async def _handle_telemetry(
     if telemetry_log is None:
         # workstation_id no existe para esta cuenta: log WARNING, descartar
         logger.warning(
-            "Telemetría descartada - workstation_id=%s no encontrada para account_id=%s",
+            "Telemetría descartada - workstation_id=%s no encontrada para organization_id=%s",
             workstation_id,
             organization_id
         )
         return
 
-    # Persistencia exitosa: broadcast 'telemetry_received' a operadores de la cuenta
-    await connection_manager.broadcast_to_account(
-        account_id=organization_id,
+    # Persistencia exitosa: broadcast 'telemetry_received' a operadores de la organización
+    await connection_manager.broadcast_to_organization(
+        organization_id=organization_id,
         message={
             "type": "telemetry_received",
             "workstation_id": workstation_id,
@@ -443,7 +466,7 @@ async def _handle_connectivity_result(
         # Payload inválido: registrar error y descartar mensaje (NO cerrar WebSocket)
         logger.error(
             "[%s] Payload de connectivity_result inválido - workstation_id=%s, error=%s",
-            datetime.utcnow().isoformat(),
+            datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             workstation_id,
             str(e)
         )
@@ -454,7 +477,7 @@ async def _handle_connectivity_result(
         result = connectivity_service.persist_connectivity_result(
             db=db,
             workstation_id=workstation_id,
-            account_id=organization_id,
+            organization_id=organization_id,
             payload=payload
         )
 
@@ -463,15 +486,15 @@ async def _handle_connectivity_result(
             logger.warning(
                 "[%s] Resultado de conectividad descartado - workstation_id=%s "
                 "no encontrada para organization_id=%s",
-                datetime.utcnow().isoformat(),
+                datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 workstation_id,
                 organization_id
             )
             return
 
-        # Persistencia exitosa: broadcast a operadores de la misma cuenta
-        await connection_manager.broadcast_to_account(
-            account_id=organization_id,
+        # Persistencia exitosa: broadcast a operadores de la misma organización
+        await connection_manager.broadcast_to_organization(
+            organization_id=organization_id,
             message={
                 "type": "connectivity_result",
                 "workstation_id": str(workstation_id),
@@ -487,7 +510,7 @@ async def _handle_connectivity_result(
         logger.info(
             "[%s] Resultado de conectividad persistido y broadcast - workstation_id=%s, "
             "check_id=%s, check_type=%s, success=%s, latency_ms=%s",
-            datetime.utcnow().isoformat(),
+            datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             workstation_id,
             payload.check_id,
             payload.check_type,
@@ -500,7 +523,7 @@ async def _handle_connectivity_result(
         logger.error(
             "[%s] Error al persistir resultado de conectividad - workstation_id=%s, "
             "check_id=%s, error=%s",
-            datetime.utcnow().isoformat(),
+            datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             workstation_id,
             data.get("check_id", "desconocido"),
             str(e)

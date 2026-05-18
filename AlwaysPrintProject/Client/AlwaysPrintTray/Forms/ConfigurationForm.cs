@@ -30,6 +30,9 @@ namespace AlwaysPrintTray.Forms
         private TextBox  _txtCloudApiUrl  = null!;
         private ComboBox _cmbCloudLocale  = null!;
 
+        // === AUTO-ACTUALIZACIÓN ===
+        private CheckBox _chkAutoUpdate   = null!;
+
         public ConfigurationForm(PipeClient pipe)
         {
             _pipe = pipe ?? throw new ArgumentNullException(nameof(pipe));
@@ -139,6 +142,29 @@ namespace AlwaysPrintTray.Forms
             Controls.Add(_cmbCloudLocale);
             y += 40;
 
+            // === SECCIÓN AUTO-ACTUALIZACIÓN ===
+
+            // Separador visual
+            Controls.Add(new Label
+            {
+                Text      = "─── Actualizaciones ───",
+                Location  = new Point(lx, y),
+                Size      = new Size(480, 20),
+                ForeColor = SystemColors.GrayText
+            });
+            y += 26;
+
+            // Checkbox: Habilitar Actualizaciones Automáticas
+            _chkAutoUpdate = new CheckBox
+            {
+                Text     = "Habilitar Actualizaciones Automáticas",
+                Location = new Point(cx, y),
+                Size     = new Size(290, 22)
+            };
+            Controls.Add(new Label { Text = "Auto-actualización:", Location = new Point(lx, y + 3), Size = new Size(lw, 20) });
+            Controls.Add(_chkAutoUpdate);
+            y += 40;
+
             // Status bar
             _lblStatus = new Label
             {
@@ -174,6 +200,11 @@ namespace AlwaysPrintTray.Forms
         private void LoadCurrentConfiguration()
         {
             _lblStatus.Text = "Cargando configuración...";
+
+            // Cargar flag de auto-actualización directamente del registro
+            // (es independiente de AppConfiguration y no requiere privilegios elevados para lectura)
+            var registry = new RegistryConfigManager();
+            _chkAutoUpdate.Checked = registry.LoadAutoUpdateEnabled();
 
             var response = _pipe.Send(PipeMessage.Create(MessageType.GetCurrentConfiguration));
             if (response?.Type == MessageType.Ack)
@@ -256,7 +287,11 @@ namespace AlwaysPrintTray.Forms
                 CloudLocale  = cloudLocale
             };
 
-            var payload  = new UpdateConfigurationPayload { Configuration = cfg };
+            var payload  = new UpdateConfigurationPayload
+            {
+                Configuration = cfg,
+                AutoUpdateEnabled = _chkAutoUpdate.Checked
+            };
             var request  = PipeMessage.Create(MessageType.UpdateConfiguration, payload);
             var response = _pipe.Send(request);
 
@@ -265,8 +300,8 @@ namespace AlwaysPrintTray.Forms
                 var ack = response.GetPayload<AckPayload>();
                 if (ack?.Success == true)
                 {
-                    _lblStatus.ForeColor = Color.DarkGreen;
-                    _lblStatus.Text = "Configuración guardada correctamente.";
+                    DialogResult = DialogResult.OK;
+                    Close();
                 }
                 else
                 {

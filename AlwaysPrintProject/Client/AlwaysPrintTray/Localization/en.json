@@ -1,0 +1,16 @@
+{
+  "TrayTooltip": "AlwaysPrint",
+  "MenuAbout": "About",
+  "MenuConfiguration": "Configuration",
+  "MenuExit": "Exit",
+  "BalloonInitOk": "Initialized successfully ({0}).",
+  "BalloonInitFail": "Operating in local mode.",
+  "BalloonServiceNotRunning": "Service is not running.",
+  "BalloonOfflineWarning": "Using cached config. No cloud connection.",
+  "BalloonOfflineTitle": "AlwaysPrint",
+  "BalloonOfflineText": "Using cached config. No cloud connection.",
+  "BalloonOfflineNoConfig": "No cloud connection and no cached config. Using defaults.",
+  "BalloonReconnected": "Cloud connection restored.",
+  "BalloonConnectedOk": "Connected to cloud successfully.",
+  "TooltipOffline": "AlwaysPrint (offline)"
+}

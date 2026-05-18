@@ -19,6 +19,14 @@ namespace AlwaysPrint.Shared.Messages
     {
         [JsonProperty("configuration")]
         public AppConfiguration Configuration { get; set; } = new AppConfiguration();
+
+        /// <summary>
+        /// Flag independiente de auto-actualización. Se persiste por separado
+        /// de AppConfiguration para evitar sobreescritura por sincronización Cloud.
+        /// Nullable: si es null, el Service no modifica el valor actual en registro.
+        /// </summary>
+        [JsonProperty("autoUpdateEnabled")]
+        public bool? AutoUpdateEnabled { get; set; }
     }
 
     public class CheckCorporateQueuePayload
@@ -177,5 +185,33 @@ namespace AlwaysPrint.Shared.Messages
 
         [JsonProperty("usingCachedConfig")]
         public bool UsingCachedConfig { get; set; }
+    }
+
+    // ── Actualizaciones automáticas ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Payload enviado del Tray al Service para solicitar la instalación
+    /// de un MSI de actualización.
+    /// </summary>
+    public class InstallUpdatePayload
+    {
+        [JsonProperty("msiFilePath")]
+        public string MsiFilePath { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Payload enviado del Service al Tray con el resultado de la
+    /// instalación del MSI.
+    /// </summary>
+    public class InstallUpdateResponsePayload
+    {
+        [JsonProperty("success")]
+        public bool Success { get; set; }
+
+        [JsonProperty("message")]
+        public string? Message { get; set; }
+
+        [JsonProperty("exitCode")]
+        public int ExitCode { get; set; }
     }
 }

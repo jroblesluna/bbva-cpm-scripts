@@ -119,13 +119,9 @@ backend/
 │   │   ├── websocket_manager.py    # ConnectionManager singleton (1 worker requerido)
 │   │   └── workstation.py
 │   └── main.py
-├── alembic/                        # Migraciones (cadena lineal)
+├── alembic/                        # Migraciones (esquema consolidado)
 │   └── versions/
-│       ├── 001_initial_migration.py
-│       ├── d4a203945821_add_full_name_to_users.py
-│       ├── 002_add_timezone_fields.py
-│       ├── 003_add_public_ip_authorization.py
-│       └── 004_add_password_reset_token.py  ← última
+│       └── 001_initial_schema.py   # Esquema completo V1
 └── requirements.txt
 ```
 
@@ -402,7 +398,13 @@ cd AlwaysPrintProject/Cloud/terraform
 ./setup.sh apply   # aplica — gestiona la clave SSH automáticamente
 
 # Acceso interactivo al servidor (SSM, sin SSH)
-aws ssm start-session --target i-0177ed8ad554ffc08 --profile Antonio-Robles-425642439683
+# Obtener Instance ID dinámicamente:
+INSTANCE_ID=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=*alwaysprint*" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[0].Instances[0].InstanceId' \
+  --output text --profile Antonio-Robles-425642439683)
+
+aws ssm start-session --target $INSTANCE_ID --profile Antonio-Robles-425642439683
 
 # Recuperar clave SSH (solo para emergencias)
 aws secretsmanager get-secret-value \
@@ -425,22 +427,22 @@ El CI/CD (GitHub Actions) construye las imágenes, las sube a ECR y ejecuta `dep
 - Password reset completo vía AWS SES (token 1h, páginas forgot/reset)
 - Multi-cuenta con aislamiento por `account_id`
 - Gestión de VLANs, mensajes, configuración, auditoría
+- Configuración jerárquica (Global → VLAN → Workstation)
+- Telemetría y checks de conectividad
+- Sistema de configuración de acciones administrativas (.alwaysconfig)
 - Infraestructura AWS completa vía Terraform (EC2, RDS, ECR, SES, Secrets Manager)
-- CI/CD via GitHub Actions
+- CI/CD via GitHub Actions + SSM (sin SSH)
 
 ### Pendiente
-- Integración completa con AlwaysPrintTray (cliente Windows)
+- Integración completa con AlwaysPrintTray (heartbeat, config sync)
 - Alertas automáticas (workstation offline > X min)
-- Analytics y reportes avanzados
 - SSO (SAML/OAuth)
 
 ---
 
 ## Referencias
 
-- [Backend README](backend/README.md)
-- [Frontend README](frontend/README.md)
-- [CHANGELOG](CHANGELOG.md)
+- [Cloud README](README.md)
 
 ---
 

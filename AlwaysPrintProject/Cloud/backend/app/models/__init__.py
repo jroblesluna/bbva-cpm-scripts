@@ -6,21 +6,22 @@ su importación desde otros módulos.
 """
 
 from app.models.user import User, UserRole
-from app.models.account import Account, PublicIP
+from app.models.organization import Organization, PublicIP
 from app.models.vlan import VLAN
 from app.models.workstation import Workstation, License
 from app.models.config import GlobalConfig, VLANConfig, WorkstationConfig
 from app.models.audit import AuditLog, ActionType
 from app.models.message import Message, TargetType
 from app.models.telemetry import TelemetryLog, ConnectivityResult
+from app.models.action_config import ActionConfig
 
 __all__ = [
     # User models
     "User",
     "UserRole",
     
-    # Account models
-    "Account",
+    # Organization models
+    "Organization",
     "PublicIP",
     
     # VLAN models
@@ -46,4 +47,7 @@ __all__ = [
     # Telemetry models
     "TelemetryLog",
     "ConnectivityResult",
+    
+    # Action config models
+    "ActionConfig",
 ]

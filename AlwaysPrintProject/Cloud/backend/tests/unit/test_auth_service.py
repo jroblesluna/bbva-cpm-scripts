@@ -9,7 +9,7 @@ Verifica:
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 import uuid
 
@@ -90,7 +90,7 @@ class TestJWTTokens:
             "sub": user_id,
             "email": "operator@bbva.com",
             "role": "operator",
-            "account_id": str(uuid.uuid4())
+            "organization_id": str(uuid.uuid4())
         }
         
         token = AuthService.create_access_token(data)
@@ -100,7 +100,7 @@ class TestJWTTokens:
         assert payload["sub"] == user_id
         assert payload["email"] == "operator@bbva.com"
         assert payload["role"] == "operator"
-        assert "account_id" in payload
+        assert "organization_id" in payload
         assert "exp" in payload
         assert "iat" in payload
     
@@ -114,8 +114,8 @@ class TestJWTTokens:
         
         assert payload is not None
         # Verificar que la expiración está aproximadamente en 30 minutos
-        exp_time = datetime.fromtimestamp(payload["exp"])
-        expected_time = datetime.utcnow() + expires_delta
+        exp_time = datetime.fromtimestamp(payload["exp"], tz=timezone.utc).replace(tzinfo=None)
+        expected_time = datetime.now(timezone.utc).replace(tzinfo=None) + expires_delta
         # Permitir 5 segundos de diferencia por tiempo de ejecución
         assert abs((exp_time - expected_time).total_seconds()) < 5
     
@@ -201,14 +201,25 @@ class TestAuthenticateUser:
     
     def test_authenticate_user_retorna_usuario_para_credenciales_validas(self, db: Session):
         """WHEN se autentican credenciales válidas, THEN retorna el usuario."""
+        # Crear cuenta de prueba (requerida por FK)
+        from app.models.organization import Organization
+        account = Organization(
+            id=uuid.uuid4(),
+            name="Test Account",
+            is_active=True
+        )
+        db.add(account)
+        db.commit()
+
         # Crear usuario de prueba
         password = "contraseña_segura_123"
         user = User(
             id=uuid.uuid4(),
             email="operator@bbva.com",
             password_hash=AuthService.hash_password(password),
+            full_name="Operador Test",
             role=UserRole.OPERATOR,
-            account_id=uuid.uuid4(),
+            organization_id=account.id,
             is_active=True
         )
         db.add(user)
@@ -238,6 +249,7 @@ class TestAuthenticateUser:
             id=uuid.uuid4(),
             email="test@example.com",
             password_hash=AuthService.hash_password("contraseña_correcta"),
+            full_name="Test User",
             role=UserRole.OPERATOR,
             is_active=True
         )
@@ -259,6 +271,7 @@ class TestAuthenticateUser:
             id=uuid.uuid4(),
             email="inactivo@example.com",
             password_hash=AuthService.hash_password(password),
+            full_name="Inactivo User",
             role=UserRole.OPERATOR,
             is_active=False  # Usuario desactivado
         )
@@ -283,6 +296,7 @@ class TestGetUserFromToken:
             id=uuid.uuid4(),
             email="test@example.com",
             password_hash=AuthService.hash_password("password"),
+            full_name="Test User",
             role=UserRole.OPERATOR,
             is_active=True
         )
@@ -330,6 +344,7 @@ class TestGetUserFromToken:
             id=uuid.uuid4(),
             email="inactivo@example.com",
             password_hash=AuthService.hash_password("password"),
+            full_name="Inactivo User",
             role=UserRole.OPERATOR,
             is_active=False
         )
@@ -357,7 +372,7 @@ class TestCreateTokensForUser:
             email="operator@bbva.com",
             password_hash=AuthService.hash_password("password"),
             role=UserRole.OPERATOR,
-            account_id=uuid.uuid4(),
+            organization_id=uuid.uuid4(),
             is_active=True
         )
         
@@ -376,7 +391,7 @@ class TestCreateTokensForUser:
             email="admin@system.com",
             password_hash=AuthService.hash_password("password"),
             role=UserRole.ADMIN,
-            account_id=None,  # Admin no tiene account_id
+            organization_id=None,  # Admin no tiene organization_id
             is_active=True
         )
         
@@ -387,7 +402,7 @@ class TestCreateTokensForUser:
         assert payload["sub"] == str(user.id)
         assert payload["email"] == user.email
         assert payload["role"] == "admin"
-        assert payload["account_id"] is None
+        assert payload["organization_id"] is None
     
     def test_create_tokens_for_user_refresh_token_es_valido(self):
         """WHEN se crea refresh token, THEN es válido y contiene type=refresh."""

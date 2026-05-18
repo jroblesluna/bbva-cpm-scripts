@@ -22,8 +22,8 @@ from app.services.telemetry import TelemetryService
 # Router con prefijo /workstations para el endpoint de telemetría por workstation
 router = APIRouter(prefix="/workstations", tags=["telemetry"])
 
-# Router separado para endpoints a nivel de cuenta
-accounts_router = APIRouter(prefix="/accounts", tags=["telemetry"])
+# Router separado para endpoints a nivel de organización
+organizations_telemetry_router = APIRouter(prefix="/organizations", tags=["telemetry"])
 
 
 @router.get(
@@ -76,7 +76,7 @@ async def get_workstation_telemetry(
     # Verificar tenant isolation: workstation debe pertenecer a la cuenta del usuario
     workstation = db.query(Workstation).filter(
         Workstation.id == workstation_id,
-        Workstation.account_id == current_user.account_id
+        Workstation.organization_id == current_user.organization_id
     ).first()
 
     if not workstation:
@@ -90,7 +90,7 @@ async def get_workstation_telemetry(
     records = telemetry_service.get_telemetry_history(
         db=db,
         workstation_id=str(workstation_id),
-        account_id=str(current_user.account_id),
+        organization_id=str(current_user.organization_id),
         from_dt=from_dt,
         to_dt=to_dt,
         limit=limit
@@ -102,26 +102,26 @@ async def get_workstation_telemetry(
 
 # === ENDPOINT DE ESTADÍSTICAS POR CUENTA ===
 
-@accounts_router.get(
-    "/{account_id}/telemetry/stats",
+@organizations_telemetry_router.get(
+    "/{organization_id}/telemetry/stats",
     response_model=TelemetryStatsResponse,
-    summary="Obtener estadísticas de telemetría de una cuenta",
-    description="Retorna estadísticas agregadas de telemetría de las últimas 24 horas UTC para la cuenta especificada."
+    summary="Obtener estadísticas de telemetría de una organización",
+    description="Retorna estadísticas agregadas de telemetría de las últimas 24 horas UTC para la organización especificada."
 )
-async def get_account_telemetry_stats(
-    account_id: UUID,
+async def get_organization_telemetry_stats(
+    organization_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Consultar estadísticas agregadas de telemetría por cuenta.
+    Consultar estadísticas agregadas de telemetría por organización.
 
-    Verifica tenant isolation: el account_id del token debe coincidir
-    con el {account_id} solicitado, o el usuario debe tener rol admin.
-    No revela la existencia de cuentas ajenas (retorna 404 genérico).
+    Verifica tenant isolation: el organization_id del token debe coincidir
+    con el {organization_id} solicitado, o el usuario debe tener rol admin.
+    No revela la existencia de organizaciones ajenas (retorna 404 genérico).
 
     Estadísticas computadas sobre registros de las últimas 24 horas UTC:
-    - total_workstations: workstations registradas para la cuenta
+    - total_workstations: workstations registradas para la organización
     - workstations_reporting: con al menos un registro en 24h
     - avg_jobs_identified: promedio aritmético de jobs_identified
     - contingency_active_count: workstations con contingency_active=True
@@ -133,23 +133,23 @@ async def get_account_telemetry_stats(
     Retorna:
         - 200: Objeto TelemetryStatsResponse con estadísticas
         - 401: Token ausente o inválido
-        - 404: Cuenta no encontrada o no coincide con el token
+        - 404: Organización no encontrada o no coincide con el token
     """
-    # Verificar tenant isolation: account_id del token debe coincidir con {id}
-    # Los usuarios admin pueden consultar cualquier cuenta
+    # Verificar tenant isolation: organization_id del token debe coincidir con {id}
+    # Los usuarios admin pueden consultar cualquier organización
     if current_user.role != UserRole.ADMIN:
-        # Para usuarios no-admin, su account_id debe coincidir con el solicitado
-        if current_user.account_id is None or str(current_user.account_id) != str(account_id):
+        # Para usuarios no-admin, su organization_id debe coincidir con el solicitado
+        if current_user.organization_id is None or str(current_user.organization_id) != str(organization_id):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Cuenta no encontrada"
+                detail="Organización no encontrada"
             )
 
     # Computar estadísticas usando el servicio de telemetría
     telemetry_service = TelemetryService()
     stats = telemetry_service.get_telemetry_stats(
         db=db,
-        account_id=str(account_id)
+        organization_id=str(organization_id)
     )
 
     return stats

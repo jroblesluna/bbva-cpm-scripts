@@ -11,7 +11,7 @@ import uuid
 
 from app.models import (
     User, UserRole,
-    Account, PublicIP,
+    Organization, PublicIP,
     VLAN,
     Workstation, License,
     GlobalConfig, VLANConfig, WorkstationConfig,
@@ -35,7 +35,7 @@ class TestUserModel:
         assert user.email == "test@example.com"
         assert user.role == UserRole.OPERATOR
         assert user.is_active is True
-        assert user.account_id is None  # Nullable para Admin
+        assert user.organization_id is None  # Nullable para Admin
     
     def test_user_repr(self):
         """Test de representación string del usuario."""
@@ -51,31 +51,31 @@ class TestUserModel:
         assert "test@example.com" in repr_str
 
 
-class TestAccountModel:
-    """Tests para el modelo Account."""
+class TestOrganizationModel:
+    """Tests para el modelo Organization."""
     
-    def test_create_account(self):
-        """Test de creación de cuenta."""
-        account = Account(
+    def test_create_organization(self):
+        """Test de creación de organización."""
+        org = Organization(
             name="BBVA",
             description="Banco BBVA Perú",
             is_active=True
         )
         
-        assert account.name == "BBVA"
-        assert account.description == "Banco BBVA Perú"
-        assert account.is_active is True
+        assert org.name == "BBVA"
+        assert org.description == "Banco BBVA Perú"
+        assert org.is_active is True
     
-    def test_account_repr(self):
-        """Test de representación string de la cuenta."""
-        account = Account(
+    def test_organization_repr(self):
+        """Test de representación string de la organización."""
+        org = Organization(
             id=uuid.uuid4(),
             name="BBVA",
             is_active=True
         )
         
-        repr_str = repr(account)
-        assert "Account" in repr_str
+        repr_str = repr(org)
+        assert "Organization" in repr_str
         assert "BBVA" in repr_str
 
 
@@ -84,14 +84,14 @@ class TestPublicIPModel:
     
     def test_create_public_ip(self):
         """Test de creación de IP pública."""
-        account_id = uuid.uuid4()
+        org_id = uuid.uuid4()
         public_ip = PublicIP(
-            account_id=account_id,
+            organization_id=org_id,
             ip_address="200.48.225.130",
             description="Oficina principal"
         )
         
-        assert public_ip.account_id == account_id
+        assert public_ip.organization_id == org_id
         assert public_ip.ip_address == "200.48.225.130"
         assert public_ip.description == "Oficina principal"
 
@@ -101,15 +101,15 @@ class TestVLANModel:
     
     def test_create_vlan(self):
         """Test de creación de VLAN."""
-        account_id = uuid.uuid4()
+        org_id = uuid.uuid4()
         vlan = VLAN(
-            account_id=account_id,
+            organization_id=org_id,
             name="VLAN Oficina Central",
             description="Red de oficina central",
             cidr_ranges=["192.168.1.0/24", "10.0.0.0/16"]
         )
         
-        assert vlan.account_id == account_id
+        assert vlan.organization_id == org_id
         assert vlan.name == "VLAN Oficina Central"
         assert len(vlan.cidr_ranges) == 2
         assert "192.168.1.0/24" in vlan.cidr_ranges
@@ -120,9 +120,9 @@ class TestWorkstationModel:
     
     def test_create_workstation(self):
         """Test de creación de workstation."""
-        account_id = uuid.uuid4()
+        org_id = uuid.uuid4()
         workstation = Workstation(
-            account_id=account_id,
+            organization_id=org_id,
             ip_private="192.168.1.100",
             hostname="W10001",
             os_serial="ABC123",
@@ -130,7 +130,7 @@ class TestWorkstationModel:
             contingency_active=False
         )
         
-        assert workstation.account_id == account_id
+        assert workstation.organization_id == org_id
         assert workstation.ip_private == "192.168.1.100"
         assert workstation.hostname == "W10001"
         assert workstation.is_online is True
@@ -160,23 +160,28 @@ class TestGlobalConfigModel:
     
     def test_create_global_config(self):
         """Test de creación de configuración global."""
-        account_id = uuid.uuid4()
+        org_id = uuid.uuid4()
         config = GlobalConfig(
-            account_id=account_id,
+            organization_id=org_id,
             corporate_queue_name="LexmarkRoblesAI",
             pending_task_polling_minutes=3,
             bootstrap_domains="apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai"
         )
         
-        assert config.account_id == account_id
+        assert config.organization_id == org_id
         assert config.corporate_queue_name == "LexmarkRoblesAI"
         assert config.pending_task_polling_minutes == 3
         assert "robles.ai" in config.bootstrap_domains
     
     def test_global_config_defaults(self):
         """Test de valores por defecto de configuración global."""
-        account_id = uuid.uuid4()
-        config = GlobalConfig(account_id=account_id)
+        org_id = uuid.uuid4()
+        config = GlobalConfig(
+            organization_id=org_id,
+            corporate_queue_name="LexmarkRoblesAI",
+            pending_task_polling_minutes=3,
+            bootstrap_domains="apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai"
+        )
         
         assert config.corporate_queue_name == "LexmarkRoblesAI"
         assert config.pending_task_polling_minutes == 3
@@ -196,7 +201,6 @@ class TestVLANConfigModel:
         
         assert config.vlan_id == vlan_id
         assert config.corporate_queue_name == "CustomQueue"
-        # Otros campos son nullable para override selectivo
         assert config.pending_task_polling_minutes is None
 
 
@@ -213,7 +217,6 @@ class TestWorkstationConfigModel:
         
         assert config.workstation_id == workstation_id
         assert config.pending_task_polling_minutes == 5
-        # Otros campos son nullable para override selectivo
         assert config.corporate_queue_name is None
 
 
@@ -246,12 +249,12 @@ class TestMessageModel:
     
     def test_create_message_to_workstation(self):
         """Test de creación de mensaje a workstation."""
-        account_id = uuid.uuid4()
+        org_id = uuid.uuid4()
         sender_id = uuid.uuid4()
         workstation_id = uuid.uuid4()
         
         message = Message(
-            account_id=account_id,
+            organization_id=org_id,
             sender_id=sender_id,
             target_type=TargetType.WORKSTATION,
             target_id=workstation_id,
@@ -259,20 +262,20 @@ class TestMessageModel:
             is_delivered=False
         )
         
-        assert message.account_id == account_id
+        assert message.organization_id == org_id
         assert message.sender_id == sender_id
         assert message.target_type == TargetType.WORKSTATION
         assert message.target_id == workstation_id
         assert message.content == "Test message"
         assert message.is_delivered is False
     
-    def test_create_message_to_account(self):
-        """Test de creación de mensaje broadcast a cuenta."""
-        account_id = uuid.uuid4()
+    def test_create_message_to_organization(self):
+        """Test de creación de mensaje broadcast a organización."""
+        org_id = uuid.uuid4()
         sender_id = uuid.uuid4()
         
         message = Message(
-            account_id=account_id,
+            organization_id=org_id,
             sender_id=sender_id,
             target_type=TargetType.ACCOUNT,
             target_id=None,  # NULL para broadcast

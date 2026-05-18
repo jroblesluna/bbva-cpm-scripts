@@ -51,7 +51,7 @@ export default function PendingIPsPage() {
   const tCommon = useTranslations('common');
   const [searchTerm, setSearchTerm] = useState('');
   const [authorizingIP, setAuthorizingIP] = useState<PendingIP | null>(null);
-  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [selectedOrgId, setSelectedOrgId] = useState('');
   const [customDescription, setCustomDescription] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
@@ -64,7 +64,7 @@ export default function PendingIPsPage() {
   } = useQuery({
     queryKey: ['pending-ips'],
     queryFn: async () => {
-      const response = await api.get('/accounts/public-ips/pending');
+      const response = await api.get('/organizations/public-ips/pending');
       return response.data as PendingIP[];
     },
   });
@@ -73,7 +73,7 @@ export default function PendingIPsPage() {
   const { data: accountsData } = useQuery({
     queryKey: ['accounts', 'list-for-pending-ips'],
     queryFn: async () => {
-      const response = await api.get('/accounts/');
+      const response = await api.get('/organizations/');
       return response.data;
     },
   });
@@ -89,8 +89,8 @@ export default function PendingIPsPage() {
       accountId: string;
       description?: string;
     }) => {
-      const response = await api.post(`/accounts/public-ips/${ipId}/authorize`, {
-        account_id: accountId,
+      const response = await api.post(`/organizations/public-ips/${ipId}/authorize`, {
+        organization_id: accountId,
         description: description || undefined,
       });
       return response.data;
@@ -100,7 +100,7 @@ export default function PendingIPsPage() {
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
       queryClient.invalidateQueries({ queryKey: ['accounts', 'list-for-pending-ips'] });
       setAuthorizingIP(null);
-      setSelectedAccountId('');
+      setSelectedOrgId('');
       setCustomDescription('');
     },
   });
@@ -108,7 +108,7 @@ export default function PendingIPsPage() {
   // Mutation para rechazar IP
   const rejectMutation = useMutation({
     mutationFn: async (ipId: string) => {
-      await api.delete(`/accounts/public-ips/${ipId}/reject`);
+      await api.delete(`/organizations/public-ips/${ipId}/reject`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-ips'] });
@@ -116,11 +116,11 @@ export default function PendingIPsPage() {
   });
 
   const handleAuthorize = () => {
-    if (!authorizingIP || !selectedAccountId) return;
+    if (!authorizingIP || !selectedOrgId) return;
 
     authorizeMutation.mutate({
       ipId: authorizingIP.id,
-      accountId: selectedAccountId,
+      accountId: selectedOrgId,
       description: customDescription || undefined,
     });
   };
@@ -180,20 +180,21 @@ export default function PendingIPsPage() {
   return (
     <div className="max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
-          <p className="text-gray-600 mt-2">{t('subtitle')}</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{t('title')}</h1>
+          <p className="text-sm text-gray-600 mt-1">{t('subtitle')}</p>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-500">
-            {t('lastUpdated', { time: formatDateWithTimezone(lastUpdated, userTimezone) })}
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-500 whitespace-nowrap">
+            {formatDateWithTimezone(lastUpdated, userTimezone)}
           </span>
           <Button
+            size="sm"
             onClick={handleRefresh}
             disabled={isFetching}
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} />
             {tCommon('refresh')}
           </Button>
         </div>
@@ -261,38 +262,34 @@ export default function PendingIPsPage() {
         {filteredIPs.length > 0 ? (
           filteredIPs.map((ip) => (
             <Card key={ip.id} className="hover:shadow-md transition">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start flex-1">
-                    <div className="rounded-full p-3 bg-amber-100 mr-4">
-                      <Globe className="w-6 h-6 text-amber-600" />
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  <div className="flex items-start flex-1 min-w-0">
+                    <div className="rounded-full p-2 bg-amber-100 mr-3 shrink-0">
+                      <Globe className="w-5 h-5 text-amber-600" />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center mb-2">
-                        <h3 className="text-xl font-semibold text-gray-900 mr-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <h3 className="text-base font-semibold text-gray-900">
                           {ip.ip_address}
                         </h3>
-                        <Badge variant="secondary">
+                        <Badge variant="secondary" className="text-xs">
                           <Clock className="w-3 h-3 mr-1" />
                           {t('pending')}
                         </Badge>
                       </div>
 
                       {ip.description && (
-                        <p className="text-sm text-gray-600 mb-2">{ip.description}</p>
+                        <p className="text-sm text-gray-600 mb-1">{ip.description}</p>
                       )}
 
-                      <div className="flex items-center text-xs text-gray-500 space-x-4">
-                        <div className="flex items-center">
-                          <Clock className="w-3 h-3 mr-1" />
-                          {t('firstSeen')}{' '}
-                          {formatDateWithTimezone(ip.first_seen, userTimezone)}
-                        </div>
+                      <div className="text-xs text-gray-500">
+                        <span>{t('firstSeen')} {formatDateWithTimezone(ip.first_seen, userTimezone)}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2 ml-4">
+                  <div className="flex items-center gap-2 sm:ml-4 sm:shrink-0">
                     <Button
                       variant="default"
                       size="sm"
@@ -358,8 +355,8 @@ export default function PendingIPsPage() {
                 <Label htmlFor="account">{t('accountLabel')}</Label>
                 <select
                   id="account"
-                  value={selectedAccountId}
-                  onChange={(e) => setSelectedAccountId(e.target.value)}
+                  value={selectedOrgId}
+                  onChange={(e) => setSelectedOrgId(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md"
                   disabled={authorizeMutation.isPending}
                 >
@@ -392,7 +389,7 @@ export default function PendingIPsPage() {
                   variant="outline"
                   onClick={() => {
                     setAuthorizingIP(null);
-                    setSelectedAccountId('');
+                    setSelectedOrgId('');
                     setCustomDescription('');
                   }}
                   disabled={authorizeMutation.isPending}
@@ -402,7 +399,7 @@ export default function PendingIPsPage() {
                 <Button
                   type="button"
                   onClick={handleAuthorize}
-                  disabled={!selectedAccountId || authorizeMutation.isPending}
+                  disabled={!selectedOrgId || authorizeMutation.isPending}
                 >
                   {authorizeMutation.isPending ? t('authorizing') : t('authorize')}
                 </Button>

@@ -12,7 +12,7 @@ from sqlalchemy import Column, String, Boolean, Integer, BigInteger, DateTime, F
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
-from app.models.account import GUID  # Importar tipo GUID para consistencia
+from app.models.organization import GUID  # Importar tipo GUID para consistencia
 
 
 class TelemetryLog(Base):
@@ -33,9 +33,9 @@ class TelemetryLog(Base):
         nullable=False,
         index=True
     )
-    account_id = Column(
+    organization_id = Column(
         GUID,
-        ForeignKey("accounts.id", ondelete="CASCADE"),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
@@ -52,7 +52,7 @@ class TelemetryLog(Base):
     
     # === RELACIONES ===
     workstation = relationship("Workstation", back_populates="telemetry_logs")
-    account = relationship("Account", back_populates="telemetry_logs")
+    organization = relationship("Organization", back_populates="telemetry_logs")
     
     def __repr__(self):
         return (
@@ -78,9 +78,9 @@ class ConnectivityResult(Base):
         nullable=False,
         index=True
     )
-    account_id = Column(
+    organization_id = Column(
         GUID,
-        ForeignKey("accounts.id", ondelete="CASCADE"),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
@@ -97,7 +97,7 @@ class ConnectivityResult(Base):
     
     # === RELACIONES ===
     workstation = relationship("Workstation", back_populates="connectivity_results")
-    account = relationship("Account", back_populates="connectivity_results")
+    organization = relationship("Organization", back_populates="connectivity_results")
     
     def __repr__(self):
         return (

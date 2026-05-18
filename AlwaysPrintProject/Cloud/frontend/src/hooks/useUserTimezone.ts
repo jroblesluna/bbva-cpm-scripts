@@ -20,8 +20,8 @@ export function useUserTimezone(): string {
   }
   
   // Prioridad 2: Timezone de la organización
-  if (user?.account?.timezone) {
-    return user.account.timezone
+  if (user?.organization?.timezone) {
+    return user.organization.timezone
   }
   
   // Prioridad 3: UTC por defecto

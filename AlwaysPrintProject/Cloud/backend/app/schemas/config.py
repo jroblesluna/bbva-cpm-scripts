@@ -89,7 +89,7 @@ class GlobalConfigUpdate(BaseModel):
 class GlobalConfigResponse(BaseModel):
     """Schema de respuesta para configuración global."""
     id: Optional[UUID] = None  # None indica que no existe en BD (valores por defecto)
-    account_id: UUID
+    organization_id: UUID
     corporate_queue_name: str
     search_targets: Optional[dict] = None
     pending_task_polling_minutes: int
@@ -97,8 +97,7 @@ class GlobalConfigResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # === SCHEMAS DE CONFIGURACIÓN DE VLAN ===
@@ -144,8 +143,7 @@ class VLANConfigResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # === SCHEMAS DE CONFIGURACIÓN DE WORKSTATION ===
@@ -191,8 +189,7 @@ class WorkstationConfigResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # === SCHEMA DE CONFIGURACIÓN EFECTIVA ===

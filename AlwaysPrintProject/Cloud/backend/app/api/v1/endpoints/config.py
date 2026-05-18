@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.utils import get_client_ip
-from app.models.account import PublicIP
+from app.models.organization import PublicIP
 from app.models.config import GlobalConfig, VLANConfig, WorkstationConfig
 from app.models.user import User, UserRole
 from app.models.workstation import Workstation
@@ -129,22 +129,22 @@ def get_effective_config_by_ip(
     Raises:
         HTTPException 404: Workstation no encontrada o no pertenece a la cuenta
     """
-    # Resolver account_id según método de autenticación disponible
-    account_id = _authenticate_request(request, db)
+    # Resolver organization_id según método de autenticación disponible
+    organization_id = _authenticate_request(request, db)
 
-    if account_id == "__admin__":
-        # Admin autenticado: buscar workstation sin filtro de cuenta
+    if organization_id == "__admin__":
+        # Admin autenticado: buscar workstation sin filtro de organización
         workstation = db.query(Workstation).filter(
             Workstation.id == workstation_id,
         ).first()
-    elif account_id:
-        # Buscar la workstation verificando que pertenece a la cuenta
+    elif organization_id:
+        # Buscar la workstation verificando que pertenece a la organización
         workstation = db.query(Workstation).filter(
             Workstation.id == workstation_id,
-            Workstation.account_id == account_id,
+            Workstation.organization_id == organization_id,
         ).first()
     else:
-        # Sin cuenta resuelta → 404
+        # Sin organización resuelta → 404
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workstation con ID {workstation_id} no encontrada"
@@ -158,7 +158,7 @@ def get_effective_config_by_ip(
 
     # Obtener configuración global de la cuenta (siempre debe existir)
     global_config = db.query(GlobalConfig).filter(
-        GlobalConfig.account_id == workstation.account_id
+        GlobalConfig.organization_id == workstation.organization_id
     ).first()
 
     if not global_config:
@@ -196,7 +196,7 @@ def get_effective_config_by_ip(
 
 def _authenticate_request(request: Request, db: Session):
     """
-    Resuelve el account_id del cliente usando token Bearer o IP pública.
+    Resuelve el organization_id del cliente usando token Bearer o IP pública.
 
     Intenta primero autenticación por token Bearer (para dashboard).
     Si no hay token o es inválido, usa la IP pública del cliente (para Tray).
@@ -206,7 +206,7 @@ def _authenticate_request(request: Request, db: Session):
         db: Sesión de base de datos
 
     Returns:
-        UUID del account_id o None si no se puede autenticar
+        UUID del organization_id o None si no se puede autenticar
     """
     from app.core.security import decode_access_token
 
@@ -221,11 +221,11 @@ def _authenticate_request(request: Request, db: Session):
                 user = db.query(User).filter(User.id == user_id).first()
                 if user:
                     if user.role == UserRole.ADMIN:
-                        # Admin: buscar la workstation sin filtro de cuenta
+                        # Admin: buscar la workstation sin filtro de organización
                         # Retornar un valor especial que indica "sin filtro"
                         return "__admin__"
-                    elif user.account_id:
-                        return user.account_id
+                    elif user.organization_id:
+                        return user.organization_id
         except Exception:
             pass  # Si falla el token, intentar por IP
 
@@ -237,8 +237,8 @@ def _authenticate_request(request: Request, db: Session):
         PublicIP.is_authorized == True,
     ).first()
 
-    if public_ip_record and public_ip_record.account_id:
-        return public_ip_record.account_id
+    if public_ip_record and public_ip_record.organization_id:
+        return public_ip_record.organization_id
 
     return None
 
@@ -248,20 +248,20 @@ def _authenticate_request(request: Request, db: Session):
 
 @router.get("/global", response_model=GlobalConfigResponse)
 def get_global_config(
-    account_id: str = None,
+    organization_id: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Obtener configuración global de la cuenta.
+    Obtener configuración global de la organización.
 
     Si no existe configuración, retorna valores por defecto en lugar de 404.
 
-    - Admin: puede ver configuración de cualquier cuenta (debe especificar account_id)
-    - Operador: solo puede ver configuración de su cuenta
+    - Admin: puede ver configuración de cualquier organización (debe especificar organization_id)
+    - Operador: solo puede ver configuración de su organización
 
     Args:
-        account_id: ID de la cuenta (requerido para Admin, ignorado para Operador)
+        organization_id: ID de la organización (requerido para Admin, ignorado para Operador)
         current_user: Usuario autenticado
         db: Sesión de base de datos
 
@@ -269,41 +269,41 @@ def get_global_config(
         GlobalConfigResponse con la configuración global o valores por defecto
 
     Raises:
-        HTTPException 400: account_id requerido para Admin
+        HTTPException 400: organization_id requerido para Admin
         HTTPException 403: Sin permisos
     """
-    # Determinar qué cuenta usar
+    # Determinar qué organización usar
     if current_user.role == UserRole.ADMIN:
-        if not account_id:
+        if not organization_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="account_id requerido para administradores"
+                detail="organization_id requerido para administradores"
             )
-        target_account_id = account_id
+        target_organization_id = organization_id
     else:
-        # Operador o ReadOnly: usar su cuenta asignada
-        if not current_user.account_id:
+        # Operador o ReadOnly: usar su organización asignada
+        if not current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Usuario sin cuenta asignada"
             )
-        target_account_id = str(current_user.account_id)
+        target_organization_id = str(current_user.organization_id)
 
-    config = db.query(GlobalConfig).filter(GlobalConfig.account_id == target_account_id).first()
+    config = db.query(GlobalConfig).filter(GlobalConfig.organization_id == target_organization_id).first()
 
     if not config:
         # Retornar configuración con valores por defecto en lugar de 404
         # Esto evita errores en consola del navegador
-        from datetime import datetime
+        from datetime import datetime, timezone
         return GlobalConfigResponse(
             id=None,  # Indica que no existe en BD
-            account_id=target_account_id,
+            organization_id=target_organization_id,
             corporate_queue_name="",
             search_targets=None,
             pending_task_polling_minutes=5,
             bootstrap_domains="",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            updated_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
 
     return config
@@ -313,19 +313,19 @@ def get_global_config(
 def update_global_config(
     request: Request,
     config_data: GlobalConfigUpdate,
-    account_id: str = None,
+    organization_id: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Actualizar configuración global de la cuenta.
+    Actualizar configuración global de la organización.
 
-    - Admin: puede actualizar configuración de cualquier cuenta (debe especificar account_id)
-    - Operador: solo puede actualizar configuración de su cuenta
+    - Admin: puede actualizar configuración de cualquier organización (debe especificar organization_id)
+    - Operador: solo puede actualizar configuración de su organización
 
     Args:
         config_data: Datos de configuración a actualizar
-        account_id: ID de la cuenta (requerido para Admin, ignorado para Operador)
+        organization_id: ID de la organización (requerido para Admin, ignorado para Operador)
         current_user: Usuario autenticado
         db: Sesión de base de datos
 
@@ -333,36 +333,36 @@ def update_global_config(
         GlobalConfigResponse con la configuración actualizada
 
     Raises:
-        HTTPException 400: account_id requerido para Admin
+        HTTPException 400: organization_id requerido para Admin
         HTTPException 403: Sin permisos
     """
-    # Determinar qué cuenta usar
+    # Determinar qué organización usar
     if current_user.role == UserRole.ADMIN:
-        if not account_id:
+        if not organization_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="account_id requerido para administradores"
+                detail="organization_id requerido para administradores"
             )
-        target_account_id = account_id
+        target_organization_id = organization_id
     else:
-        # Operador o ReadOnly: usar su cuenta asignada
-        if not current_user.account_id:
+        # Operador o ReadOnly: usar su organización asignada
+        if not current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Usuario sin cuenta asignada"
             )
-        target_account_id = str(current_user.account_id)
+        target_organization_id = str(current_user.organization_id)
 
     config_service = ConfigService()
 
     # Obtener configuración actual
-    config = db.query(GlobalConfig).filter(GlobalConfig.account_id == target_account_id).first()
+    config = db.query(GlobalConfig).filter(GlobalConfig.organization_id == target_organization_id).first()
 
     if not config:
         # Crear configuración si no existe
         config = config_service.create_global_config(
             db=db,
-            account_id=target_account_id,
+            organization_id=target_organization_id,
             **config_data.model_dump(exclude_unset=True)
         )
     else:
@@ -376,7 +376,7 @@ def update_global_config(
 
         config = config_service.update_global_config(
             db=db,
-            account_id=target_account_id,
+            organization_id=target_organization_id,
             **config_data.model_dump(exclude_unset=True)
         )
 
@@ -387,7 +387,7 @@ def update_global_config(
             entity_type="global_config",
             entity_id=str(config.id),
             user_id=str(current_user.id),
-            account_id=str(target_account_id),
+            organization_id=str(target_organization_id),
             old_config=old_values,
             new_config=config_data.model_dump(exclude_unset=True),
             ip_address=get_client_ip(request)

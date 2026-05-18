@@ -74,15 +74,15 @@ async def get_workstation_connectivity(
             detail="Parámetro 'from' no puede ser posterior a 'to'"
         )
 
-    # Verificar tenant isolation: workstation debe pertenecer a la cuenta del usuario
+    # Verificar tenant isolation: workstation debe pertenecer a la organización del usuario
     # Admin puede ver cualquier workstation
-    if current_user.account_id:
+    if current_user.organization_id:
         workstation = db.query(Workstation).filter(
             Workstation.id == workstation_id,
-            Workstation.account_id == current_user.account_id
+            Workstation.organization_id == current_user.organization_id
         ).first()
     else:
-        # Admin sin account_id puede ver todas las workstations
+        # Admin sin organization_id puede ver todas las workstations
         workstation = db.query(Workstation).filter(
             Workstation.id == workstation_id
         ).first()
@@ -98,7 +98,7 @@ async def get_workstation_connectivity(
     records = connectivity_service.get_connectivity_history(
         db=db,
         workstation_id=str(workstation_id),
-        account_id=str(workstation.account_id) if workstation.account_id else str(current_user.account_id or ""),
+        organization_id=str(workstation.organization_id) if workstation.organization_id else str(current_user.organization_id or ""),
         check_id=check_id,
         from_dt=from_dt,
         to_dt=to_dt,

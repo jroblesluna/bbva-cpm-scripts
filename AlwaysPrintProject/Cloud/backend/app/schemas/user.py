@@ -6,22 +6,21 @@ Define los esquemas de validación para operaciones con usuarios.
 
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from uuid import UUID
 
 from app.models.user import UserRole
 
 
-# === SCHEMA ANIDADO PARA ACCOUNT ===
-class AccountInUser(BaseModel):
+# === SCHEMA ANIDADO PARA ORGANIZACIÓN ===
+class OrganizationInUser(BaseModel):
     """Schema anidado para mostrar información de la organización en el usuario."""
     id: UUID
     name: str
     timezone: str
     language: str = 'en'
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class UserBase(BaseModel):
@@ -29,7 +28,7 @@ class UserBase(BaseModel):
     email: EmailStr
     full_name: str = Field(..., min_length=1, max_length=255)
     role: UserRole
-    account_id: Optional[UUID] = None
+    organization_id: Optional[UUID] = None
     timezone: Optional[str] = Field(None, max_length=50, description="Zona horaria del usuario (hereda de la organización si es NULL)")
     language: str = 'en'
 
@@ -38,7 +37,8 @@ class UserCreate(UserBase):
     """Schema para crear un usuario."""
     password: str = Field(..., min_length=8, max_length=100)
     
-    @validator('password')
+    @field_validator('password')
+    @classmethod
     def validate_password(cls, v):
         """Valida que la contraseña cumpla requisitos mínimos."""
         if not any(c.isupper() for c in v):
@@ -49,15 +49,14 @@ class UserCreate(UserBase):
             raise ValueError('La contraseña debe contener al menos un número')
         return v
     
-    @validator('account_id')
-    def validate_account_id(cls, v, values):
-        """Valida que Operador y ReadOnly tengan account_id."""
-        role = values.get('role')
-        if role in [UserRole.OPERATOR, UserRole.READONLY] and v is None:
-            raise ValueError(f'Los usuarios con rol {role.value} deben tener account_id')
-        if role == UserRole.ADMIN and v is not None:
-            raise ValueError('Los usuarios Admin no deben tener account_id')
-        return v
+    @model_validator(mode='after')
+    def validate_organization_id(self):
+        """Valida que Operador y ReadOnly tengan organization_id."""
+        if self.role in [UserRole.OPERATOR, UserRole.READONLY] and self.organization_id is None:
+            raise ValueError(f'Los usuarios con rol {self.role.value} deben tener organization_id')
+        if self.role == UserRole.ADMIN and self.organization_id is not None:
+            raise ValueError('Los usuarios Admin no deben tener organization_id')
+        return self
 
 
 class UserUpdate(BaseModel):
@@ -65,7 +64,7 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     full_name: Optional[str] = Field(None, min_length=1, max_length=255)
     role: Optional[UserRole] = None
-    account_id: Optional[UUID] = None
+    organization_id: Optional[UUID] = None
     is_active: Optional[bool] = None
     timezone: Optional[str] = Field(None, max_length=50, description="Zona horaria del usuario")
     language: Optional[str] = Field(None, max_length=2, description="Idioma del usuario (en, es)")
@@ -76,7 +75,8 @@ class UserPasswordUpdate(BaseModel):
     current_password: str
     new_password: str = Field(..., min_length=8, max_length=100)
     
-    @validator('new_password')
+    @field_validator('new_password')
+    @classmethod
     def validate_password(cls, v):
         """Valida que la contraseña cumpla requisitos mínimos."""
         if not any(c.isupper() for c in v):
@@ -96,10 +96,9 @@ class UserResponse(UserBase):
     language: str
     created_at: datetime
     updated_at: datetime
-    account: Optional[AccountInUser] = None
+    organization: Optional[OrganizationInUser] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class UserListResponse(BaseModel):
@@ -108,4 +107,3 @@ class UserListResponse(BaseModel):
     total: int
     skip: int
     limit: int
-

@@ -82,8 +82,8 @@ class AuditLog(Base):
     # Estación afectada (si aplica)
     workstation_id = Column(GUID, ForeignKey("workstations.id", ondelete="SET NULL"), nullable=True)
     
-    # Cuenta afectada (si aplica)
-    account_id = Column(GUID, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
+    # Organización afectada (si aplica)
+    organization_id = Column(GUID, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
     
     # === INFORMACIÓN DE LA ACCIÓN ===
     action_type = Column(SQLEnum(ActionType), nullable=False, index=True)
@@ -103,7 +103,7 @@ class AuditLog(Base):
     # === RELACIONES ===
     user = relationship("User", back_populates="audit_logs", foreign_keys=[user_id])
     workstation = relationship("Workstation", back_populates="audit_logs", foreign_keys=[workstation_id])
-    account = relationship("Account", back_populates="audit_logs", foreign_keys=[account_id])
+    organization = relationship("Organization", back_populates="audit_logs", foreign_keys=[organization_id])
     
     def __repr__(self):
         return f"<AuditLog(id={self.id}, action_type={self.action_type}, entity_type={self.entity_type})>"

@@ -28,11 +28,6 @@ variable "ec2_instance_type" {
   type        = string
 }
 
-variable "ssh_public_key" {
-  description = "Clave pública SSH ed25519 para acceso al EC2 via Secrets Manager"
-  type        = string
-}
-
 variable "ses_from_email" {
   description = "Dirección de origen para emails transaccionales vía SES"
   type        = string

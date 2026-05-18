@@ -33,7 +33,7 @@ def list_users(
     page: int = Query(1, ge=1, description="Número de página"),
     page_size: int = Query(50, ge=1, le=100, description="Tamaño de página"),
     role: Optional[UserRole] = Query(None, description="Filtrar por rol"),
-    account_id: Optional[UUID] = Query(None, description="Filtrar por cuenta"),
+    organization_id: Optional[UUID] = Query(None, description="Filtrar por organización"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -47,7 +47,7 @@ def list_users(
         page: Número de página
         page_size: Tamaño de página (1-100)
         role: Filtrar por rol opcional
-        account_id: Filtrar por cuenta opcional
+        organization_id: Filtrar por organización opcional
         current_user: Usuario autenticado
         db: Sesión de base de datos
     
@@ -56,29 +56,29 @@ def list_users(
     """
     from sqlalchemy.orm import joinedload
     
-    query = db.query(User).options(joinedload(User.account))
+    query = db.query(User).options(joinedload(User.organization))
     
     # Operadores solo pueden ver usuarios de su cuenta
     if current_user.role == UserRole.OPERATOR:
-        if not current_user.account_id:
+        if not current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Operador sin cuenta asignada"
             )
-        query = query.filter(User.account_id == current_user.account_id)
+        query = query.filter(User.organization_id == current_user.organization_id)
     
     # Filtrar por rol si se proporciona
     if role:
         query = query.filter(User.role == role)
     
-    # Filtrar por cuenta si se proporciona (solo Admin)
-    if account_id:
+    # Filtrar por organización si se proporciona (solo Admin)
+    if organization_id:
         if current_user.role != UserRole.ADMIN:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Solo Admin puede filtrar por cuenta"
             )
-        query = query.filter(User.account_id == account_id)
+        query = query.filter(User.organization_id == organization_id)
     
     # Contar total
     total = query.count()
@@ -121,7 +121,7 @@ def create_user(
         HTTPException 403: Sin permisos
         HTTPException 409: Email ya existe
     """
-    from app.models.account import Account
+    from app.models.organization import Organization
     
     auth_service = AuthService()
     
@@ -133,7 +133,7 @@ def create_user(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Operadores solo pueden crear otros operadores"
             )
-        if user_data.account_id != current_user.account_id:
+        if user_data.organization_id != current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Operadores solo pueden crear usuarios de su misma cuenta"
@@ -150,8 +150,8 @@ def create_user(
     # Determinar timezone: usuario → organización → None
     timezone = user_data.timezone
     language = user_data.language if user_data.language in ('en', 'es') else None
-    if user_data.account_id:
-        account = db.query(Account).filter(Account.id == user_data.account_id).first()
+    if user_data.organization_id:
+        account = db.query(Organization).filter(Organization.id == user_data.organization_id).first()
         if account:
             if timezone is None and account.timezone:
                 timezone = account.timezone
@@ -166,7 +166,7 @@ def create_user(
         password_hash=auth_service.hash_password(user_data.password),
         full_name=user_data.full_name,
         role=user_data.role,
-        account_id=user_data.account_id,
+        organization_id=user_data.organization_id,
         timezone=timezone,
         language=language,
         is_active=True
@@ -183,12 +183,12 @@ def create_user(
         entity_type="user",
         entity_id=str(user.id),
         user_id=str(current_user.id),
-        account_id=str(user.account_id) if user.account_id else None,
+        organization_id=str(user.organization_id) if user.organization_id else None,
         entity_data={
             "email": user.email,
             "full_name": user.full_name,
             "role": user.role.value,
-            "account_id": str(user.account_id) if user.account_id else None,
+            "organization_id": str(user.organization_id) if user.organization_id else None,
             "timezone": user.timezone
         },
         ip_address=get_client_ip(request)
@@ -251,7 +251,7 @@ def get_user(
     """
     from sqlalchemy.orm import joinedload
     
-    user = db.query(User).options(joinedload(User.account)).filter(User.id == user_id).first()
+    user = db.query(User).options(joinedload(User.organization)).filter(User.id == user_id).first()
     
     if not user:
         raise HTTPException(
@@ -262,7 +262,7 @@ def get_user(
     # Verificar permisos
     if current_user.role == UserRole.OPERATOR:
         # Operadores solo pueden ver usuarios de su cuenta o a sí mismos
-        if user.id != current_user.id and user.account_id != current_user.account_id:
+        if user.id != current_user.id and user.organization_id != current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para ver este usuario"
@@ -316,7 +316,7 @@ def update_user(
                 detail="Operadores solo pueden actualizar su propio perfil"
             )
         # Operadores no pueden cambiar rol ni cuenta
-        if user_data.role is not None or user_data.account_id is not None:
+        if user_data.role is not None or user_data.organization_id is not None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Operadores no pueden cambiar su rol o cuenta"
@@ -334,7 +334,7 @@ def update_user(
         "email": user.email,
         "full_name": user.full_name,
         "role": user.role.value,
-        "account_id": str(user.account_id) if user.account_id else None
+        "organization_id": str(user.organization_id) if user.organization_id else None
     }
     
     # Actualizar campos
@@ -362,7 +362,7 @@ def update_user(
         entity_type="user",
         entity_id=str(user.id),
         user_id=str(current_user.id),
-        account_id=str(user.account_id) if user.account_id else None,
+        organization_id=str(user.organization_id) if user.organization_id else None,
         old_data=old_values,
         new_data=update_data,
         ip_address=get_client_ip(request)
@@ -423,7 +423,7 @@ def delete_user(
         entity_type="user",
         entity_id=str(user_id),
         user_id=str(current_user.id),
-        account_id=str(user.account_id) if user.account_id else None,
+        organization_id=str(user.organization_id) if user.organization_id else None,
         entity_data=old_values,
         ip_address=get_client_ip(request)
     )
@@ -495,7 +495,7 @@ def change_password(
         entity_type="user",
         entity_id=str(user.id),
         user_id=str(current_user.id),
-        account_id=str(user.account_id) if user.account_id else None,
+        organization_id=str(user.organization_id) if user.organization_id else None,
         old_values={"action": "password_change"},
         new_values={"action": "password_changed"},
         ip_address=get_client_ip(request)
