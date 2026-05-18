@@ -1,4 +1,4 @@
-name: Build AlwaysPrint Client
+name: Build and Deploy Client
 
 on:
   push:
