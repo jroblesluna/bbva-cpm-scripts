@@ -395,7 +395,7 @@
     "selectOrgWarning": "You must select an organization before uploading the configuration.",
     "fileLabel": "File .alwaysconfig",
     "jsonLabel": "Configuration JSON",
-    "jsonPlaceholder": "{\"version\": \"1.0\", \"name\": \"My Configuration\", ...}",
+    "jsonPlaceholder": "'{'\"version\": \"1.0\", \"name\": \"My Configuration\", ...'}'",
     "activateImmediately": "Activate immediately (deactivates previous configuration)",
     "uploading": "Uploading...",
     "upload": "Upload",
