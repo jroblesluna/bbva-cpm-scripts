@@ -257,7 +257,10 @@ namespace AlwaysPrintService.Actions
             string? path = GetParameter<string>(action, "path");
             bool recursive = GetParameter<bool>(action, "recursive", true);
             bool ignoreErrors = GetParameter<bool>(action, "ignore_errors", true);
-            string? iterateUsers = GetParameter<string>(action, "iterate_users");
+            
+            // iterate_users es un nombre de variable, no un template.
+            // Se lee como raw (sin ReplaceTemplates) para poder resolver la lista.
+            string? iterateUsers = GetRawParameter(action, "iterate_users");
             
             // Si hay iteración sobre usuarios
             if (!string.IsNullOrEmpty(iterateUsers) && !string.IsNullOrEmpty(pathTemplate))
@@ -266,7 +269,7 @@ namespace AlwaysPrintService.Actions
                 
                 if (users == null || users.Count == 0)
                 {
-                    AlwaysPrintLogger.WriteInfo("ActionEngine: no hay usuarios para iterar");
+                    AlwaysPrintLogger.WriteInfo($"ActionEngine: no hay usuarios para iterar (variable: {iterateUsers})");
                     return true;
                 }
                 
@@ -280,6 +283,7 @@ namespace AlwaysPrintService.Actions
                     };
                     
                     string resolvedPath = ReplaceTemplates(pathTemplate, tempVars);
+                    AlwaysPrintLogger.WriteInfo($"ActionEngine: DeleteFolderContents iterando usuario '{username}', path={resolvedPath}");
                     
                     bool success = AdminActions.DeleteFolderContents(resolvedPath, recursive, ignoreErrors);
                     if (!success && !ignoreErrors)
@@ -321,7 +325,8 @@ namespace AlwaysPrintService.Actions
         private bool ExecuteKillProcessesByName(ActionConfig action)
         {
             string processName = GetParameter<string>(action, "process_name") ?? "";
-            string? filterByUsers = GetParameter<string>(action, "filter_by_users");
+            // filter_by_users es un nombre de variable, no un template.
+            string? filterByUsers = GetRawParameter(action, "filter_by_users");
             bool force = GetParameter<bool>(action, "force", true);
             
             List<string>? users = null;
@@ -544,6 +549,42 @@ namespace AlwaysPrintService.Actions
             {
                 AlwaysPrintLogger.WriteWarning($"ActionEngine: error obteniendo parámetro '{paramName}': {ex.Message}");
                 return defaultValue;
+            }
+        }
+        
+        /// <summary>
+        /// Lee un parámetro string sin aplicar ReplaceTemplates.
+        /// Útil para parámetros que son nombres de variables (iterate_users, filter_by_users)
+        /// y no deben ser resueltos como templates.
+        /// </summary>
+        private string? GetRawParameter(ActionConfig action, string paramName)
+        {
+            try
+            {
+                if (action.Parameters == null)
+                    return null;
+                
+                if (!action.Parameters.TryGetValue(paramName, out JToken? token))
+                    return null;
+                
+                if (token == null)
+                    return null;
+                
+                string? value = token.ToString();
+                
+                // Remover {{}} si están presentes — el usuario puede escribir
+                // "iterate_users": "{{inactive_users}}" o "iterate_users": "inactive_users"
+                if (!string.IsNullOrEmpty(value))
+                {
+                    value = value.Trim('{', '}').Trim();
+                }
+                
+                return value;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning($"ActionEngine: error obteniendo parámetro raw '{paramName}': {ex.Message}");
+                return null;
             }
         }
         
