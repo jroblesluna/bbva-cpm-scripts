@@ -30,6 +30,7 @@ import {
   Activity,
   Wifi,
   Download,
+  Cog,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -53,6 +54,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { key: 'users', href: '/dashboard/admin/users', icon: Users, adminOnly: true },
     { key: 'pendingIps', href: '/dashboard/admin/pending-ips', icon: Globe, adminOnly: true },
     { key: 'updates', href: '/dashboard/admin/updates', icon: Download, adminOnly: true },
+    { key: 'actionConfigs', href: '/dashboard/admin/action-configs', icon: Cog, adminOnly: true },
   ]
 
   // Redirigir a login si no está autenticado

@@ -13,7 +13,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useSession } from 'next-auth/react';
+import { useAuth } from '@/hooks/useAuth';
 import {
   Upload,
   FileText,
@@ -57,7 +57,7 @@ import {
 import type { ActionConfig, ActionConfigDetail } from '@/types/action-config';
 
 export default function ActionConfigsPage() {
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -68,7 +68,7 @@ export default function ActionConfigsPage() {
   const [isActive, setIsActive] = useState(true);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   
-  const organizationId = 1; // TODO: Obtener del usuario autenticado (session?.user?.organization_id)
+  const organizationId = user?.organization_id ?? null;
   
   // Query para listar configuraciones
   const { data: configs, isLoading } = useQuery({

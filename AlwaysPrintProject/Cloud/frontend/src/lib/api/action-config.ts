@@ -14,7 +14,7 @@ import type {
  * Subir una nueva configuración de acciones.
  */
 export async function uploadActionConfig(
-  organizationId: number,
+  organizationId: string,
   data: ActionConfigUpload
 ): Promise<ActionConfig> {
   const response = await apiClient.post(
@@ -28,7 +28,7 @@ export async function uploadActionConfig(
  * Obtener la configuración activa de una organización.
  */
 export async function getActiveActionConfig(
-  organizationId: number
+  organizationId: string
 ): Promise<ActionConfig | null> {
   try {
     const response = await apiClient.get(
@@ -47,7 +47,7 @@ export async function getActiveActionConfig(
  * Listar todas las configuraciones de una organización.
  */
 export async function listActionConfigs(
-  organizationId: number
+  organizationId: string
 ): Promise<ActionConfig[]> {
   const response = await apiClient.get(
     `/organizations/${organizationId}/configs`
@@ -59,7 +59,7 @@ export async function listActionConfigs(
  * Obtener detalle completo de una configuración (incluye JSON).
  */
 export async function getActionConfigDetail(
-  organizationId: number,
+  organizationId: string,
   configId: number
 ): Promise<ActionConfigDetail> {
   const response = await apiClient.get(
@@ -72,7 +72,7 @@ export async function getActionConfigDetail(
  * Actualizar una configuración (activar/desactivar).
  */
 export async function updateActionConfig(
-  organizationId: number,
+  organizationId: string,
   configId: number,
   data: ActionConfigUpdate
 ): Promise<ActionConfig> {
@@ -87,7 +87,7 @@ export async function updateActionConfig(
  * Eliminar una configuración.
  */
 export async function deleteActionConfig(
-  organizationId: number,
+  organizationId: string,
   configId: number
 ): Promise<void> {
   await apiClient.delete(

@@ -4,7 +4,7 @@
 
 export interface ActionConfig {
   id: number;
-  organization_id: number;
+  organization_id: string;
   name: string;
   version: string;
   description: string | null;
@@ -12,7 +12,7 @@ export interface ActionConfig {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  created_by_id: number | null;
+  created_by_id: string | null;
 }
 
 export interface ActionConfigDetail extends ActionConfig {
