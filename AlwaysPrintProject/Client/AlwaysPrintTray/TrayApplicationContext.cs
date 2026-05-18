@@ -169,6 +169,9 @@ namespace AlwaysPrintTray
                     {
                         var credentials = new CloudCredentialsManager();
                         _cloudManager = new CloudManager(cfg, credentials, _pipe, _uiContext, _trayIcon);
+                        // Capturar cfg para el callback
+                        var cfgForCallback = cfg;
+                        _cloudManager.Registered += () => OnCloudManagerRegistered(cfgForCallback);
                         _cloudManager.Start();
                         AlwaysPrintLogger.WriteTrayInfo("CloudManager iniciado correctamente.");
                     }
@@ -200,14 +203,29 @@ namespace AlwaysPrintTray
                     }
                 }
 
-                // 7. Iniciar flujo de auto-actualización (fire-and-forget, no bloqueante)
-                InitializeAutoUpdate(cfg);
+                // 7. Auto-actualización se inicia cuando CloudManager confirme registro exitoso
+                // (ver OnCloudManagerRegistered). Si Cloud no está habilitada, no se verifica.
             }
             catch (OperationCanceledException) { /* shutdown normal */ }
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteTrayError("Tray bootstrap sequence falló.", ex, AlwaysPrintLogger.EvtGenericError);
             }
+        }
+
+        /// <summary>
+        /// Callback que se ejecuta cuando CloudManager confirma registro exitoso en la Cloud.
+        /// Inicia el UpdateChecker solo después de tener conexión autenticada.
+        /// Se protege contra invocaciones duplicadas con el guard _updateChecker != null.
+        /// </summary>
+        private void OnCloudManagerRegistered(AppConfiguration cfg)
+        {
+            // Evitar inicialización duplicada (el evento puede dispararse en reconexiones)
+            if (_updateChecker != null) return;
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                "AutoUpdate: conexión Cloud confirmada. Iniciando verificación de actualizaciones.");
+            InitializeAutoUpdate(cfg);
         }
 
         /// <summary>

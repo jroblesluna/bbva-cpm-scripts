@@ -28,6 +28,12 @@ namespace AlwaysPrintTray.Cloud
         /// <summary>Estado actual de conexión Cloud.</summary>
         public bool IsConnected { get; private set; }
 
+        /// <summary>
+        /// Se dispara cuando la workstation ha sido registrada exitosamente en la Cloud
+        /// (después de recibir el mensaje "registered" con WorkstationId).
+        /// </summary>
+        public event Action? Registered;
+
         private readonly AppConfiguration _config;
         private readonly CloudCredentialsManager _credentials;
         private readonly PipeClient _pipe;
@@ -386,6 +392,9 @@ namespace AlwaysPrintTray.Cloud
                 }
 
                 _credentials.SaveLastConnected(DateTime.UtcNow);
+
+                // Notificar que el registro fue exitoso (para que UpdateChecker pueda iniciar)
+                Registered?.Invoke();
             }
             catch (Exception ex)
             {
