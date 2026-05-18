@@ -224,8 +224,11 @@ namespace AlwaysPrintTray.Cloud
             SendRegistration();
             NotifyServiceCloudStatus(connected: true);
             
-            // Nota: CheckActionConfiguration() se llama en HandleRegistered() 
-            // después de recibir el WorkstationId del servidor
+            // Nota: CheckActionConfiguration() y el evento Registered se disparan
+            // en HandleRegistered() después de recibir confirmación del servidor.
+            // Si la workstation ya estaba registrada y el servidor no envía "registered"
+            // explícitamente, HandleRegistered no se ejecutará — pero eso es correcto:
+            // el UpdateChecker solo debe iniciar cuando el servidor confirma el registro.
         }
 
         private void OnDisconnected()

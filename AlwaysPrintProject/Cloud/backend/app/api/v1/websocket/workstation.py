@@ -179,6 +179,14 @@ async def workstation_websocket(
         # Enviar configuración efectiva
         config = config_service.get_effective_config(db, workstation_id)
         print(f"[WS] Config obtenida, enviando...", flush=True)
+        
+        # Enviar confirmación de registro con workstation_id
+        await websocket.send_json({
+            "type": "registered",
+            "workstation_id": workstation_id
+        })
+        print(f"[WS] Mensaje registered enviado: {workstation_id}", flush=True)
+        
         await websocket.send_json({
             "type": "config_update",
             "config": config
