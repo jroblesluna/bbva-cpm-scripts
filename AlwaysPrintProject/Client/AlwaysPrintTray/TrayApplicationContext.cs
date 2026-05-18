@@ -36,6 +36,9 @@ namespace AlwaysPrintTray
         // Integración de auto-actualización
         private UpdateChecker? _updateChecker;
 
+        // Flag para detectar si una búsqueda manual encontró actualización
+        private volatile bool _manualCheckFoundUpdate;
+
         public TrayApplicationContext()
         {
             _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
@@ -61,6 +64,7 @@ namespace AlwaysPrintTray
             var menu = new ContextMenuStrip();
             menu.Items.Add(LocalizationManager.Get("MenuAbout"),         null, (_, __) => ShowAbout());
             menu.Items.Add(LocalizationManager.Get("MenuConfiguration"), null, (_, __) => ShowConfiguration());
+            menu.Items.Add(LocalizationManager.Get("MenuCheckUpdates"),  null, (_, __) => CheckForUpdatesManual());
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(LocalizationManager.Get("MenuExit"),          null, (_, __) => ExitApplication());
 
@@ -274,9 +278,17 @@ namespace AlwaysPrintTray
         {
             try
             {
+                // Marcar que se encontró actualización (para búsqueda manual)
+                _manualCheckFoundUpdate = true;
+
                 AlwaysPrintLogger.WriteTrayInfo(
                     $"AutoUpdate: actualización disponible detectada. Versión: {updateInfo.Version}, " +
                     $"tamaño: {updateInfo.FileSize} bytes. Iniciando descarga...");
+
+                // Notificar al usuario que se está actualizando
+                ShowBalloon("AlwaysPrint",
+                    string.Format(LocalizationManager.Get("BalloonUpdating"), updateInfo.Version),
+                    ToolTipIcon.Info);
 
                 var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -349,6 +361,56 @@ namespace AlwaysPrintTray
                 AlwaysPrintLogger.WriteTrayError(
                     $"AutoUpdate: error inesperado durante el flujo de descarga/instalación: {ex.Message}",
                     AlwaysPrintLogger.EvtGenericError);
+            }
+        }
+
+        /// <summary>
+        /// Acción manual del usuario: buscar actualizaciones desde el menú del tray.
+        /// Si no hay conexión Cloud, muestra notificación informativa.
+        /// Si hay conexión, ejecuta verificación inmediata y notifica resultado.
+        /// </summary>
+        private async void CheckForUpdatesManual()
+        {
+            try
+            {
+                // Si no hay UpdateChecker inicializado, no hay conexión Cloud
+                if (_updateChecker == null)
+                {
+                    ShowBalloon("AlwaysPrint",
+                        LocalizationManager.Get("BalloonUpdateNoCloud"),
+                        ToolTipIcon.Warning);
+                    return;
+                }
+
+                AlwaysPrintLogger.WriteTrayInfo("Búsqueda manual de actualizaciones iniciada por el usuario.");
+
+                // Mostrar notificación de que se está buscando
+                ShowBalloon("AlwaysPrint",
+                    LocalizationManager.Get("BalloonCheckingUpdates"),
+                    ToolTipIcon.Info);
+
+                // Resetear flag antes de la verificación
+                _manualCheckFoundUpdate = false;
+
+                // Ejecutar verificación inmediata
+                await _updateChecker.CheckNowAsync();
+
+                // Si no se disparó el evento UpdateAvailable, no hay actualización disponible
+                if (!_manualCheckFoundUpdate)
+                {
+                    ShowBalloon("AlwaysPrint",
+                        LocalizationManager.Get("BalloonNoUpdates"),
+                        ToolTipIcon.Info);
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"Error en búsqueda manual de actualizaciones: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+                ShowBalloon("AlwaysPrint",
+                    LocalizationManager.Get("BalloonUpdateError"),
+                    ToolTipIcon.Error);
             }
         }
 

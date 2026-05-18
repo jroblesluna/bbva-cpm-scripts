@@ -2,6 +2,7 @@
   "TrayTooltip": "AlwaysPrint",
   "MenuAbout": "About",
   "MenuConfiguration": "Configuration",
+  "MenuCheckUpdates": "Check for updates",
   "MenuExit": "Exit",
   "BalloonInitOk": "Initialized successfully ({0}).",
   "BalloonInitFail": "Operating in local mode.",
@@ -12,5 +13,10 @@
   "BalloonOfflineNoConfig": "No cloud connection and no cached config. Using defaults.",
   "BalloonReconnected": "Cloud connection restored.",
   "BalloonConnectedOk": "Connected to cloud successfully.",
-  "TooltipOffline": "AlwaysPrint (offline)"
+  "TooltipOffline": "AlwaysPrint (offline)",
+  "BalloonCheckingUpdates": "Checking for updates...",
+  "BalloonUpdating": "AlwaysPrint is updating to version {0}.",
+  "BalloonNoUpdates": "No updates available. You have the latest version.",
+  "BalloonUpdateError": "Could not check for updates. Please try again later.",
+  "BalloonUpdateNoCloud": "Cannot check for updates without cloud connection."
 }
