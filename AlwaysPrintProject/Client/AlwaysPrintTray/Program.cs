@@ -36,14 +36,17 @@ namespace AlwaysPrintTray
             bool isNew;
             using var mutex = new Mutex(initiallyOwned: false, MutexName, out isNew, mutexSecurity);
 
-            // Intentar adquirir ownership del mutex
+            // Intentar adquirir ownership del mutex.
+            // Se usa un timeout de 10 segundos para manejar la race condition durante
+            // actualizaciones: el MSI mata la instancia vieja pero el Mutex tarda un
+            // instante en liberarse. Sin timeout, la nueva instancia se cierra prematuramente.
             try
             {
-                isNew = mutex.WaitOne(0);
+                isNew = mutex.WaitOne(TimeSpan.FromSeconds(10));
             }
             catch (AbandonedMutexException)
             {
-                // El mutex fue abandonado por otra instancia que crasheó — lo tomamos
+                // El mutex fue abandonado por otra instancia que crasheó o fue matada — lo tomamos
                 isNew = true;
             }
 
