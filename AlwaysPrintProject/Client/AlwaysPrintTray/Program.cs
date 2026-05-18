@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics;
 using System.Net;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Threading;
 using System.Windows.Forms;
 using AlwaysPrint.Shared.Logging;
@@ -22,7 +24,28 @@ namespace AlwaysPrintTray
             AlwaysPrintLogger.EnsureSourceExists();
 
             // Single-instance guard using a named mutex.
-            using var mutex = new Mutex(initiallyOwned: true, MutexName, out bool isNew);
+            // Se configura MutexSecurity para permitir acceso a todos los usuarios,
+            // evitando UnauthorizedAccessException cuando el Service (LocalSystem) lanza el Tray
+            // en la sesión de un usuario con privilegios limitados.
+            var mutexSecurity = new MutexSecurity();
+            mutexSecurity.AddAccessRule(new MutexAccessRule(
+                new SecurityIdentifier(WellKnownSidType.WorldSid, null),
+                MutexRights.FullControl,
+                AccessControlType.Allow));
+
+            bool isNew;
+            using var mutex = new Mutex(initiallyOwned: false, MutexName, out isNew, mutexSecurity);
+
+            // Intentar adquirir ownership del mutex
+            try
+            {
+                isNew = mutex.WaitOne(0);
+            }
+            catch (AbandonedMutexException)
+            {
+                // El mutex fue abandonado por otra instancia que crasheó — lo tomamos
+                isNew = true;
+            }
 
             if (!isNew)
             {
