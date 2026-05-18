@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
@@ -10,9 +11,11 @@ namespace AlwaysPrintTray.Forms
         public AboutForm()
         {
             var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
+            var currentUser = Environment.UserName;
+            var processStart = Process.GetCurrentProcess().StartTime;
 
             Text            = "Acerca de AlwaysPrint";
-            Size            = new Size(450, 280);
+            Size            = new Size(450, 330);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox     = false;
             MinimizeBox     = false;
@@ -61,10 +64,26 @@ namespace AlwaysPrintTray.Forms
                 Font      = new Font("Segoe UI", 9)
             };
 
+            var lblUser = new Label
+            {
+                Text      = $"Usuario: {currentUser}",
+                Location  = new Point(20, 170),
+                AutoSize  = true,
+                Font      = new Font("Segoe UI", 9)
+            };
+
+            var lblStartup = new Label
+            {
+                Text      = $"Inicio: {processStart:yyyy-MM-dd HH:mm:ss}",
+                Location  = new Point(20, 195),
+                AutoSize  = true,
+                Font      = new Font("Segoe UI", 9)
+            };
+
             var lblContact = new Label
             {
-                Text      = "Contacto: antonio@robles.ai",
-                Location  = new Point(20, 170),
+                Text      = "(c) Inversiones On Line S.A.C.",
+                Location  = new Point(20, 220),
                 AutoSize  = true,
                 ForeColor = SystemColors.GrayText,
                 Font      = new Font("Segoe UI", 9)
@@ -74,11 +93,11 @@ namespace AlwaysPrintTray.Forms
             {
                 Text          = "Cerrar",
                 DialogResult  = DialogResult.OK,
-                Location      = new Point(330, 195),
+                Location      = new Point(330, 250),
                 Size          = new Size(80, 30)
             };
 
-            Controls.AddRange(new Control[] { picLogo, lblTitle, lblVersion, lblCopyright, lblDesc, lblContact, btnOk });
+            Controls.AddRange(new Control[] { picLogo, lblTitle, lblVersion, lblCopyright, lblDesc, lblUser, lblStartup, lblContact, btnOk });
             AcceptButton = btnOk;
         }
 
@@ -99,7 +118,7 @@ namespace AlwaysPrintTray.Forms
                 using var icoStream = assembly.GetManifestResourceStream("AlwaysPrintTray.Resources.logo.ico");
                 if (icoStream != null)
                 {
-                    using var icon = new Icon(icoStream, 256, 256); // Usar la resolución más alta disponible
+                    using var icon = new Icon(icoStream, 256, 256);
                     return icon.ToBitmap();
                 }
             }
