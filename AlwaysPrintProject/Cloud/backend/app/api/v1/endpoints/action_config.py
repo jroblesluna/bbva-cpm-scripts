@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.action_config import ActionConfig
 from app.schemas.action_config import (
     ActionConfigUpload,
@@ -50,8 +50,8 @@ def upload_action_config(
     
     Si is_active=True, desactiva automáticamente cualquier configuración activa previa.
     """
-    # Verificar que el usuario pertenece a la organización
-    if current_user.organization_id != organization_id:
+    # Verificar que el usuario pertenece a la organización (admins pueden gestionar cualquiera)
+    if current_user.role != UserRole.ADMIN and current_user.organization_id != organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para gestionar configuraciones de esta organización"
@@ -90,8 +90,8 @@ def get_active_action_config(
     
     Retorna 404 si no hay configuración activa.
     """
-    # Verificar que el usuario pertenece a la organización
-    if current_user.organization_id != organization_id:
+    # Verificar que el usuario pertenece a la organización (admins pueden acceder a cualquiera)
+    if current_user.role != UserRole.ADMIN and current_user.organization_id != organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para acceder a configuraciones de esta organización"
@@ -124,8 +124,8 @@ def list_action_configs(
     
     Incluye tanto activas como inactivas, ordenadas por fecha de creación descendente.
     """
-    # Verificar que el usuario pertenece a la organización
-    if current_user.organization_id != organization_id:
+    # Verificar que el usuario pertenece a la organización (admins pueden acceder a cualquiera)
+    if current_user.role != UserRole.ADMIN and current_user.organization_id != organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para acceder a configuraciones de esta organización"
@@ -150,8 +150,8 @@ def get_action_config_detail(
     """
     Obtiene una configuración específica con todos sus detalles incluyendo el JSON completo.
     """
-    # Verificar que el usuario pertenece a la organización
-    if current_user.organization_id != organization_id:
+    # Verificar que el usuario pertenece a la organización (admins pueden acceder a cualquiera)
+    if current_user.role != UserRole.ADMIN and current_user.organization_id != organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para acceder a configuraciones de esta organización"
@@ -187,8 +187,8 @@ def update_action_config(
     Actualmente solo permite activar/desactivar la propagación.
     Si se activa una configuración, las demás se desactivan automáticamente.
     """
-    # Verificar que el usuario pertenece a la organización
-    if current_user.organization_id != organization_id:
+    # Verificar que el usuario pertenece a la organización (admins pueden gestionar cualquiera)
+    if current_user.role != UserRole.ADMIN and current_user.organization_id != organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para gestionar configuraciones de esta organización"
@@ -223,8 +223,8 @@ def delete_action_config(
     
     Esta operación es irreversible.
     """
-    # Verificar que el usuario pertenece a la organización
-    if current_user.organization_id != organization_id:
+    # Verificar que el usuario pertenece a la organización (admins pueden gestionar cualquiera)
+    if current_user.role != UserRole.ADMIN and current_user.organization_id != organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para gestionar configuraciones de esta organización"
