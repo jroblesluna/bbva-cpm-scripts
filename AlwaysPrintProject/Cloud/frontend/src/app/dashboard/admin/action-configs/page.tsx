@@ -112,11 +112,22 @@ export default function ActionConfigsPage() {
       setValidationErrors([]);
     },
     onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.detail || 'Error subiendo configuración',
-        variant: 'destructive',
-      });
+      const status = error?.status || error?.response?.status;
+      const detail = error?.detail || error?.response?.data?.detail || 'Error subiendo configuración';
+      
+      if (status === 409) {
+        toast({
+          title: 'Configuración duplicada',
+          description: detail,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: detail,
+          variant: 'destructive',
+        });
+      }
     },
   });
   

@@ -18,6 +18,11 @@ from app.schemas.action_config import (
 logger = logging.getLogger(__name__)
 
 
+class DuplicateConfigError(Exception):
+    """Error lanzado cuando se intenta subir una configuración con hash duplicado."""
+    pass
+
+
 class ActionConfigService:
     """Servicio para gestionar configuraciones de acciones administrativas."""
     
@@ -95,6 +100,24 @@ class ActionConfigService:
         
         # Calcular hash
         config_hash = calculate_config_hash(data.config_json)
+        
+        # Verificar si ya existe una configuración con el mismo hash en esta organización
+        existing = db.query(ActionConfig).filter(
+            and_(
+                ActionConfig.organization_id == organization_id,
+                ActionConfig.config_hash == config_hash
+            )
+        ).first()
+        
+        if existing:
+            logger.warning(
+                f"Configuración duplicada: org={organization_id}, hash={config_hash}, "
+                f"existente_id={existing.id}, nombre='{existing.name}'"
+            )
+            raise DuplicateConfigError(
+                f"Ya existe una configuración con el mismo contenido (hash: {config_hash}). "
+                f"Configuración existente: '{existing.name}' (id: {existing.id})"
+            )
         
         # Si is_active=True, desactivar configuración activa previa
         if data.is_active:

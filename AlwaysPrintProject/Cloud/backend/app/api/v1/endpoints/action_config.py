@@ -19,7 +19,7 @@ from app.schemas.action_config import (
     ActionConfigDetail,
     ActionConfigDownloadInfo,
 )
-from app.services.action_config import ActionConfigService
+from app.services.action_config import ActionConfigService, DuplicateConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,11 @@ def upload_action_config(
         )
         
         return config
+    except DuplicateConfigError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e)
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
