@@ -455,7 +455,7 @@ export default function WorkstationsPage() {
       </Card>
 
       {editingWorkstation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{ zIndex: -999 }}>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{ zIndex: 999 }}>
           <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>{t('editTitle', { ip: editingWorkstation.ip_private })}</CardTitle>
