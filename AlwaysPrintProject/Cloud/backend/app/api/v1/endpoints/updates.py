@@ -174,8 +174,8 @@ def admin_download_version(
     return {"download_url": presigned_url, "version": version}
 
 
-@router.delete(
-    "/versions",
+@router.post(
+    "/versions/delete",
     summary="Eliminar versiones de S3 (admin)",
     description="Elimina múltiples versiones del bucket S3. No permite eliminar la versión latest ni versiones pineadas.",
     responses={

@@ -162,27 +162,39 @@ class S3UpdateService:
         prefix = f"versions/{version}/"
         try:
             logger.info(
-                "Eliminando versión de S3: bucket=%s, prefix=%s",
+                "Eliminando versión de S3 (con versionado): bucket=%s, prefix=%s",
                 self._bucket,
                 prefix
             )
 
-            # Listar todos los objetos bajo el prefijo
+            # Listar TODAS las versiones de los objetos bajo el prefijo
+            # (necesario porque el bucket tiene versionado habilitado —
+            # un simple DeleteObjects solo agrega delete markers sin eliminar realmente)
             objects_to_delete = []
-            paginator = self._client.get_paginator('list_objects_v2')
+            paginator = self._client.get_paginator('list_object_versions')
             pages = paginator.paginate(Bucket=self._bucket, Prefix=prefix)
 
             for page in pages:
-                for obj in page.get('Contents', []):
-                    objects_to_delete.append({'Key': obj['Key']})
+                # Versiones reales del objeto
+                for v in page.get('Versions', []):
+                    objects_to_delete.append({
+                        'Key': v['Key'],
+                        'VersionId': v['VersionId']
+                    })
+                # Delete markers existentes (también deben eliminarse)
+                for dm in page.get('DeleteMarkers', []):
+                    objects_to_delete.append({
+                        'Key': dm['Key'],
+                        'VersionId': dm['VersionId']
+                    })
 
             if not objects_to_delete:
                 logger.warning(
-                    "No se encontraron objetos para eliminar: prefix=%s", prefix
+                    "No se encontraron objetos ni versiones para eliminar: prefix=%s", prefix
                 )
                 return False
 
-            # Eliminar objetos en lotes (máximo 1000 por request de S3)
+            # Eliminar permanentemente en lotes (máximo 1000 por request de S3)
             for i in range(0, len(objects_to_delete), 1000):
                 batch = objects_to_delete[i:i + 1000]
                 self._client.delete_objects(
@@ -191,7 +203,7 @@ class S3UpdateService:
                 )
 
             logger.info(
-                "Versión eliminada exitosamente: version=%s, objetos_eliminados=%d",
+                "Versión eliminada permanentemente: version=%s, objetos_eliminados=%d",
                 version,
                 len(objects_to_delete)
             )

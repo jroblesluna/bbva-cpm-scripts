@@ -1,5 +1,6 @@
 /**
  * Página de gestión de VLANs.
+ * Vista de tarjetas (responsive) y vista de tabla con toggle.
  */
 
 'use client'
@@ -19,6 +20,9 @@ import {
   Monitor,
   X,
   Printer,
+  LayoutGrid,
+  List,
+  Calendar,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 import type { VLAN, VLANCreate, VLANUpdate, VLANDetail } from '@/types/vlan'
@@ -26,6 +30,8 @@ import type { Device } from '@/types/device'
 import { formatDateWithTimezone } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 import { CidrHealthBadge } from '@/components/vlans/CidrHealthBadge'
+
+type ViewMode = 'cards' | 'table'
 
 export default function VLANsPage() {
   const { user, getAuthHeaders } = useAuth()
@@ -45,6 +51,7 @@ export default function VLANsPage() {
   const [showDevicesModal, setShowDevicesModal] = useState(false)
   const [vlanDevices, setVlanDevices] = useState<Device[]>([])
   const [devicesVlanName, setDevicesVlanName] = useState('')
+  const [viewMode, setViewMode] = useState<ViewMode>('cards')
 
   useEffect(() => {
     if (!user) return
@@ -124,7 +131,8 @@ export default function VLANsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Encabezado */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
           <p className="mt-2 text-gray-600">{t('subtitle')}</p>
@@ -135,33 +143,43 @@ export default function VLANsPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
+      {/* Tarjetas de estadísticas */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+        <div className="bg-white rounded-lg shadow p-4 md:p-6">
           <div className="flex items-center">
-            <div className="p-3 bg-blue-100 rounded-lg"><Network className="h-6 w-6 text-blue-600" /></div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">{t('totalVlans')}</p>
-              <p className="text-2xl font-bold text-gray-900">{vlans.length}</p>
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <Network className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
+            </div>
+            <div className="ml-3 md:ml-4">
+              <p className="text-xs md:text-sm font-medium text-gray-600">{t('totalVlans')}</p>
+              <p className="text-xl md:text-2xl font-bold text-gray-900">{vlans.length}</p>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-lg shadow p-4 md:p-6">
           <div className="flex items-center">
-            <div className="p-3 bg-green-100 rounded-lg"><Monitor className="h-6 w-6 text-green-600" /></div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">{t('stations')}</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {vlans.reduce((acc, v) => acc + ((v as any).workstation_count || 0), 0)}
+            <div className="p-3 bg-green-100 rounded-lg">
+              <Monitor className="h-5 w-5 md:h-6 md:w-6 text-green-600" />
+            </div>
+            <div className="ml-3 md:ml-4">
+              <p className="text-xs md:text-sm font-medium text-gray-600">{t('stations')}</p>
+              <p className="text-xl md:text-2xl font-bold text-gray-900">
+                {vlans.reduce((acc, v) => {
+                  const detail = v as VLAN & { workstation_count?: number }
+                  return acc + (detail.workstation_count ?? 0)
+                }, 0)}
               </p>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-lg shadow p-4 md:p-6 col-span-2 md:col-span-1">
           <div className="flex items-center">
-            <div className="p-3 bg-purple-100 rounded-lg"><Network className="h-6 w-6 text-purple-600" /></div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">{t('cidrRanges')}</p>
-              <p className="text-2xl font-bold text-gray-900">
+            <div className="p-3 bg-purple-100 rounded-lg">
+              <Network className="h-5 w-5 md:h-6 md:w-6 text-purple-600" />
+            </div>
+            <div className="ml-3 md:ml-4">
+              <p className="text-xs md:text-sm font-medium text-gray-600">{t('cidrRanges')}</p>
+              <p className="text-xl md:text-2xl font-bold text-gray-900">
                 {vlans.reduce((acc, v) => acc + v.cidr_ranges.length, 0)}
               </p>
             </div>
@@ -169,9 +187,10 @@ export default function VLANsPage() {
         </div>
       </div>
 
+      {/* Filtros y toggle de vista */}
       <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="relative">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <Input
               type="text"
@@ -185,7 +204,7 @@ export default function VLANsPage() {
             <select
               value={filterOrgId || 'all'}
               onChange={(e) => setFilterOrgId(e.target.value === 'all' ? undefined : e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full md:w-auto px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">{t('allOrganizations')}</option>
               {accounts.map((account) => (
@@ -194,18 +213,42 @@ export default function VLANsPage() {
             </select>
           )}
         </div>
-        {(searchTerm || filterOrgId) && (
-          <div className="mt-4">
-            <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterOrgId(undefined) }}>
-              <X className="mr-2 h-4 w-4" />
-              {tCommon('clearFilters')}
+        <div className="flex items-center justify-between mt-4">
+          <div className="flex items-center">
+            {(searchTerm || filterOrgId) && (
+              <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterOrgId(undefined) }}>
+                <X className="mr-2 h-4 w-4" />
+                {tCommon('clearFilters')}
+              </Button>
+            )}
+          </div>
+          {/* Toggle de vista: tarjetas / tabla */}
+          <div className="flex items-center gap-1 border rounded-md p-0.5">
+            <Button
+              variant={viewMode === 'cards' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('cards')}
+              title="Vista de tarjetas"
+              className="h-8 w-8 p-0"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              title="Vista de tabla"
+              className="h-8 w-8 p-0"
+            >
+              <List className="w-4 h-4" />
             </Button>
           </div>
-        )}
+        </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        {filteredVlans.length === 0 ? (
+      {/* Contenido principal: vista de tarjetas o tabla */}
+      {filteredVlans.length === 0 ? (
+        <div className="bg-white rounded-lg shadow">
           <div className="text-center py-12">
             <Network className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">{t('emptyTitle')}</h3>
@@ -221,69 +264,149 @@ export default function VLANsPage() {
               </div>
             )}
           </div>
-        ) : (
+        </div>
+      ) : viewMode === 'cards' ? (
+        /* Vista de tarjetas (responsive) */
+        <div className="space-y-4">
+          {filteredVlans.map((vlan) => (
+            <div key={vlan.id} className="bg-white rounded-lg shadow p-4 md:p-6">
+              {/* Fila 1: Nombre + CidrHealthBadge */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Network className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                  <span className="text-sm md:text-base font-medium text-gray-900 truncate">
+                    {vlan.name}
+                  </span>
+                </div>
+                <CidrHealthBadge cidrCount={vlan.cidr_ranges.length} />
+              </div>
+              {/* Fila 2: Organización, CIDRs, descripción */}
+              <div className="space-y-2 mb-3">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                  <span className="font-medium">
+                    {accounts.find((a) => a.id === vlan.organization_id)?.name || '-'}
+                  </span>
+                  <span className="text-gray-300">|</span>
+                  <div className="flex flex-wrap gap-1">
+                    {vlan.cidr_ranges.map((cidr, idx) => (
+                      <Badge key={idx} variant="secondary" className="text-xs">
+                        {cidr}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                {vlan.description && (
+                  <p className="text-sm text-gray-500 line-clamp-2">
+                    {vlan.description}
+                  </p>
+                )}
+                <div className="flex items-center gap-1 text-xs text-gray-400">
+                  <Calendar className="h-3 w-3" />
+                  <span>{formatDateWithTimezone(vlan.created_at, timezone)}</span>
+                </div>
+              </div>
+
+              {/* Fila 3: Acciones */}
+              <div className="flex flex-wrap gap-1 pt-2 border-t border-gray-100">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleViewDevices(vlan)}
+                  title={t('viewDevices')}
+                  className="h-8 w-8 p-0"
+                >
+                  <Printer className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleEdit(vlan)}
+                  title={tCommon('edit')}
+                  className="h-8 w-8 p-0"
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDelete(vlan)}
+                  title={tCommon('delete')}
+                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* Vista de tabla (con overflow-x-auto para desktop) */
+        <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colName')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colOrganization')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colDescription')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colCidr')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colHealth')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colCreated')}</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colActions')}</th>
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colName')}</th>
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colOrganization')}</th>
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colDescription')}</th>
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colCidr')}</th>
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colHealth')}</th>
+                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colCreated')}</th>
+                  <th className="px-4 md:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colActions')}</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredVlans.map((vlan) => (
                   <tr key={vlan.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <Network className="h-5 w-5 text-gray-400 mr-2" />
                         <span className="text-sm font-medium text-gray-900">{vlan.name}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                       <span className="text-sm text-gray-600">
                         {accounts.find((a) => a.id === vlan.organization_id)?.name || '-'}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-500">{vlan.description || '-'}</span>
+                    <td className="px-4 md:px-6 py-4">
+                      <span className="text-sm text-gray-500 line-clamp-1">{vlan.description || '-'}</span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 md:px-6 py-4">
                       <div className="flex flex-wrap gap-1">
                         {vlan.cidr_ranges.map((cidr, idx) => (
                           <Badge key={idx} variant="secondary">{cidr}</Badge>
                         ))}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                       <CidrHealthBadge cidrCount={vlan.cidr_ranges.length} />
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDateWithTimezone(vlan.created_at, timezone)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Button variant="ghost" size="sm" onClick={() => handleViewDevices(vlan)} title={t('viewDevices')}>
-                        <Printer className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(vlan)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(vlan)} className="text-red-600 hover:text-red-700">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right">
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        <Button variant="ghost" size="sm" onClick={() => handleViewDevices(vlan)} title={t('viewDevices')} className="h-8 w-8 p-0">
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(vlan)} title={tCommon('edit')} className="h-8 w-8 p-0">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(vlan)} title={tCommon('delete')} className="h-8 w-8 p-0 text-red-600 hover:text-red-700">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
+      {/* Modales */}
       {showCreateModal && (
         <CreateVLANModal onClose={() => setShowCreateModal(false)} onSuccess={() => { setShowCreateModal(false); loadVlans() }} />
       )}
@@ -312,6 +435,10 @@ export default function VLANsPage() {
     </div>
   )
 }
+
+// ============================================================================
+// Modal: Crear VLAN
+// ============================================================================
 
 function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const { getAuthHeaders, user, isAdmin } = useAuth()
@@ -346,9 +473,10 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
       setLoading(true)
       await apiClient.post('/vlans/', { ...formData, cidr_ranges: validCidrs })
       onSuccess()
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Error desconocido'
       console.error('Error:', error)
-      alert(error.message)
+      alert(msg)
     } finally {
       setLoading(false)
     }
@@ -419,6 +547,10 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   )
 }
 
+// ============================================================================
+// Modal: Editar VLAN
+// ============================================================================
+
 function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detail: VLANDetail; onClose: () => void; onSuccess: () => void }) {
   const { getAuthHeaders } = useAuth()
   const t = useTranslations('vlans')
@@ -438,9 +570,10 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
       setLoading(true)
       await apiClient.put(`/vlans/${vlan.id}`, { ...formData, cidr_ranges: validCidrs })
       onSuccess()
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Error desconocido'
       console.error('Error:', error)
-      alert(error.message)
+      alert(msg)
     } finally {
       setLoading(false)
     }
@@ -508,6 +641,10 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
   )
 }
 
+// ============================================================================
+// Modal: Eliminar VLAN
+// ============================================================================
+
 function DeleteVLANModal({ vlan, onClose, onSuccess }: { vlan: VLAN; onClose: () => void; onSuccess: () => void }) {
   const { getAuthHeaders } = useAuth()
   const t = useTranslations('vlans')
@@ -519,9 +656,10 @@ function DeleteVLANModal({ vlan, onClose, onSuccess }: { vlan: VLAN; onClose: ()
       setLoading(true)
       await apiClient.delete(`/vlans/${vlan.id}`)
       onSuccess()
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Error desconocido'
       console.error('Error:', error)
-      alert(error.message)
+      alert(msg)
     } finally {
       setLoading(false)
     }
@@ -544,6 +682,10 @@ function DeleteVLANModal({ vlan, onClose, onSuccess }: { vlan: VLAN; onClose: ()
     </div>
   )
 }
+
+// ============================================================================
+// Modal: Dispositivos de VLAN
+// ============================================================================
 
 function VLANDevicesModal({ vlanName, devices, onClose }: { vlanName: string; devices: Device[]; onClose: () => void }) {
   const t = useTranslations('vlans')

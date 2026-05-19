@@ -303,11 +303,12 @@ export default function UpdatesPage() {
     setDeleteConfirmDialog({ open: false, versions: [] });
 
     try {
-      const response = await apiClient.delete<DeleteVersionsResponse>('/updates/versions', {
-        data: { versions: versionsToDelete },
+      const response = await apiClient.post<DeleteVersionsResponse>('/updates/versions/delete', {
+        versions: versionsToDelete,
       });
 
       const result = response.data;
+      console.log('[DELETE VERSIONS] Resultado:', JSON.stringify(result));
 
       // Limpiar selección
       setSelectedVersions(new Set());
@@ -342,6 +343,7 @@ export default function UpdatesPage() {
       // Refrescar datos
       await fetchData();
     } catch (err: unknown) {
+      console.error('[DELETE VERSIONS] Error:', err);
       const errorMessage =
         err && typeof err === 'object' && 'detail' in err
           ? (err as { detail: string }).detail

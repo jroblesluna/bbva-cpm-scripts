@@ -79,10 +79,16 @@ async def get_workstation_telemetry(
         )
 
     # Verificar tenant isolation: workstation debe pertenecer a la cuenta del usuario
-    workstation = db.query(Workstation).filter(
-        Workstation.id == workstation_id,
-        Workstation.organization_id == current_user.organization_id
-    ).first()
+    # Admin puede ver cualquier workstation; operador solo las de su organización
+    if current_user.role == UserRole.ADMIN:
+        workstation = db.query(Workstation).filter(
+            Workstation.id == workstation_id
+        ).first()
+    else:
+        workstation = db.query(Workstation).filter(
+            Workstation.id == workstation_id,
+            Workstation.organization_id == current_user.organization_id
+        ).first()
 
     if not workstation:
         raise HTTPException(
@@ -92,10 +98,11 @@ async def get_workstation_telemetry(
 
     # Consultar historial de telemetría usando el servicio
     telemetry_service = TelemetryService()
+    org_id = str(workstation.organization_id) if workstation.organization_id else str(current_user.organization_id or "")
     records = telemetry_service.get_telemetry_history(
         db=db,
         workstation_id=str(workstation_id),
-        organization_id=str(current_user.organization_id),
+        organization_id=org_id,
         from_dt=from_dt,
         to_dt=to_dt,
         limit=limit
