@@ -11,6 +11,7 @@ export interface Organization {
   language: string
   auto_update_enabled: boolean
   target_version: string | null
+  auto_reregister_enabled: boolean
   created_at: string
   updated_at: string
   public_ips?: PublicIP[]

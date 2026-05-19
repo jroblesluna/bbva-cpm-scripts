@@ -82,6 +82,11 @@ class Organization(Base):
     # Cuando se establece, las workstations se actualizan a esta versión específica
     target_version = Column(String(50), nullable=True)
 
+    # Flag de re-registro automático de workstations eliminadas
+    # Si está habilitado, cuando una workstation envía telemetría pero ya no existe en BD,
+    # se le solicita re-registrarse automáticamente (obtiene nuevo workstation_id)
+    auto_reregister_enabled = Column(Boolean, nullable=False, default=False, server_default='false')
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

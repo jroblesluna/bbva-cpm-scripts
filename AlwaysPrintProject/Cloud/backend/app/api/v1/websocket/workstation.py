@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.workstation import Workstation
+from app.models.organization import Organization, PublicIP
 from app.schemas.websocket import RegisterMessage, TelemetryMessage, ConnectivityResultMessage
 from app.schemas.telemetry import TelemetryMessagePayload, ConnectivityResultPayload
 from app.services.websocket_manager import connection_manager
@@ -231,6 +232,37 @@ async def workstation_websocket(
                 await connection_manager.handle_pong(workstation_id)
             
             elif message_type == "status_update":
+                # Verificar que la workstation aún existe en BD antes de actualizar
+                ws_exists = db.query(Workstation).filter(
+                    Workstation.id == workstation_id
+                ).first()
+                
+                if not ws_exists:
+                    # Workstation eliminada: verificar si la organización permite re-registro
+                    org = db.query(Organization).filter(
+                        Organization.id == workstation.organization_id
+                    ).first()
+                    
+                    if org and org.auto_reregister_enabled:
+                        logger.info(
+                            "[WS] status_update para workstation %s eliminada. "
+                            "auto_reregister_enabled=True para org %s. Solicitando re-registro.",
+                            workstation_id, org.name
+                        )
+                        await websocket.send_json({
+                            "type": "request_reregister",
+                            "reason": "workstation_not_found"
+                        })
+                        await _safe_close(websocket, 1000, "Re-registro requerido")
+                        return
+                    else:
+                        logger.warning(
+                            "[WS] status_update para workstation %s eliminada. "
+                            "auto_reregister_enabled=False. Descartando.",
+                            workstation_id
+                        )
+                        continue
+                
                 # Actualizar estado de contingencia
                 contingency_active = data.get("contingency_active")
                 current_user = data.get("current_user")
@@ -312,12 +344,37 @@ async def workstation_websocket(
             
             elif message_type == "telemetry":
                 # Procesar mensaje de telemetría periódica
-                await _handle_telemetry(
+                result = await _handle_telemetry(
                     data=data,
                     workstation_id=workstation_id,
                     organization_id=str(workstation.organization_id),
                     db=db
                 )
+                
+                # Si la workstation fue eliminada de la BD, verificar flag de re-registro
+                if result == "request_reregister":
+                    org = db.query(Organization).filter(
+                        Organization.id == workstation.organization_id
+                    ).first()
+                    
+                    if org and org.auto_reregister_enabled:
+                        logger.info(
+                            "[WS] Telemetría para workstation %s eliminada. "
+                            "auto_reregister_enabled=True para org %s. Solicitando re-registro.",
+                            workstation_id, org.name
+                        )
+                        await websocket.send_json({
+                            "type": "request_reregister",
+                            "reason": "workstation_not_found"
+                        })
+                        await _safe_close(websocket, 1000, "Re-registro requerido")
+                        return
+                    else:
+                        logger.warning(
+                            "[WS] Telemetría para workstation %s eliminada. "
+                            "auto_reregister_enabled=False. Descartando sin re-registro.",
+                            workstation_id
+                        )
             
             elif message_type == "connectivity_result":
                 # Procesar resultado de chequeo de conectividad
@@ -408,13 +465,16 @@ async def _handle_telemetry(
         return
 
     if telemetry_log is None:
-        # workstation_id no existe para esta cuenta: log WARNING, descartar
+        # workstation_id no existe para esta cuenta: solicitar re-registro
+        # Esto ocurre cuando la workstation fue eliminada de la BD pero el cliente
+        # sigue conectado con su workstation_id antiguo
         logger.warning(
-            "Telemetría descartada - workstation_id=%s no encontrada para organization_id=%s",
+            "Telemetría descartada - workstation_id=%s no encontrada para organization_id=%s. "
+            "Solicitando re-registro al cliente.",
             workstation_id,
             organization_id
         )
-        return
+        return "request_reregister"
 
     # Persistencia exitosa: broadcast 'telemetry_received' a operadores de la organización
     await connection_manager.broadcast_to_organization(

@@ -76,6 +76,7 @@ interface OrgAutoUpdateState {
   orgName: string;
   autoUpdateEnabled: boolean;
   targetVersion: string | null;
+  autoReregisterEnabled: boolean;
   isToggling: boolean;
 }
 
@@ -160,6 +161,7 @@ export default function UpdatesPage() {
           orgName: acc.name,
           autoUpdateEnabled: acc.auto_update_enabled ?? false,
           targetVersion: acc.target_version ?? null,
+          autoReregisterEnabled: acc.auto_reregister_enabled ?? false,
           isToggling: false,
         }));
         setOrganizations(orgStates);
@@ -187,6 +189,7 @@ export default function UpdatesPage() {
               orgName: acc.name,
               autoUpdateEnabled: acc.auto_update_enabled ?? false,
               targetVersion: acc.target_version ?? null,
+              autoReregisterEnabled: acc.auto_reregister_enabled ?? false,
               isToggling: false,
             },
           ]);
@@ -257,6 +260,44 @@ export default function UpdatesPage() {
       );
     } finally {
       setConfirmDialog({ open: false, orgId: '', orgName: '' });
+    }
+  };
+
+  // Toggle de re-registro automático por organización
+  const handleReregisterToggle = async (orgId: string, enabled: boolean) => {
+    setOrganizations((prev) =>
+      prev.map((org) => (org.orgId === orgId ? { ...org, isToggling: true } : org))
+    );
+
+    try {
+      await apiClient.put(`/organizations/${orgId}`, {
+        auto_reregister_enabled: enabled,
+      });
+
+      setOrganizations((prev) =>
+        prev.map((org) =>
+          org.orgId === orgId
+            ? { ...org, autoReregisterEnabled: enabled, isToggling: false }
+            : org
+        )
+      );
+
+      const orgName = organizations.find((o) => o.orgId === orgId)?.orgName ?? orgId;
+      toast({
+        title: enabled
+          ? 'Re-registro automático habilitado'
+          : 'Re-registro automático deshabilitado',
+        description: `Organización: ${orgName}`,
+      });
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar la configuración de re-registro',
+        variant: 'destructive',
+      });
+      setOrganizations((prev) =>
+        prev.map((org) => (org.orgId === orgId ? { ...org, isToggling: false } : org))
+      );
     }
   };
 
@@ -608,6 +649,25 @@ export default function UpdatesPage() {
                           Las workstations no se actualizarán automáticamente.
                         </p>
                       )}
+
+                      {/* Toggle de re-registro automático */}
+                      <div className="flex items-center justify-between pt-2 border-t mt-3">
+                        <div>
+                          <Label className="text-sm font-medium">Re-registro automático</Label>
+                          <p className="text-xs text-muted-foreground">
+                            {org.autoReregisterEnabled
+                              ? 'Workstations eliminadas se re-registran al enviar telemetría'
+                              : 'Workstations eliminadas no se re-registran automáticamente'}
+                          </p>
+                        </div>
+                        <Switch
+                          checked={org.autoReregisterEnabled}
+                          onCheckedChange={(checked) =>
+                            handleReregisterToggle(org.orgId, checked)
+                          }
+                          disabled={org.isToggling}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>

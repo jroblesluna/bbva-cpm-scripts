@@ -81,6 +81,7 @@ class OrganizationUpdate(BaseModel):
     is_active: Optional[bool] = None
     timezone: Optional[str] = Field(None, max_length=50, description="Zona horaria de la organización")
     language: Optional[str] = Field(None, max_length=2, description="Idioma por defecto de la organización")
+    auto_reregister_enabled: Optional[bool] = Field(None, description="Permitir re-registro automático de workstations eliminadas")
 
 
 class OrganizationResponse(OrganizationBase):
@@ -91,6 +92,7 @@ class OrganizationResponse(OrganizationBase):
     language: str
     auto_update_enabled: bool
     target_version: Optional[str] = None
+    auto_reregister_enabled: bool
     public_ips: list[PublicIPResponse] = []
     created_at: datetime
     updated_at: datetime
