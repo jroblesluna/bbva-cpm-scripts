@@ -35,18 +35,22 @@ class WorkstationRegisterRequest(BaseModel):
     hostname: Optional[str] = Field(None, max_length=255, description="Nombre del host Windows")
     os_serial: Optional[str] = Field(None, max_length=255, description="Serial del sistema operativo")
     current_user: Optional[str] = Field(None, max_length=255, description="Usuario actualmente logueado")
-    cidr: str = Field(..., description="CIDR de la subred de la workstation (ej: 192.168.1.0/24)")
+    cidr: Optional[str] = Field(None, description="CIDR de la subred de la workstation (ej: 192.168.1.0/24)")
     tray_version: Optional[str] = Field(None, max_length=50, description="Versión del AlwaysPrintTray")
 
     @field_validator('cidr')
     @classmethod
-    def validar_cidr(cls, v: str) -> str:
+    def validar_cidr(cls, v: Optional[str]) -> Optional[str]:
         """Valida y normaliza el CIDR a su forma canónica.
 
+        - Si es None (clientes antiguos sin soporte CIDR), se permite
         - Verifica que sea una notación IPv4 CIDR válida
         - Verifica que el prefix length esté en rango 8-30
         - Normaliza a forma canónica (ej: 192.168.1.50/24 → 192.168.1.0/24)
         """
+        if v is None:
+            return None
+
         try:
             red = ipaddress.ip_network(v, strict=False)
         except ValueError:

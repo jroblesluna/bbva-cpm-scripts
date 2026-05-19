@@ -7,9 +7,11 @@
  * - Ver la versión latest del MSI disponible en S3
  * - Configurar auto-actualización y versión pineada por organización
  * - Ver historial de versiones disponibles
+ * - Descargar versiones específicas
+ * - Eliminar versiones antiguas de S3
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   RefreshCw,
   Package,
@@ -19,8 +21,9 @@ import {
   AlertTriangle,
   Building2,
   Pin,
-  PinOff,
   History,
+  Download,
+  Trash2,
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +32,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -75,6 +79,13 @@ interface OrgAutoUpdateState {
   isToggling: boolean;
 }
 
+interface DeleteVersionsResponse {
+  deleted: string[];
+  skipped: { version: string; reason: string }[];
+  total_deleted: number;
+  total_skipped: number;
+}
+
 // ============================================================================
 // HELPERS
 // ============================================================================
@@ -101,6 +112,12 @@ export default function UpdatesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pinningOrg, setPinningOrg] = useState<string | null>(null);
+  const [selectedVersions, setSelectedVersions] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmDialog, setDeleteConfirmDialog] = useState<{
+    open: boolean;
+    versions: string[];
+  }>({ open: false, versions: [] });
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     orgId: string;
@@ -270,6 +287,140 @@ export default function UpdatesPage() {
       });
     } finally {
       setPinningOrg(null);
+    }
+  };
+
+  // Determinar qué versiones son elegibles para eliminación
+  // No se puede eliminar: la versión latest ni versiones pineadas por alguna organización
+  const pinnedVersions = useMemo(() => {
+    const pinned = new Set<string>();
+    organizations.forEach((org) => {
+      if (org.targetVersion) {
+        pinned.add(org.targetVersion);
+      }
+    });
+    return pinned;
+  }, [organizations]);
+
+  const eligibleVersions = useMemo(() => {
+    return versions.filter((v) => {
+      const isLatest = msiInfo?.version === v.version;
+      const isPinned = pinnedVersions.has(v.version);
+      return !isLatest && !isPinned;
+    });
+  }, [versions, msiInfo, pinnedVersions]);
+
+  // Manejar selección individual de versión
+  const handleVersionSelect = (version: string, checked: boolean) => {
+    setSelectedVersions((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(version);
+      } else {
+        next.delete(version);
+      }
+      return next;
+    });
+  };
+
+  // Manejar seleccionar/deseleccionar todas las versiones elegibles
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedVersions(new Set(eligibleVersions.map((v) => v.version)));
+    } else {
+      setSelectedVersions(new Set());
+    }
+  };
+
+  // Determinar estado del checkbox "Seleccionar todo"
+  const selectAllState = useMemo(() => {
+    if (eligibleVersions.length === 0) return { checked: false, indeterminate: false };
+    const selectedCount = eligibleVersions.filter((v) => selectedVersions.has(v.version)).length;
+    if (selectedCount === 0) return { checked: false, indeterminate: false };
+    if (selectedCount === eligibleVersions.length) return { checked: true, indeterminate: false };
+    return { checked: false, indeterminate: true };
+  }, [eligibleVersions, selectedVersions]);
+
+  // Descargar versión específica via endpoint admin
+  const handleDownloadVersion = (version: string) => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      toast({
+        title: 'Error',
+        description: 'No autenticado. Inicia sesión nuevamente.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    // Abrir en nueva pestaña — el endpoint redirige a la presigned URL
+    const baseUrl = apiClient.defaults.baseURL || '';
+    window.open(`${baseUrl}/updates/download/${version}`, '_blank');
+  };
+
+  // Confirmar eliminación de versiones seleccionadas
+  const handleDeleteClick = () => {
+    const versionsToDelete = Array.from(selectedVersions);
+    if (versionsToDelete.length === 0) return;
+    setDeleteConfirmDialog({ open: true, versions: versionsToDelete });
+  };
+
+  // Ejecutar eliminación de versiones
+  const performDelete = async () => {
+    const versionsToDelete = deleteConfirmDialog.versions;
+    setIsDeleting(true);
+    setDeleteConfirmDialog({ open: false, versions: [] });
+
+    try {
+      const response = await apiClient.delete<DeleteVersionsResponse>('/updates/versions', {
+        data: { versions: versionsToDelete },
+      });
+
+      const result = response.data;
+
+      // Limpiar selección
+      setSelectedVersions(new Set());
+
+      // Mostrar resultado
+      if (result.total_deleted > 0) {
+        toast({
+          title: `${result.total_deleted} versión(es) eliminada(s)`,
+          description: result.total_skipped > 0
+            ? `${result.total_skipped} versión(es) omitida(s)`
+            : 'Todas las versiones seleccionadas fueron eliminadas',
+        });
+      } else {
+        toast({
+          title: 'No se eliminaron versiones',
+          description: 'Todas las versiones seleccionadas fueron omitidas',
+          variant: 'destructive',
+        });
+      }
+
+      // Si hubo versiones omitidas, mostrar detalles
+      if (result.skipped.length > 0) {
+        const reasons = result.skipped
+          .map((s) => `${s.version}: ${s.reason}`)
+          .join(', ');
+        toast({
+          title: 'Versiones omitidas',
+          description: reasons,
+        });
+      }
+
+      // Refrescar datos
+      await fetchData();
+    } catch (err: unknown) {
+      const errorMessage =
+        err && typeof err === 'object' && 'detail' in err
+          ? (err as { detail: string }).detail
+          : 'Error al eliminar versiones';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -464,16 +615,28 @@ export default function UpdatesPage() {
             </CardContent>
           </Card>
 
-          {/* Historial de versiones (solo informativo) */}
+          {/* Historial de versiones con acciones */}
           {isAdmin && versions.length > 0 && (
             <Card>
               <CardHeader>
-                <div className="flex items-center gap-2">
-                  <History className="h-5 w-5 text-primary" />
-                  <CardTitle>Versiones Disponibles</CardTitle>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <History className="h-5 w-5 text-primary" />
+                    <CardTitle>Versiones Disponibles</CardTitle>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={selectedVersions.size === 0 || isDeleting}
+                    onClick={handleDeleteClick}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Eliminar ({selectedVersions.size})
+                  </Button>
                 </div>
                 <CardDescription>
-                  Todas las versiones del instalador almacenadas en S3.
+                  Todas las versiones del instalador almacenadas en S3. Selecciona versiones para
+                  eliminarlas.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -481,11 +644,22 @@ export default function UpdatesPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b">
+                        <th className="text-left py-2 px-3 font-medium w-10">
+                          {eligibleVersions.length > 0 && (
+                            <Checkbox
+                              checked={selectAllState.checked}
+                              indeterminate={selectAllState.indeterminate}
+                              onChange={(e) => handleSelectAll(e.target.checked)}
+                              aria-label="Seleccionar todas las versiones elegibles"
+                            />
+                          )}
+                        </th>
                         <th className="text-left py-2 px-3 font-medium">Versión</th>
                         <th className="text-left py-2 px-3 font-medium">Fecha Build</th>
                         <th className="text-left py-2 px-3 font-medium">Commit</th>
                         <th className="text-left py-2 px-3 font-medium">Tamaño</th>
                         <th className="text-left py-2 px-3 font-medium">Usada por</th>
+                        <th className="text-left py-2 px-3 font-medium">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -494,13 +668,37 @@ export default function UpdatesPage() {
                           (o) => o.targetVersion === v.version
                         );
                         const isLatest = msiInfo?.version === v.version;
+                        const isPinned = pinnedVersions.has(v.version);
+                        const isEligible = !isLatest && !isPinned;
                         return (
                           <tr key={v.version} className="border-b hover:bg-muted/50">
+                            <td className="py-2 px-3">
+                              {isEligible ? (
+                                <Checkbox
+                                  checked={selectedVersions.has(v.version)}
+                                  onChange={(e) =>
+                                    handleVersionSelect(v.version, e.target.checked)
+                                  }
+                                  aria-label={`Seleccionar versión ${v.version}`}
+                                />
+                              ) : (
+                                <span className="text-muted-foreground text-xs" title={
+                                  isLatest ? 'No se puede eliminar la versión latest' :
+                                  isPinned ? 'No se puede eliminar: pineada por una organización' : ''
+                                }>—</span>
+                              )}
+                            </td>
                             <td className="py-2 px-3 font-mono">
                               {v.version}
                               {isLatest && (
                                 <Badge variant="default" className="ml-2 text-xs">
                                   latest
+                                </Badge>
+                              )}
+                              {isPinned && !isLatest && (
+                                <Badge variant="secondary" className="ml-2 text-xs">
+                                  <Pin className="h-3 w-3 mr-1" />
+                                  pineada
                                 </Badge>
                               )}
                             </td>
@@ -524,6 +722,16 @@ export default function UpdatesPage() {
                                 <span className="text-muted-foreground text-xs">—</span>
                               )}
                             </td>
+                            <td className="py-2 px-3">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDownloadVersion(v.version)}
+                                title={`Descargar versión ${v.version}`}
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            </td>
                           </tr>
                         );
                       })}
@@ -536,7 +744,7 @@ export default function UpdatesPage() {
         </>
       )}
 
-      {/* Diálogo de confirmación */}
+      {/* Diálogo de confirmación de auto-update */}
       <Dialog
         open={confirmDialog.open}
         onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}
@@ -569,6 +777,56 @@ export default function UpdatesPage() {
               Cancelar
             </Button>
             <Button onClick={() => performToggle(confirmDialog.orgId, true)}>Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de confirmación de eliminación de versiones */}
+      <Dialog
+        open={deleteConfirmDialog.open}
+        onOpenChange={(open) => setDeleteConfirmDialog((prev) => ({ ...prev, open }))}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Eliminación de Versiones</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que deseas eliminar las siguientes versiones de S3? Esta acción no
+              se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-3">
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Se eliminarán permanentemente los archivos MSI de estas versiones del bucket S3.
+                Las workstations que tengan estas versiones instaladas no se verán afectadas, pero
+                no podrán volver a descargarlas.
+              </AlertDescription>
+            </Alert>
+
+            <div className="max-h-40 overflow-y-auto border rounded p-3">
+              <ul className="space-y-1">
+                {deleteConfirmDialog.versions.map((v) => (
+                  <li key={v} className="text-sm font-mono flex items-center gap-2">
+                    <Trash2 className="h-3 w-3 text-destructive flex-shrink-0" />
+                    {v}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmDialog({ open: false, versions: [] })}
+            >
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={performDelete} disabled={isDeleting}>
+              {isDeleting ? 'Eliminando...' : `Eliminar ${deleteConfirmDialog.versions.length} versión(es)`}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
