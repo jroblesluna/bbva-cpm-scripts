@@ -34,6 +34,12 @@ namespace AlwaysPrintTray.Cloud
         /// </summary>
         public event Action? Registered;
 
+        /// <summary>
+        /// Se dispara cuando se recibe un comando remoto "check_update" desde la Cloud.
+        /// El suscriptor (TrayApplicationContext) debe invocar UpdateChecker.CheckNowAsync().
+        /// </summary>
+        public event Action? CheckUpdateRequested;
+
         private readonly AppConfiguration _config;
         private readonly CloudCredentialsManager _credentials;
         private readonly PipeClient _pipe;
@@ -260,6 +266,9 @@ namespace AlwaysPrintTray.Cloud
                     break;
                 case "config_update":
                     HandleConfigUpdate(json);
+                    break;
+                case "command":
+                    HandleCommand(json);
                     break;
                 default:
                     AlwaysPrintLogger.WriteTrayInfo(
@@ -696,6 +705,134 @@ namespace AlwaysPrintTray.Cloud
             {
                 AlwaysPrintLogger.WriteTrayWarning(
                     $"CloudManager: error enviando pong. {ex.Message}");
+            }
+        }
+
+        // === Comandos Remotos ===
+
+        /// <summary>
+        /// Procesa un comando remoto recibido desde la Cloud.
+        /// Soporta: restart_service, restart_tray, check_update.
+        /// Envía el resultado de vuelta al servidor vía WebSocket.
+        /// </summary>
+        private void HandleCommand(string json)
+        {
+            string commandId = "unknown";
+            string commandType = "unknown";
+
+            try
+            {
+                var obj = JObject.Parse(json);
+                commandId = obj["command_id"]?.ToString() ?? "unknown";
+                commandType = obj["command_type"]?.ToString() ?? "unknown";
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: comando remoto recibido. command_id={commandId}, command_type={commandType}");
+
+                switch (commandType)
+                {
+                    case "restart_service":
+                        HandleRestartServiceCommand(commandId);
+                        break;
+
+                    case "restart_tray":
+                        HandleRestartTrayCommand(commandId);
+                        break;
+
+                    case "check_update":
+                        HandleCheckUpdateCommand(commandId);
+                        break;
+
+                    default:
+                        // Comando desconocido
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            $"CloudManager: comando remoto desconocido: {commandType}");
+                        SendCommandResult(commandId, false, $"Comando desconocido: {commandType}");
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error procesando comando remoto command_id={commandId}. {ex.Message}");
+                SendCommandResult(commandId, false, $"Error interno: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta el comando restart_service: genera un script .cmd que reinicia el servicio.
+        /// </summary>
+        private void HandleRestartServiceCommand(string commandId)
+        {
+            var (success, message) = RestartServiceHandler.Execute();
+            SendCommandResult(commandId, success, message);
+
+            if (success)
+            {
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: comando restart_service ejecutado exitosamente. El servicio se reiniciará en breve.");
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta el comando restart_tray: envía resultado y luego cierra la aplicación.
+        /// El Service detectará que el Tray no está corriendo y lo relanzará automáticamente.
+        /// </summary>
+        private void HandleRestartTrayCommand(string commandId)
+        {
+            // Enviar resultado ANTES de cerrar (para que el servidor reciba confirmación)
+            SendCommandResult(commandId, true, "Tray se cerrará. El Service lo relanzará automáticamente.");
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                "CloudManager: comando restart_tray recibido. Cerrando aplicación Tray...");
+
+            // Cerrar la aplicación en el hilo UI
+            _uiContext.Post(_ =>
+            {
+                Application.Exit();
+            }, null);
+        }
+
+        /// <summary>
+        /// Ejecuta el comando check_update: dispara el evento para que TrayApplicationContext
+        /// invoque UpdateChecker.CheckNowAsync().
+        /// </summary>
+        private void HandleCheckUpdateCommand(string commandId)
+        {
+            if (CheckUpdateRequested == null)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    "CloudManager: comando check_update recibido pero no hay suscriptor (UpdateChecker no inicializado).");
+                SendCommandResult(commandId, false, "UpdateChecker no disponible.");
+                return;
+            }
+
+            CheckUpdateRequested.Invoke();
+            SendCommandResult(commandId, true, "Verificación de actualización iniciada.");
+            AlwaysPrintLogger.WriteTrayInfo(
+                "CloudManager: comando check_update ejecutado. Verificación de actualización disparada.");
+        }
+
+        /// <summary>
+        /// Envía el resultado de un comando remoto al servidor vía WebSocket.
+        /// </summary>
+        private void SendCommandResult(string commandId, bool success, string output)
+        {
+            try
+            {
+                var payload = new JObject
+                {
+                    ["command_id"] = commandId,
+                    ["success"] = success,
+                    ["output"] = output
+                };
+
+                _wsClient!.Send("command_result", payload);
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"CloudManager: error enviando command_result para command_id={commandId}. {ex.Message}");
             }
         }
 

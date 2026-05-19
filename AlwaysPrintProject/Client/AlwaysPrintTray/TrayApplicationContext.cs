@@ -181,6 +181,7 @@ namespace AlwaysPrintTray
                         // Capturar cfg para el callback
                         var cfgForCallback = cfg;
                         _cloudManager.Registered += () => OnCloudManagerRegistered(cfgForCallback);
+                        _cloudManager.CheckUpdateRequested += OnCheckUpdateRequested;
                         _cloudManager.Start();
                         AlwaysPrintLogger.WriteTrayInfo("CloudManager iniciado correctamente.");
                     }
@@ -238,6 +239,32 @@ namespace AlwaysPrintTray
             AlwaysPrintLogger.WriteTrayInfo(
                 "AutoUpdate: conexión Cloud confirmada. Iniciando verificación de actualizaciones.");
             InitializeAutoUpdate(cfg);
+        }
+
+        /// <summary>
+        /// Callback que se ejecuta cuando se recibe un comando remoto "check_update" desde la Cloud.
+        /// Invoca UpdateChecker.CheckNowAsync() si está disponible.
+        /// </summary>
+        private async void OnCheckUpdateRequested()
+        {
+            try
+            {
+                if (_updateChecker == null)
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "OnCheckUpdateRequested: UpdateChecker no inicializado. Ignorando comando.");
+                    return;
+                }
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "OnCheckUpdateRequested: ejecutando verificación de actualización por comando remoto.");
+                await _updateChecker.CheckNowAsync();
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"OnCheckUpdateRequested: error al verificar actualización: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -614,6 +641,7 @@ namespace AlwaysPrintTray
                         // 5. Iniciar CloudManager con la configuración actualizada
                         var credentials = new CloudCredentialsManager();
                         _cloudManager = new CloudManager(cfg, credentials, _pipe, _uiContext, _trayIcon);
+                        _cloudManager.CheckUpdateRequested += OnCheckUpdateRequested;
                         _cloudManager.Start();
                         
                         AlwaysPrintLogger.WriteTrayInfo(

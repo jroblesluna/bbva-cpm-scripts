@@ -7,12 +7,15 @@ Este módulo define los endpoints para:
 - Actualización de workstations
 - Gestión de configuración específica
 - Estadísticas
+- Envío de comandos remotos a workstations
 """
 
 import logging
+import uuid
 from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -36,9 +39,134 @@ from app.schemas import (
 from app.services.workstation import WorkstationService
 from app.services.config import ConfigService
 from app.services.audit import AuditService
+from app.services.websocket_manager import connection_manager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+# === SCHEMAS PARA COMANDOS REMOTOS ===
+
+class CommandRequest(BaseModel):
+    """Schema de solicitud de comando remoto a una workstation."""
+    command_type: str = Field(
+        ...,
+        description="Tipo de comando: restart_service, restart_tray, check_update"
+    )
+    params: dict = Field(
+        default_factory=dict,
+        description="Parámetros opcionales del comando"
+    )
+
+
+class CommandResponse(BaseModel):
+    """Schema de respuesta al enviar un comando remoto."""
+    command_id: str = Field(..., description="ID único del comando enviado")
+    status: str = Field(..., description="Estado del envío: sent")
+
+
+# === ENDPOINT DE COMANDOS REMOTOS ===
+
+@router.post("/{workstation_id}/command",
+             response_model=CommandResponse,
+             status_code=status.HTTP_200_OK,
+             responses={
+                 200: {"description": "Comando enviado exitosamente"},
+                 404: {"description": "Workstation no encontrada"},
+                 409: {"description": "Workstation offline, no se puede enviar comando"},
+             })
+async def send_command(
+    workstation_id: UUID,
+    command_data: CommandRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Enviar un comando remoto a una workstation conectada vía WebSocket.
+    
+    Comandos soportados:
+    - restart_service: Reinicia el servicio AlwaysPrintService en la workstation
+    - restart_tray: Reinicia la aplicación Tray (el Service la relanza automáticamente)
+    - check_update: Fuerza verificación de actualización disponible
+    
+    Requiere autenticación de administrador u operador.
+    Si la workstation está offline, retorna 409 Conflict.
+    
+    Args:
+        workstation_id: ID de la workstation destino
+        command_data: Tipo de comando y parámetros opcionales
+        current_user: Usuario autenticado
+        db: Sesión de base de datos
+    
+    Returns:
+        CommandResponse con el command_id generado y estado "sent"
+    
+    Raises:
+        HTTPException 404: Workstation no encontrada
+        HTTPException 409: Workstation offline
+    """
+    # Verificar que la workstation existe
+    workstation = db.query(Workstation).filter(Workstation.id == workstation_id).first()
+    
+    if not workstation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workstation con ID {workstation_id} no encontrada"
+        )
+    
+    # Verificar permisos: operadores solo pueden enviar comandos a workstations de su cuenta
+    if current_user.role == UserRole.OPERATOR:
+        if workstation.organization_id != current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para enviar comandos a esta workstation"
+            )
+    
+    # Verificar que la workstation está online
+    workstation_id_str = str(workstation_id)
+    if not connection_manager.is_workstation_online(workstation_id_str):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La workstation está offline. No se puede enviar el comando."
+        )
+    
+    # Validar tipo de comando
+    valid_commands = ["restart_service", "restart_tray", "check_update"]
+    if command_data.command_type not in valid_commands:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Tipo de comando inválido: {command_data.command_type}. "
+                   f"Comandos válidos: {', '.join(valid_commands)}"
+        )
+    
+    # Generar ID único para el comando
+    command_id = str(uuid.uuid4())
+    
+    # Enviar comando vía WebSocket
+    message = {
+        "type": "command",
+        "command_id": command_id,
+        "command_type": command_data.command_type,
+        "params": command_data.params
+    }
+    
+    sent = await connection_manager.send_to_workstation(workstation_id_str, message)
+    
+    if not sent:
+        # La workstation se desconectó entre la verificación y el envío
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La workstation se desconectó antes de recibir el comando."
+        )
+    
+    logger.info(
+        f"[COMANDO] Comando enviado: command_id={command_id}, "
+        f"command_type={command_data.command_type}, "
+        f"workstation_id={workstation_id}, "
+        f"enviado_por={current_user.email}"
+    )
+    
+    return CommandResponse(command_id=command_id, status="sent")
 
 
 # === ENDPOINT DE REGISTRO (SIN AUTENTICACIÓN) ===

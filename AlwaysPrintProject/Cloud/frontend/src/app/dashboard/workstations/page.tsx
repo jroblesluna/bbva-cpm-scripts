@@ -29,9 +29,13 @@ import {
   RefreshCw,
   Trash2,
   Tag,
+  RotateCcw,
+  Download,
+  Terminal,
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
+import { useToast } from '@/hooks/use-toast';
 import type { Workstation, WorkstationUpdate, Organization, VLAN } from '@/types';
 
 export default function WorkstationsPage() {
@@ -97,6 +101,34 @@ export default function WorkstationsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workstations'] });
       setSelectedWorkstation(null);
+    },
+  });
+
+  const { toast } = useToast();
+
+  const commandMutation = useMutation({
+    mutationFn: ({ id, commandType }: { id: string; commandType: 'restart_service' | 'restart_tray' | 'check_update' }) =>
+      workstationsApi.sendCommand(id, commandType),
+    onSuccess: (_data, variables) => {
+      const labels: Record<string, string> = {
+        restart_service: 'Reiniciar Servicio',
+        restart_tray: 'Reiniciar Tray',
+        check_update: 'Verificar Actualización',
+      };
+      toast({
+        title: 'Comando enviado',
+        description: `"${labels[variables.commandType]}" enviado exitosamente.`,
+      });
+    },
+    onError: (error: { detail?: string; status?: number }) => {
+      const message = error.status === 409
+        ? 'La workstation está offline.'
+        : (error.detail ?? 'Error al enviar comando.');
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: message,
+      });
     },
   });
 
@@ -434,6 +466,37 @@ export default function WorkstationsPage() {
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
+                    {workstation.is_online && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="Reiniciar Servicio"
+                          onClick={() => commandMutation.mutate({ id: workstation.id, commandType: 'restart_service' })}
+                          disabled={commandMutation.isPending}
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="Reiniciar Tray"
+                          onClick={() => commandMutation.mutate({ id: workstation.id, commandType: 'restart_tray' })}
+                          disabled={commandMutation.isPending}
+                        >
+                          <Terminal className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="Verificar Actualización"
+                          onClick={() => commandMutation.mutate({ id: workstation.id, commandType: 'check_update' })}
+                          disabled={commandMutation.isPending}
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
                     <Button
                       variant="destructive"
                       size="sm"

@@ -454,6 +454,22 @@ export const workstationsApi = {
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/workstations/${id}`)
   },
+
+  /**
+   * Enviar comando remoto a una workstation.
+   * Requiere que la workstation esté online.
+   */
+  sendCommand: async (
+    id: string,
+    commandType: 'restart_service' | 'restart_tray' | 'check_update',
+    params?: Record<string, unknown>
+  ): Promise<{ command_id: string; status: string }> => {
+    const response = await apiClient.post<{ command_id: string; status: string }>(
+      `/workstations/${id}/command`,
+      { command_type: commandType, params: params ?? {} }
+    )
+    return response.data
+  },
 }
 
 // ============================================================================
