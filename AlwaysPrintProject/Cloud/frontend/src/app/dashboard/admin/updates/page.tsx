@@ -4,13 +4,24 @@
  * Página de administración de actualizaciones automáticas.
  *
  * Permite a los administradores:
- * - Ver la versión actual del MSI disponible en S3
- * - Habilitar/deshabilitar auto-updates por organización
- * - Confirmación antes de habilitar auto-updates
+ * - Ver la versión latest del MSI disponible en S3
+ * - Configurar auto-actualización y versión pineada por organización
+ * - Ver historial de versiones disponibles
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Package, Calendar, GitCommit, HardDrive, AlertTriangle, Building2, Pin, PinOff, History } from 'lucide-react';
+import {
+  RefreshCw,
+  Package,
+  Calendar,
+  GitCommit,
+  HardDrive,
+  AlertTriangle,
+  Building2,
+  Pin,
+  PinOff,
+  History,
+} from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -76,21 +87,6 @@ function formatFileSize(bytes: number): string {
   return `${size} ${units[i]}`;
 }
 
-function formatDate(isoDate: string): string {
-  if (!isoDate) return 'No disponible';
-  try {
-    return new Date(isoDate).toLocaleString('es-ES', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return isoDate;
-  }
-}
-
 // ============================================================================
 // COMPONENTE PRINCIPAL
 // ============================================================================
@@ -105,7 +101,11 @@ export default function UpdatesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pinningOrg, setPinningOrg] = useState<string | null>(null);
-  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; orgId: string; orgName: string }>({
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    orgId: string;
+    orgName: string;
+  }>({
     open: false,
     orgId: '',
     orgName: '',
@@ -119,7 +119,7 @@ export default function UpdatesPage() {
     setError(null);
 
     try {
-      // Obtener info del MSI desde S3 via el endpoint de check
+      // Obtener info del MSI (latest) desde S3
       let msiData: MsiInfo | null = null;
       try {
         const checkResponse = await apiClient.get<UpdateCheckResponse>('/updates/check');
@@ -131,7 +131,6 @@ export default function UpdatesPage() {
           fileSize: data.file_size,
         };
       } catch {
-        // Si falla (ej. S3 no disponible), no es crítico
         msiData = null;
       }
       setMsiInfo(msiData);
@@ -151,26 +150,29 @@ export default function UpdatesPage() {
         // Obtener historial de versiones
         try {
           const versionsResponse = await apiClient.get<MsiInfo[]>('/updates/versions');
-          setVersions(versionsResponse.data.map((v: any) => ({
-            version: v.version,
-            buildDate: v.build_date,
-            commitHash: v.commit_hash,
-            fileSize: v.file_size,
-          })));
+          setVersions(
+            versionsResponse.data.map((v: any) => ({
+              version: v.version,
+              buildDate: v.build_date,
+              commitHash: v.commit_hash,
+              fileSize: v.file_size,
+            }))
+          );
         } catch {
           setVersions([]);
         }
       } else if (user?.organization_id) {
-        // Operador: solo su organización
         try {
           const acc = await organizationsApi.get(user.organization_id);
-          setOrganizations([{
-            orgId: acc.id,
-            orgName: acc.name,
-            autoUpdateEnabled: acc.auto_update_enabled ?? false,
-            targetVersion: acc.target_version ?? null,
-            isToggling: false,
-          }]);
+          setOrganizations([
+            {
+              orgId: acc.id,
+              orgName: acc.name,
+              autoUpdateEnabled: acc.auto_update_enabled ?? false,
+              targetVersion: acc.target_version ?? null,
+              isToggling: false,
+            },
+          ]);
         } catch {
           setOrganizations([]);
         }
@@ -193,28 +195,23 @@ export default function UpdatesPage() {
   // Manejar toggle de auto-updates por organización
   const handleToggle = (orgId: string, orgName: string, checked: boolean) => {
     if (checked) {
-      // Mostrar diálogo de confirmación antes de habilitar
       setConfirmDialog({ open: true, orgId, orgName });
     } else {
-      // Deshabilitar directamente
       performToggle(orgId, false);
     }
   };
 
   // Ejecutar el toggle contra el backend
   const performToggle = async (orgId: string, enabled: boolean) => {
-    // Marcar como toggling
     setOrganizations((prev) =>
       prev.map((org) => (org.orgId === orgId ? { ...org, isToggling: true } : org))
     );
 
     try {
-      await apiClient.patch<AutoUpdateToggleResponse>(
-        `/organizations/${orgId}/auto-update`,
-        { enabled }
-      );
+      await apiClient.patch<AutoUpdateToggleResponse>(`/organizations/${orgId}/auto-update`, {
+        enabled,
+      });
 
-      // Actualizar estado local
       setOrganizations((prev) =>
         prev.map((org) =>
           org.orgId === orgId ? { ...org, autoUpdateEnabled: enabled, isToggling: false } : org
@@ -238,7 +235,6 @@ export default function UpdatesPage() {
         description: errorMessage,
         variant: 'destructive',
       });
-      // Revertir toggling state
       setOrganizations((prev) =>
         prev.map((org) => (org.orgId === orgId ? { ...org, isToggling: false } : org))
       );
@@ -247,18 +243,31 @@ export default function UpdatesPage() {
     }
   };
 
-  // Asignar versión para una organización
+  // Asignar versión pineada para una organización
   const handlePinVersion = async (orgId: string, version: string | null) => {
     setPinningOrg(orgId);
     try {
       await apiClient.put(`/updates/pin/${orgId}`, { version });
+
+      // Actualizar estado local
+      setOrganizations((prev) =>
+        prev.map((org) =>
+          org.orgId === orgId ? { ...org, targetVersion: version } : org
+        )
+      );
+
       toast({
-        title: version ? 'Versión asignada' : 'Versión desasignada',
-        description: version ? `Organización asignada a versión ${version}` : 'Organización usará la versión más reciente',
+        title: version ? 'Versión pineada' : 'Versión despineada',
+        description: version
+          ? `La organización usará siempre la versión ${version}`
+          : 'La organización usará la versión latest',
       });
-      fetchData(); // Refrescar datos
     } catch {
-      toast({ title: 'Error', description: 'No se pudo actualizar la versión asignada', variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar la versión asignada',
+        variant: 'destructive',
+      });
     } finally {
       setPinningOrg(null);
     }
@@ -306,19 +315,20 @@ export default function UpdatesPage() {
 
       {!isLoading && (
         <>
-          {/* Información del MSI actual */}
+          {/* Información del MSI latest */}
           {msiInfo && (
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Package className="h-5 w-5 text-primary" />
-                    <CardTitle>Versión Actual del Instalador</CardTitle>
+                    <CardTitle>Versión Latest</CardTitle>
                   </div>
                   <Badge variant="default">{msiInfo.version}</Badge>
                 </div>
                 <CardDescription>
-                  Información del MSI disponible en S3 para las workstations
+                  Versión más reciente del instalador en S3. Se despliega a organizaciones sin
+                  versión pineada.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -334,7 +344,9 @@ export default function UpdatesPage() {
                     <GitCommit className="h-4 w-4 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="text-xs text-muted-foreground">Commit</p>
-                      <p className="text-sm font-mono">{msiInfo.commitHash ? msiInfo.commitHash.substring(0, 8) : 'N/A'}</p>
+                      <p className="text-sm font-mono">
+                        {msiInfo.commitHash ? msiInfo.commitHash.substring(0, 8) : 'N/A'}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
@@ -349,16 +361,17 @@ export default function UpdatesPage() {
             </Card>
           )}
 
-          {/* Toggle por organización */}
+          {/* Configuración por organización */}
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Building2 className="h-5 w-5 text-primary" />
-                <CardTitle>Auto-Actualización por Organización</CardTitle>
+                <CardTitle>Configuración por Organización</CardTitle>
               </div>
               <CardDescription>
-                Habilita o deshabilita las actualizaciones automáticas para cada organización.
-                Las workstations solo se actualizarán si tanto el flag de organización como el flag local están habilitados.
+                Cada organización puede tener actualizaciones automáticas habilitadas y
+                opcionalmente una versión pineada. Si tiene versión pineada, siempre recibirá esa
+                versión (aunque cambie la latest).
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -367,59 +380,100 @@ export default function UpdatesPage() {
                   No se encontraron organizaciones.
                 </p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {organizations.map((org) => (
                     <div
                       key={org.orgId}
-                      className="flex items-center justify-between p-4 border rounded-lg"
+                      className="p-4 border rounded-lg space-y-3"
                     >
-                      <div className="space-y-1">
-                        <Label className="text-base font-medium">{org.orgName}</Label>
-                        <p className="text-sm text-muted-foreground">
-                          {org.autoUpdateEnabled
-                            ? 'Actualizaciones automáticas habilitadas'
-                            : 'Actualizaciones automáticas deshabilitadas'}
-                        </p>
-                        {org.targetVersion && (
-                          <div className="flex items-center gap-2 mt-1">
+                      {/* Fila superior: nombre + toggle */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-base font-medium">{org.orgName}</Label>
+                          <p className="text-sm text-muted-foreground">
+                            {org.autoUpdateEnabled
+                              ? 'Actualizaciones automáticas habilitadas'
+                              : 'Actualizaciones automáticas deshabilitadas'}
+                          </p>
+                        </div>
+                        <Switch
+                          checked={org.autoUpdateEnabled}
+                          onCheckedChange={(checked) =>
+                            handleToggle(org.orgId, org.orgName, checked)
+                          }
+                          disabled={org.isToggling}
+                        />
+                      </div>
+
+                      {/* Fila inferior: versión pineada */}
+                      <div className="flex items-center gap-3 pl-1">
+                        <Pin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="text-sm text-muted-foreground">Versión:</span>
+                          <select
+                            className="text-sm border rounded px-2 py-1 bg-background"
+                            value={org.targetVersion ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value || null;
+                              handlePinVersion(org.orgId, value);
+                            }}
+                            disabled={pinningOrg === org.orgId}
+                          >
+                            <option value="">Latest (automática)</option>
+                            {versions.map((v) => (
+                              <option key={v.version} value={v.version}>
+                                {v.version}
+                              </option>
+                            ))}
+                          </select>
+                          {org.targetVersion && (
                             <Badge variant="secondary" className="text-xs">
                               <Pin className="h-3 w-3 mr-1" />
-                              Asignada: {org.targetVersion}
+                              Pineada
                             </Badge>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-xs text-destructive hover:text-destructive"
-                              onClick={() => handlePinVersion(org.orgId, null)}
-                              disabled={pinningOrg === org.orgId}
-                            >
-                              <PinOff className="h-3 w-3 mr-1" />
-                              Desasignar
-                            </Button>
-                          </div>
-                        )}
+                          )}
+                          {!org.targetVersion && (
+                            <Badge variant="outline" className="text-xs">
+                              Usa latest
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                      <Switch
-                        checked={org.autoUpdateEnabled}
-                        onCheckedChange={(checked) => handleToggle(org.orgId, org.orgName, checked)}
-                        disabled={org.isToggling}
-                      />
+
+                      {/* Explicación contextual */}
+                      {org.autoUpdateEnabled && org.targetVersion && (
+                        <p className="text-xs text-amber-600 pl-7">
+                          Las workstations siempre descargarán la versión {org.targetVersion},
+                          independientemente de la versión latest.
+                        </p>
+                      )}
+                      {org.autoUpdateEnabled && !org.targetVersion && (
+                        <p className="text-xs text-muted-foreground pl-7">
+                          Las workstations se actualizarán automáticamente a la versión latest.
+                        </p>
+                      )}
+                      {!org.autoUpdateEnabled && (
+                        <p className="text-xs text-muted-foreground pl-7">
+                          Las workstations no se actualizarán automáticamente.
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
             </CardContent>
           </Card>
-          {/* Historial de Versiones */}
+
+          {/* Historial de versiones (solo informativo) */}
           {isAdmin && versions.length > 0 && (
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <History className="h-5 w-5 text-primary" />
-                  <CardTitle>Historial de Versiones</CardTitle>
+                  <CardTitle>Versiones Disponibles</CardTitle>
                 </div>
                 <CardDescription>
-                  Versiones disponibles en S3. Puedes asignar una versión específica a una organización.
+                  Todas las versiones del instalador almacenadas en S3.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -431,44 +485,51 @@ export default function UpdatesPage() {
                         <th className="text-left py-2 px-3 font-medium">Fecha Build</th>
                         <th className="text-left py-2 px-3 font-medium">Commit</th>
                         <th className="text-left py-2 px-3 font-medium">Tamaño</th>
-                        <th className="text-left py-2 px-3 font-medium">Asignar a Organización</th>
+                        <th className="text-left py-2 px-3 font-medium">Usada por</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {versions.map((v) => (
-                        <tr key={v.version} className="border-b hover:bg-muted/50">
-                          <td className="py-2 px-3 font-mono">{v.version}</td>
-                          <td className="py-2 px-3 text-muted-foreground">{v.buildDate || 'N/A'}</td>
-                          <td className="py-2 px-3 font-mono text-muted-foreground">{v.commitHash?.substring(0, 7) || 'N/A'}</td>
-                          <td className="py-2 px-3">{formatFileSize(v.fileSize)}</td>
-                          <td className="py-2 px-3">
-                            <select
-                              className="text-xs border rounded px-2 py-1"
-                              defaultValue=""
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  handlePinVersion(e.target.value, v.version);
-                                  e.target.value = '';
-                                }
-                              }}
-                              disabled={pinningOrg !== null}
-                            >
-                              <option value="">Seleccionar org...</option>
-                              {organizations.map((org) => (
-                                <option key={org.orgId} value={org.orgId}>
-                                  {org.orgName}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                        </tr>
-                      ))}
+                      {versions.map((v) => {
+                        const orgsUsingThis = organizations.filter(
+                          (o) => o.targetVersion === v.version
+                        );
+                        const isLatest = msiInfo?.version === v.version;
+                        return (
+                          <tr key={v.version} className="border-b hover:bg-muted/50">
+                            <td className="py-2 px-3 font-mono">
+                              {v.version}
+                              {isLatest && (
+                                <Badge variant="default" className="ml-2 text-xs">
+                                  latest
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-muted-foreground">
+                              {v.buildDate || 'N/A'}
+                            </td>
+                            <td className="py-2 px-3 font-mono text-muted-foreground">
+                              {v.commitHash?.substring(0, 7) || 'N/A'}
+                            </td>
+                            <td className="py-2 px-3">{formatFileSize(v.fileSize)}</td>
+                            <td className="py-2 px-3">
+                              {orgsUsingThis.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {orgsUsingThis.map((o) => (
+                                    <Badge key={o.orgId} variant="secondary" className="text-xs">
+                                      {o.orgName}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
-
-                {/* Organizaciones con versión asignada */}
-                {organizations.some(() => false) && null}
               </CardContent>
             </Card>
           )}
@@ -476,7 +537,10 @@ export default function UpdatesPage() {
       )}
 
       {/* Diálogo de confirmación */}
-      <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}>
+      <Dialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Confirmar Habilitación de Auto-Actualizaciones</DialogTitle>
@@ -491,8 +555,8 @@ export default function UpdatesPage() {
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
                 Las workstations de esta organización que tengan habilitado el flag local
-                comenzarán a actualizarse automáticamente. Asegúrate de que la versión actual
-                del MSI ha sido probada correctamente.
+                comenzarán a actualizarse automáticamente. Asegúrate de que la versión actual del
+                MSI ha sido probada correctamente.
               </AlertDescription>
             </Alert>
           </div>
@@ -504,9 +568,7 @@ export default function UpdatesPage() {
             >
               Cancelar
             </Button>
-            <Button onClick={() => performToggle(confirmDialog.orgId, true)}>
-              Confirmar
-            </Button>
+            <Button onClick={() => performToggle(confirmDialog.orgId, true)}>Confirmar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

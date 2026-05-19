@@ -18,6 +18,9 @@ __pycache__/
 .Python
 venv/
 env/
+
+# TypeScript
+*.tsbuildinfo
 ENV/
 *.egg-info/
 .pytest_cache/
