@@ -23,7 +23,7 @@ import {
   LayoutGrid,
   List,
   Calendar,
-  AlertTriangle,
+  ShieldAlert,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 import type { VLAN, VLANCreate, VLANUpdate, VLANDetail } from '@/types/vlan'
@@ -53,6 +53,7 @@ export default function VLANsPage() {
   const [vlanDevices, setVlanDevices] = useState<Device[]>([])
   const [devicesVlanName, setDevicesVlanName] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
+  const [contingencyTarget, setContingencyTarget] = useState<VLAN | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -122,10 +123,10 @@ export default function VLANsPage() {
   const handleToggleForcedContingency = async (vlan: VLAN, enabled: boolean) => {
     try {
       await apiClient.patch(`/vlans/${vlan.id}/forced-contingency`, null, { params: { enabled } })
-      // Actualizar estado local
       setVlans((prev) =>
         prev.map((v) => (v.id === vlan.id ? { ...v, forced_contingency: enabled } : v))
       )
+      setContingencyTarget(null)
     } catch (error) {
       console.error('Error al cambiar contingencia forzada:', error)
     }
@@ -324,11 +325,11 @@ export default function VLANsPage() {
                 <Button
                   variant={vlan.forced_contingency ? 'destructive' : 'ghost'}
                   size="sm"
-                  onClick={() => handleToggleForcedContingency(vlan, !vlan.forced_contingency)}
+                  onClick={() => setContingencyTarget(vlan)}
                   title={vlan.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
                   className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}`}
                 >
-                  <AlertTriangle className="h-4 w-4" />
+                  <ShieldAlert className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -412,11 +413,11 @@ export default function VLANsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleToggleForcedContingency(vlan, !vlan.forced_contingency)}
+                          onClick={() => setContingencyTarget(vlan)}
                           title={vlan.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
                           className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : ''}`}
                         >
-                          <AlertTriangle className="h-4 w-4" />
+                          <ShieldAlert className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleViewDevices(vlan)} title={t('viewDevices')} className="h-8 w-8 p-0">
                           <Printer className="h-4 w-4" />
@@ -438,6 +439,34 @@ export default function VLANsPage() {
       )}
 
       {/* Modales */}
+      {contingencyTarget && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <ShieldAlert className={`w-5 h-5 ${contingencyTarget.forced_contingency ? 'text-green-600' : 'text-orange-600'}`} />
+              <h2 className="text-lg font-bold text-gray-900">
+                {contingencyTarget.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+              </h2>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              {contingencyTarget.forced_contingency
+                ? `¿Estás seguro de desactivar la contingencia forzada para la VLAN "${contingencyTarget.name}"?`
+                : `¿Estás seguro de activar la contingencia forzada para la VLAN "${contingencyTarget.name}"? Todas las workstations de esta VLAN entrarán en modo contingencia.`
+              }
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setContingencyTarget(null)}>Cancelar</Button>
+              <Button
+                variant={contingencyTarget.forced_contingency ? 'default' : 'destructive'}
+                onClick={() => handleToggleForcedContingency(contingencyTarget, !contingencyTarget.forced_contingency)}
+                className={!contingencyTarget.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
+              >
+                {contingencyTarget.forced_contingency ? 'Desactivar' : 'Activar contingencia'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       {showCreateModal && (
         <CreateVLANModal onClose={() => setShowCreateModal(false)} onSuccess={() => { setShowCreateModal(false); loadVlans() }} />
       )}

@@ -32,7 +32,7 @@ import {
   Network,
   Users,
   Monitor,
-  AlertTriangle
+  ShieldAlert
 } from 'lucide-react'
 import type { Organization, OrganizationCreate, OrganizationUpdate, PublicIPCreate } from '@/types'
 
@@ -45,6 +45,7 @@ export default function AccountsPage() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Organization | null>(null)
   const [managingIPsOrg, setManagingIPsOrg] = useState<Organization | null>(null)
+  const [contingencyTarget, setContingencyTarget] = useState<Organization | null>(null)
 
   // Query para listar cuentas
   const { data: accounts, isLoading, error } = useQuery({
@@ -85,6 +86,7 @@ export default function AccountsPage() {
       organizationsApi.toggleForcedContingency(id, enabled),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      setContingencyTarget(null)
     },
   })
 
@@ -228,6 +230,57 @@ export default function AccountsPage() {
         </Card>
       )}
 
+      {/* Modal de confirmación de contingencia forzada */}
+      {contingencyTarget && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldAlert className={`w-5 h-5 ${contingencyTarget.forced_contingency ? 'text-green-600' : 'text-orange-600'}`} />
+                {contingencyTarget.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-600">
+                {contingencyTarget.forced_contingency
+                  ? `¿Estás seguro de desactivar la contingencia forzada para la organización "${contingencyTarget.name}"?`
+                  : `¿Estás seguro de activar la contingencia forzada para la organización "${contingencyTarget.name}"? TODAS las workstations de esta organización entrarán en modo contingencia.`
+                }
+              </p>
+              {!contingencyTarget.forced_contingency && (
+                <Alert>
+                  <ShieldAlert className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Todas las workstations conectadas recibirán una notificación de contingencia forzada.
+                  </AlertDescription>
+                </Alert>
+              )}
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setContingencyTarget(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  variant={contingencyTarget.forced_contingency ? 'default' : 'destructive'}
+                  onClick={() => forcedContingencyMutation.mutate({
+                    id: contingencyTarget.id,
+                    enabled: !contingencyTarget.forced_contingency,
+                  })}
+                  disabled={forcedContingencyMutation.isPending}
+                  className={!contingencyTarget.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
+                >
+                  {forcedContingencyMutation.isPending
+                    ? 'Procesando...'
+                    : contingencyTarget.forced_contingency
+                      ? 'Desactivar'
+                      : 'Activar contingencia'
+                  }
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Modal de gestión de IPs */}
       {managingIPsOrg && (
         <Card className="mb-6 border-green-200 bg-green-50">
@@ -314,12 +367,12 @@ export default function AccountsPage() {
                     <Button
                       variant={account.forced_contingency ? 'destructive' : 'outline'}
                       size="sm"
-                      onClick={() => forcedContingencyMutation.mutate({ id: account.id, enabled: !account.forced_contingency })}
+                      onClick={() => setContingencyTarget(account)}
                       disabled={forcedContingencyMutation.isPending}
                       title={account.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
                       className={account.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
                     >
-                      <AlertTriangle className="w-4 h-4 mr-1" />
+                      <ShieldAlert className="w-4 h-4 mr-1" />
                       <span className="hidden sm:inline">{account.forced_contingency ? 'Contingencia ON' : 'Contingencia'}</span>
                     </Button>
                     <Button

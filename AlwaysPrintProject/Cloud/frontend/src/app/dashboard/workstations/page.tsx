@@ -37,7 +37,7 @@ import {
   LayoutGrid,
   List,
   ArrowUpDown,
-  AlertTriangle,
+  ShieldAlert,
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
@@ -60,6 +60,7 @@ export default function WorkstationsPage() {
   const [filterVlanId, setFilterVlanId] = useState<string | undefined>(undefined);
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
   const [editingWorkstation, setEditingWorkstation] = useState<Workstation | null>(null);
+  const [contingencyTarget, setContingencyTarget] = useState<Workstation | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [sortField, setSortField] = useState<SortField>('ip_private');
@@ -122,6 +123,7 @@ export default function WorkstationsPage() {
       workstationsApi.toggleForcedContingency(id, enabled),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['workstations'] });
+      setContingencyTarget(null);
       toast({
         title: 'Contingencia forzada',
         description: variables.enabled
@@ -514,7 +516,7 @@ export default function WorkstationsPage() {
                 onDelete={() => handleDelete(workstation)}
                 onCommand={(commandType) => commandMutation.mutate({ id: workstation.id, commandType })}
                 onDownloadLog={() => logDownloadMutation.mutate(workstation.id)}
-                onToggleForcedContingency={(enabled) => forcedContingencyMutation.mutate({ id: workstation.id, enabled })}
+                onToggleForcedContingency={() => setContingencyTarget(workstation)}
                 isCommandPending={commandMutation.isPending}
                 isDeletePending={deleteMutation.isPending}
                 isLogPending={logDownloadMutation.isPending}
@@ -538,7 +540,10 @@ export default function WorkstationsPage() {
           onDelete={handleDelete}
           onCommand={(id, commandType) => commandMutation.mutate({ id, commandType })}
           onDownloadLog={(id) => logDownloadMutation.mutate(id)}
-          onToggleForcedContingency={(id, enabled) => forcedContingencyMutation.mutate({ id, enabled })}
+          onToggleForcedContingency={(id) => {
+            const ws = sortedWorkstations.find(w => w.id === id);
+            if (ws) setContingencyTarget(ws);
+          }}
           isCommandPending={commandMutation.isPending}
           isDeletePending={deleteMutation.isPending}
           isLogPending={logDownloadMutation.isPending}
@@ -551,6 +556,56 @@ export default function WorkstationsPage() {
           workstation={selectedWorkstation}
           onClose={() => setSelectedWorkstation(null)}
         />
+      )}
+
+      {contingencyTarget && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldAlert className={`w-5 h-5 ${contingencyTarget.forced_contingency ? 'text-green-600' : 'text-orange-600'}`} />
+                {contingencyTarget.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-600">
+                {contingencyTarget.forced_contingency
+                  ? `¿Estás seguro de desactivar la contingencia forzada para la workstation ${contingencyTarget.hostname || contingencyTarget.ip_private}?`
+                  : `¿Estás seguro de activar la contingencia forzada para la workstation ${contingencyTarget.hostname || contingencyTarget.ip_private}? Esto redirigirá el tráfico de impresión directamente a la impresora (bypass CPM/Linux).`
+                }
+              </p>
+              {!contingencyTarget.forced_contingency && (
+                <Alert>
+                  <ShieldAlert className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    La workstation recibirá una notificación indicando que está entrando en modo contingencia.
+                  </AlertDescription>
+                </Alert>
+              )}
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setContingencyTarget(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  variant={contingencyTarget.forced_contingency ? 'default' : 'destructive'}
+                  onClick={() => forcedContingencyMutation.mutate({
+                    id: contingencyTarget.id,
+                    enabled: !contingencyTarget.forced_contingency,
+                  })}
+                  disabled={forcedContingencyMutation.isPending}
+                  className={!contingencyTarget.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
+                >
+                  {forcedContingencyMutation.isPending
+                    ? 'Procesando...'
+                    : contingencyTarget.forced_contingency
+                      ? 'Desactivar'
+                      : 'Activar contingencia'
+                  }
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );
@@ -569,7 +624,7 @@ interface WorkstationCardProps {
   onDelete: () => void;
   onCommand: (commandType: 'restart_service' | 'restart_tray' | 'check_update') => void;
   onDownloadLog: () => void;
-  onToggleForcedContingency: (enabled: boolean) => void;
+  onToggleForcedContingency: () => void;
   isCommandPending: boolean;
   isDeletePending: boolean;
   isLogPending: boolean;
@@ -628,12 +683,12 @@ function WorkstationCard({
             <Button
               variant={workstation.forced_contingency ? 'destructive' : 'outline'}
               size="sm"
-              onClick={() => onToggleForcedContingency(!workstation.forced_contingency)}
+              onClick={() => onToggleForcedContingency()}
               disabled={isForcedContingencyPending}
               title={workstation.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
               className={workstation.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
             >
-              <AlertTriangle className="w-4 h-4" />
+              <ShieldAlert className="w-4 h-4" />
             </Button>
             <Button
               variant="outline"
@@ -852,7 +907,7 @@ interface WorkstationTableProps {
   onDelete: (ws: Workstation) => void;
   onCommand: (id: string, commandType: 'restart_service' | 'restart_tray' | 'check_update') => void;
   onDownloadLog: (id: string) => void;
-  onToggleForcedContingency: (id: string, enabled: boolean) => void;
+  onToggleForcedContingency: (id: string) => void;
   isCommandPending: boolean;
   isDeletePending: boolean;
   isLogPending: boolean;
@@ -967,12 +1022,12 @@ function WorkstationTable({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => onToggleForcedContingency(ws.id, !ws.forced_contingency)}
+                        onClick={() => onToggleForcedContingency(ws.id)}
                         disabled={isForcedContingencyPending}
                         title={ws.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
                         className={`h-7 w-7 p-0 ${ws.forced_contingency ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : ''}`}
                       >
-                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <ShieldAlert className="w-3.5 h-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
