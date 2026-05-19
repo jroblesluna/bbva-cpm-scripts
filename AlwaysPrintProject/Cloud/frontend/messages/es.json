@@ -151,7 +151,18 @@
     "lastUpdated": "Última actualización: {time}",
     "defaultPrinter": "Impresora Predeterminada",
     "selectPrinter": "-- Sin impresora predeterminada --",
-    "noPrintersInVlan": "No hay impresoras disponibles en esta VLAN"
+    "noPrintersInVlan": "No hay impresoras disponibles en esta VLAN",
+    "forcedContingency": "Contingencia Forzada",
+    "forcedContingencyActivate": "Activar contingencia forzada",
+    "forcedContingencyDeactivate": "Desactivar contingencia forzada",
+    "forcedContingencyConfirmActivate": "¿Estás seguro de activar la contingencia forzada para la estación {name}? Esto redirigirá el tráfico de impresión directamente a la impresora (bypass CPM/Linux).",
+    "forcedContingencyConfirmDeactivate": "¿Estás seguro de desactivar la contingencia forzada para la estación {name}?",
+    "forcedContingencyNotification": "La estación recibirá una notificación indicando que está entrando en modo contingencia.",
+    "forcedContingencyActivated": "Contingencia forzada activada para esta estación.",
+    "forcedContingencyDeactivated": "Contingencia forzada desactivada para esta estación.",
+    "forcedContingencyError": "Error al cambiar contingencia forzada.",
+    "forcedContingencyProcessing": "Procesando...",
+    "forcedContingencyBadge": "Forzada"
   },
   "vlans": {
     "title": "VLANs",
@@ -186,7 +197,13 @@
     "deleteConfirm": "¿Estás seguro de que deseas eliminar la VLAN {name}? Esta acción no se puede deshacer.",
     "devicesInVlan": "Dispositivos en esta VLAN",
     "noDevices": "No hay dispositivos asignados a esta VLAN",
-    "viewDevices": "Ver Dispositivos"
+    "viewDevices": "Ver Dispositivos",
+    "forcedContingency": "Contingencia Forzada",
+    "forcedContingencyActivate": "Activar contingencia forzada",
+    "forcedContingencyDeactivate": "Desactivar contingencia forzada",
+    "forcedContingencyConfirmActivate": "¿Estás seguro de activar la contingencia forzada para la VLAN \"{name}\"? Todas las estaciones de esta VLAN entrarán en modo contingencia.",
+    "forcedContingencyConfirmDeactivate": "¿Estás seguro de desactivar la contingencia forzada para la VLAN \"{name}\"?",
+    "forcedContingencyNotification": "Todas las estaciones conectadas recibirán una notificación de contingencia forzada."
   },
   "messages": {
     "title": "Mensajes",
@@ -373,7 +390,15 @@
     "noIpsSuggestion": "Agrega IPs para que las estaciones se asignen automáticamente.",
     "autoAssignNote": "Auto-asignación: Cuando una estación se conecta desde una de estas IPs públicas, se asignará automáticamente a esta organización.",
     "deleteAccountConfirm": "¿Eliminar la organización \"{name}\"? Esto eliminará todos los usuarios, estaciones y configuraciones. No se puede deshacer.",
-    "deleteIpConfirm": "¿Eliminar la IP {ip}? Las estaciones que se conecten desde esta IP ya no se asignarán automáticamente."
+    "deleteIpConfirm": "¿Eliminar la IP {ip}? Las estaciones que se conecten desde esta IP ya no se asignarán automáticamente.",
+    "forcedContingency": "Contingencia Forzada",
+    "forcedContingencyOn": "Contingencia ON",
+    "forcedContingencyOff": "Contingencia",
+    "forcedContingencyActivate": "Activar contingencia forzada",
+    "forcedContingencyDeactivate": "Desactivar contingencia forzada",
+    "forcedContingencyConfirmActivate": "¿Estás seguro de activar la contingencia forzada para la organización \"{name}\"? TODAS las estaciones de esta organización entrarán en modo contingencia.",
+    "forcedContingencyConfirmDeactivate": "¿Estás seguro de desactivar la contingencia forzada para la organización \"{name}\"?",
+    "forcedContingencyNotification": "Todas las estaciones conectadas recibirán una notificación de contingencia forzada."
   },
   "pendingIps": {
     "title": "IPs Públicas Pendientes",

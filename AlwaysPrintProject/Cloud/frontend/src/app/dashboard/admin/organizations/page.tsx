@@ -237,27 +237,27 @@ export default function AccountsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShieldAlert className={`w-5 h-5 ${contingencyTarget.forced_contingency ? 'text-green-600' : 'text-orange-600'}`} />
-                {contingencyTarget.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+                {contingencyTarget.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-gray-600">
                 {contingencyTarget.forced_contingency
-                  ? `¿Estás seguro de desactivar la contingencia forzada para la organización "${contingencyTarget.name}"?`
-                  : `¿Estás seguro de activar la contingencia forzada para la organización "${contingencyTarget.name}"? TODAS las workstations de esta organización entrarán en modo contingencia.`
+                  ? t('forcedContingencyConfirmDeactivate', { name: contingencyTarget.name })
+                  : t('forcedContingencyConfirmActivate', { name: contingencyTarget.name })
                 }
               </p>
               {!contingencyTarget.forced_contingency && (
                 <Alert>
                   <ShieldAlert className="h-4 w-4" />
                   <AlertDescription className="text-xs">
-                    Todas las workstations conectadas recibirán una notificación de contingencia forzada.
+                    {t('forcedContingencyNotification')}
                   </AlertDescription>
                 </Alert>
               )}
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setContingencyTarget(null)}>
-                  Cancelar
+                  {tCommon('cancel')}
                 </Button>
                 <Button
                   variant={contingencyTarget.forced_contingency ? 'default' : 'destructive'}
@@ -269,10 +269,10 @@ export default function AccountsPage() {
                   className={!contingencyTarget.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
                 >
                   {forcedContingencyMutation.isPending
-                    ? 'Procesando...'
+                    ? tCommon('updating')
                     : contingencyTarget.forced_contingency
-                      ? 'Desactivar'
-                      : 'Activar contingencia'
+                      ? t('forcedContingencyDeactivate')
+                      : t('forcedContingencyActivate')
                   }
                 </Button>
               </div>
@@ -369,11 +369,11 @@ export default function AccountsPage() {
                       size="sm"
                       onClick={() => setContingencyTarget(account)}
                       disabled={forcedContingencyMutation.isPending}
-                      title={account.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+                      title={account.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
                       className={account.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
                     >
                       <ShieldAlert className="w-4 h-4 mr-1" />
-                      <span className="hidden sm:inline">{account.forced_contingency ? 'Contingencia ON' : 'Contingencia'}</span>
+                      <span className="hidden sm:inline">{account.forced_contingency ? t('forcedContingencyOn') : t('forcedContingencyOff')}</span>
                     </Button>
                     <Button
                       variant="outline"

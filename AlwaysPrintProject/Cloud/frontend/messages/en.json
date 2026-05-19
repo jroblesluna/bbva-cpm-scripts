@@ -151,7 +151,18 @@
     "lastUpdated": "Last updated: {time}",
     "defaultPrinter": "Default Printer",
     "selectPrinter": "-- No default printer --",
-    "noPrintersInVlan": "No printers available in this VLAN"
+    "noPrintersInVlan": "No printers available in this VLAN",
+    "forcedContingency": "Forced Contingency",
+    "forcedContingencyActivate": "Activate forced contingency",
+    "forcedContingencyDeactivate": "Deactivate forced contingency",
+    "forcedContingencyConfirmActivate": "Are you sure you want to activate forced contingency for workstation {name}? This will redirect print traffic directly to the printer (bypass CPM/Linux).",
+    "forcedContingencyConfirmDeactivate": "Are you sure you want to deactivate forced contingency for workstation {name}?",
+    "forcedContingencyNotification": "The workstation will receive a notification indicating it is entering contingency mode.",
+    "forcedContingencyActivated": "Forced contingency activated for this workstation.",
+    "forcedContingencyDeactivated": "Forced contingency deactivated for this workstation.",
+    "forcedContingencyError": "Error changing forced contingency.",
+    "forcedContingencyProcessing": "Processing...",
+    "forcedContingencyBadge": "Forced"
   },
   "vlans": {
     "title": "VLANs",
@@ -186,7 +197,13 @@
     "deleteConfirm": "Are you sure you want to delete VLAN {name}? This action cannot be undone.",
     "devicesInVlan": "Devices in this VLAN",
     "noDevices": "No devices assigned to this VLAN",
-    "viewDevices": "View Devices"
+    "viewDevices": "View Devices",
+    "forcedContingency": "Forced Contingency",
+    "forcedContingencyActivate": "Activate forced contingency",
+    "forcedContingencyDeactivate": "Deactivate forced contingency",
+    "forcedContingencyConfirmActivate": "Are you sure you want to activate forced contingency for VLAN \"{name}\"? All workstations in this VLAN will enter contingency mode.",
+    "forcedContingencyConfirmDeactivate": "Are you sure you want to deactivate forced contingency for VLAN \"{name}\"?",
+    "forcedContingencyNotification": "All connected workstations will receive a forced contingency notification."
   },
   "messages": {
     "title": "Messages",
@@ -373,7 +390,15 @@
     "noIpsSuggestion": "Add IPs so workstations are automatically assigned.",
     "autoAssignNote": "Auto-assignment: When a workstation connects from one of these public IPs, it will be automatically assigned to this organization.",
     "deleteAccountConfirm": "Delete organization \"{name}\"? This will delete all users, workstations and configurations. Cannot be undone.",
-    "deleteIpConfirm": "Delete IP {ip}? Workstations connecting from this IP will no longer be automatically assigned."
+    "deleteIpConfirm": "Delete IP {ip}? Workstations connecting from this IP will no longer be automatically assigned.",
+    "forcedContingency": "Forced Contingency",
+    "forcedContingencyOn": "Contingency ON",
+    "forcedContingencyOff": "Contingency",
+    "forcedContingencyActivate": "Activate forced contingency",
+    "forcedContingencyDeactivate": "Deactivate forced contingency",
+    "forcedContingencyConfirmActivate": "Are you sure you want to activate forced contingency for organization \"{name}\"? ALL workstations in this organization will enter contingency mode.",
+    "forcedContingencyConfirmDeactivate": "Are you sure you want to deactivate forced contingency for organization \"{name}\"?",
+    "forcedContingencyNotification": "All connected workstations will receive a forced contingency notification."
   },
   "pendingIps": {
     "title": "Pending Public IPs",

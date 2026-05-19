@@ -125,17 +125,17 @@ export default function WorkstationsPage() {
       queryClient.invalidateQueries({ queryKey: ['workstations'] });
       setContingencyTarget(null);
       toast({
-        title: 'Contingencia forzada',
+        title: t('forcedContingency'),
         description: variables.enabled
-          ? 'Contingencia forzada activada para esta workstation.'
-          : 'Contingencia forzada desactivada para esta workstation.',
+          ? t('forcedContingencyActivated')
+          : t('forcedContingencyDeactivated'),
       });
     },
     onError: (error: { detail?: string }) => {
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: error.detail ?? 'Error al cambiar contingencia forzada.',
+        title: tCommon('actions'),
+        description: error.detail ?? t('forcedContingencyError'),
       });
     },
   });
@@ -564,27 +564,27 @@ export default function WorkstationsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShieldAlert className={`w-5 h-5 ${contingencyTarget.forced_contingency ? 'text-green-600' : 'text-orange-600'}`} />
-                {contingencyTarget.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+                {contingencyTarget.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-gray-600">
                 {contingencyTarget.forced_contingency
-                  ? `¿Estás seguro de desactivar la contingencia forzada para la workstation ${contingencyTarget.hostname || contingencyTarget.ip_private}?`
-                  : `¿Estás seguro de activar la contingencia forzada para la workstation ${contingencyTarget.hostname || contingencyTarget.ip_private}? Esto redirigirá el tráfico de impresión directamente a la impresora (bypass CPM/Linux).`
+                  ? t('forcedContingencyConfirmDeactivate', { name: contingencyTarget.hostname || contingencyTarget.ip_private })
+                  : t('forcedContingencyConfirmActivate', { name: contingencyTarget.hostname || contingencyTarget.ip_private })
                 }
               </p>
               {!contingencyTarget.forced_contingency && (
                 <Alert>
                   <ShieldAlert className="h-4 w-4" />
                   <AlertDescription className="text-xs">
-                    La workstation recibirá una notificación indicando que está entrando en modo contingencia.
+                    {t('forcedContingencyNotification')}
                   </AlertDescription>
                 </Alert>
               )}
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setContingencyTarget(null)}>
-                  Cancelar
+                  {tCommon('cancel')}
                 </Button>
                 <Button
                   variant={contingencyTarget.forced_contingency ? 'default' : 'destructive'}
@@ -596,10 +596,10 @@ export default function WorkstationsPage() {
                   className={!contingencyTarget.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
                 >
                   {forcedContingencyMutation.isPending
-                    ? 'Procesando...'
+                    ? t('forcedContingencyProcessing')
                     : contingencyTarget.forced_contingency
-                      ? 'Desactivar'
-                      : 'Activar contingencia'
+                      ? t('forcedContingencyDeactivate')
+                      : t('forcedContingencyActivate')
                   }
                 </Button>
               </div>
@@ -672,7 +672,7 @@ function WorkstationCard({
             )}
             {workstation.forced_contingency && (
               <Badge variant="destructive" className="bg-orange-600">
-                Forzada
+                {t('forcedContingencyBadge')}
               </Badge>
             )}
           </div>
@@ -685,7 +685,7 @@ function WorkstationCard({
               size="sm"
               onClick={() => onToggleForcedContingency()}
               disabled={isForcedContingencyPending}
-              title={workstation.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+              title={workstation.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
               className={workstation.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
             >
               <ShieldAlert className="w-4 h-4" />
@@ -1024,7 +1024,7 @@ function WorkstationTable({
                         size="sm"
                         onClick={() => onToggleForcedContingency(ws.id)}
                         disabled={isForcedContingencyPending}
-                        title={ws.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+                        title={ws.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
                         className={`h-7 w-7 p-0 ${ws.forced_contingency ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : ''}`}
                       >
                         <ShieldAlert className="w-3.5 h-3.5" />

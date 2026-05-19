@@ -326,7 +326,7 @@ export default function VLANsPage() {
                   variant={vlan.forced_contingency ? 'destructive' : 'ghost'}
                   size="sm"
                   onClick={() => setContingencyTarget(vlan)}
-                  title={vlan.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+                  title={vlan.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
                   className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}`}
                 >
                   <ShieldAlert className="h-4 w-4" />
@@ -414,7 +414,7 @@ export default function VLANsPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => setContingencyTarget(vlan)}
-                          title={vlan.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+                          title={vlan.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
                           className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : ''}`}
                         >
                           <ShieldAlert className="h-4 w-4" />
@@ -445,23 +445,28 @@ export default function VLANsPage() {
             <div className="flex items-center gap-2 mb-4">
               <ShieldAlert className={`w-5 h-5 ${contingencyTarget.forced_contingency ? 'text-green-600' : 'text-orange-600'}`} />
               <h2 className="text-lg font-bold text-gray-900">
-                {contingencyTarget.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+                {contingencyTarget.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
               </h2>
             </div>
             <p className="text-sm text-gray-600 mb-4">
               {contingencyTarget.forced_contingency
-                ? `¿Estás seguro de desactivar la contingencia forzada para la VLAN "${contingencyTarget.name}"?`
-                : `¿Estás seguro de activar la contingencia forzada para la VLAN "${contingencyTarget.name}"? Todas las workstations de esta VLAN entrarán en modo contingencia.`
+                ? t('forcedContingencyConfirmDeactivate', { name: contingencyTarget.name })
+                : t('forcedContingencyConfirmActivate', { name: contingencyTarget.name })
               }
             </p>
+            {!contingencyTarget.forced_contingency && (
+              <p className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded p-2 mb-4">
+                {t('forcedContingencyNotification')}
+              </p>
+            )}
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setContingencyTarget(null)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setContingencyTarget(null)}>{tCommon('cancel')}</Button>
               <Button
                 variant={contingencyTarget.forced_contingency ? 'default' : 'destructive'}
                 onClick={() => handleToggleForcedContingency(contingencyTarget, !contingencyTarget.forced_contingency)}
                 className={!contingencyTarget.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
               >
-                {contingencyTarget.forced_contingency ? 'Desactivar' : 'Activar contingencia'}
+                {contingencyTarget.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
               </Button>
             </div>
           </div>
