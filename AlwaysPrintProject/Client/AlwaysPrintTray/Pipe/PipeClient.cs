@@ -123,8 +123,10 @@ namespace AlwaysPrintTray.Pipe
         /// </summary>
         private static bool IsPushMessage(PipeMessage msg, string requestId)
         {
-            // Los mensajes ReportTelemetry siempre son push del Service
+            // Los mensajes ReportTelemetry y ContingencyResult siempre son push del Service
             if (msg.Type == MessageType.ReportTelemetry)
+                return true;
+            if (msg.Type == MessageType.ContingencyResult)
                 return true;
 
             // Si tiene correlationId que coincide con nuestro request, es una respuesta

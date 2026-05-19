@@ -29,6 +29,9 @@ namespace AlwaysPrintService.Pipe
         // Raised when the Tray sends TrayInitialized.
         public event Action<bool, string?>? TrayInitializedReceived;
 
+        // Raised when the Tray sends ForcedContingencyChanged.
+        public event Action<bool, string, string>? ForcedContingencyReceived;
+
         public MessageDispatcher(
             RegistryConfigManager registry,
             TaskQueueManager taskQueue,
@@ -57,6 +60,7 @@ namespace AlwaysPrintService.Pipe
                     MessageType.ActionConfigChanged         => HandleActionConfigChanged(request),
                     MessageType.SaveActionConfig            => HandleSaveActionConfig(request),
                     MessageType.InstallUpdate               => HandleInstallUpdate(request),
+                    MessageType.ForcedContingencyChanged    => HandleForcedContingencyChanged(request),
                     _ => PipeMessage.Reply(request, MessageType.Error,
                             new ErrorPayload { Code = "UNKNOWN_TYPE", Message = $"Unknown message type: {request.Type}" })
                 };
@@ -337,6 +341,36 @@ namespace AlwaysPrintService.Pipe
             {
                 AlwaysPrintLogger.WriteError(
                     $"Error procesando cambio de configuración de acciones: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = $"Error: {ex.Message}" });
+            }
+        }
+
+        private PipeMessage HandleForcedContingencyChanged(PipeMessage req)
+        {
+            try
+            {
+                var payload = req.GetPayload<ForcedContingencyPayload>();
+                if (payload == null)
+                {
+                    return PipeMessage.Reply(req, MessageType.Error,
+                        new ErrorPayload { Code = "INVALID_PAYLOAD", Message = "ForcedContingencyPayload ausente." });
+                }
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"ForcedContingencyChanged: enabled={payload.Enabled}, source={payload.Source}, sourceName={payload.SourceName}");
+
+                // Disparar evento para que el Service principal maneje la contingencia
+                ForcedContingencyReceived?.Invoke(payload.Enabled, payload.Source, payload.SourceName);
+
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = true, Message = $"Contingencia {(payload.Enabled ? "activada" : "desactivada")}." });
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"HandleForcedContingencyChanged: error: {ex.Message}",
                     AlwaysPrintLogger.EvtGenericError);
                 return PipeMessage.Reply(req, MessageType.Ack,
                     new AckPayload { Success = false, Message = $"Error: {ex.Message}" });

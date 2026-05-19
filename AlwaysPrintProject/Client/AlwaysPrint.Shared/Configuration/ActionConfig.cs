@@ -90,6 +90,8 @@ namespace AlwaysPrint.Shared.Configuration
         public const string OnConfigChange = "OnConfigChange";
         public const string OnUserLogon = "OnUserLogon";
         public const string OnUserLogoff = "OnUserLogoff";
+        public const string OnContingencyActivated = "OnContingencyActivated";
+        public const string OnContingencyDeactivated = "OnContingencyDeactivated";
     }
     
     /// <summary>
@@ -107,5 +109,7 @@ namespace AlwaysPrint.Shared.Configuration
         public const string StartTray = "StartTray";
         public const string Conditional = "Conditional";
         public const string DeleteOrphanedFolders = "DeleteOrphanedFolders";
+        public const string EnterShieldMode = "EnterShieldMode";
+        public const string ExitShieldMode = "ExitShieldMode";
     }
 }

@@ -311,6 +311,9 @@ namespace AlwaysPrintTray.Cloud
                     case MessageType.ReportTelemetry:
                         HandleReportTelemetry(message);
                         break;
+                    case MessageType.ContingencyResult:
+                        HandleContingencyResult(message);
+                        break;
                     default:
                         AlwaysPrintLogger.WriteTrayInfo(
                             $"CloudManager: mensaje push del Service tipo='{message.Type}' no manejado.");
@@ -322,6 +325,62 @@ namespace AlwaysPrintTray.Cloud
                 AlwaysPrintLogger.WriteTrayError(
                     $"CloudManager: error procesando mensaje push del Service tipo='{message.Type}'. {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Procesa un mensaje ContingencyResult del Service: muestra un balloon tip
+        /// al usuario informando si la contingencia se activó/desactivó correctamente
+        /// y a qué impresora se conectó.
+        /// </summary>
+        private void HandleContingencyResult(PipeMessage message)
+        {
+            var payload = message.GetPayload<ContingencyResultPayload>();
+            if (payload == null)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    "CloudManager: mensaje ContingencyResult recibido con payload inválido. Descartando.");
+                return;
+            }
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"CloudManager: ContingencyResult recibido. success={payload.Success}, entered={payload.Entered}, " +
+                $"printer={payload.PrinterName}, message={payload.Message}");
+
+            _uiContext.Post(_ =>
+            {
+                try
+                {
+                    string title = "AlwaysPrint - Contingencia";
+                    string text;
+                    ToolTipIcon icon;
+
+                    if (payload.Success)
+                    {
+                        if (payload.Entered)
+                        {
+                            text = $"Contingencia activada. Impresora: {payload.PrinterName} ({payload.PrinterAddress})";
+                            icon = ToolTipIcon.Warning;
+                        }
+                        else
+                        {
+                            text = "Contingencia desactivada. Impresión restaurada a modo normal (CPM).";
+                            icon = ToolTipIcon.Info;
+                        }
+                    }
+                    else
+                    {
+                        text = $"Error en contingencia: {payload.Message}";
+                        icon = ToolTipIcon.Error;
+                    }
+
+                    _trayIcon.ShowBalloonTip(5000, title, text, icon);
+                }
+                catch (Exception ex)
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"CloudManager: error mostrando balloon tip de contingencia. {ex.Message}");
+                }
+            }, null);
         }
 
         /// <summary>

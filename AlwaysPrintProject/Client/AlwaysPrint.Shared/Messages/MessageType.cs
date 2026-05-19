@@ -36,6 +36,7 @@ namespace AlwaysPrint.Shared.Messages
         InstallUpdateResponse,       // Service → Tray: resultado de la instalación
 
         // Contingencia forzada
-        ForcedContingencyChanged     // Tray → Service: contingencia forzada activada/desactivada desde Cloud
+        ForcedContingencyChanged,    // Tray → Service: contingencia forzada activada/desactivada desde Cloud
+        ContingencyResult,           // Service → Tray (push): resultado de la ejecución de contingencia
     }
 }

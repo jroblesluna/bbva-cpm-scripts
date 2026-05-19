@@ -253,4 +253,31 @@ namespace AlwaysPrint.Shared.Messages
         [JsonProperty("sourceName")]
         public string SourceName { get; set; } = string.Empty;
     }
+
+    /// <summary>
+    /// Payload push del Service al Tray con el resultado de la ejecución de contingencia.
+    /// El Tray muestra un balloon tip al usuario con esta información.
+    /// </summary>
+    public class ContingencyResultPayload
+    {
+        /// <summary>true = contingencia ejecutada exitosamente.</summary>
+        [JsonProperty("success")]
+        public bool Success { get; set; }
+
+        /// <summary>true = entró en contingencia, false = salió de contingencia.</summary>
+        [JsonProperty("entered")]
+        public bool Entered { get; set; }
+
+        /// <summary>Nombre de la impresora a la que se conectó (solo si entered=true y success=true).</summary>
+        [JsonProperty("printerName")]
+        public string? PrinterName { get; set; }
+
+        /// <summary>IP:puerto de la impresora (solo si entered=true y success=true).</summary>
+        [JsonProperty("printerAddress")]
+        public string? PrinterAddress { get; set; }
+
+        /// <summary>Mensaje descriptivo del resultado.</summary>
+        [JsonProperty("message")]
+        public string Message { get; set; } = string.Empty;
+    }
 }

@@ -215,6 +215,7 @@ namespace AlwaysPrintService
                 // 5. Iniciar servidor Named Pipe.
                 _dispatcher = new MessageDispatcher(_registry, _taskQueue, _state, ReloadActionConfiguration);
                 _dispatcher.TrayInitializedReceived += OnTrayInitialized;
+                _dispatcher.ForcedContingencyReceived += OnForcedContingencyReceived;
                 _pipeServer = new PipeServer(_dispatcher);
                 _pipeServer.Start();
 
@@ -325,6 +326,25 @@ namespace AlwaysPrintService
             
             // Ejecutar trigger OnTrayLaunched después de que el Tray se haya inicializado
             ExecuteActionTrigger(TriggerEvents.OnTrayLaunched);
+        }
+
+        /// <summary>
+        /// Callback cuando se recibe ForcedContingencyChanged del Tray.
+        /// Ejecuta el trigger OnContingencyActivated o OnContingencyDeactivated según corresponda.
+        /// </summary>
+        private void OnForcedContingencyReceived(bool enabled, string source, string sourceName)
+        {
+            AlwaysPrintLogger.WriteInfo(
+                $"OnForcedContingencyReceived: enabled={enabled}, source={source}, sourceName={sourceName}");
+
+            if (enabled)
+            {
+                ExecuteActionTrigger(TriggerEvents.OnContingencyActivated);
+            }
+            else
+            {
+                ExecuteActionTrigger(TriggerEvents.OnContingencyDeactivated);
+            }
         }
 
         private void MonitoringLoop()

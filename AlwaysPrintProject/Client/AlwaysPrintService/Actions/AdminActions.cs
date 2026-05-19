@@ -391,6 +391,233 @@ namespace AlwaysPrintService.Actions
         }
         
         // ═══════════════════════════════════════════════════════════════════════
+        // MODO CONTINGENCIA (SHIELD MODE)
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        /// <summary>
+        /// Entra en modo contingencia (Shield Mode):
+        /// 1. Detiene el servicio Spooler
+        /// 2. Crea y asigna un puerto TCP/IP directo a la impresora de contingencia
+        /// 3. Reinicia el servicio Spooler
+        /// 
+        /// Parámetros:
+        /// - queue_name: nombre de la cola corporativa (ej: "LexmarkBBVA")
+        /// - printer_ip: IP de la impresora de contingencia
+        /// - printer_port: puerto de la impresora (default: 9100)
+        /// </summary>
+        public static bool EnterShieldMode(string queueName, string printerIp, int printerPort = 9100)
+        {
+            try
+            {
+                AlwaysPrintLogger.WriteInfo(
+                    $"EnterShieldMode: iniciando contingencia. Cola={queueName}, IP={printerIp}:{printerPort}");
+
+                // 1. Detener Spooler
+                AlwaysPrintLogger.WriteInfo("EnterShieldMode: deteniendo servicio Spooler...");
+                if (!StopService("Spooler", 30, false))
+                {
+                    AlwaysPrintLogger.WriteError(
+                        "EnterShieldMode: no se pudo detener el Spooler. Abortando.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    return false;
+                }
+
+                // 2. Crear o actualizar puerto TCP/IP directo
+                string portName = $"AP_SHIELD_{printerIp}_{printerPort}";
+                AlwaysPrintLogger.WriteInfo($"EnterShieldMode: configurando puerto {portName}...");
+                if (!CreateOrUpdateTcpPort(portName, printerIp, printerPort))
+                {
+                    AlwaysPrintLogger.WriteError(
+                        "EnterShieldMode: no se pudo crear/actualizar puerto TCP/IP. Reiniciando Spooler.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    StartService("Spooler");
+                    return false;
+                }
+
+                // 3. Asignar el puerto a la cola corporativa
+                AlwaysPrintLogger.WriteInfo($"EnterShieldMode: asignando puerto {portName} a cola {queueName}...");
+                if (!AssignPortToQueue(queueName, portName))
+                {
+                    AlwaysPrintLogger.WriteError(
+                        "EnterShieldMode: no se pudo asignar puerto a la cola. Reiniciando Spooler.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    StartService("Spooler");
+                    return false;
+                }
+
+                // 4. Reiniciar Spooler
+                AlwaysPrintLogger.WriteInfo("EnterShieldMode: reiniciando servicio Spooler...");
+                if (!StartService("Spooler"))
+                {
+                    AlwaysPrintLogger.WriteError(
+                        "EnterShieldMode: no se pudo reiniciar el Spooler.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    return false;
+                }
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"EnterShieldMode: contingencia activada exitosamente. " +
+                    $"Cola '{queueName}' → {printerIp}:{printerPort}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"EnterShieldMode: error crítico: {ex.Message}", ex);
+                try { StartService("Spooler"); } catch { /* mejor esfuerzo */ }
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Sale del modo contingencia (Shield Mode):
+        /// 1. Detiene el servicio Spooler
+        /// 2. Asigna el puerto del monitor LPMC (Lexmark CPM) a la cola corporativa
+        /// 3. Reinicia el servicio Spooler
+        /// 
+        /// Parámetros:
+        /// - queue_name: nombre de la cola corporativa (ej: "LexmarkBBVA")
+        /// - lpmc_port_name: nombre del puerto LPMC (default: "LPMC:")
+        /// </summary>
+        public static bool ExitShieldMode(string queueName, string lpmcPortName = "LPMC:")
+        {
+            try
+            {
+                AlwaysPrintLogger.WriteInfo(
+                    $"ExitShieldMode: saliendo de contingencia. Cola={queueName}, Puerto LPMC={lpmcPortName}");
+
+                // 1. Detener Spooler
+                AlwaysPrintLogger.WriteInfo("ExitShieldMode: deteniendo servicio Spooler...");
+                if (!StopService("Spooler", 30, false))
+                {
+                    AlwaysPrintLogger.WriteError(
+                        "ExitShieldMode: no se pudo detener el Spooler. Abortando.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    return false;
+                }
+
+                // 2. Asignar el puerto LPMC a la cola corporativa
+                AlwaysPrintLogger.WriteInfo($"ExitShieldMode: asignando puerto {lpmcPortName} a cola {queueName}...");
+                if (!AssignPortToQueue(queueName, lpmcPortName))
+                {
+                    AlwaysPrintLogger.WriteError(
+                        "ExitShieldMode: no se pudo asignar puerto LPMC a la cola. Reiniciando Spooler.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    StartService("Spooler");
+                    return false;
+                }
+
+                // 3. Reiniciar Spooler
+                AlwaysPrintLogger.WriteInfo("ExitShieldMode: reiniciando servicio Spooler...");
+                if (!StartService("Spooler"))
+                {
+                    AlwaysPrintLogger.WriteError(
+                        "ExitShieldMode: no se pudo reiniciar el Spooler.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    return false;
+                }
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"ExitShieldMode: contingencia desactivada. Cola '{queueName}' → {lpmcPortName} (CPM)");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"ExitShieldMode: error crítico: {ex.Message}", ex);
+                try { StartService("Spooler"); } catch { /* mejor esfuerzo */ }
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Crea o actualiza un puerto TCP/IP de impresora via WMI.
+        /// </summary>
+        private static bool CreateOrUpdateTcpPort(string portName, string hostAddress, int portNumber)
+        {
+            try
+            {
+                string safePort = portName.Replace("'", "''");
+                using var portSearch = new ManagementObjectSearcher(
+                    @"\\.\root\cimv2",
+                    $"SELECT * FROM Win32_TCPIPPrinterPort WHERE Name = '{safePort}'");
+
+                ManagementObject? existingPort = null;
+                foreach (ManagementObject obj in portSearch.Get())
+                {
+                    existingPort = obj;
+                    break;
+                }
+
+                if (existingPort != null)
+                {
+                    existingPort["HostAddress"] = hostAddress;
+                    existingPort["PortNumber"] = portNumber;
+                    existingPort.Put();
+                    AlwaysPrintLogger.WriteInfo($"CreateOrUpdateTcpPort: puerto '{portName}' actualizado a {hostAddress}:{portNumber}");
+                    return true;
+                }
+
+                var portClass = new ManagementClass("Win32_TCPIPPrinterPort");
+                var newPort = portClass.CreateInstance();
+                if (newPort == null) return false;
+
+                newPort["Name"] = portName;
+                newPort["HostAddress"] = hostAddress;
+                newPort["PortNumber"] = portNumber;
+                newPort["Protocol"] = 1; // RAW
+                newPort["SNMPEnabled"] = false;
+                newPort.Put();
+
+                AlwaysPrintLogger.WriteInfo($"CreateOrUpdateTcpPort: puerto '{portName}' creado → {hostAddress}:{portNumber}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"CreateOrUpdateTcpPort: error: {ex.Message}", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Asigna un puerto (por nombre) a una cola de impresión Windows via WMI.
+        /// </summary>
+        private static bool AssignPortToQueue(string queueName, string portName)
+        {
+            try
+            {
+                string safeQueue = queueName.Replace("'", "''");
+                using var printerSearch = new ManagementObjectSearcher(
+                    @"\\.\root\cimv2",
+                    $"SELECT * FROM Win32_Printer WHERE Name = '{safeQueue}'");
+
+                ManagementObject? printer = null;
+                foreach (ManagementObject obj in printerSearch.Get())
+                {
+                    printer = obj;
+                    break;
+                }
+
+                if (printer == null)
+                {
+                    AlwaysPrintLogger.WriteError($"AssignPortToQueue: cola '{queueName}' no encontrada en WMI");
+                    return false;
+                }
+
+                printer["PortName"] = portName;
+                printer.Put();
+
+                AlwaysPrintLogger.WriteInfo($"AssignPortToQueue: cola '{queueName}' asignada a puerto '{portName}'");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"AssignPortToQueue: error: {ex.Message}", ex);
+                return false;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // GESTIÓN DE SERVICIOS
         // ═══════════════════════════════════════════════════════════════════════
         

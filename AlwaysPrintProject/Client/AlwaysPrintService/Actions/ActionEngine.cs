@@ -217,6 +217,12 @@ namespace AlwaysPrintService.Actions
                 case ActionTypes.DeleteOrphanedFolders:
                     return ExecuteDeleteOrphanedFolders(action);
                 
+                case ActionTypes.EnterShieldMode:
+                    return ExecuteEnterShieldMode(action);
+                
+                case ActionTypes.ExitShieldMode:
+                    return ExecuteExitShieldMode(action);
+                
                 default:
                     AlwaysPrintLogger.WriteWarning($"ActionEngine: tipo de acción desconocido: {action.Type}");
                     return false;
@@ -429,6 +435,47 @@ namespace AlwaysPrintService.Actions
 
             int deleted = AdminActions.DeleteOrphanedFolders(basePath!, excludeUsers, excludeActiveConsole);
             return true; // Siempre retorna éxito (los errores individuales se loguean internamente)
+        }
+
+        private bool ExecuteEnterShieldMode(ActionConfig action)
+        {
+            string queueName = GetParameter<string>(action, "queue_name") ?? "";
+            string printerIp = GetParameter<string>(action, "printer_ip") ?? "";
+            int printerPort = GetParameter<int>(action, "printer_port", 9100);
+
+            if (string.IsNullOrWhiteSpace(queueName))
+            {
+                AlwaysPrintLogger.WriteWarning("ActionEngine: EnterShieldMode requiere 'queue_name'");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(printerIp))
+            {
+                AlwaysPrintLogger.WriteWarning("ActionEngine: EnterShieldMode requiere 'printer_ip'");
+                return false;
+            }
+
+            queueName = ReplaceTemplates(queueName);
+            printerIp = ReplaceTemplates(printerIp);
+
+            return AdminActions.EnterShieldMode(queueName, printerIp, printerPort);
+        }
+
+        private bool ExecuteExitShieldMode(ActionConfig action)
+        {
+            string queueName = GetParameter<string>(action, "queue_name") ?? "";
+            string lpmcPortName = GetParameter<string>(action, "lpmc_port_name") ?? "LPMC:";
+
+            if (string.IsNullOrWhiteSpace(queueName))
+            {
+                AlwaysPrintLogger.WriteWarning("ActionEngine: ExitShieldMode requiere 'queue_name'");
+                return false;
+            }
+
+            queueName = ReplaceTemplates(queueName);
+            lpmcPortName = ReplaceTemplates(lpmcPortName);
+
+            return AdminActions.ExitShieldMode(queueName, lpmcPortName);
         }
         
         // ═══════════════════════════════════════════════════════════════════════
