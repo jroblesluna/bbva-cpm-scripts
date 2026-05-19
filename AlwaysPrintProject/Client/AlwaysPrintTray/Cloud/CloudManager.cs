@@ -186,6 +186,9 @@ namespace AlwaysPrintTray.Cloud
             // Liberar OfflineStateManager (detiene timer de verificación)
             _offlineState?.Dispose();
             _offlineState = null;
+            
+            // Detener timer de reintento de CIDR si está activo
+            StopCidrRetryTimer();
 
             _wsClient?.Disconnect();
             IsConnected = false;
@@ -327,10 +330,95 @@ namespace AlwaysPrintTray.Cloud
 
         // === Registro ===
 
+        /// <summary>
+        /// Intervalo de reintento para detección de CIDR (30 segundos).
+        /// </summary>
+        private const int CidrRetryIntervalMs = 30_000;
+        
+        /// <summary>
+        /// Timer para reintentar detección de CIDR cuando no está disponible.
+        /// </summary>
+        private System.Threading.Timer? _cidrRetryTimer;
+        
+        /// <summary>
+        /// Flag para evitar notificaciones duplicadas de error de CIDR.
+        /// </summary>
+        private bool _cidrErrorShown;
+
         private void SendRegistration()
         {
             try
             {
+                // Detectar CIDR antes de enviar registro
+                string? cidr = NetworkHelper.GetOutboundCIDR();
+                
+                if (string.IsNullOrEmpty(cidr))
+                {
+                    // CIDR no disponible: no intentar registro
+                    AlwaysPrintLogger.WriteError(
+                        "CloudManager: no se pudo detectar el CIDR de la red. " +
+                        "No se enviará registro sin CIDR. Verificar conexión de red.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    
+                    // Mostrar notificación al usuario solo la primera vez
+                    if (!_cidrErrorShown)
+                    {
+                        _cidrErrorShown = true;
+                        _uiContext.Post(_ =>
+                        {
+                            try
+                            {
+                                _trayIcon.ShowBalloonTip(
+                                    5000,
+                                    "AlwaysPrint",
+                                    LocalizationManager.Get("BalloonCidrNotDetected"),
+                                    ToolTipIcon.Error);
+                            }
+                            catch (Exception ex)
+                            {
+                                AlwaysPrintLogger.WriteTrayWarning(
+                                    $"CloudManager: error mostrando balloon tip de CIDR no detectado. {ex.Message}");
+                            }
+                        }, null);
+                    }
+                    
+                    // Iniciar retry periódico de detección de CIDR
+                    StartCidrRetryTimer();
+                    return;
+                }
+                
+                // CIDR detectado exitosamente
+                if (_cidrErrorShown)
+                {
+                    // Se recuperó después de un fallo previo
+                    _cidrErrorShown = false;
+                    StopCidrRetryTimer();
+                    
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: CIDR detectado exitosamente después de fallo previo: {cidr}");
+                    
+                    _uiContext.Post(_ =>
+                    {
+                        try
+                        {
+                            _trayIcon.ShowBalloonTip(
+                                3000,
+                                "AlwaysPrint",
+                                LocalizationManager.Get("BalloonCidrDetected"),
+                                ToolTipIcon.Info);
+                        }
+                        catch (Exception ex)
+                        {
+                            AlwaysPrintLogger.WriteTrayWarning(
+                                $"CloudManager: error mostrando balloon tip de CIDR recuperado. {ex.Message}");
+                        }
+                    }, null);
+                }
+                
+                // Obtener versión del Tray desde el Assembly
+                string trayVersion = Assembly.GetExecutingAssembly()
+                                        .GetName().Version?.ToString() ?? "0.0.0.0";
+
                 var payload = new JObject
                 {
                     ["ip_private"] = GetPrivateIp(),
@@ -338,21 +426,69 @@ namespace AlwaysPrintTray.Cloud
                     ["os_serial"] = GetOsSerial(),
                     ["current_user"] = Environment.UserName,
                     ["locale"] = LocalizationManager.CurrentLocale,
-                    ["client_version"] = Assembly.GetExecutingAssembly()
-                                            .GetName().Version?.ToString() ?? "0.0.0.0",
+                    ["client_version"] = trayVersion,
+                    ["cidr"] = cidr,
+                    ["tray_version"] = trayVersion,
                     ["workstation_id"] = _credentials.IsRegistered
                                             ? _credentials.WorkstationId
                                             : null
                 };
 
                 _wsClient!.Send("register", payload);
-                AlwaysPrintLogger.WriteTrayInfo("CloudManager: mensaje de registro enviado.");
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: mensaje de registro enviado. cidr={cidr}, tray_version={trayVersion}");
             }
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteTrayError(
                     $"CloudManager: error enviando registro. {ex.Message}");
             }
+        }
+        
+        /// <summary>
+        /// Inicia el timer de reintento periódico de detección de CIDR.
+        /// Se ejecuta cada 30 segundos hasta que el CIDR sea detectado.
+        /// </summary>
+        private void StartCidrRetryTimer()
+        {
+            if (_cidrRetryTimer != null)
+                return; // Ya está activo
+            
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"CloudManager: iniciando reintento periódico de detección de CIDR cada {CidrRetryIntervalMs / 1000}s");
+            
+            _cidrRetryTimer = new System.Threading.Timer(OnCidrRetryTick, null,
+                TimeSpan.FromMilliseconds(CidrRetryIntervalMs),
+                TimeSpan.FromMilliseconds(CidrRetryIntervalMs));
+        }
+        
+        /// <summary>
+        /// Detiene el timer de reintento de detección de CIDR.
+        /// </summary>
+        private void StopCidrRetryTimer()
+        {
+            if (_cidrRetryTimer != null)
+            {
+                _cidrRetryTimer.Dispose();
+                _cidrRetryTimer = null;
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "CloudManager: timer de reintento de CIDR detenido.");
+            }
+        }
+        
+        /// <summary>
+        /// Callback del timer de reintento de CIDR.
+        /// Intenta detectar el CIDR y, si tiene éxito, envía el registro.
+        /// </summary>
+        private void OnCidrRetryTick(object? state)
+        {
+            if (_disposed) return;
+            
+            AlwaysPrintLogger.WriteTrayInfo(
+                "CloudManager: reintentando detección de CIDR...");
+            
+            // Intentar enviar registro (SendRegistration verifica CIDR internamente)
+            SendRegistration();
         }
 
         private void HandleRegistered(string json)

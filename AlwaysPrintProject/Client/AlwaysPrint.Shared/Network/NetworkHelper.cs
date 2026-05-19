@@ -269,6 +269,190 @@ namespace AlwaysPrint.Shared.Network
         }
 
         /// <summary>
+        /// Calcula el CIDR de la interfaz de red principal (la que tiene gateway IPv4).
+        /// 
+        /// Estrategia:
+        /// 1. Obtener interfaces activas (excluir Loopback y Tunnel)
+        /// 2. Ordenar por prioridad (Ethernet > WiFi > otros)
+        /// 3. Para cada interfaz con gateway IPv4, obtener IP y máscara
+        /// 4. Calcular network address: IP AND SubnetMask (byte a byte)
+        /// 5. Calcular prefix length contando bits en la máscara
+        /// 6. Retornar string "{networkAddress}/{prefixLength}"
+        /// 
+        /// Precondiciones:
+        /// - El sistema tiene al menos una interfaz de red activa con gateway
+        /// 
+        /// Postcondiciones:
+        /// - Retorna string en formato "x.x.x.x/prefix" (ej: "192.168.1.0/24")
+        /// - Si no puede determinar, retorna null
+        /// - El network address es calculado correctamente (IP AND mask)
+        /// </summary>
+        /// <returns>CIDR en formato "networkAddress/prefixLength" o null si no hay interfaz válida</returns>
+        public static string GetOutboundCIDR()
+        {
+            try
+            {
+                // Obtener interfaces activas, excluyendo Loopback y Tunnel
+                var interfaces = NetworkInterface.GetAllNetworkInterfaces()
+                    .Where(ni =>
+                        ni.OperationalStatus == OperationalStatus.Up &&
+                        ni.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
+                        ni.NetworkInterfaceType != NetworkInterfaceType.Tunnel)
+                    .OrderBy(ni => GetInterfacePriority(ni))
+                    .ToList();
+
+                foreach (var ni in interfaces)
+                {
+                    var ipProps = ni.GetIPProperties();
+
+                    // Verificar si tiene gateway IPv4 configurado
+                    var gateways = ipProps.GatewayAddresses
+                        .Where(g => g.Address.AddressFamily == AddressFamily.InterNetwork)
+                        .ToList();
+
+                    if (!gateways.Any())
+                        continue; // Sin gateway IPv4, no es la interfaz principal
+
+                    // Obtener la dirección unicast IPv4 de esta interfaz
+                    var unicast = ipProps.UnicastAddresses
+                        .FirstOrDefault(a =>
+                            a.Address.AddressFamily == AddressFamily.InterNetwork &&
+                            !IPAddress.IsLoopback(a.Address));
+
+                    if (unicast == null)
+                        continue;
+
+                    // Calcular network address: IP AND SubnetMask (byte a byte)
+                    byte[] ipBytes = unicast.Address.GetAddressBytes();
+                    byte[] maskBytes = unicast.IPv4Mask.GetAddressBytes();
+                    byte[] networkBytes = new byte[4];
+
+                    for (int i = 0; i < 4; i++)
+                        networkBytes[i] = (byte)(ipBytes[i] & maskBytes[i]);
+
+                    IPAddress networkAddress = new IPAddress(networkBytes);
+
+                    // Calcular prefix length contando bits en la máscara
+                    int prefixLength = CountBits(maskBytes);
+
+                    string cidr = $"{networkAddress}/{prefixLength}";
+
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"NetworkHelper: CIDR calculado - Interfaz: {ni.Name}, IP: {unicast.Address}, " +
+                        $"Máscara: {unicast.IPv4Mask}, CIDR: {cidr}");
+
+                    return cidr;
+                }
+
+                AlwaysPrintLogger.WriteWarning(
+                    "NetworkHelper: no se encontró interfaz de red con gateway IPv4 para calcular CIDR",
+                    AlwaysPrintLogger.EvtGenericWarning);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    "NetworkHelper: error al calcular CIDR de la interfaz de red", ex,
+                    AlwaysPrintLogger.EvtGenericError);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Obtiene la máscara de subred de la interfaz de red principal
+        /// (la que tiene gateway predeterminado y se usa para salir a Internet).
+        /// 
+        /// Reutiliza la misma lógica de selección de interfaz que GetOutboundCIDR:
+        /// - Filtra interfaces activas (excluye Loopback y Tunnel)
+        /// - Ordena por prioridad (Ethernet > WiFi > otros)
+        /// - Selecciona la primera con gateway IPv4 configurado
+        /// 
+        /// Precondiciones:
+        /// - El sistema tiene al menos una interfaz de red activa con gateway
+        /// 
+        /// Postcondiciones:
+        /// - Retorna la máscara de subred como IPAddress (ej: 255.255.255.0)
+        /// - Si no puede determinar, retorna null
+        /// </summary>
+        /// <returns>Máscara de subred de la interfaz principal, o null si no se puede detectar</returns>
+        public static IPAddress GetOutboundSubnetMask()
+        {
+            try
+            {
+                // Seleccionar interfaz principal (misma lógica que GetOutboundCIDR)
+                var interfaces = NetworkInterface.GetAllNetworkInterfaces()
+                    .Where(ni =>
+                        ni.OperationalStatus == OperationalStatus.Up &&
+                        ni.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
+                        ni.NetworkInterfaceType != NetworkInterfaceType.Tunnel)
+                    .OrderBy(ni => GetInterfacePriority(ni))
+                    .ToList();
+
+                foreach (var ni in interfaces)
+                {
+                    var ipProps = ni.GetIPProperties();
+
+                    // Verificar si tiene gateway IPv4 configurado
+                    var gateways = ipProps.GatewayAddresses
+                        .Where(g => g.Address.AddressFamily == AddressFamily.InterNetwork)
+                        .ToList();
+
+                    if (!gateways.Any())
+                        continue; // Sin gateway, no es la interfaz principal
+
+                    // Obtener la dirección unicast IPv4 con su máscara
+                    var unicast = ipProps.UnicastAddresses
+                        .FirstOrDefault(addr =>
+                            addr.Address.AddressFamily == AddressFamily.InterNetwork &&
+                            !IPAddress.IsLoopback(addr.Address));
+
+                    if (unicast == null)
+                        continue;
+
+                    IPAddress mask = unicast.IPv4Mask;
+
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"NetworkHelper: máscara de subred detectada - interfaz {ni.Name}: {mask}");
+
+                    return mask;
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning(
+                    $"NetworkHelper: error al obtener máscara de subred: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericWarning);
+            }
+
+            AlwaysPrintLogger.WriteWarning(
+                "NetworkHelper: no se encontró interfaz con gateway para obtener máscara de subred",
+                AlwaysPrintLogger.EvtGenericWarning);
+            return null;
+        }
+
+        /// <summary>
+        /// Cuenta la cantidad de bits en 1 de una máscara de subred.
+        /// Se usa para calcular el prefix length del CIDR.
+        /// Ejemplo: 255.255.255.0 → 24 bits
+        /// </summary>
+        /// <param name="mask">Bytes de la máscara de subred (4 bytes para IPv4)</param>
+        /// <returns>Cantidad de bits en 1 (prefix length)</returns>
+        private static int CountBits(byte[] mask)
+        {
+            int bits = 0;
+            foreach (byte b in mask)
+            {
+                byte temp = b;
+                while (temp != 0)
+                {
+                    bits += temp & 1;
+                    temp >>= 1;
+                }
+            }
+            return bits;
+        }
+
+        /// <summary>
         /// Obtiene el hostname de la workstation.
         /// </summary>
         public static string GetHostname()

@@ -90,7 +90,9 @@ def register_workstation(
         f"ip_private={data.ip_private}, "
         f"hostname={data.hostname}, "
         f"public_ip={public_ip}, "
-        f"workstation_local_ip={workstation_local_ip}"
+        f"workstation_local_ip={workstation_local_ip}, "
+        f"cidr={data.cidr}, "
+        f"tray_version={data.tray_version}"
     )
     
     try:
@@ -103,7 +105,9 @@ def register_workstation(
             public_ip=public_ip,
             hostname=data.hostname,
             os_serial=data.os_serial,
-            current_user=data.current_user
+            current_user=data.current_user,
+            cidr=data.cidr,
+            tray_version=data.tray_version
         )
         
         if reg_status == "pending":

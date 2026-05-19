@@ -19,5 +19,8 @@
   "BalloonUpdating": "AlwaysPrint se está actualizando a la versión {0}.",
   "BalloonNoUpdates": "No hay actualizaciones disponibles. Ya tienes la última versión.",
   "BalloonUpdateError": "No se pudo verificar actualizaciones. Intente más tarde.",
-  "BalloonUpdateNoCloud": "No se puede buscar actualizaciones sin conexión a la nube."
+  "BalloonUpdateNoCloud": "No se puede buscar actualizaciones sin conexión a la nube.",
+  "BalloonCidrNotDetected": "No se pudo detectar la configuración de red (CIDR). Verifique su conexión de red.",
+  "BalloonCidrRetrying": "Reintentando detección de red...",
+  "BalloonCidrDetected": "Configuración de red detectada correctamente. Continuando registro."
 }

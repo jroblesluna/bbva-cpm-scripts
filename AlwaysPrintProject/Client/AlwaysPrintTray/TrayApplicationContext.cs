@@ -203,6 +203,8 @@ namespace AlwaysPrintTray
                         _cloudRegistration = new CloudRegistration(cfg);
                         _cloudRegistration.RegistrationSuccessful += OnCloudRegistrationSuccessful;
                         _cloudRegistration.RegistrationPending += OnCloudRegistrationPending;
+                        _cloudRegistration.CidrDetectionFailed += OnCidrDetectionFailed;
+                        _cloudRegistration.CidrDetectionRecovered += OnCidrDetectionRecovered;
                         AlwaysPrintLogger.WriteTrayInfo("CloudRegistration iniciado correctamente.");
                     }
                     catch (Exception exReg)
@@ -254,6 +256,48 @@ namespace AlwaysPrintTray
                     4000,
                     "AlwaysPrint",
                     LocalizationManager.Get("BalloonPendingApproval"),
+                    ToolTipIcon.Info);
+            }, null);
+        }
+
+        /// <summary>
+        /// Callback que se ejecuta cuando no se puede detectar el CIDR de la red.
+        /// Muestra un balloon tip de error indicando problemas de configuración de red.
+        /// </summary>
+        private void OnCidrDetectionFailed()
+        {
+            AlwaysPrintLogger.WriteTrayError(
+                "OnCidrDetectionFailed: no se pudo detectar el CIDR de la red. " +
+                "Verificar conexión de red (interfaz con gateway).",
+                AlwaysPrintLogger.EvtGenericError);
+
+            _uiContext.Post(_ =>
+            {
+                _trayIcon.Text = "AlwaysPrint (sin red detectada)";
+                _trayIcon.ShowBalloonTip(
+                    5000,
+                    "AlwaysPrint",
+                    LocalizationManager.Get("BalloonCidrNotDetected"),
+                    ToolTipIcon.Error);
+            }, null);
+        }
+
+        /// <summary>
+        /// Callback que se ejecuta cuando el CIDR se detecta exitosamente después de un fallo previo.
+        /// Muestra un balloon tip informativo indicando que la red fue detectada.
+        /// </summary>
+        private void OnCidrDetectionRecovered()
+        {
+            AlwaysPrintLogger.WriteTrayInfo(
+                "OnCidrDetectionRecovered: CIDR detectado exitosamente después de fallo previo.");
+
+            _uiContext.Post(_ =>
+            {
+                _trayIcon.Text = LocalizationManager.Get("TrayTooltip");
+                _trayIcon.ShowBalloonTip(
+                    3000,
+                    "AlwaysPrint",
+                    LocalizationManager.Get("BalloonCidrDetected"),
                     ToolTipIcon.Info);
             }, null);
         }

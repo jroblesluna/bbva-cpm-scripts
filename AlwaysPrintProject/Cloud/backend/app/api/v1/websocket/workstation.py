@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.workstation import Workstation
-from app.schemas.websocket import TelemetryMessage, ConnectivityResultMessage
+from app.schemas.websocket import RegisterMessage, TelemetryMessage, ConnectivityResultMessage
 from app.schemas.telemetry import TelemetryMessagePayload, ConnectivityResultPayload
 from app.services.websocket_manager import connection_manager
 from app.services.workstation import WorkstationService
@@ -66,7 +66,7 @@ async def workstation_websocket(
     Protocolo de mensajes:
     
     Cliente → Servidor:
-    - {"type": "register", "ip_private": "...", "hostname": "...", "os_serial": "...", "current_user": "..."}
+    - {"type": "register", "ip_private": "...", "hostname": "...", "os_serial": "...", "current_user": "...", "cidr": "192.168.1.0/24", "tray_version": "2.1.0"}
     - {"type": "pong"}
     - {"type": "status_update", "contingency_active": bool, "current_user": "..."}
     - {"type": "config_change_report", "field": "...", "old_value": "...", "new_value": "..."}
@@ -98,15 +98,22 @@ async def workstation_websocket(
             await _safe_close(websocket, 1008, "First message must be register")
             return
         
-        # Extraer datos de registro
-        ip_private = data.get("ip_private")
-        hostname = data.get("hostname")
-        os_serial = data.get("os_serial")
-        current_user = data.get("current_user")
-        
-        if not ip_private:
-            await _safe_close(websocket, 1008, "ip_private is required")
+        # Validar mensaje de registro con schema Pydantic (incluye validación CIDR)
+        try:
+            register_msg = RegisterMessage(**data)
+        except ValidationError as e:
+            # Extraer mensaje de error legible
+            error_detail = str(e.errors()[0].get("msg", "Datos de registro inválidos"))
+            await _safe_close(websocket, 1008, f"Registro inválido: {error_detail}")
             return
+        
+        # Extraer datos validados del mensaje de registro
+        ip_private = register_msg.ip_private
+        hostname = register_msg.hostname
+        os_serial = register_msg.os_serial
+        current_user = register_msg.current_user
+        cidr = register_msg.cidr
+        tray_version = register_msg.tray_version
         
         # Obtener IP pública del cliente desde headers de Nginx (X-Forwarded-For o X-Real-IP)
         # En WebSocket, los headers del handshake están disponibles en websocket.headers
@@ -126,6 +133,8 @@ async def workstation_websocket(
             f"[REGISTRO WS] Datos recibidos: "
             f"ip_private={ip_private}, "
             f"hostname={hostname}, "
+            f"cidr={cidr}, "
+            f"tray_version={tray_version}, "
             f"X-Workstation-Local-IP={workstation_local_ip}, "
             f"X-Forwarded-For={forwarded_for}, "
             f"X-Real-IP={real_ip}, "
@@ -140,7 +149,9 @@ async def workstation_websocket(
                 public_ip=client_host or "unknown",
                 hostname=hostname,
                 os_serial=os_serial,
-                current_user=current_user
+                current_user=current_user,
+                cidr=cidr,
+                tray_version=tray_version
             )
             
             if status == "pending":
