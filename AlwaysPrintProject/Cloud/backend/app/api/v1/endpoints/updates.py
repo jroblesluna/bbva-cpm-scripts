@@ -567,20 +567,43 @@ def download_update(
         - 403: Auto-actualizaciones deshabilitadas para la organización
         - 500: Error al generar la URL presigned
     """
-    # 1. Identificar workstation
-    workstation = _identify_workstation(request, db)
-
-    # 2. Obtener cuenta y verificar flag de auto-actualización
-    account = db.query(Organization).filter(
-        Organization.id == workstation.organization_id
-    ).first()
+    # 1. Identificar workstation o al menos la organización (backward compatibility)
+    try:
+        workstation = _identify_workstation(request, db)
+        account = db.query(Organization).filter(
+            Organization.id == workstation.organization_id
+        ).first()
+    except HTTPException:
+        # Fallback por IP pública para clientes antiguos sin headers de identificación
+        client_ip = get_client_ip(request)
+        public_ip_record = db.query(PublicIP).filter(
+            PublicIP.ip_address == client_ip,
+            PublicIP.is_authorized == True,
+        ).first()
+        
+        if public_ip_record and public_ip_record.organization_id:
+            account = db.query(Organization).filter(
+                Organization.id == public_ip_record.organization_id
+            ).first()
+            workstation = None
+            logger.info(
+                "Descarga de actualización (fallback por IP pública): "
+                "ip_publica=%s, organization=%s",
+                client_ip,
+                account.name if account else "desconocida"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Workstation no autenticada"
+            )
 
     if not account:
         logger.error(
             "Organización no encontrada para workstation en descarga: "
-            "workstation_id=%s, organization_id=%s",
-            workstation.id,
-            workstation.organization_id,
+            "workstation_id=%s, ip_publica=%s",
+            workstation.id if workstation else "N/A",
+            get_client_ip(request),
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -591,9 +614,8 @@ def download_update(
     if not account.auto_update_enabled:
         logger.warning(
             "Descarga denegada - auto-actualizaciones deshabilitadas: "
-            "workstation_id=%s, organization_id=%s, organización=%s",
-            workstation.id,
-            workstation.organization_id,
+            "workstation_id=%s, organización=%s",
+            workstation.id if workstation else "N/A",
             getattr(account, 'name', 'desconocida'),
         )
         raise HTTPException(
@@ -613,9 +635,9 @@ def download_update(
     except ClientError:
         logger.error(
             "Error de S3 al generar URL de descarga: "
-            "workstation_id=%s, organization_id=%s",
-            workstation.id,
-            workstation.organization_id,
+            "workstation_id=%s, ip_publica=%s",
+            workstation.id if workstation else "N/A",
+            get_client_ip(request),
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -625,7 +647,7 @@ def download_update(
         logger.error(
             "Error inesperado al generar URL de descarga: "
             "workstation_id=%s, error=%s",
-            workstation.id,
+            workstation.id if workstation else "N/A",
             str(e),
         )
         raise HTTPException(
@@ -636,10 +658,10 @@ def download_update(
     # 5. Loggear descarga exitosa y redirigir
     logger.info(
         "Descarga de actualización autorizada: workstation_id=%s, "
-        "ip_private=%s, organization_id=%s, status=302",
-        workstation.id,
-        workstation.ip_private,
-        workstation.organization_id,
+        "ip_publica=%s, organization=%s, status=302",
+        workstation.id if workstation else "N/A (fallback IP)",
+        get_client_ip(request),
+        account.name if account else "desconocida",
     )
 
     return RedirectResponse(url=presigned_url, status_code=302)
