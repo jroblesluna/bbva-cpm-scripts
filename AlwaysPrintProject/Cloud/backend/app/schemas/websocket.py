@@ -8,7 +8,8 @@ intercambiados a través de WebSocket entre Tray Clients, Backend y Frontend.
 from datetime import datetime
 from typing import Optional, List, Literal, Any
 from uuid import UUID
-from pydantic import BaseModel, Field
+import ipaddress
+from pydantic import BaseModel, Field, field_validator
 
 
 # === SCHEMAS DE MENSAJES WORKSTATION → BACKEND ===
@@ -21,6 +22,35 @@ class RegisterMessage(BaseModel):
     os_serial: Optional[str] = None
     current_user: Optional[str] = None
     contingency_active: bool = False
+    cidr: str = Field(..., description="CIDR de la subred de la workstation (ej: 192.168.1.0/24)")
+    tray_version: Optional[str] = Field(None, max_length=50, description="Versión del AlwaysPrintTray")
+
+    @field_validator('cidr')
+    @classmethod
+    def validar_cidr(cls, v: str) -> str:
+        """Valida y normaliza el CIDR a su forma canónica.
+
+        - Verifica que sea una notación IPv4 CIDR válida
+        - Verifica que el prefix length esté en rango 8-30
+        - Normaliza a forma canónica (ej: 192.168.1.50/24 → 192.168.1.0/24)
+        """
+        try:
+            red = ipaddress.ip_network(v, strict=False)
+        except ValueError:
+            raise ValueError(f"CIDR inválido: '{v}'. Debe ser una notación IPv4 CIDR válida (ej: 192.168.1.0/24)")
+
+        # Verificar que sea IPv4
+        if red.version != 4:
+            raise ValueError(f"CIDR inválido: '{v}'. Solo se admiten redes IPv4")
+
+        # Verificar que el prefix length esté en rango 8-30
+        if red.prefixlen < 8 or red.prefixlen > 30:
+            raise ValueError(
+                f"CIDR inválido: '{v}'. El prefix length debe estar entre 8 y 30 (recibido: {red.prefixlen})"
+            )
+
+        # Retornar forma canónica normalizada
+        return str(red)
 
 
 class PongMessage(BaseModel):

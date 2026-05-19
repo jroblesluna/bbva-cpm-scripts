@@ -92,6 +92,20 @@ def create_vlan(
         if not org_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="organization_id requerido para administradores")
     
+    # Validar unicidad de CIDR por organización antes de crear
+    workstation_service = WorkstationService()
+    conflict = workstation_service.validate_cidr_uniqueness(
+        db=db,
+        organization_id=str(org_id),
+        cidrs=vlan_data.cidr_ranges
+    )
+    if conflict:
+        cidr_dup, vlan_name = conflict
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"El CIDR {cidr_dup} ya está asignado a la VLAN '{vlan_name}' en esta organización"
+        )
+    
     vlan = VLAN(
         organization_id=org_id,
         name=vlan_data.name,
@@ -149,6 +163,22 @@ def update_vlan(
     
     if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
+    
+    # Validar unicidad de CIDR si se están actualizando los cidr_ranges
+    if vlan_data.cidr_ranges is not None:
+        workstation_service = WorkstationService()
+        conflict = workstation_service.validate_cidr_uniqueness(
+            db=db,
+            organization_id=str(vlan.organization_id),
+            cidrs=vlan_data.cidr_ranges,
+            exclude_vlan_id=str(vlan.id)
+        )
+        if conflict:
+            cidr_dup, vlan_name = conflict
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"El CIDR {cidr_dup} ya está asignado a la VLAN '{vlan_name}' en esta organización"
+            )
     
     old_values = {"name": vlan.name, "cidr_ranges": vlan.cidr_ranges}
     update_data = vlan_data.model_dump(exclude_unset=True)

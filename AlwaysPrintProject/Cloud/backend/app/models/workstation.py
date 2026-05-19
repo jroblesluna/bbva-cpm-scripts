@@ -37,6 +37,10 @@ class Workstation(Base):
     os_serial = Column(String(255), nullable=True)
     current_user = Column(String(255), nullable=True)
     
+    # Información de red y versión del Tray
+    cidr = Column(String(45), nullable=True)  # CIDR reportado por la workstation (ej: "192.168.1.0/24")
+    tray_version = Column(String(50), nullable=True)  # Versión del Tray instalado (ej: "2.1.0.0")
+    
     # Estado de la estación
     is_online = Column(Boolean, nullable=False, default=False)
     contingency_active = Column(Boolean, nullable=False, default=False)

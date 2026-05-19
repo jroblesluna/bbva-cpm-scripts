@@ -79,14 +79,12 @@ def list_versions(
         404: {"description": "Organización no encontrada"},
     },
 )
-def pin_version(
+async def pin_version(
     organization_id: str,
     request: Request,
     db: Session = Depends(get_db),
 ):
     """Pinea una versión específica para una organización. Solo admin."""
-    import asyncio
-
     # Verificar admin
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
@@ -103,7 +101,7 @@ def pin_version(
         raise HTTPException(status_code=401, detail="Token inválido")
 
     # Leer body
-    body = asyncio.get_event_loop().run_until_complete(request.json())
+    body = await request.json()
     version = body.get("version")  # None o string vacío para despinear
 
     org = db.query(Organization).filter(Organization.id == organization_id).first()

@@ -462,11 +462,13 @@ export const workstationsApi = {
 
 export const vlansApi = {
   /**
-   * Listar VLANs.
+   * Listar VLANs, opcionalmente filtradas por organización.
    */
-  list: async (): Promise<VLAN[]> => {
-    const response = await apiClient.get<VLAN[]>('/vlans/')
-    return response.data
+  list: async (filters?: { organization_id?: string }): Promise<VLAN[]> => {
+    const response = await apiClient.get<{ vlans: VLAN[] }>('/vlans/', {
+      params: filters,
+    })
+    return response.data.vlans
   },
 
   /**

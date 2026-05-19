@@ -5,6 +5,7 @@ Este servicio implementa la lógica de negocio para:
 - Registro de workstations
 - Gestión de licencias
 - Detección automática de VLAN por IP
+- Auto-asignación de VLAN por CIDR
 - Actualización de estado (online/offline, contingencia)
 """
 
@@ -14,6 +15,7 @@ import logging
 from typing import Optional, List
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
 
 from app.models.workstation import Workstation, License
@@ -103,6 +105,175 @@ class WorkstationService:
         
         return None
     
+    def detect_or_create_vlan_for_cidr(
+        self,
+        db: Session,
+        organization_id: str,
+        cidr: str
+    ) -> Optional[str]:
+        """
+        Busca una VLAN existente que contenga el CIDR reportado.
+        Si no existe, auto-crea una VLAN con nombre VLAN_{CIDR}.
+        
+        Maneja race conditions: si dos workstations con el mismo CIDR
+        se registran simultáneamente, la segunda encontrará la VLAN
+        creada por la primera tras un reintento.
+        
+        Args:
+            db: Sesión de base de datos
+            organization_id: UUID de la organización (tenant isolation)
+            cidr: String CIDR válido (ya validado por Pydantic)
+            
+        Returns:
+            UUID de la VLAN asignada (existente o nueva), None si el CIDR es inválido
+            
+        Precondiciones:
+            - cidr es un string CIDR válido (validado previamente)
+            - organization_id corresponde a una organización existente
+            
+        Postcondiciones:
+            - Retorna UUID de VLAN (nunca None para CIDR válido)
+            - Si VLAN existente contiene el CIDR exacto → retorna esa VLAN
+            - Si no existe → crea VLAN con nombre VLAN_{cidr} y retorna su UUID
+            - La VLAN creada tiene cidr_ranges = [cidr]
+            - La VLAN pertenece a la organización indicada
+        """
+        # Normalizar CIDR a forma canónica
+        try:
+            normalized_cidr = str(ipaddress.ip_network(cidr, strict=False))
+        except ValueError:
+            logger.error(f"[VLAN-CIDR] CIDR inválido recibido: {cidr}")
+            return None
+        
+        # Buscar VLANs de la organización que contengan el CIDR
+        vlan_id = self._find_vlan_with_cidr(db, organization_id, normalized_cidr)
+        if vlan_id:
+            logger.info(
+                f"[VLAN-CIDR] VLAN existente encontrada para CIDR {normalized_cidr}: "
+                f"vlan_id={vlan_id}"
+            )
+            return vlan_id
+        
+        # Verificar unicidad de CIDR antes de auto-crear VLAN
+        conflict = self.validate_cidr_uniqueness(db, organization_id, [normalized_cidr])
+        if conflict:
+            cidr_dup, vlan_name = conflict
+            logger.error(
+                f"[VLAN-CIDR] CIDR {normalized_cidr} ya existe en VLAN '{vlan_name}' "
+                f"de la organización {organization_id}. No se puede auto-crear VLAN."
+            )
+            return None
+        
+        # No encontrada: auto-crear VLAN
+        try:
+            new_vlan = VLAN(
+                organization_id=organization_id,
+                name=f"VLAN_{normalized_cidr}",
+                description=f"Auto-creada durante registro de workstation con CIDR {normalized_cidr}",
+                cidr_ranges=[normalized_cidr]
+            )
+            db.add(new_vlan)
+            db.flush()
+            
+            logger.info(
+                f"[VLAN-CIDR] VLAN auto-creada para CIDR {normalized_cidr}: "
+                f"vlan_id={new_vlan.id}, nombre=VLAN_{normalized_cidr}"
+            )
+            return str(new_vlan.id)
+        
+        except IntegrityError:
+            # Race condition: otra transacción creó la VLAN simultáneamente
+            # Reintentar búsqueda tras rollback del savepoint
+            db.rollback()
+            logger.warning(
+                f"[VLAN-CIDR] Race condition detectada para CIDR {normalized_cidr}. "
+                f"Reintentando búsqueda..."
+            )
+            
+            vlan_id = self._find_vlan_with_cidr(db, organization_id, normalized_cidr)
+            if vlan_id:
+                logger.info(
+                    f"[VLAN-CIDR] VLAN encontrada tras reintento para CIDR {normalized_cidr}: "
+                    f"vlan_id={vlan_id}"
+                )
+                return vlan_id
+            
+            # Si aún no se encuentra, algo inesperado ocurrió
+            logger.error(
+                f"[VLAN-CIDR] No se pudo encontrar ni crear VLAN para CIDR {normalized_cidr} "
+                f"en organización {organization_id}"
+            )
+            return None
+    
+    def _find_vlan_with_cidr(
+        self,
+        db: Session,
+        organization_id: str,
+        normalized_cidr: str
+    ) -> Optional[str]:
+        """
+        Busca una VLAN de la organización que contenga el CIDR exacto en cidr_ranges.
+        
+        Args:
+            db: Sesión de base de datos
+            organization_id: UUID de la organización
+            normalized_cidr: CIDR normalizado a buscar
+            
+        Returns:
+            UUID de la VLAN si se encuentra, None si no
+        """
+        vlans = db.query(VLAN).filter_by(organization_id=organization_id).all()
+        
+        for vlan in vlans:
+            if normalized_cidr in (vlan.cidr_ranges or []):
+                return str(vlan.id)
+        
+        return None
+    
+    def validate_cidr_uniqueness(
+        self,
+        db: Session,
+        organization_id: str,
+        cidrs: List[str],
+        exclude_vlan_id: Optional[str] = None
+    ) -> Optional[tuple[str, str]]:
+        """
+        Valida que los CIDRs no existan en otra VLAN de la misma organización.
+        
+        Verifica unicidad de CIDR por organización: un CIDR solo puede pertenecer
+        a una VLAN dentro de la misma organización.
+        
+        Args:
+            db: Sesión de base de datos
+            organization_id: UUID de la organización (tenant isolation)
+            cidrs: Lista de CIDRs a validar
+            exclude_vlan_id: UUID de VLAN a excluir de la verificación
+                            (útil al actualizar una VLAN existente)
+            
+        Returns:
+            None si todos los CIDRs son únicos.
+            Tupla (cidr_duplicado, vlan_name) si se encuentra un CIDR duplicado.
+        """
+        # Obtener todas las VLANs de la organización
+        vlans = db.query(VLAN).filter_by(organization_id=organization_id).all()
+        
+        for cidr in cidrs:
+            # Normalizar CIDR para comparación consistente
+            try:
+                normalized_cidr = str(ipaddress.ip_network(cidr, strict=False))
+            except ValueError:
+                continue
+            
+            for vlan in vlans:
+                # Excluir la VLAN actual (para actualizaciones)
+                if exclude_vlan_id and str(vlan.id) == exclude_vlan_id:
+                    continue
+                
+                if normalized_cidr in (vlan.cidr_ranges or []):
+                    return (normalized_cidr, vlan.name)
+        
+        return None
+    
     def get_organization_by_public_ip(
         self, 
         db: Session, 
@@ -186,17 +357,23 @@ class WorkstationService:
         public_ip: str,
         hostname: Optional[str] = None,
         os_serial: Optional[str] = None,
-        current_user: Optional[str] = None
+        current_user: Optional[str] = None,
+        cidr: Optional[str] = None,
+        tray_version: Optional[str] = None
     ) -> tuple[Optional[Workstation], bool, str]:
         """
         Registra una workstation nueva o actualiza una existente.
         
         Flujo:
         1. Buscar workstation existente por IP privada
-        2. Si existe, actualizar y devolver
+        2. Si existe, actualizar campos y re-evaluar VLAN si CIDR cambió
         3. Si no existe, verificar autorización de IP pública
-        4. Si IP autorizada, crear workstation
+        4. Si IP autorizada, crear workstation con VLAN auto-asignada por CIDR
         5. Si IP no autorizada, registrarla como pendiente y rechazar
+        
+        La asignación de VLAN se realiza mediante CIDR cuando está disponible:
+        - Si se proporciona `cidr`, se usa `detect_or_create_vlan_for_cidr`
+        - Si no hay `cidr`, se usa el fallback `detect_vlan_for_ip`
         
         Args:
             db: Sesión de base de datos
@@ -205,6 +382,8 @@ class WorkstationService:
             hostname: Nombre del host Windows (opcional)
             os_serial: Serial del sistema operativo (opcional)
             current_user: Usuario actualmente logueado (opcional)
+            cidr: CIDR reportado por la workstation (ej: "192.168.1.0/24")
+            tray_version: Versión del Tray instalado (ej: "2.1.0.0")
             
         Returns:
             Tupla (workstation, is_new, status) donde:
@@ -215,12 +394,24 @@ class WorkstationService:
         Raises:
             ValueError: Si hay error en los datos
         """
+        # Normalizar CIDR si se proporcionó
+        normalized_cidr = None
+        if cidr:
+            try:
+                normalized_cidr = str(ipaddress.ip_network(cidr, strict=False))
+            except ValueError:
+                logger.warning(
+                    f"[REGISTRO] CIDR inválido recibido: {cidr}. Se ignorará."
+                )
+        
         # Log detallado para debugging
         logger.info(
             f"[REGISTRO] Intentando registrar workstation: "
             f"ip_private={ip_private}, "
             f"public_ip={public_ip}, "
-            f"hostname={hostname}"
+            f"hostname={hostname}, "
+            f"cidr={normalized_cidr}, "
+            f"tray_version={tray_version}"
         )
         
         # 1. Buscar workstation existente
@@ -236,7 +427,7 @@ class WorkstationService:
                 f"hostname={workstation.hostname}"
             )
             
-            # Actualizar workstation existente
+            # Actualizar campos básicos de la workstation existente
             if hostname:
                 workstation.hostname = hostname
             if os_serial:
@@ -247,20 +438,46 @@ class WorkstationService:
             workstation.is_online = True
             workstation.last_connection = datetime.now(timezone.utc).replace(tzinfo=None)
             
-            # Detectar VLAN (puede haber cambiado)
-            vlan_id = self.detect_vlan_for_ip(
-                db, 
-                str(workstation.organization_id), 
-                ip_private
-            )
-            workstation.vlan_id = vlan_id
+            # Guardar tray_version si se proporcionó
+            if tray_version:
+                workstation.tray_version = tray_version
+            
+            # Determinar VLAN: usar CIDR si está disponible
+            organization_id = str(workstation.organization_id)
+            
+            if normalized_cidr:
+                # Verificar si el CIDR cambió respecto al almacenado
+                cidr_changed = workstation.cidr != normalized_cidr
+                
+                if cidr_changed:
+                    logger.info(
+                        f"[REGISTRO] CIDR cambió para workstation {workstation.id}: "
+                        f"anterior={workstation.cidr}, nuevo={normalized_cidr}. "
+                        f"Re-evaluando VLAN..."
+                    )
+                
+                # Actualizar CIDR almacenado
+                workstation.cidr = normalized_cidr
+                
+                # Asignar VLAN por CIDR (siempre re-evaluar para consistencia)
+                vlan_id = self.detect_or_create_vlan_for_cidr(
+                    db, organization_id, normalized_cidr
+                )
+                workstation.vlan_id = vlan_id
+            else:
+                # Fallback: detectar VLAN por IP privada (legacy)
+                vlan_id = self.detect_vlan_for_ip(
+                    db, organization_id, ip_private
+                )
+                workstation.vlan_id = vlan_id
             
             db.commit()
             db.refresh(workstation)
             
             logger.info(
                 f"[REGISTRO] Workstation actualizada exitosamente: "
-                f"id={workstation.id}"
+                f"id={workstation.id}, vlan_id={workstation.vlan_id}, "
+                f"cidr={workstation.cidr}"
             )
             
             return workstation, False, "authorized"
@@ -301,8 +518,17 @@ class WorkstationService:
             f"{account.name} (id={account.id})"
         )
         
-        # 3. Crear workstation
-        vlan_id = self.detect_vlan_for_ip(db, str(account.id), ip_private)
+        # 3. Crear workstation — determinar VLAN por CIDR o fallback por IP
+        organization_id = str(account.id)
+        
+        if normalized_cidr:
+            # Asignar VLAN por CIDR (método preferido)
+            vlan_id = self.detect_or_create_vlan_for_cidr(
+                db, organization_id, normalized_cidr
+            )
+        else:
+            # Fallback: detectar VLAN por IP privada (legacy)
+            vlan_id = self.detect_vlan_for_ip(db, organization_id, ip_private)
         
         workstation = Workstation(
             organization_id=account.id,
@@ -311,6 +537,8 @@ class WorkstationService:
             hostname=hostname,
             os_serial=os_serial,
             current_user=current_user,
+            cidr=normalized_cidr,
+            tray_version=tray_version,
             is_online=True,
             contingency_active=False,
             last_connection=datetime.now(timezone.utc).replace(tzinfo=None),
@@ -325,7 +553,9 @@ class WorkstationService:
             f"id={workstation.id}, "
             f"ip_private={workstation.ip_private}, "
             f"hostname={workstation.hostname}, "
-            f"organization_id={workstation.organization_id}"
+            f"organization_id={workstation.organization_id}, "
+            f"cidr={workstation.cidr}, "
+            f"vlan_id={workstation.vlan_id}"
         )
         
         # 4. Activar licencia

@@ -18,6 +18,8 @@ export interface Workstation {
   first_seen: string
   created_at: string
   updated_at: string
+  cidr: string | null
+  tray_version: string | null
   organization?: Organization
   vlan?: VLANBasic | null
 }

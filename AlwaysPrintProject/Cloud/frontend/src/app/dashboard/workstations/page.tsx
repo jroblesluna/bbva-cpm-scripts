@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { workstationsApi, organizationsApi } from '@/lib/api';
+import { workstationsApi, organizationsApi, vlansApi } from '@/lib/api';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,10 +28,11 @@ import {
   Edit,
   RefreshCw,
   Trash2,
+  Tag,
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
-import type { Workstation, WorkstationUpdate, Organization } from '@/types';
+import type { Workstation, WorkstationUpdate, Organization, VLAN } from '@/types';
 
 export default function WorkstationsPage() {
   const queryClient = useQueryClient();
@@ -42,6 +43,7 @@ export default function WorkstationsPage() {
   const [filterOnline, setFilterOnline] = useState<boolean | undefined>(undefined);
   const [filterContingency, setFilterContingency] = useState<boolean | undefined>(undefined);
   const [filterOrgId, setFilterOrgId] = useState<string | undefined>(undefined);
+  const [filterVlanId, setFilterVlanId] = useState<string | undefined>(undefined);
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
   const [editingWorkstation, setEditingWorkstation] = useState<Workstation | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -52,13 +54,14 @@ export default function WorkstationsPage() {
     isFetching,
     error,
   } = useQuery({
-    queryKey: ['workstations', searchTerm, filterOnline, filterContingency, filterOrgId],
+    queryKey: ['workstations', searchTerm, filterOnline, filterContingency, filterOrgId, filterVlanId],
     queryFn: () =>
       workstationsApi.list({
         search: searchTerm || undefined,
         is_online: filterOnline,
         contingency_active: filterContingency,
         organization_id: filterOrgId,
+        vlan_id: filterVlanId,
       }),
     placeholderData: (prev) => prev,
   });
@@ -71,6 +74,13 @@ export default function WorkstationsPage() {
   const { data: accounts } = useQuery({
     queryKey: ['accounts'],
     queryFn: () => organizationsApi.list(),
+  });
+
+  // Obtener VLANs de la organización seleccionada para el filtro
+  const { data: vlans } = useQuery({
+    queryKey: ['vlans', filterOrgId],
+    queryFn: () => vlansApi.list({ organization_id: filterOrgId }),
+    enabled: !!filterOrgId,
   });
 
   const updateMutation = useMutation({
@@ -208,7 +218,7 @@ export default function WorkstationsPage() {
 
       <Card className="mb-6">
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="md:col-span-2">
               <div className="flex items-center">
                 <Search className="w-5 h-5 text-gray-400 mr-3" />
@@ -243,6 +253,8 @@ export default function WorkstationsPage() {
                 onChange={(e) => {
                   const value = e.target.value;
                   setFilterOrgId(value === 'all' ? undefined : value);
+                  // Limpiar filtro de VLAN al cambiar organización
+                  setFilterVlanId(undefined);
                 }}
                 className="w-full px-3 py-2 border rounded-md"
               >
@@ -255,6 +267,26 @@ export default function WorkstationsPage() {
                   ))}
               </select>
             </div>
+            {filterOrgId && (
+              <div>
+                <select
+                  value={filterVlanId || 'all'}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFilterVlanId(value === 'all' ? undefined : value);
+                  }}
+                  className="w-full px-3 py-2 border rounded-md"
+                >
+                  <option value="all">{t('allVlans')}</option>
+                  {Array.isArray(vlans) &&
+                    vlans.map((vlan) => (
+                      <option key={vlan.id} value={vlan.id}>
+                        {vlan.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
           </div>
           <div className="flex items-center space-x-4 mt-4">
             <label className="flex items-center space-x-2 cursor-pointer">
@@ -269,7 +301,8 @@ export default function WorkstationsPage() {
             {(searchTerm ||
               filterOnline !== undefined ||
               filterContingency !== undefined ||
-              filterOrgId) && (
+              filterOrgId ||
+              filterVlanId) && (
               <Button
                 variant="outline"
                 size="sm"
@@ -278,6 +311,7 @@ export default function WorkstationsPage() {
                   setFilterOnline(undefined);
                   setFilterContingency(undefined);
                   setFilterOrgId(undefined);
+                  setFilterVlanId(undefined);
                 }}
               >
                 {tCommon('clearFilters')}
@@ -333,7 +367,7 @@ export default function WorkstationsPage() {
                           </Badge>
                         )}
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-gray-600 mb-3">
                         {workstation.hostname && (
                           <div className="flex items-center">
                             <Monitor className="w-4 h-4 mr-1" />
@@ -346,10 +380,16 @@ export default function WorkstationsPage() {
                             {workstation.current_user}
                           </div>
                         )}
+                        {workstation.cidr && (
+                          <div className="flex items-center">
+                            <Network className="w-4 h-4 mr-1" />
+                            CIDR: {workstation.cidr}
+                          </div>
+                        )}
                         {workstation.vlan_id && (
                           <div className="flex items-center">
                             <Network className="w-4 h-4 mr-1" />
-                            VLAN: {workstation.vlan_id}
+                            VLAN: {workstation.vlan?.name ?? workstation.vlan_id}
                           </div>
                         )}
                         {workstation.organization && (
@@ -358,6 +398,10 @@ export default function WorkstationsPage() {
                             {workstation.organization.name}
                           </div>
                         )}
+                        <div className="flex items-center">
+                          <Tag className="w-4 h-4 mr-1" />
+                          Versión Tray: {workstation.tray_version ?? '—'}
+                        </div>
                       </div>
                       <div className="flex items-center text-xs text-gray-500 space-x-4">
                         <div className="flex items-center">
@@ -412,7 +456,8 @@ export default function WorkstationsPage() {
                 {searchTerm ||
                 filterOnline !== undefined ||
                 filterContingency !== undefined ||
-                filterOrgId
+                filterOrgId ||
+                filterVlanId
                   ? t('emptyFilterMessage')
                   : t('emptyMessage')}
               </p>
@@ -566,6 +611,37 @@ function WorkstationDetailModal({
           </Button>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Sección prominente: Versión Tray, CIDR y VLAN */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center mb-1">
+                <Tag className="w-4 h-4 text-blue-600 mr-2" />
+                <span className="text-xs font-medium text-blue-700 uppercase">Versión Tray</span>
+              </div>
+              <p className="text-lg font-semibold text-blue-900">
+                {workstation.tray_version ?? '—'}
+              </p>
+            </div>
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <div className="flex items-center mb-1">
+                <Network className="w-4 h-4 text-purple-600 mr-2" />
+                <span className="text-xs font-medium text-purple-700 uppercase">CIDR</span>
+              </div>
+              <p className="text-lg font-semibold font-mono text-purple-900">
+                {workstation.cidr ?? '—'}
+              </p>
+            </div>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center mb-1">
+                <Network className="w-4 h-4 text-green-600 mr-2" />
+                <span className="text-xs font-medium text-green-700 uppercase">VLAN asignada</span>
+              </div>
+              <p className="text-lg font-semibold text-green-900">
+                {workstation.vlan?.name ?? (workstation.vlan_id ? workstation.vlan_id : '—')}
+              </p>
+            </div>
+          </div>
+
           <div>
             <h3 className="text-sm font-medium text-gray-700 mb-2">{tCommon('status')}</h3>
             <div className="flex items-center space-x-2">
@@ -584,12 +660,16 @@ function WorkstationDetailModal({
                 <dt className="text-gray-600">{t('privateIp')}</dt>
                 <dd className="font-mono font-medium">{workstation.ip_private}</dd>
               </div>
-              {workstation.vlan_id && (
-                <div>
-                  <dt className="text-gray-600">VLAN</dt>
-                  <dd className="font-medium">{workstation.vlan_id}</dd>
-                </div>
-              )}
+              <div>
+                <dt className="text-gray-600">CIDR</dt>
+                <dd className="font-mono font-medium">{workstation.cidr ?? '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-gray-600">VLAN</dt>
+                <dd className="font-medium">
+                  {workstation.vlan?.name ?? (workstation.vlan_id ? workstation.vlan_id : '—')}
+                </dd>
+              </div>
             </dl>
           </div>
           <div>
@@ -613,6 +693,10 @@ function WorkstationDetailModal({
                   <dd className="font-medium">{workstation.current_user}</dd>
                 </div>
               )}
+              <div>
+                <dt className="text-gray-600">Versión Tray</dt>
+                <dd className="font-medium">{workstation.tray_version ?? '—'}</dd>
+              </div>
             </dl>
           </div>
           {workstation.organization && (
