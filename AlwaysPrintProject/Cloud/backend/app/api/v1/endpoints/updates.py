@@ -431,13 +431,40 @@ def check_update(
         except Exception:
             pass  # Si falla el token de admin, intentar como workstation
 
-    # Flujo normal: identificar workstation
-    workstation = _identify_workstation(request, db)
-
-    # 2. Obtener organization_id y leer auto_update_enabled
-    account = db.query(Organization).filter(
-        Organization.id == workstation.organization_id
-    ).first()
+    # Flujo normal: identificar workstation o al menos la organización
+    # Para clientes antiguos que no envían X-Workstation-ID ni X-Workstation-Local-IP,
+    # intentamos identificar la organización por IP pública directamente.
+    try:
+        workstation = _identify_workstation(request, db)
+        account = db.query(Organization).filter(
+            Organization.id == workstation.organization_id
+        ).first()
+    except HTTPException:
+        # No se pudo identificar la workstation — intentar identificar organización por IP pública
+        # (backward compatibility con clientes antiguos que no envían headers de identificación)
+        client_ip = get_client_ip(request)
+        public_ip_record = db.query(PublicIP).filter(
+            PublicIP.ip_address == client_ip,
+            PublicIP.is_authorized == True,
+        ).first()
+        
+        if public_ip_record and public_ip_record.organization_id:
+            account = db.query(Organization).filter(
+                Organization.id == public_ip_record.organization_id
+            ).first()
+            workstation = None
+            logger.info(
+                "Verificación de actualización (fallback por IP pública): "
+                "ip_publica=%s, organization=%s",
+                client_ip,
+                account.name if account else "desconocida"
+            )
+        else:
+            # Tampoco se pudo identificar la organización
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Workstation no autenticada"
+            )
 
     if not account:
         logger.error(
@@ -467,8 +494,8 @@ def check_update(
         logger.error(
             "S3 no disponible al verificar actualización: "
             "workstation_id=%s, ip_private=%s",
-            workstation.id,
-            workstation.ip_private,
+            workstation.id if workstation else "N/A",
+            workstation.ip_private if workstation else get_client_ip(request),
         )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -477,7 +504,7 @@ def check_update(
     except Exception as e:
         logger.error(
             "Error inesperado al consultar S3: workstation_id=%s, error=%s",
-            workstation.id,
+            workstation.id if workstation else "N/A",
             str(e),
         )
         raise HTTPException(
@@ -499,8 +526,8 @@ def check_update(
     logger.info(
         "Verificación de actualización: workstation_id=%s, ip_private=%s, "
         "version_disponible=%s, auto_update_enabled=%s, status=200",
-        workstation.id,
-        workstation.ip_private,
+        workstation.id if workstation else "N/A (fallback por IP)",
+        workstation.ip_private if workstation else get_client_ip(request),
         msi_metadata['version'],
         auto_update_enabled,
     )
