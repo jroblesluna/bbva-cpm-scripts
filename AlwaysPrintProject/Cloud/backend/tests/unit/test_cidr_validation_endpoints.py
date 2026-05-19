@@ -112,12 +112,12 @@ class TestCidrInvalidoRetorna422:
         error_str = str(exc_info.value)
         assert "CIDR inválido" in error_str or "IPv4" in error_str
 
-    def test_cidr_sin_campo_obligatorio(self):
-        """Registro sin campo cidr es rechazado."""
-        with pytest.raises(ValidationError):
-            WorkstationRegisterRequest(
-                ip_private="192.168.1.50"
-            )
+    def test_cidr_sin_campo_es_aceptado(self):
+        """Registro sin campo cidr es aceptado (backward compatibility con clientes antiguos)."""
+        request = WorkstationRegisterRequest(
+            ip_private="192.168.1.50"
+        )
+        assert request.cidr is None
 
 
 class TestCidrPrefixFueraDeRango:

@@ -143,6 +143,71 @@ class S3UpdateService:
 
         return versions
 
+    def delete_version(self, version: str) -> bool:
+        """
+        Elimina todos los objetos bajo el prefijo versions/{version}/ en S3.
+
+        Borra recursivamente todos los archivos asociados a una versión específica.
+
+        Args:
+            version: String de versión a eliminar (ej: "1.26.518.2152")
+
+        Returns:
+            True si se eliminaron objetos, False si no había nada que eliminar
+
+        Raises:
+            ClientError: Si ocurre un error al interactuar con S3.
+        """
+        prefix = f"versions/{version}/"
+        try:
+            logger.info(
+                "Eliminando versión de S3: bucket=%s, prefix=%s",
+                self._bucket,
+                prefix
+            )
+
+            # Listar todos los objetos bajo el prefijo
+            objects_to_delete = []
+            paginator = self._client.get_paginator('list_objects_v2')
+            pages = paginator.paginate(Bucket=self._bucket, Prefix=prefix)
+
+            for page in pages:
+                for obj in page.get('Contents', []):
+                    objects_to_delete.append({'Key': obj['Key']})
+
+            if not objects_to_delete:
+                logger.warning(
+                    "No se encontraron objetos para eliminar: prefix=%s", prefix
+                )
+                return False
+
+            # Eliminar objetos en lotes (máximo 1000 por request de S3)
+            for i in range(0, len(objects_to_delete), 1000):
+                batch = objects_to_delete[i:i + 1000]
+                self._client.delete_objects(
+                    Bucket=self._bucket,
+                    Delete={'Objects': batch}
+                )
+
+            logger.info(
+                "Versión eliminada exitosamente: version=%s, objetos_eliminados=%d",
+                version,
+                len(objects_to_delete)
+            )
+            return True
+
+        except ClientError as e:
+            error_code = e.response['Error']['Code']
+            error_message = e.response['Error']['Message']
+            logger.error(
+                "Error al eliminar versión de S3: "
+                "código=%s, mensaje=%s, prefix=%s",
+                error_code,
+                error_message,
+                prefix
+            )
+            raise
+
     def generate_download_url(self, key: str = None, expires_in: int = 3600) -> str:
         """
         Genera una URL presigned para descargar el MSI desde S3.

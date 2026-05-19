@@ -117,6 +117,167 @@ async def pin_version(
     return {"message": f"Versión {action} exitosamente", "target_version": org.target_version}
 
 
+@router.get(
+    "/download/{version}",
+    summary="Descargar versión específica (admin)",
+    description="Genera una URL presigned de S3 para una versión específica y redirige al admin.",
+    responses={
+        302: {"description": "Redirect a presigned URL de S3"},
+        401: {"description": "No autenticado o no autorizado"},
+        404: {"description": "Versión no encontrada en S3"},
+        500: {"description": "Error al generar URL de descarga"},
+    },
+)
+def admin_download_version(
+    version: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Genera una URL presigned para descargar una versión específica. Solo admin."""
+    # Verificar que es admin
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="No autenticado")
+
+    try:
+        token = auth_header[7:]
+        payload = decode_access_token(token)
+        user_id = payload.get("sub")
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user or user.role != UserRole.ADMIN:
+            raise HTTPException(status_code=401, detail="No autorizado")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+    try:
+        s3_service = S3UpdateService()
+        target_key = f"versions/{version}/AlwaysPrint.msi"
+        # Verificar que el objeto existe antes de generar URL
+        s3_service.get_msi_metadata(key=target_key)
+        presigned_url = s3_service.generate_download_url(key=target_key)
+    except ClientError as e:
+        error_code = e.response['Error']['Code']
+        if error_code in ('404', 'NoSuchKey'):
+            raise HTTPException(status_code=404, detail=f"Versión {version} no encontrada en S3")
+        logger.error("Error S3 al generar URL de descarga para admin: %s", str(e))
+        raise HTTPException(status_code=500, detail="Error al generar URL de descarga")
+    except Exception as e:
+        logger.error("Error inesperado al generar URL de descarga para admin: %s", str(e))
+        raise HTTPException(status_code=500, detail="Error al generar URL de descarga")
+
+    logger.info(
+        "Descarga admin autorizada: usuario=%s, versión=%s",
+        user.email if user else "desconocido",
+        version,
+    )
+
+    return RedirectResponse(url=presigned_url, status_code=302)
+
+
+@router.delete(
+    "/versions",
+    summary="Eliminar versiones de S3 (admin)",
+    description="Elimina múltiples versiones del bucket S3. No permite eliminar la versión latest ni versiones pineadas.",
+    responses={
+        200: {"description": "Resultado de la eliminación"},
+        401: {"description": "No autenticado o no autorizado"},
+        400: {"description": "No se proporcionaron versiones"},
+    },
+)
+async def admin_delete_versions(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Elimina múltiples versiones de S3. No permite eliminar latest ni pineadas. Solo admin."""
+    # Verificar que es admin
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="No autenticado")
+
+    try:
+        token = auth_header[7:]
+        payload = decode_access_token(token)
+        user_id = payload.get("sub")
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user or user.role != UserRole.ADMIN:
+            raise HTTPException(status_code=401, detail="No autorizado")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+    # Leer body con las versiones a eliminar
+    body = await request.json()
+    versions_to_delete = body.get("versions", [])
+
+    if not versions_to_delete or not isinstance(versions_to_delete, list):
+        raise HTTPException(status_code=400, detail="Se requiere una lista de versiones a eliminar")
+
+    # Obtener la versión latest para protegerla
+    try:
+        s3_service = S3UpdateService()
+        latest_metadata = s3_service.get_msi_metadata()
+        latest_version = latest_metadata.get('version', '')
+    except Exception:
+        raise HTTPException(status_code=503, detail="No se puede determinar la versión latest")
+
+    # Obtener versiones pineadas por organizaciones
+    pinned_versions = set()
+    orgs_with_pins = db.query(Organization).filter(
+        Organization.target_version.isnot(None),
+        Organization.target_version != ''
+    ).all()
+    for org in orgs_with_pins:
+        if org.target_version:
+            pinned_versions.add(org.target_version)
+
+    # Procesar eliminaciones
+    deleted = []
+    skipped = []
+
+    for version in versions_to_delete:
+        version = version.strip()
+        if not version:
+            continue
+
+        # No permitir eliminar la versión latest
+        if version == latest_version:
+            skipped.append({"version": version, "reason": "Es la versión latest actual"})
+            continue
+
+        # No permitir eliminar versiones pineadas
+        if version in pinned_versions:
+            orgs_using = [org.name for org in orgs_with_pins if org.target_version == version]
+            skipped.append({
+                "version": version,
+                "reason": f"Pineada por: {', '.join(orgs_using)}"
+            })
+            continue
+
+        # Intentar eliminar
+        try:
+            result = s3_service.delete_version(version)
+            if result:
+                deleted.append(version)
+            else:
+                skipped.append({"version": version, "reason": "No se encontraron objetos en S3"})
+        except ClientError as e:
+            logger.error("Error al eliminar versión %s: %s", version, str(e))
+            skipped.append({"version": version, "reason": f"Error de S3: {str(e)}"})
+
+    logger.info(
+        "Eliminación de versiones completada: usuario=%s, eliminadas=%d, omitidas=%d",
+        user.email if user else "desconocido",
+        len(deleted),
+        len(skipped),
+    )
+
+    return {
+        "deleted": deleted,
+        "skipped": skipped,
+        "total_deleted": len(deleted),
+        "total_skipped": len(skipped),
+    }
+
+
 def _identify_workstation(request: Request, db: Session) -> Workstation:
     """
     Identifica la workstation que realiza la solicitud.
