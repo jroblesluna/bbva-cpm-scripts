@@ -133,8 +133,9 @@ class S3UpdateService:
                         logger.warning("No se pudo leer metadata de versión: %s", version_str)
                         continue
 
-            # Ordenar por versión descendente (más reciente primero)
-            versions.sort(key=lambda v: v['version'], reverse=True)
+            # Ordenar por fecha de build descendente (más reciente primero)
+            # Si build_date no está disponible, usar versión como fallback
+            versions.sort(key=lambda v: v.get('build_date', '') or '', reverse=True)
             logger.info("Versiones encontradas: %d", len(versions))
 
         except ClientError as e:

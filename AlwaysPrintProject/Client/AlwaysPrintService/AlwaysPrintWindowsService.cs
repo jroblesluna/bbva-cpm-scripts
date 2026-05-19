@@ -40,11 +40,9 @@ namespace AlwaysPrintService
         private CancellationTokenSource _cts = new CancellationTokenSource();
         
         // Ruta del archivo de configuración de acciones.
-        // Se usa ProgramData para que tanto el Tray (usuario normal) como el Service (LocalSystem)
-        // puedan acceder al mismo archivo sin problemas de permisos.
-        private string ConfigFilePath => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-            "Robles.AI", "AlwaysPrint", "active.alwaysconfig");
+        // Se usa ProgramData para que tanto el Tray (usuario normal, solo lectura) como el
+        // Service (LocalSystem, lectura/escritura) puedan acceder al mismo archivo.
+        private string ConfigFilePath => PipeConstants.ActionConfigFilePath;
 
         private new const bool CanHandleSessionChangeEvent = true;
 
@@ -198,6 +196,9 @@ namespace AlwaysPrintService
 
                 // 3. Asegurar valores por defecto en registro.
                 _registry.EnsureDefaults();
+
+                // 3.2. Asegurar que el directorio de configuración de acciones existe.
+                EnsureActionConfigDirectory();
 
                 // 3.5. Cargar configuración de acciones si existe.
                 LoadActionConfiguration();
@@ -383,6 +384,29 @@ namespace AlwaysPrintService
         
         // ── Gestión de Configuración de Acciones ────────────────────────────────
         
+        /// <summary>
+        /// Asegura que el directorio de configuración de acciones existe.
+        /// Se ejecuta al inicio del servicio para que esté disponible antes de
+        /// cualquier escritura o lectura.
+        /// </summary>
+        private void EnsureActionConfigDirectory()
+        {
+            try
+            {
+                string configDir = PipeConstants.ActionConfigDirectory;
+                if (!Directory.Exists(configDir))
+                {
+                    Directory.CreateDirectory(configDir);
+                    AlwaysPrintLogger.WriteInfo($"Directorio de configuración de acciones creado: {configDir}");
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"Error creando directorio de configuración de acciones: {ex.Message}", ex);
+            }
+        }
+
         /// <summary>
         /// Carga la configuración de acciones desde el archivo active.alwaysconfig.
         /// </summary>

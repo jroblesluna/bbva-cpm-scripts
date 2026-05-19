@@ -29,6 +29,7 @@ namespace AlwaysPrint.Shared.Messages
         
         // Configuración de Acciones
         ActionConfigChanged,         // Tray → Service: nueva configuración de acciones descargada
+        SaveActionConfig,            // Tray → Service: guardar contenido de config en disco
 
         // Actualizaciones automáticas
         InstallUpdate,               // Tray → Service: solicitar instalación de MSI

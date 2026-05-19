@@ -187,6 +187,24 @@ namespace AlwaysPrint.Shared.Messages
         public bool UsingCachedConfig { get; set; }
     }
 
+    // ── Configuración de Acciones ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Payload enviado del Tray al Service para que persista la configuración
+    /// de acciones en disco (C:\ProgramData\AlwaysPrint\config\active.alwaysconfig).
+    /// El Tray descarga el JSON de la Cloud y lo envía al Service porque solo
+    /// LocalSystem tiene permisos de escritura en ProgramData.
+    /// </summary>
+    public class SaveActionConfigPayload
+    {
+        [JsonProperty("configJson")]
+        public string ConfigJson { get; set; } = string.Empty;
+
+        /// <summary>Hash SHA256 (8 chars) para verificación de integridad.</summary>
+        [JsonProperty("hash")]
+        public string Hash { get; set; } = string.Empty;
+    }
+
     // ── Actualizaciones automáticas ─────────────────────────────────────────────
 
     /// <summary>

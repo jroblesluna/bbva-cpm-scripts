@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Text;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
@@ -53,6 +55,7 @@ namespace AlwaysPrintService.Pipe
                     MessageType.CheckServiceStatus          => HandleCheckServiceStatus(request),
                     MessageType.CloudConfigurationReceived  => HandleCloudConfigurationReceived(request),
                     MessageType.ActionConfigChanged         => HandleActionConfigChanged(request),
+                    MessageType.SaveActionConfig            => HandleSaveActionConfig(request),
                     MessageType.InstallUpdate               => HandleInstallUpdate(request),
                     _ => PipeMessage.Reply(request, MessageType.Error,
                             new ErrorPayload { Code = "UNKNOWN_TYPE", Message = $"Unknown message type: {request.Type}" })
@@ -192,6 +195,108 @@ namespace AlwaysPrintService.Pipe
             var handler = new UpdateInstallHandler();
             var result = handler.Execute(payload.MsiFilePath);
             return PipeMessage.Reply(req, MessageType.InstallUpdateResponse, result);
+        }
+
+        /// <summary>
+        /// Maneja la solicitud del Tray para guardar la configuración de acciones en disco.
+        /// Escribe atómicamente (tmp + rename) en C:\ProgramData\AlwaysPrint\config\active.alwaysconfig
+        /// y luego dispara la recarga de configuración.
+        /// </summary>
+        private PipeMessage HandleSaveActionConfig(PipeMessage req)
+        {
+            try
+            {
+                AlwaysPrintLogger.WriteInfo(
+                    "SaveActionConfig: solicitud de escritura de configuración recibida del Tray",
+                    AlwaysPrintLogger.EvtConfigSaved);
+
+                var payload = req.GetPayload<SaveActionConfigPayload>();
+                if (payload == null)
+                {
+                    AlwaysPrintLogger.WriteError(
+                        "SaveActionConfig: payload ausente o inválido",
+                        AlwaysPrintLogger.EvtGenericError);
+                    return PipeMessage.Reply(req, MessageType.Error,
+                        new ErrorPayload { Code = "INVALID_PAYLOAD", Message = "SaveActionConfigPayload ausente." });
+                }
+
+                string configDir = PipeConstants.ActionConfigDirectory;
+                string configFilePath = PipeConstants.ActionConfigFilePath;
+
+                // Asegurar que el directorio existe
+                if (!Directory.Exists(configDir))
+                {
+                    Directory.CreateDirectory(configDir);
+                    AlwaysPrintLogger.WriteInfo($"SaveActionConfig: directorio creado: {configDir}");
+                }
+
+                // Si el contenido está vacío, eliminar el archivo (config desactivada en Cloud)
+                if (string.IsNullOrEmpty(payload.ConfigJson))
+                {
+                    if (File.Exists(configFilePath))
+                    {
+                        File.Delete(configFilePath);
+                        AlwaysPrintLogger.WriteInfo("SaveActionConfig: archivo de configuración eliminado (config vacía)");
+                    }
+
+                    // Disparar recarga para que el ActionEngine limpie su estado
+                    TriggerReloadActionConfig();
+
+                    return PipeMessage.Reply(req, MessageType.Ack,
+                        new AckPayload { Success = true, Message = "Configuración eliminada." });
+                }
+
+                // Escritura atómica: escribir en .tmp y luego renombrar
+                string tempPath = configFilePath + ".tmp";
+                File.WriteAllText(tempPath, payload.ConfigJson, Encoding.UTF8);
+
+                // Reemplazar archivo activo
+                if (File.Exists(configFilePath))
+                    File.Delete(configFilePath);
+
+                File.Move(tempPath, configFilePath);
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"SaveActionConfig: configuración guardada exitosamente. Hash={payload.Hash}, Path={configFilePath}",
+                    AlwaysPrintLogger.EvtConfigSaved);
+
+                // Disparar recarga de configuración (equivalente a ActionConfigChanged)
+                TriggerReloadActionConfig();
+
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = true, Message = "Configuración guardada y recarga iniciada." });
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"SaveActionConfig: error al guardar configuración: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = $"Error al guardar: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Encola la tarea de recarga de configuración de acciones.
+        /// Reutilizado por HandleSaveActionConfig y HandleActionConfigChanged.
+        /// </summary>
+        private void TriggerReloadActionConfig()
+        {
+            if (_reloadActionConfigCallback == null)
+            {
+                AlwaysPrintLogger.WriteWarning(
+                    "TriggerReloadActionConfig: callback no configurado",
+                    AlwaysPrintLogger.EvtGenericWarning);
+                return;
+            }
+
+            var task = new ReloadActionConfigTask(_reloadActionConfigCallback);
+            bool queued = _taskQueue.Enqueue(task);
+
+            if (queued)
+                AlwaysPrintLogger.WriteInfo("TriggerReloadActionConfig: tarea de recarga encolada");
+            else
+                AlwaysPrintLogger.WriteWarning("TriggerReloadActionConfig: cola llena, no se pudo encolar");
         }
 
         private PipeMessage HandleActionConfigChanged(PipeMessage req)

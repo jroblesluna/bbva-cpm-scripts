@@ -15,6 +15,8 @@ namespace AlwaysPrintTray.Cloud
     /// <summary>
     /// Gestiona la descarga y verificación de archivos de configuración de acciones
     /// desde el servidor Cloud.
+    /// La escritura del archivo se delega al Service vía Named Pipe (el Tray no tiene
+    /// permisos de escritura en ProgramData).
     /// </summary>
     public class ConfigManager
     {
@@ -22,22 +24,17 @@ namespace AlwaysPrintTray.Cloud
         private readonly PipeClient _pipeClient;
         private readonly string _configFilePath;
         
+        /// <summary>Timeout en milisegundos para esperar respuesta del Service al guardar config.</summary>
+        private const int SaveConfigTimeoutMs = 10_000;
+        
         public ConfigManager(HttpClient httpClient, PipeClient pipeClient)
         {
             _httpClient = httpClient;
             _pipeClient = pipeClient;
             
-            // Ruta donde se guarda la configuración activa.
-            // Se usa ProgramData porque el Tray corre como usuario normal y no puede
-            // escribir en Program Files. El Service (LocalSystem) también puede leer desde aquí.
-            string configDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                "Robles.AI", "AlwaysPrint");
-            
-            if (!Directory.Exists(configDir))
-                Directory.CreateDirectory(configDir);
-            
-            _configFilePath = Path.Combine(configDir, "active.alwaysconfig");
+            // Ruta donde el Service guarda la configuración activa.
+            // El Tray solo lee desde aquí; la escritura la hace el Service (LocalSystem).
+            _configFilePath = PipeConstants.ActionConfigFilePath;
         }
         
         // ═══════════════════════════════════════════════════════════════════════
@@ -61,12 +58,11 @@ namespace AlwaysPrintTray.Cloud
                 {
                     AlwaysPrintLogger.WriteInfo("ConfigManager: no hay configuración activa en Cloud");
                     
-                    // Si no hay config en Cloud pero existe local, eliminarla
+                    // Si no hay config en Cloud pero existe local, eliminarla vía Service
                     if (File.Exists(_configFilePath))
                     {
-                        AlwaysPrintLogger.WriteInfo("ConfigManager: eliminando configuración local obsoleta");
-                        File.Delete(_configFilePath);
-                        NotifyServiceConfigChanged();
+                        AlwaysPrintLogger.WriteInfo("ConfigManager: eliminando configuración local obsoleta vía Service");
+                        SendSaveActionConfigToService("", "");
                     }
                     
                     return true;
@@ -84,33 +80,16 @@ namespace AlwaysPrintTray.Cloud
                 // 3. Descargar nueva configuración
                 AlwaysPrintLogger.WriteInfo($"ConfigManager: descargando nueva configuración (hash: {cloudConfigInfo.Hash})");
                 
-                bool downloaded = await DownloadConfigAsync(cloudApiUrl, workstationId, apiKey, cloudConfigInfo.DownloadUrl);
+                bool downloaded = await DownloadConfigAsync(cloudApiUrl, workstationId, apiKey, cloudConfigInfo.DownloadUrl, cloudConfigInfo.Hash);
                 
                 if (downloaded)
                 {
-                    AlwaysPrintLogger.WriteInfo("ConfigManager: configuración descargada exitosamente");
-                    
-                    // Verificar hash del archivo descargado
-                    string? downloadedHash = GetLocalConfigHash();
-                    
-                    if (downloadedHash != null && downloadedHash.Equals(cloudConfigInfo.Hash, StringComparison.OrdinalIgnoreCase))
-                    {
-                        AlwaysPrintLogger.WriteInfo("ConfigManager: hash verificado correctamente");
-                        
-                        // Notificar al Service que hay nueva configuración
-                        NotifyServiceConfigChanged();
-                        
-                        return true;
-                    }
-                    else
-                    {
-                        AlwaysPrintLogger.WriteError($"ConfigManager: hash no coincide. Esperado: {cloudConfigInfo.Hash}, Obtenido: {downloadedHash}");
-                        return false;
-                    }
+                    AlwaysPrintLogger.WriteInfo("ConfigManager: configuración descargada y guardada exitosamente");
+                    return true;
                 }
                 else
                 {
-                    AlwaysPrintLogger.WriteError("ConfigManager: error descargando configuración");
+                    AlwaysPrintLogger.WriteError("ConfigManager: error descargando/guardando configuración");
                     return false;
                 }
             }
@@ -169,7 +148,7 @@ namespace AlwaysPrintTray.Cloud
         // DESCARGA
         // ═══════════════════════════════════════════════════════════════════════
         
-        private async Task<bool> DownloadConfigAsync(string cloudApiUrl, string workstationId, string apiKey, string downloadUrl)
+        private async Task<bool> DownloadConfigAsync(string cloudApiUrl, string workstationId, string apiKey, string downloadUrl, string expectedHash)
         {
             try
             {
@@ -183,25 +162,98 @@ namespace AlwaysPrintTray.Cloud
                 
                 string configJson = await response.Content.ReadAsStringAsync();
                 
-                // Guardar en archivo temporal primero
-                string tempPath = _configFilePath + ".tmp";
-                File.WriteAllText(tempPath, configJson, Encoding.UTF8);
+                // Verificar hash del contenido descargado antes de enviar al Service
+                string downloadedHash = CalculateHash(configJson);
                 
-                // Reemplazar archivo activo
-                if (File.Exists(_configFilePath))
+                if (!downloadedHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
                 {
-                    File.Delete(_configFilePath);
+                    AlwaysPrintLogger.WriteError(
+                        $"ConfigManager: hash no coincide. Esperado: {expectedHash}, Obtenido: {downloadedHash}");
+                    return false;
                 }
                 
-                File.Move(tempPath, _configFilePath);
+                AlwaysPrintLogger.WriteInfo("ConfigManager: hash verificado correctamente");
                 
-                AlwaysPrintLogger.WriteInfo($"ConfigManager: configuración guardada en {_configFilePath}");
+                // Enviar contenido al Service para que lo persista en disco
+                bool saved = SendSaveActionConfigToService(configJson, downloadedHash);
                 
+                if (!saved)
+                {
+                    AlwaysPrintLogger.WriteError("ConfigManager: el Service no pudo guardar la configuración");
+                    return false;
+                }
+                
+                AlwaysPrintLogger.WriteInfo($"ConfigManager: configuración guardada por el Service en {_configFilePath}");
                 return true;
             }
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteError($"ConfigManager: error descargando configuración: {ex.Message}", ex);
+                return false;
+            }
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════════
+        // COMUNICACIÓN CON EL SERVICE VÍA NAMED PIPE
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        /// <summary>
+        /// Envía el contenido de la configuración al Service para que lo persista en disco.
+        /// El Service escribe atómicamente (tmp + rename) y luego recarga la configuración.
+        /// </summary>
+        /// <param name="configJson">Contenido JSON de la configuración. Vacío para eliminar.</param>
+        /// <param name="hash">Hash SHA256 (8 chars) para verificación de integridad.</param>
+        /// <returns>true si el Service confirmó la escritura exitosa.</returns>
+        private bool SendSaveActionConfigToService(string configJson, string hash)
+        {
+            try
+            {
+                if (!_pipeClient.IsConnected)
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        "ConfigManager: pipe no conectado, no se puede enviar configuración al Service");
+                    return false;
+                }
+                
+                var payload = new SaveActionConfigPayload
+                {
+                    ConfigJson = configJson,
+                    Hash = hash
+                };
+                
+                var message = PipeMessage.Create(MessageType.SaveActionConfig, payload);
+                var response = _pipeClient.Send(message);
+                
+                if (response == null)
+                {
+                    AlwaysPrintLogger.WriteError("ConfigManager: no se recibió respuesta del Service (timeout o desconexión)");
+                    return false;
+                }
+                
+                if (response.Type == MessageType.Error)
+                {
+                    var error = response.GetPayload<ErrorPayload>();
+                    AlwaysPrintLogger.WriteError(
+                        $"ConfigManager: Service retornó error al guardar config: [{error?.Code}] {error?.Message}");
+                    return false;
+                }
+                
+                var ack = response.GetPayload<AckPayload>();
+                if (ack?.Success == true)
+                {
+                    AlwaysPrintLogger.WriteInfo($"ConfigManager: Service confirmó escritura exitosa. {ack.Message}");
+                    return true;
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        $"ConfigManager: Service reportó fallo al guardar: {ack?.Message}");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"ConfigManager: error enviando config al Service: {ex.Message}", ex);
                 return false;
             }
         }
@@ -244,38 +296,6 @@ namespace AlwaysPrintTray.Cloud
                 // Convertir a hexadecimal y tomar primeros 8 caracteres
                 string fullHash = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
                 return fullHash.Substring(0, 8);
-            }
-        }
-        
-        // ═══════════════════════════════════════════════════════════════════════
-        // NOTIFICACIÓN AL SERVICE
-        // ═══════════════════════════════════════════════════════════════════════
-        
-        /// <summary>
-        /// Notifica al Service que hay una nueva configuración disponible.
-        /// El Service debe recargar la configuración y ejecutar el trigger OnConfigChange.
-        /// </summary>
-        private void NotifyServiceConfigChanged()
-        {
-            try
-            {
-                AlwaysPrintLogger.WriteInfo("ConfigManager: notificando al Service sobre cambio de configuración");
-                
-                if (!_pipeClient.IsConnected)
-                {
-                    AlwaysPrintLogger.WriteWarning("ConfigManager: pipe no conectado, no se puede notificar al Service");
-                    return;
-                }
-                
-                // Enviar mensaje al Service vía Named Pipe
-                var message = PipeMessage.Create(MessageType.ActionConfigChanged, null);
-                _pipeClient.Send(message);
-                
-                AlwaysPrintLogger.WriteInfo("ConfigManager: notificación enviada al Service");
-            }
-            catch (Exception ex)
-            {
-                AlwaysPrintLogger.WriteWarning($"ConfigManager: error notificando al Service: {ex.Message}");
             }
         }
         

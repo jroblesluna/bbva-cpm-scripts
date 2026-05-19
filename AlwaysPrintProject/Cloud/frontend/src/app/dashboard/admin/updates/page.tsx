@@ -551,6 +551,16 @@ export default function UpdatesPage() {
                     </div>
                   </div>
                 </div>
+                <div className="mt-4 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownloadVersion(msiInfo.version)}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Descargar MSI ({msiInfo.version})
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}
