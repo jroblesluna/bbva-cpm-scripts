@@ -11,6 +11,7 @@ Esta migración:
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 # Identificadores de revisión utilizados por Alembic
 revision: str = '004_add_devices_table'
@@ -24,9 +25,9 @@ def upgrade() -> None:
     # Crear tabla de dispositivos
     op.create_table(
         'devices',
-        sa.Column('id', sa.String(36), primary_key=True),
-        sa.Column('organization_id', sa.String(36), sa.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('vlan_id', sa.String(36), sa.ForeignKey('vlans.id', ondelete='SET NULL'), nullable=True),
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column('organization_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=False),
+        sa.Column('vlan_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('vlans.id', ondelete='SET NULL'), nullable=True),
         sa.Column('name', sa.String(255), nullable=False),
         sa.Column('ip_address', sa.String(45), nullable=False),
         sa.Column('description', sa.String(1000), nullable=True),
@@ -34,14 +35,14 @@ def upgrade() -> None:
         sa.Column('location', sa.String(500), nullable=True),
         sa.Column('port', sa.Integer(), nullable=False, server_default='9100'),
         sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('created_at', sa.DateTime(), nullable=False),
-        sa.Column('updated_at', sa.DateTime(), nullable=False),
+        sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
+        sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
     )
     
     # Agregar columna de impresora predeterminada a workstations
     op.add_column(
         'workstations',
-        sa.Column('default_printer_id', sa.String(36), sa.ForeignKey('devices.id', ondelete='SET NULL'), nullable=True)
+        sa.Column('default_printer_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('devices.id', ondelete='SET NULL'), nullable=True)
     )
 
 
