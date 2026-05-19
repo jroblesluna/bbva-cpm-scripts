@@ -321,15 +321,15 @@ export default function VLANsPage() {
 
               {/* Fila 3: Acciones */}
               <div className="flex flex-wrap gap-1 pt-2 border-t border-gray-100 items-center">
-                <label className="flex items-center gap-1 mr-2 cursor-pointer" title="Contingencia forzada">
-                  <AlertTriangle className={`w-4 h-4 ${vlan.forced_contingency ? 'text-orange-600' : 'text-gray-400'}`} />
-                  <input
-                    type="checkbox"
-                    checked={vlan.forced_contingency}
-                    onChange={(e) => handleToggleForcedContingency(vlan, e.target.checked)}
-                    className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                  />
-                </label>
+                <Button
+                  variant={vlan.forced_contingency ? 'destructive' : 'ghost'}
+                  size="sm"
+                  onClick={() => handleToggleForcedContingency(vlan, !vlan.forced_contingency)}
+                  title={vlan.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+                  className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}`}
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -409,14 +409,15 @@ export default function VLANsPage() {
                     </td>
                     <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex flex-wrap gap-1 justify-end items-center">
-                        <label className="flex items-center cursor-pointer mr-1" title="Contingencia forzada">
-                          <input
-                            type="checkbox"
-                            checked={vlan.forced_contingency}
-                            onChange={(e) => handleToggleForcedContingency(vlan, e.target.checked)}
-                            className="rounded border-gray-300 text-orange-600 focus:ring-orange-500 h-3.5 w-3.5"
-                          />
-                        </label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleForcedContingency(vlan, !vlan.forced_contingency)}
+                          title={vlan.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+                          className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : ''}`}
+                        >
+                          <AlertTriangle className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleViewDevices(vlan)} title={t('viewDevices')} className="h-8 w-8 p-0">
                           <Printer className="h-4 w-4" />
                         </Button>

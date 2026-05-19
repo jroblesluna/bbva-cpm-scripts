@@ -624,17 +624,17 @@ function WorkstationCard({
 
           {/* Acciones: visibles en desktop en la misma fila */}
           <div className="hidden md:flex items-center flex-wrap gap-1">
-            {/* Switch de contingencia forzada */}
-            <label className="flex items-center gap-1 mr-2 cursor-pointer" title="Contingencia forzada">
-              <AlertTriangle className={`w-4 h-4 ${workstation.forced_contingency ? 'text-orange-600' : 'text-gray-400'}`} />
-              <input
-                type="checkbox"
-                checked={workstation.forced_contingency}
-                onChange={(e) => onToggleForcedContingency(e.target.checked)}
-                disabled={isForcedContingencyPending}
-                className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-              />
-            </label>
+            {/* Botón de contingencia forzada */}
+            <Button
+              variant={workstation.forced_contingency ? 'destructive' : 'outline'}
+              size="sm"
+              onClick={() => onToggleForcedContingency(!workstation.forced_contingency)}
+              disabled={isForcedContingencyPending}
+              title={workstation.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+              className={workstation.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
+            >
+              <AlertTriangle className="w-4 h-4" />
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -964,15 +964,16 @@ function WorkstationTable({
                   {/* Acciones */}
                   <td className="px-3 py-3 whitespace-nowrap">
                     <div className="flex items-center gap-1">
-                      <label className="flex items-center cursor-pointer" title="Contingencia forzada">
-                        <input
-                          type="checkbox"
-                          checked={ws.forced_contingency}
-                          onChange={(e) => onToggleForcedContingency(ws.id, e.target.checked)}
-                          disabled={isForcedContingencyPending}
-                          className="rounded border-gray-300 text-orange-600 focus:ring-orange-500 h-3.5 w-3.5"
-                        />
-                      </label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onToggleForcedContingency(ws.id, !ws.forced_contingency)}
+                        disabled={isForcedContingencyPending}
+                        title={ws.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+                        className={`h-7 w-7 p-0 ${ws.forced_contingency ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : ''}`}
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"

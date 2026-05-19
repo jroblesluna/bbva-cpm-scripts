@@ -311,16 +311,17 @@ export default function AccountsPage() {
                   </div>
 
                   <div className="flex items-center gap-2 sm:ml-4 shrink-0 self-end sm:self-start">
-                    <label className="flex items-center gap-1 cursor-pointer" title="Contingencia forzada">
-                      <AlertTriangle className={`w-4 h-4 ${account.forced_contingency ? 'text-orange-600' : 'text-gray-400'}`} />
-                      <input
-                        type="checkbox"
-                        checked={account.forced_contingency}
-                        onChange={(e) => forcedContingencyMutation.mutate({ id: account.id, enabled: e.target.checked })}
-                        disabled={forcedContingencyMutation.isPending}
-                        className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                      />
-                    </label>
+                    <Button
+                      variant={account.forced_contingency ? 'destructive' : 'outline'}
+                      size="sm"
+                      onClick={() => forcedContingencyMutation.mutate({ id: account.id, enabled: !account.forced_contingency })}
+                      disabled={forcedContingencyMutation.isPending}
+                      title={account.forced_contingency ? 'Desactivar contingencia forzada' : 'Activar contingencia forzada'}
+                      className={account.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
+                    >
+                      <AlertTriangle className="w-4 h-4 mr-1" />
+                      <span className="hidden sm:inline">{account.forced_contingency ? 'Contingencia ON' : 'Contingencia'}</span>
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
