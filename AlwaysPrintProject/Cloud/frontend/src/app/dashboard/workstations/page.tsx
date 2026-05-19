@@ -455,21 +455,26 @@ export default function WorkstationsPage() {
       </Card>
 
       {editingWorkstation && (
-        <Card className="mb-6 border-amber-200 bg-amber-50">
-          <CardHeader>
-            <CardTitle>{t('editTitle', { ip: editingWorkstation.ip_private })}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <WorkstationForm
-              workstation={editingWorkstation}
-              accounts={accounts || []}
-              onSubmit={(data) => updateMutation.mutate({ id: editingWorkstation.id, data })}
-              onCancel={() => setEditingWorkstation(null)}
-              isLoading={updateMutation.isPending}
-              error={updateMutation.error?.message}
-            />
-          </CardContent>
-        </Card>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{ zIndex: -999 }}>
+          <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>{t('editTitle', { ip: editingWorkstation.ip_private })}</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setEditingWorkstation(null)}>
+                <XCircle className="w-5 h-5" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <WorkstationForm
+                workstation={editingWorkstation}
+                accounts={accounts || []}
+                onSubmit={(data) => updateMutation.mutate({ id: editingWorkstation.id, data })}
+                onCancel={() => setEditingWorkstation(null)}
+                isLoading={updateMutation.isPending}
+                error={updateMutation.error?.message}
+              />
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Contenido principal: vista de tarjetas o tabla */}
