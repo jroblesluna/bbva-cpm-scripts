@@ -577,6 +577,7 @@ def list_workstations(
     workstations = (
         base_query
         .options(joinedload(Workstation.organization))
+        .options(joinedload(Workstation.vlan))
         .offset(offset)
         .limit(page_size)
         .all()
@@ -730,7 +731,7 @@ def get_workstation(
     """
     from sqlalchemy.orm import joinedload
     
-    workstation = db.query(Workstation).options(joinedload(Workstation.organization)).filter(Workstation.id == workstation_id).first()
+    workstation = db.query(Workstation).options(joinedload(Workstation.organization)).options(joinedload(Workstation.vlan)).filter(Workstation.id == workstation_id).first()
     
     if not workstation:
         raise HTTPException(

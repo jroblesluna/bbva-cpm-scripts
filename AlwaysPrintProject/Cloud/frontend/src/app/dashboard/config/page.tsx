@@ -13,7 +13,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { apiClient } from '@/lib/api';
+import { apiClient, organizationsApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
@@ -30,10 +30,14 @@ import {
   AlertCircle,
   Building2,
   Globe,
+  RefreshCw,
+  Pin,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { ConnectivityCheckEditor } from '@/components/ConnectivityCheckEditor';
 import { LocaleSelector } from '@/components/LocaleSelector';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import type {
   GlobalConfig,
   GlobalConfigUpdate,
@@ -74,6 +78,13 @@ export default function ConfigPage() {
   const [connectivityChecks, setConnectivityChecks] = useState<ConnectivityCheck[]>([]);
   const [locale, setLocale] = useState('');
 
+  // Estado de auto-actualización por organización
+  const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(false);
+  const [targetVersion, setTargetVersion] = useState<string | null>(null);
+  const [autoReregisterEnabled, setAutoReregisterEnabled] = useState(false);
+  const [togglingAutoUpdate, setTogglingAutoUpdate] = useState(false);
+  const [availableVersions, setAvailableVersions] = useState<Array<{ version: string }>>([]);
+
   // Obtener nombre de la organización seleccionada para placeholders
   const getSelectedAccountName = (): string => {
     if (user?.role === 'admin' && selectedOrgId) {
@@ -102,8 +113,46 @@ export default function ConfigPage() {
   useEffect(() => {
     if (user?.role === 'admin' && selectedOrgId) {
       loadConfig();
+      loadOrgUpdateState(selectedOrgId);
     }
   }, [selectedOrgId]);
+
+  // Cargar versiones disponibles (para selector de versión pineada)
+  useEffect(() => {
+    const loadVersions = async () => {
+      try {
+        const response = await apiClient.get('/updates/versions');
+        setAvailableVersions(
+          (response.data || []).map((v: { version: string }) => ({ version: v.version }))
+        );
+      } catch {
+        setAvailableVersions([]);
+      }
+    };
+    if (user?.role === 'admin') {
+      loadVersions();
+    }
+  }, [user?.role]);
+
+  const loadOrgUpdateState = async (orgId: string) => {
+    try {
+      const acc = await organizationsApi.get(orgId);
+      setAutoUpdateEnabled(acc.auto_update_enabled ?? false);
+      setTargetVersion(acc.target_version ?? null);
+      setAutoReregisterEnabled(acc.auto_reregister_enabled ?? false);
+    } catch {
+      setAutoUpdateEnabled(false);
+      setTargetVersion(null);
+      setAutoReregisterEnabled(false);
+    }
+  };
+
+  // Para operadores, cargar su propio estado de auto-update
+  useEffect(() => {
+    if (user?.role === 'operator' && user?.organization_id) {
+      loadOrgUpdateState(user.organization_id);
+    }
+  }, [user]);
 
   const loadAccounts = async () => {
     try {
@@ -288,6 +337,53 @@ export default function ConfigPage() {
   const addSearchIp = () => {
     setSearchIps([...searchIps, '']);
     setHasChanges(true);
+  };
+
+  // === Handlers de auto-actualización ===
+
+  const handleAutoUpdateToggle = async (enabled: boolean) => {
+    const orgId = user?.role === 'admin' ? selectedOrgId : user?.organization_id;
+    if (!orgId) return;
+
+    setTogglingAutoUpdate(true);
+    try {
+      await apiClient.patch(`/organizations/${orgId}/auto-update`, { enabled });
+      setAutoUpdateEnabled(enabled);
+    } catch {
+      // Revertir en caso de error
+    } finally {
+      setTogglingAutoUpdate(false);
+    }
+  };
+
+  const handleReregisterToggle = async (enabled: boolean) => {
+    const orgId = user?.role === 'admin' ? selectedOrgId : user?.organization_id;
+    if (!orgId) return;
+
+    setTogglingAutoUpdate(true);
+    try {
+      await apiClient.put(`/organizations/${orgId}`, { auto_reregister_enabled: enabled });
+      setAutoReregisterEnabled(enabled);
+    } catch {
+      // Revertir en caso de error
+    } finally {
+      setTogglingAutoUpdate(false);
+    }
+  };
+
+  const handlePinVersion = async (version: string | null) => {
+    const orgId = user?.role === 'admin' ? selectedOrgId : user?.organization_id;
+    if (!orgId) return;
+
+    setTogglingAutoUpdate(true);
+    try {
+      await apiClient.put(`/updates/pin/${orgId}`, { version });
+      setTargetVersion(version);
+    } catch {
+      // Revertir en caso de error
+    } finally {
+      setTogglingAutoUpdate(false);
+    }
   };
 
   const removeSearchIp = (index: number) => {
@@ -641,6 +737,75 @@ export default function ConfigPage() {
                 <div>
                   <h3 className="text-sm font-medium text-yellow-900">{t('noConfigTitle')}</h3>
                   <p className="mt-1 text-sm text-yellow-700">{t('noConfigMsg')}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Sección de Actualizaciones y Re-registro por Organización */}
+          {(selectedOrgId || user?.role !== 'admin') && (
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-6 space-y-5">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">{t('updatesTitle')}</h3>
+                  <p className="text-sm text-gray-600 mt-1">{t('updatesDesc')}</p>
+                </div>
+
+                {/* Toggle de auto-actualización */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <Label className="text-sm font-medium">{t('autoUpdateLabel')}</Label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {autoUpdateEnabled ? t('autoUpdateEnabledDesc') : t('autoUpdateDisabledDesc')}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={autoUpdateEnabled}
+                    onCheckedChange={handleAutoUpdateToggle}
+                    disabled={togglingAutoUpdate}
+                  />
+                </div>
+
+                {/* Selector de versión pineada */}
+                <div className="flex items-center gap-3 p-4 border rounded-lg">
+                  <Pin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                  <div className="flex items-center gap-2 flex-1">
+                    <span className="text-sm text-gray-700">{t('pinnedVersionLabel')}</span>
+                    <select
+                      className="text-sm border rounded px-2 py-1 bg-white"
+                      value={targetVersion ?? ''}
+                      onChange={(e) => handlePinVersion(e.target.value || null)}
+                      disabled={togglingAutoUpdate}
+                    >
+                      <option value="">{t('pinnedVersionLatest')}</option>
+                      {availableVersions.map((v) => (
+                        <option key={v.version} value={v.version}>{v.version}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Explicación contextual */}
+                {autoUpdateEnabled && targetVersion && (
+                  <p className="text-xs text-amber-600 px-4">{t('pinnedVersionNote', { version: targetVersion })}</p>
+                )}
+                {autoUpdateEnabled && !targetVersion && (
+                  <p className="text-xs text-gray-500 px-4">{t('latestVersionNote')}</p>
+                )}
+
+                {/* Toggle de re-registro automático */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <Label className="text-sm font-medium">{t('autoReregisterLabel')}</Label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {autoReregisterEnabled ? t('autoReregisterEnabledDesc') : t('autoReregisterDisabledDesc')}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={autoReregisterEnabled}
+                    onCheckedChange={handleReregisterToggle}
+                    disabled={togglingAutoUpdate}
+                  />
                 </div>
               </div>
             </div>

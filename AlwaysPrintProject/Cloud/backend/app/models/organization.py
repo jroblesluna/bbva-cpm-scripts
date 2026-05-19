@@ -102,6 +102,7 @@ class Organization(Base):
     telemetry_logs = relationship("TelemetryLog", back_populates="organization", cascade="all, delete-orphan")
     connectivity_results = relationship("ConnectivityResult", back_populates="organization", cascade="all, delete-orphan")
     action_configs = relationship("ActionConfig", back_populates="organization", cascade="all, delete-orphan")
+    devices = relationship("Device", back_populates="organization", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Organization(id={self.id}, name={self.name}, is_active={self.is_active})>"

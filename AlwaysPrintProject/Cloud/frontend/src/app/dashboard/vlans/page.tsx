@@ -18,9 +18,11 @@ import {
   Trash2,
   Monitor,
   X,
+  Printer,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 import type { VLAN, VLANCreate, VLANUpdate, VLANDetail } from '@/types/vlan'
+import type { Device } from '@/types/device'
 import { formatDateWithTimezone } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 import { CidrHealthBadge } from '@/components/vlans/CidrHealthBadge'
@@ -40,10 +42,13 @@ export default function VLANsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [selectedVlan, setSelectedVlan] = useState<VLAN | null>(null)
   const [vlanDetail, setVlanDetail] = useState<VLANDetail | null>(null)
+  const [showDevicesModal, setShowDevicesModal] = useState(false)
+  const [vlanDevices, setVlanDevices] = useState<Device[]>([])
+  const [devicesVlanName, setDevicesVlanName] = useState('')
 
   useEffect(() => {
     if (!user) return
-    if (user.role === 'admin') loadAccounts()
+    loadAccounts()
     loadVlans()
   }, [user, filterOrgId])
 
@@ -93,6 +98,17 @@ export default function VLANsPage() {
   const handleDelete = (vlan: VLAN) => {
     setSelectedVlan(vlan)
     setShowDeleteModal(true)
+  }
+
+  const handleViewDevices = async (vlan: VLAN) => {
+    try {
+      const response = await apiClient.get(`/devices/?vlan_id=${vlan.id}`)
+      setVlanDevices(response.data.devices || [])
+      setDevicesVlanName(vlan.name)
+      setShowDevicesModal(true)
+    } catch (error) {
+      console.error('Error cargando dispositivos:', error)
+    }
   }
 
   if (loading) {
@@ -211,6 +227,7 @@ export default function VLANsPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colName')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colOrganization')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colDescription')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colCidr')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colHealth')}</th>
@@ -226,6 +243,11 @@ export default function VLANsPage() {
                         <Network className="h-5 w-5 text-gray-400 mr-2" />
                         <span className="text-sm font-medium text-gray-900">{vlan.name}</span>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-600">
+                        {accounts.find((a) => a.id === vlan.organization_id)?.name || '-'}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-gray-500">{vlan.description || '-'}</span>
@@ -244,6 +266,9 @@ export default function VLANsPage() {
                       {formatDateWithTimezone(vlan.created_at, timezone)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <Button variant="ghost" size="sm" onClick={() => handleViewDevices(vlan)} title={t('viewDevices')}>
+                        <Printer className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="sm" onClick={() => handleEdit(vlan)}>
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -275,6 +300,13 @@ export default function VLANsPage() {
           vlan={selectedVlan}
           onClose={() => { setShowDeleteModal(false); setSelectedVlan(null) }}
           onSuccess={() => { setShowDeleteModal(false); setSelectedVlan(null); loadVlans() }}
+        />
+      )}
+      {showDevicesModal && (
+        <VLANDevicesModal
+          vlanName={devicesVlanName}
+          devices={vlanDevices}
+          onClose={() => { setShowDevicesModal(false); setVlanDevices([]) }}
         />
       )}
     </div>
@@ -506,6 +538,78 @@ function DeleteVLANModal({ vlan, onClose, onSuccess }: { vlan: VLAN; onClose: ()
             <Button onClick={handleDelete} disabled={loading} className="bg-red-600 hover:bg-red-700">
               {loading ? tCommon('deleting') : tCommon('delete')}
             </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function VLANDevicesModal({ vlanName, devices, onClose }: { vlanName: string; devices: Device[]; onClose: () => void }) {
+  const t = useTranslations('vlans')
+  const tCommon = useTranslations('common')
+  const tDevices = useTranslations('devices')
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900">
+              {t('devicesInVlan')} — {vlanName}
+            </h2>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          {devices.length === 0 ? (
+            <div className="text-center py-8">
+              <Printer className="mx-auto h-12 w-12 text-gray-400" />
+              <p className="mt-2 text-sm text-gray-500">{t('noDevices')}</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{tDevices('colName')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{tDevices('colIp')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{tDevices('colModel')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{tDevices('colLocation')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{tDevices('colStatus')}</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {devices.map((device) => (
+                    <tr key={device.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <Printer className="h-4 w-4 text-gray-400 mr-2" />
+                          <span className="text-sm font-medium text-gray-900">{device.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="text-sm font-mono text-gray-700">{device.ip_address}:{device.port}</span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="text-sm text-gray-500">{device.model || '-'}</span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="text-sm text-gray-500">{device.location || '-'}</span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <Badge variant={device.is_active ? 'default' : 'secondary'}>
+                          {device.is_active ? tDevices('statusActive') : tDevices('statusInactive')}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="flex justify-end mt-4">
+            <Button variant="outline" onClick={onClose}>{tCommon('close')}</Button>
           </div>
         </div>
       </div>

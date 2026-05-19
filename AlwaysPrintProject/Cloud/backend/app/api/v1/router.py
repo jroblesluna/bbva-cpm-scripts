@@ -21,6 +21,7 @@ from app.api.v1.endpoints import (
     action_config,
     organizations,
     updates,
+    devices,
 )
 
 # Router principal de la API v1
@@ -127,6 +128,13 @@ api_router.include_router(
 api_router.include_router(
     updates.router,
     tags=["Actualizaciones"]
+)
+
+# Dispositivos (impresoras)
+api_router.include_router(
+    devices.router,
+    prefix="/devices",
+    tags=["Dispositivos"]
 )
 
 

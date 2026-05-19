@@ -144,6 +144,14 @@ from app.schemas.action_config import (
     calculate_config_hash,
 )
 
+# === DEVICE SCHEMAS ===
+from app.schemas.device import (
+    DeviceCreate,
+    DeviceUpdate,
+    DeviceResponse,
+    DeviceListResponse,
+)
+
 # === UPDATE SCHEMAS ===
 from app.schemas.updates import (
     UpdateCheckResponse,
@@ -254,4 +262,9 @@ __all__ = [
     "calculate_config_hash",
     # Updates
     "UpdateCheckResponse",
+    # Device
+    "DeviceCreate",
+    "DeviceUpdate",
+    "DeviceResponse",
+    "DeviceListResponse",
 ]

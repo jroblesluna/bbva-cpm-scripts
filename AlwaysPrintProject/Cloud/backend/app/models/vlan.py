@@ -40,6 +40,7 @@ class VLAN(Base):
     # === RELACIONES ===
     organization = relationship("Organization", back_populates="vlans")
     workstations = relationship("Workstation", back_populates="vlan")
+    devices = relationship("Device", back_populates="vlan")
     vlan_config = relationship("VLANConfig", back_populates="vlan", uselist=False, cascade="all, delete-orphan")
     
     def __repr__(self):

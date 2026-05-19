@@ -605,7 +605,26 @@ function WorkstationForm({
     os_serial: workstation.os_serial || undefined,
     current_user: workstation.current_user || undefined,
     organization_id: workstation.organization_id || undefined,
+    default_printer_id: workstation.default_printer_id || undefined,
   });
+  const [availablePrinters, setAvailablePrinters] = useState<Array<{ id: string; name: string; ip_address: string }>>([]);
+
+  // Cargar impresoras disponibles en la VLAN de la workstation
+  useEffect(() => {
+    if (!workstation.vlan_id) {
+      setAvailablePrinters([]);
+      return;
+    }
+    const loadPrinters = async () => {
+      try {
+        const response = await workstationsApi.getVlanDevices(workstation.vlan_id as string);
+        setAvailablePrinters(response);
+      } catch (err) {
+        console.error('Error cargando impresoras:', err);
+      }
+    };
+    loadPrinters();
+  }, [workstation.vlan_id]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -681,6 +700,32 @@ function WorkstationForm({
           </select>
         </div>
       </div>
+      {/* Selector de impresora predeterminada (solo si la workstation tiene VLAN) */}
+      {workstation.vlan_id && (
+        <div className="space-y-2">
+          <Label htmlFor="default_printer_id">{t('defaultPrinter')}</Label>
+          <select
+            id="default_printer_id"
+            value={formData.default_printer_id || ''}
+            onChange={(e) =>
+              setFormData({ ...formData, default_printer_id: e.target.value || undefined })
+            }
+            disabled={isLoading}
+            className="w-full px-3 py-2 border rounded-md"
+          >
+            <option value="">{t('selectPrinter')}</option>
+            {availablePrinters.length > 0 ? (
+              availablePrinters.map((printer) => (
+                <option key={printer.id} value={printer.id}>
+                  {printer.name} ({printer.ip_address})
+                </option>
+              ))
+            ) : (
+              <option value="" disabled>{t('noPrintersInVlan')}</option>
+            )}
+          </select>
+        </div>
+      )}
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription className="text-xs">{t('accountAutoNote')}</AlertDescription>

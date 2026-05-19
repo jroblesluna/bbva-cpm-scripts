@@ -44,6 +44,9 @@ import type {
   AuditLogListResponse,
   AuditLogStats,
   ApiError,
+  Device,
+  DeviceCreate,
+  DeviceUpdate,
 } from '@/types'
 
 // ============================================================================
@@ -486,6 +489,17 @@ export const workstationsApi = {
     const filename = filenameMatch ? filenameMatch[1] : 'alwaysprint.log'
     return { blob: response.data as Blob, filename }
   },
+
+  /**
+   * Obtener dispositivos (impresoras) disponibles en una VLAN.
+   * Se usa para el selector de impresora predeterminada.
+   */
+  getVlanDevices: async (vlanId: string): Promise<Array<{ id: string; name: string; ip_address: string }>> => {
+    const response = await apiClient.get<{ devices: Array<{ id: string; name: string; ip_address: string }> }>(
+      `/devices/?vlan_id=${vlanId}&is_active=true`
+    )
+    return response.data.devices || []
+  },
 }
 
 // ============================================================================
@@ -563,6 +577,53 @@ export const vlansApi = {
    */
   deleteConfig: async (id: string): Promise<void> => {
     await apiClient.delete(`/vlans/${id}/config`)
+  },
+}
+
+// ============================================================================
+// DISPOSITIVOS (IMPRESORAS)
+// ============================================================================
+
+export const devicesApi = {
+  /**
+   * Listar dispositivos, opcionalmente filtrados.
+   */
+  list: async (filters?: { organization_id?: string; vlan_id?: string; is_active?: boolean; search?: string }): Promise<Device[]> => {
+    const response = await apiClient.get<{ devices: Device[] }>('/devices/', {
+      params: filters,
+    })
+    return response.data.devices
+  },
+
+  /**
+   * Obtener dispositivo por ID.
+   */
+  get: async (id: string): Promise<Device> => {
+    const response = await apiClient.get<Device>(`/devices/${id}`)
+    return response.data
+  },
+
+  /**
+   * Crear nuevo dispositivo.
+   */
+  create: async (data: DeviceCreate): Promise<Device> => {
+    const response = await apiClient.post<Device>('/devices/', data)
+    return response.data
+  },
+
+  /**
+   * Actualizar dispositivo.
+   */
+  update: async (id: string, data: DeviceUpdate): Promise<Device> => {
+    const response = await apiClient.put<Device>(`/devices/${id}`, data)
+    return response.data
+  },
+
+  /**
+   * Eliminar dispositivo.
+   */
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/devices/${id}`)
   },
 }
 

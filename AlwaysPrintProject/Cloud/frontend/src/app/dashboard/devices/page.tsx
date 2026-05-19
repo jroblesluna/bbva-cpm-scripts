@@ -1,0 +1,714 @@
+/**
+ * Página de gestión de dispositivos (impresoras).
+ */
+
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useAuth } from '@/hooks/useAuth'
+import { useTranslations } from 'next-intl'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import {
+  Printer,
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  X,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react'
+import { apiClient } from '@/lib/api'
+import type { Device, DeviceCreate, DeviceUpdate } from '@/types/device'
+import type { VLAN } from '@/types/vlan'
+import { formatDateWithTimezone } from '@/lib/dateUtils'
+import { useUserTimezone } from '@/hooks/useUserTimezone'
+
+export default function DevicesPage() {
+  const { user } = useAuth()
+  const timezone = useUserTimezone()
+  const t = useTranslations('devices')
+  const tCommon = useTranslations('common')
+  const [devices, setDevices] = useState<Device[]>([])
+  const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
+  const [vlans, setVlans] = useState<VLAN[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterOrgId, setFilterOrgId] = useState<string | undefined>(undefined)
+  const [filterVlanId, setFilterVlanId] = useState<string | undefined>(undefined)
+  const [filterActive, setFilterActive] = useState<string>('all')
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
+
+  useEffect(() => {
+    if (!user) return
+    if (user.role === 'admin') loadAccounts()
+    loadDevices()
+  }, [user, filterOrgId, filterVlanId, filterActive])
+
+  useEffect(() => {
+    if (!user) return
+    loadVlans()
+  }, [user, filterOrgId])
+
+  const loadAccounts = async () => {
+    try {
+      const response = await apiClient.get('/organizations/?skip=0&limit=1000')
+      setAccounts(response.data.items || [])
+    } catch (error) {
+      console.error('Error cargando organizaciones:', error)
+    }
+  }
+
+  const loadVlans = async () => {
+    try {
+      const params = filterOrgId ? `?organization_id=${filterOrgId}` : ''
+      const response = await apiClient.get(`/vlans/${params}`)
+      setVlans(response.data.vlans || [])
+    } catch (error) {
+      console.error('Error cargando VLANs:', error)
+    }
+  }
+
+  const loadDevices = async () => {
+    try {
+      setLoading(true)
+      const params: Record<string, string> = {}
+      if (filterOrgId) params.organization_id = filterOrgId
+      if (filterVlanId) params.vlan_id = filterVlanId
+      if (filterActive !== 'all') params.is_active = filterActive
+      const queryString = new URLSearchParams(params).toString()
+      const url = queryString ? `/devices/?${queryString}` : '/devices/'
+      const response = await apiClient.get(url)
+      setDevices(response.data.devices || [])
+    } catch (error) {
+      console.error('Error cargando dispositivos:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredDevices = devices.filter((device) => {
+    const s = searchTerm.toLowerCase()
+    return (
+      device.name.toLowerCase().includes(s) ||
+      device.ip_address.includes(s) ||
+      device.description?.toLowerCase().includes(s) ||
+      device.model?.toLowerCase().includes(s) ||
+      device.location?.toLowerCase().includes(s)
+    )
+  })
+
+  const activeCount = devices.filter((d) => d.is_active).length
+  const inactiveCount = devices.filter((d) => !d.is_active).length
+
+  const handleEdit = (device: Device) => {
+    setSelectedDevice(device)
+    setShowEditModal(true)
+  }
+
+  const handleDelete = (device: Device) => {
+    setSelectedDevice(device)
+    setShowDeleteModal(true)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">{tCommon('loading')}</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Encabezado */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
+          <p className="mt-2 text-gray-600">{t('subtitle')}</p>
+        </div>
+        <Button onClick={() => setShowCreateModal(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          {t('create')}
+        </Button>
+      </div>
+
+      {/* Estadísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="p-3 bg-blue-100 rounded-lg"><Printer className="h-6 w-6 text-blue-600" /></div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">{t('totalDevices')}</p>
+              <p className="text-2xl font-bold text-gray-900">{devices.length}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="p-3 bg-green-100 rounded-lg"><CheckCircle className="h-6 w-6 text-green-600" /></div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">{t('activeDevices')}</p>
+              <p className="text-2xl font-bold text-green-600">{activeCount}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="p-3 bg-gray-100 rounded-lg"><XCircle className="h-6 w-6 text-gray-500" /></div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">{t('inactiveDevices')}</p>
+              <p className="text-2xl font-bold text-gray-600">{inactiveCount}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Input
+              type="text"
+              placeholder={t('searchPlaceholder')}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          {user?.role === 'admin' && (
+            <select
+              value={filterOrgId || 'all'}
+              onChange={(e) => {
+                setFilterOrgId(e.target.value === 'all' ? undefined : e.target.value)
+                setFilterVlanId(undefined)
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">{t('allOrganizations')}</option>
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>{account.name}</option>
+              ))}
+            </select>
+          )}
+          <select
+            value={filterVlanId || 'all'}
+            onChange={(e) => setFilterVlanId(e.target.value === 'all' ? undefined : e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">{t('allVlans')}</option>
+            {vlans.map((vlan) => (
+              <option key={vlan.id} value={vlan.id}>{vlan.name}</option>
+            ))}
+          </select>
+          <select
+            value={filterActive}
+            onChange={(e) => setFilterActive(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">{t('allStatuses')}</option>
+            <option value="true">{t('statusActive')}</option>
+            <option value="false">{t('statusInactive')}</option>
+          </select>
+        </div>
+        {(searchTerm || filterOrgId || filterVlanId || filterActive !== 'all') && (
+          <div className="mt-4">
+            <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterOrgId(undefined); setFilterVlanId(undefined); setFilterActive('all') }}>
+              <X className="mr-2 h-4 w-4" />
+              {tCommon('clearFilters')}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Tabla de dispositivos */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        {filteredDevices.length === 0 ? (
+          <div className="text-center py-12">
+            <Printer className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">{t('emptyTitle')}</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              {searchTerm || filterOrgId || filterVlanId || filterActive !== 'all' ? t('emptyMessage') : t('emptyCreate')}
+            </p>
+            {!searchTerm && !filterOrgId && !filterVlanId && filterActive === 'all' && (
+              <div className="mt-6">
+                <Button onClick={() => setShowCreateModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('create')}
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colName')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colIp')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colModel')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colVlan')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colLocation')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colStatus')}</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colActions')}</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredDevices.map((device) => (
+                  <tr key={device.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <Printer className="h-5 w-5 text-gray-400 mr-2" />
+                        <div>
+                          <span className="text-sm font-medium text-gray-900">{device.name}</span>
+                          {device.description && (
+                            <p className="text-xs text-gray-500">{device.description}</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm font-mono text-gray-700">{device.ip_address}:{device.port}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-500">{device.model || '-'}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {device.vlan_name ? (
+                        <Badge variant="secondary">{device.vlan_name}</Badge>
+                      ) : (
+                        <span className="text-sm text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-500">{device.location || '-'}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <Badge variant={device.is_active ? 'default' : 'secondary'}>
+                        {device.is_active ? t('statusActive') : t('statusInactive')}
+                      </Badge>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(device)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(device)} className="text-red-600 hover:text-red-700">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Modales */}
+      {showCreateModal && (
+        <CreateDeviceModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => { setShowCreateModal(false); loadDevices() }}
+        />
+      )}
+      {showEditModal && selectedDevice && (
+        <EditDeviceModal
+          device={selectedDevice}
+          onClose={() => { setShowEditModal(false); setSelectedDevice(null) }}
+          onSuccess={() => { setShowEditModal(false); setSelectedDevice(null); loadDevices() }}
+        />
+      )}
+      {showDeleteModal && selectedDevice && (
+        <DeleteDeviceModal
+          device={selectedDevice}
+          onClose={() => { setShowDeleteModal(false); setSelectedDevice(null) }}
+          onSuccess={() => { setShowDeleteModal(false); setSelectedDevice(null); loadDevices() }}
+        />
+      )}
+    </div>
+  )
+}
+
+
+// === MODAL: CREAR DISPOSITIVO ===
+
+function CreateDeviceModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const { user, isAdmin } = useAuth()
+  const t = useTranslations('devices')
+  const tCommon = useTranslations('common')
+  const [loading, setLoading] = useState(false)
+  const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
+  const [vlans, setVlans] = useState<VLAN[]>([])
+  const [formData, setFormData] = useState<DeviceCreate>({
+    organization_id: user?.organization_id || '',
+    vlan_id: null,
+    name: '',
+    ip_address: '',
+    description: '',
+    model: '',
+    location: '',
+    port: 9100,
+    is_active: true,
+  })
+
+  useEffect(() => {
+    if (!isAdmin()) return
+    const load = async () => {
+      try {
+        const response = await apiClient.get('/organizations/')
+        setAccounts(response.data.items || [])
+      } catch (error) { console.error(error) }
+    }
+    load()
+  }, [isAdmin])
+
+  useEffect(() => {
+    const orgId = formData.organization_id
+    if (!orgId) { setVlans([]); return }
+    const load = async () => {
+      try {
+        const response = await apiClient.get(`/vlans/?organization_id=${orgId}`)
+        setVlans(response.data.vlans || [])
+      } catch (error) { console.error(error) }
+    }
+    load()
+  }, [formData.organization_id])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name.trim() || !formData.ip_address.trim()) return
+
+    try {
+      setLoading(true)
+      const payload = {
+        ...formData,
+        vlan_id: formData.vlan_id || undefined,
+      }
+      await apiClient.post('/devices/', payload)
+      onSuccess()
+    } catch (error: unknown) {
+      console.error('Error:', error)
+      const err = error as { response?: { data?: { detail?: string } } }
+      alert(err.response?.data?.detail || 'Error al crear dispositivo')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('createTitle')}</h2>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {isAdmin() && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('organization')}</label>
+                <select
+                  value={formData.organization_id || ''}
+                  onChange={(e) => setFormData({ ...formData, organization_id: e.target.value, vlan_id: null })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">{t('selectOrg')}</option>
+                  {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('vlanLabel')}</label>
+              <select
+                value={formData.vlan_id || ''}
+                onChange={(e) => setFormData({ ...formData, vlan_id: e.target.value || null })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">{t('selectVlan')}</option>
+                {vlans.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('nameLabel')}</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder={t('namePlaceholder')}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('ipLabel')}</label>
+                <input
+                  type="text"
+                  value={formData.ip_address}
+                  onChange={(e) => setFormData({ ...formData, ip_address: e.target.value })}
+                  placeholder={t('ipPlaceholder')}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('descriptionLabel')}</label>
+              <textarea
+                value={formData.description || ''}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder={t('descPlaceholder')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={2}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('modelLabel')}</label>
+                <input
+                  type="text"
+                  value={formData.model || ''}
+                  onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                  placeholder={t('modelPlaceholder')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('locationLabel')}</label>
+                <input
+                  type="text"
+                  value={formData.location || ''}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  placeholder={t('locationPlaceholder')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('portLabel')}</label>
+                <input
+                  type="number"
+                  value={formData.port || 9100}
+                  onChange={(e) => setFormData({ ...formData, port: parseInt(e.target.value) || 9100 })}
+                  min={1}
+                  max={65535}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="mt-1 text-xs text-gray-500">{t('portHelper')}</p>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="is_active"
+                checked={formData.is_active}
+                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                className="rounded mr-2"
+              />
+              <label htmlFor="is_active" className="text-sm text-gray-700">{t('activeLabel')}</label>
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button type="button" variant="outline" onClick={onClose} disabled={loading}>{tCommon('cancel')}</Button>
+              <Button type="submit" disabled={loading}>{loading ? tCommon('creating') : t('createTitle')}</Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// === MODAL: EDITAR DISPOSITIVO ===
+
+function EditDeviceModal({ device, onClose, onSuccess }: { device: Device; onClose: () => void; onSuccess: () => void }) {
+  const t = useTranslations('devices')
+  const tCommon = useTranslations('common')
+  const [loading, setLoading] = useState(false)
+  const [vlans, setVlans] = useState<VLAN[]>([])
+  const [formData, setFormData] = useState<DeviceUpdate>({
+    vlan_id: device.vlan_id,
+    name: device.name,
+    ip_address: device.ip_address,
+    description: device.description,
+    model: device.model,
+    location: device.location,
+    port: device.port,
+    is_active: device.is_active,
+  })
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const response = await apiClient.get(`/vlans/?organization_id=${device.organization_id}`)
+        setVlans(response.data.vlans || [])
+      } catch (error) { console.error(error) }
+    }
+    load()
+  }, [device.organization_id])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name?.trim() || !formData.ip_address?.trim()) return
+
+    try {
+      setLoading(true)
+      await apiClient.put(`/devices/${device.id}`, formData)
+      onSuccess()
+    } catch (error: unknown) {
+      console.error('Error:', error)
+      const err = error as { response?: { data?: { detail?: string } } }
+      alert(err.response?.data?.detail || 'Error al actualizar dispositivo')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('editTitle')}</h2>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('vlanLabel')}</label>
+              <select
+                value={formData.vlan_id || ''}
+                onChange={(e) => setFormData({ ...formData, vlan_id: e.target.value || null })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">{t('selectVlan')}</option>
+                {vlans.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('nameLabel')}</label>
+                <input
+                  type="text"
+                  value={formData.name || ''}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder={t('namePlaceholder')}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('ipLabel')}</label>
+                <input
+                  type="text"
+                  value={formData.ip_address || ''}
+                  onChange={(e) => setFormData({ ...formData, ip_address: e.target.value })}
+                  placeholder={t('ipPlaceholder')}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('descriptionLabel')}</label>
+              <textarea
+                value={formData.description || ''}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder={t('descPlaceholder')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={2}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('modelLabel')}</label>
+                <input
+                  type="text"
+                  value={formData.model || ''}
+                  onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                  placeholder={t('modelPlaceholder')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('locationLabel')}</label>
+                <input
+                  type="text"
+                  value={formData.location || ''}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  placeholder={t('locationPlaceholder')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('portLabel')}</label>
+                <input
+                  type="number"
+                  value={formData.port || 9100}
+                  onChange={(e) => setFormData({ ...formData, port: parseInt(e.target.value) || 9100 })}
+                  min={1}
+                  max={65535}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="edit_is_active"
+                checked={formData.is_active ?? true}
+                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                className="rounded mr-2"
+              />
+              <label htmlFor="edit_is_active" className="text-sm text-gray-700">{t('activeLabel')}</label>
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button type="button" variant="outline" onClick={onClose} disabled={loading}>{tCommon('cancel')}</Button>
+              <Button type="submit" disabled={loading}>{loading ? tCommon('updating') : tCommon('update')}</Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// === MODAL: ELIMINAR DISPOSITIVO ===
+
+function DeleteDeviceModal({ device, onClose, onSuccess }: { device: Device; onClose: () => void; onSuccess: () => void }) {
+  const t = useTranslations('devices')
+  const tCommon = useTranslations('common')
+  const [loading, setLoading] = useState(false)
+
+  const handleDelete = async () => {
+    try {
+      setLoading(true)
+      await apiClient.delete(`/devices/${device.id}`)
+      onSuccess()
+    } catch (error: unknown) {
+      console.error('Error:', error)
+      const err = error as { response?: { data?: { detail?: string } } }
+      alert(err.response?.data?.detail || 'Error al eliminar dispositivo')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div className="p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">{t('deleteTitle')}</h2>
+          <p className="text-gray-600 mb-6">{t('deleteConfirm', { name: device.name })}</p>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={onClose} disabled={loading}>{tCommon('cancel')}</Button>
+            <Button onClick={handleDelete} disabled={loading} className="bg-red-600 hover:bg-red-700">
+              {loading ? tCommon('deleting') : tCommon('delete')}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

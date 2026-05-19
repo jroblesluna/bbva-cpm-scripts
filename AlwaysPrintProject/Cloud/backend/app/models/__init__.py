@@ -14,6 +14,7 @@ from app.models.audit import AuditLog, ActionType
 from app.models.message import Message, TargetType
 from app.models.telemetry import TelemetryLog, ConnectivityResult
 from app.models.action_config import ActionConfig
+from app.models.device import Device
 
 __all__ = [
     # User models
@@ -50,4 +51,7 @@ __all__ = [
     
     # Action config models
     "ActionConfig",
+    
+    # Device models
+    "Device",
 ]

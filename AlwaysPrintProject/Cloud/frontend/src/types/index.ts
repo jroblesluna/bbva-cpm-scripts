@@ -14,6 +14,9 @@ export * from './workstation'
 // VLAN types
 export * from './vlan'
 
+// Device types
+export * from './device'
+
 // Config types
 export * from './config'
 

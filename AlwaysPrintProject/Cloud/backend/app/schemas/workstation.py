@@ -104,9 +104,13 @@ class WorkstationResponse(BaseModel):
     updated_at: datetime
     cidr: Optional[str] = Field(None, description="CIDR de la subred reportado por la workstation")
     tray_version: Optional[str] = Field(None, description="Versión del AlwaysPrintTray instalado")
+    default_printer_id: Optional[UUID] = Field(None, description="ID del dispositivo (impresora) predeterminado")
     
     # Relación con organización (anidada)
     organization: Optional['OrganizationBasicResponse'] = None
+    
+    # Relación con VLAN (anidada)
+    vlan: Optional['VLANBasicResponse'] = None
     
     model_config = {"from_attributes": True}
 
@@ -122,7 +126,16 @@ class OrganizationBasicResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# Actualizar forward reference
+# Schema básico de VLAN para relaciones anidadas
+class VLANBasicResponse(BaseModel):
+    """Schema básico de VLAN para relaciones anidadas."""
+    id: UUID
+    name: str
+    
+    model_config = {"from_attributes": True}
+
+
+# Actualizar forward references
 WorkstationResponse.model_rebuild()
 
 
@@ -139,6 +152,7 @@ class WorkstationUpdate(BaseModel):
     os_serial: Optional[str] = Field(None, max_length=255)
     current_user: Optional[str] = Field(None, max_length=255)
     vlan_id: Optional[UUID] = None
+    default_printer_id: Optional[UUID] = Field(None, description="ID del dispositivo (impresora) predeterminado")
 
 
 class WorkstationStatusUpdate(BaseModel):

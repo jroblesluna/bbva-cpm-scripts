@@ -20,6 +20,7 @@ export interface Workstation {
   updated_at: string
   cidr: string | null
   tray_version: string | null
+  default_printer_id: string | null
   organization?: Organization
   vlan?: VLANBasic | null
 }
@@ -45,6 +46,7 @@ export interface WorkstationUpdate {
   current_user?: string | null
   organization_id?: string | null
   vlan_id?: string | null
+  default_printer_id?: string | null
 }
 
 export interface WorkstationStats {

@@ -31,6 +31,7 @@ import {
   Wifi,
   Download,
   Cog,
+  Printer,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -47,6 +48,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { key: 'telemetry', href: '/dashboard/telemetry', icon: Activity },
     { key: 'connectivity', href: '/dashboard/connectivity', icon: Wifi },
     { key: 'vlans', href: '/dashboard/vlans', icon: Network },
+    { key: 'devices', href: '/dashboard/devices', icon: Printer },
     { key: 'config', href: '/dashboard/config', icon: Settings },
     { key: 'messages', href: '/dashboard/messages', icon: MessageSquare },
     { key: 'audit', href: '/dashboard/audit', icon: FileText },

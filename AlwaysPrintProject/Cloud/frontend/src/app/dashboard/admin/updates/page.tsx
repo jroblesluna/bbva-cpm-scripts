@@ -19,7 +19,6 @@ import {
   GitCommit,
   HardDrive,
   AlertTriangle,
-  Building2,
   Pin,
   History,
   Download,
@@ -27,8 +26,6 @@ import {
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -63,12 +60,6 @@ interface UpdateCheckResponse {
   file_size: number;
   build_date: string;
   commit_hash: string;
-}
-
-interface AutoUpdateToggleResponse {
-  auto_update_enabled: boolean;
-  organization_id: string;
-  updated_at: string;
 }
 
 interface OrgAutoUpdateState {
@@ -112,22 +103,12 @@ export default function UpdatesPage() {
   const [versions, setVersions] = useState<MsiInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pinningOrg, setPinningOrg] = useState<string | null>(null);
   const [selectedVersions, setSelectedVersions] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmDialog, setDeleteConfirmDialog] = useState<{
     open: boolean;
     versions: string[];
   }>({ open: false, versions: [] });
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    orgId: string;
-    orgName: string;
-  }>({
-    open: false,
-    orgId: '',
-    orgName: '',
-  });
 
   const isAdmin = user?.role === 'admin';
 
@@ -212,98 +193,8 @@ export default function UpdatesPage() {
     fetchData();
   }, [fetchData]);
 
-  // Manejar toggle de auto-updates por organización
-  const handleToggle = (orgId: string, orgName: string, checked: boolean) => {
-    if (checked) {
-      setConfirmDialog({ open: true, orgId, orgName });
-    } else {
-      performToggle(orgId, false);
-    }
-  };
-
-  // Ejecutar el toggle contra el backend
-  const performToggle = async (orgId: string, enabled: boolean) => {
-    setOrganizations((prev) =>
-      prev.map((org) => (org.orgId === orgId ? { ...org, isToggling: true } : org))
-    );
-
-    try {
-      await apiClient.patch<AutoUpdateToggleResponse>(`/organizations/${orgId}/auto-update`, {
-        enabled,
-      });
-
-      setOrganizations((prev) =>
-        prev.map((org) =>
-          org.orgId === orgId ? { ...org, autoUpdateEnabled: enabled, isToggling: false } : org
-        )
-      );
-
-      const orgName = organizations.find((o) => o.orgId === orgId)?.orgName ?? orgId;
-      toast({
-        title: enabled
-          ? 'Actualizaciones automáticas habilitadas'
-          : 'Actualizaciones automáticas deshabilitadas',
-        description: `Organización: ${orgName}`,
-      });
-    } catch (err: unknown) {
-      const errorMessage =
-        err && typeof err === 'object' && 'detail' in err
-          ? (err as { detail: string }).detail
-          : 'Error al actualizar configuración';
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-      setOrganizations((prev) =>
-        prev.map((org) => (org.orgId === orgId ? { ...org, isToggling: false } : org))
-      );
-    } finally {
-      setConfirmDialog({ open: false, orgId: '', orgName: '' });
-    }
-  };
-
-  // Toggle de re-registro automático por organización
-  const handleReregisterToggle = async (orgId: string, enabled: boolean) => {
-    setOrganizations((prev) =>
-      prev.map((org) => (org.orgId === orgId ? { ...org, isToggling: true } : org))
-    );
-
-    try {
-      await apiClient.put(`/organizations/${orgId}`, {
-        auto_reregister_enabled: enabled,
-      });
-
-      setOrganizations((prev) =>
-        prev.map((org) =>
-          org.orgId === orgId
-            ? { ...org, autoReregisterEnabled: enabled, isToggling: false }
-            : org
-        )
-      );
-
-      const orgName = organizations.find((o) => o.orgId === orgId)?.orgName ?? orgId;
-      toast({
-        title: enabled
-          ? 'Re-registro automático habilitado'
-          : 'Re-registro automático deshabilitado',
-        description: `Organización: ${orgName}`,
-      });
-    } catch {
-      toast({
-        title: 'Error',
-        description: 'No se pudo actualizar la configuración de re-registro',
-        variant: 'destructive',
-      });
-      setOrganizations((prev) =>
-        prev.map((org) => (org.orgId === orgId ? { ...org, isToggling: false } : org))
-      );
-    }
-  };
-
-  // Asignar versión pineada para una organización
+  // Asignar versión pineada para una organización (usado por tabla de versiones)
   const handlePinVersion = async (orgId: string, version: string | null) => {
-    setPinningOrg(orgId);
     try {
       await apiClient.put(`/updates/pin/${orgId}`, { version });
 
@@ -326,8 +217,6 @@ export default function UpdatesPage() {
         description: 'No se pudo actualizar la versión asignada',
         variant: 'destructive',
       });
-    } finally {
-      setPinningOrg(null);
     }
   };
 
@@ -565,127 +454,7 @@ export default function UpdatesPage() {
             </Card>
           )}
 
-          {/* Configuración por organización */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-primary" />
-                <CardTitle>Configuración por Organización</CardTitle>
-              </div>
-              <CardDescription>
-                Cada organización puede tener actualizaciones automáticas habilitadas y
-                opcionalmente una versión pineada. Si tiene versión pineada, siempre recibirá esa
-                versión (aunque cambie la latest).
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {organizations.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">
-                  No se encontraron organizaciones.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {organizations.map((org) => (
-                    <div
-                      key={org.orgId}
-                      className="p-4 border rounded-lg space-y-3"
-                    >
-                      {/* Fila superior: nombre + toggle */}
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-base font-medium">{org.orgName}</Label>
-                          <p className="text-sm text-muted-foreground">
-                            {org.autoUpdateEnabled
-                              ? 'Actualizaciones automáticas habilitadas'
-                              : 'Actualizaciones automáticas deshabilitadas'}
-                          </p>
-                        </div>
-                        <Switch
-                          checked={org.autoUpdateEnabled}
-                          onCheckedChange={(checked) =>
-                            handleToggle(org.orgId, org.orgName, checked)
-                          }
-                          disabled={org.isToggling}
-                        />
-                      </div>
-
-                      {/* Fila inferior: versión pineada */}
-                      <div className="flex items-center gap-3 pl-1">
-                        <Pin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        <div className="flex items-center gap-2 flex-1">
-                          <span className="text-sm text-muted-foreground">Versión:</span>
-                          <select
-                            className="text-sm border rounded px-2 py-1 bg-background"
-                            value={org.targetVersion ?? ''}
-                            onChange={(e) => {
-                              const value = e.target.value || null;
-                              handlePinVersion(org.orgId, value);
-                            }}
-                            disabled={pinningOrg === org.orgId}
-                          >
-                            <option value="">Latest (automática)</option>
-                            {versions.map((v) => (
-                              <option key={v.version} value={v.version}>
-                                {v.version}
-                              </option>
-                            ))}
-                          </select>
-                          {org.targetVersion && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Pin className="h-3 w-3 mr-1" />
-                              Pineada
-                            </Badge>
-                          )}
-                          {!org.targetVersion && (
-                            <Badge variant="outline" className="text-xs">
-                              Usa latest
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Explicación contextual */}
-                      {org.autoUpdateEnabled && org.targetVersion && (
-                        <p className="text-xs text-amber-600 pl-7">
-                          Las workstations siempre descargarán la versión {org.targetVersion},
-                          independientemente de la versión latest.
-                        </p>
-                      )}
-                      {org.autoUpdateEnabled && !org.targetVersion && (
-                        <p className="text-xs text-muted-foreground pl-7">
-                          Las workstations se actualizarán automáticamente a la versión latest.
-                        </p>
-                      )}
-                      {!org.autoUpdateEnabled && (
-                        <p className="text-xs text-muted-foreground pl-7">
-                          Las workstations no se actualizarán automáticamente.
-                        </p>
-                      )}
-
-                      {/* Toggle de re-registro automático */}
-                      <div className="flex items-center justify-between pt-2 border-t mt-3">
-                        <div>
-                          <Label className="text-sm font-medium">Re-registro automático</Label>
-                          <p className="text-xs text-muted-foreground">
-                            {org.autoReregisterEnabled
-                              ? 'Workstations eliminadas se re-registran al enviar telemetría'
-                              : 'Workstations eliminadas no se re-registran automáticamente'}
-                          </p>
-                        </div>
-                        <Switch
-                          checked={org.autoReregisterEnabled}
-                          onCheckedChange={(checked) =>
-                            handleReregisterToggle(org.orgId, checked)
-                          }
-                          disabled={org.isToggling}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* Configuración por organización — Movida a /dashboard/config */}
 
           {/* Historial de versiones con acciones */}
           {isAdmin && versions.length > 0 && (
@@ -815,43 +584,6 @@ export default function UpdatesPage() {
           )}
         </>
       )}
-
-      {/* Diálogo de confirmación de auto-update */}
-      <Dialog
-        open={confirmDialog.open}
-        onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmar Habilitación de Auto-Actualizaciones</DialogTitle>
-            <DialogDescription>
-              ¿Estás seguro de que deseas habilitar las actualizaciones automáticas para
-              <strong> {confirmDialog.orgName}</strong>?
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-4">
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                Las workstations de esta organización que tengan habilitado el flag local
-                comenzarán a actualizarse automáticamente. Asegúrate de que la versión actual del
-                MSI ha sido probada correctamente.
-              </AlertDescription>
-            </Alert>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setConfirmDialog({ open: false, orgId: '', orgName: '' })}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={() => performToggle(confirmDialog.orgId, true)}>Confirmar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Diálogo de confirmación de eliminación de versiones */}
       <Dialog

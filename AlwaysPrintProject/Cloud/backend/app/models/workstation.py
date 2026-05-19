@@ -45,6 +45,9 @@ class Workstation(Base):
     is_online = Column(Boolean, nullable=False, default=False)
     contingency_active = Column(Boolean, nullable=False, default=False)
     
+    # Impresora predeterminada asignada
+    default_printer_id = Column(GUID, ForeignKey("devices.id", ondelete="SET NULL"), nullable=True)
+    
     # === TIMESTAMPS ===
     last_connection = Column(DateTime, nullable=True)
     first_seen = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -54,6 +57,7 @@ class Workstation(Base):
     # === RELACIONES ===
     organization = relationship("Organization", back_populates="workstations")
     vlan = relationship("VLAN", back_populates="workstations")
+    default_printer = relationship("Device", foreign_keys="Workstation.default_printer_id")
     licenses = relationship("License", back_populates="workstation", cascade="all, delete-orphan")
     workstation_config = relationship("WorkstationConfig", back_populates="workstation", uselist=False, cascade="all, delete-orphan")
     audit_logs = relationship("AuditLog", back_populates="workstation", foreign_keys="AuditLog.workstation_id")
