@@ -743,6 +743,10 @@ namespace AlwaysPrintTray.Cloud
                         HandleCheckUpdateCommand(commandId);
                         break;
 
+                    case "get_latest_log":
+                        HandleGetLatestLogCommand(commandId);
+                        break;
+
                     default:
                         // Comando desconocido
                         AlwaysPrintLogger.WriteTrayWarning(
@@ -811,6 +815,84 @@ namespace AlwaysPrintTray.Cloud
             SendCommandResult(commandId, true, "Verificación de actualización iniciada.");
             AlwaysPrintLogger.WriteTrayInfo(
                 "CloudManager: comando check_update ejecutado. Verificación de actualización disparada.");
+        }
+
+        /// <summary>
+        /// Ejecuta el comando get_latest_log: lee el último archivo de log de la carpeta
+        /// C:\ProgramData\AlwaysPrint\logs y envía su contenido codificado en base64.
+        /// </summary>
+        private void HandleGetLatestLogCommand(string commandId)
+        {
+            try
+            {
+                string logsFolder = @"C:\ProgramData\AlwaysPrint\logs";
+
+                if (!System.IO.Directory.Exists(logsFolder))
+                {
+                    SendCommandResult(commandId, false, "La carpeta de logs no existe.");
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"CloudManager: comando get_latest_log - carpeta no encontrada: {logsFolder}");
+                    return;
+                }
+
+                // Obtener el archivo más reciente por fecha de última escritura
+                var logFiles = new System.IO.DirectoryInfo(logsFolder)
+                    .GetFiles("*.*")
+                    .OrderByDescending(f => f.LastWriteTimeUtc)
+                    .ToArray();
+
+                if (logFiles.Length == 0)
+                {
+                    SendCommandResult(commandId, false, "No se encontraron archivos de log.");
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "CloudManager: comando get_latest_log - no hay archivos en la carpeta de logs.");
+                    return;
+                }
+
+                var latestFile = logFiles[0];
+
+                // Limitar tamaño a 5 MB para evitar problemas de memoria/WebSocket
+                const long maxSize = 5 * 1024 * 1024;
+                if (latestFile.Length > maxSize)
+                {
+                    SendCommandResult(commandId, false,
+                        $"El archivo de log es demasiado grande ({latestFile.Length / 1024 / 1024} MB). Máximo: 5 MB.");
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"CloudManager: comando get_latest_log - archivo demasiado grande: {latestFile.Length} bytes.");
+                    return;
+                }
+
+                // Leer archivo con FileShare.ReadWrite para no bloquear escrituras activas
+                byte[] fileContent;
+                using (var fs = new System.IO.FileStream(
+                    latestFile.FullName,
+                    System.IO.FileMode.Open,
+                    System.IO.FileAccess.Read,
+                    System.IO.FileShare.ReadWrite))
+                {
+                    fileContent = new byte[fs.Length];
+                    fs.Read(fileContent, 0, fileContent.Length);
+                }
+
+                // Codificar en base64 y enviar como JSON con nombre de archivo
+                string base64Content = Convert.ToBase64String(fileContent);
+                var resultJson = new JObject
+                {
+                    ["filename"] = latestFile.Name,
+                    ["content"] = base64Content
+                };
+
+                SendCommandResult(commandId, true, resultJson.ToString(Formatting.None));
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: comando get_latest_log ejecutado. Archivo: {latestFile.Name}, " +
+                    $"tamaño: {latestFile.Length} bytes.");
+            }
+            catch (Exception ex)
+            {
+                SendCommandResult(commandId, false, $"Error leyendo archivo de log: {ex.Message}");
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error ejecutando comando get_latest_log. {ex.Message}");
+            }
         }
 
         /// <summary>

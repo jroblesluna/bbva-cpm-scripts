@@ -470,6 +470,22 @@ export const workstationsApi = {
     )
     return response.data
   },
+
+  /**
+   * Descargar el último archivo de log de una workstation online.
+   * Retorna un Blob con el contenido del archivo.
+   */
+  downloadLatestLog: async (id: string): Promise<{ blob: Blob; filename: string }> => {
+    const response = await apiClient.get(`/workstations/${id}/logs/download`, {
+      responseType: 'blob',
+      timeout: 45000, // 45s timeout (el backend espera 30s máximo)
+    })
+    // Extraer nombre de archivo del header Content-Disposition
+    const contentDisposition = response.headers['content-disposition'] || ''
+    const filenameMatch = contentDisposition.match(/filename="?([^";\n]+)"?/)
+    const filename = filenameMatch ? filenameMatch[1] : 'alwaysprint.log'
+    return { blob: response.data as Blob, filename }
+  },
 }
 
 // ============================================================================

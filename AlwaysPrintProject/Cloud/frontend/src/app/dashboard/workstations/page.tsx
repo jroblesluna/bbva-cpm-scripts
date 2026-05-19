@@ -32,6 +32,7 @@ import {
   RotateCcw,
   Download,
   Terminal,
+  FileText,
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
@@ -127,6 +128,40 @@ export default function WorkstationsPage() {
       toast({
         variant: 'destructive',
         title: 'Error',
+        description: message,
+      });
+    },
+  });
+
+  const logDownloadMutation = useMutation({
+    mutationFn: (id: string) => workstationsApi.downloadLatestLog(id),
+    onSuccess: ({ blob, filename }) => {
+      // Crear enlace temporal para descargar el archivo
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast({
+        title: 'Log descargado',
+        description: `Archivo "${filename}" descargado exitosamente.`,
+      });
+    },
+    onError: (error: { detail?: string; status?: number }) => {
+      let message: string;
+      if (error.status === 409) {
+        message = 'La workstation está offline.';
+      } else if (error.status === 408) {
+        message = 'Timeout esperando respuesta de la workstation.';
+      } else {
+        message = error.detail ?? 'Error al descargar el log.';
+      }
+      toast({
+        variant: 'destructive',
+        title: 'Error al descargar log',
         description: message,
       });
     },
@@ -468,6 +503,15 @@ export default function WorkstationsPage() {
                     </Button>
                     {workstation.is_online && (
                       <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="Descargar Log"
+                          onClick={() => logDownloadMutation.mutate(workstation.id)}
+                          disabled={logDownloadMutation.isPending}
+                        >
+                          <FileText className="w-4 h-4" />
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"

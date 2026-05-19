@@ -7,11 +7,12 @@ Este módulo implementa el ConnectionManager que gestiona:
 - Envío/recepción de mensajes
 - Ping/pong para detección de conexiones muertas
 - Encolado de mensajes para workstations offline
+- Espera de respuestas de comandos (request-response sobre WebSocket)
 """
 
 import asyncio
 import json
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 from datetime import datetime, timezone
 from fastapi import WebSocket
 from sqlalchemy.orm import Session
@@ -50,6 +51,10 @@ class ConnectionManager:
         
         # Flag para detener el ping loop
         self._ping_loop_running = False
+        
+        # Respuestas pendientes de comandos: {command_id: (asyncio.Event, dict|None)}
+        # Permite esperar la respuesta de un comando específico
+        self._pending_command_responses: Dict[str, Tuple[asyncio.Event, List[Optional[dict]]]] = {}
     
     async def connect_workstation(
         self, 
@@ -373,6 +378,66 @@ class ConnectionManager:
             "operators": len(self.operator_connections),
             "pending_messages": sum(len(msgs) for msgs in self.pending_messages.values())
         }
+
+    def register_command_waiter(self, command_id: str) -> asyncio.Event:
+        """
+        Registra un waiter para esperar la respuesta de un comando específico.
+        
+        Args:
+            command_id: ID del comando cuya respuesta se espera
+            
+        Returns:
+            asyncio.Event que se señalará cuando llegue la respuesta
+        """
+        event = asyncio.Event()
+        # Usamos una lista de un elemento para poder mutar el contenido
+        self._pending_command_responses[command_id] = (event, [None])
+        return event
+
+    def resolve_command_response(self, command_id: str, response: dict) -> bool:
+        """
+        Resuelve la espera de un comando con la respuesta recibida.
+        
+        Args:
+            command_id: ID del comando
+            response: Respuesta completa del comando
+            
+        Returns:
+            True si había un waiter esperando, False si no
+        """
+        if command_id in self._pending_command_responses:
+            event, container = self._pending_command_responses[command_id]
+            container[0] = response
+            event.set()
+            return True
+        return False
+
+    async def wait_for_command_response(
+        self, command_id: str, timeout: float = 30.0
+    ) -> Optional[dict]:
+        """
+        Espera la respuesta de un comando con timeout.
+        
+        Args:
+            command_id: ID del comando
+            timeout: Tiempo máximo de espera en segundos
+            
+        Returns:
+            Respuesta del comando o None si timeout
+        """
+        if command_id not in self._pending_command_responses:
+            return None
+        
+        event, container = self._pending_command_responses[command_id]
+        
+        try:
+            await asyncio.wait_for(event.wait(), timeout=timeout)
+            return container[0]
+        except asyncio.TimeoutError:
+            return None
+        finally:
+            # Limpiar el waiter
+            self._pending_command_responses.pop(command_id, None)
 
 
 # Instancia global del ConnectionManager

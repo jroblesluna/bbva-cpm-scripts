@@ -329,6 +329,13 @@ async def workstation_websocket(
                 success = data.get("success")
                 output = data.get("output")
                 
+                # Resolver waiter si hay alguno esperando esta respuesta
+                connection_manager.resolve_command_response(command_id, {
+                    "command_id": command_id,
+                    "success": success,
+                    "output": output
+                })
+                
                 # Notificar a operadores
                 await connection_manager.broadcast_to_organization(
                     organization_id=str(workstation.organization_id),

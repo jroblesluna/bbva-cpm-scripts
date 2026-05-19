@@ -169,6 +169,154 @@ async def send_command(
     return CommandResponse(command_id=command_id, status="sent")
 
 
+# === ENDPOINT DE DESCARGA DE LOGS ===
+
+@router.get("/{workstation_id}/logs/download",
+            status_code=status.HTTP_200_OK,
+            responses={
+                200: {"description": "Contenido del último archivo de log"},
+                404: {"description": "Workstation no encontrada"},
+                408: {"description": "Timeout esperando respuesta de la workstation"},
+                409: {"description": "Workstation offline"},
+                500: {"description": "Error al obtener el log"},
+            })
+async def download_latest_log(
+    workstation_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Solicita y descarga el último archivo de log de una workstation online.
+    
+    Envía un comando 'get_latest_log' a la workstation vía WebSocket,
+    espera la respuesta con el contenido del archivo y lo retorna como descarga.
+    
+    La workstation lee el último archivo de C:\\ProgramData\\AlwaysPrint\\logs
+    y envía su contenido codificado en base64.
+    
+    Args:
+        workstation_id: ID de la workstation
+        current_user: Usuario autenticado
+        db: Sesión de base de datos
+    
+    Returns:
+        Response con el contenido del archivo de log como descarga
+    
+    Raises:
+        HTTPException 404: Workstation no encontrada
+        HTTPException 408: Timeout esperando respuesta
+        HTTPException 409: Workstation offline
+        HTTPException 500: Error al obtener el log
+    """
+    import base64
+    from fastapi.responses import Response
+    
+    # Verificar que la workstation existe
+    workstation = db.query(Workstation).filter(Workstation.id == workstation_id).first()
+    
+    if not workstation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workstation con ID {workstation_id} no encontrada"
+        )
+    
+    # Verificar permisos
+    if current_user.role == UserRole.OPERATOR:
+        if workstation.organization_id != current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para acceder a los logs de esta workstation"
+            )
+    
+    # Verificar que la workstation está online
+    workstation_id_str = str(workstation_id)
+    if not connection_manager.is_workstation_online(workstation_id_str):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La workstation está offline. No se puede obtener el log."
+        )
+    
+    # Generar ID único para el comando
+    command_id = str(uuid.uuid4())
+    
+    # Registrar waiter ANTES de enviar el comando
+    connection_manager.register_command_waiter(command_id)
+    
+    # Enviar comando vía WebSocket
+    message = {
+        "type": "command",
+        "command_id": command_id,
+        "command_type": "get_latest_log",
+        "params": {}
+    }
+    
+    sent = await connection_manager.send_to_workstation(workstation_id_str, message)
+    
+    if not sent:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La workstation se desconectó antes de recibir el comando."
+        )
+    
+    # Esperar respuesta con timeout de 30 segundos
+    response_data = await connection_manager.wait_for_command_response(
+        command_id, timeout=30.0
+    )
+    
+    if response_data is None:
+        raise HTTPException(
+            status_code=status.HTTP_408_REQUEST_TIMEOUT,
+            detail="Timeout esperando respuesta de la workstation. Intente nuevamente."
+        )
+    
+    if not response_data.get("success"):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error en la workstation: {response_data.get('output', 'Error desconocido')}"
+        )
+    
+    # Decodificar contenido base64
+    output = response_data.get("output", "")
+    filename = response_data.get("filename", "alwaysprint.log")
+    
+    # El output puede ser el contenido en base64 o un JSON con filename y content
+    try:
+        # Intentar parsear como JSON (formato: {"filename": "...", "content": "base64..."})
+        import json as json_module
+        output_data = json_module.loads(output)
+        if isinstance(output_data, dict):
+            filename = output_data.get("filename", filename)
+            content_b64 = output_data.get("content", "")
+            file_content = base64.b64decode(content_b64)
+        else:
+            file_content = base64.b64decode(output)
+    except (json_module.JSONDecodeError, ValueError):
+        # Si no es JSON, asumir que es base64 directo
+        try:
+            file_content = base64.b64decode(output)
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error decodificando el contenido del log recibido."
+            )
+    
+    logger.info(
+        f"[LOGS] Log descargado: workstation_id={workstation_id}, "
+        f"filename={filename}, size={len(file_content)} bytes, "
+        f"solicitado_por={current_user.email}"
+    )
+    
+    # Retornar como descarga de archivo
+    return Response(
+        content=file_content,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(file_content))
+        }
+    )
+
+
 # === ENDPOINT DE REGISTRO (SIN AUTENTICACIÓN) ===
 
 @router.post("/register", 
