@@ -68,6 +68,16 @@ resource "aws_iam_role_policy" "ec2_permissions" {
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
         Resource = "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:/${var.project_name}/${var.environment}/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:DeleteObject", "s3:DeleteObjectVersion"]
+        Resource = "arn:aws:s3:::alwaysprint-artifacts/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket", "s3:ListBucketVersions"]
+        Resource = "arn:aws:s3:::alwaysprint-artifacts"
       }
     ]
   })

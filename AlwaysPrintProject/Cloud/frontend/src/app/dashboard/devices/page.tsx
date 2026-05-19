@@ -19,6 +19,7 @@ import {
   X,
   CheckCircle,
   XCircle,
+  Eye,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 import type { Device, DeviceCreate, DeviceUpdate } from '@/types/device'
@@ -42,6 +43,7 @@ export default function DevicesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
 
   useEffect(() => {
@@ -114,6 +116,11 @@ export default function DevicesPage() {
   const handleDelete = (device: Device) => {
     setSelectedDevice(device)
     setShowDeleteModal(true)
+  }
+
+  const handleViewDetails = (device: Device) => {
+    setSelectedDevice(device)
+    setShowDetailsModal(true)
   }
 
   if (loading) {
@@ -298,6 +305,9 @@ export default function DevicesPage() {
                       </Badge>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <Button variant="ghost" size="sm" onClick={() => handleViewDetails(device)} title={t('viewDetails')}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="sm" onClick={() => handleEdit(device)}>
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -314,6 +324,12 @@ export default function DevicesPage() {
       </div>
 
       {/* Modales */}
+      {showDetailsModal && selectedDevice && (
+        <DeviceDetailsModal
+          device={selectedDevice}
+          onClose={() => { setShowDetailsModal(false); setSelectedDevice(null) }}
+        />
+      )}
       {showCreateModal && (
         <CreateDeviceModal
           onClose={() => setShowCreateModal(false)}
@@ -706,6 +722,98 @@ function DeleteDeviceModal({ device, onClose, onSuccess }: { device: Device; onC
             <Button onClick={handleDelete} disabled={loading} className="bg-red-600 hover:bg-red-700">
               {loading ? tCommon('deleting') : tCommon('delete')}
             </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+// === MODAL: VER DETALLES DEL DISPOSITIVO ===
+
+function DeviceDetailsModal({ device, onClose }: { device: Device; onClose: () => void }) {
+  const t = useTranslations('devices')
+  const tCommon = useTranslations('common')
+  const timezone = useUserTimezone()
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          {/* Encabezado */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Printer className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">{device.name}</h2>
+                <Badge variant={device.is_active ? 'default' : 'secondary'}>
+                  {device.is_active ? t('statusActive') : t('statusInactive')}
+                </Badge>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Información del dispositivo */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase">{t('colIp')}</p>
+                <p className="text-sm font-mono text-gray-900">{device.ip_address}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase">{t('portLabel')}</p>
+                <p className="text-sm font-mono text-gray-900">{device.port}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase">{t('colModel')}</p>
+                <p className="text-sm text-gray-900">{device.model || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase">{t('colLocation')}</p>
+                <p className="text-sm text-gray-900">{device.location || '-'}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase">{t('colVlan')}</p>
+              <p className="text-sm text-gray-900">
+                {device.vlan_name ? (
+                  <Badge variant="secondary">{device.vlan_name}</Badge>
+                ) : (
+                  <span className="text-gray-400">{t('noVlan')}</span>
+                )}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase">{t('descriptionLabel')}</p>
+              <p className="text-sm text-gray-900">{device.description || '-'}</p>
+            </div>
+
+            <div className="border-t pt-4 grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase">{t('createdAt')}</p>
+                <p className="text-sm text-gray-700">{formatDateWithTimezone(device.created_at, timezone)}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase">{t('updatedAt')}</p>
+                <p className="text-sm text-gray-700">{formatDateWithTimezone(device.updated_at, timezone)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Botón cerrar */}
+          <div className="flex justify-end pt-6">
+            <Button variant="outline" onClick={onClose}>{tCommon('close')}</Button>
           </div>
         </div>
       </div>

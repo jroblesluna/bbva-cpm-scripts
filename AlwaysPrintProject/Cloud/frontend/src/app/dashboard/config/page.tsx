@@ -708,27 +708,6 @@ export default function ConfigPage() {
             </div>
           </div>
 
-          {/* Información adicional */}
-          {config && (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-gray-900 mb-2">{tCommon('status')}</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">{t('lastUpdated')}</span>
-                  <span className="ml-2 text-gray-900">
-                    {formatDateWithTimezone(config.updated_at, userTimezone)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-600">{t('created')}</span>
-                  <span className="ml-2 text-gray-900">
-                    {formatDateWithTimezone(config.created_at, userTimezone)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Advertencia si no hay configuración */}
           {!config && selectedOrgId && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -819,6 +798,27 @@ export default function ConfigPage() {
                 <div>
                   <h3 className="text-sm font-medium text-blue-900">{t('selectOrgTitle')}</h3>
                   <p className="mt-1 text-sm text-blue-700">{t('selectOrgMsg')}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Información adicional — Estado */}
+          {config && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="text-sm font-medium text-gray-900 mb-2">{tCommon('status')}</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600">{t('lastUpdated')}</span>
+                  <span className="ml-2 text-gray-900">
+                    {formatDateWithTimezone(config.updated_at, userTimezone)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-600">{t('created')}</span>
+                  <span className="ml-2 text-gray-900">
+                    {formatDateWithTimezone(config.created_at, userTimezone)}
+                  </span>
                 </div>
               </div>
             </div>

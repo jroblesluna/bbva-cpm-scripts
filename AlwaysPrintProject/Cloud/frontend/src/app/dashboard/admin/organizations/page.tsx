@@ -212,22 +212,27 @@ export default function AccountsPage() {
         </Card>
       )}
 
-      {/* Formulario de edición */}
+      {/* Modal de edición */}
       {editingAccount && (
-        <Card className="mb-6 border-amber-200 bg-amber-50">
-          <CardHeader>
-            <CardTitle>{t('editTitle', { name: editingAccount.name })}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AccountForm
-              initialData={editingAccount}
-              onSubmit={(data) => updateMutation.mutate({ id: editingAccount.id, data })}
-              onCancel={() => setEditingAccount(null)}
-              isLoading={updateMutation.isPending}
-              error={(updateMutation.error as any)?.detail}
-            />
-          </CardContent>
-        </Card>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>{t('editTitle', { name: editingAccount.name })}</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setEditingAccount(null)} className="h-8 w-8 p-0">
+                <X className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <AccountForm
+                initialData={editingAccount}
+                onSubmit={(data) => updateMutation.mutate({ id: editingAccount.id, data })}
+                onCancel={() => setEditingAccount(null)}
+                isLoading={updateMutation.isPending}
+                error={(updateMutation.error as any)?.detail}
+              />
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Modal de confirmación de contingencia forzada */}

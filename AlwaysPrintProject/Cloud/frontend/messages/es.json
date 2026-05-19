@@ -556,6 +556,9 @@
     "deleteTitle": "Eliminar Dispositivo",
     "deleteConfirm": "¿Estás seguro de que deseas eliminar el dispositivo {name}? Esta acción no se puede deshacer.",
     "assignedToVlan": "Asignado a VLAN: {vlan}",
-    "noVlan": "Sin VLAN asignada"
+    "noVlan": "Sin VLAN asignada",
+    "viewDetails": "Ver Detalles",
+    "createdAt": "Fecha de Creación",
+    "updatedAt": "Última Actualización"
   }
 }

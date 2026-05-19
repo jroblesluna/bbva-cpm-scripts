@@ -51,7 +51,7 @@ resource "aws_s3_bucket_ownership_controls" "artifacts" {
   }
 }
 
-# Política del bucket — acceso de solo lectura para el rol EC2
+# Política del bucket — acceso para el rol EC2 (lectura, listado de versiones y eliminación)
 resource "aws_s3_bucket_policy" "artifacts" {
   bucket = aws_s3_bucket.artifacts.id
 
@@ -69,8 +69,15 @@ resource "aws_s3_bucket_policy" "artifacts" {
         Sid       = "PermitirListadoEC2"
         Effect    = "Allow"
         Principal = { AWS = var.ec2_role_arn }
-        Action    = ["s3:ListBucket"]
+        Action    = ["s3:ListBucket", "s3:ListBucketVersions"]
         Resource  = aws_s3_bucket.artifacts.arn
+      },
+      {
+        Sid       = "PermitirEliminacionVersionesEC2"
+        Effect    = "Allow"
+        Principal = { AWS = var.ec2_role_arn }
+        Action    = ["s3:DeleteObject", "s3:DeleteObjectVersion"]
+        Resource  = "${aws_s3_bucket.artifacts.arn}/*"
       }
     ]
   })

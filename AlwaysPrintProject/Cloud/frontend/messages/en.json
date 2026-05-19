@@ -556,6 +556,9 @@
     "deleteTitle": "Delete Device",
     "deleteConfirm": "Are you sure you want to delete device {name}? This action cannot be undone.",
     "assignedToVlan": "Assigned to VLAN: {vlan}",
-    "noVlan": "No VLAN assigned"
+    "noVlan": "No VLAN assigned",
+    "viewDetails": "View Details",
+    "createdAt": "Created At",
+    "updatedAt": "Last Updated"
   }
 }
