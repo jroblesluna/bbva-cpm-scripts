@@ -136,6 +136,34 @@ class QueueStatusSummary(BaseModel):
     error: int = Field(0, description="Cantidad de workstations con estado 'error'")
 
 
+class TelemetryLatestBatchResponse(BaseModel):
+    """
+    Schema de respuesta para la última telemetría de un conjunto de workstations.
+
+    Usado en el endpoint POST /api/v1/telemetry/latest-batch.
+    Retorna un diccionario donde la clave es el workstation_id (string UUID)
+    y el valor es el registro de telemetría más reciente (o null si no tiene).
+    """
+    items: dict[str, Optional[TelemetryLogResponse]] = Field(
+        ...,
+        description="Mapa workstation_id → último registro de telemetría (null si no tiene)"
+    )
+
+
+class TelemetryLatestBatchRequest(BaseModel):
+    """
+    Schema de request para obtener la última telemetría de un conjunto de workstations.
+
+    Acepta una lista de workstation_ids (máximo 100) para consultar en batch.
+    """
+    workstation_ids: List[str] = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Lista de workstation_ids a consultar (máximo 100)"
+    )
+
+
 class TelemetryStatsResponse(BaseModel):
     """
     Schema de respuesta para estadísticas agregadas de telemetría por organización.

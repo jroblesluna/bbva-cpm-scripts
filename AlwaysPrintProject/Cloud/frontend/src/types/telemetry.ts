@@ -52,3 +52,11 @@ export interface TelemetryStats {
   queue_status_summary: QueueStatusSummary
   last_updated: string | null
 }
+
+/**
+ * Respuesta batch con la última telemetría de cada workstation.
+ * Mapa workstation_id → última entrada de telemetría (o null si no tiene).
+ */
+export interface TelemetryLatestBatch {
+  items: Record<string, TelemetryEntry | null>
+}

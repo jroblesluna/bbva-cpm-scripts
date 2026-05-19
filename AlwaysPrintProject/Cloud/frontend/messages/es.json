@@ -460,6 +460,7 @@
     "colDisconnections": "Desconexiones",
     "colDateTime": "Fecha/Hora",
     "contingencyActive2": "Activa",
-    "contingencyInactive": "Inactiva"
+    "contingencyInactive": "Inactiva",
+    "pagination": "Mostrando {start} a {end} de {total} workstations"
   }
 }

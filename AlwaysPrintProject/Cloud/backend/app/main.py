@@ -21,8 +21,15 @@ async def lifespan(app: FastAPI):
     """
     Gestor de ciclo de vida de la aplicación.
     
+    En desarrollo (SQLite): crea las tablas automáticamente si no existen.
     Inicia el ping loop al arrancar y lo detiene al cerrar.
     """
+    # Startup: Crear tablas en SQLite si no existen (desarrollo)
+    if settings.is_sqlite:
+        import app.models  # noqa: F401 — Registrar modelos en Base.metadata
+        from app.core.database import init_db
+        init_db()
+
     # Startup: Iniciar ping loop
     ping_task = asyncio.create_task(
         connection_manager.start_ping_loop(SessionLocal)

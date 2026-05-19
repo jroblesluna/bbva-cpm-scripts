@@ -39,15 +39,21 @@ import type { TelemetryEntry, TelemetryStats } from '@/types/telemetry';
 import type { Workstation } from '@/types/workstation';
 
 // ============================================================================
+// CONSTANTES
+// ============================================================================
+
+const PAGE_SIZE = 50;
+
+// ============================================================================
 // INTERFACES INTERNAS
 // ============================================================================
 
 /**
- * Workstation con su última entrada de telemetría asociada.
+ * Respuesta paginada de workstations.
  */
-interface WorkstationTelemetryRow {
-  workstation: Workstation;
-  latestEntry: TelemetryEntry | null;
+interface WorkstationsPaginatedResponse {
+  items: Workstation[];
+  total: number;
 }
 
 // ============================================================================
@@ -66,6 +72,20 @@ async function fetchTelemetryStats(accountId: string): Promise<TelemetryStats> {
 }
 
 /**
+ * Obtiene la última telemetría de las workstations visibles (batch).
+ * Envía los IDs de las workstations actualmente en la página para evitar
+ * N llamadas individuales. Máximo 100 IDs por llamada.
+ */
+async function fetchLatestTelemetryBatch(workstationIds: string[]): Promise<Record<string, TelemetryEntry | null>> {
+  if (workstationIds.length === 0) return {};
+  const response = await apiClient.post<{ items: Record<string, TelemetryEntry | null> }>(
+    '/workstations/telemetry/latest-batch',
+    { workstation_ids: workstationIds }
+  );
+  return response.data.items;
+}
+
+/**
  * Obtiene el historial de telemetría de una workstation (últimas 24h, max 100).
  */
 async function fetchWorkstationTelemetry(workstationId: string): Promise<TelemetryEntry[]> {
@@ -77,13 +97,13 @@ async function fetchWorkstationTelemetry(workstationId: string): Promise<Telemet
 }
 
 /**
- * Obtiene la lista de workstations de la cuenta.
+ * Obtiene la lista paginada de workstations.
  */
-async function fetchWorkstations(): Promise<Workstation[]> {
-  const response = await apiClient.get<{ items: Workstation[] }>('/workstations/', {
-    params: { page_size: 500 },
+async function fetchWorkstationsPaginated(page: number, pageSize: number): Promise<WorkstationsPaginatedResponse> {
+  const response = await apiClient.get<{ items: Workstation[]; total: number }>('/workstations/', {
+    params: { page, page_size: pageSize },
   });
-  return response.data.items;
+  return { items: response.data.items, total: response.data.total };
 }
 
 // ============================================================================
@@ -98,6 +118,7 @@ export default function TelemetryDashboardPage() {
   const t = useTranslations('telemetry');
   const [selectedWorkstationId, setSelectedWorkstationId] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [page, setPage] = useState(1);
 
   // --- Queries con auto-refresh cada 60s ---
 
@@ -111,8 +132,23 @@ export default function TelemetryDashboardPage() {
   });
 
   const workstationsQuery = useQuery({
-    queryKey: ['telemetry', 'workstations'],
-    queryFn: fetchWorkstations,
+    queryKey: ['telemetry', 'workstations', page],
+    queryFn: () => fetchWorkstationsPaginated(page, PAGE_SIZE),
+    staleTime: 60000,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true,
+    placeholderData: (prev) => prev,
+  });
+
+  // Derivar lista de workstations antes de la query batch (que depende de sus IDs)
+  const workstations = workstationsQuery.data?.items ?? [];
+  const totalWorkstations = workstationsQuery.data?.total ?? 0;
+  const totalPages = Math.ceil(totalWorkstations / PAGE_SIZE);
+
+  const latestBatchQuery = useQuery({
+    queryKey: ['telemetry', 'latest-batch', workstations.map(w => w.id).sort().join(',')],
+    queryFn: () => fetchLatestTelemetryBatch(workstations.map(w => w.id)),
+    enabled: workstations.length > 0,
     staleTime: 60000,
     refetchInterval: 60000,
     refetchOnWindowFocus: true,
@@ -126,12 +162,8 @@ export default function TelemetryDashboardPage() {
     refetchOnWindowFocus: true,
   });
 
-  // --- Derivar datos para la tabla ---
-
-  const workstations = workstationsQuery.data ?? [];
-
   // --- Render ---
-  const isRefreshing = statsQuery.isFetching || workstationsQuery.isFetching;
+  const isRefreshing = statsQuery.isFetching || workstationsQuery.isFetching || latestBatchQuery.isFetching;
 
   // --- Actualizar timestamp cuando los datos se cargan exitosamente ---
   useEffect(() => {
@@ -143,7 +175,8 @@ export default function TelemetryDashboardPage() {
   const handleRefresh = useCallback(() => {
     statsQuery.refetch();
     workstationsQuery.refetch();
-  }, [statsQuery, workstationsQuery]);
+    latestBatchQuery.refetch();
+  }, [statsQuery, workstationsQuery, latestBatchQuery]);
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -181,6 +214,11 @@ export default function TelemetryDashboardPage() {
       <div className="mt-6">
         <WorkstationsTable
           workstations={workstations}
+          latestBatch={latestBatchQuery.data ?? {}}
+          total={totalWorkstations}
+          page={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
           isLoading={workstationsQuery.isLoading}
           isError={workstationsQuery.isError}
           onRetry={() => workstationsQuery.refetch()}
@@ -332,6 +370,11 @@ function StatsCards({
 
 function WorkstationsTable({
   workstations,
+  latestBatch,
+  total,
+  page,
+  totalPages,
+  onPageChange,
   isLoading,
   isError,
   onRetry,
@@ -339,6 +382,11 @@ function WorkstationsTable({
   onSelect,
 }: {
   workstations: Workstation[];
+  latestBatch: Record<string, TelemetryEntry | null>;
+  total: number;
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
   isLoading: boolean;
   isError: boolean;
   onRetry: () => void;
@@ -346,9 +394,7 @@ function WorkstationsTable({
   onSelect: (id: string) => void;
 }) {
   const t = useTranslations('telemetry');
-  // Obtener última telemetría por workstation
-  // Nota: usamos una query separada para obtener la telemetría más reciente de cada ws
-  // En este caso, la tabla de workstations muestra datos básicos y al seleccionar se carga el historial
+  const tCommon = useTranslations('common');
 
   if (isLoading) {
     return (
@@ -428,12 +474,44 @@ function WorkstationsTable({
               <WorkstationRow
                 key={ws.id}
                 workstation={ws}
+                latestEntry={latestBatch[ws.id] ?? null}
                 isSelected={ws.id === selectedId}
                 onSelect={() => onSelect(ws.id)}
               />
             ))}
           </TableBody>
         </Table>
+
+        {/* Controles de paginación */}
+        {total > PAGE_SIZE && (
+          <div className="flex items-center justify-between border-t border-gray-200 pt-4 mt-4">
+            <p className="text-sm text-gray-700">
+              {t('pagination', {
+                start: (page - 1) * PAGE_SIZE + 1,
+                end: Math.min(page * PAGE_SIZE, total),
+                total,
+              })}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onPageChange(page - 1)}
+                disabled={page === 1}
+              >
+                {tCommon('previous')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onPageChange(page + 1)}
+                disabled={page >= totalPages}
+              >
+                {tCommon('next')}
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -445,37 +523,17 @@ function WorkstationsTable({
 
 function WorkstationRow({
   workstation,
+  latestEntry,
   isSelected,
   onSelect,
 }: {
   workstation: Workstation;
+  latestEntry: TelemetryEntry | null;
   isSelected: boolean;
   onSelect: () => void;
 }) {
   const t = useTranslations('telemetry');
-  // Obtener la última telemetría de esta workstation
-  const { data: telemetryData } = useQuery({
-    queryKey: ['telemetry', 'latest', workstation.id],
-    queryFn: async () => {
-      try {
-        const response = await apiClient.get<TelemetryEntry[]>(
-          `/workstations/${workstation.id}/telemetry`,
-          { params: { limit: 1 } }
-        );
-        return response.data;
-      } catch (error: any) {
-        if (error?.response?.status === 404) {
-          return [];
-        }
-        throw error;
-      }
-    },
-    staleTime: 60000,
-    refetchInterval: 60000,
-    retry: false,
-  });
 
-  const latest = telemetryData?.[0] ?? null;
   const displayName = workstation.hostname ?? workstation.ip_private;
 
   return (
@@ -485,31 +543,31 @@ function WorkstationRow({
     >
       <TableCell className="font-medium">{displayName}</TableCell>
       <TableCell>
-        {latest ? (
-          <QueueStatusBadge status={latest.queue_status} />
+        {latestEntry ? (
+          <QueueStatusBadge status={latestEntry.queue_status} />
         ) : (
           <Badge variant="secondary">{t('noData')}</Badge>
         )}
       </TableCell>
       <TableCell>
-        {latest ? (
-          <ContingencyBadge active={latest.contingency_active} />
+        {latestEntry ? (
+          <ContingencyBadge active={latestEntry.contingency_active} />
         ) : (
           <span className="text-gray-400">—</span>
         )}
       </TableCell>
       <TableCell>
-        {latest ? latest.jobs_identified : <span className="text-gray-400">—</span>}
+        {latestEntry ? latestEntry.jobs_identified : <span className="text-gray-400">—</span>}
       </TableCell>
       <TableCell>
-        {latest?.avg_release_time_ms != null ? (
-          `${latest.avg_release_time_ms} ms`
+        {latestEntry?.avg_release_time_ms != null ? (
+          `${latestEntry.avg_release_time_ms} ms`
         ) : (
           <span className="text-gray-400">—</span>
         )}
       </TableCell>
       <TableCell>
-        {latest ? latest.disconnection_count : <span className="text-gray-400">—</span>}
+        {latestEntry ? latestEntry.disconnection_count : <span className="text-gray-400">—</span>}
       </TableCell>
     </TableRow>
   );

@@ -16,7 +16,14 @@ from sqlalchemy import func, distinct, desc
 
 from app.models.telemetry import TelemetryLog
 from app.models.workstation import Workstation
-from app.schemas.telemetry import TelemetryMessagePayload, TelemetryStatsResponse, QueueStatusSummary
+from app.schemas.telemetry import (
+    TelemetryMessagePayload,
+    TelemetryStatsResponse,
+    TelemetryLatestBatchResponse,
+    TelemetryLatestBatchRequest,
+    TelemetryLogResponse,
+    QueueStatusSummary,
+)
 
 
 class TelemetryService:
@@ -239,3 +246,71 @@ class TelemetryService:
             queue_status_summary=QueueStatusSummary(**queue_summary),
             last_updated=last_updated
         )
+
+    def get_latest_telemetry_batch(
+        self,
+        db: Session,
+        workstation_ids: List[str],
+        organization_id: Optional[str] = None
+    ) -> TelemetryLatestBatchResponse:
+        """
+        Obtiene la última telemetría de un conjunto de workstations.
+
+        Si organization_id se proporciona (usuario Operador), verifica que
+        las workstations pertenezcan a esa organización (tenant isolation).
+        Si organization_id es None (usuario Admin), consulta sin restricción.
+
+        Args:
+            db: Sesión de base de datos
+            workstation_ids: Lista de UUIDs de workstations a consultar (máx 100)
+            organization_id: UUID de la organización para tenant isolation (None para Admin)
+
+        Returns:
+            TelemetryLatestBatchResponse con el mapa de última telemetría por workstation
+        """
+        if not workstation_ids:
+            return TelemetryLatestBatchResponse(items={})
+
+        # Verificar que las workstations existen (y pertenecen a la organización si aplica)
+        ws_query = db.query(Workstation).filter(
+            Workstation.id.in_(workstation_ids)
+        )
+        if organization_id:
+            ws_query = ws_query.filter(Workstation.organization_id == organization_id)
+
+        valid_workstations = ws_query.all()
+        valid_ids = [str(ws.id) for ws in valid_workstations]
+
+        if not valid_ids:
+            # Retornar null para todos los IDs solicitados
+            return TelemetryLatestBatchResponse(
+                items={ws_id: None for ws_id in workstation_ids}
+            )
+
+        # Subconsulta: obtener el recorded_at máximo por workstation
+        latest_per_ws = db.query(
+            TelemetryLog.workstation_id,
+            func.max(TelemetryLog.recorded_at).label("max_recorded_at")
+        ).filter(
+            TelemetryLog.workstation_id.in_(valid_ids)
+        ).group_by(TelemetryLog.workstation_id).subquery()
+
+        # Obtener los registros más recientes por workstation
+        most_recent_logs = db.query(TelemetryLog).join(
+            latest_per_ws,
+            (TelemetryLog.workstation_id == latest_per_ws.c.workstation_id) &
+            (TelemetryLog.recorded_at == latest_per_ws.c.max_recorded_at)
+        ).all()
+
+        # Construir mapa workstation_id → último registro
+        logs_by_ws = {str(log.workstation_id): log for log in most_recent_logs}
+
+        items = {}
+        for ws_id in workstation_ids:
+            log = logs_by_ws.get(ws_id)
+            if log:
+                items[ws_id] = TelemetryLogResponse.model_validate(log)
+            else:
+                items[ws_id] = None
+
+        return TelemetryLatestBatchResponse(items=items)

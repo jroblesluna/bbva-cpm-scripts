@@ -16,7 +16,12 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User, UserRole
 from app.models.workstation import Workstation
-from app.schemas.telemetry import TelemetryLogResponse, TelemetryStatsResponse
+from app.schemas.telemetry import (
+    TelemetryLogResponse,
+    TelemetryStatsResponse,
+    TelemetryLatestBatchResponse,
+    TelemetryLatestBatchRequest,
+)
 from app.services.telemetry import TelemetryService
 
 # Router con prefijo /workstations para el endpoint de telemetría por workstation
@@ -153,3 +158,49 @@ async def get_organization_telemetry_stats(
     )
 
     return stats
+
+
+# === ENDPOINT BATCH: ÚLTIMA TELEMETRÍA POR WORKSTATION ===
+
+@router.post(
+    "/telemetry/latest-batch",
+    response_model=TelemetryLatestBatchResponse,
+    summary="Obtener última telemetría de un conjunto de workstations",
+    description="Recibe una lista de workstation_ids (máx 100) y retorna la última telemetría de cada una."
+)
+async def get_telemetry_latest_batch(
+    body: TelemetryLatestBatchRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtener la última telemetría de un conjunto de workstations (batch).
+
+    Endpoint que elimina la necesidad de hacer N llamadas individuales
+    GET /workstations/{id}/telemetry?limit=1 desde el frontend.
+
+    - Admin: puede consultar cualquier workstation (sin filtro de organización)
+    - Operador: solo puede consultar workstations de su organización
+
+    Acepta máximo 100 workstation_ids por llamada para mantener rendimiento
+    con escalas de 10,000+ workstations (el frontend pagina y solo consulta
+    las workstations visibles en la página actual).
+
+    Retorna:
+        - 200: Objeto con mapa {workstation_id: última_telemetría | null}
+        - 401: Token ausente o inválido
+    """
+    # Determinar organization_id para tenant isolation según rol
+    org_id = None
+    if current_user.role != UserRole.ADMIN:
+        org_id = str(current_user.organization_id) if current_user.organization_id else None
+
+    # Obtener última telemetría batch usando el servicio
+    telemetry_service = TelemetryService()
+    result = telemetry_service.get_latest_telemetry_batch(
+        db=db,
+        workstation_ids=body.workstation_ids,
+        organization_id=org_id
+    )
+
+    return result
