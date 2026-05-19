@@ -88,29 +88,43 @@ class ConnectionManager:
     async def disconnect_workstation(
         self, 
         workstation_id: str,
-        db: Session
+        db: Session,
+        websocket: WebSocket = None
     ):
         """
         Desconecta un Tray Client y marca como offline.
         
+        Solo marca offline si el WebSocket que se desconecta es el mismo que está
+        actualmente registrado. Si ya fue reemplazado por una nueva conexión
+        (reconexión rápida tras StopTray/StartTray), no se marca offline.
+        
         Args:
             workstation_id: UUID de la workstation
             db: Sesión de base de datos
+            websocket: WebSocket que se está desconectando (para comparar con el activo)
         """
+        should_mark_offline = False
+        
         async with self._lock:
             if workstation_id in self.workstation_connections:
-                del self.workstation_connections[workstation_id]
+                current_ws = self.workstation_connections[workstation_id]
+                # Solo desconectar si es el mismo WebSocket (o si no se proporcionó)
+                if websocket is None or current_ws is websocket:
+                    del self.workstation_connections[workstation_id]
+                    should_mark_offline = True
+                # Si el WebSocket activo es diferente, ya se reconectó — no marcar offline
             
-            if workstation_id in self.last_pong:
+            if should_mark_offline and workstation_id in self.last_pong:
                 del self.last_pong[workstation_id]
         
-        # Actualizar estado en base de datos
-        workstation_service = WorkstationService()
-        workstation_service.update_workstation_status(
-            db=db,
-            workstation_id=workstation_id,
-            is_online=False
-        )
+        # Solo actualizar estado en BD si esta era la conexión activa
+        if should_mark_offline:
+            workstation_service = WorkstationService()
+            workstation_service.update_workstation_status(
+                db=db,
+                workstation_id=workstation_id,
+                is_online=False
+            )
     
     async def connect_operator(
         self, 

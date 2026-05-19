@@ -413,7 +413,8 @@ async def workstation_websocket(
         if workstation_id:
             await connection_manager.disconnect_workstation(
                 workstation_id=workstation_id,
-                db=db
+                db=db,
+                websocket=websocket
             )
 
 
