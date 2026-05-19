@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Management;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Threading;
@@ -27,6 +28,15 @@ namespace AlwaysPrintTray.Cloud
     {
         /// <summary>Estado actual de conexión Cloud.</summary>
         public bool IsConnected { get; private set; }
+
+        /// <summary>URL base de la API Cloud.</summary>
+        public string CloudApiUrl => _config.CloudApiUrl;
+
+        /// <summary>ID de la workstation registrada en la Cloud (null si no registrada).</summary>
+        public string? WorkstationId => _credentials.WorkstationId;
+
+        /// <summary>HttpClient compartido para requests HTTP a la Cloud.</summary>
+        public HttpClient? HttpClient => _wsClient?.HttpClient;
 
         /// <summary>
         /// Se dispara cuando la workstation ha sido registrada exitosamente en la Cloud

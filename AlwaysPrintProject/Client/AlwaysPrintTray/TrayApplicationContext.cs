@@ -64,6 +64,7 @@ namespace AlwaysPrintTray
             var menu = new ContextMenuStrip();
             menu.Items.Add(LocalizationManager.Get("MenuAbout"),         null, (_, __) => ShowAbout());
             menu.Items.Add(LocalizationManager.Get("MenuConfiguration"), null, (_, __) => ShowConfiguration());
+            menu.Items.Add(LocalizationManager.Get("MenuMyPrinters"),    null, (_, __) => ShowMyPrinters());
             menu.Items.Add(LocalizationManager.Get("MenuCheckUpdates"),  null, (_, __) => CheckForUpdatesManual());
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(LocalizationManager.Get("MenuExit"),          null, (_, __) => ExitApplication());
@@ -548,6 +549,39 @@ namespace AlwaysPrintTray
         private void ShowAbout()
         {
             using var form = new AboutForm();
+            form.ShowDialog();
+        }
+
+        private void ShowMyPrinters()
+        {
+            if (_cloudManager == null || !_cloudManager.IsConnected)
+            {
+                MessageBox.Show(
+                    "No hay conexión con la nube. Verifique su conexión e intente de nuevo.",
+                    "Mis Impresoras", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(_cloudManager.WorkstationId))
+            {
+                MessageBox.Show(
+                    "La workstation no está registrada en la nube. Espere a que se complete el registro.",
+                    "Mis Impresoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (_cloudManager.HttpClient == null)
+            {
+                MessageBox.Show(
+                    "Error interno: cliente HTTP no disponible.",
+                    "Mis Impresoras", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            using var form = new MyPrintersForm(
+                _cloudManager.CloudApiUrl,
+                _cloudManager.WorkstationId,
+                _cloudManager.HttpClient);
             form.ShowDialog();
         }
 

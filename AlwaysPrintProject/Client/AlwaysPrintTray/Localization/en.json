@@ -2,6 +2,7 @@
   "TrayTooltip": "AlwaysPrint",
   "MenuAbout": "About",
   "MenuConfiguration": "Configuration",
+  "MenuMyPrinters": "My Printers",
   "MenuCheckUpdates": "Check for updates",
   "MenuExit": "Exit",
   "BalloonInitOk": "Initialized successfully ({0}).",

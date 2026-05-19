@@ -272,3 +272,122 @@ def delete_device(
     )
     
     return None
+
+
+# === ENDPOINTS PARA WORKSTATIONS (autenticación por IP pública) ===
+
+@router.get("/workstation/{workstation_id}/my-printers")
+def get_my_printers(
+    workstation_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Obtener las impresoras disponibles para una workstation (misma VLAN).
+    
+    Este endpoint es accesible por las workstations sin autenticación JWT.
+    Retorna las impresoras activas que pertenecen a la misma VLAN que la workstation.
+    Si la workstation no tiene VLAN asignada, retorna todas las impresoras activas
+    de la organización.
+    
+    Incluye información sobre cuál es la impresora favorita (default_printer_id)
+    y cuál sería la impresora por defecto (menor IP en la VLAN).
+    """
+    from app.models.workstation import Workstation
+    
+    # Buscar la workstation
+    workstation = db.query(Workstation).filter(Workstation.id == workstation_id).first()
+    if not workstation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workstation con ID {workstation_id} no encontrada"
+        )
+    
+    # Obtener dispositivos activos de la misma VLAN (o de la organización si no tiene VLAN)
+    query = db.query(Device).filter(
+        Device.organization_id == workstation.organization_id,
+        Device.is_active == True
+    )
+    
+    if workstation.vlan_id:
+        query = query.filter(Device.vlan_id == workstation.vlan_id)
+    
+    devices = query.order_by(Device.ip_address).all()
+    
+    # Determinar impresora por defecto (menor IP)
+    default_device_id = str(devices[0].id) if devices else None
+    
+    # Construir respuesta
+    printers = []
+    for device in devices:
+        printers.append({
+            "id": str(device.id),
+            "name": device.name,
+            "ip_address": device.ip_address,
+            "port": device.port,
+            "model": device.model,
+            "location": device.location,
+            "is_favorite": str(device.id) == str(workstation.default_printer_id) if workstation.default_printer_id else False,
+            "is_default": str(device.id) == default_device_id,
+        })
+    
+    return {
+        "workstation_id": str(workstation.id),
+        "vlan_id": str(workstation.vlan_id) if workstation.vlan_id else None,
+        "vlan_name": workstation.vlan.name if workstation.vlan else None,
+        "favorite_printer_id": str(workstation.default_printer_id) if workstation.default_printer_id else None,
+        "default_printer_id": default_device_id,
+        "printers": printers,
+        "total": len(printers),
+    }
+
+
+@router.put("/workstation/{workstation_id}/favorite-printer")
+def set_favorite_printer(
+    workstation_id: UUID,
+    body: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Establecer la impresora favorita de contingencia para una workstation.
+    
+    Body JSON: { "device_id": "uuid" | null }
+    - Si device_id es un UUID válido: establece esa impresora como favorita
+    - Si device_id es null: elimina la favorita (usará la de menor IP por defecto)
+    """
+    from app.models.workstation import Workstation
+    
+    # Buscar la workstation
+    workstation = db.query(Workstation).filter(Workstation.id == workstation_id).first()
+    if not workstation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workstation con ID {workstation_id} no encontrada"
+        )
+    
+    device_id = body.get("device_id")
+    
+    if device_id:
+        # Validar que el dispositivo existe y pertenece a la misma organización
+        device = db.query(Device).filter(
+            Device.id == device_id,
+            Device.organization_id == workstation.organization_id,
+            Device.is_active == True
+        ).first()
+        if not device:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Dispositivo no encontrado o no pertenece a la organización"
+            )
+        workstation.default_printer_id = device.id
+    else:
+        workstation.default_printer_id = None
+    
+    db.commit()
+    db.refresh(workstation)
+    
+    return {
+        "success": True,
+        "workstation_id": str(workstation.id),
+        "favorite_printer_id": str(workstation.default_printer_id) if workstation.default_printer_id else None,
+    }
