@@ -570,6 +570,76 @@ def toggle_auto_update(
 # === TARGET VERSION ===
 
 @router.patch(
+    "/{org_id}/forced-contingency",
+    summary="Activar/desactivar contingencia forzada",
+    description=(
+        "Permite a un administrador activar o desactivar la contingencia forzada "
+        "para toda una organización. Todas las workstations de la organización "
+        "heredan este estado."
+    )
+)
+def toggle_forced_contingency(
+    org_id: UUID,
+    body: AutoUpdateToggleRequest,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Activar o desactivar contingencia forzada para una organización.
+    Todas las workstations de la organización heredan este estado.
+    """
+    organization = db.query(Organization).filter(Organization.id == org_id).first()
+
+    if not organization:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organización no encontrada"
+        )
+
+    organization.forced_contingency = body.enabled
+    db.commit()
+    db.refresh(organization)
+
+    logger.info(
+        "Contingencia forzada actualizada: org_id=%s, enabled=%s, admin_id=%s",
+        org_id,
+        body.enabled,
+        current_user.id,
+    )
+
+    # Notificar a todas las workstations online de esta organización vía WebSocket
+    from app.services.websocket_manager import connection_manager
+    from app.models.workstation import Workstation
+    import asyncio
+
+    workstations = db.query(Workstation).filter(
+        Workstation.organization_id == org_id
+    ).all()
+
+    message = {
+        "type": "forced_contingency",
+        "enabled": body.enabled,
+        "source": "organization",
+        "source_name": organization.name,
+    }
+
+    for ws in workstations:
+        ws_id_str = str(ws.id)
+        if connection_manager.is_workstation_online(ws_id_str):
+            try:
+                loop = asyncio.get_event_loop()
+                loop.create_task(connection_manager.send_to_workstation(ws_id_str, message))
+            except RuntimeError:
+                pass
+
+    return {
+        "forced_contingency": organization.forced_contingency,
+        "organization_id": str(organization.id),
+        "updated_at": organization.updated_at,
+    }
+
+
+@router.patch(
     "/{org_id}/target-version",
     response_model=TargetVersionResponse,
     summary="Establecer versión objetivo de actualización",

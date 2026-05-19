@@ -7,7 +7,7 @@ dentro de una cuenta, identificados por rangos CIDR.
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -32,6 +32,10 @@ class VLAN(Base):
     
     # Rangos CIDR como array JSON: ["192.168.1.0/24", "10.0.0.0/16"]
     cidr_ranges = Column(JSON, nullable=False, default=list)
+
+    # Flag de contingencia forzada a nivel de VLAN
+    # Cuando está activo, TODAS las workstations de esta VLAN entran en modo contingencia
+    forced_contingency = Column(Boolean, nullable=False, default=False, server_default='false')
     
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

@@ -87,6 +87,10 @@ class Organization(Base):
     # se le solicita re-registrarse automáticamente (obtiene nuevo workstation_id)
     auto_reregister_enabled = Column(Boolean, nullable=False, default=False, server_default='false')
 
+    # Flag de contingencia forzada a nivel de organización
+    # Cuando está activo, TODAS las workstations de esta organización entran en modo contingencia
+    forced_contingency = Column(Boolean, nullable=False, default=False, server_default='false')
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

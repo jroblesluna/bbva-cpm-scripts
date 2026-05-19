@@ -898,6 +898,58 @@ def update_workstation_config(
     return config
 
 
+@router.patch("/{workstation_id}/forced-contingency")
+async def toggle_workstation_forced_contingency(
+    workstation_id: UUID,
+    enabled: bool = Query(..., description="Activar o desactivar contingencia forzada"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Activar o desactivar contingencia forzada para una workstation individual.
+    """
+    workstation = db.query(Workstation).filter(Workstation.id == workstation_id).first()
+
+    if not workstation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workstation con ID {workstation_id} no encontrada"
+        )
+
+    if current_user.role == UserRole.OPERATOR:
+        if workstation.organization_id != current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para modificar esta workstation"
+            )
+
+    workstation.forced_contingency = enabled
+    db.commit()
+    db.refresh(workstation)
+
+    logger.info(
+        "Contingencia forzada workstation actualizada: workstation_id=%s, enabled=%s, user_id=%s",
+        workstation_id, enabled, current_user.id,
+    )
+
+    # Notificar a la workstation si está online
+    workstation_id_str = str(workstation_id)
+    if connection_manager.is_workstation_online(workstation_id_str):
+        message = {
+            "type": "forced_contingency",
+            "enabled": enabled,
+            "source": "workstation",
+            "source_name": workstation.hostname or workstation.ip_private,
+        }
+        await connection_manager.send_to_workstation(workstation_id_str, message)
+
+    return {
+        "forced_contingency": workstation.forced_contingency,
+        "workstation_id": str(workstation.id),
+        "updated_at": workstation.updated_at,
+    }
+
+
 @router.delete("/{workstation_id}/config", status_code=status.HTTP_204_NO_CONTENT)
 def delete_workstation_config(
     request: Request,

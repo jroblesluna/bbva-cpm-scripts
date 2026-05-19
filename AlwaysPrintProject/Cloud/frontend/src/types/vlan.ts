@@ -8,6 +8,7 @@ export interface VLAN {
   name: string
   description: string | null
   cidr_ranges: string[]
+  forced_contingency: boolean
   created_at: string
   updated_at: string
 }

@@ -14,6 +14,7 @@ export interface Workstation {
   current_user: string | null
   is_online: boolean
   contingency_active: boolean
+  forced_contingency: boolean
   last_connection: string | null
   first_seen: string
   created_at: string

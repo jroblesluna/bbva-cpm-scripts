@@ -93,6 +93,7 @@ class OrganizationResponse(OrganizationBase):
     auto_update_enabled: bool
     target_version: Optional[str] = None
     auto_reregister_enabled: bool
+    forced_contingency: bool = False
     public_ips: list[PublicIPResponse] = []
     created_at: datetime
     updated_at: datetime

@@ -37,6 +37,7 @@ import {
   LayoutGrid,
   List,
   ArrowUpDown,
+  AlertTriangle,
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
@@ -113,6 +114,27 @@ export default function WorkstationsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workstations'] });
       setSelectedWorkstation(null);
+    },
+  });
+
+  const forcedContingencyMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      workstationsApi.toggleForcedContingency(id, enabled),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['workstations'] });
+      toast({
+        title: 'Contingencia forzada',
+        description: variables.enabled
+          ? 'Contingencia forzada activada para esta workstation.'
+          : 'Contingencia forzada desactivada para esta workstation.',
+      });
+    },
+    onError: (error: { detail?: string }) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.detail ?? 'Error al cambiar contingencia forzada.',
+      });
     },
   });
 
@@ -492,9 +514,11 @@ export default function WorkstationsPage() {
                 onDelete={() => handleDelete(workstation)}
                 onCommand={(commandType) => commandMutation.mutate({ id: workstation.id, commandType })}
                 onDownloadLog={() => logDownloadMutation.mutate(workstation.id)}
+                onToggleForcedContingency={(enabled) => forcedContingencyMutation.mutate({ id: workstation.id, enabled })}
                 isCommandPending={commandMutation.isPending}
                 isDeletePending={deleteMutation.isPending}
                 isLogPending={logDownloadMutation.isPending}
+                isForcedContingencyPending={forcedContingencyMutation.isPending}
               />
             ))
           ) : (
@@ -514,9 +538,11 @@ export default function WorkstationsPage() {
           onDelete={handleDelete}
           onCommand={(id, commandType) => commandMutation.mutate({ id, commandType })}
           onDownloadLog={(id) => logDownloadMutation.mutate(id)}
+          onToggleForcedContingency={(id, enabled) => forcedContingencyMutation.mutate({ id, enabled })}
           isCommandPending={commandMutation.isPending}
           isDeletePending={deleteMutation.isPending}
           isLogPending={logDownloadMutation.isPending}
+          isForcedContingencyPending={forcedContingencyMutation.isPending}
         />
       )}
 
@@ -543,9 +569,11 @@ interface WorkstationCardProps {
   onDelete: () => void;
   onCommand: (commandType: 'restart_service' | 'restart_tray' | 'check_update') => void;
   onDownloadLog: () => void;
+  onToggleForcedContingency: (enabled: boolean) => void;
   isCommandPending: boolean;
   isDeletePending: boolean;
   isLogPending: boolean;
+  isForcedContingencyPending: boolean;
 }
 
 function WorkstationCard({
@@ -557,9 +585,11 @@ function WorkstationCard({
   onDelete,
   onCommand,
   onDownloadLog,
+  onToggleForcedContingency,
   isCommandPending,
   isDeletePending,
   isLogPending,
+  isForcedContingencyPending,
 }: WorkstationCardProps) {
   return (
     <Card className="hover:shadow-md transition">
@@ -585,10 +615,26 @@ function WorkstationCard({
                 {t('contingency')}
               </Badge>
             )}
+            {workstation.forced_contingency && (
+              <Badge variant="destructive" className="bg-orange-600">
+                Forzada
+              </Badge>
+            )}
           </div>
 
           {/* Acciones: visibles en desktop en la misma fila */}
           <div className="hidden md:flex items-center flex-wrap gap-1">
+            {/* Switch de contingencia forzada */}
+            <label className="flex items-center gap-1 mr-2 cursor-pointer" title="Contingencia forzada">
+              <AlertTriangle className={`w-4 h-4 ${workstation.forced_contingency ? 'text-orange-600' : 'text-gray-400'}`} />
+              <input
+                type="checkbox"
+                checked={workstation.forced_contingency}
+                onChange={(e) => onToggleForcedContingency(e.target.checked)}
+                disabled={isForcedContingencyPending}
+                className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+              />
+            </label>
             <Button
               variant="outline"
               size="sm"
@@ -806,9 +852,11 @@ interface WorkstationTableProps {
   onDelete: (ws: Workstation) => void;
   onCommand: (id: string, commandType: 'restart_service' | 'restart_tray' | 'check_update') => void;
   onDownloadLog: (id: string) => void;
+  onToggleForcedContingency: (id: string, enabled: boolean) => void;
   isCommandPending: boolean;
   isDeletePending: boolean;
   isLogPending: boolean;
+  isForcedContingencyPending: boolean;
 }
 
 function WorkstationTable({
@@ -823,9 +871,11 @@ function WorkstationTable({
   onDelete,
   onCommand,
   onDownloadLog,
+  onToggleForcedContingency,
   isCommandPending,
   isDeletePending,
   isLogPending,
+  isForcedContingencyPending,
 }: WorkstationTableProps) {
   if (workstations.length === 0) {
     return (
@@ -914,6 +964,15 @@ function WorkstationTable({
                   {/* Acciones */}
                   <td className="px-3 py-3 whitespace-nowrap">
                     <div className="flex items-center gap-1">
+                      <label className="flex items-center cursor-pointer" title="Contingencia forzada">
+                        <input
+                          type="checkbox"
+                          checked={ws.forced_contingency}
+                          onChange={(e) => onToggleForcedContingency(ws.id, e.target.checked)}
+                          disabled={isForcedContingencyPending}
+                          className="rounded border-gray-300 text-orange-600 focus:ring-orange-500 h-3.5 w-3.5"
+                        />
+                      </label>
                       <Button
                         variant="ghost"
                         size="sm"

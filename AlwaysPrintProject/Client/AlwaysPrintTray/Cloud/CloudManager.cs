@@ -270,6 +270,9 @@ namespace AlwaysPrintTray.Cloud
                 case "command":
                     HandleCommand(json);
                     break;
+                case "forced_contingency":
+                    HandleForcedContingency(json);
+                    break;
                 default:
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"CloudManager: mensaje recibido tipo='{type}' (sin handler).");
@@ -690,6 +693,84 @@ namespace AlwaysPrintTray.Cloud
                     AlwaysPrintLogger.WriteTrayInfo(
                         "CloudManager: ConnectivityMonitor detenido y liberado tras config_update (ConnectivityChecks vacío).");
                 }
+            }
+        }
+
+        // === Contingencia Forzada ===
+
+        /// <summary>
+        /// Procesa un mensaje de contingencia forzada recibido desde la Cloud.
+        /// Muestra una notificación al usuario indicando que se está entrando o saliendo
+        /// del modo contingencia forzada.
+        /// </summary>
+        private void HandleForcedContingency(string json)
+        {
+            try
+            {
+                var obj = JObject.Parse(json);
+                bool enabled = obj["enabled"]?.Value<bool>() ?? false;
+                string source = obj["source"]?.ToString() ?? "cloud";
+                string sourceName = obj["source_name"]?.ToString() ?? "";
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: contingencia forzada recibida. enabled={enabled}, source={source}, source_name={sourceName}");
+
+                // Notificar al Service vía Named Pipe
+                try
+                {
+                    if (_pipe.IsConnected)
+                    {
+                        var payload = new ForcedContingencyPayload
+                        {
+                            Enabled = enabled,
+                            Source = source,
+                            SourceName = sourceName
+                        };
+                        _pipe.Send(PipeMessage.Create(MessageType.ForcedContingencyChanged, payload));
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            "CloudManager: notificación de contingencia forzada enviada al Service.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"CloudManager: error notificando contingencia forzada al Service. {ex.Message}");
+                }
+
+                // Mostrar notificación al usuario en el system tray
+                _uiContext.Post(_ =>
+                {
+                    try
+                    {
+                        string title = "AlwaysPrint";
+                        string message;
+
+                        if (enabled)
+                        {
+                            message = $"Se está entrando en modo contingencia forzada (origen: {sourceName}).";
+                        }
+                        else
+                        {
+                            message = $"Se ha desactivado el modo contingencia forzada (origen: {sourceName}).";
+                        }
+
+                        _trayIcon.ShowBalloonTip(
+                            5000,
+                            title,
+                            message,
+                            enabled ? ToolTipIcon.Warning : ToolTipIcon.Info);
+                    }
+                    catch (Exception ex)
+                    {
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            $"CloudManager: error mostrando balloon tip de contingencia forzada. {ex.Message}");
+                    }
+                }, null);
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error procesando mensaje forced_contingency. {ex.Message}");
             }
         }
 

@@ -31,7 +31,8 @@ import {
   X,
   Network,
   Users,
-  Monitor
+  Monitor,
+  AlertTriangle
 } from 'lucide-react'
 import type { Organization, OrganizationCreate, OrganizationUpdate, PublicIPCreate } from '@/types'
 
@@ -73,6 +74,15 @@ export default function AccountsPage() {
   // Mutation para eliminar cuenta
   const deleteMutation = useMutation({
     mutationFn: (id: string) => organizationsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+    },
+  })
+
+  // Mutation para toggle de contingencia forzada
+  const forcedContingencyMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      organizationsApi.toggleForcedContingency(id, enabled),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
     },
@@ -301,6 +311,16 @@ export default function AccountsPage() {
                   </div>
 
                   <div className="flex items-center gap-2 sm:ml-4 shrink-0 self-end sm:self-start">
+                    <label className="flex items-center gap-1 cursor-pointer" title="Contingencia forzada">
+                      <AlertTriangle className={`w-4 h-4 ${account.forced_contingency ? 'text-orange-600' : 'text-gray-400'}`} />
+                      <input
+                        type="checkbox"
+                        checked={account.forced_contingency}
+                        onChange={(e) => forcedContingencyMutation.mutate({ id: account.id, enabled: e.target.checked })}
+                        disabled={forcedContingencyMutation.isPending}
+                        className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                      />
+                    </label>
                     <Button
                       variant="outline"
                       size="sm"

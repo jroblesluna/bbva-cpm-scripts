@@ -256,6 +256,63 @@ def list_vlan_workstations(
     return workstation_service.get_workstations_by_vlan(db, vlan_id, page, page_size)
 
 
+@router.patch("/{vlan_id}/forced-contingency")
+def toggle_vlan_forced_contingency(
+    vlan_id: UUID,
+    enabled: bool = Query(..., description="Activar o desactivar contingencia forzada"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Activar o desactivar contingencia forzada para una VLAN.
+    Todas las workstations de la VLAN heredan este estado.
+    """
+    vlan = db.query(VLAN).filter(VLAN.id == vlan_id).first()
+    if not vlan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
+
+    if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
+
+    vlan.forced_contingency = enabled
+    db.commit()
+    db.refresh(vlan)
+
+    # Notificar a workstations online de esta VLAN vía WebSocket
+    from app.services.websocket_manager import connection_manager
+    from app.models.workstation import Workstation
+    import asyncio
+    import logging as log_module
+
+    log_module.getLogger(__name__).info(
+        "Contingencia forzada VLAN actualizada: vlan_id=%s, enabled=%s, user_id=%s",
+        vlan_id, enabled, current_user.id,
+    )
+
+    workstations = db.query(Workstation).filter(Workstation.vlan_id == vlan_id).all()
+    message = {
+        "type": "forced_contingency",
+        "enabled": enabled,
+        "source": "vlan",
+        "source_name": vlan.name,
+    }
+
+    for ws in workstations:
+        ws_id_str = str(ws.id)
+        if connection_manager.is_workstation_online(ws_id_str):
+            try:
+                loop = asyncio.get_event_loop()
+                loop.create_task(connection_manager.send_to_workstation(ws_id_str, message))
+            except RuntimeError:
+                pass
+
+    return {
+        "forced_contingency": vlan.forced_contingency,
+        "vlan_id": str(vlan.id),
+        "updated_at": vlan.updated_at,
+    }
+
+
 @router.get("/{vlan_id}/config", response_model=VLANConfigResponse)
 def get_vlan_config(
     vlan_id: UUID,

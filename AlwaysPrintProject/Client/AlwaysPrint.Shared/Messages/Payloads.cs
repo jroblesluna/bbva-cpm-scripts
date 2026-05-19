@@ -232,4 +232,25 @@ namespace AlwaysPrint.Shared.Messages
         [JsonProperty("exitCode")]
         public int ExitCode { get; set; }
     }
+
+    // ── Contingencia Forzada ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Payload enviado del Tray al Service cuando se recibe un mensaje
+    /// de contingencia forzada desde la Cloud.
+    /// </summary>
+    public class ForcedContingencyPayload
+    {
+        /// <summary>true = contingencia forzada activada, false = desactivada.</summary>
+        [JsonProperty("enabled")]
+        public bool Enabled { get; set; }
+
+        /// <summary>Origen del cambio: "organization", "vlan" o "workstation".</summary>
+        [JsonProperty("source")]
+        public string Source { get; set; } = string.Empty;
+
+        /// <summary>Nombre del origen (nombre de la organización, VLAN o workstation).</summary>
+        [JsonProperty("sourceName")]
+        public string SourceName { get; set; } = string.Empty;
+    }
 }

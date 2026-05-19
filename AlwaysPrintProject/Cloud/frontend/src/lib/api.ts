@@ -324,6 +324,17 @@ export const organizationsApi = {
   rejectIP: async (ipId: string): Promise<void> => {
     await apiClient.delete(`/organizations/public-ips/${ipId}/reject`)
   },
+
+  /**
+   * Activar/desactivar contingencia forzada para una organización.
+   */
+  toggleForcedContingency: async (id: string, enabled: boolean): Promise<{ forced_contingency: boolean }> => {
+    const response = await apiClient.patch<{ forced_contingency: boolean }>(
+      `/organizations/${id}/forced-contingency`,
+      { enabled }
+    )
+    return response.data
+  },
 }
 
 
@@ -500,6 +511,18 @@ export const workstationsApi = {
     )
     return response.data.devices || []
   },
+
+  /**
+   * Activar/desactivar contingencia forzada para una workstation.
+   */
+  toggleForcedContingency: async (id: string, enabled: boolean): Promise<{ forced_contingency: boolean }> => {
+    const response = await apiClient.patch<{ forced_contingency: boolean }>(
+      `/workstations/${id}/forced-contingency`,
+      null,
+      { params: { enabled } }
+    )
+    return response.data
+  },
 }
 
 // ============================================================================
@@ -577,6 +600,18 @@ export const vlansApi = {
    */
   deleteConfig: async (id: string): Promise<void> => {
     await apiClient.delete(`/vlans/${id}/config`)
+  },
+
+  /**
+   * Activar/desactivar contingencia forzada para una VLAN.
+   */
+  toggleForcedContingency: async (id: string, enabled: boolean): Promise<{ forced_contingency: boolean }> => {
+    const response = await apiClient.patch<{ forced_contingency: boolean }>(
+      `/vlans/${id}/forced-contingency`,
+      null,
+      { params: { enabled } }
+    )
+    return response.data
   },
 }
 

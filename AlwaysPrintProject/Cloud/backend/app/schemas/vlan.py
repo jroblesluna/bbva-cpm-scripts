@@ -64,6 +64,7 @@ class VLANResponse(BaseModel):
     name: str
     description: Optional[str] = None
     cidr_ranges: list[str]
+    forced_contingency: bool = False
     created_at: datetime
     updated_at: datetime
     

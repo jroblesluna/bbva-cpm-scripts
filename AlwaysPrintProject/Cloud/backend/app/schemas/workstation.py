@@ -98,6 +98,7 @@ class WorkstationResponse(BaseModel):
     current_user: Optional[str] = None
     is_online: bool
     contingency_active: bool
+    forced_contingency: bool = False
     last_connection: Optional[datetime] = None
     first_seen: datetime
     created_at: datetime

@@ -33,6 +33,9 @@ namespace AlwaysPrint.Shared.Messages
 
         // Actualizaciones automáticas
         InstallUpdate,               // Tray → Service: solicitar instalación de MSI
-        InstallUpdateResponse        // Service → Tray: resultado de la instalación
+        InstallUpdateResponse,       // Service → Tray: resultado de la instalación
+
+        // Contingencia forzada
+        ForcedContingencyChanged     // Tray → Service: contingencia forzada activada/desactivada desde Cloud
     }
 }
