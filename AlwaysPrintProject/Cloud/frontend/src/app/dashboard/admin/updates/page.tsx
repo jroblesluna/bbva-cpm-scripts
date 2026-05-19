@@ -383,19 +383,21 @@ export default function UpdatesPage() {
   }, [eligibleVersions, selectedVersions]);
 
   // Descargar versión específica via endpoint admin
-  const handleDownloadVersion = (version: string) => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
+  const handleDownloadVersion = async (version: string) => {
+    try {
+      // Obtener la presigned URL via API autenticada
+      const response = await apiClient.get<{ download_url: string; version: string }>(
+        `/updates/download/${version}`
+      );
+      // Abrir la presigned URL de S3 (no requiere autenticación)
+      window.open(response.data.download_url, '_blank');
+    } catch {
       toast({
         title: 'Error',
-        description: 'No autenticado. Inicia sesión nuevamente.',
+        description: `No se pudo obtener la URL de descarga para la versión ${version}`,
         variant: 'destructive',
       });
-      return;
     }
-    // Abrir en nueva pestaña — el endpoint redirige a la presigned URL
-    const baseUrl = apiClient.defaults.baseURL || '';
-    window.open(`${baseUrl}/updates/download/${version}`, '_blank');
   };
 
   // Confirmar eliminación de versiones seleccionadas

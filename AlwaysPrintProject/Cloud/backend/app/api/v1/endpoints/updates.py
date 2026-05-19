@@ -120,9 +120,9 @@ async def pin_version(
 @router.get(
     "/download/{version}",
     summary="Descargar versión específica (admin)",
-    description="Genera una URL presigned de S3 para una versión específica y redirige al admin.",
+    description="Genera una URL presigned de S3 para una versión específica y la retorna como JSON.",
     responses={
-        302: {"description": "Redirect a presigned URL de S3"},
+        200: {"description": "URL presigned para descarga"},
         401: {"description": "No autenticado o no autorizado"},
         404: {"description": "Versión no encontrada en S3"},
         500: {"description": "Error al generar URL de descarga"},
@@ -171,7 +171,7 @@ def admin_download_version(
         version,
     )
 
-    return RedirectResponse(url=presigned_url, status_code=302)
+    return {"download_url": presigned_url, "version": version}
 
 
 @router.delete(
