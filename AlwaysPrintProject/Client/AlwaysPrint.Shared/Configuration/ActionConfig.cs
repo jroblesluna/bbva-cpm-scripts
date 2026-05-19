@@ -106,5 +106,6 @@ namespace AlwaysPrint.Shared.Configuration
         public const string StopTray = "StopTray";
         public const string StartTray = "StartTray";
         public const string Conditional = "Conditional";
+        public const string DeleteOrphanedFolders = "DeleteOrphanedFolders";
     }
 }

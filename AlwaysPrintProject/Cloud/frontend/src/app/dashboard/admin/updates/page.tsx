@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Package, Calendar, GitCommit, HardDrive, AlertTriangle, Building2 } from 'lucide-react';
+import { RefreshCw, Package, Calendar, GitCommit, HardDrive, AlertTriangle, Building2, Pin, PinOff, History } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -60,6 +60,7 @@ interface OrgAutoUpdateState {
   orgId: string;
   orgName: string;
   autoUpdateEnabled: boolean;
+  targetVersion: string | null;
   isToggling: boolean;
 }
 
@@ -100,8 +101,10 @@ export default function UpdatesPage() {
 
   const [msiInfo, setMsiInfo] = useState<MsiInfo | null>(null);
   const [organizations, setOrganizations] = useState<OrgAutoUpdateState[]>([]);
+  const [versions, setVersions] = useState<MsiInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pinningOrg, setPinningOrg] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; orgId: string; orgName: string }>({
     open: false,
     orgId: '',
@@ -140,9 +143,23 @@ export default function UpdatesPage() {
           orgId: acc.id,
           orgName: acc.name,
           autoUpdateEnabled: acc.auto_update_enabled ?? false,
+          targetVersion: acc.target_version ?? null,
           isToggling: false,
         }));
         setOrganizations(orgStates);
+
+        // Obtener historial de versiones
+        try {
+          const versionsResponse = await apiClient.get<MsiInfo[]>('/updates/versions');
+          setVersions(versionsResponse.data.map((v: any) => ({
+            version: v.version,
+            buildDate: v.build_date,
+            commitHash: v.commit_hash,
+            fileSize: v.file_size,
+          })));
+        } catch {
+          setVersions([]);
+        }
       } else if (user?.organization_id) {
         // Operador: solo su organización
         try {
@@ -151,6 +168,7 @@ export default function UpdatesPage() {
             orgId: acc.id,
             orgName: acc.name,
             autoUpdateEnabled: acc.auto_update_enabled ?? false,
+            targetVersion: acc.target_version ?? null,
             isToggling: false,
           }]);
         } catch {
@@ -226,6 +244,23 @@ export default function UpdatesPage() {
       );
     } finally {
       setConfirmDialog({ open: false, orgId: '', orgName: '' });
+    }
+  };
+
+  // Asignar versión para una organización
+  const handlePinVersion = async (orgId: string, version: string | null) => {
+    setPinningOrg(orgId);
+    try {
+      await apiClient.put(`/updates/pin/${orgId}`, { version });
+      toast({
+        title: version ? 'Versión asignada' : 'Versión desasignada',
+        description: version ? `Organización asignada a versión ${version}` : 'Organización usará la versión más reciente',
+      });
+      fetchData(); // Refrescar datos
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo actualizar la versión asignada', variant: 'destructive' });
+    } finally {
+      setPinningOrg(null);
     }
   };
 
@@ -345,6 +380,24 @@ export default function UpdatesPage() {
                             ? 'Actualizaciones automáticas habilitadas'
                             : 'Actualizaciones automáticas deshabilitadas'}
                         </p>
+                        {org.targetVersion && (
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="secondary" className="text-xs">
+                              <Pin className="h-3 w-3 mr-1" />
+                              Asignada: {org.targetVersion}
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                              onClick={() => handlePinVersion(org.orgId, null)}
+                              disabled={pinningOrg === org.orgId}
+                            >
+                              <PinOff className="h-3 w-3 mr-1" />
+                              Desasignar
+                            </Button>
+                          </div>
+                        )}
                       </div>
                       <Switch
                         checked={org.autoUpdateEnabled}
@@ -357,6 +410,68 @@ export default function UpdatesPage() {
               )}
             </CardContent>
           </Card>
+          {/* Historial de Versiones */}
+          {isAdmin && versions.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <History className="h-5 w-5 text-primary" />
+                  <CardTitle>Historial de Versiones</CardTitle>
+                </div>
+                <CardDescription>
+                  Versiones disponibles en S3. Puedes asignar una versión específica a una organización.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-3 font-medium">Versión</th>
+                        <th className="text-left py-2 px-3 font-medium">Fecha Build</th>
+                        <th className="text-left py-2 px-3 font-medium">Commit</th>
+                        <th className="text-left py-2 px-3 font-medium">Tamaño</th>
+                        <th className="text-left py-2 px-3 font-medium">Asignar a Organización</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {versions.map((v) => (
+                        <tr key={v.version} className="border-b hover:bg-muted/50">
+                          <td className="py-2 px-3 font-mono">{v.version}</td>
+                          <td className="py-2 px-3 text-muted-foreground">{v.buildDate || 'N/A'}</td>
+                          <td className="py-2 px-3 font-mono text-muted-foreground">{v.commitHash?.substring(0, 7) || 'N/A'}</td>
+                          <td className="py-2 px-3">{formatFileSize(v.fileSize)}</td>
+                          <td className="py-2 px-3">
+                            <select
+                              className="text-xs border rounded px-2 py-1"
+                              defaultValue=""
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  handlePinVersion(e.target.value, v.version);
+                                  e.target.value = '';
+                                }
+                              }}
+                              disabled={pinningOrg !== null}
+                            >
+                              <option value="">Seleccionar org...</option>
+                              {organizations.map((org) => (
+                                <option key={org.orgId} value={org.orgId}>
+                                  {org.orgName}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Organizaciones con versión asignada */}
+                {organizations.some(() => false) && null}
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
 

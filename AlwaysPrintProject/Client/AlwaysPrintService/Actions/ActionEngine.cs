@@ -214,6 +214,9 @@ namespace AlwaysPrintService.Actions
                 case ActionTypes.StartTray:
                     return ExecuteStartTray(action);
                 
+                case ActionTypes.DeleteOrphanedFolders:
+                    return ExecuteDeleteOrphanedFolders(action);
+                
                 default:
                     AlwaysPrintLogger.WriteWarning($"ActionEngine: tipo de acción desconocido: {action.Type}");
                     return false;
@@ -394,6 +397,38 @@ namespace AlwaysPrintService.Actions
                 AlwaysPrintLogger.WriteError($"ActionEngine: StartTray - error: {ex.Message}", ex);
                 return false;
             }
+        }
+
+        private bool ExecuteDeleteOrphanedFolders(ActionConfig action)
+        {
+            string? basePath = action.Parameters?["base_path"]?.ToString();
+            if (string.IsNullOrWhiteSpace(basePath))
+            {
+                AlwaysPrintLogger.WriteWarning("ActionEngine: DeleteOrphanedFolders requiere 'base_path'");
+                return false;
+            }
+
+            bool excludeActiveConsole = action.Parameters?["exclude_active_console_user"]?.Value<bool>() ?? true;
+
+            // Obtener lista de usuarios a preservar desde la variable especificada
+            var excludeUsers = new List<string>();
+            string? excludeVariable = action.Parameters?["exclude_users_variable"]?.ToString();
+
+            if (!string.IsNullOrEmpty(excludeVariable))
+            {
+                if (_variables.TryGetValue(excludeVariable!, out var varValue) && varValue is List<string> userList)
+                {
+                    excludeUsers.AddRange(userList);
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteInfo(
+                        $"ActionEngine: DeleteOrphanedFolders - variable '{excludeVariable}' no encontrada o vacía");
+                }
+            }
+
+            int deleted = AdminActions.DeleteOrphanedFolders(basePath!, excludeUsers, excludeActiveConsole);
+            return true; // Siempre retorna éxito (los errores individuales se loguean internamente)
         }
         
         // ═══════════════════════════════════════════════════════════════════════

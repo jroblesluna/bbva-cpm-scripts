@@ -31,6 +31,94 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/updates", tags=["Actualizaciones"])
 
 
+@router.get(
+    "/versions",
+    summary="Listar versiones disponibles",
+    description="Retorna todas las versiones del MSI disponibles en S3 (solo admin).",
+    responses={
+        401: {"description": "No autenticado"},
+        503: {"description": "S3 no disponible"},
+    },
+)
+def list_versions(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Lista todas las versiones disponibles en S3. Solo accesible por admin."""
+    # Verificar que es admin
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="No autenticado")
+
+    try:
+        token = auth_header[7:]
+        payload = decode_access_token(token)
+        user_id = payload.get("sub")
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user or user.role != UserRole.ADMIN:
+            raise HTTPException(status_code=401, detail="No autorizado")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+    try:
+        s3_service = S3UpdateService()
+        versions = s3_service.list_versions()
+        return versions
+    except Exception as e:
+        logger.error("Error listando versiones: %s", str(e))
+        raise HTTPException(status_code=503, detail="No se pueden listar las versiones")
+
+
+@router.put(
+    "/pin/{organization_id}",
+    summary="Pinear versión para una organización",
+    description="Establece una versión específica como objetivo para una organización.",
+    responses={
+        200: {"description": "Versión pineada exitosamente"},
+        401: {"description": "No autenticado"},
+        404: {"description": "Organización no encontrada"},
+    },
+)
+def pin_version(
+    organization_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Pinea una versión específica para una organización. Solo admin."""
+    import asyncio
+
+    # Verificar admin
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="No autenticado")
+
+    try:
+        token = auth_header[7:]
+        payload = decode_access_token(token)
+        user_id = payload.get("sub")
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user or user.role != UserRole.ADMIN:
+            raise HTTPException(status_code=401, detail="No autorizado")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+    # Leer body
+    body = asyncio.get_event_loop().run_until_complete(request.json())
+    version = body.get("version")  # None o string vacío para despinear
+
+    org = db.query(Organization).filter(Organization.id == organization_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organización no encontrada")
+
+    org.target_version = version if version else None
+    db.commit()
+
+    action = "asignada" if version else "desasignada"
+    logger.info("Versión %s para organización %s: %s", action, org.name, version or "latest")
+
+    return {"message": f"Versión {action} exitosamente", "target_version": org.target_version}
+
+
 def _identify_workstation(request: Request, db: Session) -> Workstation:
     """
     Identifica la workstation que realiza la solicitud.

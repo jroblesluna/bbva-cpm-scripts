@@ -315,6 +315,82 @@ namespace AlwaysPrintService.Actions
         }
         
         // ═══════════════════════════════════════════════════════════════════════
+        // ELIMINACIÓN DE CARPETAS HUÉRFANAS
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        /// <summary>
+        /// Elimina carpetas de usuarios que no tienen sesión abierta (ni activa ni desconectada).
+        /// Enumera subdirectorios de basePath y elimina los que no están en la lista de exclusión.
+        /// </summary>
+        /// <param name="basePath">Directorio base que contiene carpetas por usuario.</param>
+        /// <param name="excludeUsers">Lista de usuarios cuyas carpetas se deben preservar.</param>
+        /// <param name="excludeActiveConsoleUser">Si true, también preserva la carpeta del usuario de consola activa.</param>
+        /// <returns>Cantidad de carpetas eliminadas.</returns>
+        public static int DeleteOrphanedFolders(string basePath, List<string> excludeUsers, bool excludeActiveConsoleUser = true)
+        {
+            int deleted = 0;
+            
+            try
+            {
+                AlwaysPrintLogger.WriteInfo(
+                    $"DeleteOrphanedFolders: iniciando en {basePath}, " +
+                    $"excludeUsers=[{string.Join(", ", excludeUsers)}], excludeActiveConsole={excludeActiveConsoleUser}");
+                
+                if (!Directory.Exists(basePath))
+                {
+                    AlwaysPrintLogger.WriteWarning($"DeleteOrphanedFolders: directorio base no existe: {basePath}");
+                    return 0;
+                }
+                
+                // Construir lista completa de usuarios a preservar
+                var preserveUsers = new HashSet<string>(excludeUsers, StringComparer.OrdinalIgnoreCase);
+                
+                if (excludeActiveConsoleUser)
+                {
+                    string? activeUser = GetActiveConsoleUser();
+                    if (!string.IsNullOrEmpty(activeUser))
+                    {
+                        preserveUsers.Add(activeUser!);
+                        AlwaysPrintLogger.WriteInfo($"DeleteOrphanedFolders: preservando usuario de consola activa: {activeUser}");
+                    }
+                }
+                
+                AlwaysPrintLogger.WriteInfo($"DeleteOrphanedFolders: usuarios a preservar: [{string.Join(", ", preserveUsers)}]");
+                
+                // Enumerar subdirectorios y eliminar los huérfanos
+                foreach (var dir in Directory.GetDirectories(basePath))
+                {
+                    string folderName = Path.GetFileName(dir);
+                    
+                    if (preserveUsers.Contains(folderName))
+                    {
+                        AlwaysPrintLogger.WriteInfo($"DeleteOrphanedFolders: preservando carpeta: {folderName}");
+                        continue;
+                    }
+                    
+                    try
+                    {
+                        Directory.Delete(dir, recursive: true);
+                        deleted++;
+                        AlwaysPrintLogger.WriteInfo($"DeleteOrphanedFolders: carpeta eliminada: {dir}");
+                    }
+                    catch (Exception ex)
+                    {
+                        AlwaysPrintLogger.WriteWarning($"DeleteOrphanedFolders: error eliminando {dir}: {ex.Message}");
+                    }
+                }
+                
+                AlwaysPrintLogger.WriteInfo($"DeleteOrphanedFolders: completado. Carpetas eliminadas: {deleted}");
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"DeleteOrphanedFolders: error: {ex.Message}", ex);
+            }
+            
+            return deleted;
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════════
         // GESTIÓN DE SERVICIOS
         // ═══════════════════════════════════════════════════════════════════════
         

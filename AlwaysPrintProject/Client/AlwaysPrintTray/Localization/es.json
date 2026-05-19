@@ -13,6 +13,7 @@
   "BalloonOfflineNoConfig": "Sin conexión a la nube y sin configuración guardada. Usando valores por defecto.",
   "BalloonReconnected": "Conexión con la nube restaurada.",
   "BalloonConnectedOk": "Conectado a la nube exitosamente.",
+  "BalloonPendingApproval": "Pendiente de aprobación. La IP pública de esta red aún no ha sido autorizada.",
   "TooltipOffline": "AlwaysPrint (sin conexión).",
   "BalloonCheckingUpdates": "Buscando actualizaciones...",
   "BalloonUpdating": "AlwaysPrint se está actualizando a la versión {0}.",

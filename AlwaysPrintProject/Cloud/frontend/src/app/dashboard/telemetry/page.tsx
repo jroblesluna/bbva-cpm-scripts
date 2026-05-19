@@ -457,14 +457,22 @@ function WorkstationRow({
   const { data: telemetryData } = useQuery({
     queryKey: ['telemetry', 'latest', workstation.id],
     queryFn: async () => {
-      const response = await apiClient.get<TelemetryEntry[]>(
-        `/workstations/${workstation.id}/telemetry`,
-        { params: { limit: 1 } }
-      );
-      return response.data;
+      try {
+        const response = await apiClient.get<TelemetryEntry[]>(
+          `/workstations/${workstation.id}/telemetry`,
+          { params: { limit: 1 } }
+        );
+        return response.data;
+      } catch (error: any) {
+        if (error?.response?.status === 404) {
+          return [];
+        }
+        throw error;
+      }
     },
     staleTime: 60000,
     refetchInterval: 60000,
+    retry: false,
   });
 
   const latest = telemetryData?.[0] ?? null;

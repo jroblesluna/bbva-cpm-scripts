@@ -99,6 +99,50 @@ class S3UpdateService:
             )
             raise
 
+    def list_versions(self) -> list:
+        """
+        Lista todas las versiones disponibles en el bucket S3.
+
+        Escanea el prefijo 'versions/' y retorna metadata de cada versión encontrada.
+
+        Returns:
+            Lista de dicts con: version, build_date, commit_hash, file_size
+        """
+        versions = []
+        try:
+            logger.info("Listando versiones disponibles en S3: bucket=%s, prefix=versions/", self._bucket)
+
+            paginator = self._client.get_paginator('list_objects_v2')
+            pages = paginator.paginate(Bucket=self._bucket, Prefix='versions/', Delimiter='/')
+
+            for page in pages:
+                for prefix in page.get('CommonPrefixes', []):
+                    # prefix es algo como 'versions/1.26.518.2152/'
+                    version_str = prefix['Prefix'].replace('versions/', '').rstrip('/')
+                    if not version_str:
+                        continue
+
+                    # Obtener metadata de cada versión
+                    try:
+                        key = f"versions/{version_str}/AlwaysPrint.msi"
+                        meta = self.get_msi_metadata(key=key)
+                        meta['version'] = version_str  # Usar el nombre del directorio como versión
+                        versions.append(meta)
+                    except ClientError:
+                        # Si no se puede leer metadata de una versión, omitirla
+                        logger.warning("No se pudo leer metadata de versión: %s", version_str)
+                        continue
+
+            # Ordenar por versión descendente (más reciente primero)
+            versions.sort(key=lambda v: v['version'], reverse=True)
+            logger.info("Versiones encontradas: %d", len(versions))
+
+        except ClientError as e:
+            logger.error("Error listando versiones en S3: %s", str(e))
+            raise
+
+        return versions
+
     def generate_download_url(self, key: str = None, expires_in: int = 3600) -> str:
         """
         Genera una URL presigned para descargar el MSI desde S3.

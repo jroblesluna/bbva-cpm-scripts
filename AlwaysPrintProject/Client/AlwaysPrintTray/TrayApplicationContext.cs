@@ -202,6 +202,7 @@ namespace AlwaysPrintTray
                     {
                         _cloudRegistration = new CloudRegistration(cfg);
                         _cloudRegistration.RegistrationSuccessful += OnCloudRegistrationSuccessful;
+                        _cloudRegistration.RegistrationPending += OnCloudRegistrationPending;
                         AlwaysPrintLogger.WriteTrayInfo("CloudRegistration iniciado correctamente.");
                     }
                     catch (Exception exReg)
@@ -235,6 +236,26 @@ namespace AlwaysPrintTray
             AlwaysPrintLogger.WriteTrayInfo(
                 "AutoUpdate: conexión Cloud confirmada. Iniciando verificación de actualizaciones.");
             InitializeAutoUpdate(cfg);
+        }
+
+        /// <summary>
+        /// Callback que se ejecuta cuando CloudRegistration detecta que la IP está pendiente de aprobación.
+        /// Muestra un balloon tip informativo y cambia el tooltip del tray.
+        /// </summary>
+        private void OnCloudRegistrationPending()
+        {
+            AlwaysPrintLogger.WriteTrayInfo(
+                "OnCloudRegistrationPending: IP pública pendiente de aprobación en la Cloud.");
+
+            _uiContext.Post(_ =>
+            {
+                _trayIcon.Text = "AlwaysPrint (pendiente de aprobación)";
+                _trayIcon.ShowBalloonTip(
+                    4000,
+                    "AlwaysPrint",
+                    LocalizationManager.Get("BalloonPendingApproval"),
+                    ToolTipIcon.Info);
+            }, null);
         }
 
         /// <summary>

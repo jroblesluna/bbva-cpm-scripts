@@ -13,6 +13,7 @@
   "BalloonOfflineNoConfig": "No cloud connection and no cached config. Using defaults.",
   "BalloonReconnected": "Cloud connection restored.",
   "BalloonConnectedOk": "Connected to cloud successfully.",
+  "BalloonPendingApproval": "Pending approval. The public IP of this network has not been authorized yet.",
   "TooltipOffline": "AlwaysPrint (offline)",
   "BalloonCheckingUpdates": "Checking for updates...",
   "BalloonUpdating": "AlwaysPrint is updating to version {0}.",

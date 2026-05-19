@@ -38,6 +38,14 @@ namespace AlwaysPrintTray.Cloud
         /// Parámetros: (workstationId, accountId, accountName, cloudApiUrl)
         /// </summary>
         public event Action<string, string, string, string>? RegistrationSuccessful;
+
+        /// <summary>
+        /// Evento que se dispara cuando la IP pública está pendiente de aprobación.
+        /// Se dispara solo la primera vez que se detecta (no en cada reintento).
+        /// </summary>
+        public event Action? RegistrationPending;
+
+        private bool _pendingNotified;
         
         public CloudRegistration(AppConfiguration config)
         {
@@ -197,6 +205,13 @@ namespace AlwaysPrintTray.Cloud
                         $"message={message}, " +
                         $"retry_after={retryAfter}s",
                         AlwaysPrintLogger.EvtGenericWarning);
+                    
+                    // Notificar solo la primera vez
+                    if (!_pendingNotified)
+                    {
+                        _pendingNotified = true;
+                        RegistrationPending?.Invoke();
+                    }
                     
                     // Continuar reintentando según el intervalo configurado
                 }
