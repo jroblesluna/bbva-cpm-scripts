@@ -76,6 +76,16 @@ Para el downgrade de enums:
 sa.Enum(name='mi_enum').drop(op.get_bind(), checkfirst=True)
 ```
 
+9. **En los modelos SQLAlchemy, siempre usar `create_type=False`** en columnas con `SQLEnum`:
+
+```python
+# CORRECTO: el modelo no intenta crear el tipo (la migración se encarga)
+status = Column(SQLEnum(MiEnum, name='mi_enum', create_type=False), nullable=False)
+
+# INCORRECTO: SQLAlchemy intenta CREATE TYPE al cargar el modelo → falla si ya existe
+status = Column(SQLEnum(MiEnum), nullable=False)
+```
+
 ## Convenciones de Nombres
 
 | Operación | Formato de revision ID |
