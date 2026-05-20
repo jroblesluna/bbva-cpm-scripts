@@ -221,6 +221,73 @@ class S3UpdateService:
             )
             raise
 
+    def upload_msi(self, file_data: bytes, version: str, build_date: str, commit_hash: str) -> dict:
+        """
+        Sube un MSI al bucket S3 como latest y como versión específica.
+
+        Almacena el archivo en dos ubicaciones:
+        - latest/AlwaysPrint.msi (siempre la versión más reciente)
+        - versions/{version}/AlwaysPrint.msi (historial)
+
+        Args:
+            file_data: Contenido binario del archivo MSI
+            version: Versión del MSI (ej: "1.26.518.2152")
+            build_date: Fecha de build en formato ISO
+            commit_hash: Hash del commit de git
+
+        Returns:
+            dict con: version, build_date, commit_hash, file_size
+
+        Raises:
+            ClientError: Si ocurre un error al subir a S3.
+        """
+        metadata = {
+            'version': version,
+            'build-date': build_date,
+            'commit-hash': commit_hash,
+        }
+        file_size = len(file_data)
+
+        try:
+            # Subir como latest
+            logger.info(
+                "Subiendo MSI a S3: bucket=%s, version=%s, tamaño=%d bytes",
+                self._bucket, version, file_size
+            )
+            self._client.put_object(
+                Bucket=self._bucket,
+                Key=self._key,
+                Body=file_data,
+                ContentType='application/x-msi',
+                Metadata=metadata,
+            )
+
+            # Subir como versión específica
+            version_key = f"versions/{version}/AlwaysPrint.msi"
+            self._client.put_object(
+                Bucket=self._bucket,
+                Key=version_key,
+                Body=file_data,
+                ContentType='application/x-msi',
+                Metadata=metadata,
+            )
+
+            logger.info(
+                "MSI subido exitosamente: version=%s, latest=%s, versioned=%s",
+                version, self._key, version_key
+            )
+
+            return {
+                'version': version,
+                'build_date': build_date,
+                'commit_hash': commit_hash,
+                'file_size': file_size,
+            }
+
+        except ClientError as e:
+            logger.error("Error al subir MSI a S3: %s", str(e))
+            raise
+
     def generate_download_url(self, key: str = None, expires_in: int = 3600) -> str:
         """
         Genera una URL presigned para descargar el MSI desde S3.

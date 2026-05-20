@@ -10,9 +10,10 @@ siguiendo el mismo patrón que el endpoint de configuración efectiva.
 """
 
 import logging
+from datetime import datetime, timezone
 
 from botocore.exceptions import ClientError
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -54,6 +55,73 @@ def list_versions(
     except Exception as e:
         logger.error("Error listando versiones: %s", str(e))
         raise HTTPException(status_code=503, detail="No se pueden listar las versiones")
+
+
+@router.post(
+    "/upload",
+    summary="Subir MSI de actualización (admin)",
+    description="Sube un archivo MSI al bucket S3 como latest y como versión específica.",
+    responses={
+        200: {"description": "MSI subido exitosamente"},
+        400: {"description": "Archivo inválido"},
+        401: {"description": "No autenticado"},
+        403: {"description": "No autorizado"},
+        500: {"description": "Error al subir a S3"},
+    },
+)
+async def upload_msi(
+    file: UploadFile = File(..., description="Archivo MSI a subir"),
+    version: str = None,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Sube un archivo MSI al bucket S3. Solo admin."""
+    # Validar que es un archivo .msi
+    if not file.filename or not file.filename.lower().endswith('.msi'):
+        raise HTTPException(status_code=400, detail="Solo se permiten archivos .msi")
+
+    # Leer contenido del archivo
+    file_data = await file.read()
+    if len(file_data) < 1024:  # Mínimo 1KB
+        raise HTTPException(status_code=400, detail="Archivo demasiado pequeño para ser un MSI válido")
+
+    # Determinar versión (del query param o generar una basada en timestamp)
+    if not version:
+        now = datetime.now(timezone.utc)
+        version = now.strftime("1.%y.%m%d.%H%M%S")
+
+    build_date = datetime.now(timezone.utc).isoformat()
+    commit_hash = "manual-upload"
+
+    try:
+        s3_service = S3UpdateService()
+        result = s3_service.upload_msi(
+            file_data=file_data,
+            version=version,
+            build_date=build_date,
+            commit_hash=commit_hash,
+        )
+
+        logger.info(
+            "MSI subido por admin: usuario=%s, version=%s, tamaño=%d bytes",
+            current_user.email,
+            version,
+            len(file_data),
+        )
+
+        return {
+            "message": "MSI subido exitosamente",
+            "version": result['version'],
+            "build_date": result['build_date'],
+            "commit_hash": result['commit_hash'],
+            "file_size": result['file_size'],
+        }
+    except ClientError as e:
+        logger.error("Error S3 al subir MSI: %s", str(e))
+        raise HTTPException(status_code=500, detail="Error al subir archivo a S3")
+    except Exception as e:
+        logger.error("Error inesperado al subir MSI: %s", str(e))
+        raise HTTPException(status_code=500, detail="Error interno al subir archivo")
 
 
 @router.put(

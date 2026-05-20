@@ -24,6 +24,7 @@ import {
   History,
   Download,
   Trash2,
+  Upload,
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -115,6 +116,7 @@ export default function UpdatesPage() {
     open: boolean;
     versions: string[];
   }>({ open: false, versions: [] });
+  const [isUploading, setIsUploading] = useState(false);
 
   const isAdmin = user?.role === 'admin';
 
@@ -194,6 +196,42 @@ export default function UpdatesPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Subir MSI manualmente
+  const handleUploadMsi = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.msi')) {
+      toast({ title: 'Error', description: 'Solo se permiten archivos .msi', variant: 'destructive' });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      await apiClient.post('/updates/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120000, // 2 min para archivos grandes
+      });
+
+      toast({ title: 'MSI subido', description: `${file.name} subido exitosamente` });
+      await fetchData();
+    } catch (err: unknown) {
+      const apiErr = err as { detail?: string };
+      toast({
+        title: 'Error al subir MSI',
+        description: apiErr.detail || 'Error desconocido',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
+      // Limpiar input para permitir subir el mismo archivo de nuevo
+      event.target.value = '';
+    }
+  };
 
   // Asignar versión pineada para una organización
   const handlePinVersion = async (orgId: string, version: string | null) => {
@@ -372,10 +410,32 @@ export default function UpdatesPage() {
           </p>
         </div>
 
-        <Button variant="outline" onClick={fetchData} disabled={isLoading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          {t('refresh')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={fetchData} disabled={isLoading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            {t('refresh')}
+          </Button>
+
+          {isAdmin && (
+            <>
+              <input
+                type="file"
+                id="msi-upload"
+                accept=".msi"
+                className="hidden"
+                onChange={handleUploadMsi}
+                disabled={isUploading}
+              />
+              <Button
+                onClick={() => document.getElementById('msi-upload')?.click()}
+                disabled={isUploading}
+              >
+                <Upload className={`mr-2 h-4 w-4 ${isUploading ? 'animate-spin' : ''}`} />
+                {isUploading ? 'Subiendo...' : 'Subir MSI'}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Error */}
