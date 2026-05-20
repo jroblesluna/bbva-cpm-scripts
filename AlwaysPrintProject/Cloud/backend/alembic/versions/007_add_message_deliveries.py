@@ -26,15 +26,12 @@ def upgrade() -> None:
     op.execute("DO $$ BEGIN CREATE TYPE deliverymode AS ENUM ('all', 'only_connected'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
     op.execute("DO $$ BEGIN CREATE TYPE deliverystatus AS ENUM ('pending', 'sent', 'skipped'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
 
-    deliverymode_enum = sa.Enum('all', 'only_connected', name='deliverymode', create_type=False)
-    deliverystatus_enum = sa.Enum('pending', 'sent', 'skipped', name='deliverystatus', create_type=False)
-
     # Agregar columna delivery_mode a messages
     op.add_column(
         'messages',
         sa.Column(
             'delivery_mode',
-            deliverymode_enum,
+            sa.Enum('all', 'only_connected', name='deliverymode', create_type=False),
             nullable=False,
             server_default='all'
         )
@@ -48,7 +45,7 @@ def upgrade() -> None:
         sa.Column('workstation_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column(
             'status',
-            deliverystatus_enum,
+            sa.Enum('pending', 'sent', 'skipped', name='deliverystatus', create_type=False),
             nullable=False,
             server_default='pending'
         ),
