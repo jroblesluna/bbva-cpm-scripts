@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   RefreshCw,
   Package,
@@ -40,6 +41,8 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
+import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { apiClient, organizationsApi } from '@/lib/api';
 import type { Organization } from '@/types';
 
@@ -97,6 +100,9 @@ function formatFileSize(bytes: number): string {
 export default function UpdatesPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const timezone = useUserTimezone();
+  const t = useTranslations('updates');
+  const tCommon = useTranslations('common');
 
   const [msiInfo, setMsiInfo] = useState<MsiInfo | null>(null);
   const [organizations, setOrganizations] = useState<OrgAutoUpdateState[]>([]);
@@ -178,22 +184,18 @@ export default function UpdatesPage() {
           setOrganizations([]);
         }
       }
-    } catch (err: unknown) {
-      const errorMessage =
-        err && typeof err === 'object' && 'detail' in err
-          ? (err as { detail: string }).detail
-          : 'Error al obtener información de actualizaciones';
-      setError(errorMessage);
+    } catch {
+      setError(t('errorFetch'));
     } finally {
       setIsLoading(false);
     }
-  }, [isAdmin, user?.organization_id]);
+  }, [isAdmin, user?.organization_id, t]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Asignar versión pineada para una organización (usado por tabla de versiones)
+  // Asignar versión pineada para una organización
   const handlePinVersion = async (orgId: string, version: string | null) => {
     try {
       await apiClient.put(`/updates/pin/${orgId}`, { version });
@@ -206,22 +208,21 @@ export default function UpdatesPage() {
       );
 
       toast({
-        title: version ? 'Versión pineada' : 'Versión despineada',
+        title: version ? t('pinSuccess') : t('unpinSuccess'),
         description: version
-          ? `La organización usará siempre la versión ${version}`
-          : 'La organización usará la versión latest',
+          ? t('pinSuccessDesc', { version })
+          : t('unpinSuccessDesc'),
       });
     } catch {
       toast({
-        title: 'Error',
-        description: 'No se pudo actualizar la versión asignada',
+        title: tCommon('actions'),
+        description: t('pinError'),
         variant: 'destructive',
       });
     }
   };
 
   // Determinar qué versiones son elegibles para eliminación
-  // No se puede eliminar: la versión latest ni versiones pineadas por alguna organización
   const pinnedVersions = useMemo(() => {
     const pinned = new Set<string>();
     organizations.forEach((org) => {
@@ -274,16 +275,14 @@ export default function UpdatesPage() {
   // Descargar versión específica via endpoint admin
   const handleDownloadVersion = async (version: string) => {
     try {
-      // Obtener la presigned URL via API autenticada
       const response = await apiClient.get<{ download_url: string; version: string }>(
         `/updates/download/${version}`
       );
-      // Abrir la presigned URL de S3 (no requiere autenticación)
       window.open(response.data.download_url, '_blank');
     } catch {
       toast({
-        title: 'Error',
-        description: `No se pudo obtener la URL de descarga para la versión ${version}`,
+        title: tCommon('actions'),
+        description: t('downloadError', { version }),
         variant: 'destructive',
       });
     }
@@ -316,15 +315,15 @@ export default function UpdatesPage() {
       // Mostrar resultado
       if (result.total_deleted > 0) {
         toast({
-          title: `${result.total_deleted} versión(es) eliminada(s)`,
+          title: t('deleteSuccess', { count: result.total_deleted }),
           description: result.total_skipped > 0
-            ? `${result.total_skipped} versión(es) omitida(s)`
-            : 'Todas las versiones seleccionadas fueron eliminadas',
+            ? t('deleteSkipped', { count: result.total_skipped })
+            : t('deleteSuccessAll'),
         });
       } else {
         toast({
-          title: 'No se eliminaron versiones',
-          description: 'Todas las versiones seleccionadas fueron omitidas',
+          title: t('deleteNone'),
+          description: t('deleteNoneDesc'),
           variant: 'destructive',
         });
       }
@@ -335,7 +334,7 @@ export default function UpdatesPage() {
           .map((s) => `${s.version}: ${s.reason}`)
           .join(', ');
         toast({
-          title: 'Versiones omitidas',
+          title: t('skippedTitle'),
           description: reasons,
         });
       }
@@ -347,9 +346,9 @@ export default function UpdatesPage() {
       const errorMessage =
         err && typeof err === 'object' && 'detail' in err
           ? (err as { detail: string }).detail
-          : 'Error al eliminar versiones';
+          : t('deleteError');
       toast({
-        title: 'Error',
+        title: tCommon('actions'),
         description: errorMessage,
         variant: 'destructive',
       });
@@ -367,15 +366,15 @@ export default function UpdatesPage() {
       {/* Encabezado */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Actualizaciones Automáticas</h1>
+          <h1 className="text-3xl font-bold">{t('title')}</h1>
           <p className="text-muted-foreground mt-1">
-            Gestiona las actualizaciones del cliente AlwaysPrint por organización
+            {t('subtitle')}
           </p>
         </div>
 
         <Button variant="outline" onClick={fetchData} disabled={isLoading}>
           <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          Actualizar
+          {t('refresh')}
         </Button>
       </div>
 
@@ -392,7 +391,7 @@ export default function UpdatesPage() {
         <Card>
           <CardContent className="py-12">
             <p className="text-center text-muted-foreground">
-              Cargando información de actualizaciones...
+              {t('loading')}
             </p>
           </CardContent>
         </Card>
@@ -407,13 +406,12 @@ export default function UpdatesPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Package className="h-5 w-5 text-primary" />
-                    <CardTitle>Versión Latest</CardTitle>
+                    <CardTitle>{t('latestVersion')}</CardTitle>
                   </div>
                   <Badge variant="default">{msiInfo.version}</Badge>
                 </div>
                 <CardDescription>
-                  Versión más reciente del instalador en S3. Se despliega a organizaciones sin
-                  versión pineada.
+                  {t('latestDesc')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -421,14 +419,18 @@ export default function UpdatesPage() {
                   <div className="flex items-start gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="text-xs text-muted-foreground">Fecha de Build</p>
-                      <p className="text-sm font-medium">{msiInfo.buildDate || 'N/A'}</p>
+                      <p className="text-xs text-muted-foreground">{t('buildDate')}</p>
+                      <p className="text-sm font-medium">
+                        {msiInfo.buildDate
+                          ? formatDateWithTimezone(msiInfo.buildDate, timezone)
+                          : 'N/A'}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
                     <GitCommit className="h-4 w-4 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="text-xs text-muted-foreground">Commit</p>
+                      <p className="text-xs text-muted-foreground">{t('commit')}</p>
                       <p className="text-sm font-mono">
                         {msiInfo.commitHash ? msiInfo.commitHash.substring(0, 8) : 'N/A'}
                       </p>
@@ -437,7 +439,7 @@ export default function UpdatesPage() {
                   <div className="flex items-start gap-2">
                     <HardDrive className="h-4 w-4 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="text-xs text-muted-foreground">Tamaño</p>
+                      <p className="text-xs text-muted-foreground">{t('size')}</p>
                       <p className="text-sm font-medium">{formatFileSize(msiInfo.fileSize)}</p>
                     </div>
                   </div>
@@ -449,14 +451,12 @@ export default function UpdatesPage() {
                     onClick={() => handleDownloadVersion(msiInfo.version)}
                   >
                     <Download className="mr-2 h-4 w-4" />
-                    Descargar MSI ({msiInfo.version})
+                    {t('downloadMsi', { version: msiInfo.version })}
                   </Button>
                 </div>
               </CardContent>
             </Card>
           )}
-
-          {/* Configuración por organización — Movida a /dashboard/config */}
 
           {/* Historial de versiones con acciones */}
           {isAdmin && versions.length > 0 && (
@@ -465,7 +465,7 @@ export default function UpdatesPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <History className="h-5 w-5 text-primary" />
-                    <CardTitle>Versiones Disponibles</CardTitle>
+                    <CardTitle>{t('availableVersions')}</CardTitle>
                   </div>
                   <Button
                     variant="destructive"
@@ -474,12 +474,11 @@ export default function UpdatesPage() {
                     onClick={handleDeleteClick}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Eliminar ({selectedVersions.size})
+                    {t('deleteSelected', { count: selectedVersions.size })}
                   </Button>
                 </div>
                 <CardDescription>
-                  Todas las versiones del instalador almacenadas en S3. Selecciona versiones para
-                  eliminarlas.
+                  {t('availableVersionsDesc')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -493,16 +492,16 @@ export default function UpdatesPage() {
                               checked={selectAllState.checked}
                               indeterminate={selectAllState.indeterminate}
                               onChange={(e) => handleSelectAll(e.target.checked)}
-                              aria-label="Seleccionar todas las versiones elegibles"
+                              aria-label={t('selectAllEligible')}
                             />
                           )}
                         </th>
-                        <th className="text-left py-2 px-3 font-medium">Versión</th>
-                        <th className="text-left py-2 px-3 font-medium">Fecha Build</th>
-                        <th className="text-left py-2 px-3 font-medium">Commit</th>
-                        <th className="text-left py-2 px-3 font-medium">Tamaño</th>
-                        <th className="text-left py-2 px-3 font-medium">Usada por</th>
-                        <th className="text-left py-2 px-3 font-medium">Acciones</th>
+                        <th className="text-left py-2 px-3 font-medium">{t('colVersion')}</th>
+                        <th className="text-left py-2 px-3 font-medium">{t('colBuildDate')}</th>
+                        <th className="text-left py-2 px-3 font-medium">{t('colCommit')}</th>
+                        <th className="text-left py-2 px-3 font-medium">{t('colSize')}</th>
+                        <th className="text-left py-2 px-3 font-medium">{t('colUsedBy')}</th>
+                        <th className="text-left py-2 px-3 font-medium">{t('colActions')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -522,12 +521,12 @@ export default function UpdatesPage() {
                                   onChange={(e) =>
                                     handleVersionSelect(v.version, e.target.checked)
                                   }
-                                  aria-label={`Seleccionar versión ${v.version}`}
+                                  aria-label={t('selectVersion', { version: v.version })}
                                 />
                               ) : (
                                 <span className="text-muted-foreground text-xs" title={
-                                  isLatest ? 'No se puede eliminar la versión latest' :
-                                  isPinned ? 'No se puede eliminar: pineada por una organización' : ''
+                                  isLatest ? t('cannotDeleteLatest') :
+                                  isPinned ? t('cannotDeletePinned') : ''
                                 }>—</span>
                               )}
                             </td>
@@ -535,18 +534,20 @@ export default function UpdatesPage() {
                               {v.version}
                               {isLatest && (
                                 <Badge variant="default" className="ml-2 text-xs">
-                                  latest
+                                  {t('badgeLatest')}
                                 </Badge>
                               )}
                               {isPinned && !isLatest && (
                                 <Badge variant="secondary" className="ml-2 text-xs">
                                   <Pin className="h-3 w-3 mr-1" />
-                                  pineada
+                                  {t('badgePinned')}
                                 </Badge>
                               )}
                             </td>
                             <td className="py-2 px-3 text-muted-foreground">
-                              {v.buildDate || 'N/A'}
+                              {v.buildDate
+                                ? formatDateWithTimezone(v.buildDate, timezone)
+                                : 'N/A'}
                             </td>
                             <td className="py-2 px-3 font-mono text-muted-foreground">
                               {v.commitHash?.substring(0, 7) || 'N/A'}
@@ -570,7 +571,7 @@ export default function UpdatesPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleDownloadVersion(v.version)}
-                                title={`Descargar versión ${v.version}`}
+                                title={t('downloadVersion', { version: v.version })}
                               >
                                 <Download className="h-4 w-4" />
                               </Button>
@@ -594,10 +595,9 @@ export default function UpdatesPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmar Eliminación de Versiones</DialogTitle>
+            <DialogTitle>{t('deleteConfirmTitle')}</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que deseas eliminar las siguientes versiones de S3? Esta acción no
-              se puede deshacer.
+              {t('deleteConfirmDesc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -605,9 +605,7 @@ export default function UpdatesPage() {
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Se eliminarán permanentemente los archivos MSI de estas versiones del bucket S3.
-                Las workstations que tengan estas versiones instaladas no se verán afectadas, pero
-                no podrán volver a descargarlas.
+                {t('deleteWarning')}
               </AlertDescription>
             </Alert>
 
@@ -628,10 +626,12 @@ export default function UpdatesPage() {
               variant="outline"
               onClick={() => setDeleteConfirmDialog({ open: false, versions: [] })}
             >
-              Cancelar
+              {tCommon('cancel')}
             </Button>
             <Button variant="destructive" onClick={performDelete} disabled={isDeleting}>
-              {isDeleting ? 'Eliminando...' : `Eliminar ${deleteConfirmDialog.versions.length} versión(es)`}
+              {isDeleting
+                ? t('deleting')
+                : t('deleteBtn', { count: deleteConfirmDialog.versions.length })}
             </Button>
           </DialogFooter>
         </DialogContent>
