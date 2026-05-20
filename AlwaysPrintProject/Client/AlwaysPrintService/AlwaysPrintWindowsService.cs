@@ -332,10 +332,16 @@ namespace AlwaysPrintService
         /// Callback cuando se recibe ForcedContingencyChanged del Tray.
         /// Ejecuta el trigger OnContingencyActivated o OnContingencyDeactivated según corresponda.
         /// </summary>
-        private void OnForcedContingencyReceived(bool enabled, string source, string sourceName)
+        private void OnForcedContingencyReceived(bool enabled, string source, string sourceName, string? printerIp)
         {
             AlwaysPrintLogger.WriteInfo(
-                $"OnForcedContingencyReceived: enabled={enabled}, source={source}, sourceName={sourceName}");
+                $"OnForcedContingencyReceived: enabled={enabled}, source={source}, sourceName={sourceName}, printerIp={printerIp ?? "null"}");
+
+            // Establecer la IP de contingencia como variable del ActionEngine
+            if (!string.IsNullOrEmpty(printerIp))
+            {
+                _actionEngine.SetConfigVariable("contingency_printer_ip", printerIp);
+            }
 
             if (enabled)
             {

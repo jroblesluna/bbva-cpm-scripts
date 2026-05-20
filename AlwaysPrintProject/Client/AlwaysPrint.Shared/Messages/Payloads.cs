@@ -252,6 +252,10 @@ namespace AlwaysPrint.Shared.Messages
         /// <summary>Nombre del origen (nombre de la organización, VLAN o workstation).</summary>
         [JsonProperty("sourceName")]
         public string SourceName { get; set; } = string.Empty;
+
+        /// <summary>IP de la impresora de contingencia (obtenida del default_printer de la workstation).</summary>
+        [JsonProperty("printerIp")]
+        public string? PrinterIp { get; set; }
     }
 
     /// <summary>

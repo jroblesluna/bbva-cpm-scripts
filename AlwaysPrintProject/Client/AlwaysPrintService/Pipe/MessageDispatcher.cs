@@ -30,7 +30,7 @@ namespace AlwaysPrintService.Pipe
         public event Action<bool, string?>? TrayInitializedReceived;
 
         // Raised when the Tray sends ForcedContingencyChanged.
-        public event Action<bool, string, string>? ForcedContingencyReceived;
+        public event Action<bool, string, string, string?>? ForcedContingencyReceived;
 
         public MessageDispatcher(
             RegistryConfigManager registry,
@@ -362,7 +362,7 @@ namespace AlwaysPrintService.Pipe
                     $"ForcedContingencyChanged: enabled={payload.Enabled}, source={payload.Source}, sourceName={payload.SourceName}");
 
                 // Disparar evento para que el Service principal maneje la contingencia
-                ForcedContingencyReceived?.Invoke(payload.Enabled, payload.Source, payload.SourceName);
+                ForcedContingencyReceived?.Invoke(payload.Enabled, payload.Source, payload.SourceName, payload.PrinterIp);
 
                 return PipeMessage.Reply(req, MessageType.Ack,
                     new AckPayload { Success = true, Message = $"Contingencia {(payload.Enabled ? "activada" : "desactivada")}." });

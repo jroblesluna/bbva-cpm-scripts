@@ -816,9 +816,10 @@ namespace AlwaysPrintTray.Cloud
                 bool enabled = obj["enabled"]?.Value<bool>() ?? false;
                 string source = obj["source"]?.ToString() ?? "cloud";
                 string sourceName = obj["source_name"]?.ToString() ?? "";
+                string? printerIp = obj["printer_ip"]?.ToString();
 
                 AlwaysPrintLogger.WriteTrayInfo(
-                    $"CloudManager: contingencia forzada recibida. enabled={enabled}, source={source}, source_name={sourceName}");
+                    $"CloudManager: contingencia forzada recibida. enabled={enabled}, source={source}, source_name={sourceName}, printer_ip={printerIp ?? "null"}");
 
                 // Notificar al Service vía Named Pipe
                 try
@@ -829,7 +830,8 @@ namespace AlwaysPrintTray.Cloud
                         {
                             Enabled = enabled,
                             Source = source,
-                            SourceName = sourceName
+                            SourceName = sourceName,
+                            PrinterIp = printerIp
                         };
                         _pipe.Send(PipeMessage.Create(MessageType.ForcedContingencyChanged, payload));
                         AlwaysPrintLogger.WriteTrayInfo(
