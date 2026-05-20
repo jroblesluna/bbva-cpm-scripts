@@ -23,8 +23,18 @@ def upgrade() -> None:
     """Agregar delivery_mode a messages y crear tabla message_deliveries."""
     # Crear enums primero (PostgreSQL requiere que existan antes de usarlos)
     # Usar DO $$ para evitar error si ya existen (checkfirst no siempre funciona en Alembic)
+    op.execute("DO $$ BEGIN CREATE TYPE targettype AS ENUM ('workstation', 'vlan', 'account'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
     op.execute("DO $$ BEGIN CREATE TYPE deliverymode AS ENUM ('all', 'only_connected'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
     op.execute("DO $$ BEGIN CREATE TYPE deliverystatus AS ENUM ('pending', 'sent', 'skipped'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
+
+    # Recrear columna target_type si fue eliminada por CASCADE
+    op.execute("""
+        DO $$ BEGIN
+            ALTER TABLE messages ADD COLUMN target_type targettype NOT NULL DEFAULT 'workstation';
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_messages_target_type ON messages (target_type)")
 
     # Agregar columna delivery_mode a messages
     op.add_column(
