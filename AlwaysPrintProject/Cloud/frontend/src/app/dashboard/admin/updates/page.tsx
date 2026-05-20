@@ -45,6 +45,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { apiClient, organizationsApi } from '@/lib/api';
+import { Input } from '@/components/ui/input';
 import type { Organization } from '@/types';
 
 // ============================================================================
@@ -117,6 +118,11 @@ export default function UpdatesPage() {
     versions: string[];
   }>({ open: false, versions: [] });
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadDialog, setUploadDialog] = useState<{
+    open: boolean;
+    file: File | null;
+    version: string;
+  }>({ open: false, file: null, version: '' });
 
   const isAdmin = user?.role === 'admin';
 
@@ -204,20 +210,36 @@ export default function UpdatesPage() {
 
     if (!file.name.toLowerCase().endsWith('.msi')) {
       toast({ title: 'Error', description: 'Solo se permiten archivos .msi', variant: 'destructive' });
+      event.target.value = '';
       return;
     }
 
+    // Sugerir versión basada en fecha actual
+    const now = new Date();
+    const suggested = `1.${String(now.getFullYear()).slice(2)}.${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}.${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+
+    setUploadDialog({ open: true, file, version: suggested });
+    event.target.value = '';
+  };
+
+  // Confirmar upload con versión
+  const performUpload = async () => {
+    const { file, version } = uploadDialog;
+    if (!file || !version.trim()) return;
+
+    setUploadDialog({ open: false, file: null, version: '' });
     setIsUploading(true);
+
     try {
       const formData = new FormData();
       formData.append('file', file);
 
-      await apiClient.post('/updates/upload', formData, {
+      await apiClient.post(`/updates/upload?version=${encodeURIComponent(version.trim())}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 120000, // 2 min para archivos grandes
+        timeout: 120000,
       });
 
-      toast({ title: 'MSI subido', description: `${file.name} subido exitosamente` });
+      toast({ title: 'MSI subido', description: `${file.name} (v${version.trim()}) subido exitosamente` });
       await fetchData();
     } catch (err: unknown) {
       const apiErr = err as { detail?: string };
@@ -228,8 +250,6 @@ export default function UpdatesPage() {
       });
     } finally {
       setIsUploading(false);
-      // Limpiar input para permitir subir el mismo archivo de nuevo
-      event.target.value = '';
     }
   };
 
@@ -692,6 +712,46 @@ export default function UpdatesPage() {
               {isDeleting
                 ? t('deleting')
                 : t('deleteBtn', { count: deleteConfirmDialog.versions.length })}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de versión para upload de MSI */}
+      <Dialog
+        open={uploadDialog.open}
+        onOpenChange={(open) => { if (!open) setUploadDialog({ open: false, file: null, version: '' }); }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Subir MSI</DialogTitle>
+            <DialogDescription>
+              Archivo: {uploadDialog.file?.name} ({uploadDialog.file ? formatFileSize(uploadDialog.file.size) : ''})
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-3">
+            <label className="text-sm font-medium">Número de versión</label>
+            <Input
+              value={uploadDialog.version}
+              onChange={(e) => setUploadDialog((prev) => ({ ...prev, version: e.target.value }))}
+              placeholder="Ej: 1.26.0520.1234"
+            />
+            <p className="text-xs text-muted-foreground">
+              Formato sugerido: Major.YY.MMDD.HHmmSS
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setUploadDialog({ open: false, file: null, version: '' })}
+            >
+              {tCommon('cancel')}
+            </Button>
+            <Button onClick={performUpload} disabled={!uploadDialog.version.trim()}>
+              <Upload className="mr-2 h-4 w-4" />
+              Subir
             </Button>
           </DialogFooter>
         </DialogContent>

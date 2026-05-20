@@ -82,6 +82,8 @@ server {
     listen 80;
     server_name ${domain_name};
 
+    client_max_body_size 100M;
+
     access_log /var/log/nginx/alwaysprint_access.log;
     error_log /var/log/nginx/alwaysprint_error.log;
 
