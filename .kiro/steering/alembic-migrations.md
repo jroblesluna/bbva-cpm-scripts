@@ -59,6 +59,22 @@ def downgrade() -> None:
 5. **Verificar cadena antes de commit** — ejecutar `alembic history` localmente
 6. **Comentarios y docstrings en español**
 7. **No usar `autogenerate`** en producción — escribir migraciones manualmente para control total
+8. **Enums PostgreSQL: NUNCA usar `enum.create(checkfirst=True)`** — no funciona correctamente en Alembic. Usar SQL raw idempotente:
+
+```python
+# CORRECTO: idempotente en PostgreSQL
+op.execute("DO $$ BEGIN CREATE TYPE mi_enum AS ENUM ('valor1', 'valor2'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
+mi_enum = sa.Enum('valor1', 'valor2', name='mi_enum', create_type=False)
+
+# INCORRECTO: falla si el enum ya existe (migración parcial previa)
+mi_enum = sa.Enum('valor1', 'valor2', name='mi_enum')
+mi_enum.create(op.get_bind(), checkfirst=True)  # ← BUG: checkfirst no funciona en Alembic
+```
+
+Para el downgrade de enums:
+```python
+sa.Enum(name='mi_enum').drop(op.get_bind(), checkfirst=True)
+```
 
 ## Convenciones de Nombres
 
