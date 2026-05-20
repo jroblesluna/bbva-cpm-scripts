@@ -7,11 +7,12 @@
 #
 # Flujo:
 #   0. Lee outputs de Terraform (fuente de verdad)
-#   1. Verifica infraestructura AWS (EC2, RDS, ECR)
-#   2. Verifica containers y aplicación vía SSM
-#   3. Verifica endpoints públicos (DNS, HTTPS, SSL)
-#   4. Muestra errores recientes
-#   5. Muestra acciones recomendadas si hay problemas
+#   1. Verifica DNS (registros A, DKIM, MX)
+#   2. Verifica infraestructura AWS (EC2, RDS, ECR)
+#   3. Verifica containers y aplicación vía SSM
+#   4. Verifica endpoints públicos (HTTPS, SSL)
+#   5. Muestra errores recientes
+#   6. Muestra acciones recomendadas si hay problemas
 # =============================================================================
 
 set -o pipefail
@@ -157,9 +158,72 @@ fi
 [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ] && [ -n "$1" ] && INSTANCE_ID="$1"
 
 # =============================================================================
-# 1. INFRAESTRUCTURA AWS
+# 1. VALIDACIÓN DNS
 # =============================================================================
-print_header "1. INFRAESTRUCTURA AWS"
+print_header "1. VALIDACIÓN DNS"
+
+echo -e "\n  ${BLUE}Registros DNS:${NC}"
+DNS_OK=false
+IP_RESOLVED=$(dig +short "$DOMAIN" 2>/dev/null | head -1)
+if [ -n "$IP_RESOLVED" ]; then
+    if [ -n "$EC2_IP" ] && [ "$IP_RESOLVED" = "$EC2_IP" ]; then
+        check_ok "$DOMAIN → $IP_RESOLVED (coincide con EC2)"
+        DNS_OK=true
+    elif [ -n "$EC2_IP" ]; then
+        check_fail "$DOMAIN → $IP_RESOLVED (NO coincide con EC2: $EC2_IP)"
+        recommend "Actualizar DNS en Hostinger: $DOMAIN → $EC2_IP (registro A)"
+    else
+        check_warn "$DOMAIN → $IP_RESOLVED (EC2 IP aún no disponible para comparar)"
+    fi
+else
+    check_fail "No se pudo resolver DNS para $DOMAIN"
+    recommend "Configurar registro A en Hostinger: $DOMAIN → ${EC2_IP:-<EC2_IP>}"
+fi
+
+# Verificar registros SES (DKIM, MX, SPF)
+echo -e "\n  ${BLUE}Registros SES (email):${NC}"
+
+# Verificar los 3 DKIM de SES (los prefijos son hashes fijos)
+DKIM_COUNT=0
+dig +short CNAME "747nftpdxxtgstnrzognxq5p677xkvuc._domainkey.apps.iol.pe" 2>/dev/null | grep -qi "amazonses" && DKIM_COUNT=$((DKIM_COUNT + 1))
+dig +short CNAME "6asyw5tayk6tkfigloleydr5vn7q57k6._domainkey.apps.iol.pe" 2>/dev/null | grep -qi "amazonses" && DKIM_COUNT=$((DKIM_COUNT + 1))
+dig +short CNAME "36toxjwf6nmzy4rtsvemymfmeksssa32._domainkey.apps.iol.pe" 2>/dev/null | grep -qi "amazonses" && DKIM_COUNT=$((DKIM_COUNT + 1))
+
+# Verificar TXT _amazonses como prueba de verificación SES
+SES_VERIFY=$(dig +short TXT "_amazonses.apps.iol.pe" 2>/dev/null | head -1)
+if [ -n "$SES_VERIFY" ]; then
+    check_ok "SES verificación — dominio apps.iol.pe verificado"
+else
+    check_warn "SES verificación — TXT _amazonses no encontrado"
+fi
+
+if [ "$DKIM_COUNT" -ge 3 ]; then
+    check_ok "DKIM — 3/3 registros configurados"
+elif [ "$DKIM_COUNT" -gt 0 ]; then
+    check_warn "DKIM — solo $DKIM_COUNT/3 registros configurados"
+    recommend "Faltan registros DKIM en DNS. Verificar en AWS SES → Identities → apps.iol.pe"
+else
+    check_warn "DKIM — no verificable (puede requerir propagación DNS)"
+fi
+
+MX_RECORD=$(dig +short MX "mail.apps.iol.pe" 2>/dev/null | head -1)
+if echo "$MX_RECORD" | grep -q "amazonses.com"; then
+    check_ok "MX (mail.apps.iol.pe) — configurado (SES)"
+else
+    check_warn "MX (mail.apps.iol.pe) — ${MX_RECORD:-no definido}"
+fi
+
+SPF_RECORD=$(dig +short TXT "mail.apps.iol.pe" 2>/dev/null | grep "spf" | head -1)
+if echo "$SPF_RECORD" | grep -q "amazonses.com"; then
+    check_ok "SPF (mail.apps.iol.pe) — incluye amazonses.com"
+else
+    check_warn "SPF (mail.apps.iol.pe) — ${SPF_RECORD:-no definido}"
+fi
+
+# =============================================================================
+# 2. INFRAESTRUCTURA AWS
+# =============================================================================
+print_header "2. INFRAESTRUCTURA AWS"
 
 if ! command -v aws &> /dev/null; then
     check_fail "AWS CLI no instalado"
@@ -256,9 +320,9 @@ else
 fi
 
 # =============================================================================
-# 2. CONTAINERS Y APLICACIÓN (vía SSM)
+# 3. CONTAINERS Y APLICACIÓN (vía SSM)
 # =============================================================================
-print_header "2. CONTAINERS Y APLICACIÓN (vía SSM)"
+print_header "3. CONTAINERS Y APLICACIÓN (vía SSM)"
 
 if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
     check_warn "Instance ID no disponible — saltando"
@@ -343,26 +407,9 @@ else
 fi
 
 # =============================================================================
-# 3. CONECTIVIDAD Y ENDPOINTS PÚBLICOS
+# 4. CONECTIVIDAD Y ENDPOINTS PÚBLICOS
 # =============================================================================
-print_header "3. ENDPOINTS PÚBLICOS"
-
-# DNS
-echo -e "\n  ${BLUE}DNS:${NC}"
-DNS_OK=false
-IP_RESOLVED=$(dig +short "$DOMAIN" 2>/dev/null | head -1)
-if [ -n "$IP_RESOLVED" ]; then
-    if [ -n "$EC2_IP" ] && [ "$IP_RESOLVED" = "$EC2_IP" ]; then
-        check_ok "$DOMAIN → $IP_RESOLVED (coincide con EC2)"
-        DNS_OK=true
-    else
-        check_fail "$DOMAIN → $IP_RESOLVED (NO coincide con EC2: $EC2_IP)"
-        recommend "Actualizar DNS en Hostinger: $DOMAIN → $EC2_IP (registro A)"
-    fi
-else
-    check_fail "No se pudo resolver DNS para $DOMAIN"
-    recommend "Configurar registro A en Hostinger: $DOMAIN → $EC2_IP"
-fi
+print_header "4. ENDPOINTS PÚBLICOS"
 
 # HTTPS
 echo -e "\n  ${BLUE}HTTPS:${NC}"
@@ -436,9 +483,9 @@ else
 fi
 
 # =============================================================================
-# 4. ERRORES RECIENTES
+# 5. ERRORES RECIENTES
 # =============================================================================
-print_header "4. ERRORES RECIENTES"
+print_header "5. ERRORES RECIENTES"
 
 if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
     LOGS=$(ssm_exec "$INSTANCE_ID" '["echo \"=== BACKEND ===\"; docker logs alwaysprint-backend-1 --tail 30 2>&1 | grep -i \"error\\|traceback\\|critical\" | tail -5 || echo \"Sin errores\"; echo; echo \"=== FRONTEND ===\"; docker logs alwaysprint-frontend-1 --tail 30 2>&1 | grep -i \"error\" | grep -v \"favicon\\|_next\\|NEXT\" | tail -3 || echo \"Sin errores\""]' 8)

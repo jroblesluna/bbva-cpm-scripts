@@ -17,7 +17,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, require_admin
 from app.core.utils import get_client_ip
 from app.models.organization import Organization, PublicIP
 from app.models.user import User, UserRole
@@ -37,29 +37,16 @@ router = APIRouter(prefix="/updates", tags=["Actualizaciones"])
     description="Retorna todas las versiones del MSI disponibles en S3 (solo admin).",
     responses={
         401: {"description": "No autenticado"},
+        403: {"description": "No autorizado"},
         503: {"description": "S3 no disponible"},
     },
 )
 def list_versions(
     request: Request,
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """Lista todas las versiones disponibles en S3. Solo accesible por admin."""
-    # Verificar que es admin
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="No autenticado")
-
-    try:
-        token = auth_header[7:]
-        payload = decode_access_token(token)
-        user_id = payload.get("sub")
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user or user.role != UserRole.ADMIN:
-            raise HTTPException(status_code=401, detail="No autorizado")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Token inválido")
-
     try:
         s3_service = S3UpdateService()
         versions = s3_service.list_versions()
@@ -76,30 +63,17 @@ def list_versions(
     responses={
         200: {"description": "Versión pineada exitosamente"},
         401: {"description": "No autenticado"},
+        403: {"description": "No autorizado"},
         404: {"description": "Organización no encontrada"},
     },
 )
 async def pin_version(
     organization_id: str,
     request: Request,
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """Pinea una versión específica para una organización. Solo admin."""
-    # Verificar admin
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="No autenticado")
-
-    try:
-        token = auth_header[7:]
-        payload = decode_access_token(token)
-        user_id = payload.get("sub")
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user or user.role != UserRole.ADMIN:
-            raise HTTPException(status_code=401, detail="No autorizado")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Token inválido")
-
     # Leer body
     body = await request.json()
     version = body.get("version")  # None o string vacío para despinear
@@ -124,6 +98,7 @@ async def pin_version(
     responses={
         200: {"description": "URL presigned para descarga"},
         401: {"description": "No autenticado o no autorizado"},
+        403: {"description": "No autorizado"},
         404: {"description": "Versión no encontrada en S3"},
         500: {"description": "Error al generar URL de descarga"},
     },
@@ -131,24 +106,10 @@ async def pin_version(
 def admin_download_version(
     version: str,
     request: Request,
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """Genera una URL presigned para descargar una versión específica. Solo admin."""
-    # Verificar que es admin
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="No autenticado")
-
-    try:
-        token = auth_header[7:]
-        payload = decode_access_token(token)
-        user_id = payload.get("sub")
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user or user.role != UserRole.ADMIN:
-            raise HTTPException(status_code=401, detail="No autorizado")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Token inválido")
-
     try:
         s3_service = S3UpdateService()
         target_key = f"versions/{version}/AlwaysPrint.msi"
@@ -167,7 +128,7 @@ def admin_download_version(
 
     logger.info(
         "Descarga admin autorizada: usuario=%s, versión=%s",
-        user.email if user else "desconocido",
+        current_user.email,
         version,
     )
 
@@ -181,29 +142,16 @@ def admin_download_version(
     responses={
         200: {"description": "Resultado de la eliminación"},
         401: {"description": "No autenticado o no autorizado"},
+        403: {"description": "No autorizado"},
         400: {"description": "No se proporcionaron versiones"},
     },
 )
 async def admin_delete_versions(
     request: Request,
+    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """Elimina múltiples versiones de S3. No permite eliminar latest ni pineadas. Solo admin."""
-    # Verificar que es admin
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="No autenticado")
-
-    try:
-        token = auth_header[7:]
-        payload = decode_access_token(token)
-        user_id = payload.get("sub")
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user or user.role != UserRole.ADMIN:
-            raise HTTPException(status_code=401, detail="No autorizado")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Token inválido")
-
     # Leer body con las versiones a eliminar
     body = await request.json()
     versions_to_delete = body.get("versions", [])
@@ -265,7 +213,7 @@ async def admin_delete_versions(
 
     logger.info(
         "Eliminación de versiones completada: usuario=%s, eliminadas=%d, omitidas=%d",
-        user.email if user else "desconocido",
+        current_user.email,
         len(deleted),
         len(skipped),
     )
