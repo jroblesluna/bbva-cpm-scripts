@@ -1,5 +1,5 @@
 {
-  "version": "2.2",
+  "version": "2.3",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager",
   "created_at": "2026-05-15T12:00:00Z",
@@ -147,11 +147,29 @@
         },
         {
           "type": "EnterShieldMode",
-          "description": "Cambiar puerto a IP directa de contingencia",
+          "description": "Crear puerto TCP/IP y asignar a cola corporativa",
           "parameters": {
             "queue_name": "{{corporate_queue_name}}",
             "printer_ip": "{{contingency_printer_ip}}",
             "printer_port": 9100
+          }
+        },
+        {
+          "type": "StopService",
+          "description": "Detener Spooler para aplicar cambio de puerto",
+          "parameters": {
+            "service_name": "Spooler",
+            "graceful_timeout_seconds": 30,
+            "force_kill_on_timeout": false
+          }
+        },
+        {
+          "type": "StartService",
+          "description": "Reiniciar Spooler con nuevo puerto asignado",
+          "parameters": {
+            "service_name": "Spooler",
+            "wait_for_running": true,
+            "timeout_seconds": 30
           }
         },
         {
@@ -184,10 +202,28 @@
         },
         {
           "type": "ExitShieldMode",
-          "description": "Restaurar puerto LPMC (CPM)",
+          "description": "Restaurar puerto LPMC (CPM) en cola corporativa",
           "parameters": {
             "queue_name": "{{corporate_queue_name}}",
             "lpmc_port_name": "LPMC:"
+          }
+        },
+        {
+          "type": "StopService",
+          "description": "Detener Spooler para aplicar cambio de puerto",
+          "parameters": {
+            "service_name": "Spooler",
+            "graceful_timeout_seconds": 30,
+            "force_kill_on_timeout": false
+          }
+        },
+        {
+          "type": "StartService",
+          "description": "Reiniciar Spooler con puerto CPM restaurado",
+          "parameters": {
+            "service_name": "Spooler",
+            "wait_for_running": true,
+            "timeout_seconds": 30
           }
         },
         {

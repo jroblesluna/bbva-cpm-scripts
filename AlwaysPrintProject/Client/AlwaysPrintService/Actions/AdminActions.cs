@@ -412,7 +412,7 @@ namespace AlwaysPrintService.Actions
                 AlwaysPrintLogger.WriteInfo(
                     $"EnterShieldMode: iniciando contingencia. Cola={queueName}, IP={printerIp}:{printerPort}");
 
-                // 1. Crear o actualizar puerto TCP/IP directo (Spooler debe estar corriendo)
+                // 1. Crear o actualizar puerto TCP/IP directo
                 string portName = $"AP_SHIELD_{printerIp}_{printerPort}";
                 AlwaysPrintLogger.WriteInfo($"EnterShieldMode: configurando puerto {portName}...");
                 if (!CreateOrUpdateTcpPort(portName, printerIp, printerPort))
@@ -423,7 +423,7 @@ namespace AlwaysPrintService.Actions
                     return false;
                 }
 
-                // 2. Asignar el puerto a la cola corporativa (Spooler debe estar corriendo)
+                // 2. Asignar el puerto a la cola corporativa
                 AlwaysPrintLogger.WriteInfo($"EnterShieldMode: asignando puerto {portName} a cola {queueName}...");
                 if (!AssignPortToQueue(queueName, portName))
                 {
@@ -433,32 +433,16 @@ namespace AlwaysPrintService.Actions
                     return false;
                 }
 
-                // 3. Reiniciar Spooler para que tome los cambios de puerto
-                AlwaysPrintLogger.WriteInfo("EnterShieldMode: reiniciando servicio Spooler...");
-                if (!StopService("Spooler", 30, false))
-                {
-                    AlwaysPrintLogger.WriteWarning(
-                        "EnterShieldMode: no se pudo detener el Spooler para reinicio. Continuando.");
-                }
-                Thread.Sleep(1000);
-                if (!StartService("Spooler"))
-                {
-                    AlwaysPrintLogger.WriteError(
-                        "EnterShieldMode: no se pudo reiniciar el Spooler.",
-                        AlwaysPrintLogger.EvtGenericError);
-                    return false;
-                }
-
                 AlwaysPrintLogger.WriteInfo(
-                    $"EnterShieldMode: contingencia activada exitosamente. " +
-                    $"Cola '{queueName}' → {printerIp}:{printerPort}");
+                    $"EnterShieldMode: contingencia configurada exitosamente. " +
+                    $"Cola '{queueName}' → {printerIp}:{printerPort}. " +
+                    "Nota: reiniciar Spooler para aplicar cambios.");
                 return true;
             }
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteError(
                     $"EnterShieldMode: error crítico: {ex.Message}", ex);
-                try { StartService("Spooler"); } catch { /* mejor esfuerzo */ }
                 return false;
             }
         }
@@ -480,7 +464,7 @@ namespace AlwaysPrintService.Actions
                 AlwaysPrintLogger.WriteInfo(
                     $"ExitShieldMode: saliendo de contingencia. Cola={queueName}, Puerto LPMC={lpmcPortName}");
 
-                // 1. Asignar el puerto LPMC a la cola corporativa (Spooler debe estar corriendo)
+                // 1. Asignar el puerto LPMC a la cola corporativa
                 AlwaysPrintLogger.WriteInfo($"ExitShieldMode: asignando puerto {lpmcPortName} a cola {queueName}...");
                 if (!AssignPortToQueue(queueName, lpmcPortName))
                 {
@@ -490,31 +474,15 @@ namespace AlwaysPrintService.Actions
                     return false;
                 }
 
-                // 2. Reiniciar Spooler para que tome los cambios de puerto
-                AlwaysPrintLogger.WriteInfo("ExitShieldMode: reiniciando servicio Spooler...");
-                if (!StopService("Spooler", 30, false))
-                {
-                    AlwaysPrintLogger.WriteWarning(
-                        "ExitShieldMode: no se pudo detener el Spooler para reinicio. Continuando.");
-                }
-                Thread.Sleep(1000);
-                if (!StartService("Spooler"))
-                {
-                    AlwaysPrintLogger.WriteError(
-                        "ExitShieldMode: no se pudo reiniciar el Spooler.",
-                        AlwaysPrintLogger.EvtGenericError);
-                    return false;
-                }
-
                 AlwaysPrintLogger.WriteInfo(
-                    $"ExitShieldMode: contingencia desactivada. Cola '{queueName}' → {lpmcPortName} (CPM)");
+                    $"ExitShieldMode: contingencia desactivada. Cola '{queueName}' → {lpmcPortName} (CPM). " +
+                    "Nota: reiniciar Spooler para aplicar cambios.");
                 return true;
             }
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteError(
                     $"ExitShieldMode: error crítico: {ex.Message}", ex);
-                try { StartService("Spooler"); } catch { /* mejor esfuerzo */ }
                 return false;
             }
         }
