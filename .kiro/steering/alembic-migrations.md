@@ -86,6 +86,26 @@ status = Column(SQLEnum(MiEnum, name='mi_enum', create_type=False), nullable=Fal
 status = Column(SQLEnum(MiEnum), nullable=False)
 ```
 
+10. **Enums PostgreSQL son case-sensitive.** Los valores en la BD deben coincidir exactamente con lo que SQLAlchemy envía en las queries:
+
+```python
+# Si el enum en PG fue creado con valores en minúscula:
+#   CREATE TYPE deliverystatus AS ENUM ('pending', 'sent', 'skipped')
+# Entonces el modelo DEBE usar values_callable para enviar minúsculas:
+status = Column(
+    SQLEnum(DeliveryStatus, name='deliverystatus', create_type=False,
+            values_callable=lambda x: [e.value for e in x]),
+    nullable=False
+)
+
+# Si el enum en PG fue creado con valores en MAYÚSCULA (enums legacy):
+#   CREATE TYPE userrole AS ENUM ('ADMIN', 'OPERATOR', 'READONLY')
+# Entonces NO usar values_callable (SQLAlchemy envía el nombre del atributo por defecto):
+role = Column(SQLEnum(UserRole, name='userrole', create_type=False), nullable=False)
+```
+
+**Regla para enums nuevos:** Siempre crear con valores en minúscula y usar `values_callable`.
+
 ## Convenciones de Nombres
 
 | Operación | Formato de revision ID |

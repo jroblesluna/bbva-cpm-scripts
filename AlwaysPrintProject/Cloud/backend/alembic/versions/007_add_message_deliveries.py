@@ -4,14 +4,15 @@ Revision ID: 007_msg_deliveries
 Revises: 006_contingency_ip
 Create Date: 2026-05-20 14:00:00.000000
 
-Esta migración:
-- Agrega columna delivery_mode a la tabla messages (all / only_connected)
-- Crea tabla message_deliveries para tracking individual de entrega por workstation
+Esta migración es 100% idempotente (safe to re-run):
+- Crea enums si no existen
+- Agrega columnas si no existen
+- Crea tabla si no existe
+- Convierte columnas a enum si aún son varchar
 """
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 revision: str = '007_msg_deliveries'
 down_revision: Union[str, None] = '006_contingency_ip'
@@ -20,14 +21,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Agregar delivery_mode a messages y crear tabla message_deliveries."""
-    # Crear enums primero (PostgreSQL requiere que existan antes de usarlos)
-    # Usar DO $$ para evitar error si ya existen (checkfirst no siempre funciona en Alembic)
+    """Agregar delivery_mode a messages y crear tabla message_deliveries (idempotente)."""
+    
+    # 1. Crear enums (idempotente)
     op.execute("DO $$ BEGIN CREATE TYPE targettype AS ENUM ('workstation', 'vlan', 'account'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
     op.execute("DO $$ BEGIN CREATE TYPE deliverymode AS ENUM ('all', 'only_connected'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
     op.execute("DO $$ BEGIN CREATE TYPE deliverystatus AS ENUM ('pending', 'sent', 'skipped'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
 
-    # Recrear columna target_type si fue eliminada por CASCADE
+    # 2. Agregar columna target_type a messages si no existe (pudo ser eliminada por CASCADE)
     op.execute("""
         DO $$ BEGIN
             ALTER TABLE messages ADD COLUMN target_type targettype NOT NULL DEFAULT 'workstation';
@@ -36,60 +37,62 @@ def upgrade() -> None:
     """)
     op.execute("CREATE INDEX IF NOT EXISTS ix_messages_target_type ON messages (target_type)")
 
-    # Agregar columna delivery_mode a messages
-    op.add_column(
-        'messages',
-        sa.Column(
-            'delivery_mode',
-            sa.String(20),
-            nullable=False,
-            server_default='all'
-        )
-    )
+    # 3. Agregar columna delivery_mode a messages si no existe
+    op.execute("""
+        DO $$ BEGIN
+            ALTER TABLE messages ADD COLUMN delivery_mode deliverymode NOT NULL DEFAULT 'all';
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;
+    """)
 
-    # Crear tabla message_deliveries
-    op.create_table(
-        'message_deliveries',
-        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('message_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('workstation_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column(
-            'status',
-            sa.String(20),
-            nullable=False,
-            server_default='pending'
-        ),
-        sa.Column('delivered_at', sa.DateTime, nullable=True),
-        sa.ForeignKeyConstraint(['message_id'], ['messages.id'], ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['workstation_id'], ['workstations.id'], ondelete='CASCADE'),
-        sa.PrimaryKeyConstraint('id'),
-    )
+    # 4. Crear tabla message_deliveries si no existe
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS message_deliveries (
+            id UUID PRIMARY KEY,
+            message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+            workstation_id UUID NOT NULL REFERENCES workstations(id) ON DELETE CASCADE,
+            status deliverystatus NOT NULL DEFAULT 'pending',
+            delivered_at TIMESTAMP
+        );
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_message_deliveries_message_id ON message_deliveries (message_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_message_deliveries_workstation_id ON message_deliveries (workstation_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_message_deliveries_status ON message_deliveries (status)")
 
-    # Índices para consultas frecuentes
-    op.create_index('ix_message_deliveries_message_id', 'message_deliveries', ['message_id'])
-    op.create_index('ix_message_deliveries_workstation_id', 'message_deliveries', ['workstation_id'])
-    op.create_index('ix_message_deliveries_status', 'message_deliveries', ['status'])
+    # 5. Si delivery_mode es varchar (de un intento anterior), convertir a enum
+    op.execute("""
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name = 'messages' AND column_name = 'delivery_mode' 
+                AND data_type = 'character varying'
+            ) THEN
+                ALTER TABLE messages ALTER COLUMN delivery_mode DROP DEFAULT;
+                ALTER TABLE messages ALTER COLUMN delivery_mode TYPE deliverymode USING delivery_mode::deliverymode;
+                ALTER TABLE messages ALTER COLUMN delivery_mode SET DEFAULT 'all';
+            END IF;
+        END $$;
+    """)
 
-    # Cambiar columnas de String a enum (los tipos ya fueron creados con DO $$)
-    # Primero eliminar defaults que son strings (incompatibles con el cast a enum)
-    op.execute("ALTER TABLE messages ALTER COLUMN delivery_mode DROP DEFAULT")
-    op.execute("ALTER TABLE messages ALTER COLUMN delivery_mode TYPE deliverymode USING delivery_mode::deliverymode")
-    op.execute("ALTER TABLE messages ALTER COLUMN delivery_mode SET DEFAULT 'all'")
-    
-    op.execute("ALTER TABLE message_deliveries ALTER COLUMN status DROP DEFAULT")
-    op.execute("ALTER TABLE message_deliveries ALTER COLUMN status TYPE deliverystatus USING status::deliverystatus")
-    op.execute("ALTER TABLE message_deliveries ALTER COLUMN status SET DEFAULT 'pending'")
+    # 6. Si status es varchar (de un intento anterior), convertir a enum
+    op.execute("""
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name = 'message_deliveries' AND column_name = 'status' 
+                AND data_type = 'character varying'
+            ) THEN
+                ALTER TABLE message_deliveries ALTER COLUMN status DROP DEFAULT;
+                ALTER TABLE message_deliveries ALTER COLUMN status TYPE deliverystatus USING status::deliverystatus;
+                ALTER TABLE message_deliveries ALTER COLUMN status SET DEFAULT 'pending';
+            END IF;
+        END $$;
+    """)
 
 
 def downgrade() -> None:
-    """Revertir: eliminar tabla message_deliveries y columna delivery_mode."""
-    op.drop_index('ix_message_deliveries_status', table_name='message_deliveries')
-    op.drop_index('ix_message_deliveries_workstation_id', table_name='message_deliveries')
-    op.drop_index('ix_message_deliveries_message_id', table_name='message_deliveries')
-    op.drop_table('message_deliveries')
-
-    op.drop_column('messages', 'delivery_mode')
-
-    # Eliminar enums creados
-    sa.Enum(name='deliverystatus').drop(op.get_bind(), checkfirst=True)
-    sa.Enum(name='deliverymode').drop(op.get_bind(), checkfirst=True)
+    """Revertir: eliminar tabla message_deliveries y columnas agregadas."""
+    op.execute("DROP TABLE IF EXISTS message_deliveries CASCADE")
+    op.execute("ALTER TABLE messages DROP COLUMN IF EXISTS delivery_mode")
+    op.execute("DROP TYPE IF EXISTS deliverystatus CASCADE")
+    op.execute("DROP TYPE IF EXISTS deliverymode CASCADE")
