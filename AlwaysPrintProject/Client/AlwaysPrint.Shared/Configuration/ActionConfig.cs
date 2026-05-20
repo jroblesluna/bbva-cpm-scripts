@@ -111,6 +111,7 @@ namespace AlwaysPrint.Shared.Configuration
         public const string DeleteOrphanedFolders = "DeleteOrphanedFolders";
         public const string CreateTcpPort = "CreateTcpPort";
         public const string AssignPortToQueue = "AssignPortToQueue";
+        public const string DeleteTcpPort = "DeleteTcpPort";
         public const string PausePrintQueue = "PausePrintQueue";
         public const string UnpausePrintQueue = "UnpausePrintQueue";
         public const string SetDefaultPrinter = "SetDefaultPrinter";

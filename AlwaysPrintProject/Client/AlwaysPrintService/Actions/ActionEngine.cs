@@ -239,6 +239,9 @@ namespace AlwaysPrintService.Actions
                 case ActionTypes.AssignPortToQueue:
                     return ExecuteAssignPortToQueue(action);
                 
+                case ActionTypes.DeleteTcpPort:
+                    return ExecuteDeleteTcpPort(action);
+                
                 // Compatibilidad hacia atrás: tipos obsoletos
                 case "EnterShieldMode":
                     AlwaysPrintLogger.WriteWarning("ActionEngine: 'EnterShieldMode' está obsoleto. Usar 'CreateTcpPort' + 'AssignPortToQueue'.");
@@ -504,6 +507,21 @@ namespace AlwaysPrintService.Actions
             portName = ReplaceTemplates(portName);
 
             return AdminActions.AssignPortToQueue(queueName, portName);
+        }
+
+        private bool ExecuteDeleteTcpPort(ActionConfig action)
+        {
+            string portName = GetParameter<string>(action, "port_name") ?? "";
+
+            if (string.IsNullOrWhiteSpace(portName))
+            {
+                AlwaysPrintLogger.WriteWarning("ActionEngine: DeleteTcpPort requiere 'port_name'");
+                return false;
+            }
+
+            portName = ReplaceTemplates(portName);
+
+            return AdminActions.DeleteTcpPort(portName);
         }
 
         // ═══════════════════════════════════════════════════════════════════════

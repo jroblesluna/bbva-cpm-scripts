@@ -444,6 +444,49 @@ namespace AlwaysPrintService.Actions
         }
 
         /// <summary>
+        /// Elimina un puerto TCP/IP de impresora via WMI.
+        /// Solo se puede eliminar si no está asignado a ninguna cola.
+        /// Parámetros: port_name (nombre del puerto a eliminar)
+        /// </summary>
+        public static bool DeleteTcpPort(string portName)
+        {
+            try
+            {
+                AlwaysPrintLogger.WriteInfo($"DeleteTcpPort: eliminando puerto '{portName}'...");
+
+                string safePort = portName.Replace("'", "''");
+                using var portSearch = new ManagementObjectSearcher(
+                    @"\\.\root\cimv2",
+                    $"SELECT * FROM Win32_TCPIPPrinterPort WHERE Name = '{safePort}'");
+
+                ManagementObject? existingPort = null;
+                foreach (ManagementObject obj in portSearch.Get())
+                {
+                    existingPort = obj;
+                    break;
+                }
+
+                if (existingPort == null)
+                {
+                    AlwaysPrintLogger.WriteInfo($"DeleteTcpPort: puerto '{portName}' no existe. Nada que eliminar.");
+                    return true; // No es error si no existe
+                }
+
+                existingPort.Delete();
+                AlwaysPrintLogger.WriteInfo($"DeleteTcpPort: puerto '{portName}' eliminado exitosamente.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                // Si falla porque está en uso, loggear warning (no es crítico)
+                AlwaysPrintLogger.WriteWarning(
+                    $"DeleteTcpPort: no se pudo eliminar puerto '{portName}': {ex.Message}. " +
+                    "Puede estar en uso por otra cola.");
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Asigna un puerto (por nombre) a una cola de impresión Windows via WMI.
         /// </summary>
         public static bool AssignPortToQueue(string queueName, string portName)

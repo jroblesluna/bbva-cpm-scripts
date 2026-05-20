@@ -146,23 +146,6 @@
           }
         },
         {
-          "type": "CreateTcpPort",
-          "description": "Crear puerto TCP/IP Standard directo a impresora de contingencia",
-          "parameters": {
-            "port_name": "AP_{{contingency_printer_ip}}_9100",
-            "host_address": "{{contingency_printer_ip}}",
-            "port_number": 9100
-          }
-        },
-        {
-          "type": "AssignPortToQueue",
-          "description": "Asignar puerto de contingencia a cola corporativa",
-          "parameters": {
-            "queue_name": "{{corporate_queue_name}}",
-            "port_name": "AP_{{contingency_printer_ip}}_9100"
-          }
-        },
-        {
           "type": "StopService",
           "description": "Detener Spooler para aplicar cambio de puerto",
           "parameters": {
@@ -181,6 +164,30 @@
           }
         },
         {
+          "type": "CreateTcpPort",
+          "description": "Crear puerto TCP/IP Standard directo a impresora de contingencia",
+          "parameters": {
+            "port_name": "AP_{{contingency_printer_ip}}_9100",
+            "host_address": "{{contingency_printer_ip}}",
+            "port_number": 9100
+          }
+        },
+        {
+          "type": "AssignPortToQueue",
+          "description": "Asignar puerto de contingencia a cola corporativa",
+          "parameters": {
+            "queue_name": "{{corporate_queue_name}}",
+            "port_name": "AP_{{contingency_printer_ip}}_9100"
+          }
+        },
+        {
+          "type": "DeleteTcpPort",
+          "description": "Eliminar puerto LPMC anterior (ya no en uso)",
+          "parameters": {
+            "port_name": "LPMCHybridPort"
+          }
+        },
+        {
           "type": "UnpausePrintQueue",
           "description": "Reanudar cola corporativa con nuevo puerto",
           "parameters": {
@@ -194,6 +201,15 @@
       "description": "Desactivar modo contingencia: restaurar flujo CPM",
       "actions": [
         {
+          "type": "StopService",
+          "description": "Detener servicio CPM",
+          "parameters": {
+            "service_name": "lpmc_universal_service",
+            "graceful_timeout_seconds": 10,
+            "force_kill_on_timeout": true
+          }
+        },
+        {
           "type": "KillProcessesByName",
           "description": "Eliminar procesos CPM tray huérfanos",
           "parameters": {
@@ -206,14 +222,6 @@
           "description": "Pausar cola corporativa antes de restaurar puerto",
           "parameters": {
             "queue_name": "{{corporate_queue_name}}"
-          }
-        },
-        {
-          "type": "AssignPortToQueue",
-          "description": "Restaurar puerto LPMC en cola corporativa",
-          "parameters": {
-            "queue_name": "{{corporate_queue_name}}",
-            "port_name": "LPMC:"
           }
         },
         {
@@ -232,6 +240,30 @@
             "service_name": "Spooler",
             "wait_for_running": true,
             "timeout_seconds": 30
+          }
+        },
+        {
+          "type": "CreateTcpPort",
+          "description": "Crear puerto TCP/IP Standard LPMC",
+          "parameters": {
+            "port_name": "LPMCHybridPort",
+            "host_address": "127.0.0.1",
+            "port_number": 9167
+          }
+        },
+        {
+          "type": "AssignPortToQueue",
+          "description": "Restaurar puerto LPMC en cola corporativa",
+          "parameters": {
+            "queue_name": "{{corporate_queue_name}}",
+            "port_name": "LPMCHybridPort"
+          }
+        },
+        {
+          "type": "DeleteTcpPort",
+          "description": "Eliminar puerto de contingencia anterior (ya no en uso)",
+          "parameters": {
+            "port_name": "AP_{{contingency_printer_ip}}_9100"
           }
         },
         {
