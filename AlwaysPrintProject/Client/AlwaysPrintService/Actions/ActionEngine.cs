@@ -233,11 +233,20 @@ namespace AlwaysPrintService.Actions
                 case ActionTypes.DeleteOrphanedFolders:
                     return ExecuteDeleteOrphanedFolders(action);
                 
-                case ActionTypes.EnterShieldMode:
-                    return ExecuteEnterShieldMode(action);
+                case ActionTypes.CreateTcpPort:
+                    return ExecuteCreateTcpPort(action);
                 
-                case ActionTypes.ExitShieldMode:
-                    return ExecuteExitShieldMode(action);
+                case ActionTypes.AssignPortToQueue:
+                    return ExecuteAssignPortToQueue(action);
+                
+                // Compatibilidad hacia atrás: tipos obsoletos
+                case "EnterShieldMode":
+                    AlwaysPrintLogger.WriteWarning("ActionEngine: 'EnterShieldMode' está obsoleto. Usar 'CreateTcpPort' + 'AssignPortToQueue'.");
+                    return ExecuteEnterShieldModeLegacy(action);
+                
+                case "ExitShieldMode":
+                    AlwaysPrintLogger.WriteWarning("ActionEngine: 'ExitShieldMode' está obsoleto. Usar 'AssignPortToQueue'.");
+                    return ExecuteExitShieldModeLegacy(action);
                 
                 case ActionTypes.PausePrintQueue:
                     return ExecutePausePrintQueue(action);
@@ -462,45 +471,90 @@ namespace AlwaysPrintService.Actions
             return true; // Siempre retorna éxito (los errores individuales se loguean internamente)
         }
 
-        private bool ExecuteEnterShieldMode(ActionConfig action)
+        private bool ExecuteCreateTcpPort(ActionConfig action)
+        {
+            string portName = GetParameter<string>(action, "port_name") ?? "";
+            string hostAddress = GetParameter<string>(action, "host_address") ?? "";
+            int portNumber = GetParameter<int>(action, "port_number", 9100);
+
+            if (string.IsNullOrWhiteSpace(portName) || string.IsNullOrWhiteSpace(hostAddress))
+            {
+                AlwaysPrintLogger.WriteWarning("ActionEngine: CreateTcpPort requiere 'port_name' y 'host_address'");
+                return false;
+            }
+
+            portName = ReplaceTemplates(portName);
+            hostAddress = ReplaceTemplates(hostAddress);
+
+            return AdminActions.CreateOrUpdateTcpPort(portName, hostAddress, portNumber);
+        }
+
+        private bool ExecuteAssignPortToQueue(ActionConfig action)
+        {
+            string queueName = GetParameter<string>(action, "queue_name") ?? "";
+            string portName = GetParameter<string>(action, "port_name") ?? "";
+
+            if (string.IsNullOrWhiteSpace(queueName) || string.IsNullOrWhiteSpace(portName))
+            {
+                AlwaysPrintLogger.WriteWarning("ActionEngine: AssignPortToQueue requiere 'queue_name' y 'port_name'");
+                return false;
+            }
+
+            queueName = ReplaceTemplates(queueName);
+            portName = ReplaceTemplates(portName);
+
+            return AdminActions.AssignPortToQueue(queueName, portName);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // COMPATIBILIDAD HACIA ATRÁS (OBSOLETO)
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Soporte legacy para configs antiguas que usen EnterShieldMode.
+        /// Delega en CreateOrUpdateTcpPort + AssignPortToQueue.
+        /// </summary>
+        private bool ExecuteEnterShieldModeLegacy(ActionConfig action)
         {
             string queueName = GetParameter<string>(action, "queue_name") ?? "";
             string printerIp = GetParameter<string>(action, "printer_ip") ?? "";
             int printerPort = GetParameter<int>(action, "printer_port", 9100);
 
-            if (string.IsNullOrWhiteSpace(queueName))
+            if (string.IsNullOrWhiteSpace(queueName) || string.IsNullOrWhiteSpace(printerIp))
             {
-                AlwaysPrintLogger.WriteWarning("ActionEngine: EnterShieldMode requiere 'queue_name'");
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(printerIp))
-            {
-                AlwaysPrintLogger.WriteWarning("ActionEngine: EnterShieldMode requiere 'printer_ip'");
+                AlwaysPrintLogger.WriteWarning("ActionEngine: EnterShieldMode (legacy) requiere 'queue_name' y 'printer_ip'");
                 return false;
             }
 
             queueName = ReplaceTemplates(queueName);
             printerIp = ReplaceTemplates(printerIp);
 
-            return AdminActions.EnterShieldMode(queueName, printerIp, printerPort);
+            string portName = $"AP_{printerIp}_{printerPort}";
+            bool portOk = AdminActions.CreateOrUpdateTcpPort(portName, printerIp, printerPort);
+            if (!portOk) return false;
+
+            return AdminActions.AssignPortToQueue(queueName, portName);
         }
 
-        private bool ExecuteExitShieldMode(ActionConfig action)
+        /// <summary>
+        /// Soporte legacy para configs antiguas que usen ExitShieldMode.
+        /// Delega en AssignPortToQueue.
+        /// </summary>
+        private bool ExecuteExitShieldModeLegacy(ActionConfig action)
         {
             string queueName = GetParameter<string>(action, "queue_name") ?? "";
             string lpmcPortName = GetParameter<string>(action, "lpmc_port_name") ?? "LPMC:";
 
             if (string.IsNullOrWhiteSpace(queueName))
             {
-                AlwaysPrintLogger.WriteWarning("ActionEngine: ExitShieldMode requiere 'queue_name'");
+                AlwaysPrintLogger.WriteWarning("ActionEngine: ExitShieldMode (legacy) requiere 'queue_name'");
                 return false;
             }
 
             queueName = ReplaceTemplates(queueName);
             lpmcPortName = ReplaceTemplates(lpmcPortName);
 
-            return AdminActions.ExitShieldMode(queueName, lpmcPortName);
+            return AdminActions.AssignPortToQueue(queueName, lpmcPortName);
         }
 
         private bool ExecutePausePrintQueue(ActionConfig action)

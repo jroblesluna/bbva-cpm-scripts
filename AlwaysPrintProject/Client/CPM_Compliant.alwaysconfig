@@ -146,12 +146,20 @@
           }
         },
         {
-          "type": "EnterShieldMode",
-          "description": "Crear puerto TCP/IP y asignar a cola corporativa",
+          "type": "CreateTcpPort",
+          "description": "Crear puerto TCP/IP Standard directo a impresora de contingencia",
+          "parameters": {
+            "port_name": "AP_{{contingency_printer_ip}}_9100",
+            "host_address": "{{contingency_printer_ip}}",
+            "port_number": 9100
+          }
+        },
+        {
+          "type": "AssignPortToQueue",
+          "description": "Asignar puerto de contingencia a cola corporativa",
           "parameters": {
             "queue_name": "{{corporate_queue_name}}",
-            "printer_ip": "{{contingency_printer_ip}}",
-            "printer_port": 9100
+            "port_name": "AP_{{contingency_printer_ip}}_9100"
           }
         },
         {
@@ -201,11 +209,11 @@
           }
         },
         {
-          "type": "ExitShieldMode",
-          "description": "Restaurar puerto LPMC (CPM) en cola corporativa",
+          "type": "AssignPortToQueue",
+          "description": "Restaurar puerto LPMC en cola corporativa",
           "parameters": {
             "queue_name": "{{corporate_queue_name}}",
-            "lpmc_port_name": "LPMC:"
+            "port_name": "LPMC:"
           }
         },
         {

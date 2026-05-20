@@ -109,8 +109,8 @@ namespace AlwaysPrint.Shared.Configuration
         public const string StartTray = "StartTray";
         public const string Conditional = "Conditional";
         public const string DeleteOrphanedFolders = "DeleteOrphanedFolders";
-        public const string EnterShieldMode = "EnterShieldMode";
-        public const string ExitShieldMode = "ExitShieldMode";
+        public const string CreateTcpPort = "CreateTcpPort";
+        public const string AssignPortToQueue = "AssignPortToQueue";
         public const string PausePrintQueue = "PausePrintQueue";
         public const string UnpausePrintQueue = "UnpausePrintQueue";
         public const string SetDefaultPrinter = "SetDefaultPrinter";

@@ -391,106 +391,13 @@ namespace AlwaysPrintService.Actions
         }
         
         // ═══════════════════════════════════════════════════════════════════════
-        // MODO CONTINGENCIA (SHIELD MODE)
+        // OPERACIONES ATÓMICAS DE PUERTOS E IMPRESORAS
         // ═══════════════════════════════════════════════════════════════════════
-        
-        /// <summary>
-        /// Entra en modo contingencia (Shield Mode):
-        /// 1. Detiene el servicio Spooler
-        /// 2. Crea y asigna un puerto TCP/IP directo a la impresora de contingencia
-        /// 3. Reinicia el servicio Spooler
-        /// 
-        /// Parámetros:
-        /// - queue_name: nombre de la cola corporativa (ej: "LexmarkBBVA")
-        /// - printer_ip: IP de la impresora de contingencia
-        /// - printer_port: puerto de la impresora (default: 9100)
-        /// </summary>
-        public static bool EnterShieldMode(string queueName, string printerIp, int printerPort = 9100)
-        {
-            try
-            {
-                AlwaysPrintLogger.WriteInfo(
-                    $"EnterShieldMode: iniciando contingencia. Cola={queueName}, IP={printerIp}:{printerPort}");
-
-                // 1. Crear o actualizar puerto TCP/IP directo
-                string portName = $"AP_SHIELD_{printerIp}_{printerPort}";
-                AlwaysPrintLogger.WriteInfo($"EnterShieldMode: configurando puerto {portName}...");
-                if (!CreateOrUpdateTcpPort(portName, printerIp, printerPort))
-                {
-                    AlwaysPrintLogger.WriteError(
-                        "EnterShieldMode: no se pudo crear/actualizar puerto TCP/IP.",
-                        AlwaysPrintLogger.EvtGenericError);
-                    return false;
-                }
-
-                // 2. Asignar el puerto a la cola corporativa
-                AlwaysPrintLogger.WriteInfo($"EnterShieldMode: asignando puerto {portName} a cola {queueName}...");
-                if (!AssignPortToQueue(queueName, portName))
-                {
-                    AlwaysPrintLogger.WriteError(
-                        "EnterShieldMode: no se pudo asignar puerto a la cola.",
-                        AlwaysPrintLogger.EvtGenericError);
-                    return false;
-                }
-
-                AlwaysPrintLogger.WriteInfo(
-                    $"EnterShieldMode: contingencia configurada exitosamente. " +
-                    $"Cola '{queueName}' → {printerIp}:{printerPort}. " +
-                    "Nota: reiniciar Spooler para aplicar cambios.");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                AlwaysPrintLogger.WriteError(
-                    $"EnterShieldMode: error crítico: {ex.Message}", ex);
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Sale del modo contingencia (Shield Mode):
-        /// 1. Detiene el servicio Spooler
-        /// 2. Asigna el puerto del monitor LPMC (Lexmark CPM) a la cola corporativa
-        /// 3. Reinicia el servicio Spooler
-        /// 
-        /// Parámetros:
-        /// - queue_name: nombre de la cola corporativa (ej: "LexmarkBBVA")
-        /// - lpmc_port_name: nombre del puerto LPMC (default: "LPMC:")
-        /// </summary>
-        public static bool ExitShieldMode(string queueName, string lpmcPortName = "LPMC:")
-        {
-            try
-            {
-                AlwaysPrintLogger.WriteInfo(
-                    $"ExitShieldMode: saliendo de contingencia. Cola={queueName}, Puerto LPMC={lpmcPortName}");
-
-                // 1. Asignar el puerto LPMC a la cola corporativa
-                AlwaysPrintLogger.WriteInfo($"ExitShieldMode: asignando puerto {lpmcPortName} a cola {queueName}...");
-                if (!AssignPortToQueue(queueName, lpmcPortName))
-                {
-                    AlwaysPrintLogger.WriteError(
-                        "ExitShieldMode: no se pudo asignar puerto LPMC a la cola.",
-                        AlwaysPrintLogger.EvtGenericError);
-                    return false;
-                }
-
-                AlwaysPrintLogger.WriteInfo(
-                    $"ExitShieldMode: contingencia desactivada. Cola '{queueName}' → {lpmcPortName} (CPM). " +
-                    "Nota: reiniciar Spooler para aplicar cambios.");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                AlwaysPrintLogger.WriteError(
-                    $"ExitShieldMode: error crítico: {ex.Message}", ex);
-                return false;
-            }
-        }
 
         /// <summary>
         /// Crea o actualiza un puerto TCP/IP de impresora via WMI.
         /// </summary>
-        private static bool CreateOrUpdateTcpPort(string portName, string hostAddress, int portNumber)
+        public static bool CreateOrUpdateTcpPort(string portName, string hostAddress, int portNumber)
         {
             try
             {
@@ -539,7 +446,7 @@ namespace AlwaysPrintService.Actions
         /// <summary>
         /// Asigna un puerto (por nombre) a una cola de impresión Windows via WMI.
         /// </summary>
-        private static bool AssignPortToQueue(string queueName, string portName)
+        public static bool AssignPortToQueue(string queueName, string portName)
         {
             try
             {
