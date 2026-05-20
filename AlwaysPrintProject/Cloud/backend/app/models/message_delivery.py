@@ -42,7 +42,7 @@ class MessageDelivery(Base):
 
     # === ESTADO DE ENTREGA ===
     status = Column(
-        SQLEnum(DeliveryStatus, name='deliverystatus', create_type=False),
+        SQLEnum(DeliveryStatus, name='deliverystatus', create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False, default=DeliveryStatus.PENDING, index=True
     )
     delivered_at = Column(DateTime, nullable=True)

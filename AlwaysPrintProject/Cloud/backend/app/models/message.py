@@ -46,7 +46,7 @@ class Message(Base):
     sender_id = Column(GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     
     # === DESTINATARIO ===
-    target_type = Column(SQLEnum(TargetType, name='targettype', create_type=False), nullable=False, index=True)
+    target_type = Column(SQLEnum(TargetType, name='targettype', create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True)
     # target_id puede ser workstation_id, vlan_id, o NULL (para broadcast a cuenta)
     target_id = Column(GUID, nullable=True, index=True)
     
@@ -54,7 +54,7 @@ class Message(Base):
     # all = todas las workstations (offline reciben al reconectar)
     # only_connected = solo las conectadas en el momento del envío
     delivery_mode = Column(
-        SQLEnum(DeliveryMode, name='deliverymode', create_type=False),
+        SQLEnum(DeliveryMode, name='deliverymode', create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=DeliveryMode.ALL,
         server_default="all"
