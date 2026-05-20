@@ -412,25 +412,24 @@ namespace AlwaysPrintService.Actions
                 AlwaysPrintLogger.WriteInfo(
                     $"EnterShieldMode: iniciando contingencia. Cola={queueName}, IP={printerIp}:{printerPort}");
 
-                // 1. Detener Spooler
+                // 1. Crear o actualizar puerto TCP/IP directo (con Spooler corriendo)
+                string portName = $"AP_SHIELD_{printerIp}_{printerPort}";
+                AlwaysPrintLogger.WriteInfo($"EnterShieldMode: configurando puerto {portName}...");
+                if (!CreateOrUpdateTcpPort(portName, printerIp, printerPort))
+                {
+                    AlwaysPrintLogger.WriteError(
+                        "EnterShieldMode: no se pudo crear/actualizar puerto TCP/IP.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    return false;
+                }
+
+                // 2. Detener Spooler para cambiar el puerto asignado a la cola
                 AlwaysPrintLogger.WriteInfo("EnterShieldMode: deteniendo servicio Spooler...");
                 if (!StopService("Spooler", 30, false))
                 {
                     AlwaysPrintLogger.WriteError(
                         "EnterShieldMode: no se pudo detener el Spooler. Abortando.",
                         AlwaysPrintLogger.EvtGenericError);
-                    return false;
-                }
-
-                // 2. Crear o actualizar puerto TCP/IP directo
-                string portName = $"AP_SHIELD_{printerIp}_{printerPort}";
-                AlwaysPrintLogger.WriteInfo($"EnterShieldMode: configurando puerto {portName}...");
-                if (!CreateOrUpdateTcpPort(portName, printerIp, printerPort))
-                {
-                    AlwaysPrintLogger.WriteError(
-                        "EnterShieldMode: no se pudo crear/actualizar puerto TCP/IP. Reiniciando Spooler.",
-                        AlwaysPrintLogger.EvtGenericError);
-                    StartService("Spooler");
                     return false;
                 }
 
