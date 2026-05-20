@@ -77,7 +77,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
-    role = Column(SQLEnum(UserRole, name="userrole", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False, default=UserRole.READONLY)
+    role = Column(SQLEnum(UserRole, name="userrole", create_type=False), nullable=False, default=UserRole.READONLY)
     is_active = Column(Boolean, nullable=False, default=True)
     
     # === RELACIÓN CON ORGANIZACIÓN ===
