@@ -357,7 +357,7 @@ def check_update(
             user_id = payload.get("sub")
             if user_id:
                 user = db.query(User).filter(User.id == user_id).first()
-                if user and user.role == UserRole.ADMIN:
+                if user and (user.role == UserRole.ADMIN or str(user.role.value if hasattr(user.role, 'value') else user.role) == "admin"):
                     # Admin: retornar solo metadata del MSI (sin requerir workstation)
                     try:
                         s3_service = S3UpdateService()
@@ -376,8 +376,17 @@ def check_update(
                         build_date=msi_metadata['build_date'],
                         commit_hash=msi_metadata['commit_hash'],
                     )
-        except Exception:
-            pass  # Si falla el token de admin, intentar como workstation
+                elif user:
+                    # Usuario autenticado pero no es admin — no caer al flujo workstation
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Se requieren permisos de administrador"
+                    )
+        except HTTPException:
+            raise  # Re-lanzar HTTPExceptions (403, 503)
+        except Exception as e:
+            logger.warning("Error al verificar token admin en /updates/check: %s", str(e))
+            pass  # Si falla el token, intentar como workstation
 
     # Flujo normal: identificar workstation o al menos la organización
     # Para clientes antiguos que no envían X-Workstation-ID ni X-Workstation-Local-IP,
