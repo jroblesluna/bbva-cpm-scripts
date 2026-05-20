@@ -6,11 +6,12 @@ enviados a workstations, VLANs o cuentas.
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
-from app.models.message import TargetType
+from app.models.message import TargetType, DeliveryMode
+from app.models.message_delivery import DeliveryStatus
 
 
 # === SCHEMAS DE MESSAGE ===
@@ -20,6 +21,10 @@ class MessageCreate(BaseModel):
     target_type: TargetType = Field(..., description="Tipo de destinatario (workstation, vlan, account)")
     target_id: Optional[UUID] = Field(None, description="ID del destinatario (NULL para broadcast a cuenta)")
     content: str = Field(..., min_length=1, max_length=5000, description="Contenido del mensaje")
+    delivery_mode: DeliveryMode = Field(
+        default=DeliveryMode.ALL,
+        description="Modo de entrega: 'all' (todas, offline reciben luego) o 'only_connected' (solo conectadas)"
+    )
     
     @field_validator("target_id")
     @classmethod
@@ -38,6 +43,21 @@ class MessageCreate(BaseModel):
         return v
 
 
+class MessageDeliveryResponse(BaseModel):
+    """Schema de respuesta para una entrega individual."""
+    id: UUID
+    message_id: UUID
+    workstation_id: UUID
+    status: DeliveryStatus
+    delivered_at: Optional[datetime] = None
+    # Campos adicionales de la workstation para mostrar en el frontend
+    workstation_hostname: Optional[str] = None
+    workstation_ip: Optional[str] = None
+    workstation_is_online: Optional[bool] = None
+
+    model_config = {"from_attributes": True}
+
+
 class MessageResponse(BaseModel):
     """Schema de respuesta para mensaje."""
     id: UUID
@@ -46,17 +66,24 @@ class MessageResponse(BaseModel):
     target_type: TargetType
     target_id: Optional[UUID] = None
     content: str
+    delivery_mode: DeliveryMode = DeliveryMode.ALL
     is_delivered: bool
     sent_at: datetime
     delivered_at: Optional[datetime] = None
+    # Resumen de entregas
+    total_deliveries: Optional[int] = None
+    sent_deliveries: Optional[int] = None
+    pending_deliveries: Optional[int] = None
+    skipped_deliveries: Optional[int] = None
     
     model_config = {"from_attributes": True}
 
 
 class MessageDetailResponse(MessageResponse):
-    """Schema de respuesta detallada para mensaje (incluye información del remitente)."""
+    """Schema de respuesta detallada para mensaje (incluye información del remitente y entregas)."""
     sender_name: Optional[str] = Field(None, description="Nombre del usuario que envió el mensaje")
     sender_email: Optional[str] = Field(None, description="Email del usuario que envió el mensaje")
+    deliveries: Optional[List[MessageDeliveryResponse]] = None
     
     model_config = {"from_attributes": True}
 

@@ -2,11 +2,13 @@
 Endpoints de gestión de mensajes.
 
 Este módulo define los endpoints para:
-- Envío de mensajes a workstations
-- Listado de mensajes
+- Envío de mensajes a workstations con push en tiempo real
+- Listado de mensajes con resumen de entregas
+- Detalle de mensaje con entregas individuales
 - Estadísticas de mensajes
 """
 
+import logging
 from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
@@ -16,10 +18,13 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.utils import get_client_ip
 from app.models.user import User, UserRole
-from app.models.message import Message, TargetType
-from app.schemas import (
+from app.models.message import Message, TargetType, DeliveryMode
+from app.models.message_delivery import MessageDelivery, DeliveryStatus
+from app.models.workstation import Workstation
+from app.schemas.message import (
     MessageCreate,
     MessageResponse,
+    MessageDeliveryResponse,
     MessageDetailResponse,
     MessageListResponse,
     MessageStatsResponse,
@@ -28,6 +33,30 @@ from app.services.message import MessageService
 from app.services.audit import AuditService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _build_message_response(db: Session, message: Message) -> dict:
+    """Construye la respuesta de un mensaje con resumen de entregas."""
+    message_service = MessageService()
+    summary = message_service.get_delivery_summary(db, str(message.id))
+    
+    return {
+        "id": message.id,
+        "organization_id": message.organization_id,
+        "sender_id": message.sender_id,
+        "target_type": message.target_type,
+        "target_id": message.target_id,
+        "content": message.content,
+        "delivery_mode": message.delivery_mode,
+        "is_delivered": message.is_delivered,
+        "sent_at": message.sent_at,
+        "delivered_at": message.delivered_at,
+        "total_deliveries": summary["total"],
+        "sent_deliveries": summary["sent"],
+        "pending_deliveries": summary["pending"],
+        "skipped_deliveries": summary["skipped"],
+    }
 
 
 @router.get("/", response_model=MessageListResponse)
@@ -39,7 +68,7 @@ def list_messages(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Listar mensajes de la organización."""
+    """Listar mensajes de la organización con resumen de entregas."""
     if current_user.role == UserRole.OPERATOR and not current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
     
@@ -57,18 +86,21 @@ def list_messages(
     offset = (page - 1) * page_size
     messages = query.order_by(Message.sent_at.desc()).offset(offset).limit(page_size).all()
     
-    return MessageListResponse(total=total, page=page, page_size=page_size, messages=messages)
+    # Construir respuestas con resumen de entregas
+    message_responses = [_build_message_response(db, msg) for msg in messages]
+    
+    return MessageListResponse(total=total, page=page, page_size=page_size, messages=message_responses)
 
 
 @router.post("/", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
-def send_message(
+async def send_message(
     request: Request,
     message_data: MessageCreate,
     organization_id: Optional[UUID] = Query(None, description="ID de la organización destino (requerido para admin)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Enviar un mensaje a workstation(s)."""
+    """Enviar un mensaje a workstation(s) con push en tiempo real."""
     if current_user.role == UserRole.OPERATOR and not current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
     
@@ -82,16 +114,32 @@ def send_message(
     # Enviar mensaje según tipo de destinatario
     if message_data.target_type == TargetType.WORKSTATION:
         message = message_service.send_message_to_workstation(
-            db, target_org_id, current_user.id, message_data.target_id, message_data.content
+            db, target_org_id, current_user.id, message_data.target_id, message_data.content,
+            delivery_mode=DeliveryMode.ALL
         )
     elif message_data.target_type == TargetType.VLAN:
         message = message_service.send_message_to_vlan(
-            db, target_org_id, current_user.id, message_data.target_id, message_data.content
+            db, target_org_id, current_user.id, message_data.target_id, message_data.content,
+            delivery_mode=message_data.delivery_mode
         )
     else:  # ACCOUNT
         message = message_service.send_message_to_organization(
-            db, target_org_id, current_user.id, message_data.content
+            db, target_org_id, current_user.id, message_data.content,
+            delivery_mode=message_data.delivery_mode
         )
+    
+    # Push en tiempo real a workstations online
+    try:
+        sent_count = await message_service.push_message_to_online_workstations(db, message)
+        logger.info(
+            f"[MENSAJES] Mensaje creado y enviado: id={message.id}, "
+            f"target_type={message_data.target_type.value}, "
+            f"delivery_mode={message_data.delivery_mode.value}, "
+            f"push_enviados={sent_count}"
+        )
+    except Exception as e:
+        # No fallar la creación del mensaje si el push falla
+        logger.error(f"[MENSAJES] Error en push WebSocket: {e}")
     
     # Registrar en auditoría
     audit_service = AuditService()
@@ -106,7 +154,9 @@ def send_message(
         ip_address=get_client_ip(request)
     )
     
-    return message
+    # Refrescar para obtener datos actualizados
+    db.refresh(message)
+    return _build_message_response(db, message)
 
 
 @router.get("/stats", response_model=MessageStatsResponse)
@@ -120,21 +170,17 @@ def get_message_stats(
     
     org_id = current_user.organization_id if current_user.role == UserRole.OPERATOR else None
     
-    # Query base
     base_query = db.query(Message)
     if org_id:
         base_query = base_query.filter(Message.organization_id == org_id)
     
-    # Contar totales
     total_sent = base_query.count()
     
-    # Contar entregados (crear nueva query desde base)
     delivered_query = db.query(Message)
     if org_id:
         delivered_query = delivered_query.filter(Message.organization_id == org_id)
     total_delivered = delivered_query.filter(Message.is_delivered == True).count()
     
-    # Calcular pendientes y tasa de entrega
     total_pending = total_sent - total_delivered
     delivery_rate = (total_delivered / total_sent * 100) if total_sent > 0 else 0.0
     
@@ -152,7 +198,7 @@ def get_message(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Obtener detalles de un mensaje."""
+    """Obtener detalles de un mensaje con entregas individuales."""
     message = db.query(Message).filter(Message.id == message_id).first()
     if not message:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mensaje no encontrado")
@@ -160,12 +206,81 @@ def get_message(
     if current_user.role == UserRole.OPERATOR and message.organization_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
-    # Agregar información del remitente
+    # Obtener entregas con información de workstation
+    message_service = MessageService()
+    deliveries = message_service.get_deliveries_for_message(db, str(message_id))
+    
+    # Construir respuesta de entregas con datos de workstation
+    delivery_responses = []
+    for d in deliveries:
+        ws = db.query(Workstation).filter_by(id=d.workstation_id).first()
+        delivery_responses.append(MessageDeliveryResponse(
+            id=d.id,
+            message_id=d.message_id,
+            workstation_id=d.workstation_id,
+            status=d.status,
+            delivered_at=d.delivered_at,
+            workstation_hostname=ws.hostname if ws else None,
+            workstation_ip=ws.ip_private if ws else None,
+            workstation_is_online=ws.is_online if ws else None,
+        ))
+    
+    # Resumen
+    summary = message_service.get_delivery_summary(db, str(message_id))
+    
     sender_name = message.sender.full_name if message.sender else None
     sender_email = message.sender.email if message.sender else None
     
     return MessageDetailResponse(
-        **message.__dict__,
+        id=message.id,
+        organization_id=message.organization_id,
+        sender_id=message.sender_id,
+        target_type=message.target_type,
+        target_id=message.target_id,
+        content=message.content,
+        delivery_mode=message.delivery_mode,
+        is_delivered=message.is_delivered,
+        sent_at=message.sent_at,
+        delivered_at=message.delivered_at,
+        total_deliveries=summary["total"],
+        sent_deliveries=summary["sent"],
+        pending_deliveries=summary["pending"],
+        skipped_deliveries=summary["skipped"],
         sender_name=sender_name,
-        sender_email=sender_email
+        sender_email=sender_email,
+        deliveries=delivery_responses,
     )
+
+
+@router.get("/{message_id}/deliveries", response_model=list[MessageDeliveryResponse])
+def get_message_deliveries(
+    message_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Obtener entregas individuales de un mensaje."""
+    message = db.query(Message).filter(Message.id == message_id).first()
+    if not message:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mensaje no encontrado")
+    
+    if current_user.role == UserRole.OPERATOR and message.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
+    
+    message_service = MessageService()
+    deliveries = message_service.get_deliveries_for_message(db, str(message_id))
+    
+    responses = []
+    for d in deliveries:
+        ws = db.query(Workstation).filter_by(id=d.workstation_id).first()
+        responses.append(MessageDeliveryResponse(
+            id=d.id,
+            message_id=d.message_id,
+            workstation_id=d.workstation_id,
+            status=d.status,
+            delivered_at=d.delivered_at,
+            workstation_hostname=ws.hostname if ws else None,
+            workstation_ip=ws.ip_private if ws else None,
+            workstation_is_online=ws.is_online if ws else None,
+        ))
+    
+    return responses

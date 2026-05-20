@@ -1,5 +1,6 @@
 /**
  * Página de gestión de mensajes a workstations.
+ * Incluye vista de entregas individuales por workstation expandible.
  */
 
 'use client'
@@ -18,8 +19,12 @@ import {
   Send,
   CheckCircle,
   Clock,
+  ChevronDown,
+  ChevronRight,
+  XCircle,
+  Monitor,
 } from 'lucide-react'
-import type { Message, MessageCreate, MessageStats, TargetType } from '@/types/message'
+import type { Message, MessageCreate, MessageStats, TargetType, DeliveryMode, MessageDelivery } from '@/types/message'
 import type { Workstation } from '@/types/workstation'
 import type { VLAN } from '@/types/vlan'
 import { formatDateWithTimezone } from '@/lib/dateUtils'
@@ -40,6 +45,9 @@ export default function MessagesPage() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const pageSize = 50
+  // Estado para filas expandidas (ver entregas individuales)
+  const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set())
+  const [deliveriesCache, setDeliveriesCache] = useState<Record<string, MessageDelivery[]>>({})
 
   useEffect(() => {
     loadMessages()
@@ -73,6 +81,25 @@ export default function MessagesPage() {
     }
   }
 
+  const toggleExpand = async (messageId: string) => {
+    const newExpanded = new Set(expandedMessages)
+    if (newExpanded.has(messageId)) {
+      newExpanded.delete(messageId)
+    } else {
+      newExpanded.add(messageId)
+      // Cargar entregas si no están en cache
+      if (!deliveriesCache[messageId]) {
+        try {
+          const response = await apiClient.get(`/messages/${messageId}/deliveries`)
+          setDeliveriesCache(prev => ({ ...prev, [messageId]: response.data }))
+        } catch (error) {
+          console.error('Error cargando entregas:', error)
+        }
+      }
+    }
+    setExpandedMessages(newExpanded)
+  }
+
   const filteredMessages = messages.filter((message) =>
     message.content.toLowerCase().includes(searchTerm.toLowerCase())
   )
@@ -92,6 +119,19 @@ export default function MessagesPage() {
       case 'vlan': return 'bg-purple-100 text-purple-800'
       case 'account': return 'bg-green-100 text-green-800'
       default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getDeliveryStatusBadge = (status: string) => {
+    switch (status) {
+      case 'sent':
+        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="mr-1 h-3 w-3" />Enviado</Badge>
+      case 'pending':
+        return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="mr-1 h-3 w-3" />Pendiente</Badge>
+      case 'skipped':
+        return <Badge className="bg-gray-100 text-gray-800"><XCircle className="mr-1 h-3 w-3" />Omitido</Badge>
+      default:
+        return <Badge className="bg-gray-100 text-gray-800">{status}</Badge>
     }
   }
 
@@ -202,42 +242,113 @@ export default function MessagesPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colType')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colContent')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colStatus')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colSent')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colDelivered')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8"></th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colType')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colContent')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Modo</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colStatus')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entregas</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colSent')}</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredMessages.map((message) => (
-                  <tr key={message.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge className={getTargetTypeBadgeColor(message.target_type)}>
-                        {getTargetTypeLabel(message.target_type)}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-gray-900 line-clamp-2">{message.content}</p>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {message.is_delivered ? (
-                        <Badge className="bg-green-100 text-green-800">
-                          <CheckCircle className="mr-1 h-3 w-3" />{t('delivered')}
+                  <>
+                    <tr key={message.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => toggleExpand(message.id)}>
+                      <td className="px-4 py-4">
+                        {(message.total_deliveries ?? 0) > 0 && (
+                          expandedMessages.has(message.id)
+                            ? <ChevronDown className="h-4 w-4 text-gray-500" />
+                            : <ChevronRight className="h-4 w-4 text-gray-500" />
+                        )}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <Badge className={getTargetTypeBadgeColor(message.target_type)}>
+                          {getTargetTypeLabel(message.target_type)}
                         </Badge>
-                      ) : (
-                        <Badge className="bg-yellow-100 text-yellow-800">
-                          <Clock className="mr-1 h-3 w-3" />{t('pending')}
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDateWithTimezone(message.sent_at, timezone)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {message.delivered_at ? formatDateWithTimezone(message.delivered_at, timezone) : '-'}
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="text-sm text-gray-900 line-clamp-2">{message.content}</p>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {message.target_type !== 'workstation' && (
+                          <Badge className={message.delivery_mode === 'all' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'}>
+                            {message.delivery_mode === 'all' ? 'Todas' : 'Solo conectadas'}
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {message.is_delivered ? (
+                          <Badge className="bg-green-100 text-green-800">
+                            <CheckCircle className="mr-1 h-3 w-3" />{t('delivered')}
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-yellow-100 text-yellow-800">
+                            <Clock className="mr-1 h-3 w-3" />{t('pending')}
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {message.total_deliveries != null && (
+                          <span>
+                            <span className="text-green-600 font-medium">{message.sent_deliveries}</span>
+                            {' / '}
+                            <span>{message.total_deliveries}</span>
+                            {(message.pending_deliveries ?? 0) > 0 && (
+                              <span className="text-yellow-600 ml-1">({message.pending_deliveries} pend.)</span>
+                            )}
+                            {(message.skipped_deliveries ?? 0) > 0 && (
+                              <span className="text-gray-400 ml-1">({message.skipped_deliveries} omit.)</span>
+                            )}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDateWithTimezone(message.sent_at, timezone)}
+                      </td>
+                    </tr>
+                    {/* Fila expandida con entregas individuales */}
+                    {expandedMessages.has(message.id) && (
+                      <tr key={`${message.id}-deliveries`}>
+                        <td colSpan={7} className="px-0 py-0">
+                          <div className="bg-gray-50 border-t border-b border-gray-200 px-8 py-3">
+                            <p className="text-xs font-medium text-gray-500 uppercase mb-2">Entregas por workstation</p>
+                            {deliveriesCache[message.id] ? (
+                              deliveriesCache[message.id].length > 0 ? (
+                                <div className="space-y-1">
+                                  {deliveriesCache[message.id].map((delivery) => (
+                                    <div key={delivery.id} className="flex items-center justify-between py-1.5 px-3 bg-white rounded border border-gray-100">
+                                      <div className="flex items-center gap-3">
+                                        <Monitor className={`h-4 w-4 ${delivery.workstation_is_online ? 'text-green-500' : 'text-gray-400'}`} />
+                                        <span className="text-sm font-medium text-gray-800">
+                                          {delivery.workstation_hostname || delivery.workstation_ip || 'Desconocida'}
+                                        </span>
+                                        {delivery.workstation_ip && delivery.workstation_hostname && (
+                                          <span className="text-xs text-gray-400">{delivery.workstation_ip}</span>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                        {getDeliveryStatusBadge(delivery.status)}
+                                        {delivery.delivered_at && (
+                                          <span className="text-xs text-gray-500">
+                                            {formatDateWithTimezone(delivery.delivered_at, timezone)}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-gray-500 italic">Sin entregas registradas</p>
+                              )
+                            ) : (
+                              <p className="text-sm text-gray-400">Cargando...</p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 ))}
               </tbody>
             </table>
@@ -279,6 +390,7 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
   const [targetType, setTargetType] = useState<TargetType>('account')
   const [targetId, setTargetId] = useState<string>('')
   const [content, setContent] = useState('')
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>('all')
   const [workstations, setWorkstations] = useState<Workstation[]>([])
   const [vlans, setVlans] = useState<VLAN[]>([])
 
@@ -302,10 +414,7 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
   }, [user])
 
   // Cargar workstations y VLANs filtradas por organización seleccionada
-  // Para admin: se recargan cuando cambia selectedOrgId
-  // Para operador: se cargan una vez (el backend filtra por su org automáticamente)
   useEffect(() => {
-    // Admin necesita tener una org seleccionada para filtrar
     if (user?.role === 'admin' && !selectedOrgId) return
 
     const loadWS = async () => {
@@ -336,7 +445,6 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
     e.preventDefault()
     if (!content.trim()) return
     if (targetType !== 'account' && !targetId) return
-    // Admin debe seleccionar cuenta
     if (user?.role === 'admin' && !selectedOrgId) {
       alert('Debes seleccionar una organización destino')
       return
@@ -347,17 +455,18 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
         target_type: targetType,
         target_id: targetType === 'account' ? null : targetId,
         content: content.trim(),
+        delivery_mode: targetType === 'workstation' ? 'all' : deliveryMode,
       }
-      // Construir URL con account_id para admin
       let url = '/messages/'
       if (user?.role === 'admin' && selectedOrgId) {
         url += `?organization_id=${selectedOrgId}`
       }
       await apiClient.post(url, messageData)
       onSuccess()
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { detail?: string; message?: string }
       console.error('Error:', error)
-      alert(error.detail || error.message || 'Error al enviar mensaje')
+      alert(err.detail || err.message || 'Error al enviar mensaje')
     } finally {
       setLoading(false)
     }
@@ -409,6 +518,42 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
                     <option key={ws.id} value={ws.id}>{ws.hostname || ws.ip_private} - {ws.current_user || 'Sin usuario'}</option>
                   ))}
                 </select>
+              </div>
+            )}
+            {/* Selector de modo de entrega (solo para VLAN y Organization) */}
+            {targetType !== 'workstation' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Modo de entrega</label>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-3 p-3 border rounded-md cursor-pointer hover:bg-gray-50 transition">
+                    <input
+                      type="radio"
+                      name="deliveryMode"
+                      value="all"
+                      checked={deliveryMode === 'all'}
+                      onChange={() => setDeliveryMode('all')}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Todas las workstations</p>
+                      <p className="text-xs text-gray-500">Las conectadas lo reciben ahora. Las desconectadas lo recibirán cuando se reconecten.</p>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 p-3 border rounded-md cursor-pointer hover:bg-gray-50 transition">
+                    <input
+                      type="radio"
+                      name="deliveryMode"
+                      value="only_connected"
+                      checked={deliveryMode === 'only_connected'}
+                      onChange={() => setDeliveryMode('only_connected')}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Solo conectadas</p>
+                      <p className="text-xs text-gray-500">Solo las workstations online en este momento recibirán el mensaje. Las desconectadas no lo recibirán.</p>
+                    </div>
+                  </label>
+                </div>
               </div>
             )}
             <div>

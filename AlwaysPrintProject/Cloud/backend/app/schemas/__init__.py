@@ -69,6 +69,7 @@ from app.schemas.config import (
 from app.schemas.message import (
     MessageCreate,
     MessageResponse,
+    MessageDeliveryResponse,
     MessageDetailResponse,
     MessageListResponse,
     MessageStatsResponse,
@@ -207,6 +208,7 @@ __all__ = [
     # Message
     "MessageCreate",
     "MessageResponse",
+    "MessageDeliveryResponse",
     "MessageDetailResponse",
     "MessageListResponse",
     "MessageStatsResponse",

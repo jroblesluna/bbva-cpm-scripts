@@ -22,6 +22,12 @@ class TargetType(str, enum.Enum):
     ACCOUNT = "account"
 
 
+class DeliveryMode(str, enum.Enum):
+    """Modos de entrega para mensajes broadcast (VLAN/account)."""
+    ALL = "all"                      # Todas las workstations (offline reciben al reconectar)
+    ONLY_CONNECTED = "only_connected"  # Solo las conectadas en el momento del envío
+
+
 class Message(Base):
     """
     Modelo de mensaje enviado a estaciones.
@@ -44,10 +50,20 @@ class Message(Base):
     # target_id puede ser workstation_id, vlan_id, o NULL (para broadcast a cuenta)
     target_id = Column(GUID, nullable=True, index=True)
     
+    # === MODO DE ENTREGA ===
+    # all = todas las workstations (offline reciben al reconectar)
+    # only_connected = solo las conectadas en el momento del envío
+    delivery_mode = Column(
+        SQLEnum(DeliveryMode),
+        nullable=False,
+        default=DeliveryMode.ALL,
+        server_default="all"
+    )
+    
     # === CONTENIDO ===
     content = Column(String(5000), nullable=False)
     
-    # === ESTADO DE ENTREGA ===
+    # === ESTADO DE ENTREGA (resumen) ===
     is_delivered = Column(Boolean, nullable=False, default=False)
     
     # === TIMESTAMPS ===
@@ -57,6 +73,7 @@ class Message(Base):
     # === RELACIONES ===
     organization = relationship("Organization", back_populates="messages")
     sender = relationship("User", back_populates="sent_messages", foreign_keys=[sender_id])
+    deliveries = relationship("MessageDelivery", back_populates="message", cascade="all, delete-orphan")
     
     # Relación condicional con Workstation (solo cuando target_type=workstation)
     target_workstation = relationship(

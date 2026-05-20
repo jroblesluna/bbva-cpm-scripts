@@ -69,6 +69,7 @@ class Workstation(Base):
     audit_logs = relationship("AuditLog", back_populates="workstation", foreign_keys="AuditLog.workstation_id")
     telemetry_logs = relationship("TelemetryLog", back_populates="workstation", cascade="all, delete-orphan")
     connectivity_results = relationship("ConnectivityResult", back_populates="workstation", cascade="all, delete-orphan")
+    message_deliveries = relationship("MessageDelivery", back_populates="workstation", cascade="all, delete-orphan")
     
     # Relación con mensajes (solo cuando target_type=workstation)
     messages = relationship(

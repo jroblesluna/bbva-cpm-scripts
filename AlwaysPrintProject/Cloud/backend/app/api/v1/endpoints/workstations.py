@@ -230,20 +230,25 @@ async def download_latest_log(
             )
     
     # Verificar compatibilidad de versión del Tray
-    # El comando get_latest_log requiere Tray >= 2.1.0
-    MIN_LOG_DOWNLOAD_VERSION = "2.1.0"
+    # El comando get_latest_log requiere Tray >= 1.26.519.550
+    MIN_LOG_DOWNLOAD_VERSION = "1.26.519.550"
     if workstation.tray_version:
         try:
-            # Comparar versiones (formato: "X.Y.Z" o "X.Y.Z.W")
-            ws_parts = [int(p) for p in workstation.tray_version.split(".")[:3]]
+            # Comparar versiones (formato: "X.Y.Z.W")
+            ws_parts = [int(p) for p in workstation.tray_version.split(".")]
             min_parts = [int(p) for p in MIN_LOG_DOWNLOAD_VERSION.split(".")]
+            # Rellenar con ceros si tienen diferente longitud
+            max_len = max(len(ws_parts), len(min_parts))
+            ws_parts.extend([0] * (max_len - len(ws_parts)))
+            min_parts.extend([0] * (max_len - len(min_parts)))
             if ws_parts < min_parts:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=(
                         f"La workstation tiene Tray v{workstation.tray_version} "
                         f"pero se requiere v{MIN_LOG_DOWNLOAD_VERSION} o superior "
-                        f"para descargar logs remotamente."
+                        f"para descargar logs remotamente. "
+                        f"Actualice el Tray de esta workstation para habilitar esta función."
                     )
                 )
         except (ValueError, AttributeError):

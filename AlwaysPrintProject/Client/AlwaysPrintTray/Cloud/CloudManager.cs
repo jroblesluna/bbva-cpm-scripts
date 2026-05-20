@@ -283,10 +283,54 @@ namespace AlwaysPrintTray.Cloud
                 case "forced_contingency":
                     HandleForcedContingency(json);
                     break;
+                case "message":
+                    HandleCloudMessage(json);
+                    break;
                 default:
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"CloudManager: mensaje recibido tipo='{type}' (sin handler).");
                     break;
+            }
+        }
+
+        /// <summary>
+        /// Maneja mensajes push enviados por un administrador desde la Cloud.
+        /// Muestra un balloon tip con el contenido del mensaje.
+        /// Formato esperado: {"type": "message", "message_id": "...", "content": "...", "sent_at": "..."}
+        /// </summary>
+        private void HandleCloudMessage(string json)
+        {
+            try
+            {
+                var data = JObject.Parse(json);
+                var content = data["content"]?.ToString();
+                var messageId = data["message_id"]?.ToString();
+
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "CloudManager: mensaje recibido sin contenido.");
+                    return;
+                }
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: mensaje Cloud recibido. id={messageId}, longitud={content.Length}");
+
+                // Mostrar notificación al usuario vía balloon tip
+                _uiContext.Post(_ =>
+                {
+                    _trayIcon.BalloonTipIcon = ToolTipIcon.Info;
+                    _trayIcon.BalloonTipTitle = "AlwaysPrint - Mensaje";
+                    _trayIcon.BalloonTipText = content.Length > 255
+                        ? content.Substring(0, 252) + "..."
+                        : content;
+                    _trayIcon.ShowBalloonTip(8000);
+                }, null);
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error procesando mensaje Cloud. {ex.Message}");
             }
         }
 

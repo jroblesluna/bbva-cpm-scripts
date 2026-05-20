@@ -205,13 +205,14 @@ async def workstation_websocket(
         })
         print(f"[WS] Config enviada, entrando al loop", flush=True)
         
-        # Enviar mensajes pendientes
-        pending_messages = message_service.get_pending_messages_for_workstation(
+        # Enviar mensajes pendientes (nuevo sistema de deliveries)
+        pending_deliveries = message_service.get_pending_deliveries_for_workstation(
             db=db,
             workstation_id=workstation_id
         )
         
-        for msg in pending_messages:
+        for delivery in pending_deliveries:
+            msg = delivery.message
             await websocket.send_json({
                 "type": "message",
                 "message_id": str(msg.id),
@@ -219,8 +220,8 @@ async def workstation_websocket(
                 "sent_at": msg.sent_at.isoformat()
             })
             
-            # Marcar como entregado
-            message_service.mark_message_as_delivered(db, str(msg.id))
+            # Marcar delivery individual como enviado
+            message_service.mark_delivery_as_sent(db, str(msg.id), workstation_id)
         
         # Loop de recepción de mensajes
         while True:

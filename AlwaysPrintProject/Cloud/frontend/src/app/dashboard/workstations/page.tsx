@@ -197,7 +197,7 @@ export default function WorkstationsPage() {
       } else if (error.status === 408) {
         message = 'Timeout esperando respuesta de la workstation.';
       } else if (error.status === 422) {
-        message = error.detail ?? 'Versión del Tray incompatible para descarga de logs.';
+        message = error.detail ?? 'La versión del Tray instalada en esta workstation no soporta la descarga remota de logs. Actualice el Tray a v1.26.519.550 o superior.';
       } else if (!error.status) {
         message = error.detail ?? 'Sin respuesta del servidor. Verifique la conectividad.';
       } else {
