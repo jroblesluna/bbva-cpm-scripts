@@ -31,7 +31,7 @@ def upgrade() -> None:
         'messages',
         sa.Column(
             'delivery_mode',
-            sa.Enum('all', 'only_connected', name='deliverymode', create_type=False),
+            sa.String(20),
             nullable=False,
             server_default='all'
         )
@@ -45,7 +45,7 @@ def upgrade() -> None:
         sa.Column('workstation_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column(
             'status',
-            sa.Enum('pending', 'sent', 'skipped', name='deliverystatus', create_type=False),
+            sa.String(20),
             nullable=False,
             server_default='pending'
         ),
@@ -59,6 +59,10 @@ def upgrade() -> None:
     op.create_index('ix_message_deliveries_message_id', 'message_deliveries', ['message_id'])
     op.create_index('ix_message_deliveries_workstation_id', 'message_deliveries', ['workstation_id'])
     op.create_index('ix_message_deliveries_status', 'message_deliveries', ['status'])
+
+    # Cambiar columnas de String a enum (los tipos ya fueron creados con DO $$)
+    op.execute("ALTER TABLE messages ALTER COLUMN delivery_mode TYPE deliverymode USING delivery_mode::deliverymode")
+    op.execute("ALTER TABLE message_deliveries ALTER COLUMN status TYPE deliverystatus USING status::deliverystatus")
 
 
 def downgrade() -> None:
