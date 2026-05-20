@@ -130,6 +130,21 @@ fi
 [ -z "$DOMAIN" ] && DOMAIN="alwaysprint.apps.iol.pe"
 [ -z "$AWS_REGION" ] && AWS_REGION="us-west-2"
 
+# Si no tenemos INSTANCE_ID o EC2_IP de Terraform, obtener de AWS CLI
+if [ -z "$INSTANCE_ID" ] || [ -z "$EC2_IP" ]; then
+    EC2_INFO=$(aws ec2 describe-instances \
+        --region "$AWS_REGION" \
+        --filters "Name=tag:Name,Values=*alwaysprint*" "Name=instance-state-name,Values=running" \
+        --query "Reservations[0].Instances[0].[InstanceId,PublicIpAddress]" \
+        --output text 2>/dev/null)
+    
+    if [ -n "$EC2_INFO" ] && [ "$EC2_INFO" != "None" ]; then
+        [ -z "$INSTANCE_ID" ] && INSTANCE_ID=$(echo "$EC2_INFO" | awk '{print $1}')
+        [ -z "$EC2_IP" ] && EC2_IP=$(echo "$EC2_INFO" | awk '{print $2}')
+    fi
+fi
+[ -z "$AWS_REGION" ] && AWS_REGION="us-west-2"
+
 # Detectar Instance ID si Terraform no lo proporcionó
 if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
     INSTANCE_ID=$(aws ec2 describe-instances \

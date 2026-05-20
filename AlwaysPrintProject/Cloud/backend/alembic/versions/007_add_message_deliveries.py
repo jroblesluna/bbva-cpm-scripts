@@ -22,10 +22,12 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Agregar delivery_mode a messages y crear tabla message_deliveries."""
     # Crear enums primero (PostgreSQL requiere que existan antes de usarlos)
-    deliverymode_enum = sa.Enum('all', 'only_connected', name='deliverymode')
-    deliverystatus_enum = sa.Enum('pending', 'sent', 'skipped', name='deliverystatus')
-    deliverymode_enum.create(op.get_bind(), checkfirst=True)
-    deliverystatus_enum.create(op.get_bind(), checkfirst=True)
+    # Usar DO $$ para evitar error si ya existen (checkfirst no siempre funciona en Alembic)
+    op.execute("DO $$ BEGIN CREATE TYPE deliverymode AS ENUM ('all', 'only_connected'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE deliverystatus AS ENUM ('pending', 'sent', 'skipped'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
+
+    deliverymode_enum = sa.Enum('all', 'only_connected', name='deliverymode', create_type=False)
+    deliverystatus_enum = sa.Enum('pending', 'sent', 'skipped', name='deliverystatus', create_type=False)
 
     # Agregar columna delivery_mode a messages
     op.add_column(
