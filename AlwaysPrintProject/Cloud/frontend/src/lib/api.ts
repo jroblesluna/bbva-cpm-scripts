@@ -488,17 +488,34 @@ export const workstationsApi = {
   /**
    * Descargar el último archivo de log de una workstation online.
    * Retorna un Blob con el contenido del archivo.
+   * Maneja errores de respuesta JSON cuando el backend devuelve error en vez de blob.
    */
   downloadLatestLog: async (id: string): Promise<{ blob: Blob; filename: string }> => {
-    const response = await apiClient.get(`/workstations/${id}/logs/download`, {
-      responseType: 'blob',
-      timeout: 45000, // 45s timeout (el backend espera 30s máximo)
-    })
-    // Extraer nombre de archivo del header Content-Disposition
-    const contentDisposition = response.headers['content-disposition'] || ''
-    const filenameMatch = contentDisposition.match(/filename="?([^";\n]+)"?/)
-    const filename = filenameMatch ? filenameMatch[1] : 'alwaysprint.log'
-    return { blob: response.data as Blob, filename }
+    try {
+      const response = await apiClient.get(`/workstations/${id}/logs/download`, {
+        responseType: 'blob',
+        timeout: 45000, // 45s timeout (el backend espera 30s máximo)
+      })
+      // Extraer nombre de archivo del header Content-Disposition
+      const contentDisposition = response.headers['content-disposition'] || ''
+      const filenameMatch = contentDisposition.match(/filename="?([^";\n]+)"?/)
+      const filename = filenameMatch ? filenameMatch[1] : 'alwaysprint.log'
+      return { blob: response.data as Blob, filename }
+    } catch (error: unknown) {
+      // Cuando responseType es 'blob', axios recibe errores JSON como Blob.
+      // Intentar extraer el mensaje de error del blob si es posible.
+      const apiErr = error as { detail?: string; status?: number }
+      if (apiErr.detail) {
+        // El interceptor ya transformó el error correctamente
+        throw apiErr
+      }
+      // Si no hay detail, puede ser un error de red o timeout
+      const axiosErr = error as { message?: string; code?: string }
+      if (axiosErr.code === 'ECONNABORTED' || axiosErr.message?.includes('timeout')) {
+        throw { detail: 'Timeout: no se recibió respuesta del servidor.', status: 408 }
+      }
+      throw { detail: 'Error de conexión al descargar el log.', status: undefined }
+    }
   },
 
   /**

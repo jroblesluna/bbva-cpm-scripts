@@ -178,6 +178,7 @@ async def send_command(
                 404: {"description": "Workstation no encontrada"},
                 408: {"description": "Timeout esperando respuesta de la workstation"},
                 409: {"description": "Workstation offline"},
+                422: {"description": "Versión del Tray incompatible"},
                 500: {"description": "Error al obtener el log"},
             })
 async def download_latest_log(
@@ -228,6 +229,30 @@ async def download_latest_log(
                 detail="No tienes permisos para acceder a los logs de esta workstation"
             )
     
+    # Verificar compatibilidad de versión del Tray
+    # El comando get_latest_log requiere Tray >= 2.1.0
+    MIN_LOG_DOWNLOAD_VERSION = "2.1.0"
+    if workstation.tray_version:
+        try:
+            # Comparar versiones (formato: "X.Y.Z" o "X.Y.Z.W")
+            ws_parts = [int(p) for p in workstation.tray_version.split(".")[:3]]
+            min_parts = [int(p) for p in MIN_LOG_DOWNLOAD_VERSION.split(".")]
+            if ws_parts < min_parts:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"La workstation tiene Tray v{workstation.tray_version} "
+                        f"pero se requiere v{MIN_LOG_DOWNLOAD_VERSION} o superior "
+                        f"para descargar logs remotamente."
+                    )
+                )
+        except (ValueError, AttributeError):
+            # Si no se puede parsear la versión, continuar (no bloquear)
+            logger.warning(
+                f"[LOGS] No se pudo parsear tray_version='{workstation.tray_version}' "
+                f"de workstation_id={workstation_id}"
+            )
+
     # Verificar que la workstation está online
     workstation_id_str = str(workstation_id)
     if not connection_manager.is_workstation_online(workstation_id_str):

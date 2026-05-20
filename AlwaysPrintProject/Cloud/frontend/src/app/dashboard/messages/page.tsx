@@ -286,34 +286,51 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
   const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([])
   const [selectedOrgId, setSelectedOrgId] = useState<string>('')
 
+  // Cargar cuentas al inicio (solo admin)
   useEffect(() => {
+    if (user?.role === 'admin') {
+      const loadAccounts = async () => {
+        try {
+          const r = await apiClient.get('/organizations/?skip=0&limit=1000')
+          const items = r.data.items || []
+          setAccounts(items)
+          if (items.length > 0) setSelectedOrgId(items[0].id)
+        } catch (e) { console.error(e) }
+      }
+      loadAccounts()
+    }
+  }, [user])
+
+  // Cargar workstations y VLANs filtradas por organización seleccionada
+  // Para admin: se recargan cuando cambia selectedOrgId
+  // Para operador: se cargan una vez (el backend filtra por su org automáticamente)
+  useEffect(() => {
+    // Admin necesita tener una org seleccionada para filtrar
+    if (user?.role === 'admin' && !selectedOrgId) return
+
     const loadWS = async () => {
       try {
-        const r = await apiClient.get('/workstations/')
+        const params = new URLSearchParams()
+        if (user?.role === 'admin' && selectedOrgId) {
+          params.append('organization_id', selectedOrgId)
+        }
+        const r = await apiClient.get(`/workstations/?${params.toString()}`)
         setWorkstations(r.data.items || [])
       } catch (e) { console.error(e) }
     }
     const loadVLANs = async () => {
       try {
-        const r = await apiClient.get('/vlans/')
+        const params = new URLSearchParams()
+        if (user?.role === 'admin' && selectedOrgId) {
+          params.append('organization_id', selectedOrgId)
+        }
+        const r = await apiClient.get(`/vlans/?${params.toString()}`)
         setVlans(r.data.vlans || [])
-      } catch (e) { console.error(e) }
-    }
-    const loadAccounts = async () => {
-      try {
-        const r = await apiClient.get('/organizations/?skip=0&limit=1000')
-        const items = r.data.items || []
-        setAccounts(items)
-        if (items.length > 0) setSelectedOrgId(items[0].id)
       } catch (e) { console.error(e) }
     }
     loadWS()
     loadVLANs()
-    // Admin necesita seleccionar cuenta destino
-    if (user?.role === 'admin') {
-      loadAccounts()
-    }
-  }, [user])
+  }, [user, selectedOrgId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -356,7 +373,7 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
             {user?.role === 'admin' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Organización destino</label>
-                <select value={selectedOrgId} onChange={(e) => setSelectedOrgId(e.target.value)}
+                <select value={selectedOrgId} onChange={(e) => { setSelectedOrgId(e.target.value); setTargetId('') }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
                   <option value="">Seleccionar organización...</option>
                   {accounts.map((acc) => <option key={acc.id} value={acc.id}>{acc.name}</option>)}

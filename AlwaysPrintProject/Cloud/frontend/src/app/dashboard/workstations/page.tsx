@@ -169,20 +169,25 @@ export default function WorkstationsPage() {
   });
 
   const logDownloadMutation = useMutation({
-    mutationFn: (id: string) => workstationsApi.downloadLatestLog(id),
-    onSuccess: ({ blob, filename }) => {
+    mutationFn: (workstation: Workstation) => workstationsApi.downloadLatestLog(workstation.id),
+    onSuccess: ({ blob, filename }, workstation) => {
+      // Renombrar archivo: <hostname>_<currentUser>_<filenameOriginal>
+      const pcName = (workstation.hostname || workstation.ip_private).replace(/[\\/:*?"<>|]/g, '_');
+      const userName = (workstation.current_user || 'unknown').replace(/[\\/:*?"<>|]/g, '_');
+      const renamedFilename = `${pcName}_${userName}_${filename}`;
+
       // Crear enlace temporal para descargar el archivo
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = filename;
+      a.download = renamedFilename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       toast({
         title: 'Log descargado',
-        description: `Archivo "${filename}" descargado exitosamente.`,
+        description: `Archivo "${renamedFilename}" descargado exitosamente.`,
       });
     },
     onError: (error: { detail?: string; status?: number }) => {
@@ -191,6 +196,10 @@ export default function WorkstationsPage() {
         message = 'La workstation está offline.';
       } else if (error.status === 408) {
         message = 'Timeout esperando respuesta de la workstation.';
+      } else if (error.status === 422) {
+        message = error.detail ?? 'Versión del Tray incompatible para descarga de logs.';
+      } else if (!error.status) {
+        message = error.detail ?? 'Sin respuesta del servidor. Verifique la conectividad.';
       } else {
         message = error.detail ?? 'Error al descargar el log.';
       }
@@ -515,7 +524,7 @@ export default function WorkstationsPage() {
                 onEdit={() => setEditingWorkstation(workstation)}
                 onDelete={() => handleDelete(workstation)}
                 onCommand={(commandType) => commandMutation.mutate({ id: workstation.id, commandType })}
-                onDownloadLog={() => logDownloadMutation.mutate(workstation.id)}
+                onDownloadLog={() => logDownloadMutation.mutate(workstation)}
                 onToggleForcedContingency={() => setContingencyTarget(workstation)}
                 isCommandPending={commandMutation.isPending}
                 isDeletePending={deleteMutation.isPending}
@@ -539,7 +548,7 @@ export default function WorkstationsPage() {
           onEdit={(ws) => setEditingWorkstation(ws)}
           onDelete={handleDelete}
           onCommand={(id, commandType) => commandMutation.mutate({ id, commandType })}
-          onDownloadLog={(id) => logDownloadMutation.mutate(id)}
+          onDownloadLog={(ws) => logDownloadMutation.mutate(ws)}
           onToggleForcedContingency={(id) => {
             const ws = sortedWorkstations.find(w => w.id === id);
             if (ws) setContingencyTarget(ws);
@@ -906,7 +915,7 @@ interface WorkstationTableProps {
   onEdit: (ws: Workstation) => void;
   onDelete: (ws: Workstation) => void;
   onCommand: (id: string, commandType: 'restart_service' | 'restart_tray' | 'check_update') => void;
-  onDownloadLog: (id: string) => void;
+  onDownloadLog: (ws: Workstation) => void;
   onToggleForcedContingency: (id: string) => void;
   isCommandPending: boolean;
   isDeletePending: boolean;
@@ -1053,7 +1062,7 @@ function WorkstationTable({
                             variant="ghost"
                             size="sm"
                             title="Descargar Log"
-                            onClick={() => onDownloadLog(ws.id)}
+                            onClick={() => onDownloadLog(ws)}
                             disabled={isLogPending}
                             className="h-7 w-7 p-0"
                           >
