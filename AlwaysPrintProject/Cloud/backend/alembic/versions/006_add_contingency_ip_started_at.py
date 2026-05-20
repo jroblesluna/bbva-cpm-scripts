@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 # Identificadores de revisión utilizados por Alembic
-revision: str = '006_add_contingency_ip_started_at'
+revision: str = '006_contingency_ip'
 down_revision: Union[str, None] = '005_add_forced_contingency'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
