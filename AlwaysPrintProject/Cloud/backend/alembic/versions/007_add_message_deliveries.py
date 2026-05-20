@@ -11,6 +11,7 @@ Esta migración:
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 revision: str = '007_msg_deliveries'
 down_revision: Union[str, None] = '006_contingency_ip'
@@ -20,12 +21,18 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Agregar delivery_mode a messages y crear tabla message_deliveries."""
+    # Crear enums primero (PostgreSQL requiere que existan antes de usarlos)
+    deliverymode_enum = sa.Enum('all', 'only_connected', name='deliverymode')
+    deliverystatus_enum = sa.Enum('pending', 'sent', 'skipped', name='deliverystatus')
+    deliverymode_enum.create(op.get_bind(), checkfirst=True)
+    deliverystatus_enum.create(op.get_bind(), checkfirst=True)
+
     # Agregar columna delivery_mode a messages
     op.add_column(
         'messages',
         sa.Column(
             'delivery_mode',
-            sa.Enum('all', 'only_connected', name='deliverymode'),
+            deliverymode_enum,
             nullable=False,
             server_default='all'
         )
@@ -34,16 +41,19 @@ def upgrade() -> None:
     # Crear tabla message_deliveries
     op.create_table(
         'message_deliveries',
-        sa.Column('id', sa.CHAR(32), primary_key=True),
-        sa.Column('message_id', sa.CHAR(32), sa.ForeignKey('messages.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('workstation_id', sa.CHAR(32), sa.ForeignKey('workstations.id', ondelete='CASCADE'), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('message_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('workstation_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column(
             'status',
-            sa.Enum('pending', 'sent', 'skipped', name='deliverystatus'),
+            deliverystatus_enum,
             nullable=False,
             server_default='pending'
         ),
         sa.Column('delivered_at', sa.DateTime, nullable=True),
+        sa.ForeignKeyConstraint(['message_id'], ['messages.id'], ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['workstation_id'], ['workstations.id'], ondelete='CASCADE'),
+        sa.PrimaryKeyConstraint('id'),
     )
 
     # Índices para consultas frecuentes
