@@ -44,6 +44,8 @@ class Workstation(Base):
     # Estado de la estación
     is_online = Column(Boolean, nullable=False, default=False)
     contingency_active = Column(Boolean, nullable=False, default=False)
+    contingency_ip = Column(String(45), nullable=True)  # IP de contingencia actual
+    contingency_started_at = Column(DateTime, nullable=True)  # Cuándo se activó la contingencia
 
     # Flag de contingencia forzada a nivel individual de workstation
     # Cuando está activo, esta workstation entra en modo contingencia independientemente del estado real

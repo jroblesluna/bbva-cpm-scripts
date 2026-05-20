@@ -265,13 +265,15 @@ async def workstation_websocket(
                 
                 # Actualizar estado de contingencia
                 contingency_active = data.get("contingency_active")
+                contingency_printer_ip = data.get("contingency_printer_ip")
                 current_user = data.get("current_user")
                 
                 if contingency_active is not None:
                     workstation_service.update_contingency_status(
                         db=db,
                         workstation_id=workstation_id,
-                        contingency_active=contingency_active
+                        contingency_active=contingency_active,
+                        contingency_ip=contingency_printer_ip
                     )
                     
                     # Registrar en auditoría
@@ -299,6 +301,7 @@ async def workstation_websocket(
                         "type": "workstation_status_change",
                         "workstation_id": workstation_id,
                         "contingency_active": contingency_active,
+                        "contingency_printer_ip": contingency_printer_ip,
                         "current_user": current_user
                     },
                     db=db

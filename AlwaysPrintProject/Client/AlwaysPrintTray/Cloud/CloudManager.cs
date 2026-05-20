@@ -346,6 +346,42 @@ namespace AlwaysPrintTray.Cloud
                 $"CloudManager: ContingencyResult recibido. success={payload.Success}, entered={payload.Entered}, " +
                 $"printer={payload.PrinterName}, message={payload.Message}");
 
+            // Enviar status_update al servidor Cloud con el estado de contingencia y la IP
+            if (payload.Success && _wsClient != null && _wsClient.IsConnected)
+            {
+                try
+                {
+                    // Extraer solo la IP del PrinterAddress (formato "IP:puerto")
+                    string? printerIp = null;
+                    if (!string.IsNullOrEmpty(payload.PrinterAddress))
+                    {
+                        int colonIdx = payload.PrinterAddress.LastIndexOf(':');
+                        printerIp = colonIdx > 0
+                            ? payload.PrinterAddress.Substring(0, colonIdx)
+                            : payload.PrinterAddress;
+                    }
+
+                    _wsClient.Send("status_update", new
+                    {
+                        contingency_active = payload.Entered,
+                        contingency_printer_ip = printerIp,
+                        current_user = Environment.UserName
+                    });
+
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: status_update enviado al servidor. " +
+                        $"contingency_active={payload.Entered}, contingency_printer_ip={printerIp}");
+                }
+                catch (Exception ex)
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"CloudManager: error enviando status_update de contingencia al servidor. {ex.Message}");
+                }
+            }
+
+            // Actualizar estado en TelemetryReporter
+            _telemetryReporter?.UpdateContingencyState(payload.Entered);
+
             _uiContext.Post(_ =>
             {
                 try
@@ -816,11 +852,11 @@ namespace AlwaysPrintTray.Cloud
 
                         if (enabled)
                         {
-                            message = $"Se está entrando en modo contingencia forzada (origen: {sourceName}).";
+                            message = $"Se está entrando en modo contingencia (origen: {sourceName}).";
                         }
                         else
                         {
-                            message = $"Se ha desactivado el modo contingencia forzada (origen: {sourceName}).";
+                            message = $"Se ha desactivado el modo contingencia (origen: {sourceName}).";
                         }
 
                         _trayIcon.ShowBalloonTip(

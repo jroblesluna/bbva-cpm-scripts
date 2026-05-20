@@ -660,7 +660,8 @@ class WorkstationService:
         self,
         db: Session,
         workstation_id: str,
-        contingency_active: bool
+        contingency_active: bool,
+        contingency_ip: str = None
     ) -> Workstation:
         """
         Actualiza el estado de contingencia de una workstation.
@@ -669,6 +670,7 @@ class WorkstationService:
             db: Sesión de base de datos
             workstation_id: UUID de la workstation
             contingency_active: Estado de contingencia
+            contingency_ip: IP de la impresora de contingencia (solo al activar)
             
         Returns:
             Workstation actualizada
@@ -681,6 +683,15 @@ class WorkstationService:
             raise ValueError(f"Workstation {workstation_id} no encontrada")
         
         workstation.contingency_active = contingency_active
+        
+        if contingency_active:
+            # Al activar: guardar IP y timestamp de inicio
+            workstation.contingency_ip = contingency_ip
+            workstation.contingency_started_at = datetime.utcnow()
+        else:
+            # Al desactivar: limpiar IP y timestamp
+            workstation.contingency_ip = None
+            workstation.contingency_started_at = None
         
         db.commit()
         db.refresh(workstation)

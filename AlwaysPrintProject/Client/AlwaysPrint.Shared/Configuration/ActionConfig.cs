@@ -111,5 +111,8 @@ namespace AlwaysPrint.Shared.Configuration
         public const string DeleteOrphanedFolders = "DeleteOrphanedFolders";
         public const string EnterShieldMode = "EnterShieldMode";
         public const string ExitShieldMode = "ExitShieldMode";
+        public const string PausePrintQueue = "PausePrintQueue";
+        public const string UnpausePrintQueue = "UnpausePrintQueue";
+        public const string SetDefaultPrinter = "SetDefaultPrinter";
     }
 }

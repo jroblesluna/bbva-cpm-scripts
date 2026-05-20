@@ -618,6 +618,107 @@ namespace AlwaysPrintService.Actions
         }
 
         // ═══════════════════════════════════════════════════════════════════════
+        // GESTIÓN DE COLAS DE IMPRESIÓN
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Pausa una cola de impresión Windows via WMI.
+        /// Parámetros: queue_name (nombre de la cola)
+        /// </summary>
+        public static bool PausePrintQueue(string queueName)
+        {
+            try
+            {
+                AlwaysPrintLogger.WriteInfo($"PausePrintQueue: pausando cola '{queueName}'...");
+
+                string safeQueue = queueName.Replace("'", "''");
+                using var searcher = new ManagementObjectSearcher(
+                    @"\\.\root\cimv2",
+                    $"SELECT * FROM Win32_Printer WHERE Name = '{safeQueue}'");
+
+                ManagementObject? printer = null;
+                foreach (ManagementObject obj in searcher.Get())
+                {
+                    printer = obj;
+                    break;
+                }
+
+                if (printer == null)
+                {
+                    AlwaysPrintLogger.WriteWarning($"PausePrintQueue: cola '{queueName}' no encontrada en WMI");
+                    return false;
+                }
+
+                printer.InvokeMethod("Pause", null);
+                AlwaysPrintLogger.WriteInfo($"PausePrintQueue: cola '{queueName}' pausada exitosamente");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"PausePrintQueue: error pausando cola '{queueName}': {ex.Message}", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Reanuda una cola de impresión Windows via WMI.
+        /// Parámetros: queue_name (nombre de la cola)
+        /// </summary>
+        public static bool UnpausePrintQueue(string queueName)
+        {
+            try
+            {
+                AlwaysPrintLogger.WriteInfo($"UnpausePrintQueue: reanudando cola '{queueName}'...");
+
+                string safeQueue = queueName.Replace("'", "''");
+                using var searcher = new ManagementObjectSearcher(
+                    @"\\.\root\cimv2",
+                    $"SELECT * FROM Win32_Printer WHERE Name = '{safeQueue}'");
+
+                ManagementObject? printer = null;
+                foreach (ManagementObject obj in searcher.Get())
+                {
+                    printer = obj;
+                    break;
+                }
+
+                if (printer == null)
+                {
+                    AlwaysPrintLogger.WriteWarning($"UnpausePrintQueue: cola '{queueName}' no encontrada en WMI");
+                    return false;
+                }
+
+                printer.InvokeMethod("Resume", null);
+                AlwaysPrintLogger.WriteInfo($"UnpausePrintQueue: cola '{queueName}' reanudada exitosamente");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"UnpausePrintQueue: error reanudando cola '{queueName}': {ex.Message}", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Establece una impresora como predeterminada para el usuario logueado.
+        /// Como el Service corre como SYSTEM, esta acción se delega al Tray via Named Pipe.
+        /// El Tray detecta el cambio de contingencia y establece la impresora predeterminada
+        /// en el contexto del usuario interactivo.
+        /// Parámetros: queue_name (nombre de la cola/impresora)
+        /// </summary>
+        public static bool SetDefaultPrinter(string queueName)
+        {
+            // TODO: El Service corre como SYSTEM, por lo que SetDefaultPrinterW no afecta
+            // al usuario interactivo. Esta acción se delega al Tray, que ya recibe la
+            // notificación de contingencia y puede ejecutar SetDefaultPrinter en contexto de usuario.
+            AlwaysPrintLogger.WriteInfo(
+                $"SetDefaultPrinter: acción delegada al Tray. " +
+                $"La impresora '{queueName}' será establecida como predeterminada " +
+                $"por el Tray al detectar el cambio de contingencia.");
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // GESTIÓN DE SERVICIOS
         // ═══════════════════════════════════════════════════════════════════════
         

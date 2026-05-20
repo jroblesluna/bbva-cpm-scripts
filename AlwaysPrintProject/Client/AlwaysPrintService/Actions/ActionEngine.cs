@@ -18,11 +18,27 @@ namespace AlwaysPrintService.Actions
     /// - Templates ({{variable}})
     /// - Condicionales
     /// - Iteración sobre listas de usuarios
+    /// - Variables de configuración (corporate_queue_name, contingency_printer_ip)
     /// </summary>
     public class ActionEngine
     {
         private readonly Dictionary<string, object> _variables = new Dictionary<string, object>();
+        private readonly Dictionary<string, string> _configVariables = new Dictionary<string, string>();
         private ActionConfiguration? _config;
+        
+        // ═══════════════════════════════════════════════════════════════════════
+        // VARIABLES DE CONFIGURACIÓN
+        // ═══════════════════════════════════════════════════════════════════════
+        
+        /// <summary>
+        /// Establece una variable de configuración que se resuelve en templates {{nombre}}.
+        /// Estas variables provienen de AppConfiguration y son inmutables durante la ejecución.
+        /// </summary>
+        public void SetConfigVariable(string name, string value)
+        {
+            _configVariables[name] = value;
+            AlwaysPrintLogger.WriteInfo($"ActionEngine: variable de configuración '{name}' establecida.");
+        }
         
         // ═══════════════════════════════════════════════════════════════════════
         // CARGA DE CONFIGURACIÓN
@@ -222,6 +238,15 @@ namespace AlwaysPrintService.Actions
                 
                 case ActionTypes.ExitShieldMode:
                     return ExecuteExitShieldMode(action);
+                
+                case ActionTypes.PausePrintQueue:
+                    return ExecutePausePrintQueue(action);
+                
+                case ActionTypes.UnpausePrintQueue:
+                    return ExecuteUnpausePrintQueue(action);
+                
+                case ActionTypes.SetDefaultPrinter:
+                    return ExecuteSetDefaultPrinter(action);
                 
                 default:
                     AlwaysPrintLogger.WriteWarning($"ActionEngine: tipo de acción desconocido: {action.Type}");
@@ -477,6 +502,51 @@ namespace AlwaysPrintService.Actions
 
             return AdminActions.ExitShieldMode(queueName, lpmcPortName);
         }
+
+        private bool ExecutePausePrintQueue(ActionConfig action)
+        {
+            string queueName = GetParameter<string>(action, "queue_name") ?? "";
+
+            if (string.IsNullOrWhiteSpace(queueName))
+            {
+                AlwaysPrintLogger.WriteWarning("ActionEngine: PausePrintQueue requiere 'queue_name'");
+                return false;
+            }
+
+            queueName = ReplaceTemplates(queueName);
+
+            return AdminActions.PausePrintQueue(queueName);
+        }
+
+        private bool ExecuteUnpausePrintQueue(ActionConfig action)
+        {
+            string queueName = GetParameter<string>(action, "queue_name") ?? "";
+
+            if (string.IsNullOrWhiteSpace(queueName))
+            {
+                AlwaysPrintLogger.WriteWarning("ActionEngine: UnpausePrintQueue requiere 'queue_name'");
+                return false;
+            }
+
+            queueName = ReplaceTemplates(queueName);
+
+            return AdminActions.UnpausePrintQueue(queueName);
+        }
+
+        private bool ExecuteSetDefaultPrinter(ActionConfig action)
+        {
+            string queueName = GetParameter<string>(action, "queue_name") ?? "";
+
+            if (string.IsNullOrWhiteSpace(queueName))
+            {
+                AlwaysPrintLogger.WriteWarning("ActionEngine: SetDefaultPrinter requiere 'queue_name'");
+                return false;
+            }
+
+            queueName = ReplaceTemplates(queueName);
+
+            return AdminActions.SetDefaultPrinter(queueName);
+        }
         
         // ═══════════════════════════════════════════════════════════════════════
         // EVALUACIÓN DE CONDICIONES
@@ -581,6 +651,7 @@ namespace AlwaysPrintService.Actions
             {
                 string varName = match.Groups[1].Value;
                 
+                // Primero buscar en variables de ejecución
                 if (variables.TryGetValue(varName, out object? value))
                 {
                     if (value is string str)
@@ -590,6 +661,12 @@ namespace AlwaysPrintService.Actions
                         return string.Join(",", list);
                     
                     return value?.ToString() ?? "";
+                }
+                
+                // Luego buscar en variables de configuración (AppConfiguration)
+                if (_configVariables.TryGetValue(varName, out string? configValue))
+                {
+                    return configValue ?? "";
                 }
                 
                 AlwaysPrintLogger.WriteWarning($"ActionEngine: variable '{varName}' no encontrada en template");

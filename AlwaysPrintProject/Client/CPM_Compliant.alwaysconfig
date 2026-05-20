@@ -116,6 +116,97 @@
           }
         }
       ]
+    },
+    {
+      "event": "OnContingencyActivated",
+      "description": "Activar modo contingencia: bypass CPM, imprimir directo a IP",
+      "actions": [
+        {
+          "type": "StopService",
+          "description": "Detener servicio CPM",
+          "parameters": {
+            "service_name": "lpmc_universal_service",
+            "graceful_timeout_seconds": 10,
+            "force_kill_on_timeout": true
+          }
+        },
+        {
+          "type": "KillProcessesByName",
+          "description": "Eliminar procesos CPM tray",
+          "parameters": {
+            "process_name": "lpmc-systemtray-app.exe",
+            "force": true
+          }
+        },
+        {
+          "type": "PausePrintQueue",
+          "description": "Pausar cola corporativa antes de cambiar puerto",
+          "parameters": {
+            "queue_name": "{{corporate_queue_name}}"
+          }
+        },
+        {
+          "type": "EnterShieldMode",
+          "description": "Cambiar puerto a IP directa de contingencia",
+          "parameters": {
+            "queue_name": "{{corporate_queue_name}}",
+            "printer_ip": "{{contingency_printer_ip}}",
+            "printer_port": 9100
+          }
+        },
+        {
+          "type": "UnpausePrintQueue",
+          "description": "Reanudar cola corporativa con nuevo puerto",
+          "parameters": {
+            "queue_name": "{{corporate_queue_name}}"
+          }
+        }
+      ]
+    },
+    {
+      "event": "OnContingencyDeactivated",
+      "description": "Desactivar modo contingencia: restaurar flujo CPM",
+      "actions": [
+        {
+          "type": "KillProcessesByName",
+          "description": "Eliminar procesos CPM tray huérfanos",
+          "parameters": {
+            "process_name": "lpmc-systemtray-app.exe",
+            "force": true
+          }
+        },
+        {
+          "type": "PausePrintQueue",
+          "description": "Pausar cola corporativa antes de restaurar puerto",
+          "parameters": {
+            "queue_name": "{{corporate_queue_name}}"
+          }
+        },
+        {
+          "type": "ExitShieldMode",
+          "description": "Restaurar puerto LPMC (CPM)",
+          "parameters": {
+            "queue_name": "{{corporate_queue_name}}",
+            "lpmc_port_name": "LPMC:"
+          }
+        },
+        {
+          "type": "UnpausePrintQueue",
+          "description": "Reanudar cola corporativa con puerto CPM",
+          "parameters": {
+            "queue_name": "{{corporate_queue_name}}"
+          }
+        },
+        {
+          "type": "StartService",
+          "description": "Iniciar servicio CPM",
+          "parameters": {
+            "service_name": "lpmc_universal_service",
+            "wait_for_running": true,
+            "timeout_seconds": 30
+          }
+        }
+      ]
     }
   ]
 }
