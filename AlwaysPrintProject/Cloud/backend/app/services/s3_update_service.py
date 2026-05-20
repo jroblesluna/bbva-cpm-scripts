@@ -221,6 +221,40 @@ class S3UpdateService:
             )
             raise
 
+    def get_object(self, key: str = None) -> dict:
+        """
+        Obtiene el objeto MSI completo desde S3 (para streaming directo).
+
+        Args:
+            key: Clave S3 del objeto. Si es None, usa la clave por defecto (latest/AlwaysPrint.msi)
+
+        Returns:
+            Respuesta de S3 GetObject con Body (StreamingBody) y ContentLength
+
+        Raises:
+            ClientError: Si el objeto no existe o S3 no está disponible.
+        """
+        effective_key = key if key is not None else self._key
+
+        logger.info(
+            "Descargando objeto de S3: bucket=%s, key=%s",
+            self._bucket,
+            effective_key
+        )
+
+        response = self._client.get_object(
+            Bucket=self._bucket,
+            Key=effective_key
+        )
+
+        logger.info(
+            "Objeto obtenido de S3: key=%s, tamaño=%d bytes",
+            effective_key,
+            response.get('ContentLength', 0)
+        )
+
+        return response
+
     def upload_msi(self, file_data: bytes, version: str, build_date: str, commit_hash: str) -> dict:
         """
         Sube un MSI al bucket S3 como latest y como versión específica.

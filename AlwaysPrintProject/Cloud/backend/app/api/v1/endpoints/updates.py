@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -569,7 +569,7 @@ def check_update(
         "habilitadas."
     ),
     responses={
-        302: {"description": "Redirect a presigned URL de S3"},
+        200: {"description": "Archivo MSI (streaming)"},
         401: {"description": "Workstation no autenticada"},
         403: {"description": "Actualizaciones automáticas deshabilitadas para esta organización"},
         500: {"description": "Error interno al generar URL de descarga"},
@@ -587,7 +587,7 @@ def download_update(
     y redirige al cliente con un 302.
 
     Retorna:
-        - 302: Redirect a la presigned URL de S3
+        - 200: Archivo MSI (streaming directo desde S3)
         - 401: Workstation no autenticada
         - 403: Auto-actualizaciones deshabilitadas para la organización
         - 500: Error al generar la URL presigned
@@ -648,45 +648,53 @@ def download_update(
             detail="Actualizaciones automáticas deshabilitadas para esta organización"
         )
 
-    # 4. Generar presigned URL para descarga del MSI
-    # Si la organización tiene target_version, usar esa versión específica
+    # 4. Descargar el MSI desde S3 y servirlo directamente (streaming)
+    # Se evita el redirect a presigned URL porque algunos clientes no lo manejan correctamente
     try:
         s3_service = S3UpdateService()
         if account.target_version:
             target_key = f"versions/{account.target_version}/AlwaysPrint.msi"
-            presigned_url = s3_service.generate_download_url(key=target_key)
         else:
-            presigned_url = s3_service.generate_download_url()
+            target_key = None  # Usa la clave por defecto (latest)
+
+        s3_response = s3_service.get_object(key=target_key)
     except ClientError:
         logger.error(
-            "Error de S3 al generar URL de descarga: "
+            "Error de S3 al descargar MSI: "
             "workstation_id=%s, ip_publica=%s",
             workstation.id if workstation else "N/A",
             get_client_ip(request),
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error interno al generar URL de descarga"
+            detail="Error interno al descargar archivo"
         )
     except Exception as e:
         logger.error(
-            "Error inesperado al generar URL de descarga: "
+            "Error inesperado al descargar MSI: "
             "workstation_id=%s, error=%s",
             workstation.id if workstation else "N/A",
             str(e),
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error interno al generar URL de descarga"
+            detail="Error interno al descargar archivo"
         )
 
-    # 5. Loggear descarga exitosa y redirigir
+    # 5. Loggear descarga exitosa y servir archivo
     logger.info(
         "Descarga de actualización autorizada: workstation_id=%s, "
-        "ip_publica=%s, organization=%s, status=302",
+        "ip_publica=%s, organization=%s, status=200",
         workstation.id if workstation else "N/A (fallback IP)",
         get_client_ip(request),
         account.name if account else "desconocida",
     )
 
-    return RedirectResponse(url=presigned_url, status_code=302)
+    return StreamingResponse(
+        s3_response['Body'].iter_chunks(chunk_size=65536),
+        media_type="application/x-msi",
+        headers={
+            "Content-Disposition": "attachment; filename=AlwaysPrint.msi",
+            "Content-Length": str(s3_response.get('ContentLength', 0)),
+        },
+    )
