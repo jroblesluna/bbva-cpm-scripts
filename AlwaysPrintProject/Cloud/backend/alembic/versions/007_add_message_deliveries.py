@@ -61,8 +61,14 @@ def upgrade() -> None:
     op.create_index('ix_message_deliveries_status', 'message_deliveries', ['status'])
 
     # Cambiar columnas de String a enum (los tipos ya fueron creados con DO $$)
+    # Primero eliminar defaults que son strings (incompatibles con el cast a enum)
+    op.execute("ALTER TABLE messages ALTER COLUMN delivery_mode DROP DEFAULT")
     op.execute("ALTER TABLE messages ALTER COLUMN delivery_mode TYPE deliverymode USING delivery_mode::deliverymode")
+    op.execute("ALTER TABLE messages ALTER COLUMN delivery_mode SET DEFAULT 'all'")
+    
+    op.execute("ALTER TABLE message_deliveries ALTER COLUMN status DROP DEFAULT")
     op.execute("ALTER TABLE message_deliveries ALTER COLUMN status TYPE deliverystatus USING status::deliverystatus")
+    op.execute("ALTER TABLE message_deliveries ALTER COLUMN status SET DEFAULT 'pending'")
 
 
 def downgrade() -> None:
