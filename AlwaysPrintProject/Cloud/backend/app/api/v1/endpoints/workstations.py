@@ -935,13 +935,25 @@ async def toggle_workstation_forced_contingency(
     # Notificar a la workstation si está online
     workstation_id_str = str(workstation_id)
     if connection_manager.is_workstation_online(workstation_id_str):
-        # Obtener IP de la impresora default para contingencia
+        # Obtener IP de la impresora de contingencia:
+        # 1. Favorita (default_printer_id) si existe
+        # 2. Menor IP en la VLAN si no hay favorita
         printer_ip = None
+        from app.models.device import Device
         if workstation.default_printer_id:
-            from app.models.device import Device
             printer = db.query(Device).filter(Device.id == workstation.default_printer_id).first()
             if printer:
                 printer_ip = printer.ip_address
+        
+        if not printer_ip and workstation.vlan_id:
+            # Fallback: menor IP en la VLAN
+            first_device = db.query(Device).filter(
+                Device.organization_id == workstation.organization_id,
+                Device.vlan_id == workstation.vlan_id,
+                Device.is_active == True
+            ).order_by(Device.ip_address).first()
+            if first_device:
+                printer_ip = first_device.ip_address
         
         message = {
             "type": "forced_contingency",
