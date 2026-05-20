@@ -86,7 +86,7 @@ class AuditLog(Base):
     organization_id = Column(GUID, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
     
     # === INFORMACIÓN DE LA ACCIÓN ===
-    action_type = Column(SQLEnum(ActionType), nullable=False, index=True)
+    action_type = Column(SQLEnum(ActionType, name="actiontype", create_type=False), nullable=False, index=True)
     entity_type = Column(String(100), nullable=False, index=True)  # Tipo de entidad afectada
     entity_id = Column(GUID, nullable=False, index=True)  # ID de la entidad afectada
     

@@ -41,7 +41,10 @@ class MessageDelivery(Base):
     workstation_id = Column(GUID, ForeignKey("workstations.id", ondelete="CASCADE"), nullable=False, index=True)
 
     # === ESTADO DE ENTREGA ===
-    status = Column(SQLEnum(DeliveryStatus), nullable=False, default=DeliveryStatus.PENDING, index=True)
+    status = Column(
+        SQLEnum(DeliveryStatus, name='deliverystatus', create_type=False),
+        nullable=False, default=DeliveryStatus.PENDING, index=True
+    )
     delivered_at = Column(DateTime, nullable=True)
 
     # === RELACIONES ===
