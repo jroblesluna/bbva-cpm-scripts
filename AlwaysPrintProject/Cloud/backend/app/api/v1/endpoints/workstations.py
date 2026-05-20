@@ -475,8 +475,12 @@ def register_workstation(
                 )
             
             # Construir URL del servidor cloud
-            # Usar el host del request para construir la URL
-            cloud_api_url = f"{request.url.scheme}://{request.url.netloc}"
+            # Siempre HTTPS en producción (nginx termina SSL)
+            host = request.headers.get("Host", request.url.netloc)
+            # Limpiar puerto si viene incluido (ej: host:8000)
+            if ":" in host and not host.startswith("["):
+                host = host.split(":")[0]
+            cloud_api_url = f"https://{host}"
             
             logger.info(
                 f"[REGISTRO HTTP] Devolviendo credenciales: "
