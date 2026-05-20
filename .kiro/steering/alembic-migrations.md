@@ -116,6 +116,21 @@ role = Column(SQLEnum(UserRole, name='userrole', create_type=False), nullable=Fa
 | Índice | `NNN_idx_tabla_campo` |
 | Cambio de tipo | `NNN_alter_campo_tabla` |
 
+## Migración Consolidada
+
+Las migraciones 001-007 originales fueron consolidadas en una única migración inicial:
+- **Archivo**: `001_initial_schema.py`
+- **Revision ID**: `001_initial_schema`
+- **down_revision**: `None`
+
+Las futuras migraciones deben usar `'001_initial_schema'` como `down_revision`.
+
+Ejemplo para la siguiente migración:
+```python
+revision: str = '002_mi_nueva_migracion'
+down_revision: Union[str, None] = '001_initial_schema'
+```
+
 ## Ejecución Automática
 
 El `docker-entrypoint.sh` ejecuta `alembic upgrade head` al iniciar el contenedor. Si una migración falla, el backend NO arranca. Por eso es crítico que las migraciones sean idempotentes y correctas antes de hacer push.
