@@ -19,7 +19,7 @@ jobs:
 
       - name: Read AWS region from terraform.tfvars
         run: |
-          REGION=$(grep 'aws_region' AlwaysPrintProject/Cloud/terraform/terraform.tfvars | grep -oP '(?<=")[^"]+')
+          REGION=$(grep 'aws_region' AlwaysPrintProject/Cloud/terraform/prod.tfvars | grep -oP '(?<=")[^"]+')
           echo "AWS_REGION=$REGION" >> $GITHUB_ENV
 
       - uses: aws-actions/configure-aws-credentials@v4
