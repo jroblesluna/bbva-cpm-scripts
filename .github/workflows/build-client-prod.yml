@@ -1,4 +1,4 @@
-name: Build and Deploy Client (Prod)
+name: PROD ➡️ Build and Deploy Client
 
 on:
   workflow_dispatch:

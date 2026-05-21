@@ -1,4 +1,4 @@
-name: Deploy Frontend (Prod)
+name: PROD ➡️ Deploy Frontend
 
 on:
   workflow_dispatch:
