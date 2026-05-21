@@ -199,7 +199,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <h1 className="text-xl font-bold text-gray-900">AlwaysPrint</h1>
             </div>
           </div>
-          <nav className="flex-1 space-y-1 px-2 py-4">
+          <nav className="flex-1 overflow-y-auto space-y-1 px-2 py-4">
             {filteredNavigation.map((item) => {
               const isActive = pathname === item.href
               return (
