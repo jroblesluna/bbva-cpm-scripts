@@ -162,7 +162,13 @@
     "forcedContingencyDeactivated": "Forced contingency deactivated for this workstation.",
     "forcedContingencyError": "Error changing forced contingency.",
     "forcedContingencyProcessing": "Processing...",
-    "forcedContingencyBadge": "Forced"
+    "forcedContingencyBadge": "Forced",
+    "restartServiceTitle": "Restart Service",
+    "restartTrayTitle": "Restart Tray",
+    "restartConfirmMessage": "Do you want to {action} on workstation {name}?",
+    "restartWarning": "The workstation will temporarily disconnect while the restart is performed. The status will update automatically once it reconnects.",
+    "restartConfirmBtn": "Confirm restart",
+    "restartSending": "Sending..."
   },
   "vlans": {
     "title": "VLANs",

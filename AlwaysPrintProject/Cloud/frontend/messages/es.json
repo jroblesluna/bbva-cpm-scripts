@@ -162,7 +162,13 @@
     "forcedContingencyDeactivated": "Contingencia forzada desactivada para esta estación.",
     "forcedContingencyError": "Error al cambiar contingencia forzada.",
     "forcedContingencyProcessing": "Procesando...",
-    "forcedContingencyBadge": "Forzada"
+    "forcedContingencyBadge": "Forzada",
+    "restartServiceTitle": "Reiniciar Servicio",
+    "restartTrayTitle": "Reiniciar Tray",
+    "restartConfirmMessage": "¿Desea {action} en la estación {name}?",
+    "restartWarning": "La estación se desconectará momentáneamente mientras se realiza el reinicio. El estado se actualizará automáticamente cuando vuelva a conectarse.",
+    "restartConfirmBtn": "Confirmar reinicio",
+    "restartSending": "Enviando..."
   },
   "vlans": {
     "title": "VLANs",

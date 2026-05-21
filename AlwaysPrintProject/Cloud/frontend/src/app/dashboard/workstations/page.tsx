@@ -61,6 +61,7 @@ export default function WorkstationsPage() {
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
   const [editingWorkstation, setEditingWorkstation] = useState<Workstation | null>(null);
   const [contingencyTarget, setContingencyTarget] = useState<Workstation | null>(null);
+  const [restartTarget, setRestartTarget] = useState<{ workstation: Workstation; commandType: 'restart_service' | 'restart_tray' } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [sortField, setSortField] = useState<SortField>('ip_private');
@@ -155,6 +156,9 @@ export default function WorkstationsPage() {
         title: 'Comando enviado',
         description: `"${labels[variables.commandType]}" enviado exitosamente.`,
       });
+      setRestartTarget(null);
+      // Refrescar estado de workstations tras reinicio
+      queryClient.invalidateQueries({ queryKey: ['workstations'] });
     },
     onError: (error: { detail?: string; status?: number }) => {
       const message = error.status === 409
@@ -165,6 +169,7 @@ export default function WorkstationsPage() {
         title: 'Error',
         description: message,
       });
+      setRestartTarget(null);
     },
   });
 
@@ -214,6 +219,22 @@ export default function WorkstationsPage() {
   const handleDelete = (workstation: Workstation) => {
     if (confirm(`¿Eliminar workstation ${workstation.hostname || workstation.ip_private}? Esta acción no se puede deshacer.`)) {
       deleteMutation.mutate(workstation.id);
+    }
+  };
+
+  // Handler de comandos: reinicio abre modal de confirmación, otros se ejecutan directo
+  const handleCommand = (workstation: Workstation, commandType: 'restart_service' | 'restart_tray' | 'check_update') => {
+    if (commandType === 'restart_service' || commandType === 'restart_tray') {
+      setRestartTarget({ workstation, commandType });
+    } else {
+      commandMutation.mutate({ id: workstation.id, commandType });
+    }
+  };
+
+  const handleCommandById = (id: string, commandType: 'restart_service' | 'restart_tray' | 'check_update') => {
+    const ws = workstations.find(w => w.id === id) || sortedWorkstations.find(w => w.id === id);
+    if (ws) {
+      handleCommand(ws, commandType);
     }
   };
 
@@ -523,7 +544,7 @@ export default function WorkstationsPage() {
                 onViewDetails={() => setSelectedWorkstation(workstation)}
                 onEdit={() => setEditingWorkstation(workstation)}
                 onDelete={() => handleDelete(workstation)}
-                onCommand={(commandType) => commandMutation.mutate({ id: workstation.id, commandType })}
+                onCommand={(commandType) => handleCommand(workstation, commandType)}
                 onDownloadLog={() => logDownloadMutation.mutate(workstation)}
                 onToggleForcedContingency={() => setContingencyTarget(workstation)}
                 isCommandPending={commandMutation.isPending}
@@ -547,7 +568,7 @@ export default function WorkstationsPage() {
           onViewDetails={(ws) => setSelectedWorkstation(ws)}
           onEdit={(ws) => setEditingWorkstation(ws)}
           onDelete={handleDelete}
-          onCommand={(id, commandType) => commandMutation.mutate({ id, commandType })}
+          onCommand={(id, commandType) => handleCommandById(id, commandType)}
           onDownloadLog={(ws) => logDownloadMutation.mutate(ws)}
           onToggleForcedContingency={(id) => {
             const ws = sortedWorkstations.find(w => w.id === id);
@@ -609,6 +630,58 @@ export default function WorkstationsPage() {
                     : contingencyTarget.forced_contingency
                       ? t('forcedContingencyDeactivate')
                       : t('forcedContingencyActivate')
+                  }
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal de confirmación de reinicio de servicio/tray */}
+      {restartTarget && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-amber-600" />
+                {restartTarget.commandType === 'restart_service'
+                  ? t('restartServiceTitle')
+                  : t('restartTrayTitle')
+                }
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-600">
+                {t('restartConfirmMessage', {
+                  action: restartTarget.commandType === 'restart_service'
+                    ? t('restartServiceTitle').toLowerCase()
+                    : t('restartTrayTitle').toLowerCase(),
+                  name: restartTarget.workstation.hostname || restartTarget.workstation.ip_private,
+                })}
+              </p>
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  {t('restartWarning')}
+                </AlertDescription>
+              </Alert>
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setRestartTarget(null)}>
+                  {tCommon('cancel')}
+                </Button>
+                <Button
+                  variant="default"
+                  onClick={() => commandMutation.mutate({
+                    id: restartTarget.workstation.id,
+                    commandType: restartTarget.commandType,
+                  })}
+                  disabled={commandMutation.isPending}
+                  className="bg-amber-600 hover:bg-amber-700"
+                >
+                  {commandMutation.isPending
+                    ? t('restartSending')
+                    : t('restartConfirmBtn')
                   }
                 </Button>
               </div>
