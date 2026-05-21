@@ -248,7 +248,9 @@ dig alwaysprint.dev.iol.pe
 
 # RDS disponible
 aws rds describe-db-instances \
-  --query "DBInstances[?DBInstanceIdentifier=='alwaysprint-dev'].DBInstanceStatus" \
+  --db-instance-identifier "alwaysprint-dev-postgres" \
+  --query "DBInstances[0].DBInstanceStatus" \
+  --output text \
   --profile AlwaysPrint-dev-040982755196
 
 # ECR repos creados
@@ -275,18 +277,18 @@ aws s3 ls --profile AlwaysPrint-dev-040982755196 | grep alwaysprint
    - Add secret: `AWS_ACCESS_KEY_ID` → (key de cuenta 040982755196)
    - Add secret: `AWS_SECRET_ACCESS_KEY` → (secret de cuenta 040982755196)
    - Sin protecciones adicionales (deploy automático)
-3. Crear environment **`production`**:
+3. Crear environment **`prod`**:
    - Add secret: `AWS_ACCESS_KEY_ID` → (key de cuenta 425642439683)
    - Add secret: `AWS_SECRET_ACCESS_KEY` → (secret de cuenta 425642439683)
    - ✅ Activar **"Required reviewers"** → agregarte como reviewer
    - (Opcional) Activar "Wait timer" de 5 minutos para tener margen de cancelar
 
 ### Verificación
-- En Settings → Environments: aparecen `dev` y `production`
-- `production` muestra el badge "Protection rules" con reviewer configurado
+- En Settings → Environments: aparecen `dev` y `prod`
+- `prod` muestra el badge "Protection rules" con reviewer configurado
 - Cada environment muestra 2 secrets
 
-**Resultado esperado**: Ambos environments visibles. Production tiene required reviewer activo.
+**Resultado esperado**: Ambos environments visibles. Prod tiene required reviewer activo.
 
 ---
 
@@ -364,7 +366,7 @@ jobs:
   deploy-prod:
     runs-on: ubuntu-latest
     needs: deploy-dev
-    environment: production    # ← Requiere aprobación manual
+    environment: prod    # ← Requiere aprobación manual
     steps:
       - uses: actions/checkout@v4
 
@@ -479,7 +481,7 @@ jobs:
   deploy-prod:
     runs-on: ubuntu-latest
     needs: deploy-dev
-    environment: production
+    environment: prod
     steps:
       - uses: actions/checkout@v4
 
@@ -652,7 +654,7 @@ jobs:
   deploy-prod:
     runs-on: ubuntu-latest
     needs: [build, deploy-dev]
-    environment: production    # ← Requiere aprobación manual
+    environment: prod    # ← Requiere aprobación manual
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -740,7 +742,7 @@ curl -s https://alwaysprint.apps.iol.pe/api/v1/health
 1. Verificar que todo funciona en `alwaysprint.dev.iol.pe`
 2. En GitHub → Actions → el workflow en ejecución:
    - Click en "Review deployments"
-   - Seleccionar environment `production`
+   - Seleccionar environment `prod`
    - Click "Approve and deploy"
 3. El job `deploy-prod` se ejecuta
 
@@ -829,8 +831,8 @@ aws s3 ls s3://alwaysprint-prod-artifacts/latest/ --profile AlwaysPrint-prod-425
 ## Troubleshooting
 
 ### Job de prod no aparece como "Waiting for review"
-- Verificar que el environment `production` tiene "Required reviewers" activado
-- Verificar que el job usa `environment: production` (exacto, case-sensitive)
+- Verificar que el environment `prod` tiene "Required reviewers" activado
+- Verificar que el job usa `environment: prod` (exacto, case-sensitive)
 
 ### Deploy a dev falla con "AccessDenied"
 - Verificar secrets en GitHub environment `dev` (son de la cuenta 040982755196)

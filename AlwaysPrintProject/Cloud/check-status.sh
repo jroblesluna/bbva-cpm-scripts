@@ -3,10 +3,10 @@
 # AlwaysPrint Cloud Manager - Script de verificación de estado
 # Ejecutar desde tu máquina local para verificar que todo está operativo
 #
-# Uso: ./check-status.sh [instance-id]
+# Uso: ./check-status.sh <dev|prod>
 #
 # Flujo:
-#   0. Lee outputs de Terraform (fuente de verdad)
+#   0. Selecciona entorno y lee outputs de Terraform
 #   1. Verifica DNS (registros A, DKIM, MX)
 #   2. Verifica infraestructura AWS (EC2, RDS, ECR)
 #   3. Verifica containers y aplicación vía SSM
@@ -16,6 +16,39 @@
 # =============================================================================
 
 set -o pipefail
+
+# =============================================================================
+# VALIDACIÓN DE PARÁMETRO
+# =============================================================================
+ENV="${1:-}"
+
+if [ -z "$ENV" ] || { [ "$ENV" != "dev" ] && [ "$ENV" != "prod" ]; }; then
+    echo "Uso: ./check-status.sh <dev|prod>"
+    echo ""
+    echo "  dev   — Verificar entorno de desarrollo (cuenta 040982755196)"
+    echo "  prod  — Verificar entorno de producción (cuenta 425642439683)"
+    exit 1
+fi
+
+# Configuración por entorno
+if [ "$ENV" = "dev" ]; then
+    AWS_PROFILE="AlwaysPrint-dev-040982755196"
+    TF_WORKSPACE="dev"
+    TF_VARS="dev.tfvars"
+    ECR_PREFIX="alwaysprint-dev"
+    EC2_TAG="alwaysprint-dev-ec2"
+    ENV_LABEL="DESARROLLO"
+else
+    AWS_PROFILE="AlwaysPrint-prod-425642439683"
+    TF_WORKSPACE="prod"
+    TF_VARS="prod.tfvars"
+    ECR_PREFIX="alwaysprint-prod"
+    EC2_TAG="alwaysprint-prod-ec2"
+    ENV_LABEL="PRODUCCIÓN"
+fi
+
+export AWS_PROFILE
+AWS_REGION="us-west-2"
 
 # Colores
 RED='\033[0;31m'
@@ -93,12 +126,15 @@ ssm_exec() {
 # =============================================================================
 # 0. TERRAFORM OUTPUTS (fuente de verdad de la infraestructura)
 # =============================================================================
-print_header "0. TERRAFORM STATE"
+print_header "0. ENTORNO: $ENV_LABEL [$ENV] — Perfil: $AWS_PROFILE"
 
 TF_DIR="$(cd "$(dirname "$0")/terraform" 2>/dev/null && pwd)"
 
 if [ -d "$TF_DIR/.terraform" ]; then
-    echo -e "  ${CYAN}Leyendo outputs de Terraform...${NC}"
+    echo -e "  ${CYAN}Seleccionando workspace '$TF_WORKSPACE' y leyendo outputs...${NC}"
+    
+    # Cambiar al workspace correcto
+    terraform -chdir="$TF_DIR" workspace select "$TF_WORKSPACE" >/dev/null 2>&1
     
     TF_OUTPUT=$(terraform -chdir="$TF_DIR" output -json 2>/dev/null)
     
@@ -109,7 +145,6 @@ if [ -d "$TF_DIR/.terraform" ]; then
         RDS_ENDPOINT=$(echo "$TF_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('rds_endpoint',{}).get('value',''))" 2>/dev/null)
         BACKEND_ECR=$(echo "$TF_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('backend_ecr_url',{}).get('value',''))" 2>/dev/null)
         FRONTEND_ECR=$(echo "$TF_OUTPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('frontend_ecr_url',{}).get('value',''))" 2>/dev/null)
-        AWS_REGION="us-west-2"
         
         check_ok "Terraform state leído correctamente"
         echo -e "  ${NC}  Domain:       ${DOMAIN:-no definido}"
@@ -120,42 +155,26 @@ if [ -d "$TF_DIR/.terraform" ]; then
         echo -e "  ${NC}  Frontend ECR: ${FRONTEND_ECR:-no definido}"
     else
         check_warn "No se pudieron leer outputs de Terraform (¿infraestructura no aplicada?)"
-        recommend "Ejecutar: cd terraform && ./setup.sh apply"
+        recommend "Ejecutar: terraform workspace select $TF_WORKSPACE && terraform apply -var-file=$TF_VARS"
     fi
 else
     check_warn "Terraform no inicializado en $TF_DIR"
-    recommend "Ejecutar: cd terraform && terraform init && ./setup.sh apply"
+    recommend "Ejecutar: cd terraform && terraform init"
 fi
 
-# Fallbacks
-[ -z "$DOMAIN" ] && DOMAIN="alwaysprint.apps.iol.pe"
-[ -z "$AWS_REGION" ] && AWS_REGION="us-west-2"
-
-# Si no tenemos INSTANCE_ID o EC2_IP de Terraform, obtener de AWS CLI
-if [ -z "$INSTANCE_ID" ] || [ -z "$EC2_IP" ]; then
+# Fallbacks si Terraform no proporcionó datos
+if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
     EC2_INFO=$(aws ec2 describe-instances \
         --region "$AWS_REGION" \
-        --filters "Name=tag:Name,Values=*alwaysprint*" "Name=instance-state-name,Values=running" \
+        --filters "Name=tag:Name,Values=$EC2_TAG" "Name=instance-state-name,Values=running" \
         --query "Reservations[0].Instances[0].[InstanceId,PublicIpAddress]" \
         --output text 2>/dev/null)
     
     if [ -n "$EC2_INFO" ] && [ "$EC2_INFO" != "None" ]; then
-        [ -z "$INSTANCE_ID" ] && INSTANCE_ID=$(echo "$EC2_INFO" | awk '{print $1}')
-        [ -z "$EC2_IP" ] && EC2_IP=$(echo "$EC2_INFO" | awk '{print $2}')
+        INSTANCE_ID=$(echo "$EC2_INFO" | awk '{print $1}')
+        EC2_IP=$(echo "$EC2_INFO" | awk '{print $2}')
     fi
 fi
-[ -z "$AWS_REGION" ] && AWS_REGION="us-west-2"
-
-# Detectar Instance ID si Terraform no lo proporcionó
-if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
-    INSTANCE_ID=$(aws ec2 describe-instances \
-        --filters "Name=tag:Name,Values=*alwaysprint*" "Name=instance-state-name,Values=running" \
-        --query 'Reservations[0].Instances[0].InstanceId' \
-        --output text \
-        --region "$AWS_REGION" 2>/dev/null)
-fi
-
-[ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ] && [ -n "$1" ] && INSTANCE_ID="$1"
 
 # =============================================================================
 # 1. VALIDACIÓN DNS
@@ -171,53 +190,13 @@ if [ -n "$IP_RESOLVED" ]; then
         DNS_OK=true
     elif [ -n "$EC2_IP" ]; then
         check_fail "$DOMAIN → $IP_RESOLVED (NO coincide con EC2: $EC2_IP)"
-        recommend "Actualizar DNS en Hostinger: $DOMAIN → $EC2_IP (registro A)"
+        recommend "Actualizar DNS: $DOMAIN → $EC2_IP (registro A)"
     else
         check_warn "$DOMAIN → $IP_RESOLVED (EC2 IP aún no disponible para comparar)"
     fi
 else
     check_fail "No se pudo resolver DNS para $DOMAIN"
-    recommend "Configurar registro A en Hostinger: $DOMAIN → ${EC2_IP:-<EC2_IP>}"
-fi
-
-# Verificar registros SES (DKIM, MX, SPF)
-echo -e "\n  ${BLUE}Registros SES (email):${NC}"
-
-# Verificar los 3 DKIM de SES (los prefijos son hashes fijos)
-DKIM_COUNT=0
-dig +short CNAME "747nftpdxxtgstnrzognxq5p677xkvuc._domainkey.apps.iol.pe" 2>/dev/null | grep -qi "amazonses" && DKIM_COUNT=$((DKIM_COUNT + 1))
-dig +short CNAME "6asyw5tayk6tkfigloleydr5vn7q57k6._domainkey.apps.iol.pe" 2>/dev/null | grep -qi "amazonses" && DKIM_COUNT=$((DKIM_COUNT + 1))
-dig +short CNAME "36toxjwf6nmzy4rtsvemymfmeksssa32._domainkey.apps.iol.pe" 2>/dev/null | grep -qi "amazonses" && DKIM_COUNT=$((DKIM_COUNT + 1))
-
-# Verificar TXT _amazonses como prueba de verificación SES
-SES_VERIFY=$(dig +short TXT "_amazonses.apps.iol.pe" 2>/dev/null | head -1)
-if [ -n "$SES_VERIFY" ]; then
-    check_ok "SES verificación — dominio apps.iol.pe verificado"
-else
-    check_warn "SES verificación — TXT _amazonses no encontrado"
-fi
-
-if [ "$DKIM_COUNT" -ge 3 ]; then
-    check_ok "DKIM — 3/3 registros configurados"
-elif [ "$DKIM_COUNT" -gt 0 ]; then
-    check_warn "DKIM — solo $DKIM_COUNT/3 registros configurados"
-    recommend "Faltan registros DKIM en DNS. Verificar en AWS SES → Identities → apps.iol.pe"
-else
-    check_warn "DKIM — no verificable (puede requerir propagación DNS)"
-fi
-
-MX_RECORD=$(dig +short MX "mail.apps.iol.pe" 2>/dev/null | head -1)
-if echo "$MX_RECORD" | grep -q "amazonses.com"; then
-    check_ok "MX (mail.apps.iol.pe) — configurado (SES)"
-else
-    check_warn "MX (mail.apps.iol.pe) — ${MX_RECORD:-no definido}"
-fi
-
-SPF_RECORD=$(dig +short TXT "mail.apps.iol.pe" 2>/dev/null | grep "spf" | head -1)
-if echo "$SPF_RECORD" | grep -q "amazonses.com"; then
-    check_ok "SPF (mail.apps.iol.pe) — incluye amazonses.com"
-else
-    check_warn "SPF (mail.apps.iol.pe) — ${SPF_RECORD:-no definido}"
+    recommend "Configurar registro A: $DOMAIN → ${EC2_IP:-<EC2_IP>}"
 fi
 
 # =============================================================================
@@ -242,10 +221,8 @@ else
             check_ok "EC2 $INSTANCE_ID — running"
         elif [ -n "$EC2_STATE" ] && [ "$EC2_STATE" != "None" ]; then
             check_fail "EC2 $INSTANCE_ID — estado: $EC2_STATE"
-            recommend "EC2 no está running. Verificar en consola AWS o ejecutar: ./setup.sh apply"
         else
             check_fail "EC2 $INSTANCE_ID — no encontrado"
-            recommend "Instancia no existe. Ejecutar: cd terraform && ./setup.sh apply"
         fi
 
         EC2_STATUS=$(aws ec2 describe-instance-status \
@@ -261,13 +238,15 @@ else
         fi
     else
         check_fail "Instance ID no disponible"
-        recommend "No se detectó instancia EC2. Ejecutar: cd terraform && ./setup.sh apply"
+        recommend "No se detectó instancia EC2. Ejecutar terraform apply -var-file=$TF_VARS"
     fi
 
     # RDS
     echo -e "\n  ${BLUE}RDS PostgreSQL:${NC}"
+    RDS_ID="${ECR_PREFIX}-postgres"
     RDS_STATUS=$(aws rds describe-db-instances \
-        --query 'DBInstances[?contains(DBInstanceIdentifier, `alwaysprint`)].DBInstanceStatus' \
+        --db-instance-identifier "$RDS_ID" \
+        --query "DBInstances[0].DBInstanceStatus" \
         --output text \
         --region "$AWS_REGION" 2>/dev/null)
     
@@ -277,45 +256,52 @@ else
         check_warn "RDS — $RDS_STATUS"
     else
         check_fail "RDS no encontrado"
-        recommend "Base de datos no existe. Ejecutar: cd terraform && ./setup.sh apply"
     fi
 
     # ECR
     echo -e "\n  ${BLUE}ECR Repositories:${NC}"
     BACKEND_IMAGES=$(aws ecr describe-images \
-        --repository-name alwaysprint-prod-backend \
+        --repository-name "${ECR_PREFIX}-backend" \
         --query 'imageDetails | length(@)' \
         --output text \
         --region "$AWS_REGION" 2>/dev/null)
     
     if [ -n "$BACKEND_IMAGES" ] && [ "$BACKEND_IMAGES" != "0" ] && [ "$BACKEND_IMAGES" != "None" ]; then
         BACKEND_LATEST=$(aws ecr describe-images \
-            --repository-name alwaysprint-prod-backend \
+            --repository-name "${ECR_PREFIX}-backend" \
             --query 'imageDetails | sort_by(@, &imagePushedAt) | [-1].imageTags[0]' \
             --output text \
             --region "$AWS_REGION" 2>/dev/null)
         check_ok "Backend ECR — $BACKEND_IMAGES imágenes (última: ${BACKEND_LATEST:-latest})"
     else
-        check_fail "Backend ECR — sin imágenes"
-        recommend "No hay imagen de backend. Ejecutar workflow: GitHub → Actions → Deploy Backend → Run workflow"
+        check_warn "Backend ECR — sin imágenes"
     fi
 
     FRONTEND_IMAGES=$(aws ecr describe-images \
-        --repository-name alwaysprint-prod-frontend \
+        --repository-name "${ECR_PREFIX}-frontend" \
         --query 'imageDetails | length(@)' \
         --output text \
         --region "$AWS_REGION" 2>/dev/null)
     
     if [ -n "$FRONTEND_IMAGES" ] && [ "$FRONTEND_IMAGES" != "0" ] && [ "$FRONTEND_IMAGES" != "None" ]; then
         FRONTEND_LATEST=$(aws ecr describe-images \
-            --repository-name alwaysprint-prod-frontend \
+            --repository-name "${ECR_PREFIX}-frontend" \
             --query 'imageDetails | sort_by(@, &imagePushedAt) | [-1].imageTags[0]' \
             --output text \
             --region "$AWS_REGION" 2>/dev/null)
         check_ok "Frontend ECR — $FRONTEND_IMAGES imágenes (última: ${FRONTEND_LATEST:-latest})"
     else
-        check_fail "Frontend ECR — sin imágenes"
-        recommend "No hay imagen de frontend. Ejecutar workflow: GitHub → Actions → Deploy Frontend → Run workflow"
+        check_warn "Frontend ECR — sin imágenes"
+    fi
+
+    # S3
+    echo -e "\n  ${BLUE}S3 Artifacts:${NC}"
+    S3_BUCKET="${ECR_PREFIX}-artifacts"
+    S3_EXISTS=$(aws s3api head-bucket --bucket "$S3_BUCKET" 2>&1)
+    if [ $? -eq 0 ]; then
+        check_ok "S3 bucket $S3_BUCKET — existe"
+    else
+        check_fail "S3 bucket $S3_BUCKET — no encontrado"
     fi
 fi
 
@@ -329,10 +315,10 @@ if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
 else
     echo -e "  ${CYAN}Consultando estado de containers...${NC}"
     
-    CONTAINER_STATUS=$(ssm_exec "$INSTANCE_ID" '["echo BACKEND_STATUS=$(docker inspect --format={{.State.Status}} alwaysprint-backend-1 2>/dev/null || echo not_found); echo BACKEND_IMAGE=$(docker inspect --format={{.Config.Image}} alwaysprint-backend-1 2>/dev/null || echo N/A); echo FRONTEND_STATUS=$(docker inspect --format={{.State.Status}} alwaysprint-frontend-1 2>/dev/null || echo not_found); echo FRONTEND_IMAGE=$(docker inspect --format={{.Config.Image}} alwaysprint-frontend-1 2>/dev/null || echo N/A); echo REDIS_STATUS=$(docker inspect --format={{.State.Status}} alwaysprint-redis-1 2>/dev/null || echo not_found); echo HEALTH=$(curl -s http://localhost:8000/api/v1/health 2>/dev/null || echo FAIL); echo FRONTEND_HTTP=$(curl -s -o /dev/null -w %{http_code} http://localhost:3000/ 2>/dev/null || echo 000); echo NGINX_STATUS=$(systemctl is-active nginx 2>/dev/null || echo inactive); echo SSL_EXISTS=$(test -d /etc/letsencrypt/live && ls /etc/letsencrypt/live/ | head -1 || echo no); echo RESTART_COUNT_B=$(docker inspect --format={{.RestartCount}} alwaysprint-backend-1 2>/dev/null || echo 0); echo RESTART_COUNT_F=$(docker inspect --format={{.RestartCount}} alwaysprint-frontend-1 2>/dev/null || echo 0)"]' 10)
+    CONTAINER_STATUS=$(ssm_exec "$INSTANCE_ID" '["echo BACKEND_STATUS=$(docker inspect --format={{.State.Status}} alwaysprint-backend-1 2>/dev/null || echo not_found); echo BACKEND_IMAGE=$(docker inspect --format={{.Config.Image}} alwaysprint-backend-1 2>/dev/null || echo N/A); echo FRONTEND_STATUS=$(docker inspect --format={{.State.Status}} alwaysprint-frontend-1 2>/dev/null || echo not_found); echo FRONTEND_IMAGE=$(docker inspect --format={{.Config.Image}} alwaysprint-frontend-1 2>/dev/null || echo N/A); echo REDIS_STATUS=$(docker inspect --format={{.State.Status}} alwaysprint-redis-1 2>/dev/null || echo not_found); echo HEALTH=$(curl -s http://localhost:8000/api/v1/health 2>/dev/null || echo FAIL); echo FRONTEND_HTTP=$(curl -s -o /dev/null -w %{http_code} http://localhost:3000/ 2>/dev/null || echo 000); echo NGINX_STATUS=$(systemctl is-active nginx 2>/dev/null || echo inactive); echo SSL_EXISTS=$(test -d /etc/letsencrypt/live && ls /etc/letsencrypt/live/ | head -1 || echo no)"]' 10)
     
     if [ -n "$CONTAINER_STATUS" ]; then
-        eval $(echo "$CONTAINER_STATUS" | grep -E "^(BACKEND_|FRONTEND_|REDIS_|HEALTH|NGINX_|SSL_|RESTART_)" | head -20)
+        eval $(echo "$CONTAINER_STATUS" | grep -E "^(BACKEND_|FRONTEND_|REDIS_|HEALTH|NGINX_|SSL_)" | head -20)
         
         # Backend
         echo -e "\n  ${BLUE}Backend:${NC}"
@@ -343,7 +329,6 @@ else
             recommend "Backend no desplegado. Ejecutar workflow Deploy Backend en GitHub Actions"
         else
             check_fail "Container — $BACKEND_STATUS"
-            recommend "Backend en estado $BACKEND_STATUS. Ver logs: docker logs alwaysprint-backend-1"
         fi
         
         if echo "$HEALTH" | grep -q "healthy"; then
@@ -351,10 +336,7 @@ else
             check_ok "Health check — OK (build: ${BTAG:-dev})"
         elif [ "$BACKEND_STATUS" = "running" ]; then
             check_fail "Health check — FALLO"
-            recommend "Backend running pero health falla. Posible error de migración o conexión a DB"
         fi
-        
-        [ "${RESTART_COUNT_B:-0}" != "0" ] && check_warn "Backend restart count: $RESTART_COUNT_B"
         echo -e "  ${NC}  Imagen: ${BACKEND_IMAGE:-N/A}"
         
         # Frontend
@@ -373,8 +355,6 @@ else
         elif [ "$FRONTEND_STATUS" = "running" ]; then
             check_fail "HTTP local — $FRONTEND_HTTP"
         fi
-        
-        [ "${RESTART_COUNT_F:-0}" != "0" ] && check_warn "Frontend restart count: $RESTART_COUNT_F"
         echo -e "  ${NC}  Imagen: ${FRONTEND_IMAGE:-N/A}"
         
         # Redis
@@ -382,7 +362,7 @@ else
         if [ "$REDIS_STATUS" = "running" ]; then
             check_ok "Container — running"
         else
-            check_fail "Container — ${REDIS_STATUS:-not_found}"
+            check_warn "Container — ${REDIS_STATUS:-not_found}"
         fi
         
         # Nginx & SSL
@@ -391,27 +371,25 @@ else
             check_ok "Nginx — active"
         else
             check_fail "Nginx — ${NGINX_STATUS:-inactive}"
-            recommend "Nginx no está activo. Conectar vía SSM y verificar: systemctl status nginx"
         fi
         
         if [ "$SSL_EXISTS" != "no" ] && [ -n "$SSL_EXISTS" ]; then
             check_ok "Certificado SSL — presente ($SSL_EXISTS)"
         else
-            check_warn "Certificado SSL — no configurado (solo HTTP)"
-            # La recomendación de SSL se agrega abajo en la sección DNS
+            check_warn "Certificado SSL — no configurado"
+            SSL_AUTOFIX=true
         fi
     else
         check_fail "No se pudo conectar vía SSM"
-        recommend "SSM no responde. Verificar que el EC2 tenga IAM role con AmazonSSMManagedInstanceCore"
+        recommend "SSM no responde. Verificar IAM role con AmazonSSMManagedInstanceCore"
     fi
 fi
 
 # =============================================================================
-# 4. CONECTIVIDAD Y ENDPOINTS PÚBLICOS
+# 4. ENDPOINTS PÚBLICOS
 # =============================================================================
 print_header "4. ENDPOINTS PÚBLICOS"
 
-# HTTPS
 echo -e "\n  ${BLUE}HTTPS:${NC}"
 if [ "$DNS_OK" = "true" ]; then
     HEALTH_RESP=$(curl -s --max-time $TIMEOUT "https://${DOMAIN}/api/v1/health" 2>/dev/null)
@@ -419,8 +397,7 @@ if [ "$DNS_OK" = "true" ]; then
         BUILD=$(echo "$HEALTH_RESP" | grep -o '"build_tag":"[^"]*"' | cut -d'"' -f4)
         check_ok "Backend HTTPS — OK (build: ${BUILD:-dev})"
     else
-        # Intentar HTTP si HTTPS falla
-    HEALTH_HTTP=$(curl -s --max-time $TIMEOUT "http://${EC2_IP}/api/v1/health" 2>/dev/null)
+        HEALTH_HTTP=$(curl -s --max-time $TIMEOUT "http://${EC2_IP}/api/v1/health" 2>/dev/null)
         if echo "$HEALTH_HTTP" | grep -q "healthy"; then
             check_warn "Backend responde en HTTP directo pero no HTTPS"
         else
@@ -435,15 +412,13 @@ if [ "$DNS_OK" = "true" ]; then
         check_warn "Frontend HTTPS — HTTP ${FRONTEND_RESP:-timeout}"
     fi
 else
-    # DNS no apunta al EC2, probar HTTP directo a la IP
     echo -e "  ${YELLOW}  DNS no apunta al EC2 — probando HTTP directo a $EC2_IP${NC}"
     if [ -n "$EC2_IP" ]; then
         HEALTH_DIRECT=$(curl -s --max-time $TIMEOUT "http://${EC2_IP}/api/v1/health" 2>/dev/null)
         if echo "$HEALTH_DIRECT" | grep -q "healthy"; then
             check_ok "Backend HTTP directo ($EC2_IP) — OK"
-            recommend "Aplicación funciona. Solo falta actualizar DNS: $DOMAIN → $EC2_IP"
         else
-            check_fail "Backend no responde ni por HTTP directo a $EC2_IP"
+            check_fail "Backend no responde por HTTP directo a $EC2_IP"
         fi
         
         FRONT_DIRECT=$(curl -s -o /dev/null -w "%{http_code}" --max-time $TIMEOUT "http://${EC2_IP}/" 2>/dev/null)
@@ -457,29 +432,25 @@ fi
 
 # SSL
 echo -e "\n  ${BLUE}Certificado SSL:${NC}"
-SSL_EXPIRY=$(echo | openssl s_client -servername "$DOMAIN" -connect "${DOMAIN}:443" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
-if [ -n "$SSL_EXPIRY" ]; then
-    EXPIRY_EPOCH=$(date -j -f "%b %d %H:%M:%S %Y %Z" "$SSL_EXPIRY" +%s 2>/dev/null || date -d "$SSL_EXPIRY" +%s 2>/dev/null)
-    NOW_EPOCH=$(date +%s)
-    DAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
-    if [ "$DAYS_LEFT" -gt 14 ]; then
-        check_ok "SSL válido — expira en ${DAYS_LEFT} días"
-    elif [ "$DAYS_LEFT" -gt 0 ]; then
-        check_warn "SSL expira pronto — ${DAYS_LEFT} días"
-        recommend "Renovar SSL: certbot renew (debería ser automático vía cron)"
+if [ "$DNS_OK" = "true" ]; then
+    SSL_EXPIRY=$(echo | openssl s_client -servername "$DOMAIN" -connect "${DOMAIN}:443" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
+    if [ -n "$SSL_EXPIRY" ]; then
+        EXPIRY_EPOCH=$(date -j -f "%b %d %H:%M:%S %Y %Z" "$SSL_EXPIRY" +%s 2>/dev/null || date -d "$SSL_EXPIRY" +%s 2>/dev/null)
+        NOW_EPOCH=$(date +%s)
+        DAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
+        if [ "$DAYS_LEFT" -gt 14 ]; then
+            check_ok "SSL válido — expira en ${DAYS_LEFT} días"
+        elif [ "$DAYS_LEFT" -gt 0 ]; then
+            check_warn "SSL expira pronto — ${DAYS_LEFT} días"
+        else
+            check_fail "SSL EXPIRADO"
+        fi
     else
-        check_fail "SSL EXPIRADO"
-        recommend "SSL expirado. Ejecutar vía SSM: certbot renew --force-renewal && systemctl reload nginx"
-    fi
-else
-    if [ "$DNS_OK" = "true" ]; then
         check_warn "SSL no disponible (certbot pendiente)"
         SSL_AUTOFIX=true
-        recommend "Ejecutar certbot (o responder 'y' abajo para aplicar automáticamente)"
-    else
-        check_warn "SSL no verificable (DNS no apunta al EC2)"
-        recommend "Primero actualizar DNS ($DOMAIN → $EC2_IP), luego SSL se configurará automáticamente en ~2 min"
     fi
+else
+    check_warn "SSL no verificable (DNS no apunta al EC2)"
 fi
 
 # =============================================================================
@@ -517,7 +488,7 @@ fi
 # =============================================================================
 # RESUMEN Y RECOMENDACIONES
 # =============================================================================
-print_header "RESUMEN"
+print_header "RESUMEN [$ENV_LABEL]"
 
 echo ""
 echo -e "  ${GREEN}✓ Pasaron:${NC}  $PASS"
@@ -527,19 +498,19 @@ echo ""
 
 if [ $FAIL -eq 0 ] && [ $WARN -eq 0 ]; then
     echo -e "  ${GREEN}══════════════════════════════════════════${NC}"
-    echo -e "  ${GREEN}  ✓ SISTEMA 100% OPERATIVO${NC}"
+    echo -e "  ${GREEN}  ✓ $ENV_LABEL 100% OPERATIVO${NC}"
     echo -e "  ${GREEN}══════════════════════════════════════════${NC}"
 elif [ $FAIL -eq 0 ]; then
     echo -e "  ${GREEN}══════════════════════════════════════════${NC}"
-    echo -e "  ${GREEN}  ✓ SISTEMA OPERATIVO (con warnings)${NC}"
+    echo -e "  ${GREEN}  ✓ $ENV_LABEL OPERATIVO (con warnings)${NC}"
     echo -e "  ${GREEN}══════════════════════════════════════════${NC}"
 elif [ $FAIL -le 2 ]; then
     echo -e "  ${YELLOW}══════════════════════════════════════════${NC}"
-    echo -e "  ${YELLOW}  ⚠ SISTEMA CON PROBLEMAS MENORES${NC}"
+    echo -e "  ${YELLOW}  ⚠ $ENV_LABEL CON PROBLEMAS MENORES${NC}"
     echo -e "  ${YELLOW}══════════════════════════════════════════${NC}"
 else
     echo -e "  ${RED}══════════════════════════════════════════${NC}"
-    echo -e "  ${RED}  ✗ SISTEMA CON PROBLEMAS${NC}"
+    echo -e "  ${RED}  ✗ $ENV_LABEL CON PROBLEMAS${NC}"
     echo -e "  ${RED}══════════════════════════════════════════${NC}"
 fi
 
@@ -552,8 +523,8 @@ if [ ${#RECOMMENDATIONS[@]} -gt 0 ]; then
         echo -e "  ${CYAN}$((i+1)).${NC} ${RECOMMENDATIONS[$i]}"
     done
     
-    # Ofrecer aplicar fixes automáticos
-    if [ "$SSL_AUTOFIX" = "true" ]; then
+    # Ofrecer certbot automático solo si DNS apunta correctamente
+    if [ "$SSL_AUTOFIX" = "true" ] && [ "$DNS_OK" = "true" ]; then
         echo ""
         echo -e -n "  ${BOLD}¿Ejecutar certbot automáticamente? [y/N]:${NC} "
         read -r REPLY
@@ -580,13 +551,8 @@ if [ ${#RECOMMENDATIONS[@]} -gt 0 ]; then
                 if echo "$FIX_RESULT" | grep -qi "Success\|Successfully"; then
                     echo -e "  ${GREEN}✓ SSL configurado correctamente${NC}"
                 else
-                    echo -e "  ${RED}✗ Falló. Output:${NC}"
-                    echo "$FIX_RESULT" | tail -5 | while IFS= read -r line; do
-                        echo -e "    $line"
-                    done
+                    echo -e "  ${RED}✗ Falló. Verificar manualmente vía SSM${NC}"
                 fi
-            else
-                echo -e "  ${RED}✗ No se pudo enviar comando SSM${NC}"
             fi
         fi
     fi
