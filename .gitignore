@@ -63,5 +63,4 @@ AlwaysPrintProject/Cloud/terraform/terraform.tfstate.*
 AlwaysPrintProject/Cloud/terraform/terraform.tfstate.d/
 AlwaysPrintProject/Cloud/terraform/tfplan*
 AlwaysPrintProject/Cloud/terraform/*.backup
-AlwaysPrintProject/Cloud/DEV_ENVIRONMENT_PLAN.md
 !.kiro
