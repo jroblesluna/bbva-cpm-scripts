@@ -222,6 +222,7 @@
     "colType": "Type",
     "colContent": "Content",
     "colStatus": "Status",
+    "colSender": "Sent by",
     "colSent": "Sent",
     "colDelivered": "Delivered",
     "emptyTitle": "No messages",

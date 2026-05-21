@@ -45,6 +45,7 @@ def _build_message_response(db: Session, message: Message) -> dict:
         "id": message.id,
         "organization_id": message.organization_id,
         "sender_id": message.sender_id,
+        "sender_name": message.sender.full_name if message.sender else None,
         "target_type": message.target_type,
         "target_id": message.target_id,
         "content": message.content,

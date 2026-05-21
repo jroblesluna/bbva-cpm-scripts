@@ -10,6 +10,7 @@ export interface Message {
   id: string
   organization_id: string
   sender_id: string | null
+  sender_name: string | null
   target_type: TargetType
   target_id: string | null
   content: string

@@ -248,6 +248,7 @@ export default function MessagesPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Modo</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colStatus')}</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entregas</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colSender')}</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colSent')}</th>
                 </tr>
               </thead>
@@ -303,6 +304,9 @@ export default function MessagesPage() {
                           </span>
                         )}
                       </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {message.sender_name || '—'}
+                      </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDateWithTimezone(message.sent_at, timezone)}
                       </td>
@@ -310,7 +314,7 @@ export default function MessagesPage() {
                     {/* Fila expandida con entregas individuales */}
                     {expandedMessages.has(message.id) && (
                       <tr key={`${message.id}-deliveries`}>
-                        <td colSpan={7} className="px-0 py-0">
+                        <td colSpan={8} className="px-0 py-0">
                           <div className="bg-gray-50 border-t border-b border-gray-200 px-8 py-3">
                             <p className="text-xs font-medium text-gray-500 uppercase mb-2">Entregas por workstation</p>
                             {deliveriesCache[message.id] ? (

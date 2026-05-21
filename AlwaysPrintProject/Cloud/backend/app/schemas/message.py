@@ -63,6 +63,7 @@ class MessageResponse(BaseModel):
     id: UUID
     organization_id: UUID
     sender_id: Optional[UUID] = None
+    sender_name: Optional[str] = None
     target_type: TargetType
     target_id: Optional[UUID] = None
     content: str
@@ -75,7 +76,7 @@ class MessageResponse(BaseModel):
     sent_deliveries: Optional[int] = None
     pending_deliveries: Optional[int] = None
     skipped_deliveries: Optional[int] = None
-    
+
     model_config = {"from_attributes": True}
 
 

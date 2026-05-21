@@ -222,6 +222,7 @@
     "colType": "Tipo",
     "colContent": "Contenido",
     "colStatus": "Estado",
+    "colSender": "Enviado por",
     "colSent": "Enviado",
     "colDelivered": "Entregado",
     "emptyTitle": "No hay mensajes",
