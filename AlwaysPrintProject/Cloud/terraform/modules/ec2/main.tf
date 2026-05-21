@@ -72,12 +72,12 @@ resource "aws_iam_role_policy" "ec2_permissions" {
       {
         Effect   = "Allow"
         Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:DeleteObjectVersion"]
-        Resource = "arn:aws:s3:::alwaysprint-artifacts/*"
+        Resource = "arn:aws:s3:::${var.project_name}-${var.environment}-artifacts/*"
       },
       {
         Effect   = "Allow"
         Action   = ["s3:ListBucket", "s3:ListBucketVersions"]
-        Resource = "arn:aws:s3:::alwaysprint-artifacts"
+        Resource = "arn:aws:s3:::${var.project_name}-${var.environment}-artifacts"
       }
     ]
   })

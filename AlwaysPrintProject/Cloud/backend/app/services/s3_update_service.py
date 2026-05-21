@@ -1,7 +1,7 @@
 """
 Servicio de integración con S3 para actualizaciones automáticas.
 
-Este servicio interactúa con el bucket S3 'alwaysprint-artifacts' para:
+Este servicio interactúa con el bucket S3 de artefactos para:
 - Obtener metadata del MSI más reciente (versión, fecha de build, commit hash, tamaño)
 - Generar URLs presigned para descarga segura del MSI por las workstations
 """
@@ -25,14 +25,15 @@ class S3UpdateService:
     - Consultar metadata del MSI disponible en S3
     - Generar URLs presigned temporales para descarga segura
 
-    El MSI se almacena en: s3://alwaysprint-artifacts/latest/AlwaysPrint.msi
+    El MSI se almacena en: s3://{bucket}/latest/AlwaysPrint.msi
     con metadata personalizada (version, build-date, commit-hash).
+    El nombre del bucket se configura vía la variable S3_ARTIFACTS_BUCKET.
     """
 
     def __init__(self):
         """Inicializa el cliente S3 con la región configurada."""
         self._client = boto3.client('s3', region_name=settings.AWS_REGION)
-        self._bucket = 'alwaysprint-artifacts'
+        self._bucket = settings.S3_ARTIFACTS_BUCKET
         self._key = 'latest/AlwaysPrint.msi'
 
     def get_msi_metadata(self, key: str = None) -> dict:

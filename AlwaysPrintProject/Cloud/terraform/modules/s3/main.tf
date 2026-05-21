@@ -2,12 +2,13 @@
 # Este módulo crea un bucket S3 seguro con versionado, cifrado y acceso restringido
 
 locals {
-  # Nombre fijo del bucket — no se parametriza
-  bucket_name = "alwaysprint-artifacts"
+  # Nombre del bucket incluye environment para evitar colisión entre cuentas
+  bucket_name = "${var.project_name}-${var.environment}-artifacts"
 }
 
 resource "aws_s3_bucket" "artifacts" {
-  bucket = local.bucket_name
+  bucket        = local.bucket_name
+  force_destroy = true
 
   tags = {
     Name        = local.bucket_name

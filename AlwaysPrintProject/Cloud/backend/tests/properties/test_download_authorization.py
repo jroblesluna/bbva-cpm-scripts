@@ -29,7 +29,7 @@ auto_update_flag_strategy = st.booleans()
 
 
 # === URL dummy para presigned URL de S3 ===
-DUMMY_PRESIGNED_URL = "https://alwaysprint-artifacts.s3.amazonaws.com/latest/AlwaysPrint.msi?presigned=true"
+DUMMY_PRESIGNED_URL = "https://alwaysprint-prod-artifacts.s3.amazonaws.com/latest/AlwaysPrint.msi?presigned=true"
 
 
 def _create_mock_db_session(auto_update_enabled: bool):

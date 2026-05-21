@@ -105,7 +105,7 @@ class TestS3UpdateServiceGenerateDownloadUrl:
         assert url == 'https://s3.amazonaws.com/presigned-url'
         mock_s3.generate_presigned_url.assert_called_once_with(
             'get_object',
-            Params={'Bucket': 'alwaysprint-artifacts', 'Key': 'latest/AlwaysPrint.msi'},
+            Params={'Bucket': 'alwaysprint-prod-artifacts', 'Key': 'latest/AlwaysPrint.msi'},
             ExpiresIn=3600
         )
 
@@ -122,7 +122,7 @@ class TestS3UpdateServiceGenerateDownloadUrl:
         assert url == 'https://s3.amazonaws.com/custom-url'
         mock_s3.generate_presigned_url.assert_called_once_with(
             'get_object',
-            Params={'Bucket': 'alwaysprint-artifacts', 'Key': 'latest/AlwaysPrint.msi'},
+            Params={'Bucket': 'alwaysprint-prod-artifacts', 'Key': 'latest/AlwaysPrint.msi'},
             ExpiresIn=7200
         )
 

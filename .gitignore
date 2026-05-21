@@ -60,6 +60,8 @@ AlwaysPrintProject/Cloud/terraform/.terraform/
 AlwaysPrintProject/Cloud/terraform/.terraform.lock.hcl
 AlwaysPrintProject/Cloud/terraform/terraform.tfstate
 AlwaysPrintProject/Cloud/terraform/terraform.tfstate.*
-AlwaysPrintProject/Cloud/terraform/tfplan
+AlwaysPrintProject/Cloud/terraform/terraform.tfstate.d/
+AlwaysPrintProject/Cloud/terraform/tfplan*
 AlwaysPrintProject/Cloud/terraform/*.backup
+AlwaysPrintProject/Cloud/DEV_ENVIRONMENT_PLAN.md
 !.kiro
