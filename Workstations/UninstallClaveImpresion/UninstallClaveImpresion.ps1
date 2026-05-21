@@ -501,5 +501,105 @@ if (Test-ProductStillInstalled -ProductCode $productCode) {
     exit 2
 } else {
     Write-Log "Product no longer appears registered after cleanup." "SUCCESS"
-    exit 0
 }
+
+# =========================
+# Step 5: Remove orphan services LexRestarSpool and LexrRestartSpool
+# =========================
+
+Write-Log "Checking for orphan services LexRestarSpool and LexrRestartSpool..." "INFO"
+
+$orphanServices = @("LexRestarSpool", "LexrRestartSpool")
+
+foreach ($svcName in $orphanServices) {
+    $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
+
+    if ($null -eq $svc) {
+        Write-Log "Service '$svcName' not found. Nothing to do." "INFO"
+        continue
+    }
+
+    Write-Log "Service '$svcName' found. Status: $($svc.Status)" "WARN"
+
+    # Attempt to stop it if running
+    try {
+        if ($svc.Status -ne "Stopped") {
+            Write-Log "Stopping service '$svcName'..." "INFO"
+            Stop-Service -Name $svcName -Force -ErrorAction Stop
+            Start-Sleep -Seconds 2
+            Write-Log "Service '$svcName' stopped." "SUCCESS"
+        }
+    } catch {
+        Write-Log "Could not stop service '$svcName'. Error: $($_.Exception.Message)" "WARN"
+    }
+
+    # Delete the service permanently
+    try {
+        Write-Log "Deleting service '$svcName' from service registry..." "INFO"
+        sc.exe delete $svcName | Out-Null
+        Write-Log "Service '$svcName' deleted successfully." "SUCCESS"
+    } catch {
+        Write-Log "Could not delete service '$svcName'. Error: $($_.Exception.Message)" "ERROR"
+    }
+}
+
+# =========================
+# Step 6: Remove folder "C:\Program Files (x86)\Lexmark\Clave Impresion"
+# =========================
+
+$claveFolder = "C:\Program Files (x86)\Lexmark\Clave Impresion"
+
+Write-Log "Checking for folder: $claveFolder" "INFO"
+
+if (Test-Path $claveFolder) {
+    Write-Log "Folder found: $claveFolder" "WARN"
+
+    # Search for .EXE files inside the folder
+    $exeFiles = Get-ChildItem -Path $claveFolder -Filter "*.exe" -Recurse -Force -ErrorAction SilentlyContinue
+
+    if ($exeFiles -and $exeFiles.Count -gt 0) {
+        Write-Log "Found $($exeFiles.Count) .EXE file(s) in the folder." "INFO"
+
+        foreach ($exe in $exeFiles) {
+            $exeName = $exe.Name
+            Write-Log "Searching for running processes of: $exeName" "INFO"
+
+            # Find and kill all processes matching the image name
+            $processName = [System.IO.Path]::GetFileNameWithoutExtension($exeName)
+            $runningProcs = Get-Process -Name $processName -ErrorAction SilentlyContinue
+
+            if ($runningProcs -and $runningProcs.Count -gt 0) {
+                foreach ($proc in $runningProcs) {
+                    try {
+                        Write-Log "Killing process: $($proc.ProcessName), PID: $($proc.Id)" "WARN"
+                        Stop-Process -Id $proc.Id -Force -ErrorAction Stop
+                        Write-Log "Process killed: $($proc.ProcessName), PID: $($proc.Id)" "SUCCESS"
+                    } catch {
+                        Write-Log "Could not kill process $($proc.ProcessName), PID $($proc.Id). Error: $($_.Exception.Message)" "ERROR"
+                    }
+                }
+
+                # Wait for processes to terminate
+                Start-Sleep -Seconds 2
+            } else {
+                Write-Log "No running processes found for '$exeName'." "INFO"
+            }
+        }
+    } else {
+        Write-Log "No .EXE files found in the folder." "INFO"
+    }
+
+    # Remove the entire folder
+    try {
+        Write-Log "Removing folder: $claveFolder" "WARN"
+        Remove-Item -Path $claveFolder -Recurse -Force -ErrorAction Stop
+        Write-Log "Folder removed successfully: $claveFolder" "SUCCESS"
+    } catch {
+        Write-Log "Could not remove folder $claveFolder. Error: $($_.Exception.Message)" "ERROR"
+    }
+} else {
+    Write-Log "Folder not found: $claveFolder. Nothing to do." "INFO"
+}
+
+Write-Log "Uninstall script finished." "SUCCESS"
+exit 0
