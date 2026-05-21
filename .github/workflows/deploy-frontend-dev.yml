@@ -1,4 +1,4 @@
-name: DEV ➡️ Deploy Frontend
+name: DEV → Deploy Frontend
 
 on:
   push:
