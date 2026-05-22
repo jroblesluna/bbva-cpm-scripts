@@ -816,13 +816,15 @@ namespace AlwaysPrintService.Actions
         /// <summary>
         /// Ejecuta un proceso externo (bat, exe, cmd) con ventana oculta.
         /// Captura stdout y stderr, los registra en el log.
+        /// Si runAsLoggedInUser=true, lanza el proceso como el usuario de consola activo.
         /// </summary>
         /// <param name="filePath">Ruta completa al archivo a ejecutar</param>
         /// <param name="arguments">Argumentos opcionales</param>
         /// <param name="timeoutSeconds">Timeout máximo de ejecución</param>
         /// <param name="windowStyle">Estilo de ventana: Hidden, Minimized, Normal</param>
+        /// <param name="runAsLoggedInUser">Si true, ejecuta como el usuario de consola activo</param>
         /// <returns>true si el proceso terminó con exit code 0</returns>
-        public static bool RunProcess(string filePath, string arguments = "", int timeoutSeconds = 120, string windowStyle = "Hidden")
+        public static bool RunProcess(string filePath, string arguments = "", int timeoutSeconds = 120, string windowStyle = "Hidden", bool runAsLoggedInUser = false)
         {
             try
             {
@@ -830,6 +832,11 @@ namespace AlwaysPrintService.Actions
                 {
                     AlwaysPrintLogger.WriteWarning($"RunProcess: archivo no encontrado: {filePath}");
                     return false;
+                }
+
+                if (runAsLoggedInUser)
+                {
+                    return RunProcessAsLoggedInUser(filePath, arguments, timeoutSeconds, windowStyle);
                 }
 
                 AlwaysPrintLogger.WriteInfo($"RunProcess: ejecutando '{filePath}' con argumentos '{arguments}', ventana={windowStyle}, timeout={timeoutSeconds}s");
@@ -887,6 +894,187 @@ namespace AlwaysPrintService.Actions
                 AlwaysPrintLogger.WriteError($"RunProcess: error ejecutando '{filePath}': {ex.Message}", ex);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Ejecuta un proceso como el usuario de consola activo (desde un servicio LocalSystem).
+        /// Usa WTSQueryUserToken + CreateProcessAsUser para impersonar al usuario logueado.
+        /// No captura stdout/stderr (limitación de CreateProcessAsUser).
+        /// </summary>
+        private static bool RunProcessAsLoggedInUser(string filePath, string arguments, int timeoutSeconds, string windowStyle)
+        {
+            IntPtr userToken = IntPtr.Zero;
+            IntPtr duplicateToken = IntPtr.Zero;
+
+            try
+            {
+                uint sessionId = WTSGetActiveConsoleSessionId();
+                if (sessionId == 0xFFFFFFFF)
+                {
+                    AlwaysPrintLogger.WriteWarning("RunProcess: no hay sesión de consola activa. No se puede ejecutar como usuario.");
+                    return false;
+                }
+
+                if (!WTSQueryUserToken(sessionId, out userToken))
+                {
+                    int error = Marshal.GetLastWin32Error();
+                    AlwaysPrintLogger.WriteWarning($"RunProcess: WTSQueryUserToken falló (error {error}). Sesión={sessionId}");
+                    return false;
+                }
+
+                // Duplicar token para CreateProcessAsUser
+                var sa = new SECURITY_ATTRIBUTES();
+                sa.nLength = Marshal.SizeOf(sa);
+                if (!DuplicateTokenEx(userToken, 0x10000000, ref sa, 2, 1, out duplicateToken))
+                {
+                    AlwaysPrintLogger.WriteWarning($"RunProcess: DuplicateTokenEx falló (error {Marshal.GetLastWin32Error()})");
+                    return false;
+                }
+
+                // Preparar comando: para .bat usar cmd /c
+                string commandLine;
+                if (filePath.EndsWith(".bat", StringComparison.OrdinalIgnoreCase) ||
+                    filePath.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase))
+                {
+                    commandLine = $"cmd.exe /c \"{filePath}\" {arguments}".Trim();
+                }
+                else
+                {
+                    commandLine = string.IsNullOrEmpty(arguments) ? $"\"{filePath}\"" : $"\"{filePath}\" {arguments}";
+                }
+
+                AlwaysPrintLogger.WriteInfo($"RunProcess (como usuario, sesión {sessionId}): ejecutando '{commandLine}', ventana={windowStyle}, timeout={timeoutSeconds}s");
+
+                var si = new STARTUPINFO();
+                si.cb = Marshal.SizeOf(si);
+                si.lpDesktop = "winsta0\\default";
+                // Ventana oculta
+                si.dwFlags = 0x00000001; // STARTF_USESHOWWINDOW
+                si.wShowWindow = windowStyle.Equals("Minimized", StringComparison.OrdinalIgnoreCase) ? (short)7 : (short)0; // SW_SHOWMINNOACTIVE o SW_HIDE
+
+                var pi = new PROCESS_INFORMATION();
+
+                uint creationFlags = 0x00000010; // CREATE_NEW_CONSOLE (necesario para bat)
+
+                bool created = CreateProcessAsUser(
+                    duplicateToken,
+                    null,
+                    commandLine,
+                    ref sa,
+                    ref sa,
+                    false,
+                    creationFlags,
+                    IntPtr.Zero,
+                    null,
+                    ref si,
+                    out pi);
+
+                if (!created)
+                {
+                    int error = Marshal.GetLastWin32Error();
+                    AlwaysPrintLogger.WriteWarning($"RunProcess: CreateProcessAsUser falló (error {error})");
+                    return false;
+                }
+
+                // Esperar a que termine
+                uint waitResult = WaitForSingleObject(pi.hProcess, (uint)(timeoutSeconds * 1000));
+                if (waitResult != 0) // WAIT_OBJECT_0
+                {
+                    AlwaysPrintLogger.WriteWarning($"RunProcess: timeout ({timeoutSeconds}s) alcanzado para '{filePath}' (como usuario). Terminando.");
+                    TerminateProcess(pi.hProcess, 1);
+                    CloseHandle(pi.hProcess);
+                    CloseHandle(pi.hThread);
+                    return false;
+                }
+
+                uint exitCode = 0;
+                GetExitCodeProcess(pi.hProcess, out exitCode);
+                CloseHandle(pi.hProcess);
+                CloseHandle(pi.hThread);
+
+                AlwaysPrintLogger.WriteInfo($"RunProcess (como usuario): '{filePath}' terminó con exit code {exitCode}");
+                return exitCode == 0;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"RunProcess (como usuario): error ejecutando '{filePath}': {ex.Message}", ex);
+                return false;
+            }
+            finally
+            {
+                if (userToken != IntPtr.Zero) CloseHandle(userToken);
+                if (duplicateToken != IntPtr.Zero) CloseHandle(duplicateToken);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // P/INVOKE para CreateProcessAsUser
+        // ═══════════════════════════════════════════════════════════════════════
+
+        [DllImport("wtsapi32.dll", SetLastError = true)]
+        private static extern bool WTSQueryUserToken(uint sessionId, out IntPtr phToken);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool DuplicateTokenEx(
+            IntPtr hExistingToken, uint dwDesiredAccess,
+            ref SECURITY_ATTRIBUTES lpTokenAttributes,
+            int impersonationLevel, int tokenType,
+            out IntPtr phNewToken);
+
+        [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool CreateProcessAsUser(
+            IntPtr hToken, string? lpApplicationName, string lpCommandLine,
+            ref SECURITY_ATTRIBUTES lpProcessAttributes,
+            ref SECURITY_ATTRIBUTES lpThreadAttributes,
+            bool bInheritHandles, uint dwCreationFlags,
+            IntPtr lpEnvironment, string? lpCurrentDirectory,
+            ref STARTUPINFO lpStartupInfo,
+            out PROCESS_INFORMATION lpProcessInformation);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetExitCodeProcess(IntPtr hProcess, out uint lpExitCode);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool TerminateProcess(IntPtr hProcess, uint uExitCode);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr hObject);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct SECURITY_ATTRIBUTES
+        {
+            public int nLength;
+            public IntPtr lpSecurityDescriptor;
+            public bool bInheritHandle;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct STARTUPINFO
+        {
+            public int cb;
+            public string lpReserved;
+            public string lpDesktop;
+            public string lpTitle;
+            public int dwX, dwY, dwXSize, dwYSize;
+            public int dwXCountChars, dwYCountChars;
+            public int dwFillAttribute;
+            public int dwFlags;
+            public short wShowWindow;
+            public short cbReserved2;
+            public IntPtr lpReserved2;
+            public IntPtr hStdInput, hStdOutput, hStdError;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct PROCESS_INFORMATION
+        {
+            public IntPtr hProcess;
+            public IntPtr hThread;
+            public int dwProcessId;
+            public int dwThreadId;
         }
         
         // ═══════════════════════════════════════════════════════════════════════

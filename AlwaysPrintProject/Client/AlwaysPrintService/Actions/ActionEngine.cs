@@ -630,6 +630,7 @@ namespace AlwaysPrintService.Actions
             string arguments = GetParameter<string>(action, "arguments") ?? "";
             int timeoutSeconds = GetParameter<int>(action, "timeout_seconds", 120);
             string windowStyle = GetParameter<string>(action, "window_style") ?? "Hidden";
+            bool runAsLoggedInUser = GetParameter<bool>(action, "run_as_logged_in_user", false);
 
             if (string.IsNullOrWhiteSpace(filePath))
             {
@@ -640,7 +641,7 @@ namespace AlwaysPrintService.Actions
             filePath = ReplaceTemplates(filePath);
             arguments = ReplaceTemplates(arguments);
 
-            bool result = AdminActions.RunProcess(filePath, arguments, timeoutSeconds, windowStyle);
+            bool result = AdminActions.RunProcess(filePath, arguments, timeoutSeconds, windowStyle, runAsLoggedInUser);
 
             // Si se especificó store_result_in, guardar el resultado
             if (!string.IsNullOrEmpty(action.StoreResultIn))

@@ -100,7 +100,8 @@
             "file_path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\update_winhostuser.bat",
             "arguments": "",
             "timeout_seconds": 60,
-            "window_style": "Hidden"
+            "window_style": "Hidden",
+            "run_as_logged_in_user": true
           }
         }
       ]
