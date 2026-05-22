@@ -905,7 +905,10 @@ namespace AlwaysPrintService.Actions
         {
             IntPtr userToken = IntPtr.Zero;
             IntPtr duplicateToken = IntPtr.Zero;
-            string outputFile = Path.Combine(Path.GetTempPath(), $"alwaysprint_runprocess_{Guid.NewGuid():N}.log");
+            string outputFile = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "AlwaysPrint",
+                $"runprocess_{Guid.NewGuid():N}.log");
 
             try
             {
