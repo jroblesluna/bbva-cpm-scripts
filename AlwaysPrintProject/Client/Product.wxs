@@ -96,6 +96,9 @@
     <!-- Start Menu (para shortcut y AUMID de notificaciones) -->
     <StandardDirectory Id="ProgramMenuFolder" />
 
+    <!-- Desktop de todos los usuarios -->
+    <StandardDirectory Id="DesktopFolder" />
+
     <ComponentGroup Id="AlwaysPrint.Components">
 
       <!-- ── Componente principal: Service + DLLs compartidas + registro ── -->
@@ -174,13 +177,18 @@
               KeyPath="yes" />
       </Component>
 
-      <!-- ── Shortcut en Start Menu (necesario para AUMID y notificaciones toast) ── -->
+      <!-- ── Shortcuts en Start Menu y Desktop (AUMID y notificaciones toast) ── -->
       <Component Id="cmpStartMenuShortcut" Directory="INSTALLFOLDER"
                  Guid="C7A4B5D6-E500-4E00-8F00-0BBA00000005">
         <RegistryValue Root="HKCU" Key="SOFTWARE\Robles.AI\AlwaysPrint"
                        Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
         <Shortcut Id="StartMenuShortcut"
                   Directory="ProgramMenuFolder"
+                  Name="$(var.ProductDisplayName)"
+                  Target="[INSTALLFOLDER]AlwaysPrintTray.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <Shortcut Id="DesktopShortcut"
+                  Directory="DesktopFolder"
                   Name="$(var.ProductDisplayName)"
                   Target="[INSTALLFOLDER]AlwaysPrintTray.exe"
                   WorkingDirectory="INSTALLFOLDER" />
