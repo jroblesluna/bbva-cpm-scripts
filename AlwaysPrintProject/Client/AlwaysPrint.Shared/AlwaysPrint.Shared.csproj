@@ -7,6 +7,9 @@
     <LangVersion>9</LangVersion>
     <Optimize Condition="'$(Configuration)' == 'Release'">true</Optimize>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Environment)' == 'dev'">
+    <DefineConstants>$(DefineConstants);ENV_DEV</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>

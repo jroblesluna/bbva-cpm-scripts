@@ -55,7 +55,7 @@ jobs:
           $v = "${{ steps.version.outputs.VERSION }}"
           dotnet publish .\AlwaysPrintService\AlwaysPrintService.csproj `
             -c Release -f net48 -o .\dist --no-self-contained `
-            /p:Version=$v /p:AssemblyVersion=$v /p:FileVersion=$v /p:InformationalVersion=$v
+            /p:Version=$v /p:AssemblyVersion=$v /p:FileVersion=$v /p:InformationalVersion=$v /p:Environment=dev
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Publish AlwaysPrintTray
@@ -65,7 +65,7 @@ jobs:
           $v = "${{ steps.version.outputs.VERSION }}"
           dotnet publish .\AlwaysPrintTray\AlwaysPrintTray.csproj `
             -c Release -f net48 -o .\dist --no-self-contained `
-            /p:Version=$v /p:AssemblyVersion=$v /p:FileVersion=$v /p:InformationalVersion=$v
+            /p:Version=$v /p:AssemblyVersion=$v /p:FileVersion=$v /p:InformationalVersion=$v /p:Environment=dev
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Build MSI
@@ -76,7 +76,7 @@ jobs:
           $projectDir = (Get-Location).Path + "\"
           wix build .\Product.wxs -o .\AlwaysPrint.msi `
             -ext WixToolset.Util.wixext `
-            -d "ProductVersion=$v" -d "ProjectDir=$projectDir"
+            -d "ProductVersion=$v" -d "ProjectDir=$projectDir" -d "Environment=dev"
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Upload MSI artifact

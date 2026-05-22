@@ -10,6 +10,10 @@
     <Optimize Condition="'$(Configuration)' == 'Release'">true</Optimize>
     <ApplicationIcon>..\logo.ico</ApplicationIcon>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Environment)' == 'dev'">
+    <DefineConstants>$(DefineConstants);ENV_DEV</DefineConstants>
+    <ApplicationIcon>..\logo-dev.ico</ApplicationIcon>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>

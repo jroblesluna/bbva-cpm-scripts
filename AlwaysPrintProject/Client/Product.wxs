@@ -13,7 +13,24 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
-  <Package Name="AlwaysPrint"
+  <!-- Configuración condicional por entorno -->
+  <?ifdef var.Environment ?>
+    <?if $(var.Environment) = "dev" ?>
+      <?define ProductDisplayName = "AlwaysPrint [DEV]" ?>
+      <?define BootstrapDomainsValue = "dev.iol.pe" ?>
+      <?define IconFile = "logo-dev.ico" ?>
+    <?else?>
+      <?define ProductDisplayName = "AlwaysPrint" ?>
+      <?define BootstrapDomainsValue = "apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai" ?>
+      <?define IconFile = "logo.ico" ?>
+    <?endif?>
+  <?else?>
+    <?define ProductDisplayName = "AlwaysPrint" ?>
+    <?define BootstrapDomainsValue = "apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai" ?>
+    <?define IconFile = "logo.ico" ?>
+  <?endif?>
+
+  <Package Name="$(var.ProductDisplayName)"
            Language="1033"
            Version="$(var.ProductVersion)"
            Manufacturer="Robles.AI"
@@ -132,7 +149,7 @@
           <RegistryValue Name="CorporateQueueName"       Type="string"  Value=""  />
           <RegistryValue Name="PendingTaskPollingMinutes" Type="integer" Value="3" />
           <RegistryValue Name="BootstrapDomains"         Type="string"
-                         Value="apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai" />
+                         Value="$(var.BootstrapDomainsValue)" />
           <RegistryValue Name="RoblesAiLicenseSerial"    Type="string"  Value=""  />
           <RegistryValue Name="SearchTargets"            Type="string"
                          Value='{"ips":"","ranges":""}' />

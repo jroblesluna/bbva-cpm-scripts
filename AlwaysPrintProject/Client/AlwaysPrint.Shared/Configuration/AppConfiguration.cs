@@ -11,7 +11,11 @@ namespace AlwaysPrint.Shared.Configuration
         public string CorporateQueueName { get; set; } = "LexmarkBBVA";
         public SearchTargetsConfig SearchTargets { get; set; } = new SearchTargetsConfig();
         public int PendingTaskPollingMinutes { get; set; } = 3;
+#if ENV_DEV
+        public string BootstrapDomains { get; set; } = "dev.iol.pe";
+#else
         public string BootstrapDomains { get; set; } = "apps.iol.pe,sistemas.com.pe";
+#endif
         public string RoblesAiLicenseSerial { get; set; } = string.Empty;
 
         // === INTEGRACIÓN CLOUD ===
