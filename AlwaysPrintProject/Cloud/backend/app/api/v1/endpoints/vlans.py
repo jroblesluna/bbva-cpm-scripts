@@ -416,6 +416,7 @@ def set_vlan_default_device(
 
 
 @router.get("/{vlan_id}/config", response_model=VLANConfigResponse)
+def get_vlan_config(
     vlan_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
