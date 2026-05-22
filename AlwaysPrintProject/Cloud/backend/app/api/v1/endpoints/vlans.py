@@ -401,6 +401,41 @@ def set_vlan_default_device(
         vlan_id, device_id, current_user.id,
     )
 
+    # Notificar a workstations online de esta VLAN vía WebSocket
+    from app.services.websocket_manager import connection_manager
+    from app.models.workstation import Workstation
+    from app.models.device import Device as DeviceModel
+    import asyncio
+
+    workstations = db.query(Workstation).filter(Workstation.vlan_id == vlan_id).all()
+    
+    # Resolver IP de la nueva impresora predeterminada
+    new_printer_ip = None
+    new_printer_name = None
+    if device_id:
+        dev = db.query(DeviceModel).filter(DeviceModel.id == device_id).first()
+        if dev:
+            new_printer_ip = dev.ip_address
+            new_printer_name = dev.name
+
+    for ws in workstations:
+        message = {
+            "type": "default_printer_changed",
+            "source": "vlan",
+            "vlan_name": vlan.name,
+            "default_device_id": str(device_id) if device_id else None,
+            "printer_ip": new_printer_ip,
+            "printer_name": new_printer_name,
+        }
+
+        ws_id_str = str(ws.id)
+        if connection_manager.is_workstation_online(ws_id_str):
+            try:
+                loop = asyncio.get_event_loop()
+                loop.create_task(connection_manager.send_to_workstation(ws_id_str, message))
+            except RuntimeError:
+                pass
+
     audit_service = AuditService()
     audit_service.log_update(
         db=db,
