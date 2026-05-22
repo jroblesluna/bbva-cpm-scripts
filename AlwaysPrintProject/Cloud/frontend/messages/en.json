@@ -163,6 +163,7 @@
     "forcedContingencyError": "Error changing forced contingency.",
     "forcedContingencyProcessing": "Processing...",
     "forcedContingencyBadge": "Forced",
+    "contingencyControlledByVlan": "Contingency is controlled at VLAN level",
     "restartServiceTitle": "Restart Service",
     "restartTrayTitle": "Restart Tray",
     "restartConfirmMessage": "Do you want to {action} on workstation {name}?",
@@ -209,7 +210,8 @@
     "forcedContingencyDeactivate": "Deactivate forced contingency",
     "forcedContingencyConfirmActivate": "Are you sure you want to activate forced contingency for VLAN \"{name}\"? All workstations in this VLAN will enter contingency mode.",
     "forcedContingencyConfirmDeactivate": "Are you sure you want to deactivate forced contingency for VLAN \"{name}\"?",
-    "forcedContingencyNotification": "All connected workstations will receive a forced contingency notification."
+    "forcedContingencyNotification": "All connected workstations will receive a forced contingency notification.",
+    "contingencyNoDevices": "No active devices configured for contingency"
   },
   "messages": {
     "title": "Messages",

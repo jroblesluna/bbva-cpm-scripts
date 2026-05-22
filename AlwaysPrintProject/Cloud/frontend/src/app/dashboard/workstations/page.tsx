@@ -766,9 +766,15 @@ function WorkstationCard({
               variant={workstation.forced_contingency ? 'destructive' : 'outline'}
               size="sm"
               onClick={() => onToggleForcedContingency()}
-              disabled={isForcedContingencyPending}
-              title={workstation.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
-              className={workstation.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
+              disabled={isForcedContingencyPending || workstation.vlan?.forced_contingency === true}
+              title={
+                workstation.vlan?.forced_contingency
+                  ? t('contingencyControlledByVlan')
+                  : workstation.forced_contingency
+                    ? t('forcedContingencyDeactivate')
+                    : t('forcedContingencyActivate')
+              }
+              className={`${workstation.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''} ${workstation.vlan?.forced_contingency ? 'cursor-not-allowed opacity-50' : ''}`}
             >
               <ShieldAlert className="w-4 h-4" />
             </Button>
@@ -1105,9 +1111,15 @@ function WorkstationTable({
                         variant="ghost"
                         size="sm"
                         onClick={() => onToggleForcedContingency(ws.id)}
-                        disabled={isForcedContingencyPending}
-                        title={ws.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
-                        className={`h-7 w-7 p-0 ${ws.forced_contingency ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : ''}`}
+                        disabled={isForcedContingencyPending || ws.vlan?.forced_contingency === true}
+                        title={
+                          ws.vlan?.forced_contingency
+                            ? t('contingencyControlledByVlan')
+                            : ws.forced_contingency
+                              ? t('forcedContingencyDeactivate')
+                              : t('forcedContingencyActivate')
+                        }
+                        className={`h-7 w-7 p-0 ${ws.forced_contingency ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : ''} ${ws.vlan?.forced_contingency ? 'cursor-not-allowed opacity-50' : ''}`}
                       >
                         <ShieldAlert className="w-3.5 h-3.5" />
                       </Button>
