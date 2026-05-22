@@ -16,12 +16,8 @@ namespace AlwaysPrintTray
         // Global mutex name – unique per machine, prevents multiple Tray instances.
         private const string MutexName = "Global\\AlwaysPrintTray-SingleInstance";
 
-        // AUMID para notificaciones toast en Windows 10/11
-#if ENV_DEV
-        private const string AppUserModelId = "Robles.AI.AlwaysPrint.Dev";
-#else
+        // AUMID para notificaciones toast en Windows 10/11 (mismo para dev y prod)
         private const string AppUserModelId = "Robles.AI.AlwaysPrint";
-#endif
 
         [DllImport("shell32.dll", SetLastError = true)]
         private static extern void SetCurrentProcessExplicitAppUserModelID(

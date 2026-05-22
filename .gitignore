@@ -63,4 +63,8 @@ AlwaysPrintProject/Cloud/terraform/terraform.tfstate.*
 AlwaysPrintProject/Cloud/terraform/terraform.tfstate.d/
 AlwaysPrintProject/Cloud/terraform/tfplan*
 AlwaysPrintProject/Cloud/terraform/*.backup
+
+# Client logos — generados por workflows desde Logo/
+AlwaysPrintProject/Client/logo*.ico
+AlwaysPrintProject/Client/logo*.png
 !.kiro

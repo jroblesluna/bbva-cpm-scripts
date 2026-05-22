@@ -48,6 +48,15 @@ jobs:
           Write-Host "Version: $version"
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
 
+      - name: Copy dev logo assets
+        shell: pwsh
+        working-directory: AlwaysPrintProject
+        run: |
+          Copy-Item Logo\dev\alwaysprint_icon_dev.ico Client\logo-dev.ico -Force
+          Copy-Item Logo\dev\alwaysprint_icon_dev.png Client\logo-dev.png -Force
+          Copy-Item Logo\prod\alwaysprint_icon.ico Client\logo.ico -Force
+          Copy-Item Logo\prod\alwaysprint_icon.png Client\logo.png -Force
+
       - name: Publish AlwaysPrintService
         shell: pwsh
         working-directory: AlwaysPrintProject/Client

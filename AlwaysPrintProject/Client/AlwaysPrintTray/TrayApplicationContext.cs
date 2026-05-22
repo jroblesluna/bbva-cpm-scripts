@@ -21,6 +21,14 @@ namespace AlwaysPrintTray
     {
         private const string ServiceName = "AlwaysPrintService";
 
+        // Título base para notificaciones — incluye entorno y versión
+#if ENV_DEV
+        private const string EnvLabel = "dev";
+#else
+        private const string EnvLabel = "apps";
+#endif
+        private static readonly string AppTitle = $"alwaysprint.{EnvLabel}.{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version}";
+
         private readonly NotifyIcon  _trayIcon;
         private readonly PipeClient  _pipe;
         private readonly RegistryConfigManager _registry = new RegistryConfigManager();
@@ -107,7 +115,7 @@ namespace AlwaysPrintTray
 
                 if (!serviceRunning)
                 {
-                    ShowBalloon("AlwaysPrint", LocalizationManager.Get("BalloonServiceNotRunning"), ToolTipIcon.Error);
+                    ShowBalloon(AppTitle, LocalizationManager.Get("BalloonServiceNotRunning"), ToolTipIcon.Error);
                     AlwaysPrintLogger.WriteTrayError("Tray: AlwaysPrintService no está en ejecución. Saliendo.",
                         AlwaysPrintLogger.EvtGenericError);
                     ExitApplication();
@@ -129,7 +137,7 @@ namespace AlwaysPrintTray
 
                 if (!connected)
                 {
-                    ShowBalloon("AlwaysPrint", "No se pudo conectar al servicio. Verifique que esté en ejecución.", ToolTipIcon.Error);
+                    ShowBalloon(AppTitle, "No se pudo conectar al servicio. Verifique que esté en ejecución.", ToolTipIcon.Error);
                     AlwaysPrintLogger.WriteTrayError($"Tray: no se pudo conectar al pipe después de {maxRetries} intentos. Saliendo.",
                         AlwaysPrintLogger.EvtGenericError);
                     ExitApplication();
@@ -156,7 +164,7 @@ namespace AlwaysPrintTray
 
                 if (success)
                 {
-                    ShowBalloon("AlwaysPrint", string.Format(LocalizationManager.Get("BalloonInitOk"), domain), ToolTipIcon.Info);
+                    ShowBalloon(AppTitle, string.Format(LocalizationManager.Get("BalloonInitOk"), domain), ToolTipIcon.Info);
                     AlwaysPrintLogger.WriteTrayInfo($"Tray inicializado correctamente. Domain={domain}",
                         AlwaysPrintLogger.EvtTrayStarted);
                 }
@@ -166,7 +174,7 @@ namespace AlwaysPrintTray
                     // porque CloudManager mostrará su propio estado al conectar/fallar
                     if (!cfg.CloudEnabled || string.IsNullOrWhiteSpace(cfg.CloudApiUrl))
                     {
-                        ShowBalloon("AlwaysPrint",
+                        ShowBalloon(AppTitle,
                             LocalizationManager.Get("BalloonInitFail"), ToolTipIcon.Warning);
                     }
                     AlwaysPrintLogger.WriteTrayWarning($"Tray: bootstrap fallido. {details}", AlwaysPrintLogger.EvtGenericWarning);
@@ -384,7 +392,7 @@ namespace AlwaysPrintTray
                     $"tamaño: {updateInfo.FileSize} bytes. Iniciando descarga...");
 
                 // Notificar al usuario que se está actualizando
-                ShowBalloon("AlwaysPrint",
+                ShowBalloon(AppTitle,
                     string.Format(LocalizationManager.Get("BalloonUpdating"), updateInfo.Version),
                     ToolTipIcon.Info);
 
@@ -474,7 +482,7 @@ namespace AlwaysPrintTray
                 // Si no hay UpdateChecker inicializado, no hay conexión Cloud
                 if (_updateChecker == null)
                 {
-                    ShowBalloon("AlwaysPrint",
+                    ShowBalloon(AppTitle,
                         LocalizationManager.Get("BalloonUpdateNoCloud"),
                         ToolTipIcon.Warning);
                     return;
@@ -483,7 +491,7 @@ namespace AlwaysPrintTray
                 AlwaysPrintLogger.WriteTrayInfo("Búsqueda manual de actualizaciones iniciada por el usuario.");
 
                 // Mostrar notificación de que se está buscando
-                ShowBalloon("AlwaysPrint",
+                ShowBalloon(AppTitle,
                     LocalizationManager.Get("BalloonCheckingUpdates"),
                     ToolTipIcon.Info);
 
@@ -496,7 +504,7 @@ namespace AlwaysPrintTray
                 // Si no se disparó el evento UpdateAvailable, no hay actualización disponible
                 if (!_manualCheckFoundUpdate)
                 {
-                    ShowBalloon("AlwaysPrint",
+                    ShowBalloon(AppTitle,
                         LocalizationManager.Get("BalloonNoUpdates"),
                         ToolTipIcon.Info);
                 }
@@ -506,7 +514,7 @@ namespace AlwaysPrintTray
                 AlwaysPrintLogger.WriteTrayError(
                     $"Error en búsqueda manual de actualizaciones: {ex.Message}",
                     AlwaysPrintLogger.EvtGenericError);
-                ShowBalloon("AlwaysPrint",
+                ShowBalloon(AppTitle,
                     LocalizationManager.Get("BalloonUpdateError"),
                     ToolTipIcon.Error);
             }
