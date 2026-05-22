@@ -267,6 +267,12 @@ def toggle_vlan_forced_contingency(
     Activar o desactivar contingencia forzada para una VLAN.
     Todas las workstations de la VLAN heredan este estado.
     """
+    from app.services.websocket_manager import connection_manager
+    from app.models.workstation import Workstation
+    from app.models.device import Device
+    import asyncio
+    import logging as log_module
+
     vlan = db.query(VLAN).filter(VLAN.id == vlan_id).first()
     if not vlan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
@@ -274,30 +280,53 @@ def toggle_vlan_forced_contingency(
     if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
 
+    # Si se activa contingencia, verificar que hay al menos un dispositivo activo en la VLAN
+    active_devices = []
+    if enabled:
+        active_devices = db.query(Device).filter(
+            Device.vlan_id == vlan_id,
+            Device.organization_id == vlan.organization_id,
+            Device.is_active == True
+        ).all()
+        if not active_devices:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No se puede activar contingencia VLAN: no hay dispositivos activos configurados"
+            )
+
     vlan.forced_contingency = enabled
     db.commit()
     db.refresh(vlan)
-
-    # Notificar a workstations online de esta VLAN vía WebSocket
-    from app.services.websocket_manager import connection_manager
-    from app.models.workstation import Workstation
-    import asyncio
-    import logging as log_module
 
     log_module.getLogger(__name__).info(
         "Contingencia forzada VLAN actualizada: vlan_id=%s, enabled=%s, user_id=%s",
         vlan_id, enabled, current_user.id,
     )
 
+    # Notificar a workstations online de esta VLAN vía WebSocket
     workstations = db.query(Workstation).filter(Workstation.vlan_id == vlan_id).all()
-    message = {
-        "type": "forced_contingency",
-        "enabled": enabled,
-        "source": "vlan",
-        "source_name": vlan.name,
-    }
 
     for ws in workstations:
+        # Resolver printer_ip para cada workstation:
+        # 1. Desde default_printer_id de la workstation si existe
+        # 2. Fallback: primer dispositivo activo de la VLAN
+        printer_ip = None
+        if enabled:
+            if ws.default_printer_id:
+                printer = db.query(Device).filter(Device.id == ws.default_printer_id).first()
+                if printer:
+                    printer_ip = printer.ip_address
+            if not printer_ip and active_devices:
+                printer_ip = active_devices[0].ip_address
+
+        message = {
+            "type": "forced_contingency",
+            "enabled": enabled,
+            "source": "vlan",
+            "source_name": vlan.name,
+            "printer_ip": printer_ip,
+        }
+
         ws_id_str = str(ws.id)
         if connection_manager.is_workstation_online(ws_id_str):
             try:

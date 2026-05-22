@@ -39,6 +39,7 @@ export interface VLANBasic {
   id: string
   name: string
   cidr: string
+  forced_contingency: boolean
 }
 
 export interface WorkstationUpdate {

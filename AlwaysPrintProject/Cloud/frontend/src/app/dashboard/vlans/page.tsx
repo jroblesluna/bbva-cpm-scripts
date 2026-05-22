@@ -33,6 +33,12 @@ import type { Device } from '@/types/device'
 import { formatDateWithTimezone } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 import { CidrHealthBadge } from '@/components/vlans/CidrHealthBadge'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 type ViewMode = 'cards' | 'table'
 
@@ -56,6 +62,7 @@ export default function VLANsPage() {
   const [devicesVlanName, setDevicesVlanName] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [contingencyTarget, setContingencyTarget] = useState<VLAN | null>(null)
+  const [activeDeviceCounts, setActiveDeviceCounts] = useState<Record<string, number>>({})
   const [page, setPage] = useState(1)
   const pageSize = viewMode === 'cards' ? 10 : 20
 
@@ -79,12 +86,31 @@ export default function VLANsPage() {
       setLoading(true)
       const params = filterOrgId ? `?organization_id=${filterOrgId}` : ''
       const response = await apiClient.get(`/vlans/${params}`)
-      setVlans(response.data.vlans || [])
+      const loadedVlans: VLAN[] = response.data.vlans || []
+      setVlans(loadedVlans)
+      // Cargar conteo de dispositivos activos por VLAN
+      loadActiveDeviceCounts(loadedVlans)
     } catch (error) {
       console.error('Error loading vlans:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadActiveDeviceCounts = async (vlanList: VLAN[]) => {
+    const counts: Record<string, number> = {}
+    await Promise.all(
+      vlanList.map(async (vlan) => {
+        try {
+          const response = await apiClient.get(`/devices/?vlan_id=${vlan.id}`)
+          const devices: Device[] = response.data.devices || []
+          counts[vlan.id] = devices.filter((d) => d.is_active).length
+        } catch {
+          counts[vlan.id] = 0
+        }
+      })
+    )
+    setActiveDeviceCounts(counts)
   }
 
   const filteredVlans = vlans.filter((vlan) => {
@@ -332,15 +358,29 @@ export default function VLANsPage() {
 
               {/* Fila 3: Acciones */}
               <div className="flex flex-wrap gap-1 pt-2 border-t border-gray-100 items-center">
-                <Button
-                  variant={vlan.forced_contingency ? 'destructive' : 'ghost'}
-                  size="sm"
-                  onClick={() => setContingencyTarget(vlan)}
-                  title={vlan.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
-                  className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}`}
-                >
-                  <ShieldAlert className="h-4 w-4" />
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex">
+                        <Button
+                          variant={vlan.forced_contingency ? 'destructive' : 'ghost'}
+                          size="sm"
+                          onClick={() => setContingencyTarget(vlan)}
+                          disabled={(activeDeviceCounts[vlan.id] ?? 0) === 0 && !vlan.forced_contingency}
+                          title={vlan.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
+                          className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''} ${(activeDeviceCounts[vlan.id] ?? 0) === 0 && !vlan.forced_contingency ? 'text-gray-400 cursor-not-allowed opacity-50' : ''}`}
+                        >
+                          <ShieldAlert className="h-4 w-4" />
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {(activeDeviceCounts[vlan.id] ?? 0) === 0 && !vlan.forced_contingency && (
+                      <TooltipContent>
+                        <p>{t('contingencyNoDevices')}</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -420,15 +460,29 @@ export default function VLANsPage() {
                     </td>
                     <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex flex-wrap gap-1 justify-end items-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setContingencyTarget(vlan)}
-                          title={vlan.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
-                          className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : ''}`}
-                        >
-                          <ShieldAlert className="h-4 w-4" />
-                        </Button>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setContingencyTarget(vlan)}
+                                  disabled={(activeDeviceCounts[vlan.id] ?? 0) === 0 && !vlan.forced_contingency}
+                                  title={vlan.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
+                                  className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : ''} ${(activeDeviceCounts[vlan.id] ?? 0) === 0 && !vlan.forced_contingency ? 'text-gray-400 cursor-not-allowed opacity-50' : ''}`}
+                                >
+                                  <ShieldAlert className="h-4 w-4" />
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            {(activeDeviceCounts[vlan.id] ?? 0) === 0 && !vlan.forced_contingency && (
+                              <TooltipContent>
+                                <p>{t('contingencyNoDevices')}</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
                         <Button variant="ghost" size="sm" onClick={() => handleViewDevices(vlan)} title={t('viewDevices')} className="h-8 w-8 p-0">
                           <Printer className="h-4 w-4" />
                         </Button>
