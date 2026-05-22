@@ -308,14 +308,19 @@ def toggle_vlan_forced_contingency(
 
     for ws in workstations:
         # Resolver printer_ip para cada workstation:
-        # 1. Desde default_printer_id de la workstation si existe
-        # 2. Fallback: primer dispositivo activo de la VLAN
+        # 1. Desde default_printer_id de la workstation (favorita individual)
+        # 2. Desde default_device_id de la VLAN (predeterminada de VLAN)
+        # 3. Fallback: primer dispositivo activo de la VLAN
         printer_ip = None
         if enabled:
             if ws.default_printer_id:
                 printer = db.query(Device).filter(Device.id == ws.default_printer_id).first()
                 if printer:
                     printer_ip = printer.ip_address
+            if not printer_ip and vlan.default_device_id:
+                default_dev = db.query(Device).filter(Device.id == vlan.default_device_id).first()
+                if default_dev:
+                    printer_ip = default_dev.ip_address
             if not printer_ip and active_devices:
                 printer_ip = active_devices[0].ip_address
 

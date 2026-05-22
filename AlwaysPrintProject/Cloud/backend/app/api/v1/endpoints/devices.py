@@ -314,8 +314,14 @@ def get_my_printers(
     
     devices = query.order_by(Device.ip_address).all()
     
-    # Determinar impresora por defecto (menor IP)
-    default_device_id = str(devices[0].id) if devices else None
+    # Determinar impresora por defecto:
+    # 1. default_device_id de la VLAN (configurado por admin)
+    # 2. Fallback: menor IP en la VLAN
+    default_device_id = None
+    if workstation.vlan_id and workstation.vlan and workstation.vlan.default_device_id:
+        default_device_id = str(workstation.vlan.default_device_id)
+    if not default_device_id and devices:
+        default_device_id = str(devices[0].id)
     
     # Construir respuesta
     printers = []
