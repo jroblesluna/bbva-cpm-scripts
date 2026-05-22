@@ -949,6 +949,13 @@ namespace AlwaysPrintService.Actions
 
                 AlwaysPrintLogger.WriteInfo($"RunProcess (como usuario, sesión {sessionId}): ejecutando '{filePath}', ventana={windowStyle}, timeout={timeoutSeconds}s");
 
+                // Crear bloque de variables de entorno del usuario
+                IntPtr envBlock = IntPtr.Zero;
+                if (!CreateEnvironmentBlock(out envBlock, duplicateToken, false))
+                {
+                    AlwaysPrintLogger.WriteWarning($"RunProcess: CreateEnvironmentBlock falló (error {Marshal.GetLastWin32Error()}). Usando entorno heredado.");
+                }
+
                 var si = new STARTUPINFO();
                 si.cb = Marshal.SizeOf(si);
                 si.lpDesktop = "winsta0\\default";
@@ -958,7 +965,8 @@ namespace AlwaysPrintService.Actions
 
                 var pi = new PROCESS_INFORMATION();
 
-                uint creationFlags = 0x00000010; // CREATE_NEW_CONSOLE (necesario para bat)
+                // CREATE_NEW_CONSOLE | CREATE_UNICODE_ENVIRONMENT (necesario cuando se usa CreateEnvironmentBlock)
+                uint creationFlags = 0x00000010 | 0x00000400;
 
                 bool created = CreateProcessAsUser(
                     duplicateToken,
@@ -968,10 +976,13 @@ namespace AlwaysPrintService.Actions
                     ref sa,
                     false,
                     creationFlags,
-                    IntPtr.Zero,
+                    envBlock != IntPtr.Zero ? envBlock : IntPtr.Zero,
                     null,
                     ref si,
                     out pi);
+
+                // Liberar bloque de entorno
+                if (envBlock != IntPtr.Zero) DestroyEnvironmentBlock(envBlock);
 
                 if (!created)
                 {
@@ -1069,6 +1080,12 @@ namespace AlwaysPrintService.Actions
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool CloseHandle(IntPtr hObject);
+
+        [DllImport("userenv.dll", SetLastError = true)]
+        private static extern bool CreateEnvironmentBlock(out IntPtr lpEnvironment, IntPtr hToken, bool bInherit);
+
+        [DllImport("userenv.dll", SetLastError = true)]
+        private static extern bool DestroyEnvironmentBlock(IntPtr lpEnvironment);
 
         [StructLayout(LayoutKind.Sequential)]
         private struct SECURITY_ATTRIBUTES
