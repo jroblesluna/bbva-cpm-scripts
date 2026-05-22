@@ -283,6 +283,9 @@ namespace AlwaysPrintTray.Cloud
                 case "forced_contingency":
                     HandleForcedContingency(json);
                     break;
+                case "default_printer_changed":
+                    HandleDefaultPrinterChanged(json);
+                    break;
                 case "message":
                     HandleCloudMessage(json);
                     break;
@@ -954,6 +957,57 @@ namespace AlwaysPrintTray.Cloud
             {
                 AlwaysPrintLogger.WriteTrayError(
                     $"CloudManager: error procesando mensaje forced_contingency. {ex.Message}");
+            }
+        }
+
+        // === Cambio de impresora predeterminada de VLAN ===
+
+        /// <summary>
+        /// Procesa la notificación de cambio de impresora predeterminada de la VLAN.
+        /// Muestra un balloon tip informativo al usuario.
+        /// </summary>
+        private void HandleDefaultPrinterChanged(string json)
+        {
+            try
+            {
+                var obj = JObject.Parse(json);
+                string? printerName = obj["printer_name"]?.ToString();
+                string? printerIp = obj["printer_ip"]?.ToString();
+                string? vlanName = obj["vlan_name"]?.ToString();
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: impresora predeterminada de VLAN cambiada. printer={printerName ?? "ninguna"}, ip={printerIp ?? "null"}, vlan={vlanName}");
+
+                // Mostrar notificación al usuario
+                _uiContext.Post(_ =>
+                {
+                    try
+                    {
+                        string title = "APCM";
+                        string message;
+
+                        if (!string.IsNullOrEmpty(printerName))
+                        {
+                            message = $"Impresora predeterminada actualizada: {printerName} ({printerIp})";
+                        }
+                        else
+                        {
+                            message = "Se ha removido la impresora predeterminada de la VLAN.";
+                        }
+
+                        _trayIcon.ShowBalloonTip(5000, title, message, ToolTipIcon.Info);
+                    }
+                    catch (Exception ex)
+                    {
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            $"CloudManager: error mostrando balloon tip de cambio de impresora. {ex.Message}");
+                    }
+                }, null);
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error procesando mensaje default_printer_changed. {ex.Message}");
             }
         }
 
