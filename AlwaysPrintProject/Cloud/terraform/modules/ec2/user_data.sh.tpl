@@ -61,6 +61,12 @@ services:
     command: >
       sh -c "alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port ${backend_port} --workers 1 --ws-ping-interval 300 --ws-ping-timeout 300"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:${backend_port}/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks: [app]
     depends_on: [redis]
 
