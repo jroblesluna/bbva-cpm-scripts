@@ -186,8 +186,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Sidebar desktop */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex flex-col flex-grow bg-white border-r border-gray-200">
-          <div className="flex h-16 items-center px-4 border-b">
+        <div className="flex flex-col h-full bg-white border-r border-gray-200">
+          <div className="flex-shrink-0 flex h-16 items-center px-4 border-b">
             <div className="flex items-center space-x-2">
               <Image
                 src="/alwaysprint-logo.png"
@@ -199,7 +199,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <h1 className="text-xl font-bold text-gray-900">AlwaysPrint</h1>
             </div>
           </div>
-          <nav className="flex-1 overflow-y-auto space-y-1 px-2 py-4">
+          <nav className="flex-1 overflow-y-auto space-y-1 px-2 py-4 min-h-0">
             {filteredNavigation.map((item) => {
               const isActive = pathname === item.href
               return (
