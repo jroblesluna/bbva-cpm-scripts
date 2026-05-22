@@ -48,7 +48,7 @@ class VLAN(Base):
     # === RELACIONES ===
     organization = relationship("Organization", back_populates="vlans")
     workstations = relationship("Workstation", back_populates="vlan")
-    devices = relationship("Device", back_populates="vlan")
+    devices = relationship("Device", back_populates="vlan", foreign_keys="Device.vlan_id")
     default_device = relationship("Device", foreign_keys="VLAN.default_device_id")
     vlan_config = relationship("VLANConfig", back_populates="vlan", uselist=False, cascade="all, delete-orphan")
     
