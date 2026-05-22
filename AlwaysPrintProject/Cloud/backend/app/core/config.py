@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 10
     DB_POOL_TIMEOUT: int = 30
-    DB_POOL_RECYCLE: int = 3600  # 1 hora
+    DB_POOL_RECYCLE: int = 1800  # 30 minutos — evita conexiones stale por timeout de RDS
     
     # === CONFIGURACIÓN DE SEGURIDAD ===
     SECRET_KEY: str = "CHANGE_THIS_IN_PRODUCTION_TO_A_SECURE_RANDOM_STRING"

@@ -146,7 +146,27 @@ async def version():
 @api_router.get("/health", tags=["Sistema"])
 async def health():
     """Health check accesible desde el Client Tray y monitoreo externo."""
-    return {
+    from app.core.database import engine
+    from app.core.config import settings
+
+    response = {
         "status": "healthy",
         "build_tag": os.environ.get("BUILD_TAG", "dev"),
     }
+
+    # Incluir métricas del pool de conexiones (solo PostgreSQL)
+    if not settings.is_sqlite:
+        pool = engine.pool
+        response["pool"] = {
+            "size": pool.size(),
+            "checked_out": pool.checkedout(),
+            "overflow": pool.overflow(),
+            "max_overflow": pool._max_overflow,
+            "checked_in": pool.checkedin(),
+        }
+        # Marcar como degradado si el pool está >80% utilizado
+        utilization = pool.checkedout() / max(pool.size(), 1)
+        if utilization > 0.8:
+            response["status"] = "degraded"
+
+    return response

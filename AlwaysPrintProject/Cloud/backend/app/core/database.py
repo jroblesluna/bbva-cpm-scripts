@@ -5,12 +5,15 @@ Este módulo configura el engine, session factory y base declarativa
 para SQLAlchemy, soportando SQLite, PostgreSQL y SQL Server.
 """
 
+import logging
 from typing import Generator
 from sqlalchemy import create_engine, event, text, Engine
 from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from sqlalchemy.pool import StaticPool, NullPool
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 # === CONFIGURACIÓN DEL ENGINE ===
@@ -55,6 +58,27 @@ engine = create_engine(
     settings.DATABASE_URL,
     **get_engine_config()
 )
+
+
+# === MONITOREO DEL POOL DE CONEXIONES ===
+
+if not settings.is_sqlite:
+    @event.listens_for(engine, "checkout")
+    def on_checkout(dbapi_conn, connection_record, connection_proxy):
+        """Log cuando el pool está bajo presión (>80% utilizado)."""
+        pool = engine.pool
+        checked_out = pool.checkedout()
+        pool_size = pool.size()
+        if pool_size > 0 and checked_out / pool_size > 0.8:
+            logger.warning(
+                "Pool de conexiones bajo presión: %d/%d en uso (overflow: %d/%d)",
+                checked_out, pool_size, pool.overflow(), pool._max_overflow
+            )
+
+    @event.listens_for(engine, "checkin")
+    def on_checkin(dbapi_conn, connection_record):
+        """Log cuando una conexión se devuelve al pool después de presión."""
+        pass  # Placeholder para métricas futuras
 
 
 # === HABILITAR FOREIGN KEYS EN SQLITE ===
