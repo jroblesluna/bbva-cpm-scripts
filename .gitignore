@@ -67,4 +67,8 @@ AlwaysPrintProject/Cloud/terraform/*.backup
 # Client logos — generados por workflows desde Logo/
 AlwaysPrintProject/Client/logo*.ico
 AlwaysPrintProject/Client/logo*.png
+
+# Frontend public logos — generados por workflows desde Logo/
+AlwaysPrintProject/Cloud/frontend/public/alwaysprint-logo.*
+AlwaysPrintProject/Cloud/frontend/public/favicon.ico
 !.kiro
