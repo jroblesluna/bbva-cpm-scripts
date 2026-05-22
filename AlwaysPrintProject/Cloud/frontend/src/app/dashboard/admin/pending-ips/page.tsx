@@ -25,6 +25,8 @@ import {
   RefreshCw,
   Search,
   Building2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
@@ -54,6 +56,8 @@ export default function PendingIPsPage() {
   const [selectedOrgId, setSelectedOrgId] = useState('');
   const [customDescription, setCustomDescription] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   // Query para IPs pendientes
   const {
@@ -136,6 +140,12 @@ export default function PendingIPsPage() {
     pendingIPs?.filter((ip) =>
       ip.ip_address.toLowerCase().includes(searchTerm.toLowerCase())
     ) || [];
+
+  const totalFiltered = filteredIPs.length;
+  const totalPages = Math.ceil(totalFiltered / pageSize);
+  const paginatedIPs = filteredIPs.slice((page - 1) * pageSize, page * pageSize);
+  const paginationStart = (page - 1) * pageSize + 1;
+  const paginationEnd = Math.min(page * pageSize, totalFiltered);
 
   const accounts = accountsData?.items || [];
 
@@ -250,7 +260,7 @@ export default function PendingIPsPage() {
               type="text"
               placeholder={t('searchPlaceholder')}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
               className="flex-1"
             />
           </div>
@@ -260,7 +270,7 @@ export default function PendingIPsPage() {
       {/* Lista de IPs pendientes */}
       <div className="space-y-4">
         {filteredIPs.length > 0 ? (
-          filteredIPs.map((ip) => (
+          paginatedIPs.map((ip) => (
             <Card key={ip.id} className="hover:shadow-md transition">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -325,6 +335,35 @@ export default function PendingIPsPage() {
           </Card>
         )}
       </div>
+
+      {/* Paginación */}
+      {totalFiltered > 0 && totalPages > 1 && (
+        <div className="bg-white rounded-lg shadow px-4 py-3 flex items-center justify-between border border-gray-200 mt-4 sm:px-6">
+          <div className="flex-1 flex items-center justify-between">
+            <p className="text-sm text-gray-700">
+              {t('pagination', { start: paginationStart, end: paginationEnd, total: totalFiltered })}
+            </p>
+            <div className="flex items-center gap-2">
+              {page > 1 && (
+                <Button variant="outline" size="sm" onClick={() => setPage(1)}>
+                  {tCommon('first')}
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                {tCommon('previous')}
+              </Button>
+              <span className="text-sm text-gray-600 px-2">
+                {t('pageNumber', { page })}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages}>
+                {tCommon('next')}
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de autorización */}
       {authorizingIP && (

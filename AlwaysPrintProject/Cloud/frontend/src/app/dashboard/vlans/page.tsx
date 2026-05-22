@@ -24,6 +24,8 @@ import {
   List,
   Calendar,
   ShieldAlert,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 import type { VLAN, VLANCreate, VLANUpdate, VLANDetail } from '@/types/vlan'
@@ -61,6 +63,8 @@ export default function VLANsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [contingencyTarget, setContingencyTarget] = useState<VLAN | null>(null)
   const [activeDeviceCounts, setActiveDeviceCounts] = useState<Record<string, number>>({})
+  const [page, setPage] = useState(1)
+  const pageSize = viewMode === 'cards' ? 10 : 20
 
   useEffect(() => {
     if (!user) return
@@ -117,6 +121,12 @@ export default function VLANsPage() {
       vlan.cidr_ranges.some((cidr) => cidr.includes(s))
     )
   })
+
+  const totalFiltered = filteredVlans.length
+  const totalPages = Math.ceil(totalFiltered / pageSize)
+  const paginatedVlans = filteredVlans.slice((page - 1) * pageSize, page * pageSize)
+  const paginationStart = (page - 1) * pageSize + 1
+  const paginationEnd = Math.min(page * pageSize, totalFiltered)
 
   const handleEdit = async (vlan: VLAN) => {
     try {
@@ -236,14 +246,14 @@ export default function VLANsPage() {
               type="text"
               placeholder={t('searchPlaceholder')}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setPage(1) }}
               className="pl-10"
             />
           </div>
           {user?.role === 'admin' && (
             <select
               value={filterOrgId || 'all'}
-              onChange={(e) => setFilterOrgId(e.target.value === 'all' ? undefined : e.target.value)}
+              onChange={(e) => { setFilterOrgId(e.target.value === 'all' ? undefined : e.target.value); setPage(1) }}
               className="w-full md:w-auto px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">{t('allOrganizations')}</option>
@@ -256,7 +266,7 @@ export default function VLANsPage() {
         <div className="flex items-center justify-between mt-4">
           <div className="flex items-center">
             {(searchTerm || filterOrgId) && (
-              <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterOrgId(undefined) }}>
+              <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterOrgId(undefined); setPage(1) }}>
                 <X className="mr-2 h-4 w-4" />
                 {tCommon('clearFilters')}
               </Button>
@@ -267,7 +277,7 @@ export default function VLANsPage() {
             <Button
               variant={viewMode === 'cards' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setViewMode('cards')}
+              onClick={() => { setViewMode('cards'); setPage(1) }}
               title="Vista de tarjetas"
               className="h-8 w-8 p-0"
             >
@@ -276,7 +286,7 @@ export default function VLANsPage() {
             <Button
               variant={viewMode === 'table' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setViewMode('table')}
+              onClick={() => { setViewMode('table'); setPage(1) }}
               title="Vista de tabla"
               className="h-8 w-8 p-0"
             >
@@ -308,7 +318,7 @@ export default function VLANsPage() {
       ) : viewMode === 'cards' ? (
         /* Vista de tarjetas (responsive) */
         <div className="space-y-4">
-          {filteredVlans.map((vlan) => (
+          {paginatedVlans.map((vlan) => (
             <div key={vlan.id} className="bg-white rounded-lg shadow p-4 md:p-6">
               {/* Fila 1: Nombre + CidrHealthBadge */}
               <div className="flex items-center justify-between mb-3">
@@ -419,7 +429,7 @@ export default function VLANsPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredVlans.map((vlan) => (
+                {paginatedVlans.map((vlan) => (
                   <tr key={vlan.id} className="hover:bg-gray-50">
                     <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -488,6 +498,35 @@ export default function VLANsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Paginación */}
+      {totalFiltered > 0 && totalPages > 1 && (
+        <div className="bg-white rounded-lg shadow px-4 py-3 flex items-center justify-between border border-gray-200 sm:px-6">
+          <div className="flex-1 flex items-center justify-between">
+            <p className="text-sm text-gray-700">
+              {t('pagination', { start: paginationStart, end: paginationEnd, total: totalFiltered })}
+            </p>
+            <div className="flex items-center gap-2">
+              {page > 1 && (
+                <Button variant="outline" size="sm" onClick={() => setPage(1)}>
+                  {tCommon('first')}
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                {tCommon('previous')}
+              </Button>
+              <span className="text-sm text-gray-600 px-2">
+                {t('pageNumber', { page })}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages}>
+                {tCommon('next')}
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
           </div>
         </div>
       )}

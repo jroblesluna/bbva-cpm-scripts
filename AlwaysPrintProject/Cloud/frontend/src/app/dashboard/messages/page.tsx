@@ -21,6 +21,7 @@ import {
   Clock,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   XCircle,
   Monitor,
 } from 'lucide-react'
@@ -361,15 +362,27 @@ export default function MessagesPage() {
 
         {total > pageSize && (
           <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  {t('pagination', { start: (page - 1) * pageSize + 1, end: Math.min(page * pageSize, total), total })}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setPage(page - 1)} disabled={page === 1}>{tCommon('previous')}</Button>
-                <Button variant="outline" onClick={() => setPage(page + 1)} disabled={page * pageSize >= total}>{tCommon('next')}</Button>
+            <div className="flex-1 flex items-center justify-between">
+              <p className="text-sm text-gray-700">
+                {t('pagination', { start: (page - 1) * pageSize + 1, end: Math.min(page * pageSize, total), total })}
+              </p>
+              <div className="flex items-center gap-2">
+                {page > 1 && (
+                  <Button variant="outline" size="sm" onClick={() => setPage(1)}>
+                    {tCommon('first')}
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  {tCommon('previous')}
+                </Button>
+                <span className="text-sm text-gray-600 px-2">
+                  {t('pageNumber', { page })}
+                </span>
+                <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page * pageSize >= total}>
+                  {tCommon('next')}
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
               </div>
             </div>
           </div>
