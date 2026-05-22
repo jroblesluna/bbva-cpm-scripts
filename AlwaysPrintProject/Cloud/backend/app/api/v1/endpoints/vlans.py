@@ -408,6 +408,11 @@ async def set_vlan_default_device(
 
     workstations = db.query(Workstation).filter(Workstation.vlan_id == vlan_id).all()
     
+    log_module.getLogger(__name__).info(
+        "Notificando %d workstation(s) de VLAN %s sobre cambio de impresora predeterminada",
+        len(workstations), vlan_id,
+    )
+
     # Resolver IP de la nueva impresora predeterminada
     new_printer_ip = None
     new_printer_name = None
@@ -428,11 +433,16 @@ async def set_vlan_default_device(
         }
 
         ws_id_str = str(ws.id)
-        if connection_manager.is_workstation_online(ws_id_str):
+        is_online = connection_manager.is_workstation_online(ws_id_str)
+        log_module.getLogger(__name__).info(
+            "  WS %s (ip=%s): online=%s", ws_id_str, ws.ip_private, is_online
+        )
+        if is_online:
             try:
                 await connection_manager.send_to_workstation(ws_id_str, message)
-            except Exception:
-                pass
+                log_module.getLogger(__name__).info("  → Mensaje enviado a %s", ws_id_str)
+            except Exception as e:
+                log_module.getLogger(__name__).warning("  → Error enviando a %s: %s", ws_id_str, e)
 
     audit_service = AuditService()
     audit_service.log_update(
