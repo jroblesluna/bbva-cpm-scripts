@@ -20,6 +20,8 @@ import {
   CheckCircle,
   XCircle,
   Eye,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 import type { Device, DeviceCreate, DeviceUpdate } from '@/types/device'
@@ -45,6 +47,8 @@ export default function DevicesPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
+  const [page, setPage] = useState(1)
+  const pageSize = 20
 
   useEffect(() => {
     if (!user) return
@@ -104,6 +108,12 @@ export default function DevicesPage() {
       device.location?.toLowerCase().includes(s)
     )
   })
+
+  const totalFiltered = filteredDevices.length
+  const totalPages = Math.ceil(totalFiltered / pageSize)
+  const paginatedDevices = filteredDevices.slice((page - 1) * pageSize, page * pageSize)
+  const paginationStart = (page - 1) * pageSize + 1
+  const paginationEnd = Math.min(page * pageSize, totalFiltered)
 
   const activeCount = devices.filter((d) => d.is_active).length
   const inactiveCount = devices.filter((d) => !d.is_active).length
@@ -188,7 +198,7 @@ export default function DevicesPage() {
               type="text"
               placeholder={t('searchPlaceholder')}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setPage(1) }}
               className="pl-10"
             />
           </div>
@@ -270,7 +280,7 @@ export default function DevicesPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredDevices.map((device) => (
+                {paginatedDevices.map((device) => (
                   <tr key={device.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -322,6 +332,35 @@ export default function DevicesPage() {
           </div>
         )}
       </div>
+
+      {/* Paginación */}
+      {totalFiltered > 0 && totalPages > 1 && (
+        <div className="bg-white rounded-lg shadow px-4 py-3 flex items-center justify-between border border-gray-200 sm:px-6">
+          <div className="flex-1 flex items-center justify-between">
+            <p className="text-sm text-gray-700">
+              {t('pagination', { start: paginationStart, end: paginationEnd, total: totalFiltered })}
+            </p>
+            <div className="flex items-center gap-2">
+              {page > 1 && (
+                <Button variant="outline" size="sm" onClick={() => setPage(1)}>
+                  {tCommon('first')}
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                {tCommon('previous')}
+              </Button>
+              <span className="text-sm text-gray-600 px-2">
+                {t('pageNumber', { page })}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages}>
+                {tCommon('next')}
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modales */}
       {showDetailsModal && selectedDevice && (

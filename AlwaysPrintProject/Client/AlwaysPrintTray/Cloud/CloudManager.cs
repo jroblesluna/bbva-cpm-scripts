@@ -870,6 +870,33 @@ namespace AlwaysPrintTray.Cloud
                 AlwaysPrintLogger.WriteTrayInfo(
                     $"CloudManager: contingencia forzada recibida. enabled={enabled}, source={source}, source_name={sourceName}, printer_ip={printerIp ?? "null"}");
 
+                // Validación: si se activa contingencia pero no hay printer_ip, no enviar payload al Service
+                if (enabled && string.IsNullOrEmpty(printerIp))
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "CloudManager: contingencia forzada recibida sin printer_ip. No se enviará payload al servicio.");
+
+                    // Mostrar balloon tip informativo al usuario indicando que falló la activación
+                    _uiContext.Post(_ =>
+                    {
+                        try
+                        {
+                            _trayIcon.ShowBalloonTip(
+                                5000,
+                                "AlwaysPrint",
+                                "No se pudo activar contingencia: no hay impresora configurada",
+                                ToolTipIcon.Warning);
+                        }
+                        catch (Exception ex)
+                        {
+                            AlwaysPrintLogger.WriteTrayWarning(
+                                $"CloudManager: error mostrando balloon tip de contingencia sin IP. {ex.Message}");
+                        }
+                    }, null);
+
+                    return;
+                }
+
                 // Notificar al Service vía Named Pipe
                 try
                 {

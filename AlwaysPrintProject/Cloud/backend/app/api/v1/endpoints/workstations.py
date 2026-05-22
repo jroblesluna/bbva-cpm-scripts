@@ -957,6 +957,43 @@ async def toggle_workstation_forced_contingency(
                 detail="No tienes permisos para modificar esta workstation"
             )
 
+    # Bloquear desactivación individual si la VLAN tiene contingencia forzada activa
+    if not enabled and workstation.vlan_id:
+        from app.models.vlan import VLAN
+        vlan = db.query(VLAN).filter(VLAN.id == workstation.vlan_id).first()
+        if vlan and vlan.forced_contingency:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede desactivar contingencia individual: la VLAN tiene contingencia forzada activa"
+            )
+
+    # Resolver printer_ip ANTES de modificar estado o hacer commit
+    # 1. Favorita (default_printer_id) si existe
+    # 2. Primer dispositivo activo en la VLAN si no hay favorita
+    printer_ip = None
+    from app.models.device import Device
+    if workstation.default_printer_id:
+        printer = db.query(Device).filter(Device.id == workstation.default_printer_id).first()
+        if printer:
+            printer_ip = printer.ip_address
+
+    if not printer_ip and workstation.vlan_id:
+        # Fallback: primer dispositivo activo en la VLAN
+        first_device = db.query(Device).filter(
+            Device.organization_id == workstation.organization_id,
+            Device.vlan_id == workstation.vlan_id,
+            Device.is_active == True
+        ).order_by(Device.ip_address).first()
+        if first_device:
+            printer_ip = first_device.ip_address
+
+    # Validación: si se activa contingencia y no hay IP resoluble, rechazar
+    if enabled and printer_ip is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se puede activar contingencia: no hay dispositivo de impresión disponible"
+        )
+
     workstation.forced_contingency = enabled
     db.commit()
     db.refresh(workstation)
@@ -969,26 +1006,6 @@ async def toggle_workstation_forced_contingency(
     # Notificar a la workstation si está online
     workstation_id_str = str(workstation_id)
     if connection_manager.is_workstation_online(workstation_id_str):
-        # Obtener IP de la impresora de contingencia:
-        # 1. Favorita (default_printer_id) si existe
-        # 2. Menor IP en la VLAN si no hay favorita
-        printer_ip = None
-        from app.models.device import Device
-        if workstation.default_printer_id:
-            printer = db.query(Device).filter(Device.id == workstation.default_printer_id).first()
-            if printer:
-                printer_ip = printer.ip_address
-        
-        if not printer_ip and workstation.vlan_id:
-            # Fallback: menor IP en la VLAN
-            first_device = db.query(Device).filter(
-                Device.organization_id == workstation.organization_id,
-                Device.vlan_id == workstation.vlan_id,
-                Device.is_active == True
-            ).order_by(Device.ip_address).first()
-            if first_device:
-                printer_ip = first_device.ip_address
-        
         message = {
             "type": "forced_contingency",
             "enabled": enabled,

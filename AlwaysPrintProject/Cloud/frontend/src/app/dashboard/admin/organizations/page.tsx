@@ -32,7 +32,9 @@ import {
   Network,
   Users,
   Monitor,
-  ShieldAlert
+  ShieldAlert,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import type { Organization, OrganizationCreate, OrganizationUpdate, PublicIPCreate } from '@/types'
 
@@ -46,6 +48,8 @@ export default function AccountsPage() {
   const [editingAccount, setEditingAccount] = useState<Organization | null>(null)
   const [managingIPsOrg, setManagingIPsOrg] = useState<Organization | null>(null)
   const [contingencyTarget, setContingencyTarget] = useState<Organization | null>(null)
+  const [page, setPage] = useState(1)
+  const pageSize = 10
 
   // Query para listar cuentas
   const { data: accounts, isLoading, error } = useQuery({
@@ -138,6 +142,12 @@ export default function AccountsPage() {
       )
     : []
 
+  const totalFiltered = filteredAccounts.length
+  const totalPages = Math.ceil(totalFiltered / pageSize)
+  const paginatedAccounts = filteredAccounts.slice((page - 1) * pageSize, page * pageSize)
+  const paginationStart = (page - 1) * pageSize + 1
+  const paginationEnd = Math.min(page * pageSize, totalFiltered)
+
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -188,7 +198,7 @@ export default function AccountsPage() {
               type="text"
               placeholder={t('searchPlaceholder')}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setPage(1) }}
               className="flex-1"
             />
           </div>
@@ -319,7 +329,7 @@ export default function AccountsPage() {
       {/* Lista de cuentas */}
       <div className="space-y-4">
         {filteredAccounts && filteredAccounts.length > 0 ? (
-          filteredAccounts.map((account) => (
+          paginatedAccounts.map((account) => (
             <Card key={account.id} className="hover:shadow-md transition">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -438,6 +448,35 @@ export default function AccountsPage() {
           </Card>
         )}
       </div>
+
+      {/* Paginación */}
+      {totalFiltered > 0 && totalPages > 1 && (
+        <div className="bg-white rounded-lg shadow px-4 py-3 flex items-center justify-between border border-gray-200 mt-4 sm:px-6">
+          <div className="flex-1 flex items-center justify-between">
+            <p className="text-sm text-gray-700">
+              {t('pagination', { start: paginationStart, end: paginationEnd, total: totalFiltered })}
+            </p>
+            <div className="flex items-center gap-2">
+              {page > 1 && (
+                <Button variant="outline" size="sm" onClick={() => setPage(1)}>
+                  {tCommon('first')}
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                {tCommon('previous')}
+              </Button>
+              <span className="text-sm text-gray-600 px-2">
+                {t('pageNumber', { page })}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages}>
+                {tCommon('next')}
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

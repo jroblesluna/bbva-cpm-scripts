@@ -132,6 +132,7 @@ class VLANBasicResponse(BaseModel):
     """Schema básico de VLAN para relaciones anidadas."""
     id: UUID
     name: str
+    forced_contingency: bool = False
     
     model_config = {"from_attributes": True}
 

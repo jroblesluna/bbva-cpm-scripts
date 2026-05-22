@@ -163,6 +163,7 @@
     "forcedContingencyError": "Error al cambiar contingencia forzada.",
     "forcedContingencyProcessing": "Procesando...",
     "forcedContingencyBadge": "Forzada",
+    "contingencyControlledByVlan": "La contingencia está controlada a nivel de VLAN",
     "restartServiceTitle": "Reiniciar Servicio",
     "restartTrayTitle": "Reiniciar Tray",
     "restartConfirmMessage": "¿Desea {action} en la estación {name}?",
@@ -209,7 +210,10 @@
     "forcedContingencyDeactivate": "Desactivar contingencia forzada",
     "forcedContingencyConfirmActivate": "¿Estás seguro de activar la contingencia forzada para la VLAN \"{name}\"? Todas las estaciones de esta VLAN entrarán en modo contingencia.",
     "forcedContingencyConfirmDeactivate": "¿Estás seguro de desactivar la contingencia forzada para la VLAN \"{name}\"?",
-    "forcedContingencyNotification": "Todas las estaciones conectadas recibirán una notificación de contingencia forzada."
+    "forcedContingencyNotification": "Todas las estaciones conectadas recibirán una notificación de contingencia forzada.",
+    "contingencyNoDevices": "No hay dispositivos activos configurados para contingencia"
+    "pagination": "Mostrando {start} a {end} de {total} VLANs",
+    "pageNumber": "Página {page}"
   },
   "messages": {
     "title": "Mensajes",
@@ -234,6 +238,7 @@
     "emptyTitle": "No hay mensajes",
     "emptyMessage": "Comienza enviando un mensaje a tus estaciones",
     "pagination": "Mostrando {start} a {end} de {total} mensajes",
+    "pageNumber": "Página {page}",
     "sendTitle": "Enviar Mensaje",
     "sendTo": "Enviar a *",
     "wholeOrg": "Toda la organización",
@@ -360,7 +365,9 @@
     "deleteTitle": "Confirmar Eliminación",
     "deleteConfirm": "¿Estás seguro de que deseas eliminar al usuario {name} ({email})?",
     "deleteWarning": "Esta acción no se puede deshacer. Todos los datos asociados al usuario se perderán.",
-    "deleteBtn": "Eliminar Usuario"
+    "deleteBtn": "Eliminar Usuario",
+    "pagination": "Mostrando {start} a {end} de {total} usuarios",
+    "pageNumber": "Página {page}"
   },
   "accounts": {
     "title": "Organizaciones",
@@ -405,7 +412,9 @@
     "forcedContingencyDeactivate": "Desactivar contingencia forzada",
     "forcedContingencyConfirmActivate": "¿Estás seguro de activar la contingencia forzada para la organización \"{name}\"? TODAS las estaciones de esta organización entrarán en modo contingencia.",
     "forcedContingencyConfirmDeactivate": "¿Estás seguro de desactivar la contingencia forzada para la organización \"{name}\"?",
-    "forcedContingencyNotification": "Todas las estaciones conectadas recibirán una notificación de contingencia forzada."
+    "forcedContingencyNotification": "Todas las estaciones conectadas recibirán una notificación de contingencia forzada.",
+    "pagination": "Mostrando {start} a {end} de {total} organizaciones",
+    "pageNumber": "Página {page}"
   },
   "pendingIps": {
     "title": "IPs Públicas Pendientes",
@@ -429,7 +438,9 @@
     "selectAccount": "Selecciona una organización...",
     "descriptionLabel": "Descripción (opcional)",
     "descriptionPlaceholder": "Ej: Oficina Principal Lima",
-    "lastUpdated": "Última actualización: {time}"
+    "lastUpdated": "Última actualización: {time}",
+    "pagination": "Mostrando {start} a {end} de {total} IPs",
+    "pageNumber": "Página {page}"
   },
   "language": {
     "label": "Idioma",
@@ -516,7 +527,8 @@
     "contingencyActive2": "Activa",
     "contingencyInactive": "Inactiva",
     "pagination": "Mostrando {start} a {end} de {total} workstations",
-    "allOrganizations": "Todas las organizaciones"
+    "allOrganizations": "Todas las organizaciones",
+    "pageNumber": "Página {page}"
   },
   "updates": {
     "title": "Actualizaciones Automáticas",
@@ -614,6 +626,8 @@
     "noVlan": "Sin VLAN asignada",
     "viewDetails": "Ver Detalles",
     "createdAt": "Fecha de Creación",
-    "updatedAt": "Última Actualización"
+    "updatedAt": "Última Actualización",
+    "pagination": "Mostrando {start} a {end} de {total} dispositivos",
+    "pageNumber": "Página {page}"
   }
 }

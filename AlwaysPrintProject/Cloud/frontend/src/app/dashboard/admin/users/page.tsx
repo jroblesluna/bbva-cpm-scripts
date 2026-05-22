@@ -26,7 +26,9 @@ import {
   Building2,
   Shield,
   Clock,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { formatDateWithTimezone, COMMON_TIMEZONES } from '@/lib/dateUtils'
@@ -51,6 +53,8 @@ export default function UsersPage() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [deletingUser, setDeletingUser] = useState<User | null>(null)
+  const [page, setPage] = useState(1)
+  const pageSize = 10
 
   // Query para listar usuarios
   const { data: usersData, isLoading, error } = useQuery({
@@ -101,6 +105,11 @@ export default function UsersPage() {
   })
 
   const users = usersData || []
+  const totalUsers = users.length
+  const totalPages = Math.ceil(totalUsers / pageSize)
+  const paginatedUsers = users.slice((page - 1) * pageSize, page * pageSize)
+  const paginationStart = (page - 1) * pageSize + 1
+  const paginationEnd = Math.min(page * pageSize, totalUsers)
 
   if (isLoading) {
     return (
@@ -188,7 +197,7 @@ export default function UsersPage() {
       {/* Lista de usuarios */}
       <div className="space-y-4">
         {users.length > 0 ? (
-          users.map((user) => (
+          paginatedUsers.map((user) => (
             <Card key={user.id} className="hover:shadow-md transition">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
@@ -279,6 +288,35 @@ export default function UsersPage() {
           </Card>
         )}
       </div>
+
+      {/* Paginación */}
+      {totalUsers > 0 && totalPages > 1 && (
+        <div className="bg-white rounded-lg shadow px-4 py-3 flex items-center justify-between border border-gray-200 mt-4 sm:px-6">
+          <div className="flex-1 flex items-center justify-between">
+            <p className="text-sm text-gray-700">
+              {t('pagination', { start: paginationStart, end: paginationEnd, total: totalUsers })}
+            </p>
+            <div className="flex items-center gap-2">
+              {page > 1 && (
+                <Button variant="outline" size="sm" onClick={() => setPage(1)}>
+                  {tCommon('first')}
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                {tCommon('previous')}
+              </Button>
+              <span className="text-sm text-gray-600 px-2">
+                {t('pageNumber', { page })}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages}>
+                {tCommon('next')}
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de confirmación de eliminación */}
       {deletingUser && (
