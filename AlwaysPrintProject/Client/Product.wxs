@@ -44,7 +44,7 @@
     <Property Id="ARPHELPLINK"     Value="antonio@robles.ai" />
 
     <!-- Icono para Panel de Control (Add/Remove Programs) -->
-    <Icon Id="ProductIcon" SourceFile="logo.ico" />
+    <Icon Id="ProductIcon" SourceFile="$(var.IconFile)" />
     <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
 
     <!-- MajorUpgrade: desinstala automáticamente versiones anteriores -->
@@ -92,6 +92,9 @@
         <Directory Id="LOGSFOLDER" Name="logs" />
       </Directory>
     </StandardDirectory>
+
+    <!-- Start Menu (para shortcut y AUMID de notificaciones) -->
+    <StandardDirectory Id="ProgramMenuFolder" />
 
     <ComponentGroup Id="AlwaysPrint.Components">
 
@@ -169,6 +172,19 @@
         <File Id="filTrayExe"
               Source="$(var.ProjectDir)dist\AlwaysPrintTray.exe"
               KeyPath="yes" />
+      </Component>
+
+      <!-- ── Shortcut en Start Menu (necesario para AUMID y notificaciones toast) ── -->
+      <Component Id="cmpStartMenuShortcut" Directory="INSTALLFOLDER"
+                 Guid="C7A4B5D6-E500-4E00-8F00-0BBA00000005">
+        <RegistryValue Root="HKCU" Key="SOFTWARE\Robles.AI\AlwaysPrint"
+                       Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+        <Shortcut Id="StartMenuShortcut"
+                  Directory="ProgramMenuFolder"
+                  Name="$(var.ProductDisplayName)"
+                  Target="[INSTALLFOLDER]AlwaysPrintTray.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveStartMenuFolder" Directory="ProgramMenuFolder" On="uninstall" />
       </Component>
 
       <!-- ── Componente para carpeta de logs (se preserva al desinstalar) ── -->
