@@ -211,7 +211,7 @@
     "forcedContingencyConfirmActivate": "¿Estás seguro de activar la contingencia forzada para la VLAN \"{name}\"? Todas las estaciones de esta VLAN entrarán en modo contingencia.",
     "forcedContingencyConfirmDeactivate": "¿Estás seguro de desactivar la contingencia forzada para la VLAN \"{name}\"?",
     "forcedContingencyNotification": "Todas las estaciones conectadas recibirán una notificación de contingencia forzada.",
-    "contingencyNoDevices": "No hay dispositivos activos configurados para contingencia"
+    "contingencyNoDevices": "No hay dispositivos activos configurados para contingencia",
     "pagination": "Mostrando {start} a {end} de {total} VLANs",
     "pageNumber": "Página {page}"
   },
