@@ -60,14 +60,11 @@ export default function VLANsPage() {
   const [vlanDetail, setVlanDetail] = useState<VLANDetail | null>(null)
   const [showDevicesModal, setShowDevicesModal] = useState(false)
   const [vlanDevices, setVlanDevices] = useState<Device[]>([])
-  const [devicesVlanName, setDevicesVlanName] = useState('')
+  const [devicesVlan, setDevicesVlan] = useState<VLAN | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [contingencyTarget, setContingencyTarget] = useState<VLAN | null>(null)
   const [contingencyDevices, setContingencyDevices] = useState<Device[]>([])
   const [contingencyDevicesLoading, setContingencyDevicesLoading] = useState(false)
-  const [defaultDeviceTarget, setDefaultDeviceTarget] = useState<VLAN | null>(null)
-  const [defaultDeviceOptions, setDefaultDeviceOptions] = useState<Device[]>([])
-  const [defaultDeviceLoading, setDefaultDeviceLoading] = useState(false)
   const [activeDeviceCounts, setActiveDeviceCounts] = useState<Record<string, number>>({})
   const [page, setPage] = useState(1)
   const pageSize = viewMode === 'cards' ? 10 : 20
@@ -98,27 +95,6 @@ export default function VLANsPage() {
     }
     loadDevices()
   }, [contingencyTarget])
-
-  // Cargar dispositivos activos cuando se abre el modal de impresora predeterminada
-  useEffect(() => {
-    if (!defaultDeviceTarget) {
-      setDefaultDeviceOptions([])
-      return
-    }
-    const loadDevices = async () => {
-      setDefaultDeviceLoading(true)
-      try {
-        const response = await apiClient.get(`/devices/?vlan_id=${defaultDeviceTarget.id}`)
-        const devices: Device[] = response.data.devices || []
-        setDefaultDeviceOptions(devices.filter((d) => d.is_active))
-      } catch {
-        setDefaultDeviceOptions([])
-      } finally {
-        setDefaultDeviceLoading(false)
-      }
-    }
-    loadDevices()
-  }, [defaultDeviceTarget])
 
   const loadAccounts = async () => {
     try {
@@ -197,7 +173,7 @@ export default function VLANsPage() {
     try {
       const response = await apiClient.get(`/devices/?vlan_id=${vlan.id}`)
       setVlanDevices(response.data.devices || [])
-      setDevicesVlanName(vlan.name)
+      setDevicesVlan(vlan)
       setShowDevicesModal(true)
     } catch (error) {
       console.error('Error cargando dispositivos:', error)
@@ -216,14 +192,17 @@ export default function VLANsPage() {
     }
   }
 
-  const handleToggleDefault = async (vlan: VLAN, deviceId: string | null) => {
+  const handleSetDefaultDevice = async (vlan: VLAN, deviceId: string | null) => {
     try {
       const params = deviceId ? { device_id: deviceId } : {}
       await apiClient.patch(`/vlans/${vlan.id}/default-device`, null, { params })
       setVlans((prev) =>
         prev.map((v) => (v.id === vlan.id ? { ...v, default_device_id: deviceId } : v))
       )
-      setDefaultDeviceTarget(null)
+      // Actualizar la VLAN en el modal si está abierto
+      if (devicesVlan && devicesVlan.id === vlan.id) {
+        setDevicesVlan({ ...vlan, default_device_id: deviceId })
+      }
     } catch (error) {
       console.error('Error al cambiar impresora predeterminada:', error)
     }
@@ -443,15 +422,6 @@ export default function VLANsPage() {
                   </Tooltip>
                 </TooltipProvider>
                 <Button
-                  variant={vlan.default_device_id ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setDefaultDeviceTarget(vlan)}
-                  title={vlan.default_device_id ? t('defaultDevice') : t('setDefaultDevice')}
-                  className={`h-8 w-8 p-0 ${vlan.default_device_id ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : ''}`}
-                >
-                  <Star className={`h-4 w-4 ${vlan.default_device_id ? 'fill-white' : ''}`} />
-                </Button>
-                <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleViewDevices(vlan)}
@@ -553,15 +523,6 @@ export default function VLANsPage() {
                             )}
                           </Tooltip>
                         </TooltipProvider>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDefaultDeviceTarget(vlan)}
-                          title={vlan.default_device_id ? t('defaultDevice') : t('setDefaultDevice')}
-                          className={`h-8 w-8 p-0 ${vlan.default_device_id ? 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100' : ''}`}
-                        >
-                          <Star className={`h-4 w-4 ${vlan.default_device_id ? 'fill-yellow-500' : ''}`} />
-                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleViewDevices(vlan)} title={t('viewDevices')} className="h-8 w-8 p-0">
                           <Printer className="h-4 w-4" />
                         </Button>
@@ -674,64 +635,6 @@ export default function VLANsPage() {
           </div>
         </div>
       )}
-      {defaultDeviceTarget && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-              <h2 className="text-lg font-bold text-gray-900">
-                {t('setDefaultDevice')}
-              </h2>
-            </div>
-            <p className="text-sm text-gray-600 mb-4">
-              {defaultDeviceTarget.name}
-            </p>
-            {defaultDeviceLoading ? (
-              <p className="text-sm text-gray-500 italic">{tCommon('loading')}</p>
-            ) : defaultDeviceOptions.length === 0 ? (
-              <p className="text-sm text-red-600">{t('defaultDeviceNoDevices')}</p>
-            ) : (
-              <div className="space-y-2">
-                <select
-                  defaultValue={defaultDeviceTarget.default_device_id || ''}
-                  id="default-device-select"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">{t('selectDefaultDevice')}</option>
-                  {defaultDeviceOptions.map((device) => (
-                    <option key={device.id} value={device.id}>
-                      {device.name} — {device.ip_address}:{device.port}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div className="flex justify-end gap-3 mt-4">
-              <Button variant="outline" onClick={() => setDefaultDeviceTarget(null)}>{tCommon('cancel')}</Button>
-              {defaultDeviceTarget.default_device_id && (
-                <Button
-                  variant="outline"
-                  className="text-red-600 border-red-300 hover:bg-red-50"
-                  onClick={() => handleToggleDefault(defaultDeviceTarget, null)}
-                >
-                  {t('removeDefaultDevice')}
-                </Button>
-              )}
-              <Button
-                disabled={defaultDeviceOptions.length === 0}
-                onClick={() => {
-                  const select = document.getElementById('default-device-select') as HTMLSelectElement
-                  const value = select?.value || null
-                  handleToggleDefault(defaultDeviceTarget, value || null)
-                }}
-                className="bg-yellow-500 hover:bg-yellow-600 text-white"
-              >
-                {tCommon('save')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
       {showCreateModal && (
         <CreateVLANModal onClose={() => setShowCreateModal(false)} onSuccess={() => { setShowCreateModal(false); loadVlans() }} />
       )}
@@ -750,11 +653,12 @@ export default function VLANsPage() {
           onSuccess={() => { setShowDeleteModal(false); setSelectedVlan(null); loadVlans() }}
         />
       )}
-      {showDevicesModal && (
+      {showDevicesModal && devicesVlan && (
         <VLANDevicesModal
-          vlanName={devicesVlanName}
+          vlan={devicesVlan}
           devices={vlanDevices}
-          onClose={() => { setShowDevicesModal(false); setVlanDevices([]) }}
+          onClose={() => { setShowDevicesModal(false); setVlanDevices([]); setDevicesVlan(null) }}
+          onSetDefault={(deviceId) => handleSetDefaultDevice(devicesVlan, deviceId)}
         />
       )}
     </div>
@@ -1012,7 +916,7 @@ function DeleteVLANModal({ vlan, onClose, onSuccess }: { vlan: VLAN; onClose: ()
 // Modal: Dispositivos de VLAN
 // ============================================================================
 
-function VLANDevicesModal({ vlanName, devices, onClose }: { vlanName: string; devices: Device[]; onClose: () => void }) {
+function VLANDevicesModal({ vlan, devices, onClose, onSetDefault }: { vlan: VLAN; devices: Device[]; onClose: () => void; onSetDefault: (deviceId: string | null) => void }) {
   const t = useTranslations('vlans')
   const tCommon = useTranslations('common')
   const tDevices = useTranslations('devices')
@@ -1023,7 +927,7 @@ function VLANDevicesModal({ vlanName, devices, onClose }: { vlanName: string; de
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-900">
-              {t('devicesInVlan')} — {vlanName}
+              {t('devicesInVlan')} — {vlan.name}
             </h2>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="h-5 w-5" />
@@ -1044,33 +948,49 @@ function VLANDevicesModal({ vlanName, devices, onClose }: { vlanName: string; de
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{tDevices('colModel')}</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{tDevices('colLocation')}</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{tDevices('colStatus')}</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">{t('defaultDevice')}</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {devices.map((device) => (
-                    <tr key={device.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <Printer className="h-4 w-4 text-gray-400 mr-2" />
-                          <span className="text-sm font-medium text-gray-900">{device.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="text-sm font-mono text-gray-700">{device.ip_address}:{device.port}</span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="text-sm text-gray-500">{device.model || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="text-sm text-gray-500">{device.location || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <Badge variant={device.is_active ? 'default' : 'secondary'}>
-                          {device.is_active ? tDevices('statusActive') : tDevices('statusInactive')}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
+                  {devices.map((device) => {
+                    const isDefault = vlan.default_device_id === device.id
+                    return (
+                      <tr key={device.id} className={`hover:bg-gray-50 ${isDefault ? 'bg-yellow-50' : ''}`}>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <Printer className="h-4 w-4 text-gray-400 mr-2" />
+                            <span className="text-sm font-medium text-gray-900">{device.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm font-mono text-gray-700">{device.ip_address}:{device.port}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm text-gray-500">{device.model || '-'}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm text-gray-500">{device.location || '-'}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <Badge variant={device.is_active ? 'default' : 'secondary'}>
+                            {device.is_active ? tDevices('statusActive') : tDevices('statusInactive')}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-center">
+                          <Button
+                            variant={isDefault ? 'default' : 'ghost'}
+                            size="sm"
+                            onClick={() => onSetDefault(isDefault ? null : device.id)}
+                            disabled={!device.is_active}
+                            title={isDefault ? t('removeDefaultDevice') : t('setDefaultDevice')}
+                            className={`h-8 w-8 p-0 ${isDefault ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : ''}`}
+                          >
+                            <Star className={`h-4 w-4 ${isDefault ? 'fill-white' : ''}`} />
+                          </Button>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
