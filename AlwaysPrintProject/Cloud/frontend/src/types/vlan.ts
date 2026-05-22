@@ -9,6 +9,7 @@ export interface VLAN {
   description: string | null
   cidr_ranges: string[]
   forced_contingency: boolean
+  is_default: boolean
   created_at: string
   updated_at: string
 }

@@ -21,13 +21,8 @@ namespace AlwaysPrintTray
     {
         private const string ServiceName = "AlwaysPrintService";
 
-        // Título base para notificaciones — incluye entorno y versión
-#if ENV_DEV
-        private const string EnvLabel = "dev";
-#else
-        private const string EnvLabel = "apps";
-#endif
-        private static readonly string AppTitle = $"alwaysprint.{EnvLabel}.{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version}";
+        // Título base para notificaciones
+        private const string AppTitle = "APCM";
 
         private readonly NotifyIcon  _trayIcon;
         private readonly PipeClient  _pipe;

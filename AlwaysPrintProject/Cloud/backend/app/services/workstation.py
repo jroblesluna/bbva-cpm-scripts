@@ -68,6 +68,7 @@ class WorkstationService:
         está dentro de alguno de los rangos CIDR definidos.
         
         Si la IP pertenece a múltiples VLANs, devuelve la más reciente.
+        Si no se encuentra match, usa la VLAN predeterminada de la organización.
         
         Args:
             db: Sesión de base de datos
@@ -103,7 +104,8 @@ class WorkstationService:
                     # CIDR inválido, continuar con el siguiente
                     continue
         
-        return None
+        # Fallback: usar VLAN predeterminada de la organización
+        return self._get_default_vlan_id(db, organization_id)
     
     def detect_or_create_vlan_for_cidr(
         self,
@@ -227,6 +229,31 @@ class WorkstationService:
         for vlan in vlans:
             if normalized_cidr in (vlan.cidr_ranges or []):
                 return str(vlan.id)
+        
+        return None
+
+    def _get_default_vlan_id(
+        self,
+        db: Session,
+        organization_id: str
+    ) -> Optional[str]:
+        """
+        Obtiene el UUID de la VLAN predeterminada de una organización.
+        
+        Args:
+            db: Sesión de base de datos
+            organization_id: UUID de la organización
+            
+        Returns:
+            UUID de la VLAN predeterminada si existe, None si no hay ninguna
+        """
+        default_vlan = db.query(VLAN).filter_by(
+            organization_id=organization_id,
+            is_default=True
+        ).first()
+        
+        if default_vlan:
+            return str(default_vlan.id)
         
         return None
     
@@ -463,9 +490,12 @@ class WorkstationService:
                 vlan_id = self.detect_or_create_vlan_for_cidr(
                     db, organization_id, normalized_cidr
                 )
+                # Si no se pudo asignar por CIDR, usar VLAN predeterminada
+                if not vlan_id:
+                    vlan_id = self._get_default_vlan_id(db, organization_id)
                 workstation.vlan_id = vlan_id
             else:
-                # Fallback: detectar VLAN por IP privada (legacy)
+                # Fallback: detectar VLAN por IP privada (legacy, incluye fallback a predeterminada)
                 vlan_id = self.detect_vlan_for_ip(
                     db, organization_id, ip_private
                 )
@@ -526,8 +556,11 @@ class WorkstationService:
             vlan_id = self.detect_or_create_vlan_for_cidr(
                 db, organization_id, normalized_cidr
             )
+            # Si no se pudo asignar por CIDR, usar VLAN predeterminada
+            if not vlan_id:
+                vlan_id = self._get_default_vlan_id(db, organization_id)
         else:
-            # Fallback: detectar VLAN por IP privada (legacy)
+            # Fallback: detectar VLAN por IP privada (legacy, incluye fallback a predeterminada)
             vlan_id = self.detect_vlan_for_ip(db, organization_id, ip_private)
         
         workstation = Workstation(

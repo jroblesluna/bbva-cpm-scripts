@@ -342,7 +342,84 @@ def toggle_vlan_forced_contingency(
     }
 
 
-@router.get("/{vlan_id}/config", response_model=VLANConfigResponse)
+@router.patch("/{vlan_id}/set-default")
+def set_default_vlan(
+    request: Request,
+    vlan_id: UUID,
+    enabled: bool = Query(..., description="Marcar o desmarcar como VLAN predeterminada"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Marcar o desmarcar una VLAN como predeterminada para su organización.
+    
+    Solo puede haber una VLAN predeterminada por organización.
+    Las workstations que no coincidan con ningún CIDR se asignarán a esta VLAN.
+    
+    Al activar, se reasignan automáticamente las workstations de la misma
+    organización que no tengan VLAN asignada (vlan_id IS NULL).
+    """
+    from app.models.workstation import Workstation
+    import logging as log_module
+
+    vlan = db.query(VLAN).filter(VLAN.id == vlan_id).first()
+    if not vlan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
+
+    if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
+
+    if enabled:
+        # Desmarcar cualquier otra VLAN predeterminada de la misma organización
+        db.query(VLAN).filter(
+            VLAN.organization_id == vlan.organization_id,
+            VLAN.is_default == True,
+            VLAN.id != vlan_id
+        ).update({"is_default": False})
+
+        vlan.is_default = True
+        db.flush()
+
+        # Reasignar workstations sin VLAN de esta organización
+        unassigned_workstations = db.query(Workstation).filter(
+            Workstation.organization_id == vlan.organization_id,
+            Workstation.vlan_id == None
+        ).all()
+
+        assigned_count = len(unassigned_workstations)
+        for ws in unassigned_workstations:
+            ws.vlan_id = vlan.id
+
+    else:
+        vlan.is_default = False
+        assigned_count = 0
+
+    db.commit()
+    db.refresh(vlan)
+
+    log_module.getLogger(__name__).info(
+        "VLAN predeterminada actualizada: vlan_id=%s, enabled=%s, user_id=%s, workstations_asignadas=%d",
+        vlan_id, enabled, current_user.id, assigned_count if enabled else 0,
+    )
+
+    audit_service = AuditService()
+    audit_service.log_update(
+        db=db,
+        entity_type="vlan",
+        entity_id=str(vlan.id),
+        user_id=str(current_user.id),
+        organization_id=str(vlan.organization_id),
+        old_data={"is_default": not enabled},
+        new_data={"is_default": enabled},
+        ip_address=get_client_ip(request)
+    )
+
+    return {
+        "is_default": vlan.is_default,
+        "vlan_id": str(vlan.id),
+        "assigned_workstations": assigned_count if enabled else 0,
+        "updated_at": vlan.updated_at,
+    }
 def get_vlan_config(
     vlan_id: UUID,
     current_user: User = Depends(get_current_user),

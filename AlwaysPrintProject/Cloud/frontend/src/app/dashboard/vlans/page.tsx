@@ -26,6 +26,7 @@ import {
   ShieldAlert,
   ChevronLeft,
   ChevronRight,
+  Star,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 import type { VLAN, VLANCreate, VLANUpdate, VLANDetail } from '@/types/vlan'
@@ -62,6 +63,9 @@ export default function VLANsPage() {
   const [devicesVlanName, setDevicesVlanName] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [contingencyTarget, setContingencyTarget] = useState<VLAN | null>(null)
+  const [contingencyDevices, setContingencyDevices] = useState<Device[]>([])
+  const [contingencyDevicesLoading, setContingencyDevicesLoading] = useState(false)
+  const [defaultTarget, setDefaultTarget] = useState<VLAN | null>(null)
   const [activeDeviceCounts, setActiveDeviceCounts] = useState<Record<string, number>>({})
   const [page, setPage] = useState(1)
   const pageSize = viewMode === 'cards' ? 10 : 20
@@ -71,6 +75,27 @@ export default function VLANsPage() {
     loadAccounts()
     loadVlans()
   }, [user, filterOrgId])
+
+  // Cargar dispositivos activos cuando se abre el modal de contingencia (solo al activar)
+  useEffect(() => {
+    if (!contingencyTarget || contingencyTarget.forced_contingency) {
+      setContingencyDevices([])
+      return
+    }
+    const loadDevices = async () => {
+      setContingencyDevicesLoading(true)
+      try {
+        const response = await apiClient.get(`/devices/?vlan_id=${contingencyTarget.id}`)
+        const devices: Device[] = response.data.devices || []
+        setContingencyDevices(devices.filter((d) => d.is_active))
+      } catch {
+        setContingencyDevices([])
+      } finally {
+        setContingencyDevicesLoading(false)
+      }
+    }
+    loadDevices()
+  }, [contingencyTarget])
 
   const loadAccounts = async () => {
     try {
@@ -165,6 +190,23 @@ export default function VLANsPage() {
       setContingencyTarget(null)
     } catch (error) {
       console.error('Error al cambiar contingencia forzada:', error)
+    }
+  }
+
+  const handleToggleDefault = async (vlan: VLAN, enabled: boolean) => {
+    try {
+      await apiClient.patch(`/vlans/${vlan.id}/set-default`, null, { params: { enabled } })
+      setVlans((prev) =>
+        prev.map((v) => {
+          if (v.id === vlan.id) return { ...v, is_default: enabled }
+          // Si se activa una como predeterminada, desmarcar las demás de la misma organización
+          if (enabled && v.organization_id === vlan.organization_id) return { ...v, is_default: false }
+          return v
+        })
+      )
+      setDefaultTarget(null)
+    } catch (error) {
+      console.error('Error al cambiar VLAN predeterminada:', error)
     }
   }
 
@@ -327,6 +369,12 @@ export default function VLANsPage() {
                   <span className="text-sm md:text-base font-medium text-gray-900 truncate">
                     {vlan.name}
                   </span>
+                  {vlan.is_default && (
+                    <Badge variant="default" className="bg-yellow-100 text-yellow-800 border-yellow-300 text-xs">
+                      <Star className="h-3 w-3 mr-1 fill-yellow-500 text-yellow-500" />
+                      {t('defaultBadge')}
+                    </Badge>
+                  )}
                 </div>
                 <CidrHealthBadge cidrCount={vlan.cidr_ranges.length} />
               </div>
@@ -382,6 +430,15 @@ export default function VLANsPage() {
                   </Tooltip>
                 </TooltipProvider>
                 <Button
+                  variant={vlan.is_default ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setDefaultTarget(vlan)}
+                  title={vlan.is_default ? t('unsetDefault') : t('setDefault')}
+                  className={`h-8 w-8 p-0 ${vlan.is_default ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : ''}`}
+                >
+                  <Star className={`h-4 w-4 ${vlan.is_default ? 'fill-white' : ''}`} />
+                </Button>
+                <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleViewDevices(vlan)}
@@ -432,9 +489,15 @@ export default function VLANsPage() {
                 {paginatedVlans.map((vlan) => (
                   <tr key={vlan.id} className="hover:bg-gray-50">
                     <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <Network className="h-5 w-5 text-gray-400 mr-2" />
+                      <div className="flex items-center gap-2">
+                        <Network className="h-5 w-5 text-gray-400" />
                         <span className="text-sm font-medium text-gray-900">{vlan.name}</span>
+                        {vlan.is_default && (
+                          <Badge variant="default" className="bg-yellow-100 text-yellow-800 border-yellow-300 text-xs">
+                            <Star className="h-3 w-3 mr-0.5 fill-yellow-500 text-yellow-500" />
+                            {t('defaultBadge')}
+                          </Badge>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 md:px-6 py-4 whitespace-nowrap">
@@ -483,6 +546,15 @@ export default function VLANsPage() {
                             )}
                           </Tooltip>
                         </TooltipProvider>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDefaultTarget(vlan)}
+                          title={vlan.is_default ? t('unsetDefault') : t('setDefault')}
+                          className={`h-8 w-8 p-0 ${vlan.is_default ? 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100' : ''}`}
+                        >
+                          <Star className={`h-4 w-4 ${vlan.is_default ? 'fill-yellow-500' : ''}`} />
+                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleViewDevices(vlan)} title={t('viewDevices')} className="h-8 w-8 p-0">
                           <Printer className="h-4 w-4" />
                         </Button>
@@ -552,6 +624,36 @@ export default function VLANsPage() {
                 {t('forcedContingencyNotification')}
               </p>
             )}
+            {/* Información de impresora al activar contingencia */}
+            {!contingencyTarget.forced_contingency && (
+              <div className="mb-4">
+                {contingencyDevicesLoading ? (
+                  <p className="text-xs text-gray-500 italic">{tCommon('loading')}</p>
+                ) : contingencyDevices.length > 0 ? (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Printer className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-800">{t('contingencyPrinterUsed')}</span>
+                    </div>
+                    <p className="text-sm text-green-700 font-mono ml-6">
+                      {contingencyDevices[0].name} — {contingencyDevices[0].ip_address}:{contingencyDevices[0].port}
+                    </p>
+                    {contingencyDevices.length > 1 && (
+                      <p className="text-xs text-green-600 ml-6 mt-1">
+                        {t('contingencyMoreDevices', { count: contingencyDevices.length - 1 })}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded">
+                    <div className="flex items-center gap-2">
+                      <Printer className="h-4 w-4 text-red-500" />
+                      <span className="text-sm font-medium text-red-700">{t('contingencyNoPrinters')}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => setContingencyTarget(null)}>{tCommon('cancel')}</Button>
               <Button
@@ -560,6 +662,33 @@ export default function VLANsPage() {
                 className={!contingencyTarget.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
               >
                 {contingencyTarget.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {defaultTarget && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Star className={`w-5 h-5 ${defaultTarget.is_default ? 'text-gray-600' : 'text-yellow-500 fill-yellow-500'}`} />
+              <h2 className="text-lg font-bold text-gray-900">
+                {defaultTarget.is_default ? t('unsetDefault') : t('setDefault')}
+              </h2>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              {defaultTarget.is_default
+                ? t('unsetDefaultConfirm', { name: defaultTarget.name })
+                : t('setDefaultConfirm', { name: defaultTarget.name })
+              }
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setDefaultTarget(null)}>{tCommon('cancel')}</Button>
+              <Button
+                onClick={() => handleToggleDefault(defaultTarget, !defaultTarget.is_default)}
+                className={!defaultTarget.is_default ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : ''}
+              >
+                {defaultTarget.is_default ? t('unsetDefault') : t('setDefault')}
               </Button>
             </div>
           </div>

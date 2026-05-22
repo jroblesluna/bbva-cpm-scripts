@@ -36,6 +36,11 @@ class VLAN(Base):
     # Flag de contingencia forzada a nivel de VLAN
     # Cuando está activo, TODAS las workstations de esta VLAN entran en modo contingencia
     forced_contingency = Column(Boolean, nullable=False, default=False, server_default='false')
+
+    # Flag de VLAN predeterminada por organización
+    # Solo una VLAN puede ser predeterminada por organización.
+    # Las workstations que no coincidan con ningún CIDR se asignan a esta VLAN.
+    is_default = Column(Boolean, nullable=False, default=False, server_default='false')
     
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

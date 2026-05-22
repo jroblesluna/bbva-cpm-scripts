@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { workstationsApi, organizationsApi, vlansApi } from '@/lib/api';
+import { workstationsApi, organizationsApi, vlansApi, devicesApi } from '@/lib/api';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,11 +40,12 @@ import {
   ShieldAlert,
   ChevronLeft,
   ChevronRight,
+  Printer,
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { useToast } from '@/hooks/use-toast';
-import type { Workstation, WorkstationUpdate, Organization, VLAN } from '@/types';
+import type { Workstation, WorkstationUpdate, Organization, VLAN, Device } from '@/types';
 
 type ViewMode = 'cards' | 'table';
 type SortField = 'ip_private' | 'hostname' | 'current_user' | 'organization' | 'tray_version' | 'last_connection' | 'is_online';
@@ -63,6 +64,8 @@ export default function WorkstationsPage() {
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
   const [editingWorkstation, setEditingWorkstation] = useState<Workstation | null>(null);
   const [contingencyTarget, setContingencyTarget] = useState<Workstation | null>(null);
+  const [contingencyWsDevices, setContingencyWsDevices] = useState<Device[]>([]);
+  const [contingencyWsDevicesLoading, setContingencyWsDevicesLoading] = useState(false);
   const [restartTarget, setRestartTarget] = useState<{ workstation: Workstation; commandType: 'restart_service' | 'restart_tray' } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
@@ -294,6 +297,30 @@ export default function WorkstationsPage() {
       setLastUpdated(new Date());
     }
   }, [workstationsData, isFetching]);
+
+  // Cargar dispositivos activos de la VLAN cuando se abre el modal de contingencia (solo al activar)
+  useEffect(() => {
+    if (!contingencyTarget || contingencyTarget.forced_contingency) {
+      setContingencyWsDevices([]);
+      return;
+    }
+    if (!contingencyTarget.vlan_id) {
+      setContingencyWsDevices([]);
+      return;
+    }
+    const loadDevices = async () => {
+      setContingencyWsDevicesLoading(true);
+      try {
+        const devices = await devicesApi.list({ vlan_id: contingencyTarget.vlan_id as string, is_active: true });
+        setContingencyWsDevices(devices);
+      } catch {
+        setContingencyWsDevices([]);
+      } finally {
+        setContingencyWsDevicesLoading(false);
+      }
+    };
+    loadDevices();
+  }, [contingencyTarget]);
 
   const handleRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['workstations'], refetchType: 'all' });
@@ -674,6 +701,43 @@ export default function WorkstationsPage() {
                     {t('forcedContingencyNotification')}
                   </AlertDescription>
                 </Alert>
+              )}
+              {/* Información de impresora al activar contingencia */}
+              {!contingencyTarget.forced_contingency && (
+                <div>
+                  {!contingencyTarget.vlan_id ? (
+                    <Alert variant="destructive">
+                      <Printer className="h-4 w-4" />
+                      <AlertDescription className="text-xs">
+                        {t('contingencyNoVlanAssigned')}
+                      </AlertDescription>
+                    </Alert>
+                  ) : contingencyWsDevicesLoading ? (
+                    <p className="text-xs text-gray-500 italic">{tCommon('loading')}</p>
+                  ) : contingencyWsDevices.length > 0 ? (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Printer className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-800">{t('contingencyPrinterUsed')}</span>
+                      </div>
+                      <p className="text-sm text-green-700 font-mono ml-6">
+                        {contingencyWsDevices[0].name} — {contingencyWsDevices[0].ip_address}:{contingencyWsDevices[0].port}
+                      </p>
+                      {contingencyWsDevices.length > 1 && (
+                        <p className="text-xs text-green-600 ml-6 mt-1">
+                          {t('contingencyMoreDevices', { count: contingencyWsDevices.length - 1 })}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <Alert variant="destructive">
+                      <Printer className="h-4 w-4" />
+                      <AlertDescription className="text-xs">
+                        {t('contingencyNoPrintersInVlan')}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
               )}
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setContingencyTarget(null)}>
