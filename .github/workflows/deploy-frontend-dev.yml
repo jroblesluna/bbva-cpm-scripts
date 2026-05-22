@@ -28,6 +28,14 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Use dev logo
+        working-directory: AlwaysPrintProject/Cloud/frontend
+        run: |
+          mkdir -p public
+          cp ../../Logo/dev/alwaysprint_icon_dev.png public/alwaysprint-logo.png
+          cp ../../Logo/dev/alwaysprint_icon_dev.svg public/alwaysprint-logo.svg
+          cp ../../Logo/dev/alwaysprint_icon_dev.ico public/favicon.ico
+
       - name: Build and push
         env:
           ECR_URL: ${{ steps.login-ecr.outputs.registry }}/alwaysprint-dev-frontend

@@ -44,6 +44,13 @@ jobs:
           Write-Host "Version: $version"
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
 
+      - name: Copy logo assets
+        shell: pwsh
+        working-directory: AlwaysPrintProject
+        run: |
+          Copy-Item Logo\prod\alwaysprint_icon.ico Client\logo.ico -Force
+          Copy-Item Logo\prod\alwaysprint_icon.png Client\logo.png -Force
+
       - name: Publish AlwaysPrintService
         shell: pwsh
         working-directory: AlwaysPrintProject/Client
@@ -51,7 +58,7 @@ jobs:
           $v = "${{ steps.version.outputs.VERSION }}"
           dotnet publish .\AlwaysPrintService\AlwaysPrintService.csproj `
             -c Release -f net48 -o .\dist --no-self-contained `
-            /p:Version=$v /p:AssemblyVersion=$v /p:FileVersion=$v /p:InformationalVersion=$v
+            /p:Version=$v /p:AssemblyVersion=$v /p:FileVersion=$v /p:InformationalVersion=$v /p:Environment=prod
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Publish AlwaysPrintTray
@@ -61,7 +68,7 @@ jobs:
           $v = "${{ steps.version.outputs.VERSION }}"
           dotnet publish .\AlwaysPrintTray\AlwaysPrintTray.csproj `
             -c Release -f net48 -o .\dist --no-self-contained `
-            /p:Version=$v /p:AssemblyVersion=$v /p:FileVersion=$v /p:InformationalVersion=$v
+            /p:Version=$v /p:AssemblyVersion=$v /p:FileVersion=$v /p:InformationalVersion=$v /p:Environment=prod
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Build MSI
@@ -70,16 +77,19 @@ jobs:
         run: |
           $v = "${{ steps.version.outputs.VERSION }}"
           $projectDir = (Get-Location).Path + "\"
-          wix build .\Product.wxs -o .\AlwaysPrint.msi `
+          $msiName = "AlwaysPrint-$v.msi"
+          wix build .\Product.wxs -o ".\$msiName" `
             -ext WixToolset.Util.wixext `
-            -d "ProductVersion=$v" -d "ProjectDir=$projectDir"
+            -d "ProductVersion=$v" -d "ProjectDir=$projectDir" -d "Environment=prod"
           if ($LASTEXITCODE -ne 0) { exit 1 }
+          echo "MSI_NAME=$msiName" >> $env:GITHUB_OUTPUT
+        id: msi
 
       - name: Upload MSI artifact
         uses: actions/upload-artifact@v4
         with:
           name: alwaysprint-msi
-          path: AlwaysPrintProject/Client/AlwaysPrint.msi
+          path: AlwaysPrintProject/Client/${{ steps.msi.outputs.MSI_NAME }}
           retention-days: 5
 
   deploy-prod:
@@ -101,15 +111,16 @@ jobs:
         shell: bash
         run: |
           VERSION="${{ needs.build.outputs.version }}"
+          MSI_NAME="AlwaysPrint-${VERSION}.msi"
           COMMIT="${{ github.sha }}"
           SHORT_COMMIT=${COMMIT::7}
           BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           METADATA="version=${VERSION},build-date=${BUILD_DATE},commit-hash=${SHORT_COMMIT}"
 
-          aws s3 cp AlwaysPrint.msi \
+          aws s3 cp "$MSI_NAME" \
             "s3://alwaysprint-prod-artifacts/latest/AlwaysPrint.msi" \
             --metadata "$METADATA"
-          aws s3 cp AlwaysPrint.msi \
+          aws s3 cp "$MSI_NAME" \
             "s3://alwaysprint-prod-artifacts/versions/${VERSION}/AlwaysPrint.msi" \
             --metadata "$METADATA"
 

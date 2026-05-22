@@ -44,5 +44,5 @@ backend_env_vars = {
   RATE_LIMIT_API              = "500"
   CACHE_TTL_SECONDS           = "60"
   API_V1_STR                  = "/api/v1"
-  S3_ARTIFACTS_BUCKET         = "alwaysprint-dev-dev-artifacts"
+  S3_ARTIFACTS_BUCKET         = "alwaysprint-dev-artifacts"
 }

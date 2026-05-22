@@ -68,6 +68,9 @@ SSL_AUTOFIX=false
 # Acumular recomendaciones
 RECOMMENDATIONS=()
 
+# Acumular registros DNS pendientes (tipo|nombre|valor)
+DNS_PENDING=()
+
 print_header() {
     echo ""
     echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
@@ -197,6 +200,91 @@ if [ -n "$IP_RESOLVED" ]; then
 else
     check_fail "No se pudo resolver DNS para $DOMAIN"
     recommend "Configurar registro A: $DOMAIN → ${EC2_IP:-<EC2_IP>}"
+fi
+
+# Verificar registros SES (DKIM, MX, SPF) desde outputs de Terraform
+if [ -n "$TF_OUTPUT" ]; then
+    echo -e "\n  ${BLUE}Registros SES (email):${NC}"
+
+    # Extraer zona base del dominio
+    ZONE_NAME=$(echo "$TF_OUTPUT" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+ses = d.get('ses_dns_records', {}).get('value', {})
+# Obtener zona del primer registro
+for k, v in ses.items():
+    name = v.get('nombre', '')
+    if 'amazonses' in name:
+        # Extraer zona: _amazonses.ZONA
+        print(name.replace('_amazonses.', ''))
+        break
+" 2>/dev/null)
+
+    # Verificar TXT _amazonses (verificación de dominio)
+    SES_VERIFY=$(dig +short TXT "_amazonses.${ZONE_NAME}" 2>/dev/null | head -1)
+    if [ -n "$SES_VERIFY" ]; then
+        check_ok "SES verificación — dominio ${ZONE_NAME} verificado"
+    else
+        check_warn "SES verificación — TXT _amazonses.${ZONE_NAME} no encontrado"
+        SES_TXT_VALUE=$(echo "$TF_OUTPUT" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+ses = d.get('ses_dns_records', {}).get('value', {})
+for k, v in ses.items():
+    if 'verificacion' in k:
+        print(v.get('valor', ''))
+        break
+" 2>/dev/null)
+        DNS_PENDING+=("TXT|_amazonses.${ZONE_NAME}|${SES_TXT_VALUE}")
+    fi
+
+    # Verificar cada DKIM individualmente
+    DKIM_RECORDS=$(echo "$TF_OUTPUT" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+ses = d.get('ses_dns_records', {}).get('value', {})
+for k, v in ses.items():
+    if 'dkim' in k:
+        print(v.get('nombre', '') + '|' + v.get('valor', ''))
+" 2>/dev/null)
+
+    DKIM_OK=0
+    DKIM_TOTAL=0
+    while IFS='|' read -r dkim_name dkim_value; do
+        [ -z "$dkim_name" ] && continue
+        DKIM_TOTAL=$((DKIM_TOTAL + 1))
+        RESOLVED=$(dig +short CNAME "$dkim_name" 2>/dev/null | head -1)
+        if echo "$RESOLVED" | grep -qi "amazonses"; then
+            check_ok "DKIM $DKIM_TOTAL — $dkim_name ✓"
+            DKIM_OK=$((DKIM_OK + 1))
+        else
+            check_fail "DKIM $DKIM_TOTAL — $dkim_name → ${RESOLVED:-no resuelve}"
+            DNS_PENDING+=("CNAME|${dkim_name}|${dkim_value}")
+        fi
+    done <<< "$DKIM_RECORDS"
+
+    if [ "$DKIM_TOTAL" -eq 0 ]; then
+        check_warn "DKIM — no se encontraron registros en terraform output"
+    fi
+
+    # Verificar MX
+    MX_NAME="mail.${ZONE_NAME}"
+    MX_RECORD=$(dig +short MX "$MX_NAME" 2>/dev/null | head -1)
+    if echo "$MX_RECORD" | grep -q "amazonses.com"; then
+        check_ok "MX ($MX_NAME) — configurado"
+    else
+        check_warn "MX ($MX_NAME) — ${MX_RECORD:-no definido}"
+        DNS_PENDING+=("MX|${MX_NAME}|10 feedback-smtp.${AWS_REGION}.amazonses.com")
+    fi
+
+    # Verificar SPF
+    SPF_RECORD=$(dig +short TXT "$MX_NAME" 2>/dev/null | grep "spf" | head -1)
+    if echo "$SPF_RECORD" | grep -q "amazonses.com"; then
+        check_ok "SPF ($MX_NAME) — incluye amazonses.com"
+    else
+        check_warn "SPF ($MX_NAME) — ${SPF_RECORD:-no definido}"
+        DNS_PENDING+=("TXT|${MX_NAME}|v=spf1 include:amazonses.com ~all")
+    fi
 fi
 
 # =============================================================================
@@ -448,6 +536,7 @@ if [ "$DNS_OK" = "true" ]; then
     else
         check_warn "SSL no disponible (certbot pendiente)"
         SSL_AUTOFIX=true
+        recommend "Configurar SSL con certbot para $DOMAIN"
     fi
 else
     check_warn "SSL no verificable (DNS no apunta al EC2)"
@@ -515,44 +604,56 @@ else
 fi
 
 # Mostrar recomendaciones si hay problemas
+if [ ${#DNS_PENDING[@]} -gt 0 ]; then
+    echo ""
+    echo -e "  ${BOLD}Registros DNS pendientes (Zone Editor):${NC}"
+    echo ""
+    printf "  ${CYAN}%-7s %-55s %s${NC}\n" "Tipo" "Nombre" "Valor"
+    printf "  %-7s %-55s %s\n" "-------" "-------------------------------------------------------" "-----"
+    for entry in "${DNS_PENDING[@]}"; do
+        IFS='|' read -r dtype dname dvalue <<< "$entry"
+        printf "  %-7s %-55s %s\n" "$dtype" "$dname" "$dvalue"
+    done
+fi
+
 if [ ${#RECOMMENDATIONS[@]} -gt 0 ]; then
     echo ""
-    echo -e "  ${BOLD}Acciones recomendadas:${NC}"
+    echo -e "  ${BOLD}Otras acciones recomendadas:${NC}"
     echo ""
     for i in "${!RECOMMENDATIONS[@]}"; do
         echo -e "  ${CYAN}$((i+1)).${NC} ${RECOMMENDATIONS[$i]}"
     done
-    
-    # Ofrecer certbot automático solo si DNS apunta correctamente
-    if [ "$SSL_AUTOFIX" = "true" ] && [ "$DNS_OK" = "true" ]; then
-        echo ""
-        echo -e -n "  ${BOLD}¿Ejecutar certbot automáticamente? [y/N]:${NC} "
-        read -r REPLY
-        if [[ "$REPLY" =~ ^[Yy]$ ]]; then
-            echo -e "  ${CYAN}Ejecutando certbot vía SSM...${NC}"
-            FIX_CMD_ID=$(aws ssm send-command \
-                --instance-ids "$INSTANCE_ID" \
-                --document-name "AWS-RunShellScript" \
-                --parameters "{\"commands\":[\"certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m antonio@robles.ai && systemctl reload nginx\"]}" \
-                --query "Command.CommandId" \
+fi
+
+# Ofrecer certbot automático solo si DNS apunta correctamente
+if [ "$SSL_AUTOFIX" = "true" ] && [ "$DNS_OK" = "true" ]; then
+    echo ""
+    echo -e -n "  ${BOLD}¿Ejecutar certbot automáticamente? [y/N]:${NC} "
+    read -r REPLY
+    if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+        echo -e "  ${CYAN}Ejecutando certbot vía SSM...${NC}"
+        FIX_CMD_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters "{\"commands\":[\"certbot --nginx -d $DOMAIN --non-interactive --agree-tos -m antonio@robles.ai && systemctl reload nginx\"]}" \
+            --query "Command.CommandId" \
+            --output text \
+            --region "$AWS_REGION" 2>/dev/null)
+        
+        if [ -n "$FIX_CMD_ID" ] && [ "$FIX_CMD_ID" != "None" ]; then
+            echo -e "  ${CYAN}Esperando resultado (15s)...${NC}"
+            sleep 15
+            FIX_RESULT=$(aws ssm get-command-invocation \
+                --command-id "$FIX_CMD_ID" \
+                --instance-id "$INSTANCE_ID" \
+                --query '[Status, StandardOutputContent]' \
                 --output text \
                 --region "$AWS_REGION" 2>/dev/null)
             
-            if [ -n "$FIX_CMD_ID" ] && [ "$FIX_CMD_ID" != "None" ]; then
-                echo -e "  ${CYAN}Esperando resultado (15s)...${NC}"
-                sleep 15
-                FIX_RESULT=$(aws ssm get-command-invocation \
-                    --command-id "$FIX_CMD_ID" \
-                    --instance-id "$INSTANCE_ID" \
-                    --query '[Status, StandardOutputContent]' \
-                    --output text \
-                    --region "$AWS_REGION" 2>/dev/null)
-                
-                if echo "$FIX_RESULT" | grep -qi "Success\|Successfully"; then
-                    echo -e "  ${GREEN}✓ SSL configurado correctamente${NC}"
-                else
-                    echo -e "  ${RED}✗ Falló. Verificar manualmente vía SSM${NC}"
-                fi
+            if echo "$FIX_RESULT" | grep -qi "Success\|Successfully"; then
+                echo -e "  ${GREEN}✓ SSL configurado correctamente${NC}"
+            else
+                echo -e "  ${RED}✗ Falló. Verificar manualmente vía SSM${NC}"
             fi
         fi
     fi

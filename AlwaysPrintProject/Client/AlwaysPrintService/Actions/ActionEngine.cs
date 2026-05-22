@@ -234,6 +234,7 @@ namespace AlwaysPrintService.Actions
                     return ExecuteDeleteOrphanedFolders(action);
                 
                 case ActionTypes.CreateTcpPort:
+                case ActionTypes.SetTcpPort:
                     return ExecuteCreateTcpPort(action);
                 
                 case ActionTypes.AssignPortToQueue:

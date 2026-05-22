@@ -2,25 +2,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="rearGrad" x1="512" y1="76" x2="512" y2="260" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#6A6F7C"/>
-      <stop offset="100%" stop-color="#32323C"/>
+      <stop offset="0%" stop-color="#CC6600"/>
+      <stop offset="100%" stop-color="#7A3D00"/>
     </linearGradient>
 
     <linearGradient id="bodyGrad" x1="116" y1="230" x2="908" y2="790" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#EFF0F6"/>
-      <stop offset="100%" stop-color="#E6E6F0"/>
+      <stop offset="0%" stop-color="#FFE8D0"/>
+      <stop offset="100%" stop-color="#FFD9B3"/>
     </linearGradient>
 
     <linearGradient id="bodyEdgeGrad" x1="512" y1="230" x2="512" y2="790" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#D7DAE2"/>
-      <stop offset="72%" stop-color="#A5A5AA"/>
-      <stop offset="100%" stop-color="#6B717B"/>
+      <stop offset="0%" stop-color="#FFB366"/>
+      <stop offset="72%" stop-color="#E68A2E"/>
+      <stop offset="100%" stop-color="#B35C00"/>
     </linearGradient>
 
     <linearGradient id="bodyBottomShade" x1="512" y1="650" x2="512" y2="800" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0"/>
-      <stop offset="72%" stop-color="#7B828C" stop-opacity="0.30"/>
-      <stop offset="100%" stop-color="#3F4650" stop-opacity="0.78"/>
+      <stop offset="72%" stop-color="#B35C00" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#663300" stop-opacity="0.78"/>
     </linearGradient>
 
     <linearGradient id="caveGrad" x1="512" y1="704" x2="512" y2="800" gradientUnits="userSpaceOnUse">
@@ -672,4 +672,22 @@
             fill="none" stroke="#2F3740" stroke-width="9" stroke-linecap="round" opacity="0.72"/>
     </g>
   </g>
+
+  <!-- Badge DEV -->
+  <g transform="translate(0, 0)">
+    <!-- Sombra del badge -->
+    <rect x="698" y="868" width="280" height="120" rx="24"
+          fill="#000000" opacity="0.25" transform="translate(4, 4)"/>
+    <!-- Fondo naranja -->
+    <rect x="698" y="868" width="280" height="120" rx="24"
+          fill="#FF6B00"/>
+    <!-- Borde más claro -->
+    <rect x="698" y="868" width="280" height="120" rx="24"
+          fill="none" stroke="#FFB366" stroke-width="4" opacity="0.7"/>
+    <!-- Texto DEV -->
+    <text x="838" y="948" font-family="Arial, Helvetica, sans-serif"
+          font-size="82" font-weight="bold" fill="#FFFFFF"
+          text-anchor="middle" dominant-baseline="middle">DEV</text>
+  </g>
+
 </svg>

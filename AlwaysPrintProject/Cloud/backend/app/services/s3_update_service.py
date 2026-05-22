@@ -323,7 +323,7 @@ class S3UpdateService:
             logger.error("Error al subir MSI a S3: %s", str(e))
             raise
 
-    def generate_download_url(self, key: str = None, expires_in: int = 3600) -> str:
+    def generate_download_url(self, key: str = None, expires_in: int = 3600, filename: str = None) -> str:
         """
         Genera una URL presigned para descargar el MSI desde S3.
 
@@ -333,6 +333,8 @@ class S3UpdateService:
         Args:
             key: Clave S3 del objeto. Si es None, usa la clave por defecto (latest/AlwaysPrint.msi)
             expires_in: Tiempo de expiración en segundos (default: 3600 = 1 hora)
+            filename: Nombre de archivo para la descarga. Si se proporciona, se agrega
+                      Content-Disposition para que el browser use este nombre.
 
         Returns:
             URL presigned como string
@@ -353,9 +355,13 @@ class S3UpdateService:
                 expires_in
             )
 
+            params = {'Bucket': self._bucket, 'Key': effective_key}
+            if filename:
+                params['ResponseContentDisposition'] = f'attachment; filename="{filename}"'
+
             url = self._client.generate_presigned_url(
                 'get_object',
-                Params={'Bucket': self._bucket, 'Key': effective_key},
+                Params=params,
                 ExpiresIn=expires_in
             )
 

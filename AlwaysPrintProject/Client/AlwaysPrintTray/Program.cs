@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Threading;
@@ -15,9 +16,20 @@ namespace AlwaysPrintTray
         // Global mutex name – unique per machine, prevents multiple Tray instances.
         private const string MutexName = "Global\\AlwaysPrintTray-SingleInstance";
 
+        // AUMID para notificaciones toast en Windows 10/11 (mismo para dev y prod)
+        private const string AppUserModelId = "Robles.AI.AlwaysPrint";
+
+        [DllImport("shell32.dll", SetLastError = true)]
+        private static extern void SetCurrentProcessExplicitAppUserModelID(
+            [MarshalAs(UnmanagedType.LPWStr)] string AppID);
+
         [STAThread]
         private static void Main()
         {
+            // Registrar AUMID antes de cualquier UI para que las notificaciones toast
+            // muestren el nombre correcto de la aplicación.
+            SetCurrentProcessExplicitAppUserModelID(AppUserModelId);
+
             // Forzar TLS 1.2 para todas las conexiones (requerido por WebSocket4Net en .NET 4.8)
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 

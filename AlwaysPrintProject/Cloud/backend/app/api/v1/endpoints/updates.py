@@ -183,7 +183,10 @@ def admin_download_version(
         target_key = f"versions/{version}/AlwaysPrint.msi"
         # Verificar que el objeto existe antes de generar URL
         s3_service.get_msi_metadata(key=target_key)
-        presigned_url = s3_service.generate_download_url(key=target_key)
+        presigned_url = s3_service.generate_download_url(
+            key=target_key,
+            filename=f"AlwaysPrint-{version}.msi"
+        )
     except ClientError as e:
         error_code = e.response['Error']['Code']
         if error_code in ('404', 'NoSuchKey'):

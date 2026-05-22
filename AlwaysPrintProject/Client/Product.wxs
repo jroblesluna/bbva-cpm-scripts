@@ -13,7 +13,24 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
-  <Package Name="AlwaysPrint"
+  <!-- Configuración condicional por entorno -->
+  <?ifdef var.Environment ?>
+    <?if $(var.Environment) = "dev" ?>
+      <?define ProductDisplayName = "AlwaysPrint [DEV]" ?>
+      <?define BootstrapDomainsValue = "dev.iol.pe" ?>
+      <?define IconFile = "logo-dev.ico" ?>
+    <?else?>
+      <?define ProductDisplayName = "AlwaysPrint" ?>
+      <?define BootstrapDomainsValue = "apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai" ?>
+      <?define IconFile = "logo.ico" ?>
+    <?endif?>
+  <?else?>
+    <?define ProductDisplayName = "AlwaysPrint" ?>
+    <?define BootstrapDomainsValue = "apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai" ?>
+    <?define IconFile = "logo.ico" ?>
+  <?endif?>
+
+  <Package Name="$(var.ProductDisplayName)"
            Language="1033"
            Version="$(var.ProductVersion)"
            Manufacturer="Robles.AI"
@@ -27,7 +44,7 @@
     <Property Id="ARPHELPLINK"     Value="antonio@robles.ai" />
 
     <!-- Icono para Panel de Control (Add/Remove Programs) -->
-    <Icon Id="ProductIcon" SourceFile="logo.ico" />
+    <Icon Id="ProductIcon" SourceFile="$(var.IconFile)" />
     <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
 
     <!-- MajorUpgrade: desinstala automáticamente versiones anteriores -->
@@ -75,6 +92,12 @@
         <Directory Id="LOGSFOLDER" Name="logs" />
       </Directory>
     </StandardDirectory>
+
+    <!-- Start Menu (para shortcut y AUMID de notificaciones) -->
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <!-- Desktop de todos los usuarios -->
+    <StandardDirectory Id="DesktopFolder" />
 
     <ComponentGroup Id="AlwaysPrint.Components">
 
@@ -132,7 +155,7 @@
           <RegistryValue Name="CorporateQueueName"       Type="string"  Value=""  />
           <RegistryValue Name="PendingTaskPollingMinutes" Type="integer" Value="3" />
           <RegistryValue Name="BootstrapDomains"         Type="string"
-                         Value="apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai" />
+                         Value="$(var.BootstrapDomainsValue)" />
           <RegistryValue Name="RoblesAiLicenseSerial"    Type="string"  Value=""  />
           <RegistryValue Name="SearchTargets"            Type="string"
                          Value='{"ips":"","ranges":""}' />
@@ -152,6 +175,24 @@
         <File Id="filTrayExe"
               Source="$(var.ProjectDir)dist\AlwaysPrintTray.exe"
               KeyPath="yes" />
+      </Component>
+
+      <!-- ── Shortcuts en Start Menu y Desktop (AUMID y notificaciones toast) ── -->
+      <Component Id="cmpStartMenuShortcut" Directory="INSTALLFOLDER"
+                 Guid="C7A4B5D6-E500-4E00-8F00-0BBA00000005">
+        <RegistryValue Root="HKCU" Key="SOFTWARE\Robles.AI\AlwaysPrint"
+                       Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+        <Shortcut Id="StartMenuShortcut"
+                  Directory="ProgramMenuFolder"
+                  Name="$(var.ProductDisplayName)"
+                  Target="[INSTALLFOLDER]AlwaysPrintTray.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <Shortcut Id="DesktopShortcut"
+                  Directory="DesktopFolder"
+                  Name="$(var.ProductDisplayName)"
+                  Target="[INSTALLFOLDER]AlwaysPrintTray.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveStartMenuFolder" Directory="ProgramMenuFolder" On="uninstall" />
       </Component>
 
       <!-- ── Componente para carpeta de logs (se preserva al desinstalar) ── -->
