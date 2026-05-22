@@ -65,7 +65,7 @@ class VLANResponse(BaseModel):
     description: Optional[str] = None
     cidr_ranges: list[str]
     forced_contingency: bool = False
-    is_default: bool = False
+    default_device_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
     

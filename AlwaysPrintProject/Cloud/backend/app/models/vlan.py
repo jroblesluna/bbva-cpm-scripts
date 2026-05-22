@@ -37,10 +37,9 @@ class VLAN(Base):
     # Cuando está activo, TODAS las workstations de esta VLAN entran en modo contingencia
     forced_contingency = Column(Boolean, nullable=False, default=False, server_default='false')
 
-    # Flag de VLAN predeterminada por organización
-    # Solo una VLAN puede ser predeterminada por organización.
-    # Las workstations que no coincidan con ningún CIDR se asignan a esta VLAN.
-    is_default = Column(Boolean, nullable=False, default=False, server_default='false')
+    # Impresora predeterminada de la VLAN
+    # Las workstations de esta VLAN que no tengan impresora favorita individual usarán esta.
+    default_device_id = Column(GUID, ForeignKey("devices.id", ondelete="SET NULL"), nullable=True)
     
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -50,6 +49,7 @@ class VLAN(Base):
     organization = relationship("Organization", back_populates="vlans")
     workstations = relationship("Workstation", back_populates="vlan")
     devices = relationship("Device", back_populates="vlan")
+    default_device = relationship("Device", foreign_keys="VLAN.default_device_id")
     vlan_config = relationship("VLANConfig", back_populates="vlan", uselist=False, cascade="all, delete-orphan")
     
     def __repr__(self):

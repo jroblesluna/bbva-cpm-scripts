@@ -221,13 +221,14 @@
     "contingencyMoreDevices": "+{count} impresora(s) adicional(es) disponible(s)",
     "pagination": "Mostrando {start} a {end} de {total} VLANs",
     "pageNumber": "Página {page}",
-    "setDefault": "Establecer como predeterminada",
-    "unsetDefault": "Quitar predeterminada",
-    "defaultBadge": "Predeterminada",
-    "setDefaultConfirm": "¿Establecer la VLAN \"{name}\" como predeterminada? Las estaciones sin VLAN asignada se asignarán automáticamente a esta VLAN.",
-    "unsetDefaultConfirm": "¿Quitar la VLAN \"{name}\" como predeterminada? Las estaciones ya asignadas no se verán afectadas.",
-    "defaultSuccess": "VLAN predeterminada actualizada. {count} estación(es) asignada(s).",
-    "defaultRemoved": "VLAN predeterminada removida."
+    "defaultDevice": "Impresora predeterminada",
+    "setDefaultDevice": "Establecer impresora predeterminada",
+    "removeDefaultDevice": "Quitar impresora predeterminada",
+    "noDefaultDevice": "Sin impresora predeterminada",
+    "selectDefaultDevice": "-- Seleccionar impresora --",
+    "defaultDeviceUpdated": "Impresora predeterminada actualizada.",
+    "defaultDeviceRemoved": "Impresora predeterminada removida.",
+    "defaultDeviceNoDevices": "No hay dispositivos activos en esta VLAN"
   },
   "messages": {
     "title": "Mensajes",

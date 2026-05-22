@@ -65,7 +65,9 @@ export default function VLANsPage() {
   const [contingencyTarget, setContingencyTarget] = useState<VLAN | null>(null)
   const [contingencyDevices, setContingencyDevices] = useState<Device[]>([])
   const [contingencyDevicesLoading, setContingencyDevicesLoading] = useState(false)
-  const [defaultTarget, setDefaultTarget] = useState<VLAN | null>(null)
+  const [defaultDeviceTarget, setDefaultDeviceTarget] = useState<VLAN | null>(null)
+  const [defaultDeviceOptions, setDefaultDeviceOptions] = useState<Device[]>([])
+  const [defaultDeviceLoading, setDefaultDeviceLoading] = useState(false)
   const [activeDeviceCounts, setActiveDeviceCounts] = useState<Record<string, number>>({})
   const [page, setPage] = useState(1)
   const pageSize = viewMode === 'cards' ? 10 : 20
@@ -96,6 +98,27 @@ export default function VLANsPage() {
     }
     loadDevices()
   }, [contingencyTarget])
+
+  // Cargar dispositivos activos cuando se abre el modal de impresora predeterminada
+  useEffect(() => {
+    if (!defaultDeviceTarget) {
+      setDefaultDeviceOptions([])
+      return
+    }
+    const loadDevices = async () => {
+      setDefaultDeviceLoading(true)
+      try {
+        const response = await apiClient.get(`/devices/?vlan_id=${defaultDeviceTarget.id}`)
+        const devices: Device[] = response.data.devices || []
+        setDefaultDeviceOptions(devices.filter((d) => d.is_active))
+      } catch {
+        setDefaultDeviceOptions([])
+      } finally {
+        setDefaultDeviceLoading(false)
+      }
+    }
+    loadDevices()
+  }, [defaultDeviceTarget])
 
   const loadAccounts = async () => {
     try {
@@ -193,20 +216,16 @@ export default function VLANsPage() {
     }
   }
 
-  const handleToggleDefault = async (vlan: VLAN, enabled: boolean) => {
+  const handleToggleDefault = async (vlan: VLAN, deviceId: string | null) => {
     try {
-      await apiClient.patch(`/vlans/${vlan.id}/set-default`, null, { params: { enabled } })
+      const params = deviceId ? { device_id: deviceId } : {}
+      await apiClient.patch(`/vlans/${vlan.id}/default-device`, null, { params })
       setVlans((prev) =>
-        prev.map((v) => {
-          if (v.id === vlan.id) return { ...v, is_default: enabled }
-          // Si se activa una como predeterminada, desmarcar las demás de la misma organización
-          if (enabled && v.organization_id === vlan.organization_id) return { ...v, is_default: false }
-          return v
-        })
+        prev.map((v) => (v.id === vlan.id ? { ...v, default_device_id: deviceId } : v))
       )
-      setDefaultTarget(null)
+      setDefaultDeviceTarget(null)
     } catch (error) {
-      console.error('Error al cambiar VLAN predeterminada:', error)
+      console.error('Error al cambiar impresora predeterminada:', error)
     }
   }
 
@@ -369,12 +388,6 @@ export default function VLANsPage() {
                   <span className="text-sm md:text-base font-medium text-gray-900 truncate">
                     {vlan.name}
                   </span>
-                  {vlan.is_default && (
-                    <Badge variant="default" className="bg-yellow-100 text-yellow-800 border-yellow-300 text-xs">
-                      <Star className="h-3 w-3 mr-1 fill-yellow-500 text-yellow-500" />
-                      {t('defaultBadge')}
-                    </Badge>
-                  )}
                 </div>
                 <CidrHealthBadge cidrCount={vlan.cidr_ranges.length} />
               </div>
@@ -430,13 +443,13 @@ export default function VLANsPage() {
                   </Tooltip>
                 </TooltipProvider>
                 <Button
-                  variant={vlan.is_default ? 'default' : 'ghost'}
+                  variant={vlan.default_device_id ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setDefaultTarget(vlan)}
-                  title={vlan.is_default ? t('unsetDefault') : t('setDefault')}
-                  className={`h-8 w-8 p-0 ${vlan.is_default ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : ''}`}
+                  onClick={() => setDefaultDeviceTarget(vlan)}
+                  title={vlan.default_device_id ? t('defaultDevice') : t('setDefaultDevice')}
+                  className={`h-8 w-8 p-0 ${vlan.default_device_id ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : ''}`}
                 >
-                  <Star className={`h-4 w-4 ${vlan.is_default ? 'fill-white' : ''}`} />
+                  <Star className={`h-4 w-4 ${vlan.default_device_id ? 'fill-white' : ''}`} />
                 </Button>
                 <Button
                   variant="ghost"
@@ -492,12 +505,6 @@ export default function VLANsPage() {
                       <div className="flex items-center gap-2">
                         <Network className="h-5 w-5 text-gray-400" />
                         <span className="text-sm font-medium text-gray-900">{vlan.name}</span>
-                        {vlan.is_default && (
-                          <Badge variant="default" className="bg-yellow-100 text-yellow-800 border-yellow-300 text-xs">
-                            <Star className="h-3 w-3 mr-0.5 fill-yellow-500 text-yellow-500" />
-                            {t('defaultBadge')}
-                          </Badge>
-                        )}
                       </div>
                     </td>
                     <td className="px-4 md:px-6 py-4 whitespace-nowrap">
@@ -549,11 +556,11 @@ export default function VLANsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setDefaultTarget(vlan)}
-                          title={vlan.is_default ? t('unsetDefault') : t('setDefault')}
-                          className={`h-8 w-8 p-0 ${vlan.is_default ? 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100' : ''}`}
+                          onClick={() => setDefaultDeviceTarget(vlan)}
+                          title={vlan.default_device_id ? t('defaultDevice') : t('setDefaultDevice')}
+                          className={`h-8 w-8 p-0 ${vlan.default_device_id ? 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100' : ''}`}
                         >
-                          <Star className={`h-4 w-4 ${vlan.is_default ? 'fill-yellow-500' : ''}`} />
+                          <Star className={`h-4 w-4 ${vlan.default_device_id ? 'fill-yellow-500' : ''}`} />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleViewDevices(vlan)} title={t('viewDevices')} className="h-8 w-8 p-0">
                           <Printer className="h-4 w-4" />
@@ -667,28 +674,59 @@ export default function VLANsPage() {
           </div>
         </div>
       )}
-      {defaultTarget && (
+      {defaultDeviceTarget && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center gap-2 mb-4">
-              <Star className={`w-5 h-5 ${defaultTarget.is_default ? 'text-gray-600' : 'text-yellow-500 fill-yellow-500'}`} />
+              <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
               <h2 className="text-lg font-bold text-gray-900">
-                {defaultTarget.is_default ? t('unsetDefault') : t('setDefault')}
+                {t('setDefaultDevice')}
               </h2>
             </div>
             <p className="text-sm text-gray-600 mb-4">
-              {defaultTarget.is_default
-                ? t('unsetDefaultConfirm', { name: defaultTarget.name })
-                : t('setDefaultConfirm', { name: defaultTarget.name })
-              }
+              {defaultDeviceTarget.name}
             </p>
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setDefaultTarget(null)}>{tCommon('cancel')}</Button>
+            {defaultDeviceLoading ? (
+              <p className="text-sm text-gray-500 italic">{tCommon('loading')}</p>
+            ) : defaultDeviceOptions.length === 0 ? (
+              <p className="text-sm text-red-600">{t('defaultDeviceNoDevices')}</p>
+            ) : (
+              <div className="space-y-2">
+                <select
+                  defaultValue={defaultDeviceTarget.default_device_id || ''}
+                  id="default-device-select"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">{t('selectDefaultDevice')}</option>
+                  {defaultDeviceOptions.map((device) => (
+                    <option key={device.id} value={device.id}>
+                      {device.name} — {device.ip_address}:{device.port}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="flex justify-end gap-3 mt-4">
+              <Button variant="outline" onClick={() => setDefaultDeviceTarget(null)}>{tCommon('cancel')}</Button>
+              {defaultDeviceTarget.default_device_id && (
+                <Button
+                  variant="outline"
+                  className="text-red-600 border-red-300 hover:bg-red-50"
+                  onClick={() => handleToggleDefault(defaultDeviceTarget, null)}
+                >
+                  {t('removeDefaultDevice')}
+                </Button>
+              )}
               <Button
-                onClick={() => handleToggleDefault(defaultTarget, !defaultTarget.is_default)}
-                className={!defaultTarget.is_default ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : ''}
+                disabled={defaultDeviceOptions.length === 0}
+                onClick={() => {
+                  const select = document.getElementById('default-device-select') as HTMLSelectElement
+                  const value = select?.value || null
+                  handleToggleDefault(defaultDeviceTarget, value || null)
+                }}
+                className="bg-yellow-500 hover:bg-yellow-600 text-white"
               >
-                {defaultTarget.is_default ? t('unsetDefault') : t('setDefault')}
+                {tCommon('save')}
               </Button>
             </div>
           </div>

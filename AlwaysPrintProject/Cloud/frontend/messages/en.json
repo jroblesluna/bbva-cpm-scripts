@@ -221,13 +221,14 @@
     "contingencyMoreDevices": "+{count} additional printer(s) available",
     "pagination": "Showing {start} to {end} of {total} VLANs",
     "pageNumber": "Page {page}",
-    "setDefault": "Set as default",
-    "unsetDefault": "Remove default",
-    "defaultBadge": "Default",
-    "setDefaultConfirm": "Set VLAN \"{name}\" as default? Workstations without an assigned VLAN will be automatically assigned to this VLAN.",
-    "unsetDefaultConfirm": "Remove VLAN \"{name}\" as default? Already assigned workstations will not be affected.",
-    "defaultSuccess": "Default VLAN updated. {count} workstation(s) assigned.",
-    "defaultRemoved": "Default VLAN removed."
+    "defaultDevice": "Default printer",
+    "setDefaultDevice": "Set default printer",
+    "removeDefaultDevice": "Remove default printer",
+    "noDefaultDevice": "No default printer",
+    "selectDefaultDevice": "-- Select printer --",
+    "defaultDeviceUpdated": "Default printer updated.",
+    "defaultDeviceRemoved": "Default printer removed.",
+    "defaultDeviceNoDevices": "No active devices in this VLAN"
   },
   "messages": {
     "title": "Messages",
