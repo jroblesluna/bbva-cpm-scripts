@@ -209,7 +209,9 @@
     "forcedContingencyDeactivate": "Deactivate forced contingency",
     "forcedContingencyConfirmActivate": "Are you sure you want to activate forced contingency for VLAN \"{name}\"? All workstations in this VLAN will enter contingency mode.",
     "forcedContingencyConfirmDeactivate": "Are you sure you want to deactivate forced contingency for VLAN \"{name}\"?",
-    "forcedContingencyNotification": "All connected workstations will receive a forced contingency notification."
+    "forcedContingencyNotification": "All connected workstations will receive a forced contingency notification.",
+    "pagination": "Showing {start} to {end} of {total} VLANs",
+    "pageNumber": "Page {page}"
   },
   "messages": {
     "title": "Messages",
@@ -234,6 +236,7 @@
     "emptyTitle": "No messages",
     "emptyMessage": "Start by sending a message to your workstations",
     "pagination": "Showing {start} to {end} of {total} messages",
+    "pageNumber": "Page {page}",
     "sendTitle": "Send Message",
     "sendTo": "Send to *",
     "wholeOrg": "Entire organization",
@@ -360,7 +363,9 @@
     "deleteTitle": "Confirm Deletion",
     "deleteConfirm": "Are you sure you want to delete user {name} ({email})?",
     "deleteWarning": "This action cannot be undone. All data associated with the user will be lost.",
-    "deleteBtn": "Delete User"
+    "deleteBtn": "Delete User",
+    "pagination": "Showing {start} to {end} of {total} users",
+    "pageNumber": "Page {page}"
   },
   "accounts": {
     "title": "Organizations",
@@ -405,7 +410,9 @@
     "forcedContingencyDeactivate": "Deactivate forced contingency",
     "forcedContingencyConfirmActivate": "Are you sure you want to activate forced contingency for organization \"{name}\"? ALL workstations in this organization will enter contingency mode.",
     "forcedContingencyConfirmDeactivate": "Are you sure you want to deactivate forced contingency for organization \"{name}\"?",
-    "forcedContingencyNotification": "All connected workstations will receive a forced contingency notification."
+    "forcedContingencyNotification": "All connected workstations will receive a forced contingency notification.",
+    "pagination": "Showing {start} to {end} of {total} organizations",
+    "pageNumber": "Page {page}"
   },
   "pendingIps": {
     "title": "Pending Public IPs",
@@ -429,7 +436,9 @@
     "selectAccount": "Select an organization...",
     "descriptionLabel": "Description (optional)",
     "descriptionPlaceholder": "e.g. Lima Main Office",
-    "lastUpdated": "Last updated: {time}"
+    "lastUpdated": "Last updated: {time}",
+    "pagination": "Showing {start} to {end} of {total} IPs",
+    "pageNumber": "Page {page}"
   },
   "language": {
     "label": "Language",
@@ -515,7 +524,8 @@
     "colDateTime": "Date/Time",
     "contingencyActive2": "Active",
     "contingencyInactive": "Inactive",
-    "pagination": "Showing {start} to {end} of {total} workstations"
+    "pagination": "Showing {start} to {end} of {total} workstations",
+    "pageNumber": "Page {page}"
   },
   "updates": {
     "title": "Automatic Updates",
@@ -613,6 +623,8 @@
     "noVlan": "No VLAN assigned",
     "viewDetails": "View Details",
     "createdAt": "Created At",
-    "updatedAt": "Last Updated"
+    "updatedAt": "Last Updated",
+    "pagination": "Showing {start} to {end} of {total} devices",
+    "pageNumber": "Page {page}"
   }
 }

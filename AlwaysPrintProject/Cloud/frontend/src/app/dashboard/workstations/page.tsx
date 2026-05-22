@@ -38,6 +38,8 @@ import {
   List,
   ArrowUpDown,
   ShieldAlert,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
@@ -66,6 +68,14 @@ export default function WorkstationsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [sortField, setSortField] = useState<SortField>('ip_private');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [page, setPage] = useState(1);
+  const pageSize = viewMode === 'cards' ? 10 : 20;
+
+  // Resetear página al cambiar vista (el pageSize cambia)
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    setPage(1);
+  };
 
   const {
     data: workstationsData,
@@ -73,7 +83,7 @@ export default function WorkstationsPage() {
     isFetching,
     error,
   } = useQuery({
-    queryKey: ['workstations', searchTerm, filterOnline, filterContingency, filterOrgId, filterVlanId],
+    queryKey: ['workstations', searchTerm, filterOnline, filterContingency, filterOrgId, filterVlanId, page, pageSize],
     queryFn: () =>
       workstationsApi.list({
         search: searchTerm || undefined,
@@ -81,6 +91,8 @@ export default function WorkstationsPage() {
         contingency_active: filterContingency,
         organization_id: filterOrgId,
         vlan_id: filterVlanId,
+        page,
+        page_size: pageSize,
       }),
     placeholderData: (prev) => prev,
   });
@@ -239,6 +251,10 @@ export default function WorkstationsPage() {
   };
 
   const workstations = workstationsData?.items || [];
+  const totalItems = workstationsData?.total || 0;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const paginationStart = (page - 1) * pageSize + 1;
+  const paginationEnd = Math.min(page * pageSize, totalItems);
 
   // Ordenar workstations para la vista de tabla
   const sortedWorkstations = [...workstations].sort((a, b) => {
@@ -390,7 +406,7 @@ export default function WorkstationsPage() {
                   type="text"
                   placeholder={t('searchPlaceholder')}
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
                   className="flex-1"
                 />
               </div>
@@ -403,6 +419,7 @@ export default function WorkstationsPage() {
                 onChange={(e) => {
                   const value = e.target.value;
                   setFilterOnline(value === 'all' ? undefined : value === 'online');
+                  setPage(1);
                 }}
                 className="w-full px-3 py-2 border rounded-md"
               >
@@ -419,6 +436,7 @@ export default function WorkstationsPage() {
                   setFilterOrgId(value === 'all' ? undefined : value);
                   // Limpiar filtro de VLAN al cambiar organización
                   setFilterVlanId(undefined);
+                  setPage(1);
                 }}
                 className="w-full px-3 py-2 border rounded-md"
               >
@@ -438,6 +456,7 @@ export default function WorkstationsPage() {
                   onChange={(e) => {
                     const value = e.target.value;
                     setFilterVlanId(value === 'all' ? undefined : value);
+                    setPage(1);
                   }}
                   className="w-full px-3 py-2 border rounded-md"
                 >
@@ -458,7 +477,7 @@ export default function WorkstationsPage() {
                 <input
                   type="checkbox"
                   checked={filterContingency === true}
-                  onChange={(e) => setFilterContingency(e.target.checked ? true : undefined)}
+                  onChange={(e) => { setFilterContingency(e.target.checked ? true : undefined); setPage(1); }}
                   className="rounded"
                 />
                 <span className="text-sm text-gray-700">{t('onlyContingency')}</span>
@@ -477,6 +496,7 @@ export default function WorkstationsPage() {
                     setFilterContingency(undefined);
                     setFilterOrgId(undefined);
                     setFilterVlanId(undefined);
+                    setPage(1);
                   }}
                 >
                   {tCommon('clearFilters')}
@@ -488,7 +508,7 @@ export default function WorkstationsPage() {
               <Button
                 variant={viewMode === 'cards' ? 'default' : 'ghost'}
                 size="sm"
-                onClick={() => setViewMode('cards')}
+                onClick={() => handleViewModeChange('cards')}
                 title="Vista de tarjetas"
                 className="h-8 w-8 p-0"
               >
@@ -497,7 +517,7 @@ export default function WorkstationsPage() {
               <Button
                 variant={viewMode === 'table' ? 'default' : 'ghost'}
                 size="sm"
-                onClick={() => setViewMode('table')}
+                onClick={() => handleViewModeChange('table')}
                 title="Vista de tabla"
                 className="h-8 w-8 p-0"
               >
@@ -579,6 +599,49 @@ export default function WorkstationsPage() {
           isLogPending={logDownloadMutation.isPending}
           isForcedContingencyPending={forcedContingencyMutation.isPending}
         />
+      )}
+
+      {/* Controles de paginación */}
+      {totalItems > 0 && totalPages > 1 && (
+        <div className="bg-white rounded-lg shadow px-4 py-3 flex items-center justify-between border border-gray-200 mt-4 sm:px-6">
+          <div className="flex-1 flex items-center justify-between">
+            <p className="text-sm text-gray-700">
+              {t('pagination', {
+                start: paginationStart,
+                end: paginationEnd,
+                total: totalItems,
+              })}
+            </p>
+            <div className="flex items-center gap-2">
+              {page > 1 && (
+                <Button variant="outline" size="sm" onClick={() => setPage(1)}>
+                  {tCommon('first')}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(page - 1)}
+                disabled={page <= 1}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                {tCommon('previous')}
+              </Button>
+              <span className="text-sm text-gray-600 px-2">
+                {t('pageNumber', { page })}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(page + 1)}
+                disabled={page >= totalPages}
+              >
+                {tCommon('next')}
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {selectedWorkstation && (
