@@ -899,12 +899,13 @@ namespace AlwaysPrintService.Actions
         /// <summary>
         /// Ejecuta un proceso como el usuario de consola activo (desde un servicio LocalSystem).
         /// Usa WTSQueryUserToken + CreateProcessAsUser para impersonar al usuario logueado.
-        /// No captura stdout/stderr (limitación de CreateProcessAsUser).
+        /// Redirige stdout/stderr a un archivo temporal para capturar el output.
         /// </summary>
         private static bool RunProcessAsLoggedInUser(string filePath, string arguments, int timeoutSeconds, string windowStyle)
         {
             IntPtr userToken = IntPtr.Zero;
             IntPtr duplicateToken = IntPtr.Zero;
+            string outputFile = Path.Combine(Path.GetTempPath(), $"alwaysprint_runprocess_{Guid.NewGuid():N}.log");
 
             try
             {
@@ -931,19 +932,19 @@ namespace AlwaysPrintService.Actions
                     return false;
                 }
 
-                // Preparar comando: para .bat usar cmd /c
+                // Preparar comando: redirigir stdout y stderr a archivo temporal
                 string commandLine;
                 if (filePath.EndsWith(".bat", StringComparison.OrdinalIgnoreCase) ||
                     filePath.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase))
                 {
-                    commandLine = $"cmd.exe /c \"{filePath}\" {arguments}".Trim();
+                    commandLine = $"cmd.exe /c \"\"{filePath}\" {arguments} > \"{outputFile}\" 2>&1\"".Trim();
                 }
                 else
                 {
-                    commandLine = string.IsNullOrEmpty(arguments) ? $"\"{filePath}\"" : $"\"{filePath}\" {arguments}";
+                    commandLine = $"cmd.exe /c \"\"{filePath}\" {arguments} > \"{outputFile}\" 2>&1\"".Trim();
                 }
 
-                AlwaysPrintLogger.WriteInfo($"RunProcess (como usuario, sesión {sessionId}): ejecutando '{commandLine}', ventana={windowStyle}, timeout={timeoutSeconds}s");
+                AlwaysPrintLogger.WriteInfo($"RunProcess (como usuario, sesión {sessionId}): ejecutando '{filePath}', ventana={windowStyle}, timeout={timeoutSeconds}s");
 
                 var si = new STARTUPINFO();
                 si.cb = Marshal.SizeOf(si);
@@ -992,6 +993,27 @@ namespace AlwaysPrintService.Actions
                 CloseHandle(pi.hProcess);
                 CloseHandle(pi.hThread);
 
+                // Leer output del archivo temporal y registrar en log
+                if (File.Exists(outputFile))
+                {
+                    try
+                    {
+                        string output = File.ReadAllText(outputFile).TrimEnd();
+                        if (!string.IsNullOrEmpty(output))
+                        {
+                            AlwaysPrintLogger.WriteInfo($"RunProcess stdout (como usuario) [{filePath}]: {output}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AlwaysPrintLogger.WriteWarning($"RunProcess: no se pudo leer output temporal: {ex.Message}");
+                    }
+                    finally
+                    {
+                        try { File.Delete(outputFile); } catch { }
+                    }
+                }
+
                 AlwaysPrintLogger.WriteInfo($"RunProcess (como usuario): '{filePath}' terminó con exit code {exitCode}");
                 return exitCode == 0;
             }
@@ -1004,6 +1026,8 @@ namespace AlwaysPrintService.Actions
             {
                 if (userToken != IntPtr.Zero) CloseHandle(userToken);
                 if (duplicateToken != IntPtr.Zero) CloseHandle(duplicateToken);
+                // Limpiar archivo temporal si quedó
+                try { if (File.Exists(outputFile)) File.Delete(outputFile); } catch { }
             }
         }
 
