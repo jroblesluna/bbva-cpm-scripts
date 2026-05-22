@@ -167,6 +167,28 @@ async def get_organization_telemetry_stats(
     return stats
 
 
+# === ENDPOINT DE ESTADÍSTICAS GLOBALES (ADMIN) ===
+
+@router.get(
+    "/telemetry/stats",
+    response_model=TelemetryStatsResponse,
+    summary="Obtener estadísticas globales de telemetría (Admin)",
+    description="Retorna estadísticas agregadas de telemetría de todas las organizaciones. Solo accesible para administradores."
+)
+async def get_global_telemetry_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo los administradores pueden acceder a estadísticas globales"
+        )
+
+    telemetry_service = TelemetryService()
+    return telemetry_service.get_global_telemetry_stats(db=db)
+
+
 # === ENDPOINT BATCH: ÚLTIMA TELEMETRÍA POR WORKSTATION ===
 
 @router.post(

@@ -515,7 +515,8 @@
     "colDateTime": "Fecha/Hora",
     "contingencyActive2": "Activa",
     "contingencyInactive": "Inactiva",
-    "pagination": "Mostrando {start} a {end} de {total} workstations"
+    "pagination": "Mostrando {start} a {end} de {total} workstations",
+    "allOrganizations": "Todas las organizaciones"
   },
   "updates": {
     "title": "Actualizaciones Automáticas",

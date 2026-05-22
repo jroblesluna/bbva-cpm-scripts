@@ -296,7 +296,7 @@ namespace AlwaysPrintTray.Cloud
         /// <summary>
         /// Maneja mensajes push enviados por un administrador desde la Cloud.
         /// Muestra un balloon tip con el contenido del mensaje.
-        /// Formato esperado: {"type": "message", "message_id": "...", "content": "...", "sent_at": "..."}
+        /// Formato esperado: {"type": "message", "message_id": "...", "content": "...", "sent_at": "...", "sender_name": "..."}
         /// </summary>
         private void HandleCloudMessage(string json)
         {
@@ -305,6 +305,7 @@ namespace AlwaysPrintTray.Cloud
                 var data = JObject.Parse(json);
                 var content = data["content"]?.ToString();
                 var messageId = data["message_id"]?.ToString();
+                var senderName = data["sender_name"]?.ToString();
 
                 if (string.IsNullOrWhiteSpace(content))
                 {
@@ -316,11 +317,15 @@ namespace AlwaysPrintTray.Cloud
                 AlwaysPrintLogger.WriteTrayInfo(
                     $"CloudManager: mensaje Cloud recibido. id={messageId}, longitud={content.Length}");
 
+                string title = string.IsNullOrWhiteSpace(senderName)
+                    ? "AlwaysPrint - Mensaje"
+                    : $"AlwaysPrint - Mensaje de {senderName}";
+
                 // Mostrar notificación al usuario vía balloon tip
                 _uiContext.Post(_ =>
                 {
                     _trayIcon.BalloonTipIcon = ToolTipIcon.Info;
-                    _trayIcon.BalloonTipTitle = "AlwaysPrint - Mensaje";
+                    _trayIcon.BalloonTipTitle = title;
                     _trayIcon.BalloonTipText = content.Length > 255
                         ? content.Substring(0, 252) + "..."
                         : content;

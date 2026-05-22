@@ -257,7 +257,8 @@ class MessageService:
             "type": "message",
             "message_id": str(message.id),
             "content": message.content,
-            "sent_at": message.sent_at.isoformat()
+            "sent_at": message.sent_at.isoformat(),
+            "sender_name": message.sender.full_name if message.sender else None,
         }
         
         # Enviar en paralelo a las online

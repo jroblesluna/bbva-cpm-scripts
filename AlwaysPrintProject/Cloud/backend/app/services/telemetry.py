@@ -247,6 +247,73 @@ class TelemetryService:
             last_updated=last_updated
         )
 
+    def get_global_telemetry_stats(
+        self,
+        db: Session
+    ) -> TelemetryStatsResponse:
+        """
+        Computa estadísticas globales de telemetría para todas las organizaciones.
+        Solo debe ser llamado por usuarios con rol Admin.
+        """
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        since = now - timedelta(hours=24)
+
+        total_workstations = db.query(Workstation).count()
+
+        workstations_reporting = db.query(
+            distinct(TelemetryLog.workstation_id)
+        ).filter(
+            TelemetryLog.recorded_at >= since
+        ).count()
+
+        avg_result = db.query(
+            func.avg(TelemetryLog.jobs_identified)
+        ).filter(
+            TelemetryLog.recorded_at >= since,
+            TelemetryLog.jobs_identified.isnot(None)
+        ).scalar()
+
+        avg_jobs_identified = round(float(avg_result), 2) if avg_result is not None else 0.0
+
+        last_updated = db.query(
+            func.max(TelemetryLog.recorded_at)
+        ).filter(
+            TelemetryLog.recorded_at >= since
+        ).scalar()
+
+        latest_per_ws = db.query(
+            TelemetryLog.workstation_id,
+            func.max(TelemetryLog.recorded_at).label("max_recorded_at")
+        ).filter(
+            TelemetryLog.recorded_at >= since
+        ).group_by(TelemetryLog.workstation_id).subquery()
+
+        most_recent_logs = db.query(TelemetryLog).join(
+            latest_per_ws,
+            (TelemetryLog.workstation_id == latest_per_ws.c.workstation_id) &
+            (TelemetryLog.recorded_at == latest_per_ws.c.max_recorded_at)
+        ).all()
+
+        contingency_active_count = sum(
+            1 for log in most_recent_logs
+            if log.contingency_active is True
+        )
+
+        queue_summary = {"ok": 0, "missing": 0, "error": 0}
+        for log in most_recent_logs:
+            status = log.queue_status
+            if status in queue_summary:
+                queue_summary[status] += 1
+
+        return TelemetryStatsResponse(
+            total_workstations=total_workstations,
+            workstations_reporting=workstations_reporting,
+            avg_jobs_identified=avg_jobs_identified,
+            contingency_active_count=contingency_active_count,
+            queue_status_summary=QueueStatusSummary(**queue_summary),
+            last_updated=last_updated
+        )
+
     def get_latest_telemetry_batch(
         self,
         db: Session,

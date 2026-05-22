@@ -9,8 +9,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api';
+import { apiClient, organizationsApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import { UserRole } from '@/types/user';
+import type { Organization } from '@/types';
 import { useTranslations } from 'next-intl';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
@@ -63,11 +65,11 @@ interface WorkstationsPaginatedResponse {
 /**
  * Obtiene estadísticas de telemetría de la cuenta.
  */
-async function fetchTelemetryStats(accountId: string): Promise<TelemetryStats> {
-  if (!accountId) throw new Error('Sin cuenta asignada');
-  const response = await apiClient.get<TelemetryStats>(
-    `/organizations/${accountId}/telemetry/stats`
-  );
+async function fetchTelemetryStats(accountId?: string): Promise<TelemetryStats> {
+  const url = accountId
+    ? `/organizations/${accountId}/telemetry/stats`
+    : '/workstations/telemetry/stats';
+  const response = await apiClient.get<TelemetryStats>(url);
   return response.data;
 }
 
@@ -112,6 +114,7 @@ async function fetchWorkstationsPaginated(page: number, pageSize: number): Promi
 
 export default function TelemetryDashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
+  const isAdmin = user?.role === UserRole.ADMIN;
   const accountId = user?.organization_id ?? '';
   const userTimezone = useUserTimezone();
   const tCommon = useTranslations('common');
@@ -119,13 +122,23 @@ export default function TelemetryDashboardPage() {
   const [selectedWorkstationId, setSelectedWorkstationId] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [page, setPage] = useState(1);
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+
+  const statsOrgId = isAdmin ? selectedOrgId : accountId;
+
+  const orgsQuery = useQuery<Organization[]>({
+    queryKey: ['organizations', 'list'],
+    queryFn: () => organizationsApi.list(),
+    enabled: isAdmin && !authLoading,
+    staleTime: 300000,
+  });
 
   // --- Queries con auto-refresh cada 60s ---
 
   const statsQuery = useQuery({
-    queryKey: ['telemetry', 'stats', accountId],
-    queryFn: () => fetchTelemetryStats(accountId),
-    enabled: !authLoading && !!accountId,
+    queryKey: ['telemetry', 'stats', isAdmin ? 'global' : statsOrgId],
+    queryFn: () => fetchTelemetryStats(isAdmin ? undefined : statsOrgId!),
+    enabled: !authLoading && (isAdmin || !!statsOrgId),
     staleTime: 60000,
     refetchInterval: 60000,
     refetchOnWindowFocus: true,
@@ -144,6 +157,11 @@ export default function TelemetryDashboardPage() {
   const workstations = workstationsQuery.data?.items ?? [];
   const totalWorkstations = workstationsQuery.data?.total ?? 0;
   const totalPages = Math.ceil(totalWorkstations / PAGE_SIZE);
+
+  // Filtro client-side por organización (solo admin)
+  const filteredWorkstations = isAdmin && selectedOrgId
+    ? workstations.filter((w: Workstation) => w.organization_id === selectedOrgId)
+    : workstations;
 
   const latestBatchQuery = useQuery({
     queryKey: ['telemetry', 'latest-batch', workstations.map(w => w.id).sort().join(',')],
@@ -175,8 +193,7 @@ export default function TelemetryDashboardPage() {
   const handleRefresh = useCallback(() => {
     statsQuery.refetch();
     workstationsQuery.refetch();
-    latestBatchQuery.refetch();
-  }, [statsQuery, workstationsQuery, latestBatchQuery]);
+  }, [statsQuery, workstationsQuery]);
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -189,6 +206,18 @@ export default function TelemetryDashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          {isAdmin && (
+            <select
+              value={selectedOrgId ?? ''}
+              onChange={(e: { target: { value: string } }) => { setSelectedOrgId(e.target.value || null); setPage(1); }}
+              className="px-3 py-2 border rounded-md text-sm"
+            >
+              <option value="">{t('allOrganizations')}</option>
+              {orgsQuery.data?.map((org) => (
+                <option key={org.id} value={org.id}>{org.name}</option>
+              ))}
+            </select>
+          )}
           <span className="text-sm text-gray-500">
             {tCommon('lastUpdated', { time: formatDateWithTimezone(lastUpdated, userTimezone) })}
           </span>
@@ -213,7 +242,7 @@ export default function TelemetryDashboardPage() {
       {/* Tabla de workstations */}
       <div className="mt-6">
         <WorkstationsTable
-          workstations={workstations}
+          workstations={filteredWorkstations}
           latestBatch={latestBatchQuery.data ?? {}}
           total={totalWorkstations}
           page={page}
