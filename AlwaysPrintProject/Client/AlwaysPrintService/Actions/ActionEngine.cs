@@ -261,6 +261,9 @@ namespace AlwaysPrintService.Actions
                 case ActionTypes.SetDefaultPrinter:
                     return ExecuteSetDefaultPrinter(action);
                 
+                case ActionTypes.RunProcess:
+                    return ExecuteRunProcess(action);
+                
                 default:
                     AlwaysPrintLogger.WriteWarning($"ActionEngine: tipo de acción desconocido: {action.Type}");
                     return false;
@@ -619,6 +622,33 @@ namespace AlwaysPrintService.Actions
             queueName = ReplaceTemplates(queueName);
 
             return AdminActions.SetDefaultPrinter(queueName);
+        }
+
+        private bool ExecuteRunProcess(ActionConfig action)
+        {
+            string filePath = GetParameter<string>(action, "file_path") ?? "";
+            string arguments = GetParameter<string>(action, "arguments") ?? "";
+            int timeoutSeconds = GetParameter<int>(action, "timeout_seconds", 120);
+            string windowStyle = GetParameter<string>(action, "window_style") ?? "Hidden";
+
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                AlwaysPrintLogger.WriteWarning("ActionEngine: RunProcess requiere 'file_path'");
+                return false;
+            }
+
+            filePath = ReplaceTemplates(filePath);
+            arguments = ReplaceTemplates(arguments);
+
+            bool result = AdminActions.RunProcess(filePath, arguments, timeoutSeconds, windowStyle);
+
+            // Si se especificó store_result_in, guardar el resultado
+            if (!string.IsNullOrEmpty(action.StoreResultIn))
+            {
+                SetConfigVariable(action.StoreResultIn, result ? "success" : "failed");
+            }
+
+            return result;
         }
         
         // ═══════════════════════════════════════════════════════════════════════

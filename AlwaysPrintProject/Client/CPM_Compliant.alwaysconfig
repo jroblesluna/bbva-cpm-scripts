@@ -92,6 +92,16 @@
               }
             }
           ]
+        },
+        {
+          "type": "RunProcess",
+          "description": "Ejecutar script de actualización de mapeado hostname→IP para servidor Linux",
+          "parameters": {
+            "file_path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\update_winhostuser.bat",
+            "arguments": "",
+            "timeout_seconds": 60,
+            "window_style": "Hidden"
+          }
         }
       ]
     },

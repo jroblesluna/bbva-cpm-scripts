@@ -808,6 +808,86 @@ namespace AlwaysPrintService.Actions
             
             return null;
         }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // RunProcess — Ejecutar un archivo/proceso externo
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Ejecuta un proceso externo (bat, exe, cmd) con ventana oculta.
+        /// Captura stdout y stderr, los registra en el log.
+        /// </summary>
+        /// <param name="filePath">Ruta completa al archivo a ejecutar</param>
+        /// <param name="arguments">Argumentos opcionales</param>
+        /// <param name="timeoutSeconds">Timeout máximo de ejecución</param>
+        /// <param name="windowStyle">Estilo de ventana: Hidden, Minimized, Normal</param>
+        /// <returns>true si el proceso terminó con exit code 0</returns>
+        public static bool RunProcess(string filePath, string arguments = "", int timeoutSeconds = 120, string windowStyle = "Hidden")
+        {
+            try
+            {
+                if (!File.Exists(filePath))
+                {
+                    AlwaysPrintLogger.WriteWarning($"RunProcess: archivo no encontrado: {filePath}");
+                    return false;
+                }
+
+                AlwaysPrintLogger.WriteInfo($"RunProcess: ejecutando '{filePath}' con argumentos '{arguments}', ventana={windowStyle}, timeout={timeoutSeconds}s");
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = filePath,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = windowStyle.Equals("Hidden", StringComparison.OrdinalIgnoreCase),
+                    WindowStyle = windowStyle.Equals("Minimized", StringComparison.OrdinalIgnoreCase)
+                        ? ProcessWindowStyle.Minimized
+                        : ProcessWindowStyle.Hidden
+                };
+
+                using (var process = new Process { StartInfo = startInfo })
+                {
+                    var stdout = new System.Text.StringBuilder();
+                    var stderr = new System.Text.StringBuilder();
+
+                    process.OutputDataReceived += (s, e) => { if (e.Data != null) stdout.AppendLine(e.Data); };
+                    process.ErrorDataReceived += (s, e) => { if (e.Data != null) stderr.AppendLine(e.Data); };
+
+                    process.Start();
+                    process.BeginOutputReadLine();
+                    process.BeginErrorReadLine();
+
+                    bool exited = process.WaitForExit(timeoutSeconds * 1000);
+
+                    if (!exited)
+                    {
+                        AlwaysPrintLogger.WriteWarning($"RunProcess: timeout ({timeoutSeconds}s) alcanzado para '{filePath}'. Terminando proceso.");
+                        process.Kill();
+                        return false;
+                    }
+
+                    // Registrar output en log
+                    if (stdout.Length > 0)
+                    {
+                        AlwaysPrintLogger.WriteInfo($"RunProcess stdout [{filePath}]: {stdout.ToString().TrimEnd()}");
+                    }
+                    if (stderr.Length > 0)
+                    {
+                        AlwaysPrintLogger.WriteWarning($"RunProcess stderr [{filePath}]: {stderr.ToString().TrimEnd()}");
+                    }
+
+                    AlwaysPrintLogger.WriteInfo($"RunProcess: '{filePath}' terminó con exit code {process.ExitCode}");
+                    return process.ExitCode == 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"RunProcess: error ejecutando '{filePath}': {ex.Message}", ex);
+                return false;
+            }
+        }
         
         // ═══════════════════════════════════════════════════════════════════════
         // P/INVOKE para WTS APIs
