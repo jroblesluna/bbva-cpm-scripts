@@ -48,7 +48,7 @@ class Device(Base):
     
     # === RELACIONES ===
     organization = relationship("Organization", back_populates="devices")
-    vlan = relationship("VLAN", back_populates="devices")
+    vlan = relationship("VLAN", back_populates="devices", foreign_keys="Device.vlan_id")
     
     def __repr__(self):
         return f"<Device(id={self.id}, name={self.name}, ip={self.ip_address})>"
