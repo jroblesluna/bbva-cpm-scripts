@@ -348,7 +348,7 @@ def toggle_vlan_forced_contingency(
 
 
 @router.patch("/{vlan_id}/default-device")
-def set_vlan_default_device(
+async def set_vlan_default_device(
     request: Request,
     vlan_id: UUID,
     device_id: Optional[UUID] = Query(None, description="ID del dispositivo a establecer como predeterminado (null para quitar)"),
@@ -405,7 +405,6 @@ def set_vlan_default_device(
     from app.services.websocket_manager import connection_manager
     from app.models.workstation import Workstation
     from app.models.device import Device as DeviceModel
-    import asyncio
 
     workstations = db.query(Workstation).filter(Workstation.vlan_id == vlan_id).all()
     
@@ -431,9 +430,8 @@ def set_vlan_default_device(
         ws_id_str = str(ws.id)
         if connection_manager.is_workstation_online(ws_id_str):
             try:
-                loop = asyncio.get_event_loop()
-                loop.create_task(connection_manager.send_to_workstation(ws_id_str, message))
-            except RuntimeError:
+                await connection_manager.send_to_workstation(ws_id_str, message)
+            except Exception:
                 pass
 
     audit_service = AuditService()
