@@ -36,7 +36,7 @@ class LLMProvider(ABC):
     """Interfaz abstracta para providers de LLM."""
 
     @abstractmethod
-    async def invoke(self, payload: str, max_tokens: int, model_id: Optional[str] = None) -> str:
+    async def invoke(self, payload: str, max_tokens: int, model_id: Optional[str] = None) -> tuple[str, int, int]:
         """
         Invoca el modelo con el payload dado.
 
@@ -46,7 +46,7 @@ class LLMProvider(ABC):
             model_id: Override del modelo a usar (None = usar default del provider)
 
         Retorna:
-            Texto de respuesta del modelo.
+            Tupla (texto_respuesta, input_tokens, output_tokens).
 
         Raises:
             LLMServiceError: Si falla después de todos los reintentos.
@@ -89,7 +89,7 @@ class BedrockProvider(LLMProvider):
             )
         return self._client
 
-    async def invoke(self, payload: str, max_tokens: int, model_id: Optional[str] = None) -> str:
+    async def invoke(self, payload: str, max_tokens: int, model_id: Optional[str] = None) -> tuple[str, int, int]:
         """
         Invoca Claude via Bedrock Converse API.
 
@@ -144,7 +144,7 @@ class BedrockProvider(LLMProvider):
                     output_tokens,
                 )
 
-                return response_text
+                return (response_text, input_tokens, output_tokens)
 
             except botocore.exceptions.ClientError as e:
                 error_code = e.response.get("Error", {}).get("Code", "")
@@ -211,7 +211,7 @@ class OpenAIProvider(LLMProvider):
         self.model: str = settings.LOG_ANALYZER_OPENAI_MODEL
         self.base_url: str = "https://api.openai.com/v1"
 
-    async def invoke(self, payload: str, max_tokens: int, model_id: Optional[str] = None) -> str:
+    async def invoke(self, payload: str, max_tokens: int, model_id: Optional[str] = None) -> tuple[str, int, int]:
         """
         Invoca GPT-4o via OpenAI Chat Completions API.
 
@@ -268,7 +268,7 @@ class OpenAIProvider(LLMProvider):
                             output_tokens,
                         )
 
-                        return response_text
+                        return (response_text, input_tokens, output_tokens)
 
                     # Reintentar en throttling (429) o errores de servidor (5xx)
                     if response.status_code == 429 or response.status_code >= 500:
@@ -349,7 +349,7 @@ class AnthropicProvider(LLMProvider):
         self.model: str = settings.LOG_ANALYZER_ANTHROPIC_MODEL
         self.base_url: str = "https://api.anthropic.com/v1"
 
-    async def invoke(self, payload: str, max_tokens: int, model_id: Optional[str] = None) -> str:
+    async def invoke(self, payload: str, max_tokens: int, model_id: Optional[str] = None) -> tuple[str, int, int]:
         """
         Invoca Claude via Anthropic Messages API.
 
@@ -409,7 +409,7 @@ class AnthropicProvider(LLMProvider):
                             output_tokens,
                         )
 
-                        return response_text
+                        return (response_text, input_tokens, output_tokens)
 
                     # Reintentar en throttling (429) o errores de servidor (5xx)
                     if response.status_code == 429 or response.status_code >= 500:
@@ -508,7 +508,7 @@ class LLMService:
             )
         return self._provider
 
-    async def invoke(self, payload: str, model_id: Optional[str] = None) -> str:
+    async def invoke(self, payload: str, model_id: Optional[str] = None) -> tuple[str, int, int]:
         """
         Invoca el LLM configurado.
 
@@ -520,7 +520,7 @@ class LLMService:
             model_id: Override del modelo a usar (None = usar default del provider)
 
         Retorna:
-            Texto de respuesta del modelo.
+            Tupla (texto_respuesta, input_tokens, output_tokens).
 
         Raises:
             LLMServiceError: Si falla después de todos los reintentos.
@@ -538,18 +538,19 @@ class LLMService:
         )
 
         try:
-            response = await provider.invoke(payload, self.max_tokens, model_id=model_id)
+            response_text, input_tokens, output_tokens = await provider.invoke(payload, self.max_tokens, model_id=model_id)
             duration_ms = int((time.time() - start_time) * 1000)
 
             logger.info(
                 "[LOG_ANALYZER] LLM invocación completada - provider: %s, "
-                "duración: %dms, respuesta_length: %d chars",
+                "duración: %dms, input_tokens: %d, output_tokens: %d",
                 provider.get_provider_name(),
                 duration_ms,
-                len(response),
+                input_tokens,
+                output_tokens,
             )
 
-            return response
+            return (response_text, input_tokens, output_tokens)
 
         except LLMServiceError:
             duration_ms = int((time.time() - start_time) * 1000)

@@ -227,7 +227,7 @@ class LogAnalysisService:
             # Usar modelo de la organización si está configurado, sino gpt-4o
             if org_model_id:
                 openai_provider.model = org_model_id
-            analysis_text = await openai_provider.invoke(
+            analysis_text, input_tokens, output_tokens = await openai_provider.invoke(
                 payload, settings.LOG_ANALYZER_LLM_MAX_TOKENS
             )
         else:
@@ -239,7 +239,13 @@ class LogAnalysisService:
                 org_model_id or "(default)",
                 len(payload),
             )
-            analysis_text = await self.llm_service.invoke(payload, model_id=org_model_id)
+            analysis_text, input_tokens, output_tokens = await self.llm_service.invoke(payload, model_id=org_model_id)
+
+        # Añadir estimación de tokens al final del análisis
+        analysis_text += (
+            f"\n\n---\n*Tokens utilizados: {input_tokens:,} input + "
+            f"{output_tokens:,} output = {input_tokens + output_tokens:,} total*"
+        )
 
         # 6. Calcular duración del procesamiento
         duration_ms = int((time.time() - start_time) * 1000)
