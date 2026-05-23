@@ -34,17 +34,17 @@ namespace AlwaysPrintTray.Forms
         private readonly string     _workstationId;
         private readonly HttpClient _http;
 
-        private Panel    _pnlHeader;
-        private Label    _lblTitle;
-        private Label    _lblVlan;
-        private ListView _listView;
-        private Panel    _pnlActions;
-        private APButton _btnFavorite;
-        private APButton _btnRefresh;
-        private APButton _btnClose;
-        private Panel    _pnlStatus;
-        private Label    _lblStatusIcon;
-        private Label    _lblStatus;
+        private Panel    _pnlHeader = null!;
+        private Label    _lblTitle = null!;
+        private Label    _lblVlan = null!;
+        private ListView _listView = null!;
+        private Panel    _pnlActions = null!;
+        private APButton _btnFavorite = null!;
+        private APButton _btnRefresh = null!;
+        private APButton _btnClose = null!;
+        private Panel    _pnlStatus = null!;
+        private Label    _lblStatusIcon = null!;
+        private Label    _lblStatus = null!;
 
         private List<PrinterInfo> _printers = new List<PrinterInfo>();
         private string? _favoritePrinterId;

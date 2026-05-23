@@ -74,7 +74,7 @@ namespace AlwaysPrint.Shared.Configuration
     /// </summary>
     public class StringOrArrayConverter : JsonConverter<string>
     {
-        public override string ReadJson(JsonReader reader, Type objectType, string existingValue, bool hasExistingValue, JsonSerializer serializer)
+        public override string ReadJson(JsonReader reader, Type objectType, string? existingValue, bool hasExistingValue, JsonSerializer serializer)
         {
             var token = JToken.Load(reader);
 
@@ -98,7 +98,7 @@ namespace AlwaysPrint.Shared.Configuration
             return string.Empty;
         }
 
-        public override void WriteJson(JsonWriter writer, string value, JsonSerializer serializer)
+        public override void WriteJson(JsonWriter writer, string? value, JsonSerializer serializer)
         {
             // Escribir siempre como string CSV
             writer.WriteValue(value ?? string.Empty);

@@ -293,7 +293,7 @@ namespace AlwaysPrintService.Actions
             // Almacenar resultado si se especifica
             if (!string.IsNullOrEmpty(action.StoreResultIn))
             {
-                _variables[action.StoreResultIn] = users;
+                _variables[action.StoreResultIn!] = users;
                 AlwaysPrintLogger.WriteInfo(
                     $"ActionEngine: resultado almacenado en variable '{action.StoreResultIn}': {users.Count} usuarios");
             }
@@ -315,7 +315,7 @@ namespace AlwaysPrintService.Actions
             // Si hay iteración sobre usuarios
             if (!string.IsNullOrEmpty(iterateUsers) && !string.IsNullOrEmpty(pathTemplate))
             {
-                var users = GetVariableAsList(iterateUsers);
+                var users = GetVariableAsList(iterateUsers!);
                 
                 if (users == null || users.Count == 0)
                 {
@@ -332,7 +332,7 @@ namespace AlwaysPrintService.Actions
                         ["username"] = username
                     };
                     
-                    string resolvedPath = ReplaceTemplates(pathTemplate, tempVars);
+                    string resolvedPath = ReplaceTemplates(pathTemplate!, tempVars);
                     AlwaysPrintLogger.WriteInfo($"ActionEngine: DeleteFolderContents iterando usuario '{username}', path={resolvedPath}");
                     
                     bool success = AdminActions.DeleteFolderContents(resolvedPath, recursive, ignoreErrors);
@@ -344,7 +344,7 @@ namespace AlwaysPrintService.Actions
             }
             else if (!string.IsNullOrEmpty(path))
             {
-                path = ReplaceTemplates(path);
+                path = ReplaceTemplates(path!);
                 return AdminActions.DeleteFolderContents(path, recursive, ignoreErrors);
             }
             else

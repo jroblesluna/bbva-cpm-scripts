@@ -38,7 +38,7 @@ namespace AlwaysPrint.Shared.Network
                 {
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"NetworkHelper: IP local detectada (interfaz con gateway): {ipWithGateway}");
-                    return ipWithGateway;
+                    return ipWithGateway!;
                 }
             }
             catch (Exception ex)
@@ -288,7 +288,7 @@ namespace AlwaysPrint.Shared.Network
         /// - El network address es calculado correctamente (IP AND mask)
         /// </summary>
         /// <returns>CIDR en formato "networkAddress/prefixLength" o null si no hay interfaz válida</returns>
-        public static string GetOutboundCIDR()
+        public static string? GetOutboundCIDR()
         {
             try
             {
@@ -375,7 +375,7 @@ namespace AlwaysPrint.Shared.Network
         /// - Si no puede determinar, retorna null
         /// </summary>
         /// <returns>Máscara de subred de la interfaz principal, o null si no se puede detectar</returns>
-        public static IPAddress GetOutboundSubnetMask()
+        public static IPAddress? GetOutboundSubnetMask()
         {
             try
             {
