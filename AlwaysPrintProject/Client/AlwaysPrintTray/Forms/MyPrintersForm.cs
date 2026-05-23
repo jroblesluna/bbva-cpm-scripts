@@ -1,164 +1,355 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Net.Http;
 using System.Windows.Forms;
-using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace AlwaysPrintTray.Forms
 {
-    /// <summary>
-    /// Formulario "Mis Impresoras" que muestra las impresoras disponibles en la misma VLAN
-    /// y permite al usuario seleccionar una impresora favorita para contingencia.
-    /// 
-    /// Prioridad de contingencia:
-    /// 1. Impresora favorita (seleccionada por el usuario)
-    /// 2. Impresora por defecto (menor IP en la VLAN)
-    /// 3. Iteración por las demás impresoras disponibles
-    /// </summary>
     public sealed class MyPrintersForm : Form
     {
-        private readonly string _cloudApiUrl;
-        private readonly string _workstationId;
+        // ── Palette ──────────────────────────────────────────────────────────
+        private static readonly Color CHeaderBg   = Color.FromArgb( 27,  46,  75);
+        private static readonly Color CHeaderFg   = Color.White;
+        private static readonly Color CHeaderSub  = Color.FromArgb(175, 198, 220);
+        private static readonly Color CBodyBg     = Color.FromArgb(245, 247, 250);
+        private static readonly Color CRowEven    = Color.White;
+        private static readonly Color CRowOdd     = Color.FromArgb(248, 249, 251);
+        private static readonly Color CRowSel     = Color.FromArgb(219, 234, 254);
+        private static readonly Color CRowSelFg   = Color.FromArgb( 15,  40,  80);
+        private static readonly Color CFavBg      = Color.FromArgb(251, 191,  36);
+        private static readonly Color CFavFg      = Color.FromArgb(120,  53,  15);
+        private static readonly Color CDefBg      = Color.FromArgb( 99, 102, 241);
+        private static readonly Color CDefFg      = Color.White;
+        private static readonly Color CActionsBg  = Color.FromArgb(236, 239, 244);
+        private static readonly Color CSep        = Color.FromArgb(210, 218, 228);
+        private static readonly Color CPrimary    = Color.FromArgb(  0, 120, 212);
+
+        // ── Fields ───────────────────────────────────────────────────────────
+        private readonly string     _cloudApiUrl;
+        private readonly string     _workstationId;
         private readonly HttpClient _http;
 
+        private Panel    _pnlHeader;
+        private Label    _lblTitle;
+        private Label    _lblVlan;
         private ListView _listView;
-        private Button _btnSetFavorite;
-        private Button _btnRemoveFavorite;
-        private Button _btnRefresh;
-        private Button _btnClose;
-        private Label _lblStatus;
-        private Label _lblVlan;
+        private Panel    _pnlActions;
+        private APButton _btnSetFavorite;
+        private APButton _btnRemoveFavorite;
+        private APButton _btnRefresh;
+        private APButton _btnClose;
+        private Panel    _pnlStatus;
+        private Label    _lblStatusIcon;
+        private Label    _lblStatus;
 
         private List<PrinterInfo> _printers = new List<PrinterInfo>();
         private string? _favoritePrinterId;
         private string? _defaultPrinterId;
 
+        // ── Constructor ──────────────────────────────────────────────────────
         public MyPrintersForm(string cloudApiUrl, string workstationId, HttpClient http)
         {
-            _cloudApiUrl = cloudApiUrl;
+            _cloudApiUrl   = cloudApiUrl;
             _workstationId = workstationId;
-            _http = http;
-
+            _http          = http;
             InitializeComponents();
             LoadPrinters();
         }
 
+        // ── UI Construction ──────────────────────────────────────────────────
         private void InitializeComponents()
         {
-            Text = "Mis Impresoras - Contingencia";
-            Size = new Size(650, 480);
+            Text            = "Mis Impresoras – Contingencia";
+            ClientSize      = new Size(700, 510);
             FormBorderStyle = FormBorderStyle.FixedDialog;
-            MaximizeBox = false;
-            MinimizeBox = false;
-            StartPosition = FormStartPosition.CenterScreen;
-            ShowInTaskbar = false;
+            MaximizeBox     = false;
+            MinimizeBox     = false;
+            StartPosition   = FormStartPosition.CenterScreen;
+            ShowInTaskbar   = false;
+            BackColor       = CBodyBg;
+            Font            = new Font("Segoe UI", 9f);
 
-            // Etiqueta de VLAN
+            // ── Header ───────────────────────────────────────────────────────
+            _pnlHeader = new Panel
+            {
+                Location  = new Point(0, 0),
+                Size      = new Size(700, 75),
+                BackColor = CHeaderBg
+            };
+            _lblTitle = new Label
+            {
+                Text      = "🖨  Mis Impresoras",
+                ForeColor = CHeaderFg,
+                Font      = new Font("Segoe UI", 14f, FontStyle.Bold),
+                AutoSize  = true,
+                Location  = new Point(20, 11),
+                BackColor = Color.Transparent
+            };
             _lblVlan = new Label
             {
-                Text = "Cargando información de red...",
-                Location = new Point(15, 15),
-                Size = new Size(600, 20),
-                Font = new Font("Segoe UI", 9, FontStyle.Bold)
+                Text      = "Cargando información de red…",
+                ForeColor = CHeaderSub,
+                Font      = new Font("Segoe UI", 9f),
+                AutoSize  = true,
+                Location  = new Point(22, 44),
+                BackColor = Color.Transparent
             };
+            _pnlHeader.Controls.Add(_lblTitle);
+            _pnlHeader.Controls.Add(_lblVlan);
 
-            // ListView de impresoras
+            // ── ListView (1-px border wrapper) ───────────────────────────────
             _listView = new ListView
             {
-                Location = new Point(15, 45),
-                Size = new Size(600, 280),
-                View = View.Details,
-                FullRowSelect = true,
-                GridLines = true,
-                MultiSelect = false,
-                Font = new Font("Segoe UI", 9)
+                Location      = new Point(1, 1),
+                Size          = new Size(668, 298),
+                View          = View.Details,
+                FullRowSelect  = true,
+                GridLines      = false,
+                MultiSelect    = false,
+                OwnerDraw      = true,
+                Font           = new Font("Segoe UI", 9f),
+                BorderStyle    = BorderStyle.None,
+                BackColor      = Color.White,
+                HeaderStyle    = ColumnHeaderStyle.Nonclickable
             };
-            _listView.Columns.Add("Nombre", 180);
-            _listView.Columns.Add("IP:Puerto", 130);
-            _listView.Columns.Add("Modelo", 120);
-            _listView.Columns.Add("Ubicación", 100);
-            _listView.Columns.Add("Estado", 60);
+            _listView.Columns.Add("Nombre",       200);
+            _listView.Columns.Add("IP : Puerto",  140);
+            _listView.Columns.Add("Modelo",       130);
+            _listView.Columns.Add("Ubicación",    110);
+            _listView.Columns.Add("Estado",        82);
+            _listView.DrawColumnHeader     += OnDrawColumnHeader;
+            _listView.DrawItem             += (_, e) => e.DrawDefault = false;
+            _listView.DrawSubItem          += OnDrawSubItem;
             _listView.SelectedIndexChanged += OnSelectionChanged;
 
-            // Botones
-            _btnSetFavorite = new Button
+            var listWrapper = new Panel
             {
-                Text = "⭐ Establecer como Favorita",
-                Location = new Point(15, 340),
-                Size = new Size(200, 32),
-                Enabled = false,
-                Font = new Font("Segoe UI", 9)
+                Location  = new Point(15, 90),
+                Size      = new Size(670, 300),
+                BackColor = CSep
+            };
+            listWrapper.Controls.Add(_listView);
+
+            // ── Separator 1 ──────────────────────────────────────────────────
+            var sep1 = new Panel { Location = new Point(0, 403), Size = new Size(700, 1), BackColor = CSep };
+
+            // ── Actions panel ─────────────────────────────────────────────────
+            _pnlActions = new Panel
+            {
+                Location  = new Point(0, 404),
+                Size      = new Size(700, 48),
+                BackColor = CActionsBg
+            };
+
+            _btnSetFavorite = new APButton
+            {
+                Text      = "⭐  Establecer favorita",
+                Location  = new Point(16, 8),
+                Size      = new Size(185, 32),
+                Enabled   = false,
+                BackColor = CPrimary,
+                ForeColor = Color.White,
+                Font      = new Font("Segoe UI", 9f, FontStyle.Bold)
             };
             _btnSetFavorite.Click += OnSetFavorite;
 
-            _btnRemoveFavorite = new Button
+            _btnRemoveFavorite = new APButton
             {
-                Text = "Quitar Favorita",
-                Location = new Point(225, 340),
-                Size = new Size(140, 32),
-                Enabled = false,
-                Font = new Font("Segoe UI", 9)
+                Text       = "✕  Quitar favorita",
+                Location   = new Point(212, 8),
+                Size       = new Size(152, 32),
+                Enabled    = false,
+                BackColor  = Color.White,
+                ForeColor  = Color.FromArgb(60, 75, 95),
+                Font       = new Font("Segoe UI", 9f),
+                ShowBorder = true
             };
             _btnRemoveFavorite.Click += OnRemoveFavorite;
 
-            _btnRefresh = new Button
+            _btnRefresh = new APButton
             {
-                Text = "🔄 Actualizar",
-                Location = new Point(450, 340),
-                Size = new Size(100, 32),
-                Font = new Font("Segoe UI", 9)
+                Text       = "↺",
+                Location   = new Point(590, 8),
+                Size       = new Size(40, 32),
+                BackColor  = Color.White,
+                ForeColor  = Color.FromArgb(60, 75, 95),
+                Font       = new Font("Segoe UI", 14f),
+                ShowBorder = true
             };
             _btnRefresh.Click += (_, __) => LoadPrinters();
 
-            _btnClose = new Button
+            _btnClose = new APButton
             {
-                Text = "Cerrar",
-                Location = new Point(555, 340),
-                Size = new Size(60, 32),
+                Text         = "Cerrar",
+                Location     = new Point(640, 8),
+                Size         = new Size(58, 32),
                 DialogResult = DialogResult.OK,
-                Font = new Font("Segoe UI", 9)
+                BackColor    = Color.White,
+                ForeColor    = Color.FromArgb(60, 75, 95),
+                Font         = new Font("Segoe UI", 9f),
+                ShowBorder   = true
             };
+            _pnlActions.Controls.AddRange(new Control[]
+            {
+                _btnSetFavorite, _btnRemoveFavorite, _btnRefresh, _btnClose
+            });
 
-            // Etiqueta de estado
+            // ── Separator 2 ──────────────────────────────────────────────────
+            var sep2 = new Panel { Location = new Point(0, 452), Size = new Size(700, 1), BackColor = CSep };
+
+            // ── Status panel ─────────────────────────────────────────────────
+            _pnlStatus = new Panel
+            {
+                Location  = new Point(0, 453),
+                Size      = new Size(700, 57),
+                BackColor = Color.White
+            };
+            _lblStatusIcon = new Label
+            {
+                Text      = "",
+                Location  = new Point(16, 14),
+                Size      = new Size(26, 26),
+                Font      = new Font("Segoe UI", 12f),
+                BackColor = Color.Transparent
+            };
             _lblStatus = new Label
             {
-                Text = "",
-                Location = new Point(15, 385),
-                Size = new Size(600, 50),
-                Font = new Font("Segoe UI", 8),
-                ForeColor = SystemColors.GrayText
+                Text      = "",
+                Location  = new Point(46, 10),
+                Size      = new Size(640, 40),
+                Font      = new Font("Segoe UI", 9f),
+                ForeColor = SystemColors.GrayText,
+                BackColor = Color.Transparent
             };
+            _pnlStatus.Controls.Add(_lblStatusIcon);
+            _pnlStatus.Controls.Add(_lblStatus);
 
             Controls.AddRange(new Control[]
             {
-                _lblVlan, _listView, _btnSetFavorite, _btnRemoveFavorite,
-                _btnRefresh, _btnClose, _lblStatus
+                _pnlHeader, listWrapper, sep1, _pnlActions, sep2, _pnlStatus
             });
             AcceptButton = _btnClose;
         }
 
+        // ── Owner-draw ───────────────────────────────────────────────────────
+        private void OnDrawColumnHeader(object? sender, DrawListViewColumnHeaderEventArgs e)
+        {
+            using var bg = new SolidBrush(Color.FromArgb(241, 244, 248));
+            e.Graphics.FillRectangle(bg, e.Bounds);
+
+            using var sep = new Pen(CSep);
+            e.Graphics.DrawLine(sep,
+                e.Bounds.Left,  e.Bounds.Bottom - 1,
+                e.Bounds.Right, e.Bounds.Bottom - 1);
+
+            var tr  = new RectangleF(e.Bounds.X + 10, e.Bounds.Y, e.Bounds.Width - 12, e.Bounds.Height);
+            var fmt = new StringFormat { LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter };
+            using var fg   = new SolidBrush(Color.FromArgb(55, 70, 90));
+            using var font = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+            e.Graphics.DrawString(e.Header?.Text ?? "", font, fg, tr, fmt);
+        }
+
+        private void OnDrawSubItem(object? sender, DrawListViewSubItemEventArgs e)
+        {
+            if (e.Item == null || e.SubItem == null) return;
+            var printer  = e.Item.Tag as PrinterInfo;
+            bool sel     = e.Item.Selected;
+            bool odd     = e.ItemIndex % 2 == 1;
+
+            var bgColor = sel ? CRowSel : (odd ? CRowOdd : CRowEven);
+            using (var brush = new SolidBrush(bgColor))
+                e.Graphics.FillRectangle(brush, e.Bounds);
+
+            using (var rowSep = new Pen(Color.FromArgb(232, 236, 242)))
+                e.Graphics.DrawLine(rowSep,
+                    e.Bounds.Left,  e.Bounds.Bottom - 1,
+                    e.Bounds.Right, e.Bounds.Bottom - 1);
+
+            if (e.ColumnIndex == 4)
+            {
+                DrawBadge(e.Graphics, e.Bounds, printer);
+                return;
+            }
+
+            var fgColor = sel ? CRowSelFg : Color.FromArgb(35, 45, 60);
+            var fmt     = new StringFormat { LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter };
+            var tr      = new RectangleF(e.Bounds.X + 10, e.Bounds.Y, e.Bounds.Width - 14, e.Bounds.Height);
+
+            using var fgBrush = new SolidBrush(fgColor);
+            if (e.ColumnIndex == 0)
+            {
+                using var bold = new Font("Segoe UI", 9f, FontStyle.Bold);
+                e.Graphics.DrawString(e.SubItem.Text, bold, fgBrush, tr, fmt);
+            }
+            else
+            {
+                using var reg = new Font("Segoe UI", 9f);
+                e.Graphics.DrawString(e.SubItem.Text, reg, fgBrush, tr, fmt);
+            }
+        }
+
+        private static void DrawBadge(Graphics g, Rectangle bounds, PrinterInfo? p)
+        {
+            if (p == null) return;
+            string? label = null;
+            Color bg = Color.Transparent, fg = Color.Transparent;
+
+            if (p.IsFavorite)     { label = "⭐ Favorita"; bg = CFavBg; fg = CFavFg; }
+            else if (p.IsDefault) { label = "📌 Default";  bg = CDefBg; fg = CDefFg; }
+            if (label == null) return;
+
+            using var font = new Font("Segoe UI", 7.5f, FontStyle.Bold);
+            var sz  = g.MeasureString(label, font);
+            int px = 8, py = 3;
+            int bw  = (int)sz.Width + px * 2;
+            int bh  = (int)sz.Height + py * 2;
+            int bx  = bounds.X + (bounds.Width  - bw) / 2;
+            int by  = bounds.Y + (bounds.Height - bh) / 2;
+            var rc  = new Rectangle(bx, by, bw, bh);
+
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using var path    = RoundedPath(rc, 8);
+            using var bgBrush = new SolidBrush(bg);
+            g.FillPath(bgBrush, path);
+            using var fgBrush = new SolidBrush(fg);
+            var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            g.DrawString(label, font, fgBrush, rc, fmt);
+            g.SmoothingMode = SmoothingMode.Default;
+        }
+
+        private static GraphicsPath RoundedPath(Rectangle r, int rad)
+        {
+            var p = new GraphicsPath();
+            p.AddArc(r.X,               r.Y,                rad * 2, rad * 2, 180, 90);
+            p.AddArc(r.Right - rad * 2, r.Y,                rad * 2, rad * 2, 270, 90);
+            p.AddArc(r.Right - rad * 2, r.Bottom - rad * 2, rad * 2, rad * 2,   0, 90);
+            p.AddArc(r.X,               r.Bottom - rad * 2, rad * 2, rad * 2,  90, 90);
+            p.CloseFigure();
+            return p;
+        }
+
+        // ── Data loading ─────────────────────────────────────────────────────
         private async void LoadPrinters()
         {
             try
             {
                 _listView.Items.Clear();
-                _lblStatus.Text = "Consultando impresoras disponibles...";
-                _lblStatus.ForeColor = SystemColors.GrayText;
+                SetStatus("⏳", "Consultando impresoras disponibles…", SystemColors.GrayText);
 
-                var url = $"{_cloudApiUrl}/api/v1/devices/workstation/{_workstationId}/my-printers";
+                var url      = $"{_cloudApiUrl}/api/v1/devices/workstation/{_workstationId}/my-printers";
                 var response = await _http.GetAsync(url);
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    var errorBody = await response.Content.ReadAsStringAsync();
-                    _lblStatus.Text = $"Error al obtener impresoras: {response.StatusCode}";
-                    _lblStatus.ForeColor = Color.Red;
+                    var body = await response.Content.ReadAsStringAsync();
+                    SetStatus("❌", $"Error al obtener impresoras: {response.StatusCode}", Color.Crimson);
                     AlwaysPrintLogger.WriteTrayError(
-                        $"MyPrintersForm: error HTTP {response.StatusCode} al obtener impresoras. {errorBody}");
+                        $"MyPrintersForm: error HTTP {response.StatusCode}. {body}");
                     return;
                 }
 
@@ -166,60 +357,62 @@ namespace AlwaysPrintTray.Forms
                 var data = JObject.Parse(json);
 
                 _favoritePrinterId = data["favorite_printer_id"]?.ToString();
-                _defaultPrinterId = data["default_printer_id"]?.ToString();
+                _defaultPrinterId  = data["default_printer_id"]?.ToString();
                 var vlanName = data["vlan_name"]?.ToString();
-                var total = data["total"]?.ToObject<int>() ?? 0;
+                var total    = data["total"]?.ToObject<int>() ?? 0;
 
                 _lblVlan.Text = vlanName != null
-                    ? $"VLAN: {vlanName} — {total} impresora(s) disponible(s)"
-                    : $"Sin VLAN asignada — {total} impresora(s) de la organización";
+                    ? $"VLAN: {vlanName}  ·  {total} impresora(s) disponible(s)"
+                    : $"Sin VLAN asignada  ·  {total} impresora(s) de la organización";
 
                 _printers.Clear();
-                var printersArray = data["printers"] as JArray;
-                if (printersArray != null)
+                if (data["printers"] is JArray arr)
                 {
-                    foreach (var p in printersArray)
-                    {
+                    foreach (var item in arr)
                         _printers.Add(new PrinterInfo
                         {
-                            Id = p["id"]?.ToString() ?? "",
-                            Name = p["name"]?.ToString() ?? "",
-                            IpAddress = p["ip_address"]?.ToString() ?? "",
-                            Port = p["port"]?.ToObject<int>() ?? 9100,
-                            Model = p["model"]?.ToString() ?? "",
-                            Location = p["location"]?.ToString() ?? "",
-                            IsFavorite = p["is_favorite"]?.ToObject<bool>() ?? false,
-                            IsDefault = p["is_default"]?.ToObject<bool>() ?? false,
+                            Id        = item["id"]?.ToString()             ?? "",
+                            Name      = item["name"]?.ToString()           ?? "",
+                            IpAddress = item["ip_address"]?.ToString()     ?? "",
+                            Port      = item["port"]?.ToObject<int>()      ?? 9100,
+                            Model     = item["model"]?.ToString()          ?? "",
+                            Location  = item["location"]?.ToString()       ?? "",
+                            IsFavorite = item["is_favorite"]?.ToObject<bool>() ?? false,
+                            IsDefault  = item["is_default"]?.ToObject<bool>()  ?? false,
                         });
-                    }
                 }
 
                 PopulateListView();
 
                 if (total == 0)
                 {
-                    _lblStatus.Text = "⚠️ No hay impresoras configuradas para contingencia en su red.";
-                    _lblStatus.ForeColor = Color.OrangeRed;
+                    SetStatus("⚠️", "No hay impresoras configuradas para contingencia en su red.", Color.OrangeRed);
                 }
                 else
                 {
                     var favName = _printers.Find(p => p.IsFavorite)?.Name;
                     var defName = _printers.Find(p => p.IsDefault)?.Name;
-                    _lblStatus.Text = favName != null
-                        ? $"✅ Impresora favorita: {favName}\nEn contingencia se usará esta impresora primero."
-                        : $"ℹ️ Sin favorita. En contingencia se usará: {defName ?? "ninguna"} (menor IP).";
-                    _lblStatus.ForeColor = favName != null ? Color.DarkGreen : SystemColors.GrayText;
+                    if (favName != null)
+                        SetStatus("✅", $"Favorita: {favName} — se usará primero en contingencia.", Color.FromArgb(5, 140, 90));
+                    else
+                        SetStatus("ℹ️", $"Sin favorita. En contingencia se usará: {defName ?? "ninguna"} (menor IP).", SystemColors.GrayText);
                 }
 
                 _btnRemoveFavorite.Enabled = _favoritePrinterId != null;
             }
             catch (Exception ex)
             {
-                _lblStatus.Text = $"Error de conexión: {ex.Message}";
-                _lblStatus.ForeColor = Color.Red;
+                SetStatus("❌", $"Error de conexión: {ex.Message}", Color.Crimson);
                 AlwaysPrintLogger.WriteTrayError(
-                    $"MyPrintersForm: excepción al cargar impresoras — {ex.GetType().Name}: {ex.Message}");
+                    $"MyPrintersForm: excepción — {ex.GetType().Name}: {ex.Message}");
             }
+        }
+
+        private void SetStatus(string icon, string text, Color color)
+        {
+            _lblStatusIcon.Text  = icon;
+            _lblStatus.Text      = text;
+            _lblStatus.ForeColor = color;
         }
 
         private void PopulateListView()
@@ -227,24 +420,14 @@ namespace AlwaysPrintTray.Forms
             _listView.Items.Clear();
             foreach (var printer in _printers)
             {
-                string status = "";
-                if (printer.IsFavorite) status = "⭐ Fav";
-                else if (printer.IsDefault) status = "📌 Def";
-
                 var item = new ListViewItem(new[]
                 {
                     printer.Name,
                     $"{printer.IpAddress}:{printer.Port}",
                     printer.Model,
                     printer.Location,
-                    status
+                    ""
                 });
-
-                if (printer.IsFavorite)
-                    item.BackColor = Color.LightGoldenrodYellow;
-                else if (printer.IsDefault)
-                    item.BackColor = Color.AliceBlue;
-
                 item.Tag = printer;
                 _listView.Items.Add(item);
             }
@@ -252,52 +435,36 @@ namespace AlwaysPrintTray.Forms
 
         private void OnSelectionChanged(object? sender, EventArgs e)
         {
-            bool hasSelection = _listView.SelectedItems.Count > 0;
-            if (hasSelection)
-            {
-                var selected = _listView.SelectedItems[0].Tag as PrinterInfo;
-                _btnSetFavorite.Enabled = selected != null && !selected.IsFavorite;
-            }
-            else
-            {
-                _btnSetFavorite.Enabled = false;
-            }
+            var sel = _listView.SelectedItems.Count > 0
+                ? _listView.SelectedItems[0].Tag as PrinterInfo
+                : null;
+            _btnSetFavorite.Enabled = sel != null && !sel.IsFavorite;
         }
 
         private async void OnSetFavorite(object? sender, EventArgs e)
         {
             if (_listView.SelectedItems.Count == 0) return;
-            var selected = _listView.SelectedItems[0].Tag as PrinterInfo;
-            if (selected == null) return;
-
+            var sel = _listView.SelectedItems[0].Tag as PrinterInfo;
+            if (sel == null) return;
             try
             {
                 _btnSetFavorite.Enabled = false;
-                _lblStatus.Text = $"Estableciendo {selected.Name} como favorita...";
-
-                var url = $"{_cloudApiUrl}/api/v1/devices/workstation/{_workstationId}/favorite-printer";
+                SetStatus("⏳", $"Estableciendo {sel.Name} como favorita…", SystemColors.GrayText);
+                var url     = $"{_cloudApiUrl}/api/v1/devices/workstation/{_workstationId}/favorite-printer";
                 var content = new StringContent(
-                    JsonConvert.SerializeObject(new { device_id = selected.Id }),
+                    JsonConvert.SerializeObject(new { device_id = sel.Id }),
                     System.Text.Encoding.UTF8, "application/json");
-
                 var response = await _http.PutAsync(url, content);
                 if (response.IsSuccessStatusCode)
                 {
                     AlwaysPrintLogger.WriteTrayInfo(
-                        $"MyPrintersForm: impresora favorita establecida — {selected.Name} ({selected.IpAddress})");
+                        $"MyPrintersForm: favorita → {sel.Name} ({sel.IpAddress})");
                     LoadPrinters();
                 }
                 else
-                {
-                    _lblStatus.Text = $"Error al establecer favorita: {response.StatusCode}";
-                    _lblStatus.ForeColor = Color.Red;
-                }
+                    SetStatus("❌", $"Error al establecer favorita: {response.StatusCode}", Color.Crimson);
             }
-            catch (Exception ex)
-            {
-                _lblStatus.Text = $"Error: {ex.Message}";
-                _lblStatus.ForeColor = Color.Red;
-            }
+            catch (Exception ex) { SetStatus("❌", $"Error: {ex.Message}", Color.Crimson); }
         }
 
         private async void OnRemoveFavorite(object? sender, EventArgs e)
@@ -305,43 +472,98 @@ namespace AlwaysPrintTray.Forms
             try
             {
                 _btnRemoveFavorite.Enabled = false;
-                _lblStatus.Text = "Quitando impresora favorita...";
-
-                var url = $"{_cloudApiUrl}/api/v1/devices/workstation/{_workstationId}/favorite-printer";
+                SetStatus("⏳", "Quitando impresora favorita…", SystemColors.GrayText);
+                var url     = $"{_cloudApiUrl}/api/v1/devices/workstation/{_workstationId}/favorite-printer";
                 var content = new StringContent(
                     JsonConvert.SerializeObject(new { device_id = (string?)null }),
                     System.Text.Encoding.UTF8, "application/json");
-
                 var response = await _http.PutAsync(url, content);
                 if (response.IsSuccessStatusCode)
                 {
-                    AlwaysPrintLogger.WriteTrayInfo("MyPrintersForm: impresora favorita eliminada.");
+                    AlwaysPrintLogger.WriteTrayInfo("MyPrintersForm: favorita eliminada.");
                     LoadPrinters();
                 }
                 else
-                {
-                    _lblStatus.Text = $"Error al quitar favorita: {response.StatusCode}";
-                    _lblStatus.ForeColor = Color.Red;
-                }
+                    SetStatus("❌", $"Error al quitar favorita: {response.StatusCode}", Color.Crimson);
             }
-            catch (Exception ex)
-            {
-                _lblStatus.Text = $"Error: {ex.Message}";
-                _lblStatus.ForeColor = Color.Red;
-            }
+            catch (Exception ex) { SetStatus("❌", $"Error: {ex.Message}", Color.Crimson); }
         }
 
-        /// <summary>Información de una impresora disponible.</summary>
-        private class PrinterInfo
+        // ── Data model ───────────────────────────────────────────────────────
+        private sealed class PrinterInfo
         {
-            public string Id { get; set; } = "";
-            public string Name { get; set; } = "";
+            public string Id        { get; set; } = "";
+            public string Name      { get; set; } = "";
             public string IpAddress { get; set; } = "";
-            public int Port { get; set; } = 9100;
-            public string Model { get; set; } = "";
-            public string Location { get; set; } = "";
-            public bool IsFavorite { get; set; }
-            public bool IsDefault { get; set; }
+            public int    Port      { get; set; } = 9100;
+            public string Model     { get; set; } = "";
+            public string Location  { get; set; } = "";
+            public bool   IsFavorite { get; set; }
+            public bool   IsDefault  { get; set; }
+        }
+    }
+
+    // ── Custom button with rounded corners + hover ────────────────────────────
+    internal sealed class APButton : Button
+    {
+        private bool _hovered;
+        public bool ShowBorder { get; set; }
+
+        public APButton()
+        {
+            SetStyle(
+                ControlStyles.UserPaint |
+                ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer, true);
+            FlatStyle = FlatStyle.Flat;
+            FlatAppearance.BorderSize = 0;
+        }
+
+        protected override void OnMouseEnter(EventArgs e) { _hovered = true;  Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { _hovered = false; Invalidate(); base.OnMouseLeave(e); }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g  = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            Color bg;
+            if (!Enabled)
+                bg = Color.FromArgb(218, 222, 230);
+            else if (_hovered)
+                bg = Color.FromArgb(
+                    Math.Max(0, Math.Min(255, BackColor.R - 18)),
+                    Math.Max(0, Math.Min(255, BackColor.G - 18)),
+                    Math.Max(0, Math.Min(255, BackColor.B - 18)));
+            else
+                bg = BackColor;
+
+            var rect = new Rectangle(0, 0, Width - 1, Height - 1);
+            using var path  = RoundedPath(rect, 5);
+            using var brush = new SolidBrush(bg);
+            g.FillPath(brush, path);
+
+            if (ShowBorder)
+            {
+                using var pen = new Pen(Color.FromArgb(180, 190, 205));
+                g.DrawPath(pen, path);
+            }
+
+            var fg  = Enabled ? ForeColor : Color.FromArgb(140, 150, 165);
+            var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            using var fgBrush = new SolidBrush(fg);
+            g.DrawString(Text, Font, fgBrush, new RectangleF(0, 0, Width, Height), fmt);
+        }
+
+        private static GraphicsPath RoundedPath(Rectangle r, int rad)
+        {
+            var p = new GraphicsPath();
+            p.AddArc(r.X,               r.Y,                rad * 2, rad * 2, 180, 90);
+            p.AddArc(r.Right - rad * 2, r.Y,                rad * 2, rad * 2, 270, 90);
+            p.AddArc(r.Right - rad * 2, r.Bottom - rad * 2, rad * 2, rad * 2,   0, 90);
+            p.AddArc(r.X,               r.Bottom - rad * 2, rad * 2, rad * 2,  90, 90);
+            p.CloseFigure();
+            return p;
         }
     }
 }
