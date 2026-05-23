@@ -1,4 +1,4 @@
-name: PROD 🚨⚠️🚨 Build 🚨⚠️🚨 Deploy 🚨⚠️🚨 Client 🚨⚠️🚨
+name: PROD 🚨⚠️🚨 CLIENT 🚨⚠️🚨
 
 on:
   workflow_dispatch:

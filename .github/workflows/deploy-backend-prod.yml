@@ -1,4 +1,4 @@
-name: PROD 🚨⚠️🚨 Deploy 🚨⚠️🚨 Backend 🚨⚠️🚨
+name: PROD 🚨⚠️🚨 BACKEND 🚨⚠️🚨
 
 on:
   workflow_dispatch:
