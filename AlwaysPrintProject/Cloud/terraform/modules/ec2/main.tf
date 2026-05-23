@@ -112,7 +112,10 @@ resource "aws_iam_role_policy" "bedrock_invoke_model" {
           "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet*",
           "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-opus*",
           "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-haiku*",
-          "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3*"
+          "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3*",
+          "arn:aws:bedrock:us-west-2:040982755196:inference-profile/us.anthropic.*",
+          "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude*",
+          "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude*"
         ]
       },
       {
@@ -120,7 +123,8 @@ resource "aws_iam_role_policy" "bedrock_invoke_model" {
         Effect = "Allow"
         Action = [
           "bedrock:ListFoundationModels",
-          "bedrock:GetFoundationModel"
+          "bedrock:GetFoundationModel",
+          "bedrock:ListInferenceProfiles"
         ]
         Resource = ["*"]
       }
