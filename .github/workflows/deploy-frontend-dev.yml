@@ -1,4 +1,4 @@
-name: DEV → Deploy Frontend
+name: DEV → 🌐 FRONTEND
 
 on:
   push:
