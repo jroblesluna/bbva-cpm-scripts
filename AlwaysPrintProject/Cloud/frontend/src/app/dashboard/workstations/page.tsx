@@ -47,6 +47,7 @@ import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { useToast } from '@/hooks/use-toast';
 import type { Workstation, WorkstationUpdate, Organization, VLAN, Device } from '@/types';
 import { LogAnalysisHistory } from '@/components/workstations/LogAnalysisHistory';
+import { LogAnalysisButton } from '@/components/workstations/LogAnalysisButton';
 
 type ViewMode = 'cards' | 'table';
 type SortField = 'ip_private' | 'hostname' | 'current_user' | 'organization' | 'tray_version' | 'last_connection' | 'is_online';
@@ -1680,6 +1681,16 @@ function WorkstationDetailModal({
           <div>
             <h3 className="text-sm font-medium text-gray-700 mb-2">ID</h3>
             <code className="text-xs bg-gray-100 px-2 py-1 rounded">{workstation.id}</code>
+          </div>
+
+          {/* Botón de análisis de log */}
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-gray-700">Análisis de Log</h3>
+            <LogAnalysisButton
+              workstationId={workstation.id}
+              workstationName={workstation.hostname || workstation.ip_private}
+              isOnline={workstation.is_online}
+            />
           </div>
 
           {/* Historial de análisis de logs */}
