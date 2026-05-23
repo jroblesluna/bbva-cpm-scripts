@@ -83,6 +83,38 @@ resource "aws_iam_role_policy" "ec2_permissions" {
   })
 }
 
+# ============================================================================
+# Política IAM para AWS Bedrock - Análisis de logs con Claude
+# ============================================================================
+# IMPORTANTE: El acceso al modelo debe habilitarse manualmente en:
+#   AWS Console → Amazon Bedrock → Model access → Request model access
+#   Seleccionar: Anthropic → Claude 3.5 Sonnet
+#   Región: us-west-2
+#
+# Sin este paso manual, las invocaciones al modelo fallarán con AccessDeniedException
+# incluso teniendo la política IAM correcta.
+# ============================================================================
+resource "aws_iam_role_policy" "bedrock_invoke_model" {
+  name = "${local.prefix}-bedrock-invoke-model"
+  role = aws_iam_role.ec2.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowBedrockInvokeModel"
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel"
+        ]
+        Resource = [
+          "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-5-sonnet*"
+        ]
+      }
+    ]
+  })
+}
+
 resource "aws_iam_instance_profile" "ec2" {
   name = "${local.prefix}-ec2-profile"
   role = aws_iam_role.ec2.name

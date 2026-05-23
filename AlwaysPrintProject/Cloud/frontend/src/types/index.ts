@@ -32,6 +32,12 @@ export * from './websocket'
 // Telemetry types
 export * from './telemetry'
 
+// Log Analysis types
+export * from './log-analysis'
+
+// Log Analysis types
+export * from './log-analysis'
+
 // ============================================================================
 // TIPOS COMUNES
 // ============================================================================

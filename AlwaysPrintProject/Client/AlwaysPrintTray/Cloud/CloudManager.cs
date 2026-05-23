@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Management;
 using System.Net;
@@ -1065,6 +1067,10 @@ namespace AlwaysPrintTray.Cloud
                         HandleGetLatestLogCommand(commandId);
                         break;
 
+                    case "analyze_log":
+                        HandleAnalyzeLogCommand(commandId);
+                        break;
+
                     default:
                         // Comando desconocido
                         AlwaysPrintLogger.WriteTrayWarning(
@@ -1210,6 +1216,127 @@ namespace AlwaysPrintTray.Cloud
                 SendCommandResult(commandId, false, $"Error leyendo archivo de log: {ex.Message}");
                 AlwaysPrintLogger.WriteTrayError(
                     $"CloudManager: error ejecutando comando get_latest_log. {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Umbral de compresión configurable (default 50KB).
+        /// Si el archivo de log es menor a este umbral, se comprime a ZIP antes de enviar.
+        /// </summary>
+        private const long DefaultCompressionThresholdBytes = 50 * 1024; // 50KB
+
+        /// <summary>
+        /// Ejecuta el comando analyze_log: lee el archivo de log del día actual,
+        /// lo comprime a ZIP si es menor al umbral de compresión, codifica en base64
+        /// y envía el resultado al servidor.
+        /// </summary>
+        private void HandleAnalyzeLogCommand(string commandId)
+        {
+            try
+            {
+                string logsFolder = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "AlwaysPrint", "logs");
+
+                // Construir nombre del archivo de log del día actual
+                string datePart = DateTime.Now.ToString("yyyy-MM-dd");
+                string logFileName = $"AlwaysPrint_{datePart}.log";
+                string logFilePath = Path.Combine(logsFolder, logFileName);
+
+                // Verificar si el archivo existe
+                if (!File.Exists(logFilePath))
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"CloudManager: comando analyze_log - archivo no encontrado: {logFilePath}");
+                    SendCommandResult(commandId, false, "Archivo de log del día actual no encontrado.");
+                    return;
+                }
+
+                // Leer archivo con FileShare.ReadWrite para no bloquear escrituras activas del logger
+                byte[] fileContent;
+                using (var fs = new FileStream(
+                    logFilePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite))
+                {
+                    fileContent = new byte[fs.Length];
+                    fs.Read(fileContent, 0, fileContent.Length);
+                }
+
+                long originalSize = fileContent.Length;
+
+                // Determinar umbral de compresión (configurable, default 50KB)
+                long compressionThreshold = DefaultCompressionThresholdBytes;
+
+                // Decidir si comprimir según el umbral
+                bool isCompressed;
+                string base64Content;
+
+                if (originalSize < compressionThreshold)
+                {
+                    // Comprimir a ZIP antes de enviar
+                    byte[] zipContent = CompressToZip(logFileName, fileContent);
+                    base64Content = Convert.ToBase64String(zipContent);
+                    isCompressed = true;
+
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: comando analyze_log - archivo comprimido. " +
+                        $"Original: {originalSize} bytes, ZIP: {zipContent.Length} bytes.");
+                }
+                else
+                {
+                    // Enviar sin compresión
+                    base64Content = Convert.ToBase64String(fileContent);
+                    isCompressed = false;
+
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: comando analyze_log - archivo enviado sin compresión. " +
+                        $"Tamaño: {originalSize} bytes.");
+                }
+
+                // Construir resultado JSON con la estructura esperada por el backend
+                var resultJson = new JObject
+                {
+                    ["filename"] = logFileName,
+                    ["content"] = base64Content,
+                    ["original_size"] = originalSize,
+                    ["is_compressed"] = isCompressed
+                };
+
+                SendCommandResult(commandId, true, resultJson.ToString(Formatting.None));
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: comando analyze_log ejecutado exitosamente. " +
+                    $"Archivo: {logFileName}, tamaño original: {originalSize} bytes, comprimido: {isCompressed}.");
+            }
+            catch (Exception ex)
+            {
+                SendCommandResult(commandId, false, $"Error procesando log para análisis: {ex.Message}");
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error ejecutando comando analyze_log. {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Comprime un archivo a formato ZIP en memoria.
+        /// </summary>
+        /// <param name="fileName">Nombre del archivo dentro del ZIP.</param>
+        /// <param name="fileContent">Contenido del archivo a comprimir.</param>
+        /// <returns>Bytes del archivo ZIP resultante.</returns>
+        private static byte[] CompressToZip(string fileName, byte[] fileContent)
+        {
+            using (var memoryStream = new MemoryStream())
+            {
+                using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
+                {
+                    var entry = archive.CreateEntry(fileName, CompressionLevel.Optimal);
+                    using (var entryStream = entry.Open())
+                    {
+                        entryStream.Write(fileContent, 0, fileContent.Length);
+                    }
+                }
+
+                return memoryStream.ToArray();
             }
         }
 

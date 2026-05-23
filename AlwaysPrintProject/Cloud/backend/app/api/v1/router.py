@@ -22,6 +22,7 @@ from app.api.v1.endpoints import (
     organizations,
     updates,
     devices,
+    log_analysis,
 )
 
 # Router principal de la API v1
@@ -70,6 +71,13 @@ api_router.include_router(
     workstations.router,
     prefix="/workstations",
     tags=["Workstations"]
+)
+
+# Análisis de logs de workstations
+api_router.include_router(
+    log_analysis.router,
+    prefix="/workstations",
+    tags=["Análisis de Logs"]
 )
 
 # Telemetría (historial por workstation)

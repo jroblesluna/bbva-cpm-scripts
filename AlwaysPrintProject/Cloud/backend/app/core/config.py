@@ -5,9 +5,13 @@ Este módulo define todas las variables de entorno y configuraciones
 necesarias para el sistema AlwaysPrint Cloud Management.
 """
 
+import logging
 from typing import Optional, Union
-from pydantic import field_validator
+
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -91,7 +95,84 @@ class Settings(BaseSettings):
     # === CONFIGURACIÓN DE RATE LIMITING ===
     RATE_LIMIT_LOGIN: int = 5  # intentos por minuto
     RATE_LIMIT_API: int = 100  # peticiones por minuto
-    
+
+    # === CONFIGURACIÓN DEL LOG ANALYZER ===
+    # Umbral de compresión en bytes (default 50KB). Rango válido: 1KB - 10MB.
+    LOG_ANALYZER_COMPRESSION_THRESHOLD: int = 51200
+    # Umbral de procesamiento estructural en bytes (default 100KB). Rango válido: 1KB - 50MB.
+    LOG_ANALYZER_PROCESSING_THRESHOLD: int = 102400
+    # Líneas de contexto antes/después de cada hallazgo (default 20). Rango válido: 0 - 500.
+    LOG_ANALYZER_CONTEXT_WINDOW_SIZE: int = 20
+    # Máximo de bloques de contexto (default 30). Rango válido: 1 - 1000.
+    LOG_ANALYZER_MAX_CONTEXT_BLOCKS: int = 30
+    # Top N patrones recurrentes a incluir (default 50). Rango válido: 1 - 500.
+    LOG_ANALYZER_TOP_PATTERNS: int = 50
+    # Máximo de tokens en la respuesta del LLM (default 4096). Rango válido: 100 - 16384.
+    LOG_ANALYZER_LLM_MAX_TOKENS: int = 4096
+    # Tamaño máximo de upload en bytes (default 50MB). Rango válido: 1MB - 200MB.
+    LOG_ANALYZER_MAX_UPLOAD_SIZE: int = 52428800
+    # Keywords adicionales separados por coma, se añaden a la lista por defecto.
+    LOG_ANALYZER_EXTRA_KEYWORDS: str = ""
+    # Timeout en segundos para esperar respuesta de la workstation (default 30). Rango válido: 5 - 300.
+    LOG_ANALYZER_COMMAND_TIMEOUT: int = 30
+
+    # === LLM PROVIDER ===
+    # Provider de LLM a utilizar: "bedrock", "openai", "anthropic"
+    LOG_ANALYZER_LLM_PROVIDER: str = "bedrock"
+    # Model ID para AWS Bedrock
+    LOG_ANALYZER_LLM_MODEL_ID: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    # Región AWS para Bedrock
+    LOG_ANALYZER_LLM_REGION: str = "us-west-2"
+    # API Key para OpenAI (requerido si LLM_PROVIDER = "openai")
+    LOG_ANALYZER_OPENAI_API_KEY: str = ""
+    # Modelo de OpenAI
+    LOG_ANALYZER_OPENAI_MODEL: str = "gpt-4o"
+    # API Key para Anthropic (requerido si LLM_PROVIDER = "anthropic")
+    LOG_ANALYZER_ANTHROPIC_API_KEY: str = ""
+    # Modelo de Anthropic
+    LOG_ANALYZER_ANTHROPIC_MODEL: str = "claude-3-5-sonnet-20241022"
+
+    @model_validator(mode="after")
+    def _validate_log_analyzer_settings(self) -> "Settings":
+        """
+        Valida rangos de configuración del Log Analyzer al inicio.
+
+        Si un valor está fuera de rango, emite un warning y aplica el default.
+        """
+        # Definición de rangos: (campo, min, max, default)
+        _ranges: list[tuple[str, int, int, int]] = [
+            ("LOG_ANALYZER_COMPRESSION_THRESHOLD", 1024, 10485760, 51200),
+            ("LOG_ANALYZER_PROCESSING_THRESHOLD", 1024, 52428800, 102400),
+            ("LOG_ANALYZER_CONTEXT_WINDOW_SIZE", 0, 500, 20),
+            ("LOG_ANALYZER_MAX_CONTEXT_BLOCKS", 1, 1000, 30),
+            ("LOG_ANALYZER_TOP_PATTERNS", 1, 500, 50),
+            ("LOG_ANALYZER_LLM_MAX_TOKENS", 100, 16384, 4096),
+            ("LOG_ANALYZER_MAX_UPLOAD_SIZE", 1048576, 209715200, 52428800),
+            ("LOG_ANALYZER_COMMAND_TIMEOUT", 5, 300, 30),
+        ]
+
+        for field_name, min_val, max_val, default_val in _ranges:
+            value = getattr(self, field_name)
+            if value < min_val or value > max_val:
+                logger.warning(
+                    "[LOG_ANALYZER] %s=%d fuera de rango [%d, %d]. "
+                    "Usando valor por defecto: %d",
+                    field_name, value, min_val, max_val, default_val,
+                )
+                object.__setattr__(self, field_name, default_val)
+
+        # Validar LLM_PROVIDER
+        valid_providers = ("bedrock", "openai", "anthropic")
+        if self.LOG_ANALYZER_LLM_PROVIDER not in valid_providers:
+            logger.warning(
+                "[LOG_ANALYZER] LOG_ANALYZER_LLM_PROVIDER='%s' no es válido. "
+                "Opciones: %s. Usando valor por defecto: 'bedrock'",
+                self.LOG_ANALYZER_LLM_PROVIDER, valid_providers,
+            )
+            object.__setattr__(self, "LOG_ANALYZER_LLM_PROVIDER", "bedrock")
+
+        return self
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -113,6 +194,17 @@ class Settings(BaseSettings):
     def is_sqlserver(self) -> bool:
         """Verifica si la base de datos es SQL Server."""
         return self.DATABASE_URL.startswith("mssql")
+
+    @property
+    def log_analyzer_extra_keywords_list(self) -> list[str]:
+        """Parsea LOG_ANALYZER_EXTRA_KEYWORDS en una lista de strings."""
+        if not self.LOG_ANALYZER_EXTRA_KEYWORDS.strip():
+            return []
+        return [
+            kw.strip()
+            for kw in self.LOG_ANALYZER_EXTRA_KEYWORDS.split(",")
+            if kw.strip()
+        ]
 
 
 # Instancia global de configuración
