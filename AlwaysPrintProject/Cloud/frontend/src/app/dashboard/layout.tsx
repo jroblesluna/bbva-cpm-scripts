@@ -1,10 +1,10 @@
 /**
- * Layout del dashboard con navegación y protección de rutas.
+ * Layout del dashboard con navegación agrupada y protección de rutas.
  */
 
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -32,8 +32,24 @@ import {
   Download,
   Cog,
   Printer,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
-import { useState } from 'react'
+
+// Definición de items de navegación
+interface NavItem {
+  key: string
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  adminOnly?: boolean
+}
+
+// Definición de grupos de navegación
+interface NavGroup {
+  labelKey: string | null // null = sin grupo (top-level)
+  items: NavItem[]
+  adminOnly?: boolean
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -42,22 +58,82 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const t = useTranslations('nav')
 
-  const navigation = [
-    { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { key: 'workstations', href: '/dashboard/workstations', icon: Monitor },
-    { key: 'telemetry', href: '/dashboard/telemetry', icon: Activity },
-    { key: 'connectivity', href: '/dashboard/connectivity', icon: Wifi },
-    { key: 'vlans', href: '/dashboard/vlans', icon: Network },
-    { key: 'devices', href: '/dashboard/devices', icon: Printer },
-    { key: 'config', href: '/dashboard/config', icon: Settings },
-    { key: 'messages', href: '/dashboard/messages', icon: MessageSquare },
-    { key: 'audit', href: '/dashboard/audit', icon: FileText },
-    { key: 'accounts', href: '/dashboard/admin/organizations', icon: Building2, adminOnly: true },
-    { key: 'users', href: '/dashboard/admin/users', icon: Users, adminOnly: true },
-    { key: 'pendingIps', href: '/dashboard/admin/pending-ips', icon: Globe, adminOnly: true },
-    { key: 'updates', href: '/dashboard/admin/updates', icon: Download, adminOnly: true },
-    { key: 'actionConfigs', href: '/dashboard/admin/action-configs', icon: Cog, adminOnly: true },
+  // Grupos de navegación
+  const navGroups: NavGroup[] = [
+    {
+      labelKey: null,
+      items: [
+        { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
+      ],
+    },
+    {
+      labelKey: 'groupOperations',
+      items: [
+        { key: 'workstations', href: '/dashboard/workstations', icon: Monitor },
+        { key: 'telemetry', href: '/dashboard/telemetry', icon: Activity },
+        { key: 'connectivity', href: '/dashboard/connectivity', icon: Wifi },
+      ],
+    },
+    {
+      labelKey: 'groupInfrastructure',
+      items: [
+        { key: 'vlans', href: '/dashboard/vlans', icon: Network },
+        { key: 'devices', href: '/dashboard/devices', icon: Printer },
+        { key: 'config', href: '/dashboard/config', icon: Settings },
+      ],
+    },
+    {
+      labelKey: 'groupCommunication',
+      items: [
+        { key: 'messages', href: '/dashboard/messages', icon: MessageSquare },
+        { key: 'audit', href: '/dashboard/audit', icon: FileText },
+      ],
+    },
+    {
+      labelKey: 'groupAdmin',
+      adminOnly: true,
+      items: [
+        { key: 'accounts', href: '/dashboard/admin/organizations', icon: Building2, adminOnly: true },
+        { key: 'users', href: '/dashboard/admin/users', icon: Users, adminOnly: true },
+        { key: 'pendingIps', href: '/dashboard/admin/pending-ips', icon: Globe, adminOnly: true },
+        { key: 'updates', href: '/dashboard/admin/updates', icon: Download, adminOnly: true },
+        { key: 'actionConfigs', href: '/dashboard/admin/action-configs', icon: Cog, adminOnly: true },
+      ],
+    },
   ]
+
+  // Filtrar grupos según rol
+  const filteredGroups = navGroups
+    .filter((group) => !group.adminOnly || isAdmin())
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.adminOnly || isAdmin()),
+    }))
+    .filter((group) => group.items.length > 0)
+
+  // Estado de expansión de grupos (todos expandidos por defecto)
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {}
+    navGroups.forEach((group) => {
+      if (group.labelKey) {
+        initial[group.labelKey] = true
+      }
+    })
+    return initial
+  })
+
+  // Auto-expandir grupo si contiene la ruta activa
+  useEffect(() => {
+    filteredGroups.forEach((group) => {
+      if (group.labelKey && group.items.some((item) => pathname === item.href)) {
+        setExpandedGroups((prev) => ({ ...prev, [group.labelKey!]: true }))
+      }
+    })
+  }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleGroup = (labelKey: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [labelKey]: !prev[labelKey] }))
+  }
 
   // Redirigir a login si no está autenticado
   useEffect(() => {
@@ -97,15 +173,80 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return null
   }
 
-  // Filtrar navegación según rol
-  const filteredNavigation = navigation.filter((item) => {
-    if (item.adminOnly) {
-      return isAdmin()
-    }
-    return true
-  })
-
   const roleLabel = user?.role === 'admin' ? t('admin') : t('operator')
+
+  // Componente reutilizable para renderizar la navegación agrupada
+  const renderNavGroups = (onItemClick?: () => void) => (
+    <>
+      {filteredGroups.map((group, groupIdx) => {
+        // Items sin grupo (top-level, ej: Dashboard)
+        if (!group.labelKey) {
+          return (
+            <div key={`group-${groupIdx}`}>
+              {group.items.map((item) => {
+                const isActive = pathname === item.href
+                return (
+                  <Link
+                    key={item.key}
+                    href={item.href}
+                    onClick={onItemClick}
+                    className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                      isActive
+                        ? 'bg-blue-50 text-blue-600'
+                        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                  >
+                    <item.icon className="mr-3 h-5 w-5" />
+                    {t(item.key as any)}
+                  </Link>
+                )
+              })}
+            </div>
+          )
+        }
+
+        // Grupos con label colapsable
+        const isExpanded = expandedGroups[group.labelKey] ?? true
+        return (
+          <div key={`group-${groupIdx}`} className="mt-3">
+            <button
+              onClick={() => toggleGroup(group.labelKey!)}
+              className="flex items-center w-full px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide hover:text-gray-600 transition-colors"
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-3 w-3 mr-1.5" />
+              ) : (
+                <ChevronRight className="h-3 w-3 mr-1.5" />
+              )}
+              {t(group.labelKey as any)}
+            </button>
+            {isExpanded && (
+              <div className="mt-0.5 ml-1">
+                {group.items.map((item) => {
+                  const isActive = pathname === item.href
+                  return (
+                    <Link
+                      key={item.key}
+                      href={item.href}
+                      onClick={onItemClick}
+                      className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                        isActive
+                          ? 'bg-blue-50 text-blue-600'
+                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                    >
+                      <item.icon className="mr-3 h-5 w-5" />
+                      {t(item.key as any)}
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </>
+  )
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -129,25 +270,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <X className="h-6 w-6 text-gray-500" />
               </button>
             </div>
-            <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto">
-              {filteredNavigation.map((item) => {
-                const isActive = pathname === item.href
-                return (
-                  <Link
-                    key={item.key}
-                    href={item.href}
-                    onClick={() => setSidebarOpen(false)}
-                    className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                      isActive
-                        ? 'bg-blue-50 text-blue-600'
-                        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
-                  >
-                    <item.icon className="mr-3 h-5 w-5" />
-                    {t(item.key as any)}
-                  </Link>
-                )
-              })}
+            <nav className="flex-1 px-2 py-4 overflow-y-auto">
+              {renderNavGroups(() => setSidebarOpen(false))}
             </nav>
             {/* Información de usuario y logout en móvil */}
             <div className="flex-shrink-0 border-t border-gray-200 p-3 space-y-2">
@@ -178,7 +302,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <LogOut className="mr-1.5 h-3.5 w-3.5" />
                 {t('logout')}
               </Button>
-              <BuildInfo />
             </div>
           </div>
         </div>
@@ -198,25 +321,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               />
               <h1 className="text-xl font-bold text-gray-900">AlwaysPrint</h1>
             </div>
+            <div className="ml-auto">
+              <BuildInfo compact />
+            </div>
           </div>
-          <nav className="flex-1 overflow-y-auto space-y-1 px-2 py-4 min-h-0">
-            {filteredNavigation.map((item) => {
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                    isActive
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <item.icon className="mr-3 h-5 w-5" />
-                  {t(item.key as any)}
-                </Link>
-              )
-            })}
+          <nav className="flex-1 overflow-y-auto px-2 py-4 min-h-0">
+            {renderNavGroups()}
           </nav>
           <div className="flex-shrink-0 border-t border-gray-200 p-3 space-y-2">
             <div className="flex items-center gap-3">
@@ -243,7 +353,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <LogOut className="mr-1.5 h-3.5 w-3.5" />
               {t('logout')}
             </Button>
-            <BuildInfo />
           </div>
         </div>
       </div>
@@ -264,6 +373,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               className="rounded"
             />
             <h1 className="text-lg font-semibold text-gray-900">AlwaysPrint</h1>
+          </div>
+          <div className="ml-auto">
+            <BuildInfo compact />
           </div>
         </div>
 

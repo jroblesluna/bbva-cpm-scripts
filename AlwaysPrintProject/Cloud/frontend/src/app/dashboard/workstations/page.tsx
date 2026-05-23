@@ -21,6 +21,7 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
+  X,
   Network,
   Building2,
   User,
@@ -1554,47 +1555,50 @@ function WorkstationDetailModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>{t('detailsTitle')}</CardTitle>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <XCircle className="w-5 h-5" />
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-6">
+      <Card className="max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header sticky para que el botón de cerrar siempre sea visible */}
+        <div className="sticky top-0 bg-white z-10 border-b">
+          <CardHeader className="flex flex-row items-center justify-between py-3">
+            <CardTitle className="text-base">{t('detailsTitle')}</CardTitle>
+            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+              <X className="w-4 h-4" />
+            </Button>
+          </CardHeader>
+        </div>
+        <CardContent className="space-y-4 pt-4">
           {/* Sección prominente: Versión Tray, CIDR y VLAN */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <div className="flex items-center mb-1">
-                <Tag className="w-4 h-4 text-blue-600 mr-2" />
+                <Tag className="w-3.5 h-3.5 text-blue-600 mr-1.5" />
                 <span className="text-xs font-medium text-blue-700 uppercase">Versión Tray</span>
               </div>
-              <p className="text-lg font-semibold text-blue-900">
+              <p className="text-sm font-semibold text-blue-900">
                 {workstation.tray_version ?? '—'}
               </p>
             </div>
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
               <div className="flex items-center mb-1">
-                <Network className="w-4 h-4 text-purple-600 mr-2" />
+                <Network className="w-3.5 h-3.5 text-purple-600 mr-1.5" />
                 <span className="text-xs font-medium text-purple-700 uppercase">CIDR</span>
               </div>
-              <p className="text-lg font-semibold font-mono text-purple-900">
+              <p className="text-sm font-semibold font-mono text-purple-900">
                 {workstation.cidr ?? '—'}
               </p>
             </div>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
               <div className="flex items-center mb-1">
-                <Network className="w-4 h-4 text-green-600 mr-2" />
+                <Network className="w-3.5 h-3.5 text-green-600 mr-1.5" />
                 <span className="text-xs font-medium text-green-700 uppercase">VLAN asignada</span>
               </div>
-              <p className="text-lg font-semibold text-green-900">
+              <p className="text-sm font-semibold text-green-900">
                 {workstation.vlan?.name ?? (workstation.vlan_id ? workstation.vlan_id : '—')}
               </p>
             </div>
           </div>
 
           <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">{tCommon('status')}</h3>
+            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">{tCommon('status')}</h3>
             <div className="flex items-center space-x-2">
               <Badge variant={workstation.is_online ? 'default' : 'secondary'}>
                 {workstation.is_online ? t('online') : t('offline')}
@@ -1605,8 +1609,8 @@ function WorkstationDetailModal({
             </div>
           </div>
           <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">{t('networkInfo')}</h3>
-            <dl className="grid grid-cols-2 gap-4 text-sm">
+            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">{t('networkInfo')}</h3>
+            <dl className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <dt className="text-gray-600">{t('privateIp')}</dt>
                 <dd className="font-mono font-medium">{workstation.ip_private}</dd>
@@ -1624,8 +1628,8 @@ function WorkstationDetailModal({
             </dl>
           </div>
           <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">{t('systemInfo')}</h3>
-            <dl className="grid grid-cols-2 gap-4 text-sm">
+            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">{t('systemInfo')}</h3>
+            <dl className="grid grid-cols-2 gap-3 text-sm">
               {workstation.hostname && (
                 <div>
                   <dt className="text-gray-600">{t('hostname')}</dt>
@@ -1652,16 +1656,16 @@ function WorkstationDetailModal({
           </div>
           {workstation.organization && (
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">{t('account')}</h3>
+              <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">{t('account')}</h3>
               <div className="flex items-center">
-                <Building2 className="w-5 h-5 text-blue-600 mr-2" />
-                <span className="font-medium">{workstation.organization.name}</span>
+                <Building2 className="w-4 h-4 text-blue-600 mr-2" />
+                <span className="font-medium text-sm">{workstation.organization.name}</span>
               </div>
             </div>
           )}
           <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">{t('dates')}</h3>
-            <dl className="grid grid-cols-2 gap-4 text-sm">
+            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">{t('dates')}</h3>
+            <dl className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <dt className="text-gray-600">{t('firstConnection')}</dt>
                 <dd className="font-medium">
@@ -1679,13 +1683,13 @@ function WorkstationDetailModal({
             </dl>
           </div>
           <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">ID</h3>
+            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">ID</h3>
             <code className="text-xs bg-gray-100 px-2 py-1 rounded">{workstation.id}</code>
           </div>
 
           {/* Botón de análisis de log */}
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-gray-700">Análisis de Log</h3>
+            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Análisis de Log</h3>
             <LogAnalysisButton
               workstationId={workstation.id}
               workstationName={workstation.hostname || workstation.ip_private}

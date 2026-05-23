@@ -50,7 +50,11 @@
     "logout": "Cerrar sesión",
     "loading": "Cargando...",
     "admin": "Administrador",
-    "operator": "Operador"
+    "operator": "Operador",
+    "groupOperations": "Operaciones",
+    "groupInfrastructure": "Infraestructura",
+    "groupCommunication": "Comunicación",
+    "groupAdmin": "Administración"
   },
   "login": {
     "title": "AlwaysPrint Cloud Manager",

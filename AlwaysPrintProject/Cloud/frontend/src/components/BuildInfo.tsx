@@ -3,7 +3,15 @@
 import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api'
 
-export function BuildInfo() {
+interface BuildInfoProps {
+  compact?: boolean
+}
+
+/**
+ * Componente que muestra la versión del frontend y backend.
+ * En modo compact se renderiza inline (para el header).
+ */
+export function BuildInfo({ compact = false }: BuildInfoProps) {
   const [backendTag, setBackendTag] = useState<string>('...')
   const frontendTag = process.env.NEXT_PUBLIC_BUILD_TAG || 'dev'
 
@@ -15,6 +23,17 @@ export function BuildInfo() {
     })
   }, [])
 
+  // Versión compacta para el header
+  if (compact) {
+    return (
+      <div className="text-[10px] font-mono text-gray-400 leading-tight">
+        <div>🌐 {frontendTag.slice(0, 8)}</div>
+        <div>⚙️ {backendTag.slice(0, 8)}</div>
+      </div>
+    )
+  }
+
+  // Versión completa para sidebar footer
   return (
     <div className="px-3 py-2 mt-1">
       <div className="rounded-md bg-gray-950 px-3 py-2 font-mono text-[10px] leading-relaxed">
