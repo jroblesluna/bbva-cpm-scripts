@@ -127,6 +127,16 @@ resource "aws_iam_role_policy" "bedrock_invoke_model" {
           "bedrock:ListInferenceProfiles"
         ]
         Resource = ["*"]
+      },
+      {
+        Sid    = "AllowMarketplaceForBedrock"
+        Effect = "Allow"
+        Action = [
+          "aws-marketplace:ViewSubscriptions",
+          "aws-marketplace:Subscribe",
+          "aws-marketplace:Unsubscribe"
+        ]
+        Resource = ["*"]
       }
     ]
   })
