@@ -619,9 +619,13 @@ class LLMService:
                 provider = model.get("providerName", "")
                 if provider not in ("Anthropic", "Amazon", "Meta", "Mistral AI", "Cohere"):
                     continue
+                # Filtrar modelos de embedding/rerank que no sirven para análisis de texto
+                model_name = model.get("modelName", model_id)
+                if any(skip in model_name.lower() for skip in ("embed", "rerank")):
+                    continue
                 models.append({
                     "model_id": model_id,
-                    "model_name": model.get("modelName", model_id),
+                    "model_name": model_name,
                     "provider": provider,
                 })
 
@@ -632,8 +636,21 @@ class LLMService:
                     if known["model_id"] not in existing_ids:
                         models.append(known)
 
-            models.sort(key=lambda m: (m["provider"], m["model_name"]))
-            return models if models else KNOWN_MODELS
+            # Deduplicar: preferir inference profiles (us.*) sobre model IDs directos
+            # Agrupar por (provider, model_name)
+            deduplicated: dict[tuple[str, str], dict] = {}
+            for m in models:
+                key = (m["provider"], m["model_name"])
+                existing = deduplicated.get(key)
+                if existing is None:
+                    deduplicated[key] = m
+                elif m["model_id"].startswith("us."):
+                    # Preferir el inference profile
+                    deduplicated[key] = m
+
+            result = list(deduplicated.values())
+            result.sort(key=lambda m: (m["provider"], m["model_name"]))
+            return result if result else KNOWN_MODELS
 
         except Exception as e:
             logger.warning("[LOG_ANALYZER] Error listando modelos Bedrock: %s. Usando fallback.", e)
