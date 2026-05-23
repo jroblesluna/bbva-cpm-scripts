@@ -14,6 +14,7 @@ export interface Organization {
   auto_reregister_enabled: boolean
   forced_contingency: boolean
   llm_model_id?: string | null
+  openai_api_key?: string | null
   created_at: string
   updated_at: string
   public_ips?: PublicIP[]
@@ -42,6 +43,7 @@ export interface OrganizationUpdate {
   timezone?: string
   language?: string
   llm_model_id?: string | null
+  openai_api_key?: string | null
 }
 
 export interface PublicIPCreate {

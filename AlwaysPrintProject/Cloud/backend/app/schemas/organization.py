@@ -83,6 +83,7 @@ class OrganizationUpdate(BaseModel):
     language: Optional[str] = Field(None, max_length=2, description="Idioma por defecto de la organización")
     auto_reregister_enabled: Optional[bool] = Field(None, description="Permitir re-registro automático de workstations eliminadas")
     llm_model_id: Optional[str] = Field(None, max_length=100, description="Modelo LLM para análisis de logs (NULL = usar default global)")
+    openai_api_key: Optional[str] = Field(None, max_length=200, description="API Key de OpenAI (si se configura, se usa OpenAI en vez de Bedrock)")
 
 
 class OrganizationResponse(OrganizationBase):
@@ -96,6 +97,7 @@ class OrganizationResponse(OrganizationBase):
     auto_reregister_enabled: bool
     forced_contingency: bool = False
     llm_model_id: Optional[str] = None
+    openai_api_key: Optional[str] = None
     public_ips: list[PublicIPResponse] = []
     created_at: datetime
     updated_at: datetime

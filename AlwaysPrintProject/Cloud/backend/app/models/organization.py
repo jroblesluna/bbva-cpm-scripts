@@ -95,6 +95,10 @@ class Organization(Base):
     # Si es NULL, se usa el modelo por defecto global (settings.LOG_ANALYZER_LLM_MODEL_ID)
     llm_model_id = Column(String(100), nullable=True)
 
+    # API Key de OpenAI para esta organización (opcional)
+    # Si está configurada, se usa OpenAI en vez de AWS Bedrock para el análisis de logs
+    openai_api_key = Column(String(200), nullable=True)
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

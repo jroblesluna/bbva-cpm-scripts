@@ -207,20 +207,39 @@ class LogAnalysisService:
         )
 
         # 4. Invocación del LLM
-        # Obtener modelo LLM de la organización (si está configurado)
+        # Obtener configuración LLM de la organización
         from app.models.organization import Organization
         org = db.query(Organization).filter(Organization.id == organization_id).first()
         org_model_id = org.llm_model_id if org else None
+        org_openai_key = org.openai_api_key if org else None
 
-        logger.info(
-            "[LOG_ANALYZER] Invocando LLM: workstation_id=%s, "
-            "model_override=%s, payload_length=%d chars",
-            workstation_id,
-            org_model_id or "(default)",
-            len(payload),
-        )
-
-        analysis_text = await self.llm_service.invoke(payload, model_id=org_model_id)
+        # Si la organización tiene API Key de OpenAI, usar OpenAI directamente
+        if org_openai_key:
+            from app.services.llm_service import OpenAIProvider, LLMServiceError as _Err
+            logger.info(
+                "[LOG_ANALYZER] Invocando OpenAI (API key de organización): "
+                "workstation_id=%s, payload_length=%d chars",
+                workstation_id,
+                len(payload),
+            )
+            openai_provider = OpenAIProvider()
+            openai_provider.api_key = org_openai_key
+            # Usar modelo de la organización si está configurado, sino gpt-4o
+            if org_model_id:
+                openai_provider.model = org_model_id
+            analysis_text = await openai_provider.invoke(
+                payload, settings.LOG_ANALYZER_LLM_MAX_TOKENS
+            )
+        else:
+            # Usar Bedrock (default del sistema)
+            logger.info(
+                "[LOG_ANALYZER] Invocando Bedrock: workstation_id=%s, "
+                "model_override=%s, payload_length=%d chars",
+                workstation_id,
+                org_model_id or "(default)",
+                len(payload),
+            )
+            analysis_text = await self.llm_service.invoke(payload, model_id=org_model_id)
 
         # 6. Calcular duración del procesamiento
         duration_ms = int((time.time() - start_time) * 1000)

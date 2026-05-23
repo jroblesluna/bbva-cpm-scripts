@@ -582,6 +582,7 @@ function AccountForm({
     timezone: initialData?.timezone || 'UTC',
     language: initialData?.language || 'en',
     llm_model_id: initialData?.llm_model_id || null,
+    openai_api_key: initialData?.openai_api_key || null,
   })
 
   // Cargar modelos LLM disponibles (solo al editar)
@@ -687,6 +688,22 @@ function AccountForm({
           disabled={isLoading}
           t={t}
         />
+      )}
+
+      {/* API Key de OpenAI (solo al editar) */}
+      {initialData && (
+        <div className="space-y-2">
+          <Label htmlFor="openai_api_key">{t('openaiKeyLabel')}</Label>
+          <Input
+            id="openai_api_key"
+            type="password"
+            placeholder={t('openaiKeyPlaceholder')}
+            value={formData.openai_api_key || ''}
+            onChange={(e) => setFormData({ ...formData, openai_api_key: e.target.value || null })}
+            disabled={isLoading}
+          />
+          <p className="text-xs text-gray-500">{t('openaiKeyHelper')}</p>
+        </div>
       )}
 
       <div className="flex justify-end space-x-3">
