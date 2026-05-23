@@ -842,7 +842,7 @@ export const logAnalysisApi = {
    */
   listModels: async (): Promise<{ models: Array<{ model_id: string; model_name: string; provider: string }>; default_model_id: string }> => {
     const response = await apiClient.get<{ models: Array<{ model_id: string; model_name: string; provider: string }>; default_model_id: string }>(
-      '/workstations/llm-models'
+      '/workstations/log-analyzer-models'
     )
     return response.data
   },

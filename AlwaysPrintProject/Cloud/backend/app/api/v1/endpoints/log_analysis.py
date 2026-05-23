@@ -366,7 +366,7 @@ async def get_analysis(
 
 
 @router.get(
-    "/llm-models",
+    "/log-analyzer-models",
     status_code=status.HTTP_200_OK,
 )
 async def list_available_llm_models(
