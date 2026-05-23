@@ -224,8 +224,8 @@ class LogAnalysisService:
             )
             openai_provider = OpenAIProvider()
             openai_provider.api_key = org_openai_key
-            # Usar modelo de la organización si está configurado, sino gpt-4o
-            if org_model_id:
+            # Solo usar llm_model_id si es un modelo de OpenAI (gpt-*, o1-*, chatgpt-*)
+            if org_model_id and any(org_model_id.startswith(p) for p in ("gpt-", "o1-", "o3-", "chatgpt-")):
                 openai_provider.model = org_model_id
             analysis_text, input_tokens, output_tokens = await openai_provider.invoke(
                 payload, settings.LOG_ANALYZER_LLM_MAX_TOKENS
