@@ -362,11 +362,13 @@ async def get_analysis(
     return analysis
 
 
-# === ENDPOINTS DE MODELOS LLM ===
+# === ENDPOINTS DE MODELOS LLM (router separado para evitar conflicto con /{workstation_id}) ===
+
+llm_router = APIRouter()
 
 
-@router.get(
-    "/log-analyzer-models",
+@llm_router.get(
+    "/models",
     status_code=status.HTTP_200_OK,
 )
 async def list_available_llm_models(

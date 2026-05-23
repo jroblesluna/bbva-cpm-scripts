@@ -80,6 +80,13 @@ api_router.include_router(
     tags=["Análisis de Logs"]
 )
 
+# Modelos LLM (separado para evitar conflicto con /workstations/{workstation_id})
+api_router.include_router(
+    log_analysis.llm_router,
+    prefix="/llm",
+    tags=["Análisis de Logs"]
+)
+
 # Telemetría (historial por workstation)
 api_router.include_router(
     telemetry.router,
