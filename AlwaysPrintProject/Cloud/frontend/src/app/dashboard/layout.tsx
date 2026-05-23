@@ -321,9 +321,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               />
               <h1 className="text-xl font-bold text-gray-900">AlwaysPrint</h1>
             </div>
-            <div className="ml-auto">
-              <BuildInfo compact />
-            </div>
+          </div>
+          <div className="px-4 pb-2">
+            <BuildInfo compact />
           </div>
           <nav className="flex-1 overflow-y-auto px-2 py-4 min-h-0">
             {renderNavGroups()}

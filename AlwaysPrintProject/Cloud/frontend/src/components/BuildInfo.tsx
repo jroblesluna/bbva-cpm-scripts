@@ -23,12 +23,12 @@ export function BuildInfo({ compact = false }: BuildInfoProps) {
     })
   }, [])
 
-  // Versión compacta para el header
+  // Versión compacta para el header (una línea debajo del logo)
   if (compact) {
     return (
-      <div className="text-[10px] font-mono text-gray-400 leading-tight">
-        <div>🌐 {frontendTag.slice(0, 8)}</div>
-        <div>⚙️ {backendTag.slice(0, 8)}</div>
+      <div className="text-[9px] font-mono text-gray-400 flex items-center gap-2">
+        <span>🌐{frontendTag.slice(0, 8)}</span>
+        <span>⚙️{backendTag.slice(0, 8)}</span>
       </div>
     )
   }
