@@ -1239,7 +1239,7 @@ namespace AlwaysPrintTray.Cloud
                     "AlwaysPrint", "logs");
 
                 // Construir nombre del archivo de log del día actual
-                string datePart = DateTime.Now.ToString("yyyy-MM-dd");
+                string datePart = DateTime.Now.ToString("yyyyMMdd");
                 string logFileName = $"AlwaysPrint_{datePart}.log";
                 string logFilePath = Path.Combine(logsFolder, logFileName);
 

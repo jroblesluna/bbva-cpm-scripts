@@ -12,7 +12,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Brain, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -60,16 +60,19 @@ export function LogAnalysisButton({
   const getErrorMessage = useCallback(
     (error: { detail?: string; status?: number }): string => {
       if (error.status === 409) {
-        return t('errorOffline');
+        return error.detail ?? t('errorOffline');
       }
       if (error.status === 408) {
-        return t('errorTimeout');
+        return error.detail ?? t('errorTimeout');
       }
       if (error.status === 502) {
-        return t('errorLlm');
+        return error.detail ?? t('errorLlm');
       }
       if (error.status === 422) {
         return error.detail ?? t('errorProcessing');
+      }
+      if (error.status === 500) {
+        return error.detail ?? t('errorGeneric');
       }
       if (!error.status) {
         return t('errorConnection');
@@ -93,11 +96,14 @@ export function LogAnalysisButton({
         });
         onAnalysisComplete?.(result);
       } catch (error: unknown) {
-        const apiError = error as { detail?: string; status?: number };
+        // Extraer status y detail del error de axios
+        const axiosError = error as { response?: { status?: number; data?: { detail?: string } }; message?: string };
+        const status = axiosError.response?.status;
+        const detail = axiosError.response?.data?.detail;
         toast({
           variant: 'destructive',
           title: t('errorTitle'),
-          description: getErrorMessage(apiError),
+          description: getErrorMessage({ status, detail }),
         });
       } finally {
         setIsLoading(false);
@@ -132,16 +138,18 @@ export function LogAnalysisButton({
         await executeAnalysis(false);
       }
     } catch (error: unknown) {
-      const apiError = error as { detail?: string; status?: number };
+      const axiosError = error as { response?: { status?: number; data?: { detail?: string } } };
+      const status = axiosError.response?.status;
+      const detail = axiosError.response?.data?.detail;
       // Si el endpoint retorna 404, significa que no hay análisis previo
-      if (apiError.status === 404) {
+      if (status === 404) {
         await executeAnalysis(false);
       } else {
         setIsLoading(false);
         toast({
           variant: 'destructive',
           title: t('errorTitle'),
-          description: getErrorMessage(apiError),
+          description: getErrorMessage({ status, detail }),
         });
       }
     }
@@ -168,7 +176,7 @@ export function LogAnalysisButton({
         {isLoading ? (
           <Loader2 className="w-4 h-4 animate-spin" />
         ) : (
-          <Brain className="w-4 h-4" />
+          <Sparkles className="w-4 h-4" />
         )}
         {!iconOnly && <span className="ml-2">{t('buttonLabel')}</span>}
       </Button>
