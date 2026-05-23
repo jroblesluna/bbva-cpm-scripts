@@ -407,6 +407,8 @@
     "activeLabel": "Organization active",
     "llmModelLabel": "LLM Model for Log Analysis",
     "llmModelDefault": "Use system default model",
+    "llmModelSelect": "Select model",
+    "llmProviderSelect": "Select provider",
     "llmModelHelper": "AI model used to analyze workstation logs for this organization",
     "createBtn": "Create Organization",
     "emptyTitle": "No organizations",

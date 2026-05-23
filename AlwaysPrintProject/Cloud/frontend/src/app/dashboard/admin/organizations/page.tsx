@@ -7,7 +7,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { organizationsApi, logAnalysisApi } from '@/lib/api'
 import { useTranslations } from 'next-intl'
@@ -481,6 +481,84 @@ export default function AccountsPage() {
   )
 }
 
+// Componente selector de modelo LLM con dos niveles (Provider → Modelo)
+function LlmModelSelector({
+  value,
+  onChange,
+  modelsData,
+  modelsLoading,
+  disabled,
+  t,
+}: {
+  value: string | null
+  onChange: (modelId: string | null) => void
+  modelsData: { models: Array<{ model_id: string; model_name: string; provider: string }>; default_model_id: string } | undefined
+  modelsLoading: boolean
+  disabled: boolean
+  t: ReturnType<typeof useTranslations>
+}) {
+  // Obtener providers únicos
+  const providers = Array.from(new Set(modelsData?.models?.map((m) => m.provider) || []))
+  providers.sort()
+
+  // Determinar provider actual basado en el valor seleccionado
+  const currentModel = modelsData?.models?.find((m) => m.model_id === value)
+  const [selectedProvider, setSelectedProvider] = useState<string>(currentModel?.provider || '')
+
+  // Modelos filtrados por provider seleccionado
+  const filteredModels = modelsData?.models?.filter((m) => m.provider === selectedProvider) || []
+
+  // Actualizar provider cuando cambia el valor externo
+  useEffect(() => {
+    if (value && modelsData?.models) {
+      const model = modelsData.models.find((m) => m.model_id === value)
+      if (model) setSelectedProvider(model.provider)
+    }
+  }, [value, modelsData])
+
+  return (
+    <div className="space-y-2">
+      <Label>{t('llmModelLabel')}</Label>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Selector de Provider */}
+        <select
+          value={selectedProvider}
+          onChange={(e) => {
+            setSelectedProvider(e.target.value)
+            onChange(null) // Reset modelo al cambiar provider
+          }}
+          disabled={disabled || modelsLoading}
+          className="w-full px-3 py-2 border rounded-md text-sm"
+        >
+          <option value="">{t('llmProviderSelect')}</option>
+          {providers.map((provider) => (
+            <option key={provider} value={provider}>{provider}</option>
+          ))}
+        </select>
+
+        {/* Selector de Modelo */}
+        <select
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value || null)}
+          disabled={disabled || modelsLoading || !selectedProvider}
+          className="w-full px-3 py-2 border rounded-md text-sm"
+        >
+          <option value="">
+            {selectedProvider ? t('llmModelSelect') : t('llmModelDefault')}
+            {!selectedProvider && modelsData?.default_model_id ? ` (${modelsData.default_model_id})` : ''}
+          </option>
+          {filteredModels.map((model) => (
+            <option key={model.model_id} value={model.model_id}>
+              {model.model_name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="text-xs text-gray-500">{t('llmModelHelper')}</p>
+    </div>
+  )
+}
+
 // Componente de formulario de cuenta (crear/editar)
 function AccountForm({
   initialData,
@@ -599,28 +677,16 @@ function AccountForm({
         <Label htmlFor="is_active" className="cursor-pointer">{t('activeLabel')}</Label>
       </div>
 
-      {/* Selector de modelo LLM (solo al editar) */}
+      {/* Selector de modelo LLM (solo al editar) - dos niveles: Provider → Modelo */}
       {initialData && (
-        <div className="space-y-2">
-          <Label htmlFor="llm_model_id">{t('llmModelLabel')}</Label>
-          <select
-            id="llm_model_id"
-            value={formData.llm_model_id || ''}
-            onChange={(e) => setFormData({ ...formData, llm_model_id: e.target.value || null })}
-            disabled={isLoading || modelsLoading}
-            className="w-full px-3 py-2 border rounded-md"
-          >
-            <option value="">
-              {t('llmModelDefault')}{modelsData?.default_model_id ? ` (${modelsData.default_model_id})` : ''}
-            </option>
-            {modelsData?.models?.map((model) => (
-              <option key={model.model_id} value={model.model_id}>
-                {model.model_name}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-500">{t('llmModelHelper')}</p>
-        </div>
+        <LlmModelSelector
+          value={formData.llm_model_id || null}
+          onChange={(modelId) => setFormData({ ...formData, llm_model_id: modelId })}
+          modelsData={modelsData}
+          modelsLoading={modelsLoading}
+          disabled={isLoading}
+          t={t}
+        />
       )}
 
       <div className="flex justify-end space-x-3">

@@ -578,17 +578,17 @@ class LLMService:
     @staticmethod
     async def list_available_models() -> list[dict]:
         """
-        Lista los modelos de texto disponibles en AWS Bedrock.
+        Lista los modelos de texto disponibles en AWS Bedrock, agrupados por provider.
 
-        Intenta llamar a ListFoundationModels de Bedrock. Si falla (permisos,
-        conectividad), retorna una lista de modelos conocidos como fallback.
+        Intenta llamar a ListFoundationModels de Bedrock sin filtro de provider.
+        Si falla, retorna una lista de modelos conocidos como fallback.
 
         Retorna:
             Lista de dicts con: model_id, model_name, provider
         """
         import boto3
 
-        # Modelos conocidos como fallback (inference profile IDs que funcionan con Converse API)
+        # Modelos conocidos como fallback
         KNOWN_MODELS = [
             {"model_id": "us.anthropic.claude-sonnet-4-20250514-v1:0", "model_name": "Claude Sonnet 4", "provider": "Anthropic"},
             {"model_id": "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "model_name": "Claude Sonnet 4.5", "provider": "Anthropic"},
@@ -596,15 +596,18 @@ class LLMService:
             {"model_id": "us.anthropic.claude-opus-4-6-20250501-v1:0", "model_name": "Claude Opus 4.6", "provider": "Anthropic"},
             {"model_id": "us.anthropic.claude-haiku-4-5-20251001-v1:0", "model_name": "Claude Haiku 4.5", "provider": "Anthropic"},
             {"model_id": "anthropic.claude-3-5-haiku-20241022-v1:0", "model_name": "Claude 3.5 Haiku", "provider": "Anthropic"},
+            {"model_id": "us.amazon.nova-pro-v1:0", "model_name": "Nova Pro", "provider": "Amazon"},
+            {"model_id": "us.amazon.nova-lite-v1:0", "model_name": "Nova Lite", "provider": "Amazon"},
+            {"model_id": "us.meta.llama3-3-70b-instruct-v1:0", "model_name": "Llama 3.3 70B", "provider": "Meta"},
         ]
 
         try:
             client = boto3.client("bedrock", region_name=settings.LOG_ANALYZER_LLM_REGION)
 
+            # Listar todos los modelos de texto (sin filtro de provider)
             response = await asyncio.to_thread(
                 client.list_foundation_models,
                 byOutputModality="TEXT",
-                byProvider="Anthropic",
             )
 
             models = []
@@ -612,21 +615,24 @@ class LLMService:
                 model_id = model.get("modelId", "")
                 if model.get("modelLifecycle", {}).get("status") != "ACTIVE":
                     continue
+                # Filtrar solo providers relevantes para análisis de texto
+                provider = model.get("providerName", "")
+                if provider not in ("Anthropic", "Amazon", "Meta", "Mistral AI", "Cohere"):
+                    continue
                 models.append({
                     "model_id": model_id,
                     "model_name": model.get("modelName", model_id),
-                    "provider": model.get("providerName", "Anthropic"),
+                    "provider": provider,
                 })
 
-            # Si la API retornó modelos, combinar con los inference profiles conocidos
+            # Combinar con inference profiles conocidos
             if models:
-                # Agregar inference profiles que no estén ya en la lista
                 existing_ids = {m["model_id"] for m in models}
                 for known in KNOWN_MODELS:
                     if known["model_id"] not in existing_ids:
                         models.append(known)
 
-            models.sort(key=lambda m: m["model_name"])
+            models.sort(key=lambda m: (m["provider"], m["model_name"]))
             return models if models else KNOWN_MODELS
 
         except Exception as e:
