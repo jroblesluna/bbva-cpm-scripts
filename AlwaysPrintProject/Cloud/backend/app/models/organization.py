@@ -91,6 +91,10 @@ class Organization(Base):
     # Cuando está activo, TODAS las workstations de esta organización entran en modo contingencia
     forced_contingency = Column(Boolean, nullable=False, default=False, server_default='false')
 
+    # Modelo LLM asignado a esta organización para análisis de logs
+    # Si es NULL, se usa el modelo por defecto global (settings.LOG_ANALYZER_LLM_MODEL_ID)
+    llm_model_id = Column(String(100), nullable=True)
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

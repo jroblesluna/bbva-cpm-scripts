@@ -82,6 +82,7 @@ class OrganizationUpdate(BaseModel):
     timezone: Optional[str] = Field(None, max_length=50, description="Zona horaria de la organización")
     language: Optional[str] = Field(None, max_length=2, description="Idioma por defecto de la organización")
     auto_reregister_enabled: Optional[bool] = Field(None, description="Permitir re-registro automático de workstations eliminadas")
+    llm_model_id: Optional[str] = Field(None, max_length=100, description="Modelo LLM para análisis de logs (NULL = usar default global)")
 
 
 class OrganizationResponse(OrganizationBase):
@@ -94,6 +95,7 @@ class OrganizationResponse(OrganizationBase):
     target_version: Optional[str] = None
     auto_reregister_enabled: bool
     forced_contingency: bool = False
+    llm_model_id: Optional[str] = None
     public_ips: list[PublicIPResponse] = []
     created_at: datetime
     updated_at: datetime

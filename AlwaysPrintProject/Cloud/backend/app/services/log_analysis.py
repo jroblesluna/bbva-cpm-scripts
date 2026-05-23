@@ -220,14 +220,20 @@ class LogAnalysisService:
             )
 
         # 5. Invocación del LLM
+        # Obtener modelo LLM de la organización (si está configurado)
+        from app.models.organization import Organization
+        org = db.query(Organization).filter(Organization.id == organization_id).first()
+        org_model_id = org.llm_model_id if org else None
+
         logger.info(
             "[LOG_ANALYZER] Invocando LLM: workstation_id=%s, "
-            "payload_length=%d chars",
+            "model_override=%s, payload_length=%d chars",
             workstation_id,
+            org_model_id or "(default)",
             len(payload),
         )
 
-        analysis_text = await self.llm_service.invoke(payload)
+        analysis_text = await self.llm_service.invoke(payload, model_id=org_model_id)
 
         # 6. Calcular duración del procesamiento
         duration_ms = int((time.time() - start_time) * 1000)

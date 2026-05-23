@@ -105,12 +105,24 @@ resource "aws_iam_role_policy" "bedrock_invoke_model" {
         Sid    = "AllowBedrockInvokeModel"
         Effect = "Allow"
         Action = [
-          "bedrock:InvokeModel"
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream"
         ]
         Resource = [
           "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet*",
-          "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-5-sonnet*"
+          "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-opus*",
+          "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-haiku*",
+          "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3*"
         ]
+      },
+      {
+        Sid    = "AllowBedrockListModels"
+        Effect = "Allow"
+        Action = [
+          "bedrock:ListFoundationModels",
+          "bedrock:GetFoundationModel"
+        ]
+        Resource = ["*"]
       }
     ]
   })

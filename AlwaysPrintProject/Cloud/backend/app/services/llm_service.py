@@ -36,13 +36,14 @@ class LLMProvider(ABC):
     """Interfaz abstracta para providers de LLM."""
 
     @abstractmethod
-    async def invoke(self, payload: str, max_tokens: int) -> str:
+    async def invoke(self, payload: str, max_tokens: int, model_id: Optional[str] = None) -> str:
         """
         Invoca el modelo con el payload dado.
 
         Parámetros:
             payload: Texto completo a enviar al modelo
             max_tokens: Máximo de tokens en la respuesta
+            model_id: Override del modelo a usar (None = usar default del provider)
 
         Retorna:
             Texto de respuesta del modelo.
@@ -88,13 +89,14 @@ class BedrockProvider(LLMProvider):
             )
         return self._client
 
-    async def invoke(self, payload: str, max_tokens: int) -> str:
+    async def invoke(self, payload: str, max_tokens: int, model_id: Optional[str] = None) -> str:
         """
         Invoca Claude via Bedrock Converse API.
 
         Parámetros:
             payload: Texto completo a enviar al modelo
             max_tokens: Máximo de tokens en la respuesta
+            model_id: Override del modelo (None = usar self.model_id)
 
         Retorna:
             Texto de respuesta del modelo.
@@ -104,6 +106,7 @@ class BedrockProvider(LLMProvider):
         """
         import botocore.exceptions
 
+        effective_model = model_id or self.model_id
         last_error: Optional[Exception] = None
 
         for attempt in range(MAX_RETRIES):
@@ -111,7 +114,7 @@ class BedrockProvider(LLMProvider):
                 # Ejecutar llamada síncrona de boto3 en un thread para no bloquear el event loop
                 response = await asyncio.to_thread(
                     self.client.converse,
-                    modelId=self.model_id,
+                    modelId=effective_model,
                     messages=[
                         {
                             "role": "user",
@@ -208,13 +211,14 @@ class OpenAIProvider(LLMProvider):
         self.model: str = settings.LOG_ANALYZER_OPENAI_MODEL
         self.base_url: str = "https://api.openai.com/v1"
 
-    async def invoke(self, payload: str, max_tokens: int) -> str:
+    async def invoke(self, payload: str, max_tokens: int, model_id: Optional[str] = None) -> str:
         """
         Invoca GPT-4o via OpenAI Chat Completions API.
 
         Parámetros:
             payload: Texto completo a enviar al modelo
             max_tokens: Máximo de tokens en la respuesta
+            model_id: Override del modelo (no usado en OpenAI, usa self.model)
 
         Retorna:
             Texto de respuesta del modelo.
@@ -345,13 +349,14 @@ class AnthropicProvider(LLMProvider):
         self.model: str = settings.LOG_ANALYZER_ANTHROPIC_MODEL
         self.base_url: str = "https://api.anthropic.com/v1"
 
-    async def invoke(self, payload: str, max_tokens: int) -> str:
+    async def invoke(self, payload: str, max_tokens: int, model_id: Optional[str] = None) -> str:
         """
         Invoca Claude via Anthropic Messages API.
 
         Parámetros:
             payload: Texto completo a enviar al modelo
             max_tokens: Máximo de tokens en la respuesta
+            model_id: Override del modelo (no usado en Anthropic, usa self.model)
 
         Retorna:
             Texto de respuesta del modelo.
@@ -503,7 +508,7 @@ class LLMService:
             )
         return self._provider
 
-    async def invoke(self, payload: str) -> str:
+    async def invoke(self, payload: str, model_id: Optional[str] = None) -> str:
         """
         Invoca el LLM configurado.
 
@@ -512,6 +517,7 @@ class LLMService:
 
         Parámetros:
             payload: Texto completo a enviar al modelo (prompt + datos)
+            model_id: Override del modelo a usar (None = usar default del provider)
 
         Retorna:
             Texto de respuesta del modelo.
@@ -523,15 +529,16 @@ class LLMService:
         provider = self.provider
 
         logger.info(
-            "[LOG_ANALYZER] Invocando LLM provider=%s, max_tokens=%d, "
+            "[LOG_ANALYZER] Invocando LLM provider=%s, model_override=%s, max_tokens=%d, "
             "payload_length=%d chars",
             provider.get_provider_name(),
+            model_id or "(default)",
             self.max_tokens,
             len(payload),
         )
 
         try:
-            response = await provider.invoke(payload, self.max_tokens)
+            response = await provider.invoke(payload, self.max_tokens, model_id=model_id)
             duration_ms = int((time.time() - start_time) * 1000)
 
             logger.info(
@@ -566,3 +573,49 @@ class LLMService:
             raise LLMServiceError(
                 f"Error inesperado del servicio LLM: {e}"
             ) from e
+
+
+    @staticmethod
+    async def list_available_models() -> list[dict]:
+        """
+        Lista los modelos de texto disponibles en AWS Bedrock.
+
+        Llama a la API ListFoundationModels de Bedrock y filtra por:
+        - Modelos con modalidad de texto (input y output)
+        - Modelos de Anthropic (Claude)
+
+        Retorna:
+            Lista de dicts con: model_id, model_name, provider, input_modalities, output_modalities
+        """
+        import boto3
+
+        try:
+            client = boto3.client("bedrock", region_name=settings.LOG_ANALYZER_LLM_REGION)
+
+            response = await asyncio.to_thread(
+                client.list_foundation_models,
+                byOutputModality="TEXT",
+                byProvider="Anthropic",
+            )
+
+            models = []
+            for model in response.get("modelSummaries", []):
+                model_id = model.get("modelId", "")
+                # Filtrar solo modelos activos y con texto
+                if model.get("modelLifecycle", {}).get("status") != "ACTIVE":
+                    continue
+                models.append({
+                    "model_id": model_id,
+                    "model_name": model.get("modelName", model_id),
+                    "provider": model.get("providerName", "Anthropic"),
+                    "input_modalities": model.get("inputModalities", []),
+                    "output_modalities": model.get("outputModalities", []),
+                })
+
+            # Ordenar por nombre
+            models.sort(key=lambda m: m["model_name"])
+            return models
+
+        except Exception as e:
+            logger.error("[LOG_ANALYZER] Error listando modelos Bedrock: %s", e)
+            raise LLMServiceError(f"Error obteniendo modelos disponibles: {e}") from e

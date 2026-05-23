@@ -360,3 +360,38 @@ async def get_analysis(
         )
 
     return analysis
+
+
+# === ENDPOINTS DE MODELOS LLM ===
+
+
+@router.get(
+    "/llm-models",
+    status_code=status.HTTP_200_OK,
+    responses={502: {"description": "Error consultando modelos en AWS Bedrock"}},
+)
+async def list_available_llm_models(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Listar modelos LLM disponibles en AWS Bedrock.
+
+    Consulta la API ListFoundationModels de Bedrock y retorna los modelos
+    de Anthropic activos con modalidad de texto.
+    Solo accesible por administradores.
+    """
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden consultar modelos disponibles",
+        )
+
+    try:
+        from app.services.llm_service import LLMService
+        models = await LLMService.list_available_models()
+        return {"models": models}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Error consultando modelos en AWS Bedrock: {e}",
+        )
