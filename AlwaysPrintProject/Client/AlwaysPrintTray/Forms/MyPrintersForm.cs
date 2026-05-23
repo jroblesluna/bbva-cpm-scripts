@@ -39,8 +39,7 @@ namespace AlwaysPrintTray.Forms
         private Label    _lblVlan;
         private ListView _listView;
         private Panel    _pnlActions;
-        private APButton _btnSetFavorite;
-        private APButton _btnRemoveFavorite;
+        private APButton _btnFavorite;
         private APButton _btnRefresh;
         private APButton _btnClose;
         private Panel    _pnlStatus;
@@ -146,30 +145,17 @@ namespace AlwaysPrintTray.Forms
                 BackColor = CActionsBg
             };
 
-            _btnSetFavorite = new APButton
+            _btnFavorite = new APButton
             {
                 Text      = "⭐  Establecer favorita",
                 Location  = new Point(16, 8),
-                Size      = new Size(185, 32),
+                Size      = new Size(190, 32),
                 Enabled   = false,
                 BackColor = CPrimary,
                 ForeColor = Color.White,
                 Font      = new Font("Segoe UI", 9f, FontStyle.Bold)
             };
-            _btnSetFavorite.Click += OnSetFavorite;
-
-            _btnRemoveFavorite = new APButton
-            {
-                Text       = "✕  Quitar favorita",
-                Location   = new Point(212, 8),
-                Size       = new Size(152, 32),
-                Enabled    = false,
-                BackColor  = Color.White,
-                ForeColor  = Color.FromArgb(60, 75, 95),
-                Font       = new Font("Segoe UI", 9f),
-                ShowBorder = true
-            };
-            _btnRemoveFavorite.Click += OnRemoveFavorite;
+            _btnFavorite.Click += OnFavoriteClick;
 
             _btnRefresh = new APButton
             {
@@ -196,7 +182,7 @@ namespace AlwaysPrintTray.Forms
             };
             _pnlActions.Controls.AddRange(new Control[]
             {
-                _btnSetFavorite, _btnRemoveFavorite, _btnRefresh, _btnClose
+                _btnFavorite, _btnRefresh, _btnClose
             });
 
             // ── Separator 2 ──────────────────────────────────────────────────
@@ -398,7 +384,6 @@ namespace AlwaysPrintTray.Forms
                         SetStatus("ℹ️", $"Sin favorita. En contingencia se usará: {defName ?? "ninguna"} (menor IP).", SystemColors.GrayText);
                 }
 
-                _btnRemoveFavorite.Enabled = _favoritePrinterId != null;
             }
             catch (Exception ex)
             {
@@ -438,53 +423,75 @@ namespace AlwaysPrintTray.Forms
             var sel = _listView.SelectedItems.Count > 0
                 ? _listView.SelectedItems[0].Tag as PrinterInfo
                 : null;
-            _btnSetFavorite.Enabled = sel != null && !sel.IsFavorite;
-        }
 
-        private async void OnSetFavorite(object? sender, EventArgs e)
-        {
-            if (_listView.SelectedItems.Count == 0) return;
-            var sel = _listView.SelectedItems[0].Tag as PrinterInfo;
-            if (sel == null) return;
-            try
+            if (sel == null)
             {
-                _btnSetFavorite.Enabled = false;
-                SetStatus("⏳", $"Estableciendo {sel.Name} como favorita…", SystemColors.GrayText);
-                var url     = $"{_cloudApiUrl}/api/v1/devices/workstation/{_workstationId}/favorite-printer";
-                var content = new StringContent(
-                    JsonConvert.SerializeObject(new { device_id = sel.Id }),
-                    System.Text.Encoding.UTF8, "application/json");
-                var response = await _http.PutAsync(url, content);
-                if (response.IsSuccessStatusCode)
-                {
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        $"MyPrintersForm: favorita → {sel.Name} ({sel.IpAddress})");
-                    LoadPrinters();
-                }
-                else
-                    SetStatus("❌", $"Error al establecer favorita: {response.StatusCode}", Color.Crimson);
+                _btnFavorite.Enabled    = false;
+                _btnFavorite.Text       = "⭐  Establecer favorita";
+                _btnFavorite.BackColor  = CPrimary;
+                _btnFavorite.ForeColor  = Color.White;
+                _btnFavorite.Font       = new Font("Segoe UI", 9f, FontStyle.Bold);
+                _btnFavorite.ShowBorder = false;
             }
-            catch (Exception ex) { SetStatus("❌", $"Error: {ex.Message}", Color.Crimson); }
+            else if (sel.IsFavorite)
+            {
+                _btnFavorite.Enabled    = true;
+                _btnFavorite.Text       = "✕  Quitar favorita";
+                _btnFavorite.BackColor  = Color.White;
+                _btnFavorite.ForeColor  = Color.FromArgb(60, 75, 95);
+                _btnFavorite.Font       = new Font("Segoe UI", 9f);
+                _btnFavorite.ShowBorder = true;
+            }
+            else
+            {
+                _btnFavorite.Enabled    = true;
+                _btnFavorite.Text       = "⭐  Establecer favorita";
+                _btnFavorite.BackColor  = CPrimary;
+                _btnFavorite.ForeColor  = Color.White;
+                _btnFavorite.Font       = new Font("Segoe UI", 9f, FontStyle.Bold);
+                _btnFavorite.ShowBorder = false;
+            }
+            _btnFavorite.Invalidate();
         }
 
-        private async void OnRemoveFavorite(object? sender, EventArgs e)
+        private async void OnFavoriteClick(object? sender, EventArgs e)
         {
+            var sel = _listView.SelectedItems.Count > 0
+                ? _listView.SelectedItems[0].Tag as PrinterInfo
+                : null;
+            if (sel == null) return;
+
+            _btnFavorite.Enabled = false;
             try
             {
-                _btnRemoveFavorite.Enabled = false;
-                SetStatus("⏳", "Quitando impresora favorita…", SystemColors.GrayText);
-                var url     = $"{_cloudApiUrl}/api/v1/devices/workstation/{_workstationId}/favorite-printer";
-                var content = new StringContent(
-                    JsonConvert.SerializeObject(new { device_id = (string?)null }),
-                    System.Text.Encoding.UTF8, "application/json");
+                var url = $"{_cloudApiUrl}/api/v1/devices/workstation/{_workstationId}/favorite-printer";
+                StringContent content;
+
+                if (sel.IsFavorite)
+                {
+                    SetStatus("⏳", "Quitando impresora favorita…", SystemColors.GrayText);
+                    content = new StringContent(
+                        JsonConvert.SerializeObject(new { device_id = (string?)null }),
+                        System.Text.Encoding.UTF8, "application/json");
+                }
+                else
+                {
+                    SetStatus("⏳", $"Estableciendo {sel.Name} como favorita…", SystemColors.GrayText);
+                    content = new StringContent(
+                        JsonConvert.SerializeObject(new { device_id = sel.Id }),
+                        System.Text.Encoding.UTF8, "application/json");
+                }
+
                 var response = await _http.PutAsync(url, content);
                 if (response.IsSuccessStatusCode)
                 {
-                    AlwaysPrintLogger.WriteTrayInfo("MyPrintersForm: favorita eliminada.");
+                    AlwaysPrintLogger.WriteTrayInfo(sel.IsFavorite
+                        ? "MyPrintersForm: favorita eliminada."
+                        : $"MyPrintersForm: favorita → {sel.Name} ({sel.IpAddress})");
                     LoadPrinters();
                 }
                 else
-                    SetStatus("❌", $"Error al quitar favorita: {response.StatusCode}", Color.Crimson);
+                    SetStatus("❌", $"Error: {response.StatusCode}", Color.Crimson);
             }
             catch (Exception ex) { SetStatus("❌", $"Error: {ex.Message}", Color.Crimson); }
         }
@@ -550,7 +557,13 @@ namespace AlwaysPrintTray.Forms
             }
 
             var fg  = Enabled ? ForeColor : Color.FromArgb(140, 150, 165);
-            var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            var fmt = new StringFormat
+            {
+                Alignment     = StringAlignment.Center,
+                LineAlignment = StringAlignment.Center,
+                FormatFlags   = StringFormatFlags.NoWrap,
+                Trimming      = StringTrimming.EllipsisCharacter
+            };
             using var fgBrush = new SolidBrush(fg);
             g.DrawString(Text, Font, fgBrush, new RectangleF(0, 0, Width, Height), fmt);
         }
