@@ -836,6 +836,16 @@ export const logAnalysisApi = {
     )
     return response.data
   },
+
+  /**
+   * Listar modelos LLM disponibles en AWS Bedrock.
+   */
+  listModels: async (): Promise<{ models: Array<{ model_id: string; model_name: string; provider: string }> }> => {
+    const response = await apiClient.get<{ models: Array<{ model_id: string; model_name: string; provider: string }> }>(
+      '/workstations/llm-models'
+    )
+    return response.data
+  },
 }
 
 // ============================================================================

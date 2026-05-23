@@ -9,7 +9,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { organizationsApi } from '@/lib/api'
+import { organizationsApi, logAnalysisApi } from '@/lib/api'
 import { useTranslations } from 'next-intl'
 import { COMMON_TIMEZONES, formatDateWithTimezone, getTimezoneName } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
@@ -497,12 +497,21 @@ function AccountForm({
 }) {
   const t = useTranslations('accounts')
   const tCommon = useTranslations('common')
-  const [formData, setFormData] = useState<OrganizationCreate>({
+  const [formData, setFormData] = useState<OrganizationCreate & { llm_model_id?: string | null }>({
     name: initialData?.name || '',
     description: initialData?.description || '',
     is_active: initialData?.is_active ?? true,
     timezone: initialData?.timezone || 'UTC',
     language: initialData?.language || 'en',
+    llm_model_id: initialData?.llm_model_id || null,
+  })
+
+  // Cargar modelos LLM disponibles (solo al editar)
+  const { data: modelsData, isLoading: modelsLoading } = useQuery({
+    queryKey: ['llm-models'],
+    queryFn: () => logAnalysisApi.listModels(),
+    enabled: !!initialData, // Solo cargar al editar, no al crear
+    staleTime: 5 * 60 * 1000, // Cache 5 minutos
   })
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -589,6 +598,28 @@ function AccountForm({
         />
         <Label htmlFor="is_active" className="cursor-pointer">{t('activeLabel')}</Label>
       </div>
+
+      {/* Selector de modelo LLM (solo al editar) */}
+      {initialData && (
+        <div className="space-y-2">
+          <Label htmlFor="llm_model_id">{t('llmModelLabel')}</Label>
+          <select
+            id="llm_model_id"
+            value={formData.llm_model_id || ''}
+            onChange={(e) => setFormData({ ...formData, llm_model_id: e.target.value || null })}
+            disabled={isLoading || modelsLoading}
+            className="w-full px-3 py-2 border rounded-md"
+          >
+            <option value="">{t('llmModelDefault')}</option>
+            {modelsData?.models?.map((model) => (
+              <option key={model.model_id} value={model.model_id}>
+                {model.model_name} ({model.model_id})
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500">{t('llmModelHelper')}</p>
+        </div>
+      )}
 
       <div className="flex justify-end space-x-3">
         <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>

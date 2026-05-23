@@ -13,6 +13,7 @@ export interface Organization {
   target_version: string | null
   auto_reregister_enabled: boolean
   forced_contingency: boolean
+  llm_model_id?: string | null
   created_at: string
   updated_at: string
   public_ips?: PublicIP[]
@@ -40,6 +41,7 @@ export interface OrganizationUpdate {
   is_active?: boolean
   timezone?: string
   language?: string
+  llm_model_id?: string | null
 }
 
 export interface PublicIPCreate {
