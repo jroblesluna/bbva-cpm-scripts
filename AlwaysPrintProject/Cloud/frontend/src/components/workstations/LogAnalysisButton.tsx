@@ -96,14 +96,12 @@ export function LogAnalysisButton({
         });
         onAnalysisComplete?.(result);
       } catch (error: unknown) {
-        // Extraer status y detail del error de axios
-        const axiosError = error as { response?: { status?: number; data?: { detail?: string } }; message?: string };
-        const status = axiosError.response?.status;
-        const detail = axiosError.response?.data?.detail;
+        // El interceptor de axios transforma el error a { detail, status }
+        const apiError = error as { detail?: string; status?: number };
         toast({
           variant: 'destructive',
           title: t('errorTitle'),
-          description: getErrorMessage({ status, detail }),
+          description: getErrorMessage(apiError),
         });
       } finally {
         setIsLoading(false);
@@ -138,18 +136,17 @@ export function LogAnalysisButton({
         await executeAnalysis(false);
       }
     } catch (error: unknown) {
-      const axiosError = error as { response?: { status?: number; data?: { detail?: string } } };
-      const status = axiosError.response?.status;
-      const detail = axiosError.response?.data?.detail;
+      // El interceptor de axios transforma el error a { detail, status }
+      const apiError = error as { detail?: string; status?: number };
       // Si el endpoint retorna 404, significa que no hay análisis previo
-      if (status === 404) {
+      if (apiError.status === 404) {
         await executeAnalysis(false);
       } else {
         setIsLoading(false);
         toast({
           variant: 'destructive',
           title: t('errorTitle'),
-          description: getErrorMessage({ status, detail }),
+          description: getErrorMessage(apiError),
         });
       }
     }

@@ -120,7 +120,7 @@ class Settings(BaseSettings):
     # Provider de LLM a utilizar: "bedrock", "openai", "anthropic"
     LOG_ANALYZER_LLM_PROVIDER: str = "bedrock"
     # Model ID para AWS Bedrock
-    LOG_ANALYZER_LLM_MODEL_ID: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    LOG_ANALYZER_LLM_MODEL_ID: str = "anthropic.claude-sonnet-4-6"
     # Región AWS para Bedrock
     LOG_ANALYZER_LLM_REGION: str = "us-west-2"
     # API Key para OpenAI (requerido si LLM_PROVIDER = "openai")

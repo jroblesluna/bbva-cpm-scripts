@@ -108,6 +108,7 @@ resource "aws_iam_role_policy" "bedrock_invoke_model" {
           "bedrock:InvokeModel"
         ]
         Resource = [
+          "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet*",
           "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-5-sonnet*"
         ]
       }
