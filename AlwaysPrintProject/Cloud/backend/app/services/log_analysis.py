@@ -175,51 +175,38 @@ class LogAnalysisService:
             len(file_contents),
         )
 
-        # 3. Routing por tamaño
-        processing_threshold = settings.LOG_ANALYZER_PROCESSING_THRESHOLD
-        processing_path = route_by_size(content, processing_threshold)
+        # 3. Procesamiento estructural (siempre, independiente del tamaño)
+        # El análisis estructural extrae keywords, patrones, contexto y timeline
+        # para enviar solo información relevante al LLM, optimizando tokens.
+        keywords = DEFAULT_KEYWORDS + settings.log_analyzer_extra_keywords_list
+        context_size = settings.LOG_ANALYZER_CONTEXT_WINDOW_SIZE
+        max_blocks = settings.LOG_ANALYZER_MAX_CONTEXT_BLOCKS
+        top_n = settings.LOG_ANALYZER_TOP_PATTERNS
 
-        logger.info(
-            "[LOG_ANALYZER] Ruta de procesamiento: workstation_id=%s, "
-            "path=%s, log_size=%d bytes, threshold=%d bytes",
-            workstation_id,
-            processing_path,
-            log_size_bytes,
-            processing_threshold,
+        structured_analysis = run_structural_analysis(
+            content=content,
+            filename=original_filename,
+            keywords=keywords,
+            context_size=context_size,
+            max_blocks=max_blocks,
+            top_n=top_n,
         )
 
-        # 4. Procesamiento según ruta
-        if processing_path == "direct":
-            # Ruta directa: ensamblar prompt + log crudo
-            payload = assemble_direct_payload(
-                log_content=content,
-                prompt=LLM_PROMPT,
-                workstation_id=workstation_id,
-                filename=original_filename,
-                file_size=log_size_bytes,
-            )
-        else:
-            # Ruta estructural: análisis completo + prompt
-            keywords = DEFAULT_KEYWORDS + settings.log_analyzer_extra_keywords_list
-            context_size = settings.LOG_ANALYZER_CONTEXT_WINDOW_SIZE
-            max_blocks = settings.LOG_ANALYZER_MAX_CONTEXT_BLOCKS
-            top_n = settings.LOG_ANALYZER_TOP_PATTERNS
+        processing_path = "structural"
 
-            structured_analysis = run_structural_analysis(
-                content=content,
-                filename=original_filename,
-                keywords=keywords,
-                context_size=context_size,
-                max_blocks=max_blocks,
-                top_n=top_n,
-            )
+        logger.info(
+            "[LOG_ANALYZER] Análisis estructural completado: workstation_id=%s, "
+            "log_size=%d bytes",
+            workstation_id,
+            log_size_bytes,
+        )
 
-            payload = assemble_structural_payload(
-                structured_analysis=structured_analysis,
-                prompt=LLM_PROMPT,
-            )
+        payload = assemble_structural_payload(
+            structured_analysis=structured_analysis,
+            prompt=LLM_PROMPT,
+        )
 
-        # 5. Invocación del LLM
+        # 4. Invocación del LLM
         # Obtener modelo LLM de la organización (si está configurado)
         from app.models.organization import Organization
         org = db.query(Organization).filter(Organization.id == organization_id).first()
