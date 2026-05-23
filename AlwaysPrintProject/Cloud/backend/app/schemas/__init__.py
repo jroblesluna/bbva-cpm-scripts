@@ -145,6 +145,13 @@ from app.schemas.action_config import (
     calculate_config_hash,
 )
 
+# === LOG ANALYSIS SCHEMAS ===
+from app.schemas.log_analysis import (
+    LogAnalysisResponse,
+    LogAnalysisTodayCheckResponse,
+    LogAnalysisListResponse,
+)
+
 # === DEVICE SCHEMAS ===
 from app.schemas.device import (
     DeviceCreate,
@@ -264,6 +271,10 @@ __all__ = [
     "calculate_config_hash",
     # Updates
     "UpdateCheckResponse",
+    # Log Analysis
+    "LogAnalysisResponse",
+    "LogAnalysisTodayCheckResponse",
+    "LogAnalysisListResponse",
     # Device
     "DeviceCreate",
     "DeviceUpdate",

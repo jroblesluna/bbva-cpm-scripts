@@ -9,8 +9,6 @@
     "lint": "next lint",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "test": "vitest --run",
-    "test:watch": "vitest",
-    "test": "vitest --run",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -19,6 +17,7 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-query": "^5.17.0",
     "@tanstack/react-query-devtools": "^5.17.0",
     "autoprefixer": "10.4.20",
@@ -34,7 +33,9 @@
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-hook-form": "^7.49.3",
+    "react-markdown": "^10.1.0",
     "recharts": "^2.10.4",
+    "remark-gfm": "^4.0.1",
     "tailwind-merge": "^2.2.0",
     "tailwindcss": "^3.4.1",
     "tailwindcss-animate": "^1.0.7",

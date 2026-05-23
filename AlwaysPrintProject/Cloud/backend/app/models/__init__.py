@@ -16,6 +16,7 @@ from app.models.message_delivery import MessageDelivery, DeliveryStatus
 from app.models.telemetry import TelemetryLog, ConnectivityResult
 from app.models.action_config import ActionConfig
 from app.models.device import Device
+from app.models.log_analysis import LogAnalysis
 
 __all__ = [
     # User models
@@ -58,4 +59,7 @@ __all__ = [
     
     # Device models
     "Device",
+    
+    # Log analysis models
+    "LogAnalysis",
 ]

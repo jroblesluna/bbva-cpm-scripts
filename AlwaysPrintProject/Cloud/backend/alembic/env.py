@@ -16,6 +16,7 @@ from app.models.vlan import VLAN
 from app.models.config import GlobalConfig, VLANConfig, WorkstationConfig
 from app.models.audit import AuditLog, ActionType
 from app.models.message import Message, TargetType
+from app.models.log_analysis import LogAnalysis
 
 config = context.config
 

@@ -27,6 +27,7 @@
     <Reference Include="System.Net.Http" />
     <Reference Include="System.ServiceProcess" />
     <Reference Include="System.Management" />
+    <Reference Include="System.IO.Compression" />
   </ItemGroup>
   <ItemGroup>
     <!-- Incluir logo.ico y logo.png como recursos embebidos -->

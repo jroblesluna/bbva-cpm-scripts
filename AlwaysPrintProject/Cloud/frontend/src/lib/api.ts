@@ -47,6 +47,9 @@ import type {
   Device,
   DeviceCreate,
   DeviceUpdate,
+  LogAnalysisResponse,
+  LogAnalysisListResponse,
+  LogAnalysisTodayCheckResponse,
 } from '@/types'
 
 // ============================================================================
@@ -779,6 +782,58 @@ export const auditApi = {
    */
   get: async (id: string): Promise<AuditLog> => {
     const response = await apiClient.get<AuditLog>(`/audit/${id}`)
+    return response.data
+  },
+}
+
+// ============================================================================
+// LOG ANALYSIS
+// ============================================================================
+
+export const logAnalysisApi = {
+  /**
+   * Obtener historial de análisis de una workstation, paginado.
+   */
+  list: async (
+    workstationId: string,
+    params?: { page?: number; page_size?: number }
+  ): Promise<LogAnalysisListResponse> => {
+    const response = await apiClient.get<LogAnalysisListResponse>(
+      `/workstations/${workstationId}/log-analyses`,
+      { params }
+    )
+    return response.data
+  },
+
+  /**
+   * Obtener un análisis individual por ID.
+   */
+  get: async (analysisId: string): Promise<LogAnalysisResponse> => {
+    const response = await apiClient.get<LogAnalysisResponse>(
+      `/log-analyses/${analysisId}`
+    )
+    return response.data
+  },
+
+  /**
+   * Verificar si existe un análisis del día actual.
+   */
+  checkToday: async (workstationId: string): Promise<LogAnalysisTodayCheckResponse> => {
+    const response = await apiClient.get<LogAnalysisTodayCheckResponse>(
+      `/workstations/${workstationId}/log-analyses/today`
+    )
+    return response.data
+  },
+
+  /**
+   * Solicitar análisis de log del día actual de una workstation.
+   */
+  analyzeLog: async (workstationId: string, overwrite: boolean = false): Promise<LogAnalysisResponse> => {
+    const response = await apiClient.post<LogAnalysisResponse>(
+      `/workstations/${workstationId}/analyze-log`,
+      null,
+      { params: { overwrite }, timeout: 120000 }
+    )
     return response.data
   },
 }
