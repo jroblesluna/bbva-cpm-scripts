@@ -575,7 +575,7 @@ function AccountForm({
 }) {
   const t = useTranslations('accounts')
   const tCommon = useTranslations('common')
-  const [formData, setFormData] = useState<OrganizationCreate & { llm_model_id?: string | null }>({
+  const [formData, setFormData] = useState<OrganizationCreate & { llm_model_id?: string | null; openai_api_key?: string | null }>({
     name: initialData?.name || '',
     description: initialData?.description || '',
     is_active: initialData?.is_active ?? true,
