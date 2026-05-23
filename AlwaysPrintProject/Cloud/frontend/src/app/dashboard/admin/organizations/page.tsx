@@ -610,10 +610,12 @@ function AccountForm({
             disabled={isLoading || modelsLoading}
             className="w-full px-3 py-2 border rounded-md"
           >
-            <option value="">{t('llmModelDefault')}</option>
+            <option value="">
+              {t('llmModelDefault')}{modelsData?.default_model_id ? ` (${modelsData.default_model_id})` : ''}
+            </option>
             {modelsData?.models?.map((model) => (
               <option key={model.model_id} value={model.model_id}>
-                {model.model_name} ({model.model_id})
+                {model.model_name}
               </option>
             ))}
           </select>

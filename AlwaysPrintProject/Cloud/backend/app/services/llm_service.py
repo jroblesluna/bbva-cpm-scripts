@@ -580,14 +580,23 @@ class LLMService:
         """
         Lista los modelos de texto disponibles en AWS Bedrock.
 
-        Llama a la API ListFoundationModels de Bedrock y filtra por:
-        - Modelos con modalidad de texto (input y output)
-        - Modelos de Anthropic (Claude)
+        Intenta llamar a ListFoundationModels de Bedrock. Si falla (permisos,
+        conectividad), retorna una lista de modelos conocidos como fallback.
 
         Retorna:
-            Lista de dicts con: model_id, model_name, provider, input_modalities, output_modalities
+            Lista de dicts con: model_id, model_name, provider
         """
         import boto3
+
+        # Modelos conocidos como fallback (inference profile IDs que funcionan con Converse API)
+        KNOWN_MODELS = [
+            {"model_id": "us.anthropic.claude-sonnet-4-20250514-v1:0", "model_name": "Claude Sonnet 4", "provider": "Anthropic"},
+            {"model_id": "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "model_name": "Claude Sonnet 4.5", "provider": "Anthropic"},
+            {"model_id": "us.anthropic.claude-sonnet-4-6-20251218-v1:0", "model_name": "Claude Sonnet 4.6", "provider": "Anthropic"},
+            {"model_id": "us.anthropic.claude-opus-4-6-20250501-v1:0", "model_name": "Claude Opus 4.6", "provider": "Anthropic"},
+            {"model_id": "us.anthropic.claude-haiku-4-5-20251001-v1:0", "model_name": "Claude Haiku 4.5", "provider": "Anthropic"},
+            {"model_id": "anthropic.claude-3-5-haiku-20241022-v1:0", "model_name": "Claude 3.5 Haiku", "provider": "Anthropic"},
+        ]
 
         try:
             client = boto3.client("bedrock", region_name=settings.LOG_ANALYZER_LLM_REGION)
@@ -601,21 +610,25 @@ class LLMService:
             models = []
             for model in response.get("modelSummaries", []):
                 model_id = model.get("modelId", "")
-                # Filtrar solo modelos activos y con texto
                 if model.get("modelLifecycle", {}).get("status") != "ACTIVE":
                     continue
                 models.append({
                     "model_id": model_id,
                     "model_name": model.get("modelName", model_id),
                     "provider": model.get("providerName", "Anthropic"),
-                    "input_modalities": model.get("inputModalities", []),
-                    "output_modalities": model.get("outputModalities", []),
                 })
 
-            # Ordenar por nombre
+            # Si la API retornó modelos, combinar con los inference profiles conocidos
+            if models:
+                # Agregar inference profiles que no estén ya en la lista
+                existing_ids = {m["model_id"] for m in models}
+                for known in KNOWN_MODELS:
+                    if known["model_id"] not in existing_ids:
+                        models.append(known)
+
             models.sort(key=lambda m: m["model_name"])
-            return models
+            return models if models else KNOWN_MODELS
 
         except Exception as e:
-            logger.error("[LOG_ANALYZER] Error listando modelos Bedrock: %s", e)
-            raise LLMServiceError(f"Error obteniendo modelos disponibles: {e}") from e
+            logger.warning("[LOG_ANALYZER] Error listando modelos Bedrock: %s. Usando fallback.", e)
+            return KNOWN_MODELS
