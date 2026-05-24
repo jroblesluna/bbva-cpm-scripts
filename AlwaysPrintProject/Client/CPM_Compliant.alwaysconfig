@@ -10,10 +10,10 @@
       "actions": [
         {
           "type": "RunProcess",
-          "description": "Escribir AutoUpdateEnabled=1 en HKLM\\SOFTWARE\\Robles.AI\\AlwaysPrint",
+          "description": "Escribir AutoUpdateEnabled=1 en {{registry_path}}",
           "parameters": {
             "file_path": "C:\\Windows\\System32\\reg.exe",
-            "arguments": "add \"HKLM\\SOFTWARE\\Robles.AI\\AlwaysPrint\" /v AutoUpdateEnabled /t REG_DWORD /d 1 /f",
+            "arguments": "add \"{{registry_path}}\" /v AutoUpdateEnabled /t REG_DWORD /d 1 /f",
             "timeout_seconds": 30,
             "window_style": "Hidden",
             "run_as_logged_in_user": false

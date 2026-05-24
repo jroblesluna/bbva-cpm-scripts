@@ -449,6 +449,7 @@ namespace AlwaysPrintService
                 // Establecer variables de configuración desde AppConfiguration
                 var cfg = _registry.Load();
                 _actionEngine.SetConfigVariable("corporate_queue_name", cfg.CorporateQueueName);
+                _actionEngine.SetConfigVariable("registry_path", @"HKLM\" + RegistryConfigManager.RegistryPath);
                 // contingency_printer_ip se establece dinámicamente al activar contingencia
                 // (se resuelve desde la configuración de la workstation o el parámetro del trigger)
                 
