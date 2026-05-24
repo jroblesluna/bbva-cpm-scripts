@@ -10,6 +10,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { logAnalysisApi } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -118,10 +120,12 @@ export function LogAnalysisHistory({ workstationId }: LogAnalysisHistoryProps) {
             </div>
           </div>
 
-          {/* Texto del análisis */}
+          {/* Texto del análisis (renderizado como Markdown) */}
           <div className="border rounded-lg p-4 bg-gray-50 max-h-[400px] overflow-y-auto">
-            <div className="prose prose-sm max-w-none whitespace-pre-wrap text-gray-800">
-              {selectedAnalysis.analysis_text}
+            <div className="prose prose-sm max-w-none text-gray-800 prose-headings:text-gray-900 prose-p:text-gray-700 prose-li:text-gray-700 prose-strong:text-gray-900">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {selectedAnalysis.analysis_text}
+              </ReactMarkdown>
             </div>
           </div>
         </CardContent>

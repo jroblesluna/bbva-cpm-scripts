@@ -1552,6 +1552,7 @@ function WorkstationDetailModal({
   const userTimezone = useUserTimezone();
   const t = useTranslations('workstations');
   const tCommon = useTranslations('common');
+  const queryClient = useQueryClient();
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1694,6 +1695,9 @@ function WorkstationDetailModal({
               workstationId={workstation.id}
               workstationName={workstation.hostname || workstation.ip_private}
               isOnline={workstation.is_online}
+              onAnalysisComplete={() => {
+                queryClient.invalidateQueries({ queryKey: ['log-analyses', workstation.id] });
+              }}
             />
           </div>
 
