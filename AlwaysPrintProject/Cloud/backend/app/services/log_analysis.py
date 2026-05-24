@@ -50,48 +50,93 @@ El formato de cada línea es: `[yyyy-MM-dd HH:mm:ss] [SVC/APP] Event NNNN: mensa
 
 | Event ID | Significado |
 |----------|-------------|
-| 1000 | Servicio iniciado |
+| 1000 | Servicio iniciado / cambio de estado |
 | 1001 | Servicio detenido |
-| 1003 | Monitoreo de Tray |
+| 1003 | Monitoreo de Tray / limpieza de instancias huérfanas |
 | 1004 | Cola de tareas |
 | 1005 | Servidor de pipe (IPC) |
-| 1007 | Usuario detectado |
+| 1006 | Esperando sesión de usuario |
+| 1007 | Sesión de usuario detectada / cambio de sesión |
 | 1008 | Tray lanzado |
 | 1009 | Tray inicializado |
 | 1020 | Tarea despachada |
 | 1021 | Tarea completada |
 | 1030 | Configuración guardada |
-| 1090 | Info/debug |
+| 1090 | Info/debug (operación normal) |
 | 1091 | Error |
+
+## IMPORTANTE: Comportamiento normal esperado (NO reportar como problemas)
+
+Los siguientes patrones son **operación normal** de AlwaysPrint y NO deben reportarse como errores \
+ni problemas:
+
+1. **Ciclo de sesiones de usuario**: El servicio detecta cambios de sesión (Console disconnect/connect, \
+Session locked/unlocked), mata el Tray anterior y lanza uno nuevo en la sesión activa. Esto es el \
+diseño normal — AlwaysPrint siempre ejecuta el Tray en la sesión interactiva activa.
+
+2. **Detención/inicio de lpmc_universal_service**: El ActionEngine detiene y reinicia el servicio \
+Lexmark CPM como parte de la limpieza de datos de usuarios inactivos. Esto es una acción \
+administrativa configurada (trigger OnTrayLaunched) y es comportamiento esperado.
+
+3. **KillProcessesByName lpmc-systemtray-app.exe**: Matar procesos del tray de Lexmark de usuarios \
+inactivos es parte de la limpieza normal.
+
+4. **DeleteFolderContents / DeleteOrphanedFolders**: Limpieza de carpetas de jobs de usuarios \
+inactivos en C:\\ProgramData\\LPMC\\Jobs\\. Es mantenimiento normal.
+
+5. **PropagatePermissions**: Propagación de permisos en C:\\ProgramData\\LPMC\\ es operación de \
+mantenimiento estándar.
+
+6. **RunProcess reg.exe / update_winhostuser.bat**: Escritura de registro y actualización de \
+mapeado hostname→IP son operaciones normales del trigger OnTrayLaunched.
+
+7. **PipeServer: error al cerrar conexión de cliente. Pipe is broken**: Ocurre cuando el Tray se \
+cierra al cambiar de sesión. Es esperado y no indica un problema.
+
+8. **OfflineStateManager: OnReconnected() llamado sin desconexión previa**: Ocurre en la primera \
+conexión WebSocket. Es normal.
+
+9. **TelemetryReporter: se recibió señal de reconexión pero no existe un evento de desconexión**: \
+Normal en la primera conexión.
+
+10. **ConfigurationSync: error HTTP 404 al descargar configuración**: Puede ocurrir cuando el \
+workstation_id almacenado localmente difiere del registrado en Cloud (ej: después de un re-registro). \
+Es un problema menor de sincronización, no un error crítico del servicio.
+
+11. **Event 1090 (Info/debug)**: La gran mayoría de líneas con Event 1090 son trazas de operación \
+normal. Solo reportar si el contenido indica un error real.
 
 ## Análisis solicitado
 
-Analiza la evidencia proporcionada evaluando:
-1. Estado operativo del servicio (arranques, paradas, estabilidad)
-2. Validez de la configuración del servicio
-3. Eventos de entrada/salida de contingencia
-4. Cambios de sesión de usuario
-5. Conectividad de red con Cloud Manager e impresoras
-6. Causas raíz de errores basándote en los Event IDs
+Analiza la evidencia proporcionada evaluando SOLO problemas reales:
+1. Estado operativo del servicio (¿hay crashes, reinicios inesperados, o estados anormales?)
+2. Errores de configuración que impidan el funcionamiento (no errores menores de sincronización)
+3. Eventos de contingencia (entrada/salida de modo contingencia — esto SÍ es relevante)
+4. Problemas de conectividad que afecten la operación (no reconexiones normales)
+5. Errores reales (Event 1091) que indiquen fallos del servicio
+
+Si el log muestra operación normal sin problemas significativos, indícalo claramente en el resumen.
 
 ## Formato de respuesta requerido
 
 Estructura tu respuesta en las siguientes secciones:
 
 ### (a) Resumen de hallazgos
-Resumen ejecutivo de 2-3 párrafos con los problemas principales encontrados.
+Resumen ejecutivo de 2-3 párrafos. Si todo es normal, indicar "Operación normal sin incidentes \
+significativos" y describir brevemente qué se observó.
 
 ### (b) Narrativa cronológica
-Secuencia de eventos con timestamps, describiendo qué ocurrió y cuándo.
+Secuencia de eventos relevantes (omitir operaciones rutinarias repetitivas).
 
 ### (c) Causas raíz identificadas
-Lista de causas raíz mapeadas a Event IDs específicos.
+Lista de problemas reales encontrados. Si no hay problemas, indicar "No se identificaron problemas \
+que requieran atención."
 
 ### (d) Evaluación de impacto
-Impacto en la disponibilidad del servicio de impresión.
+Impacto real en la disponibilidad del servicio de impresión. Si no hay impacto, indicarlo.
 
 ### (e) Acciones correctivas recomendadas
-Lista priorizada de acciones para resolver los problemas encontrados.
+Solo si hay problemas reales. Si todo es normal, indicar "No se requieren acciones correctivas."
 
 ---
 FIN DEL PROMPT. A continuación se presenta la evidencia del log:
