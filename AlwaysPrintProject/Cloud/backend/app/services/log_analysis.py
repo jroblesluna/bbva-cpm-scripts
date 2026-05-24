@@ -106,6 +106,17 @@ Es un problema menor de sincronización, no un error crítico del servicio.
 11. **Event 1090 (Info/debug)**: La gran mayoría de líneas con Event 1090 son trazas de operación \
 normal. Solo reportar si el contenido indica un error real.
 
+12. **Desconexiones WebSocket al cambiar de sesión**: Cuando un usuario cambia de sesión (Console \
+disconnect/connect), el Tray se cierra y se relanza en la nueva sesión. La conexión WebSocket del \
+Tray anterior se cierra abruptamente y el nuevo Tray establece una conexión nueva. Los mensajes de \
+"WebSocket connection closed", "reconnect", o errores de conexión durante estos cambios de sesión \
+son completamente normales y esperados — NO son problemas de red ni del servidor.
+
+13. **CloudWebSocketClient: errores de reconexión temporales**: Si el WebSocket se desconecta y \
+reconecta en pocos segundos (especialmente durante cambios de sesión o deploys del servidor), \
+esto es comportamiento normal del mecanismo de reconexión automática. Solo reportar si la \
+desconexión persiste por más de 5 minutos sin reconexión exitosa.
+
 ## Análisis solicitado
 
 Analiza la evidencia proporcionada evaluando SOLO problemas reales:
