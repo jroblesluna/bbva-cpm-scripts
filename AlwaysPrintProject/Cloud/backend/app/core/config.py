@@ -96,6 +96,22 @@ class Settings(BaseSettings):
     RATE_LIMIT_LOGIN: int = 5  # intentos por minuto
     RATE_LIMIT_API: int = 100  # peticiones por minuto
 
+    # === CONFIGURACIÓN DE BOOTSTRAP DOMAINS ===
+    # Dominios de bootstrap por defecto para nuevas configuraciones globales.
+    # Se auto-detecta según FRONTEND_URL si no se configura explícitamente.
+    # DEV: "dev.iol.pe" | PROD: "apps.iol.pe,sistemas.com.pe"
+    DEFAULT_BOOTSTRAP_DOMAINS: str = ""
+
+    @property
+    def default_bootstrap_domains(self) -> str:
+        """Retorna bootstrap domains, auto-detectando entorno si no está configurado."""
+        if self.DEFAULT_BOOTSTRAP_DOMAINS:
+            return self.DEFAULT_BOOTSTRAP_DOMAINS
+        # Auto-detectar según FRONTEND_URL
+        if "dev." in self.FRONTEND_URL:
+            return "dev.iol.pe"
+        return "apps.iol.pe,sistemas.com.pe"
+
     # === CONFIGURACIÓN DEL LOG ANALYZER ===
     # Umbral de compresión en bytes (default 50KB). Rango válido: 1KB - 10MB.
     LOG_ANALYZER_COMPRESSION_THRESHOLD: int = 51200

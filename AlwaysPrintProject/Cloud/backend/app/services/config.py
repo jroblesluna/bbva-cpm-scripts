@@ -98,11 +98,12 @@ class ConfigService:
         
         if not global_config:
             # Crear una GlobalConfig por defecto para la organización
+            from app.core.config import settings
             global_config = GlobalConfig(
                 organization_id=workstation.organization_id,
                 corporate_queue_name="LexmarkBBVA",
                 pending_task_polling_minutes=3,
-                bootstrap_domains="apps.iol.pe,sistemas.com.pe",
+                bootstrap_domains=settings.default_bootstrap_domains,
                 telemetry_enabled=True,
                 telemetry_interval_seconds=300,
             )
@@ -191,7 +192,7 @@ class ConfigService:
         corporate_queue_name: str = "LexmarkRoblesAI",
         search_targets: Optional[Dict] = None,
         pending_task_polling_minutes: int = 3,
-        bootstrap_domains: str = "apps.iol.pe,iol.pe,sistemas.com.pe,robles.ai",
+        bootstrap_domains: Optional[str] = None,
         connectivity_checks: Optional[list] = None,
         locale: str = "",
         telemetry_enabled: bool = True,
@@ -227,13 +228,17 @@ class ConfigService:
         if existing:
             raise ValueError(f"Ya existe una GlobalConfig para organización {organization_id}")
         
+        # Usar default de settings si no se proporcionó bootstrap_domains
+        from app.core.config import settings as app_settings
+        effective_bootstrap = bootstrap_domains if bootstrap_domains is not None else app_settings.default_bootstrap_domains
+
         # Crear GlobalConfig
         global_config = GlobalConfig(
             organization_id=organization_id,
             corporate_queue_name=corporate_queue_name,
             search_targets=search_targets,
             pending_task_polling_minutes=pending_task_polling_minutes,
-            bootstrap_domains=bootstrap_domains,
+            bootstrap_domains=effective_bootstrap,
             connectivity_checks=connectivity_checks or [],
             locale=locale,
             telemetry_enabled=telemetry_enabled,
