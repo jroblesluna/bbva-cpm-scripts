@@ -101,12 +101,12 @@ class Settings(BaseSettings):
     LOG_ANALYZER_COMPRESSION_THRESHOLD: int = 51200
     # Umbral de procesamiento estructural en bytes (default 100KB). Rango válido: 1KB - 50MB.
     LOG_ANALYZER_PROCESSING_THRESHOLD: int = 102400
-    # Líneas de contexto antes/después de cada hallazgo (default 20). Rango válido: 0 - 500.
-    LOG_ANALYZER_CONTEXT_WINDOW_SIZE: int = 20
-    # Máximo de bloques de contexto (default 30). Rango válido: 1 - 1000.
-    LOG_ANALYZER_MAX_CONTEXT_BLOCKS: int = 30
-    # Top N patrones recurrentes a incluir (default 50). Rango válido: 1 - 500.
-    LOG_ANALYZER_TOP_PATTERNS: int = 50
+    # Líneas de contexto antes/después de cada hallazgo (default 5). Rango válido: 0 - 500.
+    LOG_ANALYZER_CONTEXT_WINDOW_SIZE: int = 5
+    # Máximo de bloques de contexto (default 10). Rango válido: 1 - 1000.
+    LOG_ANALYZER_MAX_CONTEXT_BLOCKS: int = 10
+    # Top N patrones recurrentes a incluir (default 20). Rango válido: 1 - 500.
+    LOG_ANALYZER_TOP_PATTERNS: int = 20
     # Máximo de tokens en la respuesta del LLM (default 4096). Rango válido: 100 - 16384.
     LOG_ANALYZER_LLM_MAX_TOKENS: int = 4096
     # Tamaño máximo de upload en bytes (default 50MB). Rango válido: 1MB - 200MB.
@@ -143,9 +143,9 @@ class Settings(BaseSettings):
         _ranges: list[tuple[str, int, int, int]] = [
             ("LOG_ANALYZER_COMPRESSION_THRESHOLD", 1024, 10485760, 51200),
             ("LOG_ANALYZER_PROCESSING_THRESHOLD", 1024, 52428800, 102400),
-            ("LOG_ANALYZER_CONTEXT_WINDOW_SIZE", 0, 500, 20),
-            ("LOG_ANALYZER_MAX_CONTEXT_BLOCKS", 1, 1000, 30),
-            ("LOG_ANALYZER_TOP_PATTERNS", 1, 500, 50),
+            ("LOG_ANALYZER_CONTEXT_WINDOW_SIZE", 0, 500, 5),
+            ("LOG_ANALYZER_MAX_CONTEXT_BLOCKS", 1, 1000, 10),
+            ("LOG_ANALYZER_TOP_PATTERNS", 1, 500, 20),
             ("LOG_ANALYZER_LLM_MAX_TOKENS", 100, 16384, 4096),
             ("LOG_ANALYZER_MAX_UPLOAD_SIZE", 1048576, 209715200, 52428800),
             ("LOG_ANALYZER_COMMAND_TIMEOUT", 5, 300, 30),
