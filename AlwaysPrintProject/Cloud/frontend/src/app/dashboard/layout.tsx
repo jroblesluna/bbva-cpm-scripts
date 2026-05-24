@@ -75,6 +75,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       ],
     },
     {
+      labelKey: 'groupAdmin',
+      adminOnly: true,
+      items: [
+        { key: 'accounts', href: '/dashboard/admin/organizations', icon: Building2, adminOnly: true },
+        { key: 'users', href: '/dashboard/admin/users', icon: Users, adminOnly: true },
+        { key: 'pendingIps', href: '/dashboard/admin/pending-ips', icon: Globe, adminOnly: true },
+        { key: 'updates', href: '/dashboard/admin/updates', icon: Download, adminOnly: true },
+        { key: 'actionConfigs', href: '/dashboard/admin/action-configs', icon: Cog, adminOnly: true },
+      ],
+    },
+    {
       labelKey: 'groupInfrastructure',
       items: [
         { key: 'vlans', href: '/dashboard/vlans', icon: Network },
@@ -89,17 +100,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { key: 'audit', href: '/dashboard/audit', icon: FileText },
       ],
     },
-    {
-      labelKey: 'groupAdmin',
-      adminOnly: true,
-      items: [
-        { key: 'accounts', href: '/dashboard/admin/organizations', icon: Building2, adminOnly: true },
-        { key: 'users', href: '/dashboard/admin/users', icon: Users, adminOnly: true },
-        { key: 'pendingIps', href: '/dashboard/admin/pending-ips', icon: Globe, adminOnly: true },
-        { key: 'updates', href: '/dashboard/admin/updates', icon: Download, adminOnly: true },
-        { key: 'actionConfigs', href: '/dashboard/admin/action-configs', icon: Cog, adminOnly: true },
-      ],
-    },
   ]
 
   // Filtrar grupos según rol
@@ -111,12 +111,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }))
     .filter((group) => group.items.length > 0)
 
-  // Estado de expansión de grupos (todos expandidos por defecto)
+  // Estado de expansión de grupos (solo Operaciones y Administración expandidos por defecto)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {}
     navGroups.forEach((group) => {
       if (group.labelKey) {
-        initial[group.labelKey] = true
+        initial[group.labelKey] = group.labelKey === 'groupOperations' || group.labelKey === 'groupAdmin'
       }
     })
     return initial
