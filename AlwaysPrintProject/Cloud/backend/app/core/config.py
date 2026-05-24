@@ -98,19 +98,9 @@ class Settings(BaseSettings):
 
     # === CONFIGURACIÓN DE BOOTSTRAP DOMAINS ===
     # Dominios de bootstrap por defecto para nuevas configuraciones globales.
-    # Se auto-detecta según FRONTEND_URL si no se configura explícitamente.
+    # Configurar via env var o Terraform según el entorno:
     # DEV: "dev.iol.pe" | PROD: "apps.iol.pe,sistemas.com.pe"
-    DEFAULT_BOOTSTRAP_DOMAINS: str = ""
-
-    @property
-    def default_bootstrap_domains(self) -> str:
-        """Retorna bootstrap domains, auto-detectando entorno si no está configurado."""
-        if self.DEFAULT_BOOTSTRAP_DOMAINS:
-            return self.DEFAULT_BOOTSTRAP_DOMAINS
-        # Auto-detectar según FRONTEND_URL
-        if "dev." in self.FRONTEND_URL:
-            return "dev.iol.pe"
-        return "apps.iol.pe,sistemas.com.pe"
+    DEFAULT_BOOTSTRAP_DOMAINS: str = "apps.iol.pe,sistemas.com.pe"
 
     # === CONFIGURACIÓN DEL LOG ANALYZER ===
     # Umbral de compresión en bytes (default 50KB). Rango válido: 1KB - 10MB.

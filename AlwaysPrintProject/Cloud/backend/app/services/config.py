@@ -103,7 +103,7 @@ class ConfigService:
                 organization_id=workstation.organization_id,
                 corporate_queue_name="LexmarkBBVA",
                 pending_task_polling_minutes=3,
-                bootstrap_domains=settings.default_bootstrap_domains,
+                bootstrap_domains=settings.DEFAULT_BOOTSTRAP_DOMAINS,
                 telemetry_enabled=True,
                 telemetry_interval_seconds=300,
             )
@@ -230,7 +230,7 @@ class ConfigService:
         
         # Usar default de settings si no se proporcionó bootstrap_domains
         from app.core.config import settings as app_settings
-        effective_bootstrap = bootstrap_domains if bootstrap_domains is not None else app_settings.default_bootstrap_domains
+        effective_bootstrap = bootstrap_domains if bootstrap_domains is not None else app_settings.DEFAULT_BOOTSTRAP_DOMAINS
 
         # Crear GlobalConfig
         global_config = GlobalConfig(
