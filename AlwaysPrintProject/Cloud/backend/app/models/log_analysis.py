@@ -9,7 +9,7 @@ Este módulo define:
 import uuid
 
 from sqlalchemy import Column, String, Text, DateTime, Integer, Date, ForeignKey, Index
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql import func
 
 from app.core.database import Base
@@ -48,8 +48,8 @@ class LogAnalysis(Base):
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
     # === RELACIONES ===
-    workstation = relationship("Workstation", backref="log_analyses")
-    organization = relationship("Organization", backref="log_analyses")
+    workstation = relationship("Workstation", backref=backref("log_analyses", passive_deletes=True))
+    organization = relationship("Organization", backref=backref("log_analyses", passive_deletes=True))
 
     # === ÍNDICES ===
     __table_args__ = (
