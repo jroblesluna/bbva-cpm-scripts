@@ -141,7 +141,7 @@
     "account": "Organization",
     "unassigned": "Unassigned",
     "accountAutoNote": "Note: Organization assignment can also be done automatically when the workstation connects from a registered public IP.",
-    "viewDetails": "View Details",
+    "viewDetails": "Details",
     "networkInfo": "Network Information",
     "privateIp": "Private IP",
     "systemInfo": "System Information",
@@ -658,8 +658,8 @@
     "pageNumber": "Page {page}"
   },
   "logAnalysis": {
-    "buttonLabel": "Analyze Log",
-    "buttonTitle": "Analyze today's log with AI",
+    "buttonLabel": "AI Log Analysis",
+    "buttonTitle": "Analyze today's log with artificial intelligence",
     "successTitle": "Analysis completed",
     "successDescription": "The log analysis has been completed successfully.",
     "errorTitle": "Analysis error",

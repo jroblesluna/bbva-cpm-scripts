@@ -141,7 +141,7 @@
     "account": "Organización",
     "unassigned": "Sin asignar",
     "accountAutoNote": "Nota: La asignación de organización también puede hacerse automáticamente cuando la estación se conecta desde una IP pública registrada.",
-    "viewDetails": "Ver Detalles",
+    "viewDetails": "Detalles",
     "networkInfo": "Información de Red",
     "privateIp": "IP Privada",
     "systemInfo": "Información del Sistema",
@@ -658,8 +658,8 @@
     "pageNumber": "Página {page}"
   },
   "logAnalysis": {
-    "buttonLabel": "Analizar Log",
-    "buttonTitle": "Analizar log del día con IA",
+    "buttonLabel": "Análisis IA de Log",
+    "buttonTitle": "Analizar log del día con inteligencia artificial",
     "successTitle": "Análisis completado",
     "successDescription": "El análisis de log se ha completado exitosamente.",
     "errorTitle": "Error en análisis",

@@ -42,6 +42,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Printer,
+  Sparkles,
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
@@ -1038,7 +1039,7 @@ function WorkstationCard({
             className="h-8 w-8 p-0"
             title={t('viewDetails')}
           >
-            <Search className="w-4 h-4" />
+            <Sparkles className="w-4 h-4" />
           </Button>
           <Button
             variant="outline"
@@ -1260,7 +1261,7 @@ function WorkstationTable({
                         title={t('viewDetails')}
                         className="h-7 w-7 p-0"
                       >
-                        <Search className="w-3.5 h-3.5" />
+                        <Sparkles className="w-3.5 h-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
