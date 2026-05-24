@@ -7,16 +7,18 @@ using AlwaysPrint.Shared.Logging;
 namespace AlwaysPrint.Shared.Configuration
 {
     /// <summary>
-    /// Lee y escribe la configuración de AlwaysPrint en HKLM\SOFTWARE\Robles.AI\AlwaysPrint.
+    /// Lee y escribe la configuración de AlwaysPrint en el registro de Windows.
+    /// DEV: HKLM\SOFTWARE\Robles.AI\AlwaysPrint-DEV
+    /// PROD: HKLM\SOFTWARE\Robles.AI\AlwaysPrint
     /// La escritura requiere que el caller tenga privilegios de administrador (el servicio).
     /// </summary>
     public class RegistryConfigManager
     {
-        public const string RegistryPath = @"SOFTWARE\Robles.AI\AlwaysPrint";
-
 #if ENV_DEV
+        public const string RegistryPath = @"SOFTWARE\Robles.AI\AlwaysPrint-DEV";
         private const string DefaultBootstrapDomains = "dev.iol.pe";
 #else
+        public const string RegistryPath = @"SOFTWARE\Robles.AI\AlwaysPrint";
         private const string DefaultBootstrapDomains = "apps.iol.pe,sistemas.com.pe";
 #endif
 

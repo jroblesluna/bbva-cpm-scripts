@@ -6,7 +6,9 @@ using AlwaysPrint.Shared.Logging;
 namespace AlwaysPrint.Shared.Configuration
 {
     /// <summary>
-    /// Gestiona las credenciales Cloud de la workstation en HKCU\SOFTWARE\Robles.AI\AlwaysPrint\Cloud.
+    /// Gestiona las credenciales Cloud de la workstation en el registro de usuario.
+    /// DEV: HKCU\SOFTWARE\Robles.AI\AlwaysPrint-DEV\Cloud
+    /// PROD: HKCU\SOFTWARE\Robles.AI\AlwaysPrint\Cloud
     /// No requiere privilegios de administrador — usa exclusivamente Registry.CurrentUser.
     /// Solo el AlwaysPrintTray debe instanciar esta clase.
     /// </summary>
@@ -15,7 +17,11 @@ namespace AlwaysPrint.Shared.Configuration
         /// <summary>
         /// Ruta de la clave de registro en HKCU donde se almacenan las credenciales Cloud.
         /// </summary>
+#if ENV_DEV
+        public const string RegistryPath = @"SOFTWARE\Robles.AI\AlwaysPrint-DEV\Cloud";
+#else
         public const string RegistryPath = @"SOFTWARE\Robles.AI\AlwaysPrint\Cloud";
+#endif
 
         // === PROPIEDADES DE SOLO LECTURA ===
 
