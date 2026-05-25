@@ -543,9 +543,107 @@ else
 fi
 
 # =============================================================================
-# 5. ERRORES RECIENTES
+# 5. VALIDACIÓN DE VARIABLES DE ENTORNO
 # =============================================================================
-print_header "5. ERRORES RECIENTES"
+print_header "5. VALIDACIÓN DE VARIABLES DE ENTORNO"
+
+if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
+    echo -e "  ${CYAN}Verificando variables del backend...${NC}"
+    
+    DOCKER_ENV=$(ssm_exec "$INSTANCE_ID" '["docker exec alwaysprint-backend-1 env 2>/dev/null"]' 6)
+    
+    if [ -n "$DOCKER_ENV" ]; then
+        # Extraer variables relevantes
+        D_BOOTSTRAP=$(echo "$DOCKER_ENV" | grep "^DEFAULT_BOOTSTRAP_DOMAINS=" | cut -d= -f2-)
+        D_FRONTEND_URL=$(echo "$DOCKER_ENV" | grep "^FRONTEND_URL=" | cut -d= -f2-)
+        D_BUILD_TAG=$(echo "$DOCKER_ENV" | grep "^BUILD_TAG=" | cut -d= -f2-)
+        D_LOG_LEVEL=$(echo "$DOCKER_ENV" | grep "^LOG_LEVEL=" | cut -d= -f2-)
+        D_DB_URL=$(echo "$DOCKER_ENV" | grep "^DATABASE_URL=" | cut -d= -f2- | sed 's/:[^:@]*@/:***@/')
+        
+        echo -e "\n  ${BLUE}Variables clave:${NC}"
+        
+        # Validar DEFAULT_BOOTSTRAP_DOMAINS
+        if [ -n "$D_BOOTSTRAP" ]; then
+            if [ "$ENV" = "dev" ] && echo "$D_BOOTSTRAP" | grep -q "dev.iol.pe"; then
+                check_ok "DEFAULT_BOOTSTRAP_DOMAINS=$D_BOOTSTRAP"
+            elif [ "$ENV" = "prod" ] && echo "$D_BOOTSTRAP" | grep -q "apps.iol.pe"; then
+                check_ok "DEFAULT_BOOTSTRAP_DOMAINS=$D_BOOTSTRAP"
+            else
+                check_fail "DEFAULT_BOOTSTRAP_DOMAINS=$D_BOOTSTRAP (no coincide con entorno $ENV)"
+                recommend "Corregir DEFAULT_BOOTSTRAP_DOMAINS en /opt/alwaysprint/.env y ejecutar: cd /opt/alwaysprint && docker compose up -d"
+            fi
+        else
+            check_warn "DEFAULT_BOOTSTRAP_DOMAINS no definida (usará default del código: apps.iol.pe)"
+            if [ "$ENV" = "dev" ]; then
+                recommend "Agregar DEFAULT_BOOTSTRAP_DOMAINS=dev.iol.pe en /opt/alwaysprint/.env y ejecutar: cd /opt/alwaysprint && docker compose up -d"
+            fi
+        fi
+        
+        # Validar FRONTEND_URL
+        if [ -n "$D_FRONTEND_URL" ]; then
+            if echo "$D_FRONTEND_URL" | grep -q "$DOMAIN"; then
+                check_ok "FRONTEND_URL=$D_FRONTEND_URL"
+            else
+                check_warn "FRONTEND_URL=$D_FRONTEND_URL (no coincide con dominio $DOMAIN)"
+            fi
+        fi
+        
+        # Mostrar info
+        echo -e "  ${NC}  BUILD_TAG:  ${D_BUILD_TAG:-no definido}"
+        echo -e "  ${NC}  LOG_LEVEL:  ${D_LOG_LEVEL:-no definido}"
+        echo -e "  ${NC}  DB:         ${D_DB_URL:-no definido}"
+    else
+        check_warn "No se pudieron leer variables del contenedor"
+    fi
+else
+    check_warn "Instance ID no disponible — saltando validación de env vars"
+fi
+
+# =============================================================================
+# 6. ESTADÍSTICAS DE LA INSTANCIA
+# =============================================================================
+print_header "6. ESTADÍSTICAS DE LA INSTANCIA"
+
+if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
+    echo -e "  ${CYAN}Consultando recursos...${NC}"
+    
+    STATS=$(ssm_exec "$INSTANCE_ID" '["echo \"=== MEMORIA ===\"; free -h | grep -E \"Mem:|Swap:\"; echo; echo \"=== DISCO ===\"; df -h / | tail -1; echo; echo \"=== CPU ===\"; uptime; echo; echo \"=== DOCKER ===\"; docker stats --no-stream --format \"table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\" 2>/dev/null | head -5; echo; echo \"=== UPTIME CONTAINERS ===\"; docker ps --format \"table {{.Names}}\t{{.Status}}\t{{.Ports}}\" 2>/dev/null"]' 8)
+    
+    if [ -n "$STATS" ]; then
+        echo ""
+        echo "$STATS" | while IFS= read -r line; do
+            if echo "$line" | grep -q "^==="; then
+                echo -e "  ${BLUE}│${NC} $line"
+            else
+                echo -e "  ${NC}│ $line"
+            fi
+        done
+        
+        # Verificar disco
+        DISK_USE=$(echo "$STATS" | grep "/" | awk '{print $5}' | tr -d '%' | head -1)
+        if [ -n "$DISK_USE" ] && [ "$DISK_USE" -gt 85 ]; then
+            check_warn "Disco al ${DISK_USE}% — considerar limpieza"
+            recommend "Limpiar imágenes Docker antiguas: docker system prune -a --filter 'until=168h'"
+        elif [ -n "$DISK_USE" ]; then
+            check_ok "Disco al ${DISK_USE}%"
+        fi
+        
+        # Verificar memoria
+        MEM_AVAIL=$(echo "$STATS" | grep "Mem:" | awk '{print $7}')
+        if [ -n "$MEM_AVAIL" ]; then
+            check_ok "Memoria disponible: $MEM_AVAIL"
+        fi
+    else
+        check_warn "No se pudieron obtener estadísticas"
+    fi
+else
+    check_warn "Instance ID no disponible — saltando estadísticas"
+fi
+
+# =============================================================================
+# 7. ERRORES RECIENTES
+# =============================================================================
+print_header "7. ERRORES RECIENTES"
 
 if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
     LOGS=$(ssm_exec "$INSTANCE_ID" '["echo \"=== BACKEND ===\"; docker logs alwaysprint-backend-1 --tail 30 2>&1 | grep -i \"error\\|traceback\\|critical\" | tail -5 || echo \"Sin errores\"; echo; echo \"=== FRONTEND ===\"; docker logs alwaysprint-frontend-1 --tail 30 2>&1 | grep -i \"error\" | grep -v \"favicon\\|_next\\|NEXT\" | tail -3 || echo \"Sin errores\""]' 8)

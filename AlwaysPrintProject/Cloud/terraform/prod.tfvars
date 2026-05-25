@@ -45,6 +45,7 @@ backend_env_vars = {
   CACHE_TTL_SECONDS           = "300"
   API_V1_STR                  = "/api/v1"
   S3_ARTIFACTS_BUCKET         = "alwaysprint-prod-artifacts"
+  DEFAULT_BOOTSTRAP_DOMAINS   = "apps.iol.pe,sistemas.com.pe"
 }
 
 # CI/CD via GitHub Actions - no requiere variables aqui
