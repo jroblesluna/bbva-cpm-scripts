@@ -22,11 +22,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Agregar columna action_config_mandatory a workstations."""
-    op.add_column('workstations', sa.Column(
-        'action_config_mandatory', sa.Boolean(),
-        nullable=False, server_default='false',
-        comment="Si es True, esta workstation usa su propia action config (solo si ningún padre es mandatory)"
-    ))
+    op.execute(
+        "ALTER TABLE workstations ADD COLUMN IF NOT EXISTS "
+        "action_config_mandatory BOOLEAN NOT NULL DEFAULT false"
+    )
 
 
 def downgrade() -> None:
