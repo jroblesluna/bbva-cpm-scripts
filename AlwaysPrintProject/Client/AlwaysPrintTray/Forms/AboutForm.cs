@@ -62,8 +62,8 @@ namespace AlwaysPrintTray.Forms
                 Font      = new Font("Segoe UI", 18, FontStyle.Bold),
                 ForeColor = Color.White,
                 BackColor = Color.Transparent,
-                Location  = new Point(0, 100),
-                Size      = new Size(460, 34),
+                Location  = new Point(10, 96),
+                Size      = new Size(440, 42),
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
@@ -73,8 +73,8 @@ namespace AlwaysPrintTray.Forms
                 Font      = new Font("Segoe UI", 8.5f),
                 ForeColor = Color.FromArgb(148, 163, 184),
                 BackColor = Color.Transparent,
-                Location  = new Point(0, 134),
-                Size      = new Size(460, 24),
+                Location  = new Point(10, 138),
+                Size      = new Size(440, 24),
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
@@ -107,8 +107,27 @@ namespace AlwaysPrintTray.Forms
 
             AddRow(body, "Usuario",  currentUser,                                    54);
             AddRow(body, "Iniciado", processStart.ToString("yyyy-MM-dd  HH:mm:ss"),  90);
-            AddRow(body, "Empresa",  "Robles.AI",                                   126);
-            AddRow(body, "Legal",    "Inversiones On Line S.A.C.",                  162);
+
+            var lblCopyright = new Label
+            {
+                Text      = "© 2026 Robles.AI",
+                Font      = new Font("Segoe UI", 8.5f),
+                ForeColor = MutedColor,
+                Location  = new Point(30, 134),
+                Size      = new Size(400, 20),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            var lblLegal = new Label
+            {
+                Text      = "Inversiones On Line S.A.C.",
+                Font      = new Font("Segoe UI", 8.5f),
+                ForeColor = MutedColor,
+                Location  = new Point(30, 158),
+                Size      = new Size(400, 20),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            body.Controls.Add(lblCopyright);
+            body.Controls.Add(lblLegal);
 
             // ── Footer ──────────────────────────────────────────────────────
             var footer = new Panel
