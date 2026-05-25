@@ -86,6 +86,80 @@ namespace AlwaysPrint.Shared.Logging
             Write($"{message}\r\n{ex}", EventLogEntryType.Error, eventId, SourceTray);
         }
 
+        /// <summary>
+        /// Escribe el bloque "Root Log" al inicio de un archivo de log nuevo.
+        /// Contiene información diagnóstica general de la workstation para contexto.
+        /// Se invoca al crear un nuevo archivo de log (rotación diaria) o al iniciar el servicio.
+        /// </summary>
+        /// <param name="organizationName">Nombre de la organización (ej: "BBVA").</param>
+        /// <param name="organizationId">UUID de la organización en Cloud.</param>
+        /// <param name="environment">Nombre del entorno (DEV o PROD).</param>
+        /// <param name="serverUrl">URL del servidor Cloud.</param>
+        /// <param name="version">Versión del EXE del servicio.</param>
+        /// <param name="hostname">Hostname de la workstation.</param>
+        /// <param name="workstationId">UUID de la workstation registrada en Cloud.</param>
+        /// <param name="localIp">IP local de la workstation.</param>
+        /// <param name="actionConfigInfo">Nombre y versión de la configuración de acciones.</param>
+        /// <param name="osInfo">Información del sistema operativo.</param>
+        /// <param name="timezone">Zona horaria usada para timestamps.</param>
+        public static void WriteRootLog(
+            string? organizationName,
+            string? organizationId,
+            string environment,
+            string? serverUrl,
+            string version,
+            string hostname,
+            string? workstationId,
+            string localIp,
+            string? actionConfigInfo,
+            string? osInfo,
+            string? timezone)
+        {
+            try
+            {
+                string ts = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                string src = SourceService;
+                int evt = EvtServiceStarted;
+
+                var lines = new System.Text.StringBuilder();
+                lines.AppendLine($"[{ts}] [{src}] Event {evt}: ═══ ROOT LOG ═══");
+                lines.AppendLine($"[{ts}] [{src}] Event {evt}: Organización: {organizationName ?? "N/A"} ({organizationId ?? "no registrada"})");
+                lines.AppendLine($"[{ts}] [{src}] Event {evt}: Entorno: {environment}");
+                lines.AppendLine($"[{ts}] [{src}] Event {evt}: Servidor: {serverUrl ?? "N/A"}");
+                lines.AppendLine($"[{ts}] [{src}] Event {evt}: Versión: {version}");
+                lines.AppendLine($"[{ts}] [{src}] Event {evt}: Workstation: {hostname} ({workstationId ?? "no registrada"})");
+                lines.AppendLine($"[{ts}] [{src}] Event {evt}: IP: {localIp}");
+                lines.AppendLine($"[{ts}] [{src}] Event {evt}: Configuración: {actionConfigInfo ?? "sin configuración"}");
+                lines.AppendLine($"[{ts}] [{src}] Event {evt}: Zona horaria: {timezone ?? "desconocida"}");
+                lines.AppendLine($"[{ts}] [{src}] Event {evt}: OS: {osInfo ?? "desconocido"}");
+                lines.AppendLine($"[{ts}] [{src}] Event {evt}: ═══════════════");
+
+                string logFile = GetLogFileName();
+
+                lock (LogLock)
+                {
+                    Directory.CreateDirectory(LogDirectory);
+                    EnsureDirectoryPermissions();
+
+                    if (!File.Exists(logFile))
+                    {
+                        File.WriteAllText(logFile, lines.ToString());
+                        EnsureFilePermissions(logFile);
+                    }
+                    else
+                    {
+                        // Si el archivo ya existe, insertar el root log al inicio
+                        string existing = File.ReadAllText(logFile);
+                        File.WriteAllText(logFile, lines.ToString() + existing);
+                    }
+                }
+            }
+            catch
+            {
+                // Ignorar errores de logging - último recurso
+            }
+        }
+
         private static void Write(string message, EventLogEntryType type, int eventId, string source)
         {
             try

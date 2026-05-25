@@ -39,6 +39,24 @@ de impresión para BBVA. AlwaysPrint coexiste con Lexmark CPM (Cloud Print Manag
 cuando CPM falla, redirigiendo el tráfico de impresión directamente a la IP de la impresora, \
 haciendo bypass del servidor Linux.
 
+## Root Log (contexto de la workstation)
+
+Al inicio de cada archivo de log se incluye un bloque "ROOT LOG" delimitado por ═══ ROOT LOG ═══ \
+que contiene información diagnóstica de la workstation analizada:
+- Organización y su ID
+- Entorno (DEV o PROD)
+- Servidor Cloud al que reporta
+- Versión del servicio instalada
+- Hostname e IP de la workstation
+- Workstation ID (registro en Cloud)
+- Configuración de acciones activa (nombre y versión)
+- Zona horaria usada para los timestamps
+- Sistema operativo
+
+Usa esta información para contextualizar tu análisis. Por ejemplo, si la workstation está en \
+entorno DEV, los errores de conectividad con servidores de producción son esperados. Si la versión \
+es antigua, puede explicar bugs ya corregidos.
+
 ## Formato de log
 
 El formato de cada línea es: `[yyyy-MM-dd HH:mm:ss] [SVC/APP] Event NNNN: mensaje`

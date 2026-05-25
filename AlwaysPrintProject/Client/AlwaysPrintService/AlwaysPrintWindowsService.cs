@@ -7,6 +7,7 @@ using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
 using AlwaysPrint.Shared.Models;
+using AlwaysPrint.Shared.Network;
 using AlwaysPrintService.Actions;
 using AlwaysPrintService.Pipe;
 using AlwaysPrintService.Queue;
@@ -203,6 +204,9 @@ namespace AlwaysPrintService
                 // 3.5. Cargar configuración de acciones si existe.
                 LoadActionConfiguration();
 
+                // 3.6. Escribir Root Log con información diagnóstica de la workstation.
+                WriteRootLogBlock();
+
                 // 4. Inicializar cola de tareas.
                 _taskQueue.Start();
                 int cleared = _taskQueue.ClearAll();
@@ -389,6 +393,110 @@ namespace AlwaysPrintService
         }
 
         // ── Helpers ─────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Escribe el bloque Root Log con información diagnóstica de la workstation.
+        /// Se invoca al inicio del servicio después de cargar la configuración.
+        /// Algunos datos (organización, workstation ID) pueden no estar disponibles
+        /// hasta que el Tray se registre en Cloud — se escribe lo disponible.
+        /// </summary>
+        private void WriteRootLogBlock()
+        {
+            try
+            {
+                var cfg = _registry.Load();
+                string version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "desconocida";
+                string hostname = NetworkHelper.GetHostname();
+                string localIp = NetworkHelper.GetOutboundLocalIP();
+
+                // Determinar entorno
+#if ENV_DEV
+                string environment = "DEV";
+#else
+                string environment = "PROD";
+#endif
+
+                // Servidor Cloud (extraer dominio de la URL)
+                string? serverUrl = null;
+                if (!string.IsNullOrEmpty(cfg.CloudApiUrl))
+                {
+                    try
+                    {
+                        var uri = new Uri(cfg.CloudApiUrl);
+                        serverUrl = uri.Host;
+                    }
+                    catch
+                    {
+                        serverUrl = cfg.CloudApiUrl;
+                    }
+                }
+                else if (!string.IsNullOrEmpty(cfg.BootstrapDomains))
+                {
+                    // Usar el primer dominio bootstrap como referencia
+                    string firstDomain = cfg.BootstrapDomains.Split(',')[0].Trim();
+                    serverUrl = $"alwaysprint.{firstDomain}";
+                }
+
+                // Información de configuración de acciones
+                string? actionConfigInfo = _actionEngine.GetConfigurationInfo();
+                if (actionConfigInfo == "No hay configuración cargada")
+                    actionConfigInfo = null;
+
+                // Información del sistema operativo
+                string osInfo = $"{Environment.OSVersion.VersionString} ({(Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit")})";
+
+                // Zona horaria
+                var tz = TimeZoneInfo.Local;
+                string utcOffset = tz.BaseUtcOffset.Hours >= 0
+                    ? $"UTC+{tz.BaseUtcOffset.Hours}"
+                    : $"UTC{tz.BaseUtcOffset.Hours}";
+                string timezone = $"{utcOffset} ({tz.Id})";
+
+                // Datos de Cloud (organización, workstation ID) — pueden no estar disponibles
+                // ya que se almacenan en HKCU y el servicio corre como SYSTEM.
+                // El Tray los registra después. Se deja null si no están disponibles.
+                string? organizationName = null;
+                string? organizationId = null;
+                string? workstationId = null;
+
+                // Intentar leer WorkstationId desde HKLM (si existe algún valor cacheado)
+                try
+                {
+                    using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(RegistryConfigManager.RegistryPath, writable: false))
+                    {
+                        if (key != null)
+                        {
+                            workstationId = key.GetValue("WorkstationId", null) as string;
+                            organizationName = key.GetValue("OrganizationName", null) as string;
+                            organizationId = key.GetValue("OrganizationId", null) as string;
+                        }
+                    }
+                }
+                catch
+                {
+                    // Si no se puede leer, dejar null — no es crítico
+                }
+
+                AlwaysPrintLogger.WriteRootLog(
+                    organizationName: organizationName,
+                    organizationId: organizationId,
+                    environment: environment,
+                    serverUrl: serverUrl,
+                    version: version,
+                    hostname: hostname,
+                    workstationId: workstationId,
+                    localIp: localIp,
+                    actionConfigInfo: actionConfigInfo,
+                    osInfo: osInfo,
+                    timezone: timezone);
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning(
+                    $"Error escribiendo Root Log: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericWarning);
+            }
+        }
 
         private static bool IsDuplicateServiceRunning()
         {
