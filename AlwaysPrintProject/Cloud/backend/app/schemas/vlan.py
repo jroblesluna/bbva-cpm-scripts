@@ -69,19 +69,19 @@ class VLANResponse(BaseModel):
     cidr_ranges: list[str]
     forced_contingency: bool = False
     default_device_id: Optional[UUID] = None
-    metadata: Optional[dict] = None
+    vlan_metadata: Optional[dict] = Field(None, serialization_alias="metadata")
     action_config_mandatory: bool = False
     created_at: datetime
     updated_at: datetime
     
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
 
 class VLANDetailResponse(VLANResponse):
     """Schema de respuesta detallada para VLAN (incluye conteo de workstations)."""
     workstation_count: int = Field(0, description="Número de workstations en esta VLAN")
     
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
 
 class VLANListResponse(BaseModel):

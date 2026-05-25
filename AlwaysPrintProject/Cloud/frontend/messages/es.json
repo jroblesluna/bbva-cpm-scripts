@@ -178,7 +178,12 @@
     "restartConfirmMessage": "¿Desea {action} en la estación {name}?",
     "restartWarning": "La estación se desconectará momentáneamente mientras se realiza el reinicio. El estado se actualizará automáticamente cuando vuelva a conectarse.",
     "restartConfirmBtn": "Confirmar reinicio",
-    "restartSending": "Enviando..."
+    "restartSending": "Enviando...",
+    "pagination": "Mostrando {start} a {end} de {total} estaciones",
+    "pageNumber": "Página {page}",
+    "deleteTitle": "Eliminar workstation",
+    "deleteConfirmMessage": "¿Eliminar {name}? Esta acción no se puede deshacer.",
+    "deleting": "Eliminando…"
   },
   "vlans": {
     "title": "VLANs",
@@ -555,7 +560,18 @@
     "mandatoryEnabledDescOrg": "Esta configuración se impone a todas las VLANs y estaciones de la organización, sin importar que tengan su propia configuración subida",
     "mandatoryDisabledDescOrg": "Las VLANs y estaciones pueden usar su propia configuración si tienen una subida",
     "mandatoryEnabledDescVlan": "Esta configuración se impone a todas las estaciones de esta VLAN, sin importar que tengan su propia configuración subida",
-    "mandatoryDisabledDescVlan": "Esta configuración solo se aplica si la organización no tiene su configuración marcada como obligatoria"
+    "mandatoryDisabledDescVlan": "Esta configuración solo se aplica si la organización no tiene su configuración marcada como obligatoria",
+    "mandatoryDescOrg": "Si habilitas esta opción, esta configuración sobreescribirá a todas las configuraciones de las VLANs y workstations sin excepción.",
+    "mandatoryDescVlan": "Si habilitas esta opción, esta configuración sobreescribirá a todas las configuraciones de workstations que pertenecen a esta VLAN.",
+    "mandatoryDescWorkstation": "Si habilitas esta opción, esta configuración será aplicada para esta workstation.",
+    "notApplicableOrg": "Esta configuración no será aplicable ya que la organización tiene habilitada su configuración en mandatory.",
+    "notApplicableVlan": "Esta configuración no será aplicable ya que la VLAN tiene habilitada su configuración en mandatory.",
+    "applicableVlan": "Esta configuración será aplicable ya que la organización tiene deshabilitada la opción mandatory.",
+    "applicableWorkstation": "Esta configuración será aplicable ya que la organización y la VLAN tienen la opción mandatory deshabilitada.",
+    "sectionTitle": "Configuración de Acciones",
+    "sectionSubtitle": "Gestiona las acciones administrativas para esta workstation",
+    "sectionSubtitleOrg": "Gestiona las acciones administrativas para esta organización",
+    "sectionSubtitleVlan": "Gestiona las acciones administrativas para esta VLAN"
   },
   "telemetry": {
     "title": "Telemetría",

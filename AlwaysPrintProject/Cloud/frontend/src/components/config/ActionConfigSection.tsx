@@ -316,20 +316,10 @@ export function ActionConfigSection({ organizationId, vlanId, workstationId }: A
               : <ShieldOff className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
             }
             <span>
-              {!isApplicable && parentBlocker === 'org' && (
-                scope === 'vlan'
-                  ? 'Esta configuración no será aplicable ya que la organización tiene habilitada su configuración en mandatory.'
-                  : 'Esta configuración no será aplicable ya que la organización tiene habilitada su configuración en mandatory.'
-              )}
-              {!isApplicable && parentBlocker === 'vlan' && (
-                'Esta configuración no será aplicable ya que la VLAN tiene habilitada su configuración en mandatory.'
-              )}
-              {isApplicable && scope === 'vlan' && (
-                'Esta configuración será aplicable ya que la organización tiene deshabilitada la opción mandatory.'
-              )}
-              {isApplicable && scope === 'workstation' && (
-                'Esta configuración será aplicable ya que la organización y la VLAN tienen la opción mandatory deshabilitada.'
-              )}
+              {!isApplicable && parentBlocker === 'org' && t('notApplicableOrg')}
+              {!isApplicable && parentBlocker === 'vlan' && t('notApplicableVlan')}
+              {isApplicable && scope === 'vlan' && t('applicableVlan')}
+              {isApplicable && scope === 'workstation' && t('applicableWorkstation')}
             </span>
           </div>
         )}
@@ -340,10 +330,10 @@ export function ActionConfigSection({ organizationId, vlanId, workstationId }: A
             <Label className="text-sm font-medium">{t('mandatoryLabel')}</Label>
             <p className="text-xs text-gray-500 mt-0.5">
               {scope === 'org'
-                ? 'Si habilitas esta opción, esta configuración sobreescribirá a todas las configuraciones de las VLANs y workstations sin excepción.'
+                ? t('mandatoryDescOrg')
                 : scope === 'vlan'
-                  ? 'Si habilitas esta opción, esta configuración sobreescribirá a todas las configuraciones de workstations que pertenecen a esta VLAN.'
-                  : 'Si habilitas esta opción, esta configuración será aplicada para esta workstation.'
+                  ? t('mandatoryDescVlan')
+                  : t('mandatoryDescWorkstation')
               }
             </p>
           </div>

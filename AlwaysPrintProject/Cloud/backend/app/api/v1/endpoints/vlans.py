@@ -110,7 +110,8 @@ def create_vlan(
         organization_id=org_id,
         name=vlan_data.name,
         description=vlan_data.description,
-        cidr_ranges=vlan_data.cidr_ranges
+        cidr_ranges=vlan_data.cidr_ranges,
+        vlan_metadata=vlan_data.metadata,
     )
     db.add(vlan)
     db.commit()
@@ -145,7 +146,22 @@ def get_vlan(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     workstation_count = len(vlan.workstations)
-    return VLANDetailResponse(**vlan.__dict__, workstation_count=workstation_count)
+    # Construir dict mapeando vlan_metadata al campo del schema
+    vlan_data = {
+        "id": vlan.id,
+        "organization_id": vlan.organization_id,
+        "name": vlan.name,
+        "description": vlan.description,
+        "cidr_ranges": vlan.cidr_ranges,
+        "forced_contingency": vlan.forced_contingency,
+        "default_device_id": vlan.default_device_id,
+        "vlan_metadata": vlan.vlan_metadata,
+        "action_config_mandatory": vlan.action_config_mandatory,
+        "created_at": vlan.created_at,
+        "updated_at": vlan.updated_at,
+        "workstation_count": workstation_count,
+    }
+    return VLANDetailResponse(**vlan_data)
 
 
 @router.put("/{vlan_id}", response_model=VLANResponse)
@@ -182,6 +198,10 @@ def update_vlan(
     
     old_values = {"name": vlan.name, "cidr_ranges": vlan.cidr_ranges}
     update_data = vlan_data.model_dump(exclude_unset=True)
+    
+    # Mapear 'metadata' del schema a 'vlan_metadata' del modelo ORM
+    if "metadata" in update_data:
+        update_data["vlan_metadata"] = update_data.pop("metadata")
     
     for field, value in update_data.items():
         setattr(vlan, field, value)

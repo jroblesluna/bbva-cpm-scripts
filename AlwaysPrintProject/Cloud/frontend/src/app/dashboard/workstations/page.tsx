@@ -61,6 +61,7 @@ export default function WorkstationsPage() {
   const userTimezone = useUserTimezone();
   const t = useTranslations('workstations');
   const tCommon = useTranslations('common');
+  const tActions = useTranslations('actionConfigs');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOnline, setFilterOnline] = useState<boolean | undefined>(undefined);
   const [filterContingency, setFilterContingency] = useState<boolean | undefined>(undefined);
@@ -586,8 +587,8 @@ export default function WorkstationsPage() {
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
                       </div>
                       <div>
-                        <h3 className="text-sm font-semibold text-gray-900">Configuración de Acciones</h3>
-                        <p className="text-xs text-gray-500">Gestiona las acciones administrativas para esta workstation</p>
+                        <h3 className="text-sm font-semibold text-gray-900">{tActions('sectionTitle')}</h3>
+                        <p className="text-xs text-gray-500">{tActions('sectionSubtitle')}</p>
                       </div>
                     </div>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
@@ -656,7 +657,7 @@ export default function WorkstationsPage() {
       )}
 
       {/* Controles de paginación */}
-      {totalItems > 0 && totalPages > 1 && (
+      {totalItems > 0 && (
         <div className="bg-white rounded-lg shadow px-4 py-3 flex items-center justify-between border border-gray-200 mt-4 sm:px-6">
           <div className="flex-1 flex items-center justify-between">
             <p className="text-sm text-gray-700">
@@ -799,20 +800,16 @@ export default function WorkstationsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Trash2 className="w-5 h-5 text-red-600" />
-                Eliminar workstation
+                {t('deleteTitle')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-gray-600">
-                ¿Eliminar{' '}
-                <span className="font-semibold text-gray-900">
-                  {deleteTarget.hostname || deleteTarget.ip_private}
-                </span>
-                ? Esta acción no se puede deshacer.
+                {t('deleteConfirmMessage', { name: deleteTarget.hostname || deleteTarget.ip_private })}
               </p>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setDeleteTarget(null)}>
-                  Cancelar
+                  {tCommon('cancel')}
                 </Button>
                 <Button
                   variant="destructive"
@@ -823,7 +820,7 @@ export default function WorkstationsPage() {
                     });
                   }}
                 >
-                  {deleteMutation.isPending ? 'Eliminando…' : 'Eliminar'}
+                  {deleteMutation.isPending ? t('deleting') : tCommon('delete')}
                 </Button>
               </div>
             </CardContent>
