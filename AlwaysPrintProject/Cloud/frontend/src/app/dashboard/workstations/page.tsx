@@ -47,7 +47,7 @@ import {
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { useToast } from '@/hooks/use-toast';
-import type { Workstation, WorkstationUpdate, Organization, VLAN, Device } from '@/types';
+import type { Workstation, WorkstationUpdate, Organization, Device } from '@/types';
 import { LogAnalysisHistory } from '@/components/workstations/LogAnalysisHistory';
 import { LogAnalysisButton } from '@/components/workstations/LogAnalysisButton';
 
@@ -71,6 +71,7 @@ export default function WorkstationsPage() {
   const [contingencyWsDevices, setContingencyWsDevices] = useState<Device[]>([]);
   const [contingencyWsDevicesLoading, setContingencyWsDevicesLoading] = useState(false);
   const [restartTarget, setRestartTarget] = useState<{ workstation: Workstation; commandType: 'restart_service' | 'restart_tray' } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Workstation | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [sortField, setSortField] = useState<SortField>('ip_private');
@@ -236,9 +237,7 @@ export default function WorkstationsPage() {
   });
 
   const handleDelete = (workstation: Workstation) => {
-    if (confirm(`¿Eliminar workstation ${workstation.hostname || workstation.ip_private}? Esta acción no se puede deshacer.`)) {
-      deleteMutation.mutate(workstation.id);
-    }
+    setDeleteTarget(workstation);
   };
 
   // Handler de comandos: reinicio abre modal de confirmación, otros se ejecutan directo
@@ -762,6 +761,45 @@ export default function WorkstationsPage() {
                       ? t('forcedContingencyDeactivate')
                       : t('forcedContingencyActivate')
                   }
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal de confirmación de eliminación */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-red-600" />
+                Eliminar workstation
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-600">
+                ¿Eliminar{' '}
+                <span className="font-semibold text-gray-900">
+                  {deleteTarget.hostname || deleteTarget.ip_private}
+                </span>
+                ? Esta acción no se puede deshacer.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={deleteMutation.isPending}
+                  onClick={() => {
+                    deleteMutation.mutate(deleteTarget.id, {
+                      onSettled: () => setDeleteTarget(null),
+                    });
+                  }}
+                >
+                  {deleteMutation.isPending ? 'Eliminando…' : 'Eliminar'}
                 </Button>
               </div>
             </CardContent>

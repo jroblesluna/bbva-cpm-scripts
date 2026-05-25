@@ -9,7 +9,7 @@ Este módulo define los endpoints para:
 
 import logging
 from typing import Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,8 @@ from app.core.security import get_current_user, require_admin
 from app.core.utils import get_client_ip
 from app.models.user import User, UserRole
 from app.models.organization import Organization, PublicIP
+from app.models.workstation import Workstation
+from app.services.websocket_manager import connection_manager
 from app.schemas.organization import (
     OrganizationCreate,
     OrganizationUpdate,
@@ -525,7 +527,7 @@ def reject_public_ip(
     summary="Activar/desactivar actualizaciones automáticas",
     description="Permite a un administrador habilitar o deshabilitar las actualizaciones automáticas para una organización."
 )
-def toggle_auto_update(
+async def toggle_auto_update(
     org_id: UUID,
     body: AutoUpdateToggleRequest,
     current_user: User = Depends(require_admin),
@@ -533,8 +535,8 @@ def toggle_auto_update(
 ):
     """
     Activar o desactivar actualizaciones automáticas para una organización.
+    Al habilitar, envía check_update a todas las workstations online de la org.
     """
-    # Buscar la organización por ID
     organization = db.query(Organization).filter(Organization.id == org_id).first()
 
     if not organization:
@@ -548,7 +550,6 @@ def toggle_auto_update(
             detail="Organización no encontrada"
         )
 
-    # Actualizar el flag de auto-actualización
     organization.auto_update_enabled = body.enabled
     db.commit()
     db.refresh(organization)
@@ -559,6 +560,30 @@ def toggle_auto_update(
         body.enabled,
         current_user.id,
     )
+
+    # Al habilitar, disparar check_update en todas las workstations online de la org
+    if body.enabled:
+        workstations = db.query(Workstation).filter(
+            Workstation.organization_id == org_id
+        ).all()
+
+        dispatched = 0
+        for ws in workstations:
+            ws_id = str(ws.id)
+            if connection_manager.is_workstation_online(ws_id):
+                await connection_manager.send_to_workstation(ws_id, {
+                    "type": "command",
+                    "command_id": str(uuid4()),
+                    "command_type": "check_update",
+                    "params": {},
+                })
+                dispatched += 1
+
+        logger.info(
+            "check_update enviado a %d workstations online de org_id=%s",
+            dispatched,
+            org_id,
+        )
 
     return AutoUpdateToggleResponse(
         auto_update_enabled=organization.auto_update_enabled,
