@@ -232,7 +232,7 @@ export default function AccountsPage() {
       {/* Modal de edición */}
       {editingAccount && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <Card className="max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>{t('editTitle', { name: editingAccount.name })}</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setEditingAccount(null)} className="h-8 w-8 p-0">
@@ -262,9 +262,19 @@ export default function AccountsPage() {
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                 </summary>
                 <div className="mt-3">
-                  <ActionConfigSection organizationId={editingAccount.id} />
+                  <ActionConfigSection organizationId={editingAccount.id} hideHeader />
                 </div>
               </details>
+
+              {/* Botones al final del modal */}
+              <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
+                <Button type="button" variant="outline" onClick={() => setEditingAccount(null)} disabled={updateMutation.isPending}>
+                  {tCommon('cancel')}
+                </Button>
+                <Button type="submit" form={`edit-org-${editingAccount.id}`} disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? tCommon('updating') : tCommon('update')}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -620,7 +630,7 @@ function AccountForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id={initialData ? `edit-org-${initialData.id}` : 'create-org'} onSubmit={handleSubmit} className="space-y-4">
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -727,14 +737,16 @@ function AccountForm({
         </div>
       )}
 
-      <div className="flex justify-end space-x-3">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-          {tCommon('cancel')}
-        </Button>
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? (initialData ? tCommon('updating') : tCommon('creating')) : (initialData ? tCommon('update') : t('createBtn'))}
-        </Button>
-      </div>
+      {!initialData && (
+        <div className="flex justify-end space-x-3">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+            {tCommon('cancel')}
+          </Button>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? tCommon('creating') : t('createBtn')}
+          </Button>
+        </div>
+      )}
     </form>
   )
 }

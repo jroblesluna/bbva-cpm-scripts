@@ -57,9 +57,11 @@ interface ActionConfigSectionProps {
   vlanId?: string;
   /** Si se pasa, opera a nivel de Workstation */
   workstationId?: string;
+  /** Ocultar el header interno (cuando ya hay un header externo) */
+  hideHeader?: boolean;
 }
 
-export function ActionConfigSection({ organizationId, vlanId, workstationId }: ActionConfigSectionProps) {
+export function ActionConfigSection({ organizationId, vlanId, workstationId, hideHeader }: ActionConfigSectionProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const t = useTranslations('actionConfigs');
@@ -271,8 +273,8 @@ export function ActionConfigSection({ organizationId, vlanId, workstationId }: A
   return (
     <div className="bg-white rounded-lg shadow">
       <div className="p-6">
-        {/* Header del tópico (solo a nivel org) */}
-        {scope === 'org' && (
+        {/* Header del tópico (solo a nivel org y si no se oculta) */}
+        {scope === 'org' && !hideHeader && (
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
@@ -292,7 +294,7 @@ export function ActionConfigSection({ organizationId, vlanId, workstationId }: A
             </Button>
           </div>
         )}
-        {(scope === 'vlan' || scope === 'workstation') && (
+        {(scope === 'vlan' || scope === 'workstation' || (scope === 'org' && hideHeader)) && (
           <div className="flex justify-end mb-4">
             <Button
               size="sm"

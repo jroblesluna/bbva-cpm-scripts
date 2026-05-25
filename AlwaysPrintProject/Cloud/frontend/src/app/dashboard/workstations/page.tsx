@@ -562,7 +562,7 @@ export default function WorkstationsPage() {
 
       {editingWorkstation && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{ zIndex: 999 }}>
-          <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <Card className="max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>{t('editTitle', { ip: editingWorkstation.ip_private })}</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setEditingWorkstation(null)}>
@@ -577,6 +577,7 @@ export default function WorkstationsPage() {
                 onCancel={() => setEditingWorkstation(null)}
                 isLoading={updateMutation.isPending}
                 error={updateMutation.error?.message}
+                hideButtons
               />
               {/* Sección de Action Config para esta workstation (colapsable) */}
               {editingWorkstation.organization_id && (
@@ -597,10 +598,21 @@ export default function WorkstationsPage() {
                     <ActionConfigSection
                       organizationId={editingWorkstation.organization_id}
                       workstationId={editingWorkstation.id}
+                      hideHeader
                     />
                   </div>
                 </details>
               )}
+
+              {/* Botones al final del modal */}
+              <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
+                <Button type="button" variant="outline" onClick={() => setEditingWorkstation(null)} disabled={updateMutation.isPending}>
+                  {tCommon('cancel')}
+                </Button>
+                <Button type="submit" form={`edit-ws-${editingWorkstation.id}`} disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? tCommon('updating') : tCommon('update')}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -1446,6 +1458,7 @@ function WorkstationForm({
   onCancel,
   isLoading,
   error,
+  hideButtons,
 }: {
   workstation: Workstation;
   accounts: Organization[];
@@ -1453,6 +1466,7 @@ function WorkstationForm({
   onCancel: () => void;
   isLoading: boolean;
   error?: string;
+  hideButtons?: boolean;
 }) {
   const t = useTranslations('workstations');
   const tCommon = useTranslations('common');
@@ -1488,7 +1502,7 @@ function WorkstationForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id={`edit-ws-${workstation.id}`} onSubmit={handleSubmit} className="space-y-4">
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -1587,14 +1601,16 @@ function WorkstationForm({
         <AlertCircle className="h-4 w-4" />
         <AlertDescription className="text-xs">{t('accountAutoNote')}</AlertDescription>
       </Alert>
-      <div className="flex justify-end space-x-3">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-          {tCommon('cancel')}
-        </Button>
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? tCommon('updating') : tCommon('update')}
-        </Button>
-      </div>
+      {!hideButtons && (
+        <div className="flex justify-end space-x-3">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+            {tCommon('cancel')}
+          </Button>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? tCommon('updating') : tCommon('update')}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }
