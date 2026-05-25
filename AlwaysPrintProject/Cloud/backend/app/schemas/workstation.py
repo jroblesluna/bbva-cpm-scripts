@@ -99,6 +99,7 @@ class WorkstationResponse(BaseModel):
     is_online: bool
     contingency_active: bool
     forced_contingency: bool = False
+    action_config_mandatory: bool = False
     last_connection: Optional[datetime] = None
     first_seen: datetime
     created_at: datetime
@@ -155,6 +156,7 @@ class WorkstationUpdate(BaseModel):
     current_user: Optional[str] = Field(None, max_length=255)
     vlan_id: Optional[UUID] = None
     default_printer_id: Optional[UUID] = Field(None, description="ID del dispositivo (impresora) predeterminado")
+    action_config_mandatory: Optional[bool] = Field(None, description="Si True, aplica la config de acciones propia de esta workstation")
 
 
 class WorkstationStatusUpdate(BaseModel):

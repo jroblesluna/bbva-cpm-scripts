@@ -114,13 +114,14 @@ class ActionConfigService:
         if vlan and vlan.action_config_mandatory and vlan_config:
             return vlan_config
         
-        # 4. Si VLAN NO es mandatory → buscar config de workstation
+        # 4. Si VLAN NO es mandatory y workstation tiene mandatory habilitado → usar config de workstation
         if not (vlan and vlan.action_config_mandatory):
-            ws_config = ActionConfigService.get_active_config(
-                db, org.id, scope="workstation", workstation_id=workstation.id
-            )
-            if ws_config:
-                return ws_config
+            if workstation.action_config_mandatory:
+                ws_config = ActionConfigService.get_active_config(
+                    db, org.id, scope="workstation", workstation_id=workstation.id
+                )
+                if ws_config:
+                    return ws_config
         
         # 5. Si VLAN tiene config (no mandatory) → usar VLAN
         if vlan_config:

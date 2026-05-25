@@ -19,6 +19,8 @@ import {
   Power,
   PowerOff,
   Cog,
+  ShieldCheck,
+  ShieldOff,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -53,15 +55,17 @@ interface ActionConfigSectionProps {
   organizationId: string;
   /** Si se pasa, opera a nivel de VLAN en vez de org */
   vlanId?: string;
+  /** Si se pasa, opera a nivel de Workstation */
+  workstationId?: string;
 }
 
-export function ActionConfigSection({ organizationId, vlanId }: ActionConfigSectionProps) {
+export function ActionConfigSection({ organizationId, vlanId, workstationId }: ActionConfigSectionProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const t = useTranslations('actionConfigs');
   const tCommon = useTranslations('common');
 
-  const scope = vlanId ? 'vlan' : 'org';
+  const scope = workstationId ? 'workstation' : vlanId ? 'vlan' : 'org';
 
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -73,35 +77,56 @@ export function ActionConfigSection({ organizationId, vlanId }: ActionConfigSect
   const [mandatory, setMandatory] = useState(false);
   const [togglingMandatory, setTogglingMandatory] = useState(false);
 
-  // Cargar estado mandatory
+  // Estado mandatory de los padres (para mostrar mensajes de aplicabilidad)
+  const [parentOrgMandatory, setParentOrgMandatory] = useState(false);
+  const [parentVlanMandatory, setParentVlanMandatory] = useState(false);
+
+  // Cargar estado mandatory propio + padres
   useEffect(() => {
     const loadMandatory = async () => {
       try {
         if (scope === 'org') {
           const res = await apiClient.get(`/organizations/${organizationId}`);
           setMandatory(res.data.action_config_mandatory ?? false);
-        } else if (vlanId) {
-          const res = await apiClient.get(`/vlans/${vlanId}`);
-          setMandatory(res.data.action_config_mandatory ?? false);
+        } else if (scope === 'vlan' && vlanId) {
+          const [vlanRes, orgRes] = await Promise.all([
+            apiClient.get(`/vlans/${vlanId}`),
+            apiClient.get(`/organizations/${organizationId}`),
+          ]);
+          setMandatory(vlanRes.data.action_config_mandatory ?? false);
+          setParentOrgMandatory(orgRes.data.action_config_mandatory ?? false);
+        } else if (scope === 'workstation' && workstationId) {
+          const [wsRes, orgRes] = await Promise.all([
+            apiClient.get(`/workstations/${workstationId}`),
+            apiClient.get(`/organizations/${organizationId}`),
+          ]);
+          setMandatory(wsRes.data.action_config_mandatory ?? false);
+          setParentOrgMandatory(orgRes.data.action_config_mandatory ?? false);
+          // Cargar mandatory de VLAN si la workstation pertenece a una
+          const vlanIdWs = wsRes.data.vlan_id;
+          if (vlanIdWs) {
+            const vlanRes = await apiClient.get(`/vlans/${vlanIdWs}`);
+            setParentVlanMandatory(vlanRes.data.action_config_mandatory ?? false);
+          }
         }
       } catch { setMandatory(false); }
     };
     loadMandatory();
-  }, [organizationId, vlanId, scope]);
+  }, [organizationId, vlanId, workstationId, scope]);
 
   // Query para listar configuraciones
   const { data: configs, isLoading } = useQuery({
-    queryKey: ['action-configs', organizationId, scope, vlanId],
-    queryFn: () => listActionConfigs(organizationId, scope, vlanId),
+    queryKey: ['action-configs', organizationId, scope, vlanId, workstationId],
+    queryFn: () => listActionConfigs(organizationId, scope, vlanId, workstationId),
     enabled: !!organizationId,
   });
 
   // Mutation para subir configuración
   const uploadMutation = useMutation({
     mutationFn: (data: { config_json: string; is_active: boolean }) =>
-      uploadActionConfig(organizationId, data, scope, vlanId),
+      uploadActionConfig(organizationId, data, scope, vlanId, workstationId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['action-configs', organizationId, scope, vlanId] });
+      queryClient.invalidateQueries({ queryKey: ['action-configs', organizationId, scope, vlanId, workstationId] });
       toast({ title: t('uploadSuccess'), description: t('uploadSuccessDesc') });
       setUploadDialogOpen(false);
       setConfigJson('');
@@ -130,7 +155,7 @@ export function ActionConfigSection({ organizationId, vlanId }: ActionConfigSect
     mutationFn: ({ configId, is_active }: { configId: number; is_active: boolean }) =>
       updateActionConfig(organizationId, configId, { is_active }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['action-configs', organizationId, scope, vlanId] });
+      queryClient.invalidateQueries({ queryKey: ['action-configs', organizationId, scope, vlanId, workstationId] });
       toast({ title: t('updateSuccess'), description: t('updateSuccessDesc') });
     },
     onError: (error: unknown) => {
@@ -143,7 +168,7 @@ export function ActionConfigSection({ organizationId, vlanId }: ActionConfigSect
   const deleteMutation = useMutation({
     mutationFn: (configId: number) => deleteActionConfig(organizationId, configId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['action-configs', organizationId, scope, vlanId] });
+      queryClient.invalidateQueries({ queryKey: ['action-configs', organizationId, scope, vlanId, workstationId] });
       toast({ title: t('deleteSuccess'), description: t('deleteSuccessDesc') });
     },
     onError: (error: unknown) => {
@@ -214,13 +239,32 @@ export function ActionConfigSection({ organizationId, vlanId }: ActionConfigSect
     try {
       if (scope === 'org') {
         await apiClient.put(`/organizations/${organizationId}`, { action_config_mandatory: enabled });
-      } else if (vlanId) {
+      } else if (scope === 'vlan' && vlanId) {
         await apiClient.put(`/vlans/${vlanId}`, { action_config_mandatory: enabled });
+      } else if (scope === 'workstation' && workstationId) {
+        await apiClient.put(`/workstations/${workstationId}`, { action_config_mandatory: enabled });
       }
       setMandatory(enabled);
     } catch { /* silently revert */ }
     finally { setTogglingMandatory(false); }
   };
+
+  // Determina si este nivel es aplicable según el estado mandatory de los padres
+  const isApplicable =
+    scope === 'org'
+      ? true
+      : scope === 'vlan'
+        ? !parentOrgMandatory
+        : !parentOrgMandatory && !parentVlanMandatory;
+
+  const parentBlocker =
+    scope === 'workstation' && parentOrgMandatory
+      ? 'org'
+      : scope === 'workstation' && parentVlanMandatory
+        ? 'vlan'
+        : scope === 'vlan' && parentOrgMandatory
+          ? 'org'
+          : null;
 
   const activeConfig = configs?.find((c) => c.is_active);
 
@@ -248,7 +292,7 @@ export function ActionConfigSection({ organizationId, vlanId }: ActionConfigSect
             </Button>
           </div>
         )}
-        {scope === 'vlan' && (
+        {(scope === 'vlan' || scope === 'workstation') && (
           <div className="flex justify-end mb-4">
             <Button
               size="sm"
@@ -260,21 +304,53 @@ export function ActionConfigSection({ organizationId, vlanId }: ActionConfigSect
           </div>
         )}
 
+        {/* Banner de aplicabilidad según estado de padres */}
+        {scope !== 'org' && (
+          <div className={`mb-4 flex items-start gap-2 p-3 rounded-lg border text-xs ${
+            isApplicable
+              ? 'bg-green-50 border-green-200 text-green-800'
+              : 'bg-amber-50 border-amber-200 text-amber-800'
+          }`}>
+            {isApplicable
+              ? <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-green-600" />
+              : <ShieldOff className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+            }
+            <span>
+              {!isApplicable && parentBlocker === 'org' && (
+                scope === 'vlan'
+                  ? 'Esta configuración no será aplicable ya que la organización tiene habilitada su configuración en mandatory.'
+                  : 'Esta configuración no será aplicable ya que la organización tiene habilitada su configuración en mandatory.'
+              )}
+              {!isApplicable && parentBlocker === 'vlan' && (
+                'Esta configuración no será aplicable ya que la VLAN tiene habilitada su configuración en mandatory.'
+              )}
+              {isApplicable && scope === 'vlan' && (
+                'Esta configuración será aplicable ya que la organización tiene deshabilitada la opción mandatory.'
+              )}
+              {isApplicable && scope === 'workstation' && (
+                'Esta configuración será aplicable ya que la organización y la VLAN tienen la opción mandatory deshabilitada.'
+              )}
+            </span>
+          </div>
+        )}
+
         {/* Toggle de mandatory */}
-        <div className="mb-4 flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+        <div className={`mb-4 flex items-center justify-between p-3 border rounded-lg bg-gray-50 ${!isApplicable ? 'opacity-50' : ''}`}>
           <div>
             <Label className="text-sm font-medium">{t('mandatoryLabel')}</Label>
             <p className="text-xs text-gray-500 mt-0.5">
-              {mandatory
-                ? (scope === 'org' ? t('mandatoryEnabledDescOrg') : t('mandatoryEnabledDescVlan'))
-                : (scope === 'org' ? t('mandatoryDisabledDescOrg') : t('mandatoryDisabledDescVlan'))
+              {scope === 'org'
+                ? 'Si habilitas esta opción, esta configuración sobreescribirá a todas las configuraciones de las VLANs y workstations sin excepción.'
+                : scope === 'vlan'
+                  ? 'Si habilitas esta opción, esta configuración sobreescribirá a todas las configuraciones de workstations que pertenecen a esta VLAN.'
+                  : 'Si habilitas esta opción, esta configuración será aplicada para esta workstation.'
               }
             </p>
           </div>
           <Switch
             checked={mandatory}
             onCheckedChange={handleMandatoryToggle}
-            disabled={togglingMandatory}
+            disabled={togglingMandatory || !isApplicable}
           />
         </div>
 

@@ -50,6 +50,10 @@ class Workstation(Base):
     # Flag de contingencia forzada a nivel individual de workstation
     # Cuando está activo, esta workstation entra en modo contingencia independientemente del estado real
     forced_contingency = Column(Boolean, nullable=False, default=False, server_default='false')
+
+    # Flag de mandatory para action config: si True, esta workstation usa su propia config
+    # (solo aplica si ningún padre —org o vlan— tiene mandatory habilitado)
+    action_config_mandatory = Column(Boolean, nullable=False, default=False, server_default='false')
     
     # Impresora predeterminada asignada
     default_printer_id = Column(GUID, ForeignKey("devices.id", ondelete="SET NULL"), nullable=True)
