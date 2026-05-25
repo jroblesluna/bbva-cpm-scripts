@@ -1243,7 +1243,7 @@ def get_workstation_resources(
 
         if vlan:
             # Extraer metadata de la VLAN
-            vlan_metadata = vlan.metadata
+            vlan_metadata = vlan.vlan_metadata
             if vlan_metadata and isinstance(vlan_metadata, dict):
                 remote_queue_path = vlan_metadata.get("remote_queue_path")
 

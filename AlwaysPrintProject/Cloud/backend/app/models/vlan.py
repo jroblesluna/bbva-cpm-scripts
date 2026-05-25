@@ -42,7 +42,8 @@ class VLAN(Base):
     default_device_id = Column(GUID, ForeignKey("devices.id", ondelete="SET NULL"), nullable=True)
 
     # Metadatos arbitrarios de la VLAN (ej: remote_queue_path, configuraciones específicas)
-    metadata = Column(JSON, nullable=True)
+    # Nota: "metadata" es reservado por SQLAlchemy Declarative; se usa alias de columna.
+    vlan_metadata = Column("metadata", JSON, nullable=True)
 
     # Flag que indica si la action config de la VLAN es obligatoria para todas sus workstations
     # Si es True, las workstations de esta VLAN NO pueden tener su propia action config
