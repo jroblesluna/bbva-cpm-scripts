@@ -573,7 +573,7 @@ export default function VLANsPage() {
 
       {/* Modales */}
       {contingencyTarget && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex items-center gap-2 mb-4">
               <ShieldAlert className={`w-5 h-5 ${contingencyTarget.forced_contingency ? 'text-green-600' : 'text-orange-600'}`} />
@@ -718,8 +718,8 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('createTitle')}</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -785,11 +785,30 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
   const t = useTranslations('vlans')
   const tCommon = useTranslations('common')
   const [loading, setLoading] = useState(false)
+  const [devices, setDevices] = useState<Device[]>([])
+  const [devicesLoading, setDevicesLoading] = useState(true)
+  const [selectedDefaultDevice, setSelectedDefaultDevice] = useState<string | null>(vlan.default_device_id)
   const [formData, setFormData] = useState<VLANUpdate>({
     name: vlan.name,
     description: vlan.description,
     cidr_ranges: [...vlan.cidr_ranges],
   })
+
+  // Cargar dispositivos de la VLAN al abrir el modal
+  useEffect(() => {
+    const loadDevices = async () => {
+      try {
+        setDevicesLoading(true)
+        const response = await apiClient.get(`/devices/?vlan_id=${vlan.id}`)
+        setDevices((response.data.devices || []).filter((d: Device) => d.is_active))
+      } catch {
+        setDevices([])
+      } finally {
+        setDevicesLoading(false)
+      }
+    }
+    loadDevices()
+  }, [vlan.id])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -798,6 +817,11 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
     try {
       setLoading(true)
       await apiClient.put(`/vlans/${vlan.id}`, { ...formData, cidr_ranges: validCidrs })
+      // Actualizar impresora predeterminada si cambió
+      if (selectedDefaultDevice !== vlan.default_device_id) {
+        const params = selectedDefaultDevice ? { device_id: selectedDefaultDevice } : {}
+        await apiClient.patch(`/vlans/${vlan.id}/default-device`, null, { params })
+      }
       onSuccess()
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Error desconocido'
@@ -815,8 +839,8 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('editTitle')}</h2>
           {detail.workstation_count > 0 && (
@@ -859,6 +883,28 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                 <Plus className="mr-2 h-4 w-4" />{t('addRange')}
               </Button>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('defaultDevice')}</label>
+              <p className="text-xs text-gray-500 mb-2">{t('defaultDeviceHelper')}</p>
+              {devicesLoading ? (
+                <p className="text-sm text-gray-500">{tCommon('loading')}</p>
+              ) : devices.length === 0 ? (
+                <p className="text-sm text-gray-500">{t('defaultDeviceNoDevices')}</p>
+              ) : (
+                <select
+                  value={selectedDefaultDevice || ''}
+                  onChange={(e) => setSelectedDefaultDevice(e.target.value || null)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">{t('selectDefaultDevice')}</option>
+                  {devices.map((device) => (
+                    <option key={device.id} value={device.id}>
+                      {device.name} — {device.ip_address}:{device.port}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={onClose} disabled={loading}>{tCommon('cancel')}</Button>
               <Button type="submit" disabled={loading}>{loading ? tCommon('updating') : tCommon('update')}</Button>
@@ -895,7 +941,7 @@ function DeleteVLANModal({ vlan, onClose, onSuccess }: { vlan: VLAN; onClose: ()
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
         <div className="p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">{t('deleteTitle')}</h2>
@@ -922,7 +968,7 @@ function VLANDevicesModal({ vlan, devices, onClose, onSetDefault }: { vlan: VLAN
   const tDevices = useTranslations('devices')
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
       <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">

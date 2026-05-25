@@ -396,6 +396,23 @@ export default function DevicesPage() {
 
 // === MODAL: CREAR DISPOSITIVO ===
 
+function isValidIP(ip: string): boolean {
+  const trimmed = ip.trim()
+  if (!trimmed) return false
+  // IPv4
+  const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/
+  const ipv4Match = trimmed.match(ipv4Regex)
+  if (ipv4Match) {
+    return ipv4Match.slice(1).every(octet => {
+      const num = parseInt(octet, 10)
+      return num >= 0 && num <= 255
+    })
+  }
+  // IPv6 (simplificada: acepta formato válido con grupos hex separados por :)
+  const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/
+  return ipv6Regex.test(trimmed)
+}
+
 function CreateDeviceModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const { user, isAdmin } = useAuth()
   const t = useTranslations('devices')
@@ -403,6 +420,7 @@ function CreateDeviceModal({ onClose, onSuccess }: { onClose: () => void; onSucc
   const [loading, setLoading] = useState(false)
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
   const [vlans, setVlans] = useState<VLAN[]>([])
+  const [ipError, setIpError] = useState('')
   const [formData, setFormData] = useState<DeviceCreate>({
     organization_id: user?.organization_id || '',
     vlan_id: null,
@@ -442,6 +460,12 @@ function CreateDeviceModal({ onClose, onSuccess }: { onClose: () => void; onSucc
     e.preventDefault()
     if (!formData.name.trim() || !formData.ip_address.trim()) return
 
+    if (!isValidIP(formData.ip_address)) {
+      setIpError(t('ipInvalid'))
+      return
+    }
+    setIpError('')
+
     try {
       setLoading(true)
       const payload = {
@@ -460,8 +484,8 @@ function CreateDeviceModal({ onClose, onSuccess }: { onClose: () => void; onSucc
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('createTitle')}</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -480,11 +504,12 @@ function CreateDeviceModal({ onClose, onSuccess }: { onClose: () => void; onSucc
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('vlanLabel')}</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('vlanLabel')} *</label>
               <select
                 value={formData.vlan_id || ''}
                 onChange={(e) => setFormData({ ...formData, vlan_id: e.target.value || null })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
               >
                 <option value="">{t('selectVlan')}</option>
                 {vlans.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
@@ -507,11 +532,20 @@ function CreateDeviceModal({ onClose, onSuccess }: { onClose: () => void; onSucc
                 <input
                   type="text"
                   value={formData.ip_address}
-                  onChange={(e) => setFormData({ ...formData, ip_address: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, ip_address: e.target.value })
+                    if (ipError) setIpError('')
+                  }}
+                  onBlur={() => {
+                    if (formData.ip_address.trim() && !isValidIP(formData.ip_address)) {
+                      setIpError(t('ipInvalid'))
+                    }
+                  }}
                   placeholder={t('ipPlaceholder')}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${ipError ? 'border-red-500' : 'border-gray-300'}`}
                 />
+                {ipError && <p className="mt-1 text-xs text-red-600">{ipError}</p>}
               </div>
             </div>
             <div>
@@ -570,7 +604,12 @@ function CreateDeviceModal({ onClose, onSuccess }: { onClose: () => void; onSucc
             </div>
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={onClose} disabled={loading}>{tCommon('cancel')}</Button>
-              <Button type="submit" disabled={loading}>{loading ? tCommon('creating') : t('createTitle')}</Button>
+              <Button
+                type="submit"
+                disabled={loading || !formData.name.trim() || !formData.ip_address.trim() || !formData.vlan_id || (isAdmin() && !formData.organization_id)}
+              >
+                {loading ? tCommon('creating') : t('createTitle')}
+              </Button>
             </div>
           </form>
         </div>
@@ -586,6 +625,7 @@ function EditDeviceModal({ device, onClose, onSuccess }: { device: Device; onClo
   const tCommon = useTranslations('common')
   const [loading, setLoading] = useState(false)
   const [vlans, setVlans] = useState<VLAN[]>([])
+  const [ipError, setIpError] = useState('')
   const [formData, setFormData] = useState<DeviceUpdate>({
     vlan_id: device.vlan_id,
     name: device.name,
@@ -611,6 +651,12 @@ function EditDeviceModal({ device, onClose, onSuccess }: { device: Device; onClo
     e.preventDefault()
     if (!formData.name?.trim() || !formData.ip_address?.trim()) return
 
+    if (!isValidIP(formData.ip_address)) {
+      setIpError(t('ipInvalid'))
+      return
+    }
+    setIpError('')
+
     try {
       setLoading(true)
       await apiClient.put(`/devices/${device.id}`, formData)
@@ -625,8 +671,8 @@ function EditDeviceModal({ device, onClose, onSuccess }: { device: Device; onClo
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('editTitle')}</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -658,11 +704,20 @@ function EditDeviceModal({ device, onClose, onSuccess }: { device: Device; onClo
                 <input
                   type="text"
                   value={formData.ip_address || ''}
-                  onChange={(e) => setFormData({ ...formData, ip_address: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, ip_address: e.target.value })
+                    if (ipError) setIpError('')
+                  }}
+                  onBlur={() => {
+                    if (formData.ip_address?.trim() && !isValidIP(formData.ip_address)) {
+                      setIpError(t('ipInvalid'))
+                    }
+                  }}
                   placeholder={t('ipPlaceholder')}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${ipError ? 'border-red-500' : 'border-gray-300'}`}
                 />
+                {ipError && <p className="mt-1 text-xs text-red-600">{ipError}</p>}
               </div>
             </div>
             <div>
@@ -751,7 +806,7 @@ function DeleteDeviceModal({ device, onClose, onSuccess }: { device: Device; onC
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
         <div className="p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">{t('deleteTitle')}</h2>
@@ -777,8 +832,8 @@ function DeviceDetailsModal({ device, onClose }: { device: Device; onClose: () =
   const timezone = useUserTimezone()
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
+      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6">
           {/* Encabezado */}
           <div className="flex items-center justify-between mb-6">
@@ -824,13 +879,13 @@ function DeviceDetailsModal({ device, onClose }: { device: Device; onClose: () =
 
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase">{t('colVlan')}</p>
-              <p className="text-sm text-gray-900">
+              <div className="text-sm text-gray-900">
                 {device.vlan_name ? (
                   <Badge variant="secondary">{device.vlan_name}</Badge>
                 ) : (
                   <span className="text-gray-400">{t('noVlan')}</span>
                 )}
-              </p>
+              </div>
             </div>
 
             <div>

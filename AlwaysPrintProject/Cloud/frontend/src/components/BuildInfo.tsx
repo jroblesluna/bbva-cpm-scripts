@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Globe, Server } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 
 interface BuildInfoProps {
@@ -23,12 +24,18 @@ export function BuildInfo({ compact = false }: BuildInfoProps) {
     })
   }, [])
 
-  // Versión compacta para el header (alineada izquierda debajo del logo)
+  // Versión compacta para el header (alineada debajo del logo)
   if (compact) {
     return (
-      <div className="text-[11px] font-mono text-gray-500 flex items-center gap-3 mt-1">
-        <span>🌐 {frontendTag.slice(0, 8)}</span>
-        <span>⚙️ {backendTag.slice(0, 8)}</span>
+      <div className="flex items-center gap-2 mt-1.5">
+        <div className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-mono text-blue-700 ring-1 ring-inset ring-blue-200">
+          <Globe className="w-3 h-3 flex-shrink-0" />
+          <span>{frontendTag.slice(0, 8)}</span>
+        </div>
+        <div className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-mono text-purple-700 ring-1 ring-inset ring-purple-200">
+          <Server className="w-3 h-3 flex-shrink-0" />
+          <span>{backendTag.slice(0, 8)}</span>
+        </div>
       </div>
     )
   }

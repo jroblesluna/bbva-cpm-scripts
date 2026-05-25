@@ -1501,6 +1501,7 @@ function WorkstationForm({
       {workstation.vlan_id && (
         <div className="space-y-2">
           <Label htmlFor="default_printer_id">{t('defaultPrinter')}</Label>
+          <p className="text-xs text-gray-500">{t('defaultPrinterHelper')}</p>
           <select
             id="default_printer_id"
             value={formData.default_printer_id || ''}

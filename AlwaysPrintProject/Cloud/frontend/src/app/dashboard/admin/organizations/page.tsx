@@ -303,27 +303,25 @@ export default function AccountsPage() {
 
       {/* Modal de gestión de IPs */}
       {managingIPsOrg && (
-        <Card className="mb-6 border-green-200 bg-green-50">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>{t('manageIpsTitle', { name: managingIPsOrg.name })}</CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setManagingIPsOrg(null)}
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <IPManagementForm
-              organization={managingIPsOrg}
-              onAddIP={(data) => addIPMutation.mutate({ orgId: managingIPsOrg.id, data })}
-              onRemoveIP={(ipId) => removeIPMutation.mutate({ orgId: managingIPsOrg.id, ipId })}
-              isLoading={addIPMutation.isPending || removeIPMutation.isPending}
-              error={(addIPMutation.error as any)?.detail || (removeIPMutation.error as any)?.detail}
-            />
-          </CardContent>
-        </Card>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>{t('manageIpsTitle', { name: managingIPsOrg.name })}</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setManagingIPsOrg(null)} className="h-8 w-8 p-0">
+                <X className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <IPManagementForm
+                organization={managingIPsOrg}
+                onAddIP={(data) => addIPMutation.mutate({ orgId: managingIPsOrg.id, data })}
+                onRemoveIP={(ipId) => removeIPMutation.mutate({ orgId: managingIPsOrg.id, ipId })}
+                isLoading={addIPMutation.isPending || removeIPMutation.isPending}
+                error={(addIPMutation.error as any)?.detail || (removeIPMutation.error as any)?.detail}
+              />
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Lista de cuentas */}

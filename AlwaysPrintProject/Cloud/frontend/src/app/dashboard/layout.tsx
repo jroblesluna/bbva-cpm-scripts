@@ -322,7 +322,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <h1 className="text-xl font-bold text-gray-900">AlwaysPrint</h1>
             </div>
           </div>
-          <div className="px-4 pb-2">
+          <div className="px-4 py-2 border-b border-gray-100">
             <BuildInfo compact />
           </div>
           <nav className="flex-1 overflow-y-auto px-2 py-4 min-h-0">
