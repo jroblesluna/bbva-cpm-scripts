@@ -19,6 +19,7 @@ class VLANCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255, description="Nombre de la VLAN")
     description: Optional[str] = Field(None, max_length=1000, description="Descripción de la VLAN")
     cidr_ranges: list[str] = Field(..., min_length=1, description="Rangos CIDR (ej: ['192.168.1.0/24'])")
+    metadata: Optional[dict] = Field(None, description="Metadatos arbitrarios (ej: remote_queue_path)")
     
     @field_validator("cidr_ranges")
     @classmethod
@@ -40,6 +41,7 @@ class VLANUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=1000)
     cidr_ranges: Optional[list[str]] = Field(None, min_length=1)
+    metadata: Optional[dict] = Field(None, description="Metadatos arbitrarios (ej: remote_queue_path)")
     action_config_mandatory: Optional[bool] = Field(None, description="Si la action config de VLAN es obligatoria para sus workstations")
     
     @field_validator("cidr_ranges")
@@ -67,6 +69,7 @@ class VLANResponse(BaseModel):
     cidr_ranges: list[str]
     forced_contingency: bool = False
     default_device_id: Optional[UUID] = None
+    metadata: Optional[dict] = None
     action_config_mandatory: bool = False
     created_at: datetime
     updated_at: datetime

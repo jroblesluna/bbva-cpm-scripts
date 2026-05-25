@@ -1147,3 +1147,141 @@ def delete_workstation(
     )
     
     return None
+
+
+# === ENDPOINT DE RECURSOS (CONTINGENCIA) ===
+
+class ContingencyPrinterResource(BaseModel):
+    """Schema de impresora de contingencia para el recurso."""
+    id: UUID
+    name: str
+    ip_address: str
+    port: int = 9100
+    is_default: bool = False
+
+
+class WorkstationResourcesResponse(BaseModel):
+    """
+    Schema de respuesta para recursos de una workstation.
+    
+    Contiene la información necesaria para que el cliente opere
+    en modo contingencia y en modo normal (LPM).
+    """
+    remote_queue_path: Optional[str] = Field(
+        None, description="Ruta UNC de la cola remota del print server (de VLAN metadata)"
+    )
+    vlan_metadata: Optional[dict] = Field(
+        None, description="Metadatos completos de la VLAN"
+    )
+    contingency_printers: list[ContingencyPrinterResource] = Field(
+        default_factory=list, description="Impresoras de contingencia disponibles en la VLAN"
+    )
+
+
+@router.get("/{workstation_id}/resources",
+            response_model=WorkstationResourcesResponse,
+            status_code=status.HTTP_200_OK,
+            responses={
+                200: {"description": "Recursos de la workstation obtenidos exitosamente"},
+                404: {"description": "Workstation no encontrada"},
+            })
+def get_workstation_resources(
+    workstation_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtener recursos de contingencia para una workstation.
+    
+    Retorna la información necesaria para que el cliente descargue
+    y almacene en resources.json:
+    - remote_queue_path: ruta UNC de la cola del print server (desde VLAN metadata)
+    - vlan_metadata: todos los metadatos de la VLAN
+    - contingency_printers: dispositivos activos en la VLAN de la workstation
+    
+    La workstation descarga este recurso periódicamente y lo almacena
+    en C:\\ProgramData\\AlwaysPrint\\config\\resources.json para uso offline.
+    
+    Args:
+        workstation_id: ID de la workstation
+        current_user: Usuario autenticado
+        db: Sesión de base de datos
+    
+    Returns:
+        WorkstationResourcesResponse con recursos de contingencia
+    
+    Raises:
+        HTTPException 404: Workstation no encontrada
+    """
+    from app.models.vlan import VLAN
+    from app.models.device import Device
+
+    # Verificar que la workstation existe
+    workstation = db.query(Workstation).filter(Workstation.id == workstation_id).first()
+
+    if not workstation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workstation con ID {workstation_id} no encontrada"
+        )
+
+    # Verificar permisos: operadores solo pueden ver recursos de su cuenta
+    if current_user.role == UserRole.OPERATOR:
+        if workstation.organization_id != current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para ver los recursos de esta workstation"
+            )
+
+    # Obtener VLAN de la workstation
+    vlan_metadata = None
+    remote_queue_path = None
+    contingency_printers = []
+
+    if workstation.vlan_id:
+        vlan = db.query(VLAN).filter(VLAN.id == workstation.vlan_id).first()
+
+        if vlan:
+            # Extraer metadata de la VLAN
+            vlan_metadata = vlan.metadata
+            if vlan_metadata and isinstance(vlan_metadata, dict):
+                remote_queue_path = vlan_metadata.get("remote_queue_path")
+
+            # Obtener dispositivos activos de la VLAN (impresoras de contingencia)
+            devices = (
+                db.query(Device)
+                .filter(
+                    Device.vlan_id == vlan.id,
+                    Device.is_active.is_(True)
+                )
+                .all()
+            )
+
+            for device in devices:
+                # Marcar como default si coincide con el default_printer_id de la workstation
+                is_default = (
+                    workstation.default_printer_id is not None
+                    and str(device.id) == str(workstation.default_printer_id)
+                )
+                contingency_printers.append(
+                    ContingencyPrinterResource(
+                        id=device.id,
+                        name=device.name,
+                        ip_address=device.ip_address,
+                        port=device.port,
+                        is_default=is_default
+                    )
+                )
+
+    logger.info(
+        f"[RECURSOS] Recursos obtenidos: workstation_id={workstation_id}, "
+        f"vlan_id={workstation.vlan_id}, "
+        f"remote_queue_path={remote_queue_path}, "
+        f"contingency_printers={len(contingency_printers)}"
+    )
+
+    return WorkstationResourcesResponse(
+        remote_queue_path=remote_queue_path,
+        vlan_metadata=vlan_metadata,
+        contingency_printers=contingency_printers
+    )
