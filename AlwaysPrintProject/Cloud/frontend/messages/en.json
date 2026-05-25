@@ -234,7 +234,9 @@
     "selectDefaultDevice": "-- Select printer --",
     "defaultDeviceUpdated": "Default printer updated.",
     "defaultDeviceRemoved": "Default printer removed.",
-    "defaultDeviceNoDevices": "No active devices in this VLAN"
+    "defaultDeviceNoDevices": "No active devices in this VLAN",
+    "actionConfigTitle": "Administrative Actions",
+    "actionConfigDesc": "Action configuration specific to this VLAN"
   },
   "messages": {
     "title": "Messages",
@@ -321,7 +323,33 @@
     "latestVersionNote": "Workstations will automatically update to the latest version.",
     "autoReregisterLabel": "Automatic Re-registration",
     "autoReregisterEnabledDesc": "Deleted workstations will re-register when sending telemetry",
-    "autoReregisterDisabledDesc": "Deleted workstations will not re-register automatically"
+    "autoReregisterDisabledDesc": "Deleted workstations will not re-register automatically",
+    "searchOrgsPlaceholder": "Search organization by name...",
+    "noOrgsFound": "No organizations found",
+    "cardQueue": "Queue",
+    "cardPolling": "Polling",
+    "cardChecks": "Checks",
+    "cardAutoUpdate": "Auto-update",
+    "cardEnabled": "Enabled",
+    "cardDisabled": "Disabled",
+    "cardNoConfig": "No configuration defined",
+    "cardEditConfig": "Edit Configuration",
+    "cardActions": "Actions",
+    "cardNoActions": "Not configured",
+    "editingOrg": "Configuration: {name}",
+    "topicPrinting": "Printing",
+    "topicPrintingDesc": "Corporate queue, polling interval and client language",
+    "topicNetwork": "Network & Discovery",
+    "topicNetworkDesc": "Bootstrap domains and printer search on the network",
+    "topicConnectivity": "Connectivity",
+    "topicConnectivityDesc": "Endpoints that workstations should monitor",
+    "corpQueuePlaceholder": "E.g.: LexmarkBBVA",
+    "bootstrapPlaceholder": "E.g.: apps.iol.pe,robles.ai",
+    "bootstrapHelper": "Comma-separated domains the client uses to discover the server",
+    "validationQueueRequired": "Corporate queue name is required",
+    "validationPollingRange": "Polling interval must be between 1 and 1440 minutes",
+    "saveSuccess": "Configuration saved successfully",
+    "saveError": "Error saving configuration"
   },
   "audit": {
     "title": "Audit",
@@ -522,7 +550,12 @@
     "allConfigsDesc": "Upload history",
     "noConfigs": "No configurations",
     "uploadFirst": "Upload First Configuration",
-    "download": "Download"
+    "download": "Download",
+    "mandatoryLabel": "Mandatory configuration",
+    "mandatoryEnabledDescOrg": "This configuration overrides and is applied to all VLANs and workstations in the organization, regardless of their own configurations",
+    "mandatoryDisabledDescOrg": "VLANs and workstations can use their own configuration if they have one uploaded",
+    "mandatoryEnabledDescVlan": "This configuration is enforced on all workstations in this VLAN, regardless of their own uploaded configuration",
+    "mandatoryDisabledDescVlan": "This configuration only applies if the organization does not have its configuration marked as mandatory"
   },
   "telemetry": {
     "title": "Telemetry",

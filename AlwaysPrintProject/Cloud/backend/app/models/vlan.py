@@ -40,6 +40,10 @@ class VLAN(Base):
     # Impresora predeterminada de la VLAN
     # Las workstations de esta VLAN que no tengan impresora favorita individual usarán esta.
     default_device_id = Column(GUID, ForeignKey("devices.id", ondelete="SET NULL"), nullable=True)
+
+    # Flag que indica si la action config de la VLAN es obligatoria para todas sus workstations
+    # Si es True, las workstations de esta VLAN NO pueden tener su propia action config
+    action_config_mandatory = Column(Boolean, nullable=False, default=False, server_default='false')
     
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

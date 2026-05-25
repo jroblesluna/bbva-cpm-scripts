@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ActionConfigSection } from '@/components/config/ActionConfigSection'
 import { Badge } from '@/components/ui/badge'
 import {
   Network,
@@ -721,7 +722,12 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('createTitle')}</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">{t('createTitle')}</h2>
+            <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             {isAdmin() && (
               <div>
@@ -840,9 +846,14 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('editTitle')}</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">{t('editTitle')}</h2>
+            <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
           {detail.workstation_count > 0 && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
               <p className="text-sm text-blue-800">
@@ -851,7 +862,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
               </p>
             </div>
           )}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form id="edit-vlan-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{tCommon('name')} *</label>
               <input type="text" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -905,11 +916,29 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                 </select>
               )}
             </div>
-            <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={onClose} disabled={loading}>{tCommon('cancel')}</Button>
-              <Button type="submit" disabled={loading}>{loading ? tCommon('updating') : tCommon('update')}</Button>
-            </div>
           </form>
+          {/* Sección de Action Config para esta VLAN (colapsable) */}
+          <details className="mt-6 pt-6 border-t border-gray-200 group">
+            <summary className="flex items-center justify-between cursor-pointer list-none p-3 rounded-lg hover:bg-gray-50 transition-colors [&::-webkit-details-marker]:hidden">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">{t('actionConfigTitle')}</h3>
+                  <p className="text-xs text-gray-500">{t('actionConfigDesc')}</p>
+                </div>
+              </div>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
+            <div className="mt-3">
+              <ActionConfigSection organizationId={vlan.organization_id} vlanId={vlan.id} />
+            </div>
+          </details>
+          <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-gray-200">
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>{tCommon('cancel')}</Button>
+            <Button type="submit" form="edit-vlan-form" disabled={loading}>{loading ? tCommon('updating') : tCommon('update')}</Button>
+          </div>
         </div>
       </div>
     </div>
@@ -944,7 +973,12 @@ function DeleteVLANModal({ vlan, onClose, onSuccess }: { vlan: VLAN; onClose: ()
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
         <div className="p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">{t('deleteTitle')}</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900">{t('deleteTitle')}</h2>
+            <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
           <p className="text-gray-600 mb-6">{t('deleteConfirm', { name: vlan.name })}</p>
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={onClose} disabled={loading}>{tCommon('cancel')}</Button>

@@ -60,6 +60,9 @@ class ActionConfigInfo(BaseModel):
     description: Optional[str] = None
     config_hash: str
     is_active: bool
+    scope: str = "org"
+    vlan_id: Optional[UUID] = None
+    workstation_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
     created_by_id: Optional[UUID] = None

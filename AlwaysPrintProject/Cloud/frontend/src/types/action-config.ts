@@ -10,6 +10,9 @@ export interface ActionConfig {
   description: string | null;
   config_hash: string;
   is_active: boolean;
+  scope: 'org' | 'vlan' | 'workstation';
+  vlan_id: string | null;
+  workstation_id: string | null;
   created_at: string;
   updated_at: string;
   created_by_id: string | null;

@@ -13,6 +13,7 @@ export interface Organization {
   target_version: string | null
   auto_reregister_enabled: boolean
   forced_contingency: boolean
+  action_config_mandatory: boolean
   llm_model_id?: string | null
   openai_api_key?: string | null
   created_at: string

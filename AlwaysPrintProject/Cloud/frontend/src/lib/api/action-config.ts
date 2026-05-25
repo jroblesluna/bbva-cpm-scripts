@@ -15,11 +15,19 @@ import type {
  */
 export async function uploadActionConfig(
   organizationId: string,
-  data: ActionConfigUpload
+  data: ActionConfigUpload,
+  scope: string = 'org',
+  vlanId?: string,
+  workstationId?: string
 ): Promise<ActionConfig> {
+  const params: Record<string, string> = { scope };
+  if (vlanId) params.vlan_id = vlanId;
+  if (workstationId) params.workstation_id = workstationId;
+  
   const response = await apiClient.post(
     `/organizations/${organizationId}/config`,
-    data
+    data,
+    { params }
   );
   return response.data;
 }
@@ -44,13 +52,21 @@ export async function getActiveActionConfig(
 }
 
 /**
- * Listar todas las configuraciones de una organización.
+ * Listar todas las configuraciones de una organización (filtradas por scope).
  */
 export async function listActionConfigs(
-  organizationId: string
+  organizationId: string,
+  scope: string = 'org',
+  vlanId?: string,
+  workstationId?: string
 ): Promise<ActionConfig[]> {
+  const params: Record<string, string> = { scope };
+  if (vlanId) params.vlan_id = vlanId;
+  if (workstationId) params.workstation_id = workstationId;
+  
   const response = await apiClient.get(
-    `/organizations/${organizationId}/configs`
+    `/organizations/${organizationId}/configs`,
+    { params }
   );
   return response.data;
 }

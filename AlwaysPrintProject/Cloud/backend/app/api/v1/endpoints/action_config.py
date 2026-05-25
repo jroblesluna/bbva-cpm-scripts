@@ -33,29 +33,37 @@ router = APIRouter()
     response_model=ActionConfigInfo,
     status_code=status.HTTP_201_CREATED,
     summary="Subir configuración de acciones",
-    description="Sube un nuevo archivo de configuración de acciones para una organización"
+    description="Sube un nuevo archivo de configuración de acciones para una organización, VLAN o workstation"
 )
 def upload_action_config(
     organization_id: UUID,
     data: ActionConfigUpload,
+    scope: str = "org",
+    vlan_id: UUID = None,
+    workstation_id: UUID = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Sube una nueva configuración de acciones para una organización.
+    Sube una nueva configuración de acciones.
     
-    - **organization_id**: ID de la organización
-    - **config_json**: JSON completo del archivo .alwaysconfig
-    - **is_active**: Si la configuración debe estar activa (default: True)
-    
-    Si is_active=True, desactiva automáticamente cualquier configuración activa previa.
+    - **scope**: 'org', 'vlan' o 'workstation'
+    - **vlan_id**: requerido si scope='vlan'
+    - **workstation_id**: requerido si scope='workstation'
     """
-    # Verificar que el usuario pertenece a la organización (admins pueden gestionar cualquiera)
     if current_user.role != UserRole.ADMIN and current_user.organization_id != organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para gestionar configuraciones de esta organización"
         )
+    
+    # Validar scope y parámetros
+    if scope not in ("org", "vlan", "workstation"):
+        raise HTTPException(status_code=400, detail="scope debe ser 'org', 'vlan' o 'workstation'")
+    if scope == "vlan" and not vlan_id:
+        raise HTTPException(status_code=400, detail="vlan_id requerido para scope='vlan'")
+    if scope == "workstation" and not workstation_id:
+        raise HTTPException(status_code=400, detail="workstation_id requerido para scope='workstation'")
     
     try:
         config = ActionConfigService.create_config(
@@ -63,51 +71,52 @@ def upload_action_config(
             organization_id=organization_id,
             data=data,
             created_by_id=current_user.id,
-            storage_path=None  # TODO: Implementar almacenamiento en S3
+            storage_path=None,
+            scope=scope,
+            vlan_id=str(vlan_id) if vlan_id else None,
+            workstation_id=str(workstation_id) if workstation_id else None
         )
-        
         return config
     except DuplicateConfigError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.get(
     "/organizations/{organization_id}/config",
     response_model=ActionConfigInfo,
     summary="Obtener configuración activa",
-    description="Obtiene la configuración de acciones activa de una organización"
+    description="Obtiene la configuración de acciones activa de un scope"
 )
 def get_active_action_config(
     organization_id: UUID,
+    scope: str = "org",
+    vlan_id: UUID = None,
+    workstation_id: UUID = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Obtiene la configuración de acciones activa de una organización.
-    
+    Obtiene la configuración de acciones activa de un scope específico.
     Retorna 404 si no hay configuración activa.
     """
-    # Verificar que el usuario pertenece a la organización (admins pueden acceder a cualquiera)
     if current_user.role != UserRole.ADMIN and current_user.organization_id != organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para acceder a configuraciones de esta organización"
         )
     
-    config = ActionConfigService.get_active_config(db, organization_id)
+    config = ActionConfigService.get_active_config(
+        db, organization_id, scope=scope,
+        vlan_id=str(vlan_id) if vlan_id else None,
+        workstation_id=str(workstation_id) if workstation_id else None
+    )
     
     if not config:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No hay configuración activa para esta organización"
+            detail="No hay configuración activa para este scope"
         )
     
     return config
@@ -117,26 +126,34 @@ def get_active_action_config(
     "/organizations/{organization_id}/configs",
     response_model=List[ActionConfigInfo],
     summary="Listar todas las configuraciones",
-    description="Lista todas las configuraciones de acciones de una organización"
+    description="Lista configuraciones de acciones filtradas por scope"
 )
 def list_action_configs(
     organization_id: UUID,
+    scope: str = "org",
+    vlan_id: UUID = None,
+    workstation_id: UUID = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Lista todas las configuraciones de acciones de una organización.
+    Lista configuraciones de acciones filtradas por scope.
     
-    Incluye tanto activas como inactivas, ordenadas por fecha de creación descendente.
+    - **scope**: 'org', 'vlan' o 'workstation' (default: 'org')
+    - **vlan_id**: filtrar por VLAN (solo si scope='vlan')
+    - **workstation_id**: filtrar por workstation (solo si scope='workstation')
     """
-    # Verificar que el usuario pertenece a la organización (admins pueden acceder a cualquiera)
     if current_user.role != UserRole.ADMIN and current_user.organization_id != organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para acceder a configuraciones de esta organización"
         )
     
-    configs = ActionConfigService.get_all_configs(db, organization_id)
+    configs = ActionConfigService.get_all_configs(
+        db, organization_id, scope=scope,
+        vlan_id=str(vlan_id) if vlan_id else None,
+        workstation_id=str(workstation_id) if workstation_id else None
+    )
     return configs
 
 
@@ -253,22 +270,18 @@ def delete_action_config(
     "/workstations/{workstation_id}/config/info",
     response_model=ActionConfigDownloadInfo,
     summary="Info de configuración para workstation",
-    description="Obtiene información de la configuración activa para una workstation"
+    description="Obtiene información de la configuración efectiva para una workstation (con herencia jerárquica)"
 )
 def get_workstation_config_info(
     workstation_id: str,
     db: Session = Depends(get_db)
 ):
     """
-    Obtiene información de la configuración activa para una workstation.
+    Obtiene información de la configuración efectiva para una workstation.
     
+    Aplica resolución jerárquica: Org (mandatory) > Workstation > VLAN > Org (default).
     Este endpoint NO requiere autenticación (usa workstation_id como identificación).
-    Retorna 404 si no hay configuración activa.
-    
-    La workstation usa esta información para verificar si necesita descargar
-    una nueva configuración comparando el hash.
     """
-    # Obtener workstation
     from app.models.workstation import Workstation
     
     logger.info(f"[ACTION_CONFIG] Buscando workstation con id={workstation_id}")
@@ -286,38 +299,29 @@ def get_workstation_config_info(
     
     logger.info(
         f"[ACTION_CONFIG] Workstation encontrada: id={workstation.id}, "
-        f"organization_id={workstation.organization_id}"
+        f"organization_id={workstation.organization_id}, vlan_id={workstation.vlan_id}"
     )
     
-    # Obtener configuración activa de la organización
-    config = ActionConfigService.get_active_config(db, workstation.organization_id)
+    # Resolver configuración efectiva con herencia jerárquica
+    config = ActionConfigService.resolve_effective_config(db, workstation.id)
     
     if not config:
-        # Diagnóstico adicional: verificar si hay ALGUNA config para esta org
         from sqlalchemy import func
         total_configs = db.query(func.count(ActionConfig.id)).filter(
             ActionConfig.organization_id == workstation.organization_id
         ).scalar()
-        active_configs = db.query(func.count(ActionConfig.id)).filter(
-            ActionConfig.organization_id == workstation.organization_id,
-            ActionConfig.is_active == True
-        ).scalar()
         
         logger.warning(
-            f"[ACTION_CONFIG] No hay configuración activa para organization_id={workstation.organization_id}. "
-            f"Total configs en org: {total_configs}, activas: {active_configs}"
+            f"[ACTION_CONFIG] No hay configuración efectiva para workstation={workstation_id}. "
+            f"Total configs en org: {total_configs}"
         )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=(
-                f"No hay configuración activa. "
-                f"org_id={workstation.organization_id}, "
-                f"configs_total={total_configs}, configs_activas={active_configs}"
-            )
+            detail=f"No hay configuración activa. org_id={workstation.organization_id}"
         )
     
     logger.info(
-        f"[ACTION_CONFIG] Configuración activa encontrada: id={config.id}, "
+        f"[ACTION_CONFIG] Configuración efectiva: id={config.id}, scope={config.scope}, "
         f"name={config.name}, hash={config.config_hash}"
     )
     
@@ -332,19 +336,16 @@ def get_workstation_config_info(
 @router.get(
     "/workstations/{workstation_id}/config/download",
     summary="Descargar configuración",
-    description="Descarga el JSON completo de la configuración activa"
+    description="Descarga el JSON de la configuración efectiva (con herencia jerárquica)"
 )
 def download_workstation_config(
     workstation_id: str,
     db: Session = Depends(get_db)
 ):
     """
-    Descarga el JSON completo de la configuración activa para una workstation.
-    
-    Este endpoint NO requiere autenticación (usa workstation_id como identificación).
-    Retorna el JSON crudo del archivo .alwaysconfig.
+    Descarga el JSON de la configuración efectiva para una workstation.
+    Aplica resolución jerárquica: Org (mandatory) > Workstation > VLAN > Org (default).
     """
-    # Obtener workstation
     from app.models.workstation import Workstation
     workstation = db.query(Workstation).filter(
         Workstation.id == workstation_id
@@ -356,8 +357,8 @@ def download_workstation_config(
             detail="Workstation no encontrada"
         )
     
-    # Obtener configuración activa de la organización
-    config = ActionConfigService.get_active_config(db, workstation.organization_id)
+    # Resolver configuración efectiva con herencia jerárquica
+    config = ActionConfigService.resolve_effective_config(db, workstation.id)
     
     if not config:
         raise HTTPException(
@@ -365,13 +366,13 @@ def download_workstation_config(
             detail="No hay configuración activa"
         )
     
-    # Retornar JSON crudo
     return Response(
         content=config.config_json,
         media_type="application/json",
         headers={
             "Content-Disposition": f'attachment; filename="{config.name}.alwaysconfig"',
             "X-Config-Hash": config.config_hash,
-            "X-Config-Version": config.version
+            "X-Config-Version": config.version,
+            "X-Config-Scope": config.scope if isinstance(config.scope, str) else config.scope.value
         }
     )

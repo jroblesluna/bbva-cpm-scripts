@@ -254,11 +254,14 @@ export default function AccountsPage() {
       {contingencyTarget && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <Card className="max-w-md w-full">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <ShieldAlert className={`w-5 h-5 ${contingencyTarget.forced_contingency ? 'text-green-600' : 'text-orange-600'}`} />
                 {contingencyTarget.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
               </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setContingencyTarget(null)} className="h-8 w-8 p-0">
+                <X className="h-5 w-5" />
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-gray-600">

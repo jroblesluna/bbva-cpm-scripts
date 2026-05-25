@@ -393,9 +393,17 @@ namespace AlwaysPrintTray
 
                 var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-                // Obtener CloudApiUrl de la configuración actual
-                var cfg = _registry.Load();
-                var downloader = new UpdateDownloader(cfg.CloudApiUrl);
+                // Obtener CloudApiUrl: preferir la del CloudManager (ya en memoria y validada)
+                // porque el registro puede no estar actualizado aún (race condition con el Service).
+                string cloudApiUrl = _cloudManager?.CloudApiUrl ?? _registry.Load().CloudApiUrl;
+                if (string.IsNullOrWhiteSpace(cloudApiUrl))
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "AutoUpdate: CloudApiUrl no disponible al intentar descargar. " +
+                        "Se reintentará en el próximo ciclo de verificación.");
+                    return;
+                }
+                var downloader = new UpdateDownloader(cloudApiUrl);
 
                 // Descargar MSI (asíncrono, no bloqueante)
                 string? msiPath = await downloader.DownloadAsync(updateInfo.FileSize);

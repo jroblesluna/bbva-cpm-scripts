@@ -91,6 +91,10 @@ class Organization(Base):
     # Cuando está activo, TODAS las workstations de esta organización entran en modo contingencia
     forced_contingency = Column(Boolean, nullable=False, default=False, server_default='false')
 
+    # Flag que indica si la action config de la organización es obligatoria para todas las VLANs/workstations
+    # Si es True, las VLANs y workstations NO pueden tener su propia action config
+    action_config_mandatory = Column(Boolean, nullable=False, default=False, server_default='false')
+
     # Modelo LLM asignado a esta organización para análisis de logs
     # Si es NULL, se usa el modelo por defecto global (settings.LOG_ANALYZER_LLM_MODEL_ID)
     llm_model_id = Column(String(100), nullable=True)

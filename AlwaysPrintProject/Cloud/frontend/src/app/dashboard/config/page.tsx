@@ -1,13 +1,8 @@
 /**
- * Página de configuración del sistema.
+ * Página de configuración del sistema - Rediseño con cards por organización.
  *
- * Estructura jerárquica de configuración:
- * 1. Configuración Global (sistema) - Aplica a todas las organizaciones
- * 2. Configuración por Organización - Sobrescribe la global para esa organización
- * 3. Configuración por VLAN - Sobrescribe la de organización para esa VLAN
- * 4. Configuración por Workstation - Sobrescribe todo lo anterior para esa workstation
- *
- * Esta página permite gestionar los niveles 1 y 2.
+ * Admin: Ve cards de todas las organizaciones con resumen de config, puede ir a editar.
+ * Operador: Va directamente al editor de su organización, agrupado por tópicos.
  */
 
 'use client';
@@ -21,7 +16,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-  Settings,
   Save,
   RotateCcw,
   Plus,
@@ -29,13 +23,21 @@ import {
   Info,
   AlertCircle,
   Building2,
-  Globe,
   RefreshCw,
   Pin,
+  Pencil,
+  ArrowLeft,
+  Printer,
+  Network,
+  Wifi,
+  Download,
+  Search,
+  Cog,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { ConnectivityCheckEditor } from '@/components/ConnectivityCheckEditor';
 import { LocaleSelector } from '@/components/LocaleSelector';
+import { ActionConfigSection } from '@/components/config/ActionConfigSection';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import type {
@@ -44,30 +46,52 @@ import type {
   SearchTargets,
   ConnectivityCheck,
 } from '@/types/config';
+import { listActionConfigs } from '@/lib/api/action-config';
 
 interface Account {
   id: string;
   name: string;
   timezone: string;
+  is_active: boolean;
+  auto_update_enabled: boolean;
+  target_version: string | null;
+  auto_reregister_enabled: boolean;
 }
 
-type ConfigTab = 'global' | 'organization';
+interface OrgConfigSummary {
+  organization_id: string;
+  corporate_queue_name: string;
+  pending_task_polling_minutes: number;
+  bootstrap_domains: string;
+  search_targets: SearchTargets | null;
+  connectivity_checks: ConnectivityCheck[];
+  locale: string;
+  updated_at: string;
+  exists: boolean;
+  activeActionConfig: string | null; // nombre de la config activa, o null
+}
 
 export default function ConfigPage() {
   const { user } = useAuth();
   const t = useTranslations('config');
-  const userTimezone = useUserTimezone();
   const tCommon = useTranslations('common');
-  const [activeTab, setActiveTab] = useState<ConfigTab>('organization');
+  const userTimezone = useUserTimezone();
+
+  // Estado principal: admin ve lista, operador ve editor directamente
+  const [editingOrgId, setEditingOrgId] = useState<string | null>(null);
+  const [editingOrgName, setEditingOrgName] = useState<string>('');
+
+  // Lista de organizaciones (admin)
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [orgConfigs, setOrgConfigs] = useState<Record<string, OrgConfigSummary>>({});
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [searchFilter, setSearchFilter] = useState('');
+
+  // Editor state
   const [config, setConfig] = useState<GlobalConfig | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-
-  // Selector de organización (solo para Admin en tab de organización)
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedOrgId, setSelectedOrgId] = useState<string>('');
-  const [loadingAccounts, setLoadingAccounts] = useState(false);
 
   // Form state
   const [corporateQueueName, setCorporateQueueName] = useState('');
@@ -78,46 +102,36 @@ export default function ConfigPage() {
   const [connectivityChecks, setConnectivityChecks] = useState<ConnectivityCheck[]>([]);
   const [locale, setLocale] = useState('');
 
-  // Estado de auto-actualización por organización
+  // Auto-update state
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(false);
   const [targetVersion, setTargetVersion] = useState<string | null>(null);
   const [autoReregisterEnabled, setAutoReregisterEnabled] = useState(false);
   const [togglingAutoUpdate, setTogglingAutoUpdate] = useState(false);
   const [availableVersions, setAvailableVersions] = useState<Array<{ version: string }>>([]);
 
-  // Obtener nombre de la organización seleccionada para placeholders
-  const getSelectedAccountName = (): string => {
-    if (user?.role === 'admin' && selectedOrgId) {
-      const account = accounts.find((a) => a.id === selectedOrgId);
-      return account?.name || 'Organización';
-    }
-    // Para operadores, obtener el nombre de su cuenta desde user (si está disponible)
-    // Por ahora retornamos un nombre genérico
-    return 'Organización';
-  };
+  // === EFFECTS ===
 
-  const queuePlaceholder = `Lexmark${getSelectedAccountName().replace(/\s+/g, '')}`;
-  const domainPlaceholder = `${getSelectedAccountName().toLowerCase().replace(/\s+/g, '')}.com,${getSelectedAccountName().toLowerCase().replace(/\s+/g, '')}.local`;
-
-  // Cargar organizaciones (solo para Admin)
   useEffect(() => {
     if (user?.role === 'admin') {
       loadAccounts();
     } else if (user?.role === 'operator' || user?.role === 'readonly') {
-      // Para operadores, cargar configuración inmediatamente
-      loadConfig();
+      // Operador va directo a editar su organización
+      if (user?.organization_id) {
+        setEditingOrgId(user.organization_id);
+        setEditingOrgName('');
+      }
     }
   }, [user]);
 
-  // Cargar configuración cuando se selecciona una organización (solo Admin)
+  // Cargar config cuando se entra en modo edición
   useEffect(() => {
-    if (user?.role === 'admin' && selectedOrgId) {
-      loadConfig();
-      loadOrgUpdateState(selectedOrgId);
+    if (editingOrgId) {
+      loadConfig(editingOrgId);
+      loadOrgUpdateState(editingOrgId);
     }
-  }, [selectedOrgId]);
+  }, [editingOrgId]);
 
-  // Cargar versiones disponibles (para selector de versión pineada)
+  // Cargar versiones disponibles
   useEffect(() => {
     const loadVersions = async () => {
       try {
@@ -129,10 +143,72 @@ export default function ConfigPage() {
         setAvailableVersions([]);
       }
     };
-    if (user?.role === 'admin') {
+    if (user?.role === 'admin' || user?.role === 'operator') {
       loadVersions();
     }
   }, [user?.role]);
+
+  // === LOADERS ===
+
+  const loadAccounts = async () => {
+    try {
+      setLoadingAccounts(true);
+      const response = await apiClient.get('/organizations/?skip=0&limit=1000');
+      const data = response.data;
+      const items: Account[] = data.items || [];
+      setAccounts(items);
+
+      // Cargar resumen de config para cada organización
+      const configs: Record<string, OrgConfigSummary> = {};
+      await Promise.all(
+        items.map(async (acc) => {
+          try {
+            const res = await apiClient.get(`/config/global?organization_id=${acc.id}`);
+            const d = res.data;
+            // Intentar obtener action config activa
+            let activeActionConfigName: string | null = null;
+            try {
+              const actionConfigs = await listActionConfigs(acc.id);
+              const active = actionConfigs.find((c) => c.is_active);
+              activeActionConfigName = active?.name ?? null;
+            } catch { /* sin action config */ }
+
+            configs[acc.id] = {
+              organization_id: acc.id,
+              corporate_queue_name: d.corporate_queue_name || '',
+              pending_task_polling_minutes: d.pending_task_polling_minutes || 5,
+              bootstrap_domains: d.bootstrap_domains || '',
+              search_targets: d.search_targets || null,
+              connectivity_checks: d.connectivity_checks || [],
+              locale: d.locale || '',
+              updated_at: d.updated_at || '',
+              exists: !!d.id,
+              activeActionConfig: activeActionConfigName,
+            };
+          } catch {
+            configs[acc.id] = {
+              organization_id: acc.id,
+              corporate_queue_name: '',
+              pending_task_polling_minutes: 5,
+              bootstrap_domains: '',
+              search_targets: null,
+              connectivity_checks: [],
+              locale: '',
+              updated_at: '',
+              exists: false,
+              activeActionConfig: null,
+            };
+          }
+        })
+      );
+      setOrgConfigs(configs);
+    } catch (error: unknown) {
+      const err = error as { detail?: string; message?: string };
+      console.error('Error al cargar organizaciones:', err.detail || err.message);
+    } finally {
+      setLoadingAccounts(false);
+    }
+  };
 
   const loadOrgUpdateState = async (orgId: string) => {
     try {
@@ -147,57 +223,19 @@ export default function ConfigPage() {
     }
   };
 
-  // Para operadores, cargar su propio estado de auto-update
-  useEffect(() => {
-    if (user?.role === 'operator' && user?.organization_id) {
-      loadOrgUpdateState(user.organization_id);
-    }
-  }, [user]);
-
-  const loadAccounts = async () => {
-    try {
-      setLoadingAccounts(true);
-      const response = await apiClient.get('/organizations/?skip=0&limit=1000');
-
-      const data = response.data;
-      setAccounts(data.items || []);
-      if (data.items && data.items.length > 0) {
-        setSelectedOrgId(data.items[0].id);
-      }
-    } catch (error: any) {
-      const msg =
-        error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        error?.message ||
-        'Error al cargar organizaciones';
-      console.error('Error al cargar organizaciones:', msg, error?.response?.status);
-      alert(msg);
-    } finally {
-      setLoadingAccounts(false);
-    }
-  };
-
-  const loadConfig = async () => {
+  const loadConfig = async (orgId: string) => {
     try {
       setLoading(true);
-
-      // Construir URL con account_id si es Admin
       let url = '/config/global';
       if (user?.role === 'admin') {
-        if (!selectedOrgId) {
-          setLoading(false);
-          return;
-        }
-        url += `?organization_id=${selectedOrgId}`;
+        url += `?organization_id=${orgId}`;
       }
 
       const response = await apiClient.get(url);
       const data: GlobalConfig = response.data;
 
-      // Si id es null, significa que no existe configuración en BD (valores por defecto)
       if (!data.id) {
         setConfig(null);
-        // Usar valores por defecto del backend
         setCorporateQueueName(data.corporate_queue_name || '');
         setPollingMinutes(data.pending_task_polling_minutes || 5);
         setBootstrapDomains(data.bootstrap_domains || '');
@@ -209,10 +247,7 @@ export default function ConfigPage() {
         return;
       }
 
-      // Configuración existente
       setConfig(data);
-
-      // Cargar valores en el formulario
       setCorporateQueueName(data.corporate_queue_name);
       setPollingMinutes(data.pending_task_polling_minutes);
       setBootstrapDomains(data.bootstrap_domains);
@@ -225,50 +260,36 @@ export default function ConfigPage() {
         setSearchRanges(['']);
       }
 
-      // Cargar connectivity_checks y locale desde la respuesta
       const configData = data as GlobalConfig & {
         connectivity_checks?: ConnectivityCheck[];
         locale?: string;
       };
       setConnectivityChecks(configData.connectivity_checks || []);
       setLocale(configData.locale || '');
-
       setHasChanges(false);
-    } catch (error: any) {
-      const msg =
-        error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        error?.message ||
-        'Error al cargar configuración';
-      console.error('Error al cargar configuración:', msg, error?.response?.status);
-      alert(msg);
+    } catch (error: unknown) {
+      const err = error as { detail?: string; message?: string };
+      console.error('Error al cargar configuración:', err.detail || err.message);
     } finally {
       setLoading(false);
     }
   };
 
+  // === HANDLERS ===
+
   const handleSave = async () => {
-    // Validar
     if (!corporateQueueName.trim()) {
-      alert('El nombre de la cola corporativa es requerido');
+      alert(t('validationQueueRequired'));
       return;
     }
-
     if (pollingMinutes < 1 || pollingMinutes > 1440) {
-      alert('El intervalo de polling debe estar entre 1 y 1440 minutos');
+      alert(t('validationPollingRange'));
       return;
     }
-
-    // Validar que Admin haya seleccionado organización
-    if (user?.role === 'admin' && !selectedOrgId) {
-      alert('Debes seleccionar una organización');
-      return;
-    }
+    if (!editingOrgId) return;
 
     try {
       setSaving(true);
-
-      // Preparar search_targets
       const validIps = searchIps.filter((ip) => ip.trim());
       const validRanges = searchRanges.filter((range) => range.trim());
 
@@ -289,20 +310,19 @@ export default function ConfigPage() {
         locale: locale,
       };
 
-      // Construir URL con account_id si es Admin
       let url = '/config/global';
       if (user?.role === 'admin') {
-        url += `?organization_id=${selectedOrgId}`;
+        url += `?organization_id=${editingOrgId}`;
       }
 
       const response = await apiClient.put(url, updateData);
       const data: GlobalConfig = response.data;
       setConfig(data);
       setHasChanges(false);
-      alert('Configuración guardada exitosamente');
-    } catch (error: any) {
-      console.error('Error:', error);
-      alert(error.message || 'Error al guardar configuración');
+      alert(t('saveSuccess'));
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      alert(err.message || t('saveError'));
     } finally {
       setSaving(false);
     }
@@ -310,11 +330,9 @@ export default function ConfigPage() {
 
   const handleReset = () => {
     if (!config) return;
-
     setCorporateQueueName(config.corporate_queue_name);
     setPollingMinutes(config.pending_task_polling_minutes);
     setBootstrapDomains(config.bootstrap_domains);
-
     if (config.search_targets) {
       setSearchIps(config.search_targets.ips || ['']);
       setSearchRanges(config.search_targets.ranges || ['']);
@@ -322,208 +340,260 @@ export default function ConfigPage() {
       setSearchIps(['']);
       setSearchRanges(['']);
     }
-
-    // Restaurar connectivity_checks y locale
     const configData = config as GlobalConfig & {
       connectivity_checks?: ConnectivityCheck[];
       locale?: string;
     };
     setConnectivityChecks(configData.connectivity_checks || []);
     setLocale(configData.locale || '');
-
     setHasChanges(false);
   };
 
-  const addSearchIp = () => {
-    setSearchIps([...searchIps, '']);
-    setHasChanges(true);
-  };
-
-  // === Handlers de auto-actualización ===
-
   const handleAutoUpdateToggle = async (enabled: boolean) => {
-    const orgId = user?.role === 'admin' ? selectedOrgId : user?.organization_id;
-    if (!orgId) return;
-
+    if (!editingOrgId) return;
     setTogglingAutoUpdate(true);
     try {
-      await apiClient.patch(`/organizations/${orgId}/auto-update`, { enabled });
+      await apiClient.patch(`/organizations/${editingOrgId}/auto-update`, { enabled });
       setAutoUpdateEnabled(enabled);
-    } catch {
-      // Revertir en caso de error
-    } finally {
-      setTogglingAutoUpdate(false);
-    }
+    } catch { /* revert silently */ }
+    finally { setTogglingAutoUpdate(false); }
   };
 
   const handleReregisterToggle = async (enabled: boolean) => {
-    const orgId = user?.role === 'admin' ? selectedOrgId : user?.organization_id;
-    if (!orgId) return;
-
+    if (!editingOrgId) return;
     setTogglingAutoUpdate(true);
     try {
-      await apiClient.put(`/organizations/${orgId}`, { auto_reregister_enabled: enabled });
+      await apiClient.put(`/organizations/${editingOrgId}`, { auto_reregister_enabled: enabled });
       setAutoReregisterEnabled(enabled);
-    } catch {
-      // Revertir en caso de error
-    } finally {
-      setTogglingAutoUpdate(false);
-    }
+    } catch { /* revert silently */ }
+    finally { setTogglingAutoUpdate(false); }
   };
 
   const handlePinVersion = async (version: string | null) => {
-    const orgId = user?.role === 'admin' ? selectedOrgId : user?.organization_id;
-    if (!orgId) return;
-
+    if (!editingOrgId) return;
     setTogglingAutoUpdate(true);
     try {
-      await apiClient.put(`/updates/pin/${orgId}`, { version });
+      await apiClient.put(`/updates/pin/${editingOrgId}`, { version });
       setTargetVersion(version);
-    } catch {
-      // Revertir en caso de error
-    } finally {
-      setTogglingAutoUpdate(false);
-    }
+    } catch { /* revert silently */ }
+    finally { setTogglingAutoUpdate(false); }
   };
 
-  const removeSearchIp = (index: number) => {
-    setSearchIps(searchIps.filter((_, i) => i !== index));
-    setHasChanges(true);
+  // Search targets helpers
+  const addSearchIp = () => { setSearchIps([...searchIps, '']); setHasChanges(true); };
+  const removeSearchIp = (index: number) => { setSearchIps(searchIps.filter((_, i) => i !== index)); setHasChanges(true); };
+  const updateSearchIp = (index: number, value: string) => { const n = [...searchIps]; n[index] = value; setSearchIps(n); setHasChanges(true); };
+  const addSearchRange = () => { setSearchRanges([...searchRanges, '']); setHasChanges(true); };
+  const removeSearchRange = (index: number) => { setSearchRanges(searchRanges.filter((_, i) => i !== index)); setHasChanges(true); };
+  const updateSearchRange = (index: number, value: string) => { const n = [...searchRanges]; n[index] = value; setSearchRanges(n); setHasChanges(true); };
+
+  const handleBackToList = () => {
+    setEditingOrgId(null);
+    setEditingOrgName('');
+    setConfig(null);
+    setHasChanges(false);
   };
 
-  const updateSearchIp = (index: number, value: string) => {
-    const newIps = [...searchIps];
-    newIps[index] = value;
-    setSearchIps(newIps);
-    setHasChanges(true);
-  };
+  // === FILTERED ACCOUNTS ===
+  const filteredAccounts = accounts.filter((acc) =>
+    acc.name.toLowerCase().includes(searchFilter.toLowerCase())
+  );
 
-  const addSearchRange = () => {
-    setSearchRanges([...searchRanges, '']);
-    setHasChanges(true);
-  };
-
-  const removeSearchRange = (index: number) => {
-    setSearchRanges(searchRanges.filter((_, i) => i !== index));
-    setHasChanges(true);
-  };
-
-  const updateSearchRange = (index: number, value: string) => {
-    const newRanges = [...searchRanges];
-    newRanges[index] = value;
-    setSearchRanges(newRanges);
-    setHasChanges(true);
-  };
-
-  if (loading || (user?.role === 'admin' && loadingAccounts)) {
+  // === LOADING STATE ===
+  if (loading || (user?.role === 'admin' && loadingAccounts && !editingOrgId)) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando configuración...</p>
+          <p className="mt-4 text-gray-600">{tCommon('loading')}</p>
         </div>
       </div>
     );
   }
 
+  // === ADMIN: CARDS VIEW (lista de organizaciones) ===
+  if (user?.role === 'admin' && !editingOrgId) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
+            <p className="mt-2 text-gray-600">{t('subtitle')}</p>
+          </div>
+        </div>
+
+        {/* Barra de búsqueda */}
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center gap-3">
+            <Search className="h-5 w-5 text-gray-400" />
+            <Input
+              type="text"
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              placeholder={t('searchOrgsPlaceholder')}
+              className="max-w-sm"
+            />
+            {searchFilter && (
+              <Button variant="ghost" size="sm" onClick={() => setSearchFilter('')}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Cards de organizaciones */}
+        {filteredAccounts.length === 0 ? (
+          <div className="bg-white rounded-lg shadow p-12 text-center">
+            <Building2 className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-4 text-lg font-medium text-gray-900">{t('noOrgsFound')}</h3>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredAccounts.map((acc) => {
+              const cfg = orgConfigs[acc.id];
+              return (
+                <div
+                  key={acc.id}
+                  className="bg-white rounded-lg shadow hover:shadow-md transition-shadow border border-gray-100"
+                >
+                  <div className="p-5">
+                    {/* Header de la card */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                          <Building2 className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900">{acc.name}</h3>
+                          <Badge variant={acc.is_active ? 'default' : 'secondary'} className="text-xs mt-0.5">
+                            {acc.is_active ? tCommon('active') : tCommon('inactive')}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Resumen de configuración */}
+                    {cfg ? (
+                      <div className="space-y-2 text-sm">
+                        {cfg.exists ? (
+                          <>
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <Printer className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span className="truncate">
+                                {t('cardQueue')}: <span className="font-medium text-gray-900">{cfg.corporate_queue_name || '—'}</span>
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <RefreshCw className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span>
+                                {t('cardPolling')}: <span className="font-medium text-gray-900">{cfg.pending_task_polling_minutes} min</span>
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <Wifi className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span>
+                                {t('cardChecks')}: <span className="font-medium text-gray-900">{cfg.connectivity_checks.length}</span>
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <Download className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span>
+                                {t('cardAutoUpdate')}: <Badge variant={acc.auto_update_enabled ? 'default' : 'secondary'} className="text-xs">
+                                  {acc.auto_update_enabled ? t('cardEnabled') : t('cardDisabled')}
+                                </Badge>
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <Cog className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span>
+                                {t('cardActions')}: <span className="font-medium text-gray-900">
+                                  {cfg.activeActionConfig || t('cardNoActions')}
+                                </span>
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-2 text-amber-600">
+                            <AlertCircle className="h-4 w-4" />
+                            <span>{t('cardNoConfig')}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="animate-pulse space-y-2">
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                      </div>
+                    )}
+
+                    {/* Botón editar */}
+                    <div className="mt-4 pt-3 border-t border-gray-100">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => {
+                          setEditingOrgId(acc.id);
+                          setEditingOrgName(acc.name);
+                        }}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        {t('cardEditConfig')}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // === EDITOR VIEW (admin editando una org, u operador con su org) ===
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
-        <p className="mt-2 text-gray-600">{t('subtitle')}</p>
-      </div>
-
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          <button
-            onClick={() => setActiveTab('organization')}
-            className={`
-              py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2
-              ${
-                activeTab === 'organization'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }
-            `}
-          >
-            <Building2 className="h-5 w-5" />
-            {t('tabOrg')}
-          </button>
-
+      {/* Header con botón volver (solo admin) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
           {user?.role === 'admin' && (
-            <button
-              onClick={() => setActiveTab('global')}
-              className={`
-                py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2
-                ${
-                  activeTab === 'global'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }
-              `}
-            >
-              <Globe className="h-5 w-5" />
-              {t('tabGlobal')}
-            </button>
+            <Button variant="ghost" size="sm" onClick={handleBackToList}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
           )}
-        </nav>
-      </div>
-
-      {/* Tab: Configuración por Organización */}
-      {activeTab === 'organization' && (
-        <div className="space-y-6">
-          {/* Header de la sección */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">{t('orgTitle')}</h2>
-              <p className="mt-1 text-sm text-gray-600">{t('orgDesc')}</p>
-            </div>
-            <div className="flex gap-2">
-              {hasChanges && (
-                <Button variant="outline" onClick={handleReset} disabled={saving}>
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  {t('discard')}
-                </Button>
-              )}
-              <Button
-                onClick={handleSave}
-                disabled={
-                  saving || !hasChanges || (user?.role === 'admin' && !selectedOrgId)
-                }
-              >
-                <Save className="mr-2 h-4 w-4" />
-                {saving ? t('saving') : t('save')}
-              </Button>
-            </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {editingOrgName ? t('editingOrg', { name: editingOrgName }) : t('orgTitle')}
+            </h1>
+            <p className="mt-1 text-sm text-gray-600">{t('orgDesc')}</p>
           </div>
-
-          {/* Selector de Organización (solo para Admin) */}
-          {user?.role === 'admin' && (
-            <div className="bg-white rounded-lg shadow p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t('selectOrg')}
-              </label>
-              <select
-                value={selectedOrgId}
-                onChange={(e) => {
-                  setSelectedOrgId(e.target.value);
-                  setHasChanges(false);
-                }}
-                className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">{t('selectOrg')}</option>
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-sm text-gray-500">{t('selectOrgHelper')}</p>
-            </div>
+        </div>
+        <div className="flex gap-2">
+          {hasChanges && (
+            <Button variant="outline" onClick={handleReset} disabled={saving}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              {t('discard')}
+            </Button>
           )}
+          <Button onClick={handleSave} disabled={saving || !hasChanges}>
+            <Save className="mr-2 h-4 w-4" />
+            {saving ? t('saving') : t('save')}
+          </Button>
+        </div>
+      </div>
 
+      {/* Loading del editor */}
+      {loading ? (
+        <div className="flex items-center justify-center h-48">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-3 text-gray-600">{tCommon('loading')}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
           {/* Alerta de jerarquía */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex">
@@ -536,200 +606,186 @@ export default function ConfigPage() {
             </div>
           </div>
 
-          {/* Formulario */}
+          {/* === TÓPICO 1: IMPRESIÓN === */}
           <div className="bg-white rounded-lg shadow">
-            <div className="p-6 space-y-6">
-              {/* Cola Corporativa */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('corpQueue')}
-                </label>
-                <Input
-                  type="text"
-                  value={corporateQueueName}
-                  onChange={(e) => {
-                    setCorporateQueueName(e.target.value);
-                    setHasChanges(true);
-                  }}
-                  placeholder={`Ej: ${queuePlaceholder}`}
-                  className="max-w-md"
-                  disabled={user?.role === 'admin' && !selectedOrgId}
-                />
-                <p className="mt-1 text-sm text-gray-500">{t('corpQueueHelper')}</p>
-              </div>
-
-              {/* Intervalo de Polling */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('pollingInterval')}
-                </label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="1440"
-                  value={pollingMinutes}
-                  onChange={(e) => {
-                    setPollingMinutes(parseInt(e.target.value) || 1);
-                    setHasChanges(true);
-                  }}
-                  className="max-w-xs"
-                  disabled={user?.role === 'admin' && !selectedOrgId}
-                />
-                <p className="mt-1 text-sm text-gray-500">{t('pollingHelper')}</p>
-              </div>
-
-              {/* Dominios de Bootstrap */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('bootstrapDomains')}
-                </label>
-                <Input
-                  type="text"
-                  value={bootstrapDomains}
-                  onChange={(e) => {
-                    setBootstrapDomains(e.target.value);
-                    setHasChanges(true);
-                  }}
-                  placeholder={`Ej: ${domainPlaceholder}`}
-                  className="max-w-md"
-                  disabled={user?.role === 'admin' && !selectedOrgId}
-                />
-              </div>
-
-              {/* Objetivos de Búsqueda - IPs */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('printerIps')}
-                </label>
-                <div className="space-y-2">
-                  {searchIps.map((ip, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        type="text"
-                        value={ip}
-                        onChange={(e) => updateSearchIp(index, e.target.value)}
-                        placeholder="Ej: 192.168.1.100"
-                        className="max-w-md"
-                        disabled={user?.role === 'admin' && !selectedOrgId}
-                      />
-                      {searchIps.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeSearchIp(index)}
-                          disabled={user?.role === 'admin' && !selectedOrgId}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <Printer className="h-5 w-5 text-purple-600" />
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addSearchIp}
-                  className="mt-2"
-                  disabled={user?.role === 'admin' && !selectedOrgId}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t('addIp')}
-                </Button>
-                <p className="mt-1 text-sm text-gray-500">{t('printerIpsHelper')}</p>
-              </div>
-
-              {/* Objetivos de Búsqueda - Rangos */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('printerRanges')}
-                </label>
-                <div className="space-y-2">
-                  {searchRanges.map((range, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        type="text"
-                        value={range}
-                        onChange={(e) => updateSearchRange(index, e.target.value)}
-                        placeholder="Ej: 192.168.1.0/24"
-                        className="max-w-md"
-                        disabled={user?.role === 'admin' && !selectedOrgId}
-                      />
-                      {searchRanges.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeSearchRange(index)}
-                          disabled={user?.role === 'admin' && !selectedOrgId}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">{t('topicPrinting')}</h2>
+                  <p className="text-sm text-gray-500">{t('topicPrintingDesc')}</p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addSearchRange}
-                  className="mt-2"
-                  disabled={user?.role === 'admin' && !selectedOrgId}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t('addRange')}
-                </Button>
-                <p className="mt-1 text-sm text-gray-500">{t('printerRangesHelper')}</p>
               </div>
 
-              {/* Checks de Conectividad */}
-              <div>
-                <ConnectivityCheckEditor
-                  checks={connectivityChecks}
-                  onChange={(checks) => {
-                    setConnectivityChecks(checks);
-                    setHasChanges(true);
-                  }}
-                />
-              </div>
+              <div className="space-y-5">
+                {/* Cola Corporativa */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t('corpQueue')}
+                  </label>
+                  <Input
+                    type="text"
+                    value={corporateQueueName}
+                    onChange={(e) => { setCorporateQueueName(e.target.value); setHasChanges(true); }}
+                    placeholder={t('corpQueuePlaceholder')}
+                    className="max-w-md"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">{t('corpQueueHelper')}</p>
+                </div>
 
-              {/* Selector de Locale */}
-              <div>
+                {/* Intervalo de Polling */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t('pollingInterval')}
+                  </label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="1440"
+                    value={pollingMinutes}
+                    onChange={(e) => { setPollingMinutes(parseInt(e.target.value) || 1); setHasChanges(true); }}
+                    className="max-w-xs"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">{t('pollingHelper')}</p>
+                </div>
+
+                {/* Locale */}
                 <LocaleSelector
                   value={locale}
-                  onChange={(value) => {
-                    setLocale(value);
-                    setHasChanges(true);
-                  }}
+                  onChange={(value) => { setLocale(value); setHasChanges(true); }}
                 />
               </div>
             </div>
           </div>
 
-          {/* Advertencia si no hay configuración */}
-          {!config && selectedOrgId && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex">
-                <AlertCircle className="h-5 w-5 text-yellow-600 mr-3 flex-shrink-0 mt-0.5" />
+          {/* === TÓPICO 2: RED Y DESCUBRIMIENTO === */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-lg bg-green-100 flex items-center justify-center">
+                  <Network className="h-5 w-5 text-green-600" />
+                </div>
                 <div>
-                  <h3 className="text-sm font-medium text-yellow-900">{t('noConfigTitle')}</h3>
-                  <p className="mt-1 text-sm text-yellow-700">{t('noConfigMsg')}</p>
+                  <h2 className="text-lg font-semibold text-gray-900">{t('topicNetwork')}</h2>
+                  <p className="text-sm text-gray-500">{t('topicNetworkDesc')}</p>
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                {/* Dominios de Bootstrap */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t('bootstrapDomains')}
+                  </label>
+                  <Input
+                    type="text"
+                    value={bootstrapDomains}
+                    onChange={(e) => { setBootstrapDomains(e.target.value); setHasChanges(true); }}
+                    placeholder={t('bootstrapPlaceholder')}
+                    className="max-w-md"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">{t('bootstrapHelper')}</p>
+                </div>
+
+                {/* IPs de Búsqueda */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t('printerIps')}
+                  </label>
+                  <div className="space-y-2">
+                    {searchIps.map((ip, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          type="text"
+                          value={ip}
+                          onChange={(e) => updateSearchIp(index, e.target.value)}
+                          placeholder="192.168.1.100"
+                          className="max-w-md"
+                        />
+                        {searchIps.length > 1 && (
+                          <Button type="button" variant="outline" size="sm" onClick={() => removeSearchIp(index)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={addSearchIp} className="mt-2">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('addIp')}
+                  </Button>
+                  <p className="mt-1 text-sm text-gray-500">{t('printerIpsHelper')}</p>
+                </div>
+
+                {/* Rangos de Búsqueda */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t('printerRanges')}
+                  </label>
+                  <div className="space-y-2">
+                    {searchRanges.map((range, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          type="text"
+                          value={range}
+                          onChange={(e) => updateSearchRange(index, e.target.value)}
+                          placeholder="192.168.1.0/24"
+                          className="max-w-md"
+                        />
+                        {searchRanges.length > 1 && (
+                          <Button type="button" variant="outline" size="sm" onClick={() => removeSearchRange(index)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={addSearchRange} className="mt-2">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('addRange')}
+                  </Button>
+                  <p className="mt-1 text-sm text-gray-500">{t('printerRangesHelper')}</p>
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* Sección de Actualizaciones y Re-registro por Organización */}
-          {(selectedOrgId || user?.role !== 'admin') && (
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6 space-y-5">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{t('updatesTitle')}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{t('updatesDesc')}</p>
+          {/* === TÓPICO 3: CONECTIVIDAD === */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-lg bg-orange-100 flex items-center justify-center">
+                  <Wifi className="h-5 w-5 text-orange-600" />
                 </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">{t('topicConnectivity')}</h2>
+                  <p className="text-sm text-gray-500">{t('topicConnectivityDesc')}</p>
+                </div>
+              </div>
 
+              <ConnectivityCheckEditor
+                checks={connectivityChecks}
+                onChange={(checks) => { setConnectivityChecks(checks); setHasChanges(true); }}
+              />
+            </div>
+          </div>
+
+          {/* === TÓPICO 4: ACTUALIZACIONES Y RE-REGISTRO === */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <Download className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">{t('updatesTitle')}</h2>
+                  <p className="text-sm text-gray-500">{t('updatesDesc')}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
                 {/* Toggle de auto-actualización */}
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
@@ -764,7 +820,7 @@ export default function ConfigPage() {
                   </div>
                 </div>
 
-                {/* Explicación contextual */}
+                {/* Nota contextual */}
                 {autoUpdateEnabled && targetVersion && (
                   <p className="text-xs text-amber-600 px-4">{t('pinnedVersionNote', { version: targetVersion })}</p>
                 )}
@@ -788,22 +844,27 @@ export default function ConfigPage() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* === TÓPICO 5: ACCIONES ADMINISTRATIVAS === */}
+          {editingOrgId && (
+            <ActionConfigSection organizationId={editingOrgId} />
           )}
 
-          {/* Mensaje cuando Admin no ha seleccionado organización */}
-          {user?.role === 'admin' && !selectedOrgId && !loadingAccounts && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          {/* Advertencia si no hay configuración */}
+          {!config && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <div className="flex">
-                <Info className="h-5 w-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="h-5 w-5 text-yellow-600 mr-3 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="text-sm font-medium text-blue-900">{t('selectOrgTitle')}</h3>
-                  <p className="mt-1 text-sm text-blue-700">{t('selectOrgMsg')}</p>
+                  <h3 className="text-sm font-medium text-yellow-900">{t('noConfigTitle')}</h3>
+                  <p className="mt-1 text-sm text-yellow-700">{t('noConfigMsg')}</p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Información adicional — Estado */}
+          {/* Estado de la configuración */}
           {config && (
             <div className="bg-gray-50 rounded-lg p-4">
               <h3 className="text-sm font-medium text-gray-900 mb-2">{tCommon('status')}</h3>
@@ -823,49 +884,6 @@ export default function ConfigPage() {
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Tab: Configuración Global del Sistema */}
-      {activeTab === 'global' && user?.role === 'admin' && (
-        <div className="space-y-6">
-          {/* Header de la sección */}
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">{t('systemConfigTitle')}</h2>
-            <p className="mt-1 text-sm text-gray-600">{t('systemConfigMsg')}</p>
-          </div>
-
-          {/* Alerta informativa */}
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-            <div className="flex">
-              <Info className="h-5 w-5 text-purple-600 mr-3 flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="text-sm font-medium text-purple-900">
-                  {t('systemConfigTitle')}
-                </h3>
-                <p className="mt-1 text-sm text-purple-700">{t('systemConfigMsg')}</p>
-                <div className="mt-2 text-xs text-purple-600 font-mono">
-                  {t('systemHierarchy')}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Contenido del tab global */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-center py-12">
-              <Globe className="mx-auto h-16 w-16 text-gray-400" />
-              <h3 className="mt-4 text-lg font-medium text-gray-900">
-                Configuración Global del Sistema
-              </h3>
-              <p className="mt-2 text-sm text-gray-500 max-w-md mx-auto">
-                Esta sección permite configurar parámetros que se aplican a todas las
-                organizaciones. Actualmente, la configuración se gestiona a nivel de
-                organización.
-              </p>
-              <p className="mt-4 text-xs text-gray-400">{t('comingSoon')}</p>
-            </div>
-          </div>
         </div>
       )}
     </div>

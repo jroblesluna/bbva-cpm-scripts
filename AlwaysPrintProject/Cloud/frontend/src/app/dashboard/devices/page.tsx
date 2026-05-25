@@ -487,7 +487,12 @@ function CreateDeviceModal({ onClose, onSuccess }: { onClose: () => void; onSucc
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('createTitle')}</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">{t('createTitle')}</h2>
+            <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             {isAdmin() && (
               <div>
@@ -674,7 +679,12 @@ function EditDeviceModal({ device, onClose, onSuccess }: { device: Device; onClo
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('editTitle')}</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">{t('editTitle')}</h2>
+            <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('vlanLabel')}</label>
@@ -809,7 +819,12 @@ function DeleteDeviceModal({ device, onClose, onSuccess }: { device: Device; onC
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
         <div className="p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">{t('deleteTitle')}</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900">{t('deleteTitle')}</h2>
+            <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
           <p className="text-gray-600 mb-6">{t('deleteConfirm', { name: device.name })}</p>
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={onClose} disabled={loading}>{tCommon('cancel')}</Button>

@@ -24,6 +24,7 @@ import {
   ChevronLeft,
   XCircle,
   Monitor,
+  X,
 } from 'lucide-react'
 import type { Message, MessageCreate, MessageStats, TargetType, DeliveryMode, MessageDelivery } from '@/types/message'
 import type { Workstation } from '@/types/workstation'
@@ -493,7 +494,12 @@ function SendMessageModal({ onClose, onSuccess }: { onClose: () => void; onSucce
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('sendTitle')}</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">{t('sendTitle')}</h2>
+            <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Selector de cuenta para admin */}
             {user?.role === 'admin' && (

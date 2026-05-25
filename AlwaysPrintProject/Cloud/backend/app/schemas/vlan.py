@@ -40,6 +40,7 @@ class VLANUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=1000)
     cidr_ranges: Optional[list[str]] = Field(None, min_length=1)
+    action_config_mandatory: Optional[bool] = Field(None, description="Si la action config de VLAN es obligatoria para sus workstations")
     
     @field_validator("cidr_ranges")
     @classmethod
@@ -66,6 +67,7 @@ class VLANResponse(BaseModel):
     cidr_ranges: list[str]
     forced_contingency: bool = False
     default_device_id: Optional[UUID] = None
+    action_config_mandatory: bool = False
     created_at: datetime
     updated_at: datetime
     

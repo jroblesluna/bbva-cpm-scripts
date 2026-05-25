@@ -234,7 +234,9 @@
     "selectDefaultDevice": "-- Seleccionar impresora --",
     "defaultDeviceUpdated": "Impresora predeterminada actualizada.",
     "defaultDeviceRemoved": "Impresora predeterminada removida.",
-    "defaultDeviceNoDevices": "No hay dispositivos activos en esta VLAN"
+    "defaultDeviceNoDevices": "No hay dispositivos activos en esta VLAN",
+    "actionConfigTitle": "Acciones Administrativas",
+    "actionConfigDesc": "Configuración de acciones específica para esta VLAN"
   },
   "messages": {
     "title": "Mensajes",
@@ -321,7 +323,33 @@
     "latestVersionNote": "Las workstations se actualizarán automáticamente a la versión latest.",
     "autoReregisterLabel": "Re-registro Automático",
     "autoReregisterEnabledDesc": "Las workstations eliminadas se re-registrarán al enviar telemetría",
-    "autoReregisterDisabledDesc": "Las workstations eliminadas no se re-registrarán automáticamente"
+    "autoReregisterDisabledDesc": "Las workstations eliminadas no se re-registrarán automáticamente",
+    "searchOrgsPlaceholder": "Buscar organización por nombre...",
+    "noOrgsFound": "No se encontraron organizaciones",
+    "cardQueue": "Cola",
+    "cardPolling": "Polling",
+    "cardChecks": "Checks",
+    "cardAutoUpdate": "Auto-update",
+    "cardEnabled": "Activo",
+    "cardDisabled": "Inactivo",
+    "cardNoConfig": "Sin configuración definida",
+    "cardEditConfig": "Editar Configuración",
+    "cardActions": "Acciones",
+    "cardNoActions": "Sin configurar",
+    "editingOrg": "Configuración: {name}",
+    "topicPrinting": "Impresión",
+    "topicPrintingDesc": "Cola corporativa, intervalo de polling e idioma del cliente",
+    "topicNetwork": "Red y Descubrimiento",
+    "topicNetworkDesc": "Dominios de bootstrap y búsqueda de impresoras en la red",
+    "topicConnectivity": "Conectividad",
+    "topicConnectivityDesc": "Endpoints que las workstations deben monitorear",
+    "corpQueuePlaceholder": "Ej: LexmarkBBVA",
+    "bootstrapPlaceholder": "Ej: apps.iol.pe,robles.ai",
+    "bootstrapHelper": "Dominios separados por comas que el cliente usa para descubrir el servidor",
+    "validationQueueRequired": "El nombre de la cola corporativa es requerido",
+    "validationPollingRange": "El intervalo de polling debe estar entre 1 y 1440 minutos",
+    "saveSuccess": "Configuración guardada exitosamente",
+    "saveError": "Error al guardar configuración"
   },
   "audit": {
     "title": "Auditoría",
@@ -522,7 +550,12 @@
     "allConfigsDesc": "Historial de configuraciones subidas",
     "noConfigs": "No hay configuraciones",
     "uploadFirst": "Subir Primera Configuración",
-    "download": "Descargar"
+    "download": "Descargar",
+    "mandatoryLabel": "Configuración obligatoria",
+    "mandatoryEnabledDescOrg": "Esta configuración se impone a todas las VLANs y estaciones de la organización, sin importar que tengan su propia configuración subida",
+    "mandatoryDisabledDescOrg": "Las VLANs y estaciones pueden usar su propia configuración si tienen una subida",
+    "mandatoryEnabledDescVlan": "Esta configuración se impone a todas las estaciones de esta VLAN, sin importar que tengan su propia configuración subida",
+    "mandatoryDisabledDescVlan": "Esta configuración solo se aplica si la organización no tiene su configuración marcada como obligatoria"
   },
   "telemetry": {
     "title": "Telemetría",
