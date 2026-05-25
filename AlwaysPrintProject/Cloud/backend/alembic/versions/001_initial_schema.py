@@ -154,6 +154,8 @@ def upgrade() -> None:
         sa.Column('contingency_started_at', sa.DateTime(), nullable=True),
         # Columna de migración 005: forced_contingency a nivel workstation
         sa.Column('forced_contingency', sa.Boolean(), nullable=False, server_default='false'),
+        # Columna de migración 008: action_config_mandatory a nivel workstation
+        sa.Column('action_config_mandatory', sa.Boolean(), nullable=False, server_default='false'),
         # Columna de migración 004: default_printer_id (FK a devices)
         sa.Column('default_printer_id', postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column('last_connection', sa.DateTime(), nullable=True),
