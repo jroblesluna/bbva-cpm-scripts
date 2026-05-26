@@ -612,6 +612,7 @@ def list_workstations(
         base_query
         .options(joinedload(Workstation.organization))
         .options(joinedload(Workstation.vlan))
+        .order_by(Workstation.ip_private.asc())
         .offset(offset)
         .limit(page_size)
         .all()
