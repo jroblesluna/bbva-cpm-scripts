@@ -2,11 +2,11 @@
 Servicio para gestión de configuraciones de acciones administrativas.
 
 Soporta herencia jerárquica: Organización → VLAN → Workstation.
-Resolución:
-1. Si org.action_config_mandatory → usar config activa de org
-2. Si workstation tiene config activa propia y VLAN no es mandatory → usar workstation
-3. Si VLAN tiene config activa y VLAN.action_config_mandatory → usar VLAN
-4. Si VLAN tiene config activa → usar VLAN
+Resolución (de abajo hacia arriba, con mandatory de arriba anulando):
+1. Si org.action_config_mandatory → usar config activa de org (nadie sobreescribe)
+2. Si VLAN.action_config_mandatory y tiene config → usar VLAN (ignora workstation)
+3. Si workstation tiene config activa propia → usar workstation
+4. Si VLAN tiene config activa (no mandatory) → usar VLAN
 5. Fallback: usar config activa de org (default)
 """
 
@@ -75,9 +75,10 @@ class ActionConfigService:
         
         Orden de resolución:
         1. Si org.action_config_mandatory → config activa de org
-        2. Si workstation tiene config propia y VLAN no es mandatory → workstation
-        3. Si VLAN tiene config activa → VLAN (si mandatory, ignora workstation)
-        4. Fallback: config activa de org
+        2. Si VLAN es mandatory y tiene config → VLAN (ignora workstation)
+        3. Si workstation tiene config propia → workstation
+        4. Si VLAN tiene config (no mandatory) → VLAN
+        5. Fallback: config activa de org
         
         Args:
             db: Sesión de base de datos
@@ -114,14 +115,13 @@ class ActionConfigService:
         if vlan and vlan.action_config_mandatory and vlan_config:
             return vlan_config
         
-        # 4. Si VLAN NO es mandatory y workstation tiene mandatory habilitado → usar config de workstation
-        if not (vlan and vlan.action_config_mandatory):
-            if workstation.action_config_mandatory:
-                ws_config = ActionConfigService.get_active_config(
-                    db, org.id, scope="workstation", workstation_id=workstation.id
-                )
-                if ws_config:
-                    return ws_config
+        # 4. Workstation tiene config propia → usar workstation
+        # (solo se llega aquí si ni org ni VLAN son mandatory)
+        ws_config = ActionConfigService.get_active_config(
+            db, org.id, scope="workstation", workstation_id=workstation.id
+        )
+        if ws_config:
+            return ws_config
         
         # 5. Si VLAN tiene config (no mandatory) → usar VLAN
         if vlan_config:
