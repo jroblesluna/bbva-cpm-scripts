@@ -264,6 +264,9 @@ namespace AlwaysPrintService.Actions
                 case ActionTypes.RunProcess:
                     return ExecuteRunProcess(action);
                 
+                case ActionTypes.CheckPrintQueueExists:
+                    return ExecuteCheckPrintQueueExists(action);
+                
                 default:
                     AlwaysPrintLogger.WriteWarning($"ActionEngine: tipo de acción desconocido: {action.Type}");
                     return false;
@@ -709,6 +712,53 @@ namespace AlwaysPrintService.Actions
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteError($"ActionEngine: error evaluando condición: {ex.Message}", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Verifica si una cola de impresión existe en el sistema.
+        /// Almacena "true" o "false" en la variable indicada por store_result_in.
+        /// Parámetros: queue_name (string, soporta templates).
+        /// </summary>
+        private bool ExecuteCheckPrintQueueExists(ActionConfig action)
+        {
+            try
+            {
+                string queueName = GetParameter<string>(action, "queue_name") ?? "";
+                queueName = ReplaceTemplates(queueName);
+
+                if (string.IsNullOrEmpty(queueName))
+                {
+                    AlwaysPrintLogger.WriteWarning("CheckPrintQueueExists: queue_name vacío");
+                    return false;
+                }
+
+                AlwaysPrintLogger.WriteInfo($"CheckPrintQueueExists: verificando si existe cola '{queueName}'");
+
+                // Consultar registro de impresoras del Spooler
+                bool exists = false;
+                string regPath = $@"SYSTEM\CurrentControlSet\Control\Print\Printers\{queueName}";
+                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(regPath, writable: false))
+                {
+                    exists = key != null;
+                }
+
+                AlwaysPrintLogger.WriteInfo($"CheckPrintQueueExists: cola '{queueName}' existe = {exists}");
+
+                // Almacenar resultado en variable si se especificó store_result_in
+                if (!string.IsNullOrEmpty(action.StoreResultIn))
+                {
+                    _variables[action.StoreResultIn] = exists.ToString().ToLower();
+                    AlwaysPrintLogger.WriteInfo(
+                        $"CheckPrintQueueExists: resultado almacenado en '{action.StoreResultIn}' = {exists.ToString().ToLower()}");
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"CheckPrintQueueExists: error: {ex.Message}", ex);
                 return false;
             }
         }

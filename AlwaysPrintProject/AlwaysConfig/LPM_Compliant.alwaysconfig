@@ -1,5 +1,5 @@
 {
-  "version": "5.3",
+  "version": "5.4",
   "name": "LPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Print Management (modo Print Server). Gestiona contingencia creando/eliminando cola local con puerto TCP híbrido. Persiste estado en registro para sobrevivir reinicios.",
   "created_at": "2026-06-01T12:00:00Z",
@@ -45,7 +45,7 @@
     },
     {
       "event": "OnContingencyActivated",
-      "description": "Activar contingencia: desconectar cola remota, crear cola local con puerto TCP apuntando a IP de contingencia, persistir estado",
+      "description": "Activar contingencia: desconectar cola remota, crear cola local (si no existe) con puerto TCP apuntando a IP de contingencia, persistir estado",
       "actions": [
         {
           "type": "RunProcess",
@@ -68,14 +68,35 @@
           }
         },
         {
-          "type": "RunProcess",
-          "description": "Crear cola local con puerto LPMCHybridPort y driver Lexmark Universal v2 XL",
+          "type": "CheckPrintQueueExists",
+          "description": "Verificar si la cola corporativa ya existe",
           "parameters": {
-            "file_path": "C:\\Windows\\System32\\rundll32.exe",
-            "arguments": "printui.dll,PrintUIEntry /q /if /b \"{{corporate_queue_name}}\" /r \"LPMCHybridPort\" /m \"Lexmark Universal v2 XL\" /z",
-            "timeout_seconds": 60,
-            "window_style": "Hidden",
-            "run_as_logged_in_user": false
+            "queue_name": "{{corporate_queue_name}}"
+          },
+          "store_result_in": "queue_exists"
+        },
+        {
+          "type": "Conditional",
+          "description": "Crear cola local solo si no existe",
+          "parameters": {
+            "condition": {
+              "variable": "queue_exists",
+              "operator": "equals",
+              "value": "false"
+            },
+            "actions": [
+              {
+                "type": "RunProcess",
+                "description": "Crear cola local con puerto LPMCHybridPort y driver Lexmark Universal v2 XL",
+                "parameters": {
+                  "file_path": "C:\\Windows\\System32\\rundll32.exe",
+                  "arguments": "printui.dll,PrintUIEntry /q /if /b \"{{corporate_queue_name}}\" /r \"LPMCHybridPort\" /m \"Lexmark Universal v2 XL\" /z",
+                  "timeout_seconds": 60,
+                  "window_style": "Hidden",
+                  "run_as_logged_in_user": false
+                }
+              }
+            ]
           }
         },
         {
