@@ -41,6 +41,7 @@ interface NavItem {
   href: string
   icon: React.ComponentType<{ className?: string }>
   adminOnly?: boolean
+  subLabel?: string // Sub-encabezado dentro del grupo
 }
 
 // Definición de grupos de navegación
@@ -66,36 +67,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       ],
     },
     {
-      labelKey: 'groupOperations',
-      items: [
-        { key: 'workstations', href: '/dashboard/workstations', icon: Monitor },
-        { key: 'telemetry', href: '/dashboard/telemetry', icon: Activity },
-        { key: 'connectivity', href: '/dashboard/connectivity', icon: Wifi },
-      ],
-    },
-    {
       labelKey: 'groupAdmin',
       adminOnly: true,
       items: [
-        { key: 'accounts', href: '/dashboard/admin/organizations', icon: Building2, adminOnly: true },
-        { key: 'users', href: '/dashboard/admin/users', icon: Users, adminOnly: true },
-        { key: 'pendingIps', href: '/dashboard/admin/pending-ips', icon: Globe, adminOnly: true },
-        { key: 'updates', href: '/dashboard/admin/updates', icon: Download, adminOnly: true },
+        { key: 'accounts', href: '/dashboard/admin/organizations', icon: Building2, adminOnly: true, subLabel: 'subInfrastructure' },
+        { key: 'vlans', href: '/dashboard/vlans', icon: Network, subLabel: 'subInfrastructure' },
+        { key: 'workstations', href: '/dashboard/workstations', icon: Monitor, subLabel: 'subInfrastructure' },
+        { key: 'pendingIps', href: '/dashboard/admin/pending-ips', icon: Globe, adminOnly: true, subLabel: 'subRequests' },
+        { key: 'devices', href: '/dashboard/devices', icon: Printer, subLabel: 'subResources' },
       ],
     },
     {
-      labelKey: 'groupInfrastructure',
+      labelKey: 'groupMonitoring',
       items: [
-        { key: 'vlans', href: '/dashboard/vlans', icon: Network },
-        { key: 'devices', href: '/dashboard/devices', icon: Printer },
-        { key: 'config', href: '/dashboard/config', icon: Settings },
-      ],
-    },
-    {
-      labelKey: 'groupCommunication',
-      items: [
-        { key: 'messages', href: '/dashboard/messages', icon: MessageSquare },
+        { key: 'telemetry', href: '/dashboard/telemetry', icon: Activity },
+        { key: 'connectivity', href: '/dashboard/connectivity', icon: Wifi },
         { key: 'audit', href: '/dashboard/audit', icon: FileText },
+        { key: 'messages', href: '/dashboard/messages', icon: MessageSquare },
+      ],
+    },
+    {
+      labelKey: 'groupSystem',
+      adminOnly: true,
+      items: [
+        { key: 'users', href: '/dashboard/admin/users', icon: Users, adminOnly: true },
+        { key: 'updates', href: '/dashboard/admin/updates', icon: Download, adminOnly: true },
+        { key: 'config', href: '/dashboard/config', icon: Settings },
       ],
     },
   ]
@@ -109,12 +106,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }))
     .filter((group) => group.items.length > 0)
 
-  // Estado de expansión de grupos (solo Operaciones y Administración expandidos por defecto)
+  // Estado de expansión de grupos (Administración y Sistema expandidos por defecto)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {}
     navGroups.forEach((group) => {
       if (group.labelKey) {
-        initial[group.labelKey] = group.labelKey === 'groupOperations' || group.labelKey === 'groupAdmin'
+        initial[group.labelKey] = group.labelKey === 'groupAdmin' || group.labelKey === 'groupSystem'
       }
     })
     return initial
@@ -220,22 +217,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             {isExpanded && (
               <div className="mt-0.5 ml-1">
-                {group.items.map((item) => {
+                {group.items.map((item, itemIdx) => {
                   const isActive = pathname === item.href
+                  // Mostrar sub-encabezado si el item tiene subLabel y es el primero con ese subLabel
+                  const showSubLabel = item.subLabel && (itemIdx === 0 || group.items[itemIdx - 1]?.subLabel !== item.subLabel)
                   return (
-                    <Link
-                      key={item.key}
-                      href={item.href}
-                      onClick={onItemClick}
-                      className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                        isActive
-                          ? 'bg-blue-50 text-blue-600'
-                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                      }`}
-                    >
-                      <item.icon className="mr-3 h-5 w-5" />
-                      {t(item.key as any)}
-                    </Link>
+                    <div key={item.key}>
+                      {showSubLabel && (
+                        <p className="px-3 pt-2 pb-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                          {t(item.subLabel as any)}
+                        </p>
+                      )}
+                      <Link
+                        href={item.href}
+                        onClick={onItemClick}
+                        className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${item.subLabel ? 'ml-2 ' : ''}${
+                          isActive
+                            ? 'bg-blue-50 text-blue-600'
+                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                        }`}
+                      >
+                        <item.icon className="mr-3 h-5 w-5" />
+                        {t(item.key as any)}
+                      </Link>
+                    </div>
                   )
                 })}
               </div>

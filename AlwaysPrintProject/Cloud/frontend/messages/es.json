@@ -51,10 +51,12 @@
     "loading": "Cargando...",
     "admin": "Administrador",
     "operator": "Operador",
-    "groupOperations": "Operaciones",
-    "groupInfrastructure": "Infraestructura",
-    "groupCommunication": "Comunicación",
-    "groupAdmin": "Administración"
+    "groupAdmin": "Administración",
+    "subRequests": "Solicitudes",
+    "subInfrastructure": "Infraestructura",
+    "subResources": "Recursos",
+    "groupMonitoring": "Monitoreo / Operaciones",
+    "groupSystem": "Sistema"
   },
   "login": {
     "title": "AlwaysPrint Cloud Manager",
