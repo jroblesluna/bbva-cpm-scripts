@@ -679,6 +679,11 @@ export default function VLANsPage() {
           devices={vlanDevices}
           onClose={() => { setShowDevicesModal(false); setVlanDevices([]); setDevicesVlan(null) }}
           onSetDefault={(deviceId) => handleSetDefaultDevice(devicesVlan, deviceId)}
+          onAddDevice={() => {
+            setShowDevicesModal(false)
+            setAddDeviceVlan(devicesVlan)
+            setShowAddDeviceModal(true)
+          }}
         />
       )}
       {showAddDeviceModal && addDeviceVlan && (
@@ -686,10 +691,12 @@ export default function VLANsPage() {
           vlan={addDeviceVlan}
           orgName={accounts.find((a) => a.id === addDeviceVlan.organization_id)?.name || ''}
           onClose={() => { setShowAddDeviceModal(false); setAddDeviceVlan(null) }}
-          onSuccess={() => {
+          onSuccess={async () => {
             setShowAddDeviceModal(false)
+            const vlan = addDeviceVlan
             setAddDeviceVlan(null)
-            loadActiveDeviceCounts(vlans)
+            await loadActiveDeviceCounts(vlans)
+            await handleViewDevices(vlan)
           }}
         />
       )}
@@ -1027,7 +1034,7 @@ function DeleteVLANModal({ vlan, onClose, onSuccess }: { vlan: VLAN; onClose: ()
 // Modal: Dispositivos de VLAN
 // ============================================================================
 
-function VLANDevicesModal({ vlan, devices, onClose, onSetDefault }: { vlan: VLAN; devices: Device[]; onClose: () => void; onSetDefault: (deviceId: string | null) => void }) {
+function VLANDevicesModal({ vlan, devices, onClose, onSetDefault, onAddDevice }: { vlan: VLAN; devices: Device[]; onClose: () => void; onSetDefault: (deviceId: string | null) => void; onAddDevice: () => void }) {
   const t = useTranslations('vlans')
   const tCommon = useTranslations('common')
   const tDevices = useTranslations('devices')
@@ -1040,9 +1047,21 @@ function VLANDevicesModal({ vlan, devices, onClose, onSetDefault }: { vlan: VLAN
             <h2 className="text-xl font-bold text-gray-900">
               {t('devicesInVlan')} — {vlan.name}
             </h2>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="h-5 w-5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onAddDevice}
+                title={t('addDevice')}
+                className="h-8 gap-1 text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
+              >
+                <Plus className="h-4 w-4" />
+                {tDevices('createTitle')}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
           {devices.length === 0 ? (
             <div className="text-center py-8">
