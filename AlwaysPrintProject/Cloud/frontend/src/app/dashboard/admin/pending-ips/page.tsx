@@ -30,6 +30,7 @@ import {
   X,
   Monitor,
   User,
+  Info,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
@@ -62,6 +63,7 @@ export default function PendingIPsPage() {
   const [customDescription, setCustomDescription] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [page, setPage] = useState(1);
+  const [infoBanner, setInfoBanner] = useState<string | null>(null);
   const pageSize = 10;
 
   // Query para IPs pendientes
@@ -111,6 +113,17 @@ export default function PendingIPsPage() {
       setAuthorizingIP(null);
       setSelectedOrgId('');
       setCustomDescription('');
+    },
+    onError: (error: unknown) => {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '';
+      if (detail.includes('ya está autorizada')) {
+        // Otro admin ya la autorizó: refrescar lista y cerrar modal
+        queryClient.invalidateQueries({ queryKey: ['pending-ips'] });
+        setAuthorizingIP(null);
+        setSelectedOrgId('');
+        setCustomDescription('');
+        setInfoBanner(`La IP ${authorizingIP?.ip_address} ya había sido autorizada por otro administrador. La lista fue actualizada.`);
+      }
     },
   });
 
@@ -255,6 +268,19 @@ export default function PendingIPsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Banner: IP ya autorizada por otro admin */}
+      {infoBanner && (
+        <Alert className="mb-4 border-amber-300 bg-amber-50 text-amber-800">
+          <Info className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>{infoBanner}</span>
+            <Button variant="ghost" size="sm" onClick={() => setInfoBanner(null)} className="h-6 w-6 p-0 ml-3 text-amber-600 hover:text-amber-800 hover:bg-amber-100">
+              <X className="h-4 w-4" />
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Búsqueda */}
       <Card className="mb-6">
@@ -421,7 +447,7 @@ export default function PendingIPsPage() {
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    {(authorizeMutation.error as any)?.response?.data?.detail ||
+                    {(authorizeMutation.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
                       'Error al autorizar IP'}
                   </AlertDescription>
                 </Alert>
