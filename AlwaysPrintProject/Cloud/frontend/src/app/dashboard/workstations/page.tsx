@@ -6,6 +6,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { workstationsApi, organizationsApi, vlansApi, devicesApi } from '@/lib/api';
 import { useTranslations } from 'next-intl';
@@ -58,6 +59,7 @@ type SortDirection = 'asc' | 'desc';
 
 export default function WorkstationsPage() {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
   const userTimezone = useUserTimezone();
   const t = useTranslations('workstations');
   const tCommon = useTranslations('common');
@@ -65,8 +67,8 @@ export default function WorkstationsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOnline, setFilterOnline] = useState<boolean | undefined>(undefined);
   const [filterContingency, setFilterContingency] = useState<boolean | undefined>(undefined);
-  const [filterOrgId, setFilterOrgId] = useState<string | undefined>(undefined);
-  const [filterVlanId, setFilterVlanId] = useState<string | undefined>(undefined);
+  const [filterOrgId, setFilterOrgId] = useState<string | undefined>(() => searchParams.get('org_id') || undefined);
+  const [filterVlanId, setFilterVlanId] = useState<string | undefined>(() => searchParams.get('vlan_id') || undefined);
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
   const [editingWorkstation, setEditingWorkstation] = useState<Workstation | null>(null);
   const [contingencyTarget, setContingencyTarget] = useState<Workstation | null>(null);
@@ -333,7 +335,7 @@ export default function WorkstationsPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-screen-2xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
         <div className="animate-pulse space-y-4">
           {[1, 2, 3].map((i) => (
@@ -346,7 +348,7 @@ export default function WorkstationsPage() {
 
   if (error) {
     return (
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-screen-2xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -357,7 +359,7 @@ export default function WorkstationsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="max-w-screen-2xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>

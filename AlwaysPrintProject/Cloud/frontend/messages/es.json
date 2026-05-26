@@ -221,6 +221,7 @@
     "devicesInVlan": "Dispositivos en esta VLAN",
     "noDevices": "No hay dispositivos asignados a esta VLAN",
     "viewDevices": "Ver Dispositivos",
+    "viewWorkstations": "Ver Estaciones de Trabajo",
     "addDevice": "Agregar dispositivo a esta VLAN",
     "forcedContingency": "Contingencia Forzada",
     "forcedContingencyActivate": "Activar contingencia forzada",

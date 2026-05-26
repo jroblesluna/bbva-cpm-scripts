@@ -6,6 +6,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -28,6 +29,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Star,
+  RefreshCw,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 import type { VLAN, VLANCreate, VLANUpdate, VLANDetail } from '@/types/vlan'
@@ -46,6 +48,7 @@ type ViewMode = 'cards' | 'table'
 
 export default function VLANsPage() {
   const { user, getAuthHeaders } = useAuth()
+  const router = useRouter()
   const timezone = useUserTimezone()
   const t = useTranslations('vlans')
   const tCommon = useTranslations('common')
@@ -71,6 +74,8 @@ export default function VLANsPage() {
   const [addDeviceVlan, setAddDeviceVlan] = useState<VLAN | null>(null)
   const [page, setPage] = useState(1)
   const pageSize = viewMode === 'cards' ? 10 : 20
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -108,20 +113,27 @@ export default function VLANsPage() {
     }
   }
 
-  const loadVlans = async () => {
+  const loadVlans = async (silent = false) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       const params = filterOrgId ? `?organization_id=${filterOrgId}` : ''
       const response = await apiClient.get(`/vlans/${params}`)
       const loadedVlans: VLAN[] = response.data.vlans || []
       setVlans(loadedVlans)
+      setLastUpdated(new Date())
       // Cargar conteo de dispositivos activos por VLAN
       loadActiveDeviceCounts(loadedVlans)
     } catch (error) {
       console.error('Error loading vlans:', error)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
+      setRefreshing(false)
     }
+  }
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await loadVlans(true)
   }
 
   const loadActiveDeviceCounts = async (vlanList: VLAN[]) => {
@@ -228,17 +240,27 @@ export default function VLANsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-screen-2xl mx-auto space-y-6">
       {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-2 mt-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
-          <p className="mt-2 text-gray-600">{t('subtitle')}</p>
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('create')}
+          </Button>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          {t('create')}
-        </Button>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+          <p className="text-gray-600">{t('subtitle')}</p>
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-400">
+              {tCommon('lastUpdated', { time: formatDateWithTimezone(lastUpdated, timezone) })}
+            </span>
+            <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={refreshing} className="h-6 w-6 p-0 text-gray-400 hover:text-gray-600">
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Tarjetas de estadísticas */}
@@ -441,11 +463,11 @@ export default function VLANsPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleAddDevice(vlan)}
-                  title={t('addDevice')}
-                  className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                  onClick={() => router.push(`/dashboard/workstations?vlan_id=${vlan.id}&org_id=${vlan.organization_id}`)}
+                  title={t('viewWorkstations')}
+                  className="h-8 w-8 p-0"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Monitor className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -543,8 +565,8 @@ export default function VLANsPage() {
                         <Button variant="ghost" size="sm" onClick={() => handleViewDevices(vlan)} title={t('viewDevices')} className="h-8 w-8 p-0">
                           <Printer className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleAddDevice(vlan)} title={t('addDevice')} className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50">
-                          <Plus className="h-4 w-4" />
+                        <Button variant="ghost" size="sm" onClick={() => router.push(`/dashboard/workstations?vlan_id=${vlan.id}&org_id=${vlan.organization_id}`)} title={t('viewWorkstations')} className="h-8 w-8 p-0">
+                          <Monitor className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(vlan)} title={tCommon('edit')} className="h-8 w-8 p-0">
                           <Edit className="h-4 w-4" />
@@ -1053,7 +1075,7 @@ function VLANDevicesModal({ vlan, devices, onClose, onSetDefault, onAddDevice }:
                 size="sm"
                 onClick={onAddDevice}
                 title={t('addDevice')}
-                className="h-8 gap-1 text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
+                className="h-8 gap-1"
               >
                 <Plus className="h-4 w-4" />
                 {tDevices('createTitle')}

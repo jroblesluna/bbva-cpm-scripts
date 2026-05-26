@@ -36,6 +36,7 @@ import {
   ShieldAlert,
   ChevronLeft,
   ChevronRight,
+  RefreshCw,
 } from 'lucide-react'
 import type { Organization, OrganizationCreate, OrganizationUpdate, PublicIPCreate } from '@/types'
 import { ActionConfigSection } from '@/components/config/ActionConfigSection'
@@ -54,9 +55,10 @@ export default function AccountsPage() {
   const [contingencyTarget, setContingencyTarget] = useState<Organization | null>(null)
   const [page, setPage] = useState(1)
   const pageSize = 10
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 
   // Query para listar cuentas
-  const { data: accounts, isLoading, error } = useQuery({
+  const { data: accounts, isLoading, error, isFetching, refetch } = useQuery({
     queryKey: ['accounts', 'list'],
     queryFn: () => organizationsApi.list(),
   })
@@ -138,6 +140,17 @@ export default function AccountsPage() {
     },
   })
 
+  // Actualizar timestamp cuando se cargan datos
+  useEffect(() => {
+    if (accounts && !isFetching) {
+      setLastUpdated(new Date())
+    }
+  }, [accounts, isFetching])
+
+  const handleRefresh = () => {
+    refetch()
+  }
+
   // Filtrar cuentas por búsqueda
   const filteredAccounts = Array.isArray(accounts) 
     ? accounts.filter(account =>
@@ -154,7 +167,7 @@ export default function AccountsPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="max-w-screen-2xl mx-auto">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
         <div className="animate-pulse space-y-4">
           {[1, 2, 3].map((i) => (
@@ -167,7 +180,7 @@ export default function AccountsPage() {
 
   if (error) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="max-w-screen-2xl mx-auto">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-8">{t('title')}</h1>
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -180,17 +193,27 @@ export default function AccountsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6">
+    <div className="max-w-screen-2xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
+      <div className="flex flex-col gap-2 mt-2 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{t('title')}</h1>
-          <p className="text-gray-600 mt-2">{t('subtitle')}</p>
+          <Button onClick={() => setShowCreateForm(true)} className="w-full sm:w-auto">
+            <Plus className="w-4 h-4 mr-2" />
+            {t('new')}
+          </Button>
         </div>
-        <Button onClick={() => setShowCreateForm(true)} className="w-full sm:w-auto">
-          <Plus className="w-4 h-4 mr-2" />
-          {t('new')}
-        </Button>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+          <p className="text-gray-600">{t('subtitle')}</p>
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-400">
+              {tCommon('lastUpdated', { time: formatDateWithTimezone(lastUpdated, userTimezone) })}
+            </span>
+            <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isFetching} className="h-6 w-6 p-0 text-gray-400 hover:text-gray-600">
+              <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Barra de búsqueda */}
