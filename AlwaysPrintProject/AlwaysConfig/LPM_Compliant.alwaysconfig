@@ -1,12 +1,12 @@
 {
-  "version": "4.4",
+  "version": "5.0",
   "name": "LPM_Compliant",
-  "description": "Configuración de cumplimiento para Lexmark Print Management (modo Print Server)",
+  "description": "Configuración de cumplimiento para Lexmark Print Management (modo Print Server). Gestiona contingencia creando/eliminando cola local con puerto TCP híbrido.",
   "created_at": "2026-06-01T12:00:00Z",
   "triggers": [
     {
       "event": "OnTrayLaunched",
-      "description": "Ejecutar después de que el Tray se haya iniciado correctamente",
+      "description": "Habilitar auto-actualización al iniciar el Tray",
       "actions": [
         {
           "type": "RunProcess",
@@ -18,34 +18,12 @@
             "window_style": "Hidden",
             "run_as_logged_in_user": false
           }
-        },
-        {
-          "type": "RunProcess",
-          "description": "Escribir AutoUpdateEnabled=1 en registro de AlwaysPrint-DEV",
-          "parameters": {
-            "file_path": "C:\\Windows\\System32\\reg.exe",
-            "arguments": "add \"HKLM\\SOFTWARE\\Robles.AI\\AlwaysPrint-DEV\" /v AutoUpdateEnabled /t REG_DWORD /d 1 /f",
-            "timeout_seconds": 30,
-            "window_style": "Hidden",
-            "run_as_logged_in_user": false
-          }
-        },
-        {
-          "type": "RunProcess",
-          "description": "Agregar puerto NUL: en registro de puertos si no existe",
-          "parameters": {
-            "file_path": "C:\\Windows\\System32\\reg.exe",
-            "arguments": "add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Ports\" /v NUL: /t REG_SZ /d \"\" /f",
-            "timeout_seconds": 30,
-            "window_style": "Hidden",
-            "run_as_logged_in_user": false
-          }
         }
       ]
     },
     {
       "event": "OnConfigChange",
-      "description": "Ejecutar cuando se recibe una nueva configuración",
+      "description": "Reiniciar Tray al recibir nueva configuración",
       "actions": [
         {
           "type": "StopTray",
@@ -57,7 +35,7 @@
         },
         {
           "type": "StartTray",
-          "description": "Iniciar App Tray con permisos de usuario loggedin",
+          "description": "Relanzar App Tray en sesión interactiva",
           "parameters": {
             "wait_for_ready": true,
             "timeout_seconds": 60
@@ -67,33 +45,17 @@
     },
     {
       "event": "OnContingencyActivated",
-      "description": "Activar modo contingencia: redirigir cola corporativa a IP de contingencia vía registro (evita duplicados en Windows 11)",
+      "description": "Activar contingencia: desconectar cola remota, crear cola local con puerto TCP apuntando a IP de contingencia",
       "actions": [
         {
-          "type": "PausePrintQueue",
-          "description": "Pausar cola corporativa antes de cambiar puerto",
-          "parameters": {
-            "queue_name": "{{corporate_queue_name}}"
-          }
-        },
-        {
-          "type": "StopService",
-          "description": "Detener Spooler para aplicar cambios en registro",
-          "parameters": {
-            "service_name": "Spooler",
-            "graceful_timeout_seconds": 30,
-            "force_kill_on_timeout": true
-          }
-        },
-        {
           "type": "RunProcess",
-          "description": "Actualizar puerto de la cola corporativa a LPMCHybridPort en registro",
+          "description": "Desconectar cola remota del print server (si existe)",
           "parameters": {
-            "file_path": "C:\\Windows\\System32\\reg.exe",
-            "arguments": "add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\{{corporate_queue_name}}\" /v Port /t REG_SZ /d LPMCHybridPort /f",
+            "file_path": "C:\\Windows\\System32\\rundll32.exe",
+            "arguments": "printui.dll,PrintUIEntry /dn /n \"{{remote_queue_path}}\"",
             "timeout_seconds": 30,
             "window_style": "Hidden",
-            "run_as_logged_in_user": false
+            "run_as_logged_in_user": true
           }
         },
         {
@@ -106,24 +68,19 @@
           }
         },
         {
-          "type": "StartService",
-          "description": "Reiniciar Spooler con cambios aplicados",
+          "type": "RunProcess",
+          "description": "Crear cola local con puerto LPMCHybridPort y driver Lexmark Universal v2 XL",
           "parameters": {
-            "service_name": "Spooler",
-            "wait_for_running": true,
-            "timeout_seconds": 30
-          }
-        },
-        {
-          "type": "UnpausePrintQueue",
-          "description": "Reanudar cola corporativa con nuevo destino de contingencia",
-          "parameters": {
-            "queue_name": "{{corporate_queue_name}}"
+            "file_path": "C:\\Windows\\System32\\rundll32.exe",
+            "arguments": "printui.dll,PrintUIEntry /if /b \"{{corporate_queue_name}}\" /r \"LPMCHybridPort\" /m \"Lexmark Universal v2 XL\" /z",
+            "timeout_seconds": 60,
+            "window_style": "Hidden",
+            "run_as_logged_in_user": false
           }
         },
         {
           "type": "RunProcess",
-          "description": "Establecer cola corporativa como impresora predeterminada en sesión de usuario",
+          "description": "Establecer cola corporativa como impresora predeterminada",
           "parameters": {
             "file_path": "C:\\Windows\\System32\\rundll32.exe",
             "arguments": "printui.dll,PrintUIEntry /y /n \"{{corporate_queue_name}}\"",
@@ -136,54 +93,33 @@
     },
     {
       "event": "OnContingencyDeactivated",
-      "description": "Desactivar modo contingencia: apuntar cola a NUL: (deshabilitada), conectar a cola remota del print server",
+      "description": "Desactivar contingencia: eliminar cola local, reconectar cola remota del print server",
       "actions": [
         {
-          "type": "PausePrintQueue",
-          "description": "Pausar cola corporativa antes de restaurar puerto",
-          "parameters": {
-            "queue_name": "{{corporate_queue_name}}"
-          }
-        },
-        {
-          "type": "StopService",
-          "description": "Detener Spooler para aplicar cambios en registro",
-          "parameters": {
-            "service_name": "Spooler",
-            "graceful_timeout_seconds": 30,
-            "force_kill_on_timeout": true
-          }
-        },
-        {
           "type": "RunProcess",
-          "description": "Actualizar puerto de la cola corporativa a NUL: (deshabilitada)",
+          "description": "Eliminar cola local corporativa",
           "parameters": {
-            "file_path": "C:\\Windows\\System32\\reg.exe",
-            "arguments": "add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\{{corporate_queue_name}}\" /v Port /t REG_SZ /d NUL: /f",
+            "file_path": "C:\\Windows\\System32\\rundll32.exe",
+            "arguments": "printui.dll,PrintUIEntry /dl /n \"{{corporate_queue_name}}\"",
             "timeout_seconds": 30,
             "window_style": "Hidden",
             "run_as_logged_in_user": false
           }
         },
         {
-          "type": "StartService",
-          "description": "Reiniciar Spooler con cola deshabilitada",
+          "type": "RunProcess",
+          "description": "Esperar 3 segundos para que el Spooler libere recursos",
           "parameters": {
-            "service_name": "Spooler",
-            "wait_for_running": true,
-            "timeout_seconds": 30
-          }
-        },
-        {
-          "type": "UnpausePrintQueue",
-          "description": "Reanudar cola corporativa (apuntando a NUL:)",
-          "parameters": {
-            "queue_name": "{{corporate_queue_name}}"
+            "file_path": "C:\\Windows\\System32\\cmd.exe",
+            "arguments": "/c ping -n 4 127.0.0.1 >nul",
+            "timeout_seconds": 10,
+            "window_style": "Hidden",
+            "run_as_logged_in_user": false
           }
         },
         {
           "type": "RunProcess",
-          "description": "Conectar a impresora de red del print server remoto",
+          "description": "Conectar a cola remota del print server",
           "parameters": {
             "file_path": "C:\\Windows\\System32\\rundll32.exe",
             "arguments": "printui.dll,PrintUIEntry /in /n \"{{remote_queue_path}}\"",
@@ -194,7 +130,7 @@
         },
         {
           "type": "RunProcess",
-          "description": "Establecer cola remota del print server como impresora predeterminada",
+          "description": "Establecer cola remota como impresora predeterminada",
           "parameters": {
             "file_path": "C:\\Windows\\System32\\rundll32.exe",
             "arguments": "printui.dll,PrintUIEntry /y /n \"{{remote_queue_path}}\"",
