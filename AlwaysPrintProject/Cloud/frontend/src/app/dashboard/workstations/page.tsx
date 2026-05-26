@@ -1105,6 +1105,23 @@ function WorkstationCard({
 
         {/* Fila 4: Acciones en mobile (flex-wrap) */}
         <div className="flex md:hidden flex-wrap gap-1 mt-3 pt-3 border-t border-gray-100">
+          {/* Botón de contingencia forzada */}
+          <Button
+            variant={workstation.forced_contingency ? 'destructive' : 'outline'}
+            size="sm"
+            onClick={() => onToggleForcedContingency()}
+            disabled={isForcedContingencyPending || workstation.vlan?.forced_contingency === true}
+            title={
+              workstation.vlan?.forced_contingency
+                ? t('contingencyControlledByVlan')
+                : workstation.forced_contingency
+                  ? t('forcedContingencyDeactivate')
+                  : t('forcedContingencyActivate')
+            }
+            className={`h-8 w-8 p-0 ${workstation.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''} ${workstation.vlan?.forced_contingency ? 'cursor-not-allowed opacity-50' : ''}`}
+          >
+            <ShieldAlert className="w-4 h-4" />
+          </Button>
           <Button
             variant="outline"
             size="sm"
