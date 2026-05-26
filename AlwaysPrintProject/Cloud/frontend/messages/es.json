@@ -711,6 +711,17 @@
     "pagination": "Mostrando {start} a {end} de {total} dispositivos",
     "pageNumber": "Página {page}"
   },
+  "orgEdit": {
+    "title": "Editar: {name}",
+    "subtitle": "Configuración completa de la organización",
+    "tabGeneral": "General",
+    "tabPrinting": "Impresión",
+    "tabNetwork": "Red",
+    "tabConnectivity": "Conectividad",
+    "tabUpdates": "Actualizaciones",
+    "tabActions": "Acciones",
+    "tabIps": "IPs Públicas"
+  },
   "logAnalysis": {
     "buttonLabel": "Análisis IA de Log",
     "buttonTitle": "Analizar log del día con inteligencia artificial",

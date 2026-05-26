@@ -8,6 +8,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { organizationsApi, logAnalysisApi } from '@/lib/api'
 import { useTranslations } from 'next-intl'
@@ -41,6 +42,7 @@ import { ActionConfigSection } from '@/components/config/ActionConfigSection'
 
 export default function AccountsPage() {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const userTimezone = useUserTimezone()
   const t = useTranslations('accounts')
   const tCommon = useTranslations('common')
@@ -388,14 +390,6 @@ export default function AccountsPage() {
                           <span>{account.public_ips?.length || 0} {t('publicIps')}</span>
                         </div>
                         <div className="flex items-center">
-                          <Monitor className="w-4 h-4 mr-1 shrink-0" />
-                          <span>Workstations (por implementar)</span>
-                        </div>
-                        <div className="flex items-center">
-                          <Users className="w-4 h-4 mr-1 shrink-0" />
-                          <span>Usuarios (por implementar)</span>
-                        </div>
-                        <div className="flex items-center">
                           <CheckCircle className="w-4 h-4 mr-1 shrink-0" />
                           <span>Creada: {formatDateWithTimezone(account.created_at, userTimezone)}</span>
                         </div>
@@ -404,11 +398,16 @@ export default function AccountsPage() {
                       {/* IPs públicas */}
                       {account.public_ips && account.public_ips.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {account.public_ips.map((ip) => (
+                          {account.public_ips.slice(0, 5).map((ip) => (
                             <Badge key={ip.id} variant="outline" className="text-xs">
                               {ip.ip_address}
                             </Badge>
                           ))}
+                          {account.public_ips.length > 5 && (
+                            <Badge variant="outline" className="text-xs text-gray-400">
+                              +{account.public_ips.length - 5} más
+                            </Badge>
+                          )}
                         </div>
                       )}
                     </div>
@@ -438,7 +437,7 @@ export default function AccountsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setEditingAccount(account)}
+                      onClick={() => router.push(`/dashboard/admin/organizations/${account.id}/edit`)}
                       title="Editar cuenta"
                     >
                       <Edit className="w-4 h-4" />
