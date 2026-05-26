@@ -936,13 +936,21 @@ namespace AlwaysPrintTray.Cloud
                         string title = "AlwaysPrint";
                         string message;
 
+                        string sourceLabel = source switch
+                        {
+                            "workstation"  => "Workstation",
+                            "vlan"         => "VLAN",
+                            "organization" => "Organización",
+                            _              => source
+                        };
+
                         if (enabled)
                         {
-                            message = $"Se está entrando en modo contingencia (origen: {sourceName}).";
+                            message = $"Contingencia activada a nivel {sourceLabel}: {sourceName}";
                         }
                         else
                         {
-                            message = $"Se ha desactivado el modo contingencia (origen: {sourceName}).";
+                            message = $"Contingencia desactivada a nivel {sourceLabel}: {sourceName}";
                         }
 
                         _trayIcon.ShowBalloonTip(
