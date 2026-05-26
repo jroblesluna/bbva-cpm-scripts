@@ -217,7 +217,7 @@ namespace AlwaysPrintService
                     AlwaysPrintLogger.WriteInfo("Cola de tareas inicializada vacía.", AlwaysPrintLogger.EvtQueueCleared);
 
                 // 5. Iniciar servidor Named Pipe.
-                _dispatcher = new MessageDispatcher(_registry, _taskQueue, _state, ReloadActionConfiguration);
+                _dispatcher = new MessageDispatcher(_registry, _taskQueue, _state, ReloadActionConfiguration, LoadResourceVariables);
                 _dispatcher.TrayInitializedReceived += OnTrayInitialized;
                 _dispatcher.ForcedContingencyReceived += OnForcedContingencyReceived;
                 _pipeServer = new PipeServer(_dispatcher);

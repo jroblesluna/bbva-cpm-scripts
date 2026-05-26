@@ -25,6 +25,7 @@ namespace AlwaysPrintService.Pipe
         private readonly TaskQueueManager _taskQueue;
         private readonly ServiceStateMachine _stateMachine;
         private readonly Action? _reloadActionConfigCallback;
+        private readonly Action? _loadResourceVariablesCallback;
 
         // Raised when the Tray sends TrayInitialized.
         public event Action<bool, string?>? TrayInitializedReceived;
@@ -36,12 +37,14 @@ namespace AlwaysPrintService.Pipe
             RegistryConfigManager registry,
             TaskQueueManager taskQueue,
             ServiceStateMachine stateMachine,
-            Action? reloadActionConfigCallback = null)
+            Action? reloadActionConfigCallback = null,
+            Action? loadResourceVariablesCallback = null)
         {
             _registry     = registry     ?? throw new ArgumentNullException(nameof(registry));
             _taskQueue    = taskQueue    ?? throw new ArgumentNullException(nameof(taskQueue));
             _stateMachine = stateMachine ?? throw new ArgumentNullException(nameof(stateMachine));
             _reloadActionConfigCallback = reloadActionConfigCallback;
+            _loadResourceVariablesCallback = loadResourceVariablesCallback;
         }
 
         public PipeMessage Dispatch(PipeMessage request)
@@ -415,7 +418,7 @@ namespace AlwaysPrintService.Pipe
 
                 // Cargar variables desde resources.json directamente sin disparar OnConfigChange
                 // (evita loop: SaveResources → Reload → OnConfigChange → StopTray → StartTray → SaveResources...)
-                // No se encola ReloadActionConfigTask — solo se actualizan las variables del ActionEngine.
+                _loadResourceVariablesCallback?.Invoke();
 
                 return PipeMessage.Reply(req, MessageType.Ack,
                     new AckPayload { Success = true, Message = "Recursos guardados." });
