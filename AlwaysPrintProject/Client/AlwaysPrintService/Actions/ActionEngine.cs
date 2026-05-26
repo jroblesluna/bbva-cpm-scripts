@@ -269,6 +269,9 @@ namespace AlwaysPrintService.Actions
 
                 case ActionTypes.ReadRegistryValue:
                     return ExecuteReadRegistryValue(action);
+
+                case ActionTypes.ReadPrintQueuePort:
+                    return ExecuteReadPrintQueuePort(action);
                 
                 default:
                     AlwaysPrintLogger.WriteWarning($"ActionEngine: tipo de acción desconocido: {action.Type}");
@@ -817,6 +820,54 @@ namespace AlwaysPrintService.Actions
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteError($"ReadRegistryValue: error: {ex.Message}", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Lee el puerto asignado a una cola de impresión desde el registro del Spooler.
+        /// Parámetros: queue_name (string, soporta templates).
+        /// Almacena el nombre del puerto en la variable indicada por store_result_in.
+        /// Si la cola no existe, almacena cadena vacía.
+        /// </summary>
+        private bool ExecuteReadPrintQueuePort(ActionConfig action)
+        {
+            try
+            {
+                string queueName = GetParameter<string>(action, "queue_name") ?? "";
+                queueName = ReplaceTemplates(queueName);
+
+                if (string.IsNullOrEmpty(queueName))
+                {
+                    AlwaysPrintLogger.WriteWarning("ReadPrintQueuePort: queue_name vacío");
+                    return false;
+                }
+
+                AlwaysPrintLogger.WriteInfo($"ReadPrintQueuePort: leyendo puerto de cola '{queueName}'");
+
+                string portName = "";
+                string regPath = $@"SYSTEM\CurrentControlSet\Control\Print\Printers\{queueName}";
+                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(regPath, writable: false))
+                {
+                    if (key != null)
+                    {
+                        portName = key.GetValue("Port")?.ToString() ?? "";
+                    }
+                }
+
+                AlwaysPrintLogger.WriteInfo($"ReadPrintQueuePort: cola '{queueName}' → puerto = '{portName}'");
+
+                if (!string.IsNullOrEmpty(action.StoreResultIn))
+                {
+                    _variables[action.StoreResultIn] = portName;
+                    _configVariables[action.StoreResultIn] = portName;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"ReadPrintQueuePort: error: {ex.Message}", ex);
                 return false;
             }
         }

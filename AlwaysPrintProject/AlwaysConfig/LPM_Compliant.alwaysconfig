@@ -1,7 +1,7 @@
 {
-  "version": "5.5",
+  "version": "5.6",
   "name": "LPM_Compliant",
-  "description": "Configuración de cumplimiento para Lexmark Print Management (modo Print Server). Gestiona contingencia creando/eliminando cola local con puerto TCP híbrido. Persiste estado en registro para sobrevivir reinicios.",
+  "description": "Configuración de cumplimiento para Lexmark Print Management (modo Print Server). Gestiona contingencia creando/eliminando cola local con puerto TCP híbrido. Persiste estado en registro para sobrevivir reinicios. Valida existencia de cola y puerto antes de actuar.",
   "created_at": "2026-06-01T12:00:00Z",
   "triggers": [
     {
@@ -31,7 +31,7 @@
         },
         {
           "type": "Conditional",
-          "description": "Si contingencia está activa (=1), leer IP y re-aplicar contingencia",
+          "description": "Si contingencia está activa (=1): asegurar cola local con puerto correcto",
           "parameters": {
             "condition": {
               "variable": "contingency_enabled",
@@ -51,7 +51,7 @@
               },
               {
                 "type": "SetTcpPort",
-                "description": "Asegurar LPMCHybridPort apunta a IP de contingencia persistida",
+                "description": "Asegurar LPMCHybridPort apunta a IP de contingencia (crea o actualiza)",
                 "parameters": {
                   "port_name": "LPMCHybridPort",
                   "host_address": "{{contingency_printer_ip}}",
@@ -68,7 +68,7 @@
               },
               {
                 "type": "Conditional",
-                "description": "Crear cola local solo si no existe",
+                "description": "Si cola NO existe: crearla con LPMCHybridPort",
                 "parameters": {
                   "condition": {
                     "variable": "queue_exists",
@@ -91,6 +91,69 @@
                 }
               },
               {
+                "type": "Conditional",
+                "description": "Si cola SÍ existe: verificar que tenga el puerto correcto",
+                "parameters": {
+                  "condition": {
+                    "variable": "queue_exists",
+                    "operator": "equals",
+                    "value": "true"
+                  },
+                  "actions": [
+                    {
+                      "type": "ReadPrintQueuePort",
+                      "description": "Leer puerto actual de la cola",
+                      "parameters": {
+                        "queue_name": "{{corporate_queue_name}}"
+                      },
+                      "store_result_in": "current_port"
+                    },
+                    {
+                      "type": "Conditional",
+                      "description": "Si puerto no es LPMCHybridPort: reasignar vía registro",
+                      "parameters": {
+                        "condition": {
+                          "variable": "current_port",
+                          "operator": "not_equals",
+                          "value": "LPMCHybridPort"
+                        },
+                        "actions": [
+                          {
+                            "type": "StopService",
+                            "description": "Detener Spooler para cambiar puerto",
+                            "parameters": {
+                              "service_name": "Spooler",
+                              "graceful_timeout_seconds": 30,
+                              "force_kill_on_timeout": true
+                            }
+                          },
+                          {
+                            "type": "RunProcess",
+                            "description": "Actualizar puerto de la cola a LPMCHybridPort en registro",
+                            "parameters": {
+                              "file_path": "C:\\Windows\\System32\\reg.exe",
+                              "arguments": "add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\{{corporate_queue_name}}\" /v Port /t REG_SZ /d LPMCHybridPort /f",
+                              "timeout_seconds": 30,
+                              "window_style": "Hidden",
+                              "run_as_logged_in_user": false
+                            }
+                          },
+                          {
+                            "type": "StartService",
+                            "description": "Reiniciar Spooler",
+                            "parameters": {
+                              "service_name": "Spooler",
+                              "wait_for_running": true,
+                              "timeout_seconds": 30
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
                 "type": "RunProcess",
                 "description": "Establecer cola corporativa como impresora predeterminada",
                 "parameters": {
@@ -106,7 +169,7 @@
         },
         {
           "type": "Conditional",
-          "description": "Si contingencia NO está activa (=0), asegurar cola remota conectada",
+          "description": "Si contingencia NO está activa (=0): asegurar cola remota conectada",
           "parameters": {
             "condition": {
               "variable": "contingency_enabled",
@@ -165,7 +228,7 @@
     },
     {
       "event": "OnContingencyActivated",
-      "description": "Activar contingencia: desconectar cola remota, crear cola local (si no existe) con puerto TCP apuntando a IP de contingencia, persistir estado",
+      "description": "Activar contingencia: desconectar cola remota, asegurar cola local con puerto TCP correcto, persistir estado",
       "actions": [
         {
           "type": "RunProcess",
@@ -197,7 +260,7 @@
         },
         {
           "type": "Conditional",
-          "description": "Crear cola local solo si no existe",
+          "description": "Si cola NO existe: crearla",
           "parameters": {
             "condition": {
               "variable": "queue_exists",
@@ -214,6 +277,69 @@
                   "timeout_seconds": 60,
                   "window_style": "Hidden",
                   "run_as_logged_in_user": false
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "Conditional",
+          "description": "Si cola SÍ existe: verificar puerto y corregir si necesario",
+          "parameters": {
+            "condition": {
+              "variable": "queue_exists",
+              "operator": "equals",
+              "value": "true"
+            },
+            "actions": [
+              {
+                "type": "ReadPrintQueuePort",
+                "description": "Leer puerto actual de la cola",
+                "parameters": {
+                  "queue_name": "{{corporate_queue_name}}"
+                },
+                "store_result_in": "current_port"
+              },
+              {
+                "type": "Conditional",
+                "description": "Si puerto no es LPMCHybridPort: reasignar",
+                "parameters": {
+                  "condition": {
+                    "variable": "current_port",
+                    "operator": "not_equals",
+                    "value": "LPMCHybridPort"
+                  },
+                  "actions": [
+                    {
+                      "type": "StopService",
+                      "description": "Detener Spooler para cambiar puerto",
+                      "parameters": {
+                        "service_name": "Spooler",
+                        "graceful_timeout_seconds": 30,
+                        "force_kill_on_timeout": true
+                      }
+                    },
+                    {
+                      "type": "RunProcess",
+                      "description": "Actualizar puerto de la cola a LPMCHybridPort en registro",
+                      "parameters": {
+                        "file_path": "C:\\Windows\\System32\\reg.exe",
+                        "arguments": "add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\{{corporate_queue_name}}\" /v Port /t REG_SZ /d LPMCHybridPort /f",
+                        "timeout_seconds": 30,
+                        "window_style": "Hidden",
+                        "run_as_logged_in_user": false
+                      }
+                    },
+                    {
+                      "type": "StartService",
+                      "description": "Reiniciar Spooler",
+                      "parameters": {
+                        "service_name": "Spooler",
+                        "wait_for_running": true,
+                        "timeout_seconds": 30
+                      }
+                    }
+                  ]
                 }
               }
             ]
