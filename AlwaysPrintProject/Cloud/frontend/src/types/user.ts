@@ -39,6 +39,7 @@ export interface UserCreate {
 export interface UserUpdate {
   email?: string
   full_name?: string
+  password?: string
   role?: UserRole
   organization_id?: string | null
   is_active?: boolean

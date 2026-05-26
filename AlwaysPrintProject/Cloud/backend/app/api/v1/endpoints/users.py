@@ -349,6 +349,11 @@ def update_user(
                 detail=f"Ya existe un usuario con el email '{update_data['email']}'"
             )
     
+    # Si se envió password, hashearla y asignarla a password_hash
+    if "password" in update_data:
+        auth_service = AuthService()
+        user.password_hash = auth_service.hash_password(update_data.pop("password"))
+    
     for field, value in update_data.items():
         setattr(user, field, value)
     

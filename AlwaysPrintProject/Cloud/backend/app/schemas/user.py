@@ -63,6 +63,7 @@ class UserUpdate(BaseModel):
     """Schema para actualizar un usuario."""
     email: Optional[EmailStr] = None
     full_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    password: Optional[str] = Field(None, min_length=8, max_length=100, description="Nueva contraseña (dejar vacío para no cambiar)")
     role: Optional[UserRole] = None
     organization_id: Optional[UUID] = None
     is_active: Optional[bool] = None
