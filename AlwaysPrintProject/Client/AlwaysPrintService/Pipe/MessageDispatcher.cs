@@ -413,13 +413,9 @@ namespace AlwaysPrintService.Pipe
 
                 AlwaysPrintLogger.WriteInfo($"SaveResources: recursos guardados en {resourcesPath}");
 
-                // Disparar recarga de variables desde resources.json
-                // (el callback de recarga de action config también recarga variables)
-                if (_reloadActionConfigCallback != null)
-                {
-                    var task = new ReloadActionConfigTask(_reloadActionConfigCallback);
-                    _taskQueue.Enqueue(task);
-                }
+                // Cargar variables desde resources.json directamente sin disparar OnConfigChange
+                // (evita loop: SaveResources → Reload → OnConfigChange → StopTray → StartTray → SaveResources...)
+                // No se encola ReloadActionConfigTask — solo se actualizan las variables del ActionEngine.
 
                 return PipeMessage.Reply(req, MessageType.Ack,
                     new AckPayload { Success = true, Message = "Recursos guardados." });
