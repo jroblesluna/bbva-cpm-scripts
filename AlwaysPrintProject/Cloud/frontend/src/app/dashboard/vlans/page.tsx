@@ -858,11 +858,10 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
     name: vlan.name,
     description: vlan.description,
     cidr_ranges: [...vlan.cidr_ranges],
-    vlan_metadata: vlan.vlan_metadata || null,
   })
   const [metadataEntries, setMetadataEntries] = useState<Array<{ key: string; value: string }>>(
-    vlan.vlan_metadata
-      ? Object.entries(vlan.vlan_metadata).map(([key, value]) => ({ key, value: String(value) }))
+    vlan.metadata
+      ? Object.entries(vlan.metadata).map(([key, value]) => ({ key, value: String(value) }))
       : []
   )
 
@@ -892,7 +891,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
       const metadata = metadataEntries.length > 0
         ? Object.fromEntries(metadataEntries.filter(e => e.key.trim()).map(e => [e.key.trim(), e.value]))
         : null
-      await apiClient.put(`/vlans/${vlan.id}`, { ...formData, cidr_ranges: validCidrs, vlan_metadata: metadata })
+      await apiClient.put(`/vlans/${vlan.id}`, { ...formData, cidr_ranges: validCidrs, metadata: metadata })
       // Actualizar impresora predeterminada si cambió
       if (selectedDefaultDevice !== vlan.default_device_id) {
         const params = selectedDefaultDevice ? { device_id: selectedDefaultDevice } : {}

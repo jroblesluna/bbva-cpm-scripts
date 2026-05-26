@@ -10,7 +10,7 @@ export interface VLAN {
   cidr_ranges: string[]
   forced_contingency: boolean
   default_device_id: string | null
-  vlan_metadata: Record<string, string> | null
+  metadata: Record<string, string> | null
   created_at: string
   updated_at: string
 }
@@ -30,7 +30,7 @@ export interface VLANUpdate {
   name?: string
   description?: string | null
   cidr_ranges?: string[]
-  vlan_metadata?: Record<string, string> | null
+  metadata?: Record<string, string> | null
 }
 
 export interface VLANListResponse {
