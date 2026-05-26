@@ -1,12 +1,12 @@
 {
-  "version": "5.2",
+  "version": "5.3",
   "name": "LPM_Compliant",
-  "description": "Configuración de cumplimiento para Lexmark Print Management (modo Print Server). Gestiona contingencia creando/eliminando cola local con puerto TCP híbrido.",
+  "description": "Configuración de cumplimiento para Lexmark Print Management (modo Print Server). Gestiona contingencia creando/eliminando cola local con puerto TCP híbrido. Persiste estado en registro para sobrevivir reinicios.",
   "created_at": "2026-06-01T12:00:00Z",
   "triggers": [
     {
       "event": "OnTrayLaunched",
-      "description": "Habilitar auto-actualización al iniciar el Tray",
+      "description": "Habilitar auto-actualización y asegurar cola remota conectada (si no está en contingencia)",
       "actions": [
         {
           "type": "RunProcess",
@@ -45,7 +45,7 @@
     },
     {
       "event": "OnContingencyActivated",
-      "description": "Activar contingencia: desconectar cola remota, crear cola local con puerto TCP apuntando a IP de contingencia",
+      "description": "Activar contingencia: desconectar cola remota, crear cola local con puerto TCP apuntando a IP de contingencia, persistir estado",
       "actions": [
         {
           "type": "RunProcess",
@@ -88,12 +88,34 @@
             "window_style": "Hidden",
             "run_as_logged_in_user": true
           }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Persistir ContingencyEnabled=1 en registro",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\reg.exe",
+            "arguments": "add \"HKLM\\SOFTWARE\\Robles.AI\\AlwaysPrint\" /v ContingencyEnabled /t REG_DWORD /d 1 /f",
+            "timeout_seconds": 10,
+            "window_style": "Hidden",
+            "run_as_logged_in_user": false
+          }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Persistir ContingencyPrinterIp en registro",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\reg.exe",
+            "arguments": "add \"HKLM\\SOFTWARE\\Robles.AI\\AlwaysPrint\" /v ContingencyPrinterIp /t REG_SZ /d \"{{contingency_printer_ip}}\" /f",
+            "timeout_seconds": 10,
+            "window_style": "Hidden",
+            "run_as_logged_in_user": false
+          }
         }
       ]
     },
     {
       "event": "OnContingencyDeactivated",
-      "description": "Desactivar contingencia: eliminar cola local, reconectar cola remota del print server",
+      "description": "Desactivar contingencia: eliminar cola local, reconectar cola remota del print server, limpiar semáforo",
       "actions": [
         {
           "type": "RunProcess",
@@ -126,6 +148,17 @@
             "timeout_seconds": 30,
             "window_style": "Hidden",
             "run_as_logged_in_user": true
+          }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Limpiar semáforo ContingencyEnabled=0 en registro",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\reg.exe",
+            "arguments": "add \"HKLM\\SOFTWARE\\Robles.AI\\AlwaysPrint\" /v ContingencyEnabled /t REG_DWORD /d 0 /f",
+            "timeout_seconds": 10,
+            "window_style": "Hidden",
+            "run_as_logged_in_user": false
           }
         }
       ]
