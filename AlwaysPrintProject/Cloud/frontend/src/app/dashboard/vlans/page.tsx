@@ -36,6 +36,7 @@ import type { VLAN, VLANCreate, VLANUpdate, VLANDetail } from '@/types/vlan'
 import type { Device, DeviceCreate } from '@/types/device'
 import { formatDateWithTimezone } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
+import { useToast } from '@/hooks/use-toast'
 import { CidrHealthBadge } from '@/components/vlans/CidrHealthBadge'
 import {
   Tooltip,
@@ -50,6 +51,7 @@ export default function VLANsPage() {
   const { user, getAuthHeaders } = useAuth()
   const router = useRouter()
   const timezone = useUserTimezone()
+  const { toast } = useToast()
   const t = useTranslations('vlans')
   const tCommon = useTranslations('common')
   const [vlans, setVlans] = useState<VLAN[]>([])
@@ -202,8 +204,19 @@ export default function VLANsPage() {
         prev.map((v) => (v.id === vlan.id ? { ...v, forced_contingency: enabled } : v))
       )
       setContingencyTarget(null)
-    } catch (error) {
-      console.error('Error al cambiar contingencia forzada:', error)
+      toast({
+        title: t('forcedContingency'),
+        description: enabled
+          ? t('forcedContingencyActivated')
+          : t('forcedContingencyDeactivated'),
+      })
+    } catch (error: unknown) {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      toast({
+        variant: 'destructive',
+        title: t('forcedContingency'),
+        description: detail ?? t('forcedContingencyError'),
+      })
     }
   }
 

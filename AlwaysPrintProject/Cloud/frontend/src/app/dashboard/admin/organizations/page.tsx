@@ -40,11 +40,13 @@ import {
 } from 'lucide-react'
 import type { Organization, OrganizationCreate, OrganizationUpdate, PublicIPCreate } from '@/types'
 import { ActionConfigSection } from '@/components/config/ActionConfigSection'
+import { useToast } from '@/hooks/use-toast'
 
 export default function AccountsPage() {
   const queryClient = useQueryClient()
   const router = useRouter()
   const userTimezone = useUserTimezone()
+  const { toast } = useToast()
   const t = useTranslations('accounts')
   const tCommon = useTranslations('common')
   const tActions = useTranslations('actionConfigs')
@@ -94,9 +96,23 @@ export default function AccountsPage() {
   const forcedContingencyMutation = useMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
       organizationsApi.toggleForcedContingency(id, enabled),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       setContingencyTarget(null)
+      toast({
+        title: t('forcedContingency'),
+        description: variables.enabled
+          ? t('forcedContingencyActivated')
+          : t('forcedContingencyDeactivated'),
+      })
+    },
+    onError: (error: unknown) => {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      toast({
+        variant: 'destructive',
+        title: t('forcedContingency'),
+        description: detail ?? t('forcedContingencyError'),
+      })
     },
   })
 

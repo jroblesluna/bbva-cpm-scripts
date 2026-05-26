@@ -203,7 +203,80 @@ async def workstation_websocket(
             "type": "config_update",
             "config": config
         })
-        print(f"[WS] Config enviada, entrando al loop", flush=True)
+        print(f"[WS] Config enviada", flush=True)
+        
+        # Sincronizar estado de contingencia forzada (por si se activó mientras estaba offline)
+        # Prioridad: organización > VLAN > workstation individual
+        forced_contingency_enabled = False
+        forced_source = None
+        forced_source_name = None
+
+        org = db.query(Organization).filter(Organization.id == workstation.organization_id).first()
+        if org and org.forced_contingency:
+            forced_contingency_enabled = True
+            forced_source = "organization"
+            forced_source_name = org.name
+
+        if not forced_contingency_enabled and workstation.vlan_id:
+            from app.models.vlan import VLAN as VLANModel
+            ws_vlan = db.query(VLANModel).filter(VLANModel.id == workstation.vlan_id).first()
+            if ws_vlan and ws_vlan.forced_contingency:
+                forced_contingency_enabled = True
+                forced_source = "vlan"
+                forced_source_name = ws_vlan.name
+
+        if not forced_contingency_enabled and workstation.forced_contingency:
+            forced_contingency_enabled = True
+            forced_source = "workstation"
+            forced_source_name = workstation.hostname or str(workstation.ip_private)
+
+        if forced_contingency_enabled:
+            # Resolver printer_ip
+            from app.models.device import Device
+            printer_ip = None
+            if workstation.default_printer_id:
+                printer = db.query(Device).filter(Device.id == workstation.default_printer_id).first()
+                if printer:
+                    printer_ip = printer.ip_address
+            if not printer_ip and workstation.vlan_id:
+                from app.models.vlan import VLAN as VLANModel2
+                ws_vlan2 = db.query(VLANModel2).filter(VLANModel2.id == workstation.vlan_id).first()
+                if ws_vlan2 and ws_vlan2.default_device_id:
+                    default_dev = db.query(Device).filter(Device.id == ws_vlan2.default_device_id).first()
+                    if default_dev:
+                        printer_ip = default_dev.ip_address
+                if not printer_ip:
+                    first_device = db.query(Device).filter(
+                        Device.vlan_id == workstation.vlan_id,
+                        Device.organization_id == workstation.organization_id,
+                        Device.is_active == True
+                    ).order_by(Device.ip_address).first()
+                    if first_device:
+                        printer_ip = first_device.ip_address
+
+            await websocket.send_json({
+                "type": "forced_contingency",
+                "enabled": True,
+                "source": forced_source,
+                "source_name": forced_source_name,
+                "printer_ip": printer_ip,
+            })
+            print(f"[WS] Contingencia forzada sincronizada: source={forced_source}, printer_ip={printer_ip}", flush=True)
+
+        elif workstation.contingency_active:
+            # No hay contingencia forzada activa, pero la workstation reportó que está en contingencia.
+            # Esto ocurre si se desactivó la contingencia mientras estaba offline.
+            # Enviar orden de desactivación para que restaure el flujo normal.
+            await websocket.send_json({
+                "type": "forced_contingency",
+                "enabled": False,
+                "source": "sync",
+                "source_name": "reconnection",
+                "printer_ip": None,
+            })
+            print(f"[WS] Contingencia desactivada por sincronización (estaba activa offline)", flush=True)
+
+        print(f"[WS] Entrando al loop", flush=True)
         
         # Enviar mensajes pendientes (nuevo sistema de deliveries)
         pending_deliveries = message_service.get_pending_deliveries_for_workstation(

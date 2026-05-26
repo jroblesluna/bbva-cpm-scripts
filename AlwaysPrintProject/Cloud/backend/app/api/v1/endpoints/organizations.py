@@ -603,7 +603,7 @@ async def toggle_auto_update(
         "heredan este estado."
     )
 )
-def toggle_forced_contingency(
+async def toggle_forced_contingency(
     org_id: UUID,
     body: AutoUpdateToggleRequest,
     current_user: User = Depends(require_admin),
@@ -635,27 +635,50 @@ def toggle_forced_contingency(
     # Notificar a todas las workstations online de esta organización vía WebSocket
     from app.services.websocket_manager import connection_manager
     from app.models.workstation import Workstation
-    import asyncio
+    from app.models.device import Device
 
     workstations = db.query(Workstation).filter(
         Workstation.organization_id == org_id
     ).all()
 
-    message = {
-        "type": "forced_contingency",
-        "enabled": body.enabled,
-        "source": "organization",
-        "source_name": organization.name,
-    }
-
     for ws in workstations:
+        # Resolver printer_ip para cada workstation:
+        # 1. Desde default_printer_id de la workstation (favorita individual)
+        # 2. Desde default_device_id de la VLAN (predeterminada de VLAN)
+        # 3. Fallback: primer dispositivo activo en la VLAN de la workstation
+        printer_ip = None
+        if body.enabled:
+            if ws.default_printer_id:
+                printer = db.query(Device).filter(Device.id == ws.default_printer_id).first()
+                if printer:
+                    printer_ip = printer.ip_address
+            if not printer_ip and ws.vlan_id:
+                from app.models.vlan import VLAN as VLANModel
+                ws_vlan = db.query(VLANModel).filter(VLANModel.id == ws.vlan_id).first()
+                if ws_vlan and ws_vlan.default_device_id:
+                    default_dev = db.query(Device).filter(Device.id == ws_vlan.default_device_id).first()
+                    if default_dev:
+                        printer_ip = default_dev.ip_address
+            if not printer_ip and ws.vlan_id:
+                first_device = db.query(Device).filter(
+                    Device.vlan_id == ws.vlan_id,
+                    Device.organization_id == org_id,
+                    Device.is_active == True
+                ).order_by(Device.ip_address).first()
+                if first_device:
+                    printer_ip = first_device.ip_address
+
+        message = {
+            "type": "forced_contingency",
+            "enabled": body.enabled,
+            "source": "organization",
+            "source_name": organization.name,
+            "printer_ip": printer_ip,
+        }
+
         ws_id_str = str(ws.id)
         if connection_manager.is_workstation_online(ws_id_str):
-            try:
-                loop = asyncio.get_event_loop()
-                loop.create_task(connection_manager.send_to_workstation(ws_id_str, message))
-            except RuntimeError:
-                pass
+            await connection_manager.send_to_workstation(ws_id_str, message)
 
     return {
         "forced_contingency": organization.forced_contingency,
