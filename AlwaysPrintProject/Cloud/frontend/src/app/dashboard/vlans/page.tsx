@@ -6,6 +6,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -28,6 +29,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Star,
+  RefreshCw,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 import type { VLAN, VLANCreate, VLANUpdate, VLANDetail } from '@/types/vlan'
@@ -46,6 +48,7 @@ type ViewMode = 'cards' | 'table'
 
 export default function VLANsPage() {
   const { user, getAuthHeaders } = useAuth()
+  const router = useRouter()
   const timezone = useUserTimezone()
   const t = useTranslations('vlans')
   const tCommon = useTranslations('common')
@@ -71,6 +74,8 @@ export default function VLANsPage() {
   const [addDeviceVlan, setAddDeviceVlan] = useState<VLAN | null>(null)
   const [page, setPage] = useState(1)
   const pageSize = viewMode === 'cards' ? 10 : 20
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -108,20 +113,27 @@ export default function VLANsPage() {
     }
   }
 
-  const loadVlans = async () => {
+  const loadVlans = async (silent = false) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       const params = filterOrgId ? `?organization_id=${filterOrgId}` : ''
       const response = await apiClient.get(`/vlans/${params}`)
       const loadedVlans: VLAN[] = response.data.vlans || []
       setVlans(loadedVlans)
+      setLastUpdated(new Date())
       // Cargar conteo de dispositivos activos por VLAN
       loadActiveDeviceCounts(loadedVlans)
     } catch (error) {
       console.error('Error loading vlans:', error)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
+      setRefreshing(false)
     }
+  }
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await loadVlans(true)
   }
 
   const loadActiveDeviceCounts = async (vlanList: VLAN[]) => {
@@ -228,17 +240,27 @@ export default function VLANsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-screen-2xl mx-auto space-y-6">
       {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-2 mt-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
-          <p className="mt-2 text-gray-600">{t('subtitle')}</p>
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('create')}
+          </Button>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          {t('create')}
-        </Button>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+          <p className="text-gray-600">{t('subtitle')}</p>
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-400">
+              {tCommon('lastUpdated', { time: formatDateWithTimezone(lastUpdated, timezone) })}
+            </span>
+            <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={refreshing} className="h-6 w-6 p-0 text-gray-400 hover:text-gray-600">
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Tarjetas de estadísticas */}
@@ -441,11 +463,11 @@ export default function VLANsPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleAddDevice(vlan)}
-                  title={t('addDevice')}
-                  className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                  onClick={() => router.push(`/dashboard/workstations?vlan_id=${vlan.id}&org_id=${vlan.organization_id}`)}
+                  title={t('viewWorkstations')}
+                  className="h-8 w-8 p-0"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Monitor className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -543,8 +565,8 @@ export default function VLANsPage() {
                         <Button variant="ghost" size="sm" onClick={() => handleViewDevices(vlan)} title={t('viewDevices')} className="h-8 w-8 p-0">
                           <Printer className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleAddDevice(vlan)} title={t('addDevice')} className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50">
-                          <Plus className="h-4 w-4" />
+                        <Button variant="ghost" size="sm" onClick={() => router.push(`/dashboard/workstations?vlan_id=${vlan.id}&org_id=${vlan.organization_id}`)} title={t('viewWorkstations')} className="h-8 w-8 p-0">
+                          <Monitor className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(vlan)} title={tCommon('edit')} className="h-8 w-8 p-0">
                           <Edit className="h-4 w-4" />
@@ -837,6 +859,11 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
     description: vlan.description,
     cidr_ranges: [...vlan.cidr_ranges],
   })
+  const [metadataEntries, setMetadataEntries] = useState<Array<{ key: string; value: string }>>(
+    vlan.metadata
+      ? Object.entries(vlan.metadata).map(([key, value]) => ({ key, value: String(value) }))
+      : []
+  )
 
   // Cargar dispositivos de la VLAN al abrir el modal
   useEffect(() => {
@@ -860,7 +887,11 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
     if (!formData.name?.trim() || validCidrs.length === 0) return
     try {
       setLoading(true)
-      await apiClient.put(`/vlans/${vlan.id}`, { ...formData, cidr_ranges: validCidrs })
+      // Construir metadata desde las entradas clave-valor
+      const metadata = metadataEntries.length > 0
+        ? Object.fromEntries(metadataEntries.filter(e => e.key.trim()).map(e => [e.key.trim(), e.value]))
+        : null
+      await apiClient.put(`/vlans/${vlan.id}`, { ...formData, cidr_ranges: validCidrs, metadata: metadata })
       // Actualizar impresora predeterminada si cambió
       if (selectedDefaultDevice !== vlan.default_device_id) {
         const params = selectedDefaultDevice ? { device_id: selectedDefaultDevice } : {}
@@ -953,6 +984,51 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                   ))}
                 </select>
               )}
+            </div>
+            {/* Metadata de la VLAN (pares clave-valor) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('metadataLabel')}</label>
+              <p className="text-xs text-gray-500 mb-2">{t('metadataHelper')}</p>
+              <div className="space-y-2">
+                {metadataEntries.map((entry, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={entry.key}
+                      onChange={(e) => {
+                        const updated = [...metadataEntries]
+                        updated[index] = { ...updated[index], key: e.target.value }
+                        setMetadataEntries(updated)
+                      }}
+                      placeholder={t('metadataKeyPlaceholder')}
+                      className="w-1/3 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={entry.value}
+                      onChange={(e) => {
+                        const updated = [...metadataEntries]
+                        updated[index] = { ...updated[index], value: e.target.value }
+                        setMetadataEntries(updated)
+                      }}
+                      placeholder={t('metadataValuePlaceholder')}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                    <Button type="button" variant="outline" size="sm" onClick={() => setMetadataEntries(metadataEntries.filter((_, i) => i !== index))}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setMetadataEntries([...metadataEntries, { key: '', value: '' }])}
+                className="mt-2"
+              >
+                <Plus className="mr-2 h-4 w-4" />{t('metadataAdd')}
+              </Button>
             </div>
           </form>
           {/* Sección de Action Config para esta VLAN (colapsable) */}
@@ -1053,7 +1129,7 @@ function VLANDevicesModal({ vlan, devices, onClose, onSetDefault, onAddDevice }:
                 size="sm"
                 onClick={onAddDevice}
                 title={t('addDevice')}
-                className="h-8 gap-1 text-green-600 border-green-300 hover:bg-green-50 hover:text-green-700"
+                className="h-8 gap-1"
               >
                 <Plus className="h-4 w-4" />
                 {tDevices('createTitle')}

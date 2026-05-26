@@ -221,6 +221,7 @@
     "devicesInVlan": "Devices in this VLAN",
     "noDevices": "No devices assigned to this VLAN",
     "viewDevices": "View Devices",
+    "viewWorkstations": "View Workstations",
     "addDevice": "Add device to this VLAN",
     "forcedContingency": "Forced Contingency",
     "forcedContingencyActivate": "Activate forced contingency",
@@ -244,7 +245,12 @@
     "defaultDeviceRemoved": "Default printer removed.",
     "defaultDeviceNoDevices": "No active devices in this VLAN",
     "actionConfigTitle": "Administrative Actions",
-    "actionConfigDesc": "Action configuration specific to this VLAN"
+    "actionConfigDesc": "Action configuration specific to this VLAN",
+    "metadataLabel": "VLAN Metadata",
+    "metadataHelper": "Key-value pairs available to workstations (e.g. remote_queue_path)",
+    "metadataKeyPlaceholder": "Key (e.g. remote_queue_path)",
+    "metadataValuePlaceholder": "Value (e.g. \\\\server\\queue)",
+    "metadataAdd": "Add metadata"
   },
   "messages": {
     "title": "Messages",
