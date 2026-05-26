@@ -51,7 +51,9 @@ class PublicIPPendingResponse(BaseModel):
     description: Optional[str] = None
     first_seen: datetime
     created_at: datetime
-    
+    last_hostname: Optional[str] = None
+    last_user: Optional[str] = None
+
     model_config = {"from_attributes": True}
 
 

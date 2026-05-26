@@ -28,6 +28,8 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Monitor,
+  User,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
@@ -39,6 +41,8 @@ interface PendingIP {
   description: string | null;
   first_seen: string;
   created_at: string;
+  last_hostname: string | null;
+  last_user: string | null;
 }
 
 interface Account {
@@ -294,6 +298,23 @@ export default function PendingIPsPage() {
                         <p className="text-sm text-gray-600 mb-1">{ip.description}</p>
                       )}
 
+                      {(ip.last_hostname || ip.last_user) && (
+                        <div className="flex flex-wrap gap-3 mb-1">
+                          {ip.last_hostname && (
+                            <span className="flex items-center gap-1 text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                              <Monitor className="w-3 h-3 text-gray-500" />
+                              {ip.last_hostname}
+                            </span>
+                          )}
+                          {ip.last_user && (
+                            <span className="flex items-center gap-1 text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                              <User className="w-3 h-3 text-gray-500" />
+                              {ip.last_user}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       <div className="text-xs text-gray-500">
                         <span>{t('firstSeen')} {formatDateWithTimezone(ip.first_seen, userTimezone)}</span>
                       </div>
@@ -379,8 +400,20 @@ export default function PendingIPsPage() {
             <CardContent className="space-y-4">
               <Alert>
                 <Globe className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>{t('ipLabel')}</strong> {authorizingIP.ip_address}
+                <AlertDescription className="space-y-1">
+                  <div><strong>{t('ipLabel')}</strong> {authorizingIP.ip_address}</div>
+                  {authorizingIP.last_hostname && (
+                    <div className="flex items-center gap-1 text-sm">
+                      <Monitor className="w-3 h-3" />
+                      <span>{authorizingIP.last_hostname}</span>
+                    </div>
+                  )}
+                  {authorizingIP.last_user && (
+                    <div className="flex items-center gap-1 text-sm">
+                      <User className="w-3 h-3" />
+                      <span>{authorizingIP.last_user}</span>
+                    </div>
+                  )}
                 </AlertDescription>
               </Alert>
 

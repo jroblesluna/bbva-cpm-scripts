@@ -148,7 +148,11 @@ class PublicIP(Base):
     
     # Estado de autorización
     is_authorized = Column(Boolean, nullable=False, default=False, index=True)
-    
+
+    # Metadata de la última estación que intentó registrarse desde esta IP
+    last_hostname = Column(String(255), nullable=True)
+    last_user = Column(String(255), nullable=True)
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     first_seen = Column(DateTime, nullable=False, default=datetime.utcnow)  # Primera vez que intentó conectarse
