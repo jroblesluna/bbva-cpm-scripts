@@ -1,12 +1,12 @@
 {
-  "version": "5.4",
+  "version": "5.5",
   "name": "LPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Print Management (modo Print Server). Gestiona contingencia creando/eliminando cola local con puerto TCP híbrido. Persiste estado en registro para sobrevivir reinicios.",
   "created_at": "2026-06-01T12:00:00Z",
   "triggers": [
     {
       "event": "OnTrayLaunched",
-      "description": "Habilitar auto-actualización y asegurar cola remota conectada (si no está en contingencia)",
+      "description": "Habilitar auto-actualización. Leer semáforo de contingencia y aplicar estado correspondiente.",
       "actions": [
         {
           "type": "RunProcess",
@@ -17,6 +17,126 @@
             "timeout_seconds": 30,
             "window_style": "Hidden",
             "run_as_logged_in_user": false
+          }
+        },
+        {
+          "type": "ReadRegistryValue",
+          "description": "Leer semáforo ContingencyEnabled del registro",
+          "parameters": {
+            "key_path": "SOFTWARE\\Robles.AI\\AlwaysPrint",
+            "value_name": "ContingencyEnabled",
+            "default_value": "0"
+          },
+          "store_result_in": "contingency_enabled"
+        },
+        {
+          "type": "Conditional",
+          "description": "Si contingencia está activa (=1), leer IP y re-aplicar contingencia",
+          "parameters": {
+            "condition": {
+              "variable": "contingency_enabled",
+              "operator": "equals",
+              "value": "1"
+            },
+            "actions": [
+              {
+                "type": "ReadRegistryValue",
+                "description": "Leer IP de contingencia persistida",
+                "parameters": {
+                  "key_path": "SOFTWARE\\Robles.AI\\AlwaysPrint",
+                  "value_name": "ContingencyPrinterIp",
+                  "default_value": ""
+                },
+                "store_result_in": "contingency_printer_ip"
+              },
+              {
+                "type": "SetTcpPort",
+                "description": "Asegurar LPMCHybridPort apunta a IP de contingencia persistida",
+                "parameters": {
+                  "port_name": "LPMCHybridPort",
+                  "host_address": "{{contingency_printer_ip}}",
+                  "port_number": 9100
+                }
+              },
+              {
+                "type": "CheckPrintQueueExists",
+                "description": "Verificar si la cola corporativa ya existe",
+                "parameters": {
+                  "queue_name": "{{corporate_queue_name}}"
+                },
+                "store_result_in": "queue_exists"
+              },
+              {
+                "type": "Conditional",
+                "description": "Crear cola local solo si no existe",
+                "parameters": {
+                  "condition": {
+                    "variable": "queue_exists",
+                    "operator": "equals",
+                    "value": "false"
+                  },
+                  "actions": [
+                    {
+                      "type": "RunProcess",
+                      "description": "Crear cola local con puerto LPMCHybridPort",
+                      "parameters": {
+                        "file_path": "C:\\Windows\\System32\\rundll32.exe",
+                        "arguments": "printui.dll,PrintUIEntry /q /if /b \"{{corporate_queue_name}}\" /r \"LPMCHybridPort\" /m \"Lexmark Universal v2 XL\" /z",
+                        "timeout_seconds": 60,
+                        "window_style": "Hidden",
+                        "run_as_logged_in_user": false
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "RunProcess",
+                "description": "Establecer cola corporativa como impresora predeterminada",
+                "parameters": {
+                  "file_path": "C:\\Windows\\System32\\rundll32.exe",
+                  "arguments": "printui.dll,PrintUIEntry /q /y /n \"{{corporate_queue_name}}\"",
+                  "timeout_seconds": 30,
+                  "window_style": "Hidden",
+                  "run_as_logged_in_user": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "Conditional",
+          "description": "Si contingencia NO está activa (=0), asegurar cola remota conectada",
+          "parameters": {
+            "condition": {
+              "variable": "contingency_enabled",
+              "operator": "equals",
+              "value": "0"
+            },
+            "actions": [
+              {
+                "type": "RunProcess",
+                "description": "Conectar a cola remota del print server (silencioso)",
+                "parameters": {
+                  "file_path": "C:\\Windows\\System32\\rundll32.exe",
+                  "arguments": "printui.dll,PrintUIEntry /q /in /n \"{{remote_queue_path}}\"",
+                  "timeout_seconds": 60,
+                  "window_style": "Hidden",
+                  "run_as_logged_in_user": true
+                }
+              },
+              {
+                "type": "RunProcess",
+                "description": "Establecer cola remota como impresora predeterminada",
+                "parameters": {
+                  "file_path": "C:\\Windows\\System32\\rundll32.exe",
+                  "arguments": "printui.dll,PrintUIEntry /q /y /n \"{{remote_queue_path}}\"",
+                  "timeout_seconds": 30,
+                  "window_style": "Hidden",
+                  "run_as_logged_in_user": true
+                }
+              }
+            ]
           }
         }
       ]

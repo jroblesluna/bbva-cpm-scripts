@@ -266,6 +266,9 @@ namespace AlwaysPrintService.Actions
                 
                 case ActionTypes.CheckPrintQueueExists:
                     return ExecuteCheckPrintQueueExists(action);
+
+                case ActionTypes.ReadRegistryValue:
+                    return ExecuteReadRegistryValue(action);
                 
                 default:
                     AlwaysPrintLogger.WriteWarning($"ActionEngine: tipo de acción desconocido: {action.Type}");
@@ -759,6 +762,61 @@ namespace AlwaysPrintService.Actions
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteError($"CheckPrintQueueExists: error: {ex.Message}", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Lee un valor del registro de Windows y lo almacena en una variable.
+        /// Parámetros: key_path (string), value_name (string), default_value (string, opcional).
+        /// El resultado se almacena como string en la variable indicada por store_result_in.
+        /// Para DWORD, se convierte a string (ej: "0", "1").
+        /// </summary>
+        private bool ExecuteReadRegistryValue(ActionConfig action)
+        {
+            try
+            {
+                string keyPath = GetParameter<string>(action, "key_path") ?? "";
+                string valueName = GetParameter<string>(action, "value_name") ?? "";
+                string defaultValue = GetParameter<string>(action, "default_value") ?? "";
+
+                keyPath = ReplaceTemplates(keyPath);
+                valueName = ReplaceTemplates(valueName);
+
+                if (string.IsNullOrEmpty(keyPath) || string.IsNullOrEmpty(valueName))
+                {
+                    AlwaysPrintLogger.WriteWarning("ReadRegistryValue: key_path o value_name vacío");
+                    return false;
+                }
+
+                AlwaysPrintLogger.WriteInfo($"ReadRegistryValue: leyendo HKLM\\{keyPath}\\{valueName}");
+
+                string result = defaultValue;
+                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(keyPath, writable: false))
+                {
+                    if (key != null)
+                    {
+                        var regValue = key.GetValue(valueName);
+                        if (regValue != null)
+                            result = regValue.ToString() ?? defaultValue;
+                    }
+                }
+
+                AlwaysPrintLogger.WriteInfo($"ReadRegistryValue: {valueName} = '{result}'");
+
+                // Almacenar resultado en variable
+                if (!string.IsNullOrEmpty(action.StoreResultIn))
+                {
+                    _variables[action.StoreResultIn] = result;
+                    // También establecer como variable de configuración para uso en templates
+                    _configVariables[action.StoreResultIn] = result;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"ReadRegistryValue: error: {ex.Message}", ex);
                 return false;
             }
         }

@@ -330,10 +330,6 @@ namespace AlwaysPrintService
             
             // Ejecutar trigger OnTrayLaunched después de que el Tray se haya inicializado
             ExecuteActionTrigger(TriggerEvents.OnTrayLaunched);
-
-            // Verificar semáforo de contingencia persistido en registro.
-            // Si ContingencyEnabled=1, re-aplicar contingencia con la IP guardada.
-            CheckPersistedContingencyState();
         }
 
         /// <summary>
@@ -639,52 +635,6 @@ namespace AlwaysPrintService
             }
         }
 
-        /// <summary>
-        /// Verifica el semáforo de contingencia persistido en el registro.
-        /// Si ContingencyEnabled=1 y ContingencyPrinterIp tiene valor, re-aplica
-        /// la contingencia ejecutando OnContingencyActivated con la IP guardada.
-        /// Esto asegura que la contingencia sobreviva reinicios del equipo.
-        /// </summary>
-        private void CheckPersistedContingencyState()
-        {
-            try
-            {
-                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
-                    RegistryConfigManager.RegistryPath, writable: false))
-                {
-                    if (key == null) return;
-
-                    var enabledValue = key.GetValue("ContingencyEnabled");
-                    if (enabledValue == null) return;
-
-                    int enabled = Convert.ToInt32(enabledValue);
-                    if (enabled != 1) return;
-
-                    // Contingencia estaba activa antes del reinicio
-                    var printerIp = key.GetValue("ContingencyPrinterIp")?.ToString();
-                    if (string.IsNullOrEmpty(printerIp))
-                    {
-                        AlwaysPrintLogger.WriteWarning(
-                            "CheckPersistedContingencyState: ContingencyEnabled=1 pero sin ContingencyPrinterIp. No se re-aplica.");
-                        return;
-                    }
-
-                    AlwaysPrintLogger.WriteInfo(
-                        $"CheckPersistedContingencyState: contingencia persistida detectada. " +
-                        $"Re-aplicando con IP={printerIp}");
-
-                    // Establecer la IP y ejecutar el trigger
-                    _actionEngine.SetConfigVariable("contingency_printer_ip", printerIp!);
-                    ExecuteActionTrigger(TriggerEvents.OnContingencyActivated);
-                }
-            }
-            catch (Exception ex)
-            {
-                AlwaysPrintLogger.WriteWarning(
-                    $"CheckPersistedContingencyState: error verificando estado de contingencia: {ex.Message}");
-            }
-        }
-        
         /// <summary>
         /// Recarga la configuración de acciones desde el archivo.
         /// </summary>

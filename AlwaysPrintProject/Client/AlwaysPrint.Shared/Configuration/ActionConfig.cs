@@ -118,5 +118,6 @@ namespace AlwaysPrint.Shared.Configuration
         public const string SetDefaultPrinter = "SetDefaultPrinter";
         public const string RunProcess = "RunProcess";
         public const string CheckPrintQueueExists = "CheckPrintQueueExists";
+        public const string ReadRegistryValue = "ReadRegistryValue";
     }
 }
