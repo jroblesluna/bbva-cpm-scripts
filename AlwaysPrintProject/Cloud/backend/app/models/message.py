@@ -6,13 +6,16 @@ enviados por operadores a estaciones individuales, VLANs o cuentas completas.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 import enum
 
 from app.core.database import Base
 from app.models.organization import GUID  # Importar tipo GUID para consistencia
+
+# TTL por defecto para mensajes pendientes (en horas)
+MESSAGE_TTL_HOURS = 24
 
 
 class TargetType(str, enum.Enum):
@@ -69,6 +72,7 @@ class Message(Base):
     # === TIMESTAMPS ===
     sent_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     delivered_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True, index=True)  # TTL: después de esta fecha, deliveries PENDING se descartan
     
     # === RELACIONES ===
     organization = relationship("Organization", back_populates="messages")

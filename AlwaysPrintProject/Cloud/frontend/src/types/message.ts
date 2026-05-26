@@ -4,7 +4,7 @@
 
 export type TargetType = 'workstation' | 'vlan' | 'account'
 export type DeliveryMode = 'all' | 'only_connected'
-export type DeliveryStatus = 'pending' | 'sent' | 'skipped'
+export type DeliveryStatus = 'pending' | 'sent' | 'skipped' | 'expired'
 
 export interface Message {
   id: string
@@ -18,11 +18,13 @@ export interface Message {
   is_delivered: boolean
   sent_at: string
   delivered_at: string | null
+  expires_at: string | null
   // Resumen de entregas
   total_deliveries: number | null
   sent_deliveries: number | null
   pending_deliveries: number | null
   skipped_deliveries: number | null
+  expired_deliveries: number | null
 }
 
 export interface MessageDelivery {

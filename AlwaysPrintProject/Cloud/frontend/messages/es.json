@@ -287,7 +287,13 @@
     "selectStationOpt": "-- Seleccionar Estación --",
     "messageLabel": "Mensaje *",
     "messagePlaceholder": "Escribe tu mensaje aquí...",
-    "charCount": "{length} / 5000 caracteres"
+    "charCount": "{length} / 5000 caracteres",
+    "statusSent": "Enviado",
+    "statusPending": "Pendiente",
+    "statusSkipped": "Omitido",
+    "statusExpired": "Expirado",
+    "colMode": "Modo",
+    "colDeliveries": "Entregas"
   },
   "config": {
     "title": "Configuración",

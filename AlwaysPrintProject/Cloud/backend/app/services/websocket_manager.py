@@ -40,9 +40,6 @@ class ConnectionManager:
         # Un operador puede tener múltiples pestañas abiertas
         self.operator_connections: Dict[str, Set[WebSocket]] = {}
         
-        # Cola de mensajes pendientes: {workstation_id: List[dict]}
-        self.pending_messages: Dict[str, List[dict]] = {}
-        
         # Timestamps de último pong: {workstation_id: datetime}
         self.last_pong: Dict[str, datetime] = {}
         
@@ -81,9 +78,6 @@ class ConnectionManager:
             workstation_id=workstation_id,
             is_online=True
         )
-        
-        # Enviar mensajes pendientes
-        await self._send_pending_messages(workstation_id)
     
     async def disconnect_workstation(
         self, 
@@ -173,14 +167,16 @@ class ConnectionManager:
         """
         Envía mensaje a una workstation.
         
-        Si la workstation está offline, encola el mensaje.
+        Si la workstation está offline, descarta el mensaje (no encola).
+        Los mensajes de tipo "message" se gestionan por BD (deliveries),
+        no necesitan cola in-memory.
         
         Args:
             workstation_id: UUID de la workstation
             message: Mensaje a enviar (dict que se serializa a JSON)
             
         Returns:
-            True si se envió, False si se encoló
+            True si se envió, False si no se pudo enviar
         """
         async with self._lock:
             if workstation_id in self.workstation_connections:
@@ -194,10 +190,37 @@ class ConnectionManager:
                     if workstation_id in self.last_pong:
                         del self.last_pong[workstation_id]
             
-            # Workstation offline o error: encolar mensaje
-            if workstation_id not in self.pending_messages:
-                self.pending_messages[workstation_id] = []
-            self.pending_messages[workstation_id].append(message)
+            return False
+    
+    async def send_direct_to_workstation(
+        self,
+        workstation_id: str,
+        message: dict
+    ) -> bool:
+        """
+        Envía mensaje directamente a una workstation sin encolar.
+        
+        Diseñado para mensajes gestionados por BD (deliveries) donde el estado
+        se trackea en la tabla message_deliveries. No usa cola in-memory.
+        
+        Args:
+            workstation_id: UUID de la workstation
+            message: Mensaje a enviar (dict que se serializa a JSON)
+            
+        Returns:
+            True si se envió exitosamente, False si falló
+        """
+        async with self._lock:
+            if workstation_id in self.workstation_connections:
+                ws = self.workstation_connections[workstation_id]
+                try:
+                    await ws.send_json(message)
+                    return True
+                except Exception as e:
+                    # Conexión muerta, eliminar
+                    del self.workstation_connections[workstation_id]
+                    if workstation_id in self.last_pong:
+                        del self.last_pong[workstation_id]
             return False
     
     async def send_to_operator(
@@ -265,24 +288,6 @@ class ConnectionManager:
         
         for user_id in user_ids:
             await self.send_to_operator(user_id, message)
-    
-    async def _send_pending_messages(self, workstation_id: str):
-        """
-        Envía mensajes pendientes a una workstation recién conectada.
-        
-        Args:
-            workstation_id: UUID de la workstation
-        """
-        async with self._lock:
-            if workstation_id not in self.pending_messages:
-                return
-            
-            messages = self.pending_messages[workstation_id]
-            del self.pending_messages[workstation_id]
-        
-        # Enviar cada mensaje
-        for message in messages:
-            await self.send_to_workstation(workstation_id, message)
     
     async def handle_pong(self, workstation_id: str):
         """
@@ -383,14 +388,12 @@ class ConnectionManager:
         Returns:
             Dict con conteos: {
                 "workstations": int,
-                "operators": int,
-                "pending_messages": int
+                "operators": int
             }
         """
         return {
             "workstations": len(self.workstation_connections),
-            "operators": len(self.operator_connections),
-            "pending_messages": sum(len(msgs) for msgs in self.pending_messages.values())
+            "operators": len(self.operator_connections)
         }
 
     def register_command_waiter(self, command_id: str) -> asyncio.Event:

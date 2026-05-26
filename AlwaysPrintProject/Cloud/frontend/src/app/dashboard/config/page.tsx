@@ -8,7 +8,7 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslations } from 'next-intl';
-import { Settings, Info } from 'lucide-react';
+import { Settings } from 'lucide-react';
 
 export default function ConfigPage() {
   const { isAdmin } = useAuth();
@@ -24,17 +24,6 @@ export default function ConfigPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">{t('systemConfigTitle')}</h1>
         <p className="mt-2 text-gray-600">{t('systemConfigMsg')}</p>
-      </div>
-
-      {/* Jerarquía */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex">
-          <Info className="h-5 w-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="text-sm font-medium text-blue-900">{t('hierarchyTitle')}</h3>
-            <div className="mt-1 text-xs text-blue-600 font-mono">{t('systemHierarchy')}</div>
-          </div>
-        </div>
       </div>
 
       {/* Placeholder */}

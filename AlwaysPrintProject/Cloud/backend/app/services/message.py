@@ -5,17 +5,17 @@ Este servicio implementa la lógica de negocio para:
 - Envío de mensajes a workstations, VLANs o cuentas completas
 - Creación de entregas individuales (message_deliveries)
 - Push en tiempo real vía WebSocket a workstations online
-- Gestión de estado de entrega
+- Gestión de estado de entrega con TTL (expiración automática)
 - Consulta de mensajes pendientes y entregados
 """
 
 import asyncio
 import logging
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 
-from app.models.message import Message, TargetType, DeliveryMode
+from app.models.message import Message, TargetType, DeliveryMode, MESSAGE_TTL_HOURS
 from app.models.message_delivery import MessageDelivery, DeliveryStatus
 from app.models.workstation import Workstation
 from app.models.vlan import VLAN
@@ -68,6 +68,7 @@ class MessageService:
             )
         
         # Crear mensaje
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         message = Message(
             organization_id=organization_id,
             sender_id=sender_id,
@@ -76,7 +77,8 @@ class MessageService:
             content=content,
             delivery_mode=DeliveryMode.ALL,  # Siempre ALL para workstation individual
             is_delivered=False,
-            sent_at=datetime.now(timezone.utc).replace(tzinfo=None)
+            sent_at=now,
+            expires_at=now + timedelta(hours=MESSAGE_TTL_HOURS)
         )
         
         db.add(message)
@@ -125,6 +127,7 @@ class MessageService:
             )
         
         # Crear mensaje
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         message = Message(
             organization_id=organization_id,
             sender_id=sender_id,
@@ -133,7 +136,8 @@ class MessageService:
             content=content,
             delivery_mode=delivery_mode,
             is_delivered=False,
-            sent_at=datetime.now(timezone.utc).replace(tzinfo=None)
+            sent_at=now,
+            expires_at=now + timedelta(hours=MESSAGE_TTL_HOURS)
         )
         
         db.add(message)
@@ -169,6 +173,7 @@ class MessageService:
             )
         
         # Crear mensaje (target_id es NULL para broadcast a organización)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         message = Message(
             organization_id=organization_id,
             sender_id=sender_id,
@@ -177,7 +182,8 @@ class MessageService:
             content=content,
             delivery_mode=delivery_mode,
             is_delivered=False,
-            sent_at=datetime.now(timezone.utc).replace(tzinfo=None)
+            sent_at=now,
+            expires_at=now + timedelta(hours=MESSAGE_TTL_HOURS)
         )
         
         db.add(message)
@@ -238,6 +244,10 @@ class MessageService:
         Envía el mensaje vía WebSocket a todas las workstations online que tengan
         un delivery PENDING. Marca los deliveries como SENT.
         
+        Usa envío directo al WebSocket (sin pasar por la cola in-memory del
+        ConnectionManager) para garantizar que el status en BD se actualice
+        correctamente.
+        
         Returns:
             Número de workstations a las que se envió exitosamente.
         """
@@ -261,23 +271,14 @@ class MessageService:
             "sender_name": message.sender.full_name if message.sender else None,
         }
         
-        # Enviar en paralelo a las online
-        tasks = []
-        online_deliveries = []  # Lista ordenada de deliveries para las que se envía
-        
+        # Enviar directamente a las workstations online (bypass cola in-memory)
         for delivery in pending_deliveries:
             ws_id_str = str(delivery.workstation_id)
             if connection_manager.is_workstation_online(ws_id_str):
-                tasks.append(connection_manager.send_to_workstation(ws_id_str, ws_message))
-                online_deliveries.append(delivery)
-        
-        if tasks:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            for i, delivery in enumerate(online_deliveries):
-                result = results[i]
-                if result is True or (isinstance(result, bool) and result):
-                    # Enviado exitosamente
+                success = await connection_manager.send_direct_to_workstation(
+                    ws_id_str, ws_message
+                )
+                if success:
                     delivery.status = DeliveryStatus.SENT
                     delivery.delivered_at = now
                     sent_count += 1
@@ -298,6 +299,7 @@ class MessageService:
         """
         Actualiza is_delivered del mensaje padre basándose en el estado de sus deliveries.
         Se marca como entregado cuando no quedan deliveries PENDING.
+        (EXPIRED y SKIPPED se consideran "resueltos" — no bloquean la transición)
         """
         pending_count = db.query(MessageDelivery).filter(
             MessageDelivery.message_id == message.id,
@@ -306,7 +308,8 @@ class MessageService:
         
         if pending_count == 0:
             message.is_delivered = True
-            message.delivered_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            if not message.delivered_at:
+                message.delivered_at = datetime.now(timezone.utc).replace(tzinfo=None)
     
     def mark_delivery_as_sent(
         self,
@@ -317,6 +320,8 @@ class MessageService:
         """
         Marca un delivery específico como enviado.
         Usado cuando se envía un mensaje pendiente al reconectar una workstation.
+        
+        Verifica TTL antes de marcar: si el mensaje expiró, marca como EXPIRED.
         """
         delivery = db.query(MessageDelivery).filter(
             MessageDelivery.message_id == message_id,
@@ -325,11 +330,22 @@ class MessageService:
         ).first()
         
         if delivery:
-            delivery.status = DeliveryStatus.SENT
-            delivery.delivered_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            message = db.query(Message).filter_by(id=message_id).first()
+            
+            # Verificar TTL: si expiró, marcar como EXPIRED en vez de SENT
+            if message and message.expires_at and now > message.expires_at:
+                delivery.status = DeliveryStatus.EXPIRED
+                delivery.delivered_at = now
+                logger.info(
+                    f"[MENSAJES] Delivery expirado al reconectar: "
+                    f"message_id={message_id}, workstation_id={workstation_id}"
+                )
+            else:
+                delivery.status = DeliveryStatus.SENT
+                delivery.delivered_at = now
             
             # Verificar si el mensaje padre se completó
-            message = db.query(Message).filter_by(id=message_id).first()
             if message:
                 self._update_message_delivered_status(db, message)
             
@@ -344,14 +360,46 @@ class MessageService:
     ) -> List[MessageDelivery]:
         """
         Obtiene deliveries pendientes para una workstation (al reconectar).
-        Solo retorna deliveries con status PENDING.
+        
+        Implementa expiración lazy: si el mensaje ya superó su TTL (expires_at),
+        marca el delivery como EXPIRED y no lo retorna. Esto evita la necesidad
+        de un cron job o tarea periódica.
+        
+        Solo retorna deliveries con status PENDING cuyo mensaje no ha expirado.
         """
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        
         deliveries = db.query(MessageDelivery).filter(
             MessageDelivery.workstation_id == workstation_id,
             MessageDelivery.status == DeliveryStatus.PENDING
         ).join(Message).order_by(Message.sent_at.asc()).all()
         
-        return deliveries
+        valid_deliveries = []
+        expired_message_ids = set()
+        
+        for delivery in deliveries:
+            msg = delivery.message
+            # Verificar TTL: si expires_at existe y ya pasó, marcar como expirado
+            if msg.expires_at and now > msg.expires_at:
+                delivery.status = DeliveryStatus.EXPIRED
+                delivery.delivered_at = now
+                expired_message_ids.add(str(msg.id))
+            else:
+                valid_deliveries.append(delivery)
+        
+        # Actualizar estado de mensajes padre para los expirados
+        if expired_message_ids:
+            for msg_id in expired_message_ids:
+                message = db.query(Message).filter_by(id=msg_id).first()
+                if message:
+                    self._update_message_delivered_status(db, message)
+            db.commit()
+            logger.info(
+                f"[MENSAJES] Deliveries expirados para workstation={workstation_id}: "
+                f"{len(expired_message_ids)} mensajes descartados por TTL"
+            )
+        
+        return valid_deliveries
     
     def get_deliveries_for_message(
         self,
@@ -372,7 +420,7 @@ class MessageService:
     ) -> dict:
         """
         Obtiene resumen de entregas para un mensaje.
-        Returns: {total, sent, pending, skipped}
+        Returns: {total, sent, pending, skipped, expired}
         """
         deliveries = db.query(MessageDelivery).filter(
             MessageDelivery.message_id == message_id
@@ -382,12 +430,14 @@ class MessageService:
         sent = sum(1 for d in deliveries if d.status == DeliveryStatus.SENT)
         pending = sum(1 for d in deliveries if d.status == DeliveryStatus.PENDING)
         skipped = sum(1 for d in deliveries if d.status == DeliveryStatus.SKIPPED)
+        expired = sum(1 for d in deliveries if d.status == DeliveryStatus.EXPIRED)
         
         return {
             "total": total,
             "sent": sent,
             "pending": pending,
-            "skipped": skipped
+            "skipped": skipped,
+            "expired": expired
         }
     
     # === MÉTODOS LEGACY (compatibilidad) ===

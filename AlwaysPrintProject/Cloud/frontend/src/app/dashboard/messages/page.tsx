@@ -127,11 +127,13 @@ export default function MessagesPage() {
   const getDeliveryStatusBadge = (status: string) => {
     switch (status) {
       case 'sent':
-        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="mr-1 h-3 w-3" />Enviado</Badge>
+        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="mr-1 h-3 w-3" />{t('statusSent')}</Badge>
       case 'pending':
-        return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="mr-1 h-3 w-3" />Pendiente</Badge>
+        return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="mr-1 h-3 w-3" />{t('statusPending')}</Badge>
       case 'skipped':
-        return <Badge className="bg-gray-100 text-gray-800"><XCircle className="mr-1 h-3 w-3" />Omitido</Badge>
+        return <Badge className="bg-gray-100 text-gray-800"><XCircle className="mr-1 h-3 w-3" />{t('statusSkipped')}</Badge>
+      case 'expired':
+        return <Badge className="bg-red-100 text-red-800"><XCircle className="mr-1 h-3 w-3" />{t('statusExpired')}</Badge>
       default:
         return <Badge className="bg-gray-100 text-gray-800">{status}</Badge>
     }

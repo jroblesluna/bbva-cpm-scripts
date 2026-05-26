@@ -20,6 +20,7 @@ class DeliveryStatus(str, enum.Enum):
     PENDING = "pending"          # Esperando entrega (workstation offline)
     SENT = "sent"                # Enviado por WebSocket (sin confirmación del Tray)
     SKIPPED = "skipped"          # No se envió (delivery_mode=only_connected y estaba offline)
+    EXPIRED = "expired"          # TTL expirado, mensaje descartado sin entregar
 
 
 class MessageDelivery(Base):

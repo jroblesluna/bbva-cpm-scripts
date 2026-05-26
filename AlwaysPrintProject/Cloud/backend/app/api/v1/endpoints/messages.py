@@ -53,10 +53,12 @@ def _build_message_response(db: Session, message: Message) -> dict:
         "is_delivered": message.is_delivered,
         "sent_at": message.sent_at,
         "delivered_at": message.delivered_at,
+        "expires_at": message.expires_at,
         "total_deliveries": summary["total"],
         "sent_deliveries": summary["sent"],
         "pending_deliveries": summary["pending"],
         "skipped_deliveries": summary["skipped"],
+        "expired_deliveries": summary["expired"],
     }
 
 

@@ -71,11 +71,13 @@ class MessageResponse(BaseModel):
     is_delivered: bool
     sent_at: datetime
     delivered_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
     # Resumen de entregas
     total_deliveries: Optional[int] = None
     sent_deliveries: Optional[int] = None
     pending_deliveries: Optional[int] = None
     skipped_deliveries: Optional[int] = None
+    expired_deliveries: Optional[int] = None
 
     model_config = {"from_attributes": True}
 
