@@ -92,7 +92,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       items: [
         { key: 'users', href: '/dashboard/admin/users', icon: Users, adminOnly: true },
         { key: 'updates', href: '/dashboard/admin/updates', icon: Download, adminOnly: true },
-        { key: 'config', href: '/dashboard/config', icon: Settings },
+        { key: 'config', href: '/dashboard/config', icon: Settings, adminOnly: true },
       ],
     },
   ]

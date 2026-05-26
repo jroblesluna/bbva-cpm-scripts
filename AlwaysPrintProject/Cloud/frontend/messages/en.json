@@ -712,6 +712,17 @@
     "pagination": "Showing {start} to {end} of {total} devices",
     "pageNumber": "Page {page}"
   },
+  "orgEdit": {
+    "title": "Edit: {name}",
+    "subtitle": "Full organization configuration",
+    "tabGeneral": "General",
+    "tabPrinting": "Printing",
+    "tabNetwork": "Network",
+    "tabConnectivity": "Connectivity",
+    "tabUpdates": "Updates",
+    "tabActions": "Actions",
+    "tabIps": "Public IPs"
+  },
   "logAnalysis": {
     "buttonLabel": "AI Log Analysis",
     "buttonTitle": "Analyze today's log with artificial intelligence",
