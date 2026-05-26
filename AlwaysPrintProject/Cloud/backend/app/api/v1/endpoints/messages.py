@@ -37,9 +37,23 @@ logger = logging.getLogger(__name__)
 
 
 def _build_message_response(db: Session, message: Message) -> dict:
-    """Construye la respuesta de un mensaje con resumen de entregas."""
+    """Construye la respuesta de un mensaje con resumen de entregas.
+    
+    Incluye reconciliación lazy: si no quedan deliveries PENDING pero
+    is_delivered sigue en False (datos legacy), lo corrige automáticamente.
+    """
     message_service = MessageService()
     summary = message_service.get_delivery_summary(db, str(message.id))
+    
+    # Reconciliación lazy: corregir is_delivered si los deliveries ya están resueltos
+    # Cubre: mensajes con todos los deliveries SENT/SKIPPED/EXPIRED, y mensajes legacy sin deliveries
+    if not message.is_delivered and summary["pending"] == 0:
+        message.is_delivered = True
+        if not message.delivered_at:
+            from datetime import datetime, timezone
+            message.delivered_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        db.commit()
+        db.refresh(message)
     
     return {
         "id": message.id,
