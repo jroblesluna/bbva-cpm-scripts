@@ -677,6 +677,9 @@ namespace AlwaysPrintTray.Cloud
                     
                     // Verificar configuración de acciones ahora que tenemos WorkstationId
                     CheckActionConfiguration();
+
+                    // Descargar recursos de VLAN (metadata, impresoras de contingencia)
+                    DownloadResources();
                 }
 
                 _credentials.SaveLastConnected(DateTime.UtcNow);
@@ -1515,6 +1518,35 @@ namespace AlwaysPrintTray.Cloud
             {
                 AlwaysPrintLogger.WriteTrayError(
                     $"CloudManager: error en CheckActionConfiguration: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Descarga los recursos de la VLAN (metadata, impresoras de contingencia)
+        /// y los guarda en resources.json para uso offline.
+        /// </summary>
+        private async void DownloadResources()
+        {
+            try
+            {
+                if (_configManager == null || !_credentials.IsRegistered)
+                    return;
+
+                AlwaysPrintLogger.WriteTrayInfo("CloudManager: descargando recursos de VLAN");
+
+                bool success = await _configManager.DownloadResourcesAsync(
+                    _config.CloudApiUrl,
+                    _credentials.WorkstationId!,
+                    _credentials.WorkstationId!);
+
+                if (success)
+                    AlwaysPrintLogger.WriteTrayInfo("CloudManager: recursos de VLAN actualizados");
+                else
+                    AlwaysPrintLogger.WriteTrayWarning("CloudManager: error descargando recursos de VLAN");
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError($"CloudManager: error en DownloadResources: {ex.Message}");
             }
         }
     }

@@ -284,4 +284,18 @@ namespace AlwaysPrint.Shared.Messages
         [JsonProperty("message")]
         public string Message { get; set; } = string.Empty;
     }
+
+    // ── Recursos de VLAN ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Payload enviado del Tray al Service para que persista los recursos
+    /// de la VLAN en disco (C:\ProgramData\AlwaysPrint\config\resources.json).
+    /// Contiene metadata de VLAN, impresoras de contingencia y remote_queue_path.
+    /// </summary>
+    public class SaveResourcesPayload
+    {
+        /// <summary>JSON completo de los recursos descargados del endpoint /resources.</summary>
+        [JsonProperty("resourcesJson")]
+        public string ResourcesJson { get; set; } = string.Empty;
+    }
 }

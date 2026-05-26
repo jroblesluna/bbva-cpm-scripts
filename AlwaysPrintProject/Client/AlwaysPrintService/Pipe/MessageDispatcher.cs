@@ -61,6 +61,7 @@ namespace AlwaysPrintService.Pipe
                     MessageType.SaveActionConfig            => HandleSaveActionConfig(request),
                     MessageType.InstallUpdate               => HandleInstallUpdate(request),
                     MessageType.ForcedContingencyChanged    => HandleForcedContingencyChanged(request),
+                    MessageType.SaveResources               => HandleSaveResources(request),
                     _ => PipeMessage.Reply(request, MessageType.Error,
                             new ErrorPayload { Code = "UNKNOWN_TYPE", Message = $"Unknown message type: {request.Type}" })
                 };
@@ -372,6 +373,60 @@ namespace AlwaysPrintService.Pipe
                 AlwaysPrintLogger.WriteError(
                     $"HandleForcedContingencyChanged: error: {ex.Message}",
                     AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = $"Error: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Maneja la solicitud del Tray para guardar los recursos de VLAN en disco.
+        /// Escribe en C:\ProgramData\AlwaysPrint\config\resources.json y luego
+        /// carga los valores de metadata como variables del ActionEngine.
+        /// </summary>
+        private PipeMessage HandleSaveResources(PipeMessage req)
+        {
+            try
+            {
+                AlwaysPrintLogger.WriteInfo("SaveResources: solicitud de escritura de recursos recibida del Tray");
+
+                var payload = req.GetPayload<SaveResourcesPayload>();
+                if (payload == null || string.IsNullOrEmpty(payload.ResourcesJson))
+                {
+                    return PipeMessage.Reply(req, MessageType.Error,
+                        new ErrorPayload { Code = "INVALID_PAYLOAD", Message = "SaveResourcesPayload ausente o vacío." });
+                }
+
+                string configDir = PipeConstants.ActionConfigDirectory;
+                string resourcesPath = PipeConstants.ResourcesFilePath;
+
+                // Asegurar que el directorio existe
+                if (!Directory.Exists(configDir))
+                    Directory.CreateDirectory(configDir);
+
+                // Escritura atómica: tmp + rename
+                string tempPath = resourcesPath + ".tmp";
+                File.WriteAllText(tempPath, payload.ResourcesJson, Encoding.UTF8);
+
+                if (File.Exists(resourcesPath))
+                    File.Delete(resourcesPath);
+                File.Move(tempPath, resourcesPath);
+
+                AlwaysPrintLogger.WriteInfo($"SaveResources: recursos guardados en {resourcesPath}");
+
+                // Disparar recarga de variables desde resources.json
+                // (el callback de recarga de action config también recarga variables)
+                if (_reloadActionConfigCallback != null)
+                {
+                    var task = new ReloadActionConfigTask(_reloadActionConfigCallback);
+                    _taskQueue.Enqueue(task);
+                }
+
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = true, Message = "Recursos guardados." });
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"SaveResources: error: {ex.Message}", AlwaysPrintLogger.EvtGenericError);
                 return PipeMessage.Reply(req, MessageType.Ack,
                     new AckPayload { Success = false, Message = $"Error: {ex.Message}" });
             }

@@ -330,6 +330,99 @@ namespace AlwaysPrintTray.Cloud
                 return null;
             }
         }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // DESCARGA DE RECURSOS DE VLAN
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Descarga los recursos de la VLAN (metadata, impresoras de contingencia)
+        /// desde el endpoint /workstations/{id}/resources y los guarda en resources.json
+        /// vía el Service. Los valores de metadata se inyectan como variables del ActionEngine.
+        /// </summary>
+        public async Task<bool> DownloadResourcesAsync(string cloudApiUrl, string workstationId, string apiKey)
+        {
+            try
+            {
+                AlwaysPrintLogger.WriteInfo("ConfigManager: descargando recursos de VLAN");
+
+                string url = $"{cloudApiUrl.TrimEnd('/')}/api/v1/workstations/{workstationId}/resources";
+
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Add("X-API-Key", apiKey);
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    AlwaysPrintLogger.WriteInfo("ConfigManager: endpoint /resources retornó 404 (workstation sin VLAN)");
+                    return true;
+                }
+
+                if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                {
+                    AlwaysPrintLogger.WriteWarning("ConfigManager: sin permisos para obtener recursos");
+                    return false;
+                }
+
+                response.EnsureSuccessStatusCode();
+
+                string resourcesJson = await response.Content.ReadAsStringAsync();
+
+                // Enviar al Service para que lo persista en disco
+                bool saved = SendSaveResourcesToService(resourcesJson);
+
+                if (saved)
+                    AlwaysPrintLogger.WriteInfo("ConfigManager: recursos guardados exitosamente en resources.json");
+                else
+                    AlwaysPrintLogger.WriteWarning("ConfigManager: no se pudieron guardar los recursos");
+
+                return saved;
+            }
+            catch (HttpRequestException ex)
+            {
+                AlwaysPrintLogger.WriteWarning($"ConfigManager: error descargando recursos: {ex.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"ConfigManager: error inesperado descargando recursos: {ex.Message}", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Envía los recursos descargados al Service para que los persista en disco.
+        /// </summary>
+        private bool SendSaveResourcesToService(string resourcesJson)
+        {
+            try
+            {
+                if (!_pipeClient.IsConnected)
+                {
+                    AlwaysPrintLogger.WriteWarning("ConfigManager: pipe no conectado, no se pueden guardar recursos");
+                    return false;
+                }
+
+                var payload = new SaveResourcesPayload { ResourcesJson = resourcesJson };
+                var message = PipeMessage.Create(MessageType.SaveResources, payload);
+                var pipeResponse = _pipeClient.Send(message);
+
+                if (pipeResponse == null)
+                    return false;
+
+                if (pipeResponse.Type == MessageType.Error)
+                    return false;
+
+                var ack = pipeResponse.GetPayload<AckPayload>();
+                return ack?.Success == true;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"ConfigManager: error enviando recursos al Service: {ex.Message}", ex);
+                return false;
+            }
+        }
     }
     
     // ═══════════════════════════════════════════════════════════════════════

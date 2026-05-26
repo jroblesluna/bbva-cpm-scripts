@@ -560,6 +560,9 @@ namespace AlwaysPrintService
                 _actionEngine.SetConfigVariable("registry_path", @"HKLM\" + RegistryConfigManager.RegistryPath);
                 // contingency_printer_ip se establece dinámicamente al activar contingencia
                 // (se resuelve desde la configuración de la workstation o el parámetro del trigger)
+
+                // Cargar variables desde resources.json (metadata de VLAN)
+                LoadResourceVariables();
                 
                 if (File.Exists(ConfigFilePath))
                 {
@@ -587,6 +590,48 @@ namespace AlwaysPrintService
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteError($"Error cargando configuración de acciones: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// Carga variables desde resources.json (metadata de VLAN) en el ActionEngine.
+        /// Cada clave del objeto vlan_metadata se establece como variable de configuración.
+        /// </summary>
+        private void LoadResourceVariables()
+        {
+            try
+            {
+                string resourcesPath = PipeConstants.ResourcesFilePath;
+                if (!File.Exists(resourcesPath))
+                    return;
+
+                string json = File.ReadAllText(resourcesPath, System.Text.Encoding.UTF8);
+                var obj = Newtonsoft.Json.Linq.JObject.Parse(json);
+
+                // Cargar remote_queue_path directamente si existe
+                var remoteQueuePath = obj["remote_queue_path"]?.ToString();
+                if (!string.IsNullOrEmpty(remoteQueuePath))
+                    _actionEngine.SetConfigVariable("remote_queue_path", remoteQueuePath!);
+
+                // Cargar todas las claves de vlan_metadata como variables
+                var metadata = obj["vlan_metadata"] as Newtonsoft.Json.Linq.JObject;
+                if (metadata != null)
+                {
+                    foreach (var prop in metadata.Properties())
+                    {
+                        string value = prop.Value?.ToString() ?? "";
+                        if (!string.IsNullOrEmpty(value))
+                            _actionEngine.SetConfigVariable(prop.Name, value);
+                    }
+                }
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"LoadResourceVariables: variables cargadas desde resources.json" +
+                    (remoteQueuePath != null ? $" (remote_queue_path={remoteQueuePath})" : ""));
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning($"LoadResourceVariables: error leyendo resources.json: {ex.Message}");
             }
         }
         

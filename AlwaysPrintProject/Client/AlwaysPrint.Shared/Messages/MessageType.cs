@@ -38,5 +38,8 @@ namespace AlwaysPrint.Shared.Messages
         // Contingencia forzada
         ForcedContingencyChanged,    // Tray → Service: contingencia forzada activada/desactivada desde Cloud
         ContingencyResult,           // Service → Tray (push): resultado de la ejecución de contingencia
+
+        // Recursos de VLAN
+        SaveResources,               // Tray → Service: guardar resources.json en disco
     }
 }

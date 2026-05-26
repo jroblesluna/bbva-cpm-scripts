@@ -27,5 +27,12 @@ namespace AlwaysPrint.Shared.Messages
         /// Ruta: C:\ProgramData\AlwaysPrint\config\active.alwaysconfig
         /// </summary>
         public static string ActionConfigFilePath => Path.Combine(ActionConfigDirectory, "active.alwaysconfig");
+
+        /// <summary>
+        /// Ruta completa del archivo de recursos de la VLAN.
+        /// Ruta: C:\ProgramData\AlwaysPrint\config\resources.json
+        /// Contiene metadata de VLAN, impresoras de contingencia, remote_queue_path, etc.
+        /// </summary>
+        public static string ResourcesFilePath => Path.Combine(ActionConfigDirectory, "resources.json");
     }
 }

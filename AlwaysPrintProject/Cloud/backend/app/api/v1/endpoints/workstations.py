@@ -1188,11 +1188,14 @@ class WorkstationResourcesResponse(BaseModel):
             })
 def get_workstation_resources(
     workstation_id: UUID,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Obtener recursos de contingencia para una workstation.
+    
+    Este endpoint NO requiere autenticación Bearer (usa workstation_id como identificación,
+    similar al endpoint de action config). Permite que el Tray descargue recursos
+    usando solo su workstation_id como X-API-Key.
     
     Retorna la información necesaria para que el cliente descargue
     y almacene en resources.json:
@@ -1225,14 +1228,6 @@ def get_workstation_resources(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workstation con ID {workstation_id} no encontrada"
         )
-
-    # Verificar permisos: operadores solo pueden ver recursos de su cuenta
-    if current_user.role == UserRole.OPERATOR:
-        if workstation.organization_id != current_user.organization_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No tienes permisos para ver los recursos de esta workstation"
-            )
 
     # Obtener VLAN de la workstation
     vlan_metadata = None
