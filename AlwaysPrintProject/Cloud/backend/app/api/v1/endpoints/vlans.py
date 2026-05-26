@@ -277,7 +277,7 @@ def list_vlan_workstations(
 
 
 @router.patch("/{vlan_id}/forced-contingency")
-def toggle_vlan_forced_contingency(
+async def toggle_vlan_forced_contingency(
     vlan_id: UUID,
     enabled: bool = Query(..., description="Activar o desactivar contingencia forzada"),
     current_user: User = Depends(get_current_user),
@@ -290,7 +290,6 @@ def toggle_vlan_forced_contingency(
     from app.services.websocket_manager import connection_manager
     from app.models.workstation import Workstation
     from app.models.device import Device
-    import asyncio
     import logging as log_module
 
     vlan = db.query(VLAN).filter(VLAN.id == vlan_id).first()
@@ -354,11 +353,7 @@ def toggle_vlan_forced_contingency(
 
         ws_id_str = str(ws.id)
         if connection_manager.is_workstation_online(ws_id_str):
-            try:
-                loop = asyncio.get_event_loop()
-                loop.create_task(connection_manager.send_to_workstation(ws_id_str, message))
-            except RuntimeError:
-                pass
+            await connection_manager.send_to_workstation(ws_id_str, message)
 
     return {
         "forced_contingency": vlan.forced_contingency,
