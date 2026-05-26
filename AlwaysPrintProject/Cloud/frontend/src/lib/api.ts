@@ -338,6 +338,21 @@ export const organizationsApi = {
     )
     return response.data
   },
+
+  /**
+   * Enviar comando remoto a todas las workstations online de una organización.
+   */
+  sendCommand: async (
+    id: string,
+    commandType: 'restart_service' | 'restart_tray' | 'check_update'
+  ): Promise<{ command_type: string; organization_id: string; dispatched: number }> => {
+    const response = await apiClient.post(
+      `/organizations/${id}/command`,
+      null,
+      { params: { command_type: commandType } }
+    )
+    return response.data
+  },
 }
 
 
@@ -630,6 +645,21 @@ export const vlansApi = {
       `/vlans/${id}/forced-contingency`,
       null,
       { params: { enabled } }
+    )
+    return response.data
+  },
+
+  /**
+   * Enviar comando remoto a todas las workstations online de una VLAN.
+   */
+  sendCommand: async (
+    id: string,
+    commandType: 'restart_service' | 'restart_tray' | 'check_update'
+  ): Promise<{ command_type: string; vlan_id: string; dispatched: number }> => {
+    const response = await apiClient.post(
+      `/vlans/${id}/command`,
+      null,
+      { params: { command_type: commandType } }
     )
     return response.data
   },

@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
@@ -30,8 +30,11 @@ import {
   ChevronRight,
   Star,
   RefreshCw,
+  RotateCcw,
+  RefreshCcw,
+  Download,
 } from 'lucide-react'
-import { apiClient } from '@/lib/api'
+import { apiClient, vlansApi } from '@/lib/api'
 import type { VLAN, VLANCreate, VLANUpdate, VLANDetail } from '@/types/vlan'
 import type { Device, DeviceCreate } from '@/types/device'
 import { formatDateWithTimezone } from '@/lib/dateUtils'
@@ -74,6 +77,8 @@ export default function VLANsPage() {
   const [activeDeviceCounts, setActiveDeviceCounts] = useState<Record<string, number>>({})
   const [showAddDeviceModal, setShowAddDeviceModal] = useState(false)
   const [addDeviceVlan, setAddDeviceVlan] = useState<VLAN | null>(null)
+  const [bulkCommandTarget, setBulkCommandTarget] = useState<{ vlan: VLAN; commandType: 'restart_service' | 'restart_tray' | 'check_update' } | null>(null)
+  const [bulkCommandPending, setBulkCommandPending] = useState(false)
   const [page, setPage] = useState(1)
   const pageSize = viewMode === 'cards' ? 10 : 20
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
@@ -217,6 +222,28 @@ export default function VLANsPage() {
         title: t('forcedContingency'),
         description: detail ?? t('forcedContingencyError'),
       })
+    }
+  }
+
+  const handleBulkCommand = async () => {
+    if (!bulkCommandTarget) return
+    setBulkCommandPending(true)
+    try {
+      const result = await vlansApi.sendCommand(bulkCommandTarget.vlan.id, bulkCommandTarget.commandType)
+      const labels: Record<string, string> = {
+        restart_service: 'Reiniciar Servicio',
+        restart_tray: 'Reiniciar Tray',
+        check_update: 'Verificar Actualización',
+      }
+      toast({
+        title: 'Comando enviado',
+        description: `"${labels[bulkCommandTarget.commandType]}" enviado a ${result.dispatched} workstation(s) online en VLAN "${bulkCommandTarget.vlan.name}".`,
+      })
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo enviar el comando.' })
+    } finally {
+      setBulkCommandPending(false)
+      setBulkCommandTarget(null)
     }
   }
 
@@ -467,6 +494,33 @@ export default function VLANsPage() {
                 <Button
                   variant="ghost"
                   size="sm"
+                  onClick={() => setBulkCommandTarget({ vlan, commandType: 'restart_service' })}
+                  title="Reiniciar Servicio (todas las WS)"
+                  className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setBulkCommandTarget({ vlan, commandType: 'restart_tray' })}
+                  title="Reiniciar Tray (todas las WS)"
+                  className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700"
+                >
+                  <RefreshCcw className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setBulkCommandTarget({ vlan, commandType: 'check_update' })}
+                  title="Verificar Actualización (todas las WS)"
+                  className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleViewDevices(vlan)}
                   title={t('viewDevices')}
                   className="h-8 w-8 p-0"
@@ -575,6 +629,15 @@ export default function VLANsPage() {
                             )}
                           </Tooltip>
                         </TooltipProvider>
+                        <Button variant="ghost" size="sm" onClick={() => setBulkCommandTarget({ vlan, commandType: 'restart_service' })} title="Reiniciar Servicio (todas las WS)" className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700">
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setBulkCommandTarget({ vlan, commandType: 'restart_tray' })} title="Reiniciar Tray (todas las WS)" className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700">
+                          <RefreshCcw className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setBulkCommandTarget({ vlan, commandType: 'check_update' })} title="Verificar Actualización (todas las WS)" className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700">
+                          <Download className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleViewDevices(vlan)} title={t('viewDevices')} className="h-8 w-8 p-0">
                           <Printer className="h-4 w-4" />
                         </Button>
@@ -735,6 +798,63 @@ export default function VLANsPage() {
           }}
         />
       )}
+
+      {/* Modal de confirmación de comando bulk VLAN */}
+      {bulkCommandTarget && (() => {
+        const { vlan, commandType } = bulkCommandTarget
+        const labels: Record<string, { title: string; icon: React.ReactNode; desc: string; warning: string; color: string }> = {
+          restart_service: {
+            title: 'Reiniciar Servicio',
+            icon: <RotateCcw className="w-5 h-5 text-amber-600" />,
+            desc: `Se enviará la orden de reiniciar el servicio AlwaysPrint a todas las workstations online de la VLAN "${vlan.name}".`,
+            warning: 'Las impresiones en curso pueden interrumpirse. El servicio se restablecerá automáticamente en segundos.',
+            color: 'bg-amber-600 hover:bg-amber-700',
+          },
+          restart_tray: {
+            title: 'Reiniciar Tray',
+            icon: <RefreshCcw className="w-5 h-5 text-amber-600" />,
+            desc: `Se enviará la orden de reiniciar la aplicación Tray a todas las workstations online de la VLAN "${vlan.name}".`,
+            warning: 'El Tray se cerrará y el servicio lo relanzará automáticamente en segundos.',
+            color: 'bg-amber-600 hover:bg-amber-700',
+          },
+          check_update: {
+            title: 'Verificar Actualización',
+            icon: <Download className="w-5 h-5 text-blue-600" />,
+            desc: `Se forzará la verificación de actualizaciones disponibles en todas las workstations online de la VLAN "${vlan.name}".`,
+            warning: 'Si hay una nueva versión disponible, se descargará e instalará automáticamente.',
+            color: 'bg-blue-600 hover:bg-blue-700',
+          },
+        }
+        const meta = labels[commandType]
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center gap-2 mb-4">
+                {meta.icon}
+                <h2 className="text-lg font-bold text-gray-900">{meta.title} — VLAN</h2>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">{meta.desc}</p>
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-4">{meta.warning}</p>
+              <div className="flex justify-end gap-3">
+                <button
+                  className="px-4 py-2 rounded border border-gray-300 text-sm hover:bg-gray-50"
+                  onClick={() => setBulkCommandTarget(null)}
+                  disabled={bulkCommandPending}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className={`px-4 py-2 rounded text-white text-sm ${meta.color} disabled:opacity-60`}
+                  onClick={handleBulkCommand}
+                  disabled={bulkCommandPending}
+                >
+                  {bulkCommandPending ? 'Enviando...' : `Confirmar — ${meta.title}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

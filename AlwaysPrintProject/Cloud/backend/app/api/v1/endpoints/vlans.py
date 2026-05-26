@@ -362,6 +362,62 @@ async def toggle_vlan_forced_contingency(
     }
 
 
+@router.post("/{vlan_id}/command")
+async def send_vlan_command(
+    vlan_id: UUID,
+    command_type: str = Query(..., description="Tipo de comando: restart_service, restart_tray, check_update"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Enviar un comando remoto a todas las workstations online de una VLAN.
+
+    Comandos soportados:
+    - restart_service: Reinicia el servicio AlwaysPrintService
+    - restart_tray: Reinicia la aplicación Tray
+    - check_update: Fuerza verificación de actualización
+    """
+    import logging as log_module
+    from uuid import uuid4
+    from app.services.websocket_manager import connection_manager
+    from app.models.workstation import Workstation
+
+    vlan = db.query(VLAN).filter(VLAN.id == vlan_id).first()
+    if not vlan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
+
+    if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
+
+    valid_commands = ["restart_service", "restart_tray", "check_update"]
+    if command_type not in valid_commands:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Comando inválido: {command_type}. Válidos: {', '.join(valid_commands)}"
+        )
+
+    workstations = db.query(Workstation).filter(Workstation.vlan_id == vlan_id).all()
+
+    dispatched = 0
+    for ws in workstations:
+        ws_id = str(ws.id)
+        if connection_manager.is_workstation_online(ws_id):
+            await connection_manager.send_to_workstation(ws_id, {
+                "type": "command",
+                "command_id": str(uuid4()),
+                "command_type": command_type,
+                "params": {},
+            })
+            dispatched += 1
+
+    log_module.getLogger(__name__).info(
+        "Comando VLAN enviado: vlan_id=%s, command_type=%s, dispatched=%d, user_id=%s",
+        vlan_id, command_type, dispatched, current_user.id,
+    )
+
+    return {"command_type": command_type, "vlan_id": str(vlan_id), "dispatched": dispatched}
+
+
 @router.patch("/{vlan_id}/default-device")
 async def set_vlan_default_device(
     request: Request,

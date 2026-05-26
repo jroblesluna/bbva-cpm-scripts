@@ -740,3 +740,51 @@ def set_target_version(
         organization_id=str(organization.id),
         updated_at=organization.updated_at,
     )
+
+
+@router.post("/{org_id}/command")
+async def send_org_command(
+    org_id: UUID,
+    command_type: str = Query(..., description="Tipo de comando: restart_service, restart_tray, check_update"),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Enviar un comando remoto a todas las workstations online de una organización.
+
+    Comandos soportados:
+    - restart_service: Reinicia el servicio AlwaysPrintService
+    - restart_tray: Reinicia la aplicación Tray
+    - check_update: Fuerza verificación de actualización
+    """
+    organization = db.query(Organization).filter(Organization.id == org_id).first()
+    if not organization:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organización no encontrada")
+
+    valid_commands = ["restart_service", "restart_tray", "check_update"]
+    if command_type not in valid_commands:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Comando inválido: {command_type}. Válidos: {', '.join(valid_commands)}"
+        )
+
+    workstations = db.query(Workstation).filter(Workstation.organization_id == org_id).all()
+
+    dispatched = 0
+    for ws in workstations:
+        ws_id = str(ws.id)
+        if connection_manager.is_workstation_online(ws_id):
+            await connection_manager.send_to_workstation(ws_id, {
+                "type": "command",
+                "command_id": str(uuid4()),
+                "command_type": command_type,
+                "params": {},
+            })
+            dispatched += 1
+
+    logger.info(
+        "Comando Organización enviado: org_id=%s, command_type=%s, dispatched=%d, admin_id=%s",
+        org_id, command_type, dispatched, current_user.id,
+    )
+
+    return {"command_type": command_type, "organization_id": str(org_id), "dispatched": dispatched}
