@@ -443,7 +443,7 @@ export default function PendingIPsPage() {
                 </AlertDescription>
               </Alert>
 
-              {authorizeMutation.error && (
+              {authorizeMutation.error != null && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
