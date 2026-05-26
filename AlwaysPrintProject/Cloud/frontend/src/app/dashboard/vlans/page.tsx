@@ -31,7 +31,7 @@ import {
 } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 import type { VLAN, VLANCreate, VLANUpdate, VLANDetail } from '@/types/vlan'
-import type { Device } from '@/types/device'
+import type { Device, DeviceCreate } from '@/types/device'
 import { formatDateWithTimezone } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 import { CidrHealthBadge } from '@/components/vlans/CidrHealthBadge'
@@ -67,6 +67,8 @@ export default function VLANsPage() {
   const [contingencyDevices, setContingencyDevices] = useState<Device[]>([])
   const [contingencyDevicesLoading, setContingencyDevicesLoading] = useState(false)
   const [activeDeviceCounts, setActiveDeviceCounts] = useState<Record<string, number>>({})
+  const [showAddDeviceModal, setShowAddDeviceModal] = useState(false)
+  const [addDeviceVlan, setAddDeviceVlan] = useState<VLAN | null>(null)
   const [page, setPage] = useState(1)
   const pageSize = viewMode === 'cards' ? 10 : 20
 
@@ -191,6 +193,11 @@ export default function VLANsPage() {
     } catch (error) {
       console.error('Error al cambiar contingencia forzada:', error)
     }
+  }
+
+  const handleAddDevice = (vlan: VLAN) => {
+    setAddDeviceVlan(vlan)
+    setShowAddDeviceModal(true)
   }
 
   const handleSetDefaultDevice = async (vlan: VLAN, deviceId: string | null) => {
@@ -434,6 +441,15 @@ export default function VLANsPage() {
                 <Button
                   variant="ghost"
                   size="sm"
+                  onClick={() => handleAddDevice(vlan)}
+                  title={t('addDevice')}
+                  className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleEdit(vlan)}
                   title={tCommon('edit')}
                   className="h-8 w-8 p-0"
@@ -526,6 +542,9 @@ export default function VLANsPage() {
                         </TooltipProvider>
                         <Button variant="ghost" size="sm" onClick={() => handleViewDevices(vlan)} title={t('viewDevices')} className="h-8 w-8 p-0">
                           <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleAddDevice(vlan)} title={t('addDevice')} className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50">
+                          <Plus className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(vlan)} title={tCommon('edit')} className="h-8 w-8 p-0">
                           <Edit className="h-4 w-4" />
@@ -660,6 +679,18 @@ export default function VLANsPage() {
           devices={vlanDevices}
           onClose={() => { setShowDevicesModal(false); setVlanDevices([]); setDevicesVlan(null) }}
           onSetDefault={(deviceId) => handleSetDefaultDevice(devicesVlan, deviceId)}
+        />
+      )}
+      {showAddDeviceModal && addDeviceVlan && (
+        <CreateDeviceFromVLANModal
+          vlan={addDeviceVlan}
+          orgName={accounts.find((a) => a.id === addDeviceVlan.organization_id)?.name || ''}
+          onClose={() => { setShowAddDeviceModal(false); setAddDeviceVlan(null) }}
+          onSuccess={() => {
+            setShowAddDeviceModal(false)
+            setAddDeviceVlan(null)
+            loadActiveDeviceCounts(vlans)
+          }}
         />
       )}
     </div>
@@ -1078,6 +1109,192 @@ function VLANDevicesModal({ vlan, devices, onClose, onSetDefault }: { vlan: VLAN
           <div className="flex justify-end mt-4">
             <Button variant="outline" onClick={onClose}>{tCommon('close')}</Button>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function isValidIP(ip: string): boolean {
+  const trimmed = ip.trim()
+  if (!trimmed) return false
+  const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/
+  const ipv4Match = trimmed.match(ipv4Regex)
+  if (ipv4Match) {
+    return ipv4Match.slice(1).every((octet) => {
+      const num = parseInt(octet, 10)
+      return num >= 0 && num <= 255
+    })
+  }
+  const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/
+  return ipv6Regex.test(trimmed)
+}
+
+// ============================================================================
+// Modal: Crear dispositivo desde una VLAN (sin seleccionar org/vlan)
+// ============================================================================
+
+function CreateDeviceFromVLANModal({
+  vlan,
+  orgName,
+  onClose,
+  onSuccess,
+}: {
+  vlan: VLAN
+  orgName: string
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const t = useTranslations('devices')
+  const tCommon = useTranslations('common')
+  const [loading, setLoading] = useState(false)
+  const [ipError, setIpError] = useState('')
+  const [formData, setFormData] = useState<DeviceCreate>({
+    organization_id: vlan.organization_id,
+    vlan_id: vlan.id,
+    name: '',
+    ip_address: '',
+    description: '',
+    model: '',
+    location: '',
+    port: 9100,
+    is_active: true,
+  })
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name.trim() || !formData.ip_address.trim()) return
+    if (!isValidIP(formData.ip_address)) {
+      setIpError(t('ipInvalid'))
+      return
+    }
+    setIpError('')
+    try {
+      setLoading(true)
+      await apiClient.post('/devices/', formData)
+      onSuccess()
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } } }
+      alert(err.response?.data?.detail || 'Error al crear dispositivo')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">{t('createTitle')}</h2>
+            <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <div className="flex items-center gap-2">
+              <Network className="h-4 w-4 text-blue-600 flex-shrink-0" />
+              <div className="text-sm">
+                <span className="text-blue-700 font-medium">{vlan.name}</span>
+                {orgName && <span className="text-blue-500 ml-2">· {orgName}</span>}
+              </div>
+            </div>
+          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('nameLabel')}</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder={t('namePlaceholder')}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('ipLabel')}</label>
+                <input
+                  type="text"
+                  value={formData.ip_address}
+                  onChange={(e) => { setFormData({ ...formData, ip_address: e.target.value }); if (ipError) setIpError('') }}
+                  onBlur={() => { if (formData.ip_address.trim() && !isValidIP(formData.ip_address)) setIpError(t('ipInvalid')) }}
+                  placeholder={t('ipPlaceholder')}
+                  required
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${ipError ? 'border-red-500' : 'border-gray-300'}`}
+                />
+                {ipError && <p className="mt-1 text-xs text-red-600">{ipError}</p>}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('descriptionLabel')}</label>
+              <textarea
+                value={formData.description || ''}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder={t('descPlaceholder')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={2}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('modelLabel')}</label>
+                <input
+                  type="text"
+                  value={formData.model || ''}
+                  onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                  placeholder={t('modelPlaceholder')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('locationLabel')}</label>
+                <input
+                  type="text"
+                  value={formData.location || ''}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  placeholder={t('locationPlaceholder')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('portLabel')}</label>
+                <input
+                  type="number"
+                  value={formData.port || 9100}
+                  onChange={(e) => setFormData({ ...formData, port: parseInt(e.target.value) || 9100 })}
+                  min={1}
+                  max={65535}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="mt-1 text-xs text-gray-500">{t('portHelper')}</p>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="add_device_is_active"
+                checked={formData.is_active}
+                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                className="rounded mr-2"
+              />
+              <label htmlFor="add_device_is_active" className="text-sm text-gray-700">{t('activeLabel')}</label>
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button type="button" variant="outline" onClick={onClose} disabled={loading}>{tCommon('cancel')}</Button>
+              <Button
+                type="submit"
+                disabled={loading || !formData.name.trim() || !formData.ip_address.trim()}
+              >
+                {loading ? tCommon('creating') : t('createTitle')}
+              </Button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

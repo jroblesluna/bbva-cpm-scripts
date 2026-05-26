@@ -221,6 +221,7 @@
     "devicesInVlan": "Devices in this VLAN",
     "noDevices": "No devices assigned to this VLAN",
     "viewDevices": "View Devices",
+    "addDevice": "Add device to this VLAN",
     "forcedContingency": "Forced Contingency",
     "forcedContingencyActivate": "Activate forced contingency",
     "forcedContingencyDeactivate": "Deactivate forced contingency",
