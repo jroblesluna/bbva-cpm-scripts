@@ -245,7 +245,12 @@
     "defaultDeviceRemoved": "Impresora predeterminada removida.",
     "defaultDeviceNoDevices": "No hay dispositivos activos en esta VLAN",
     "actionConfigTitle": "Acciones Administrativas",
-    "actionConfigDesc": "Configuración de acciones específica para esta VLAN"
+    "actionConfigDesc": "Configuración de acciones específica para esta VLAN",
+    "metadataLabel": "Metadatos de la VLAN",
+    "metadataHelper": "Pares clave-valor disponibles para las workstations (ej: remote_queue_path)",
+    "metadataKeyPlaceholder": "Clave (ej: remote_queue_path)",
+    "metadataValuePlaceholder": "Valor (ej: \\\\server\\queue)",
+    "metadataAdd": "Agregar metadato"
   },
   "messages": {
     "title": "Mensajes",

@@ -1,5 +1,5 @@
 {
-  "version": "4.3",
+  "version": "4.4",
   "name": "LPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Print Management (modo Print Server)",
   "created_at": "2026-06-01T12:00:00Z",
@@ -14,6 +14,28 @@
           "parameters": {
             "file_path": "C:\\Windows\\System32\\reg.exe",
             "arguments": "add \"HKLM\\SOFTWARE\\Robles.AI\\AlwaysPrint\" /v AutoUpdateEnabled /t REG_DWORD /d 1 /f",
+            "timeout_seconds": 30,
+            "window_style": "Hidden",
+            "run_as_logged_in_user": false
+          }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Escribir AutoUpdateEnabled=1 en registro de AlwaysPrint-DEV",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\reg.exe",
+            "arguments": "add \"HKLM\\SOFTWARE\\Robles.AI\\AlwaysPrint-DEV\" /v AutoUpdateEnabled /t REG_DWORD /d 1 /f",
+            "timeout_seconds": 30,
+            "window_style": "Hidden",
+            "run_as_logged_in_user": false
+          }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Agregar puerto NUL: en registro de puertos si no existe",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\reg.exe",
+            "arguments": "add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Ports\" /v NUL: /t REG_SZ /d \"\" /f",
             "timeout_seconds": 30,
             "window_style": "Hidden",
             "run_as_logged_in_user": false
@@ -75,17 +97,6 @@
           }
         },
         {
-          "type": "RunProcess",
-          "description": "Asegurar que LPMCHybridPort existe en el registro de puertos",
-          "parameters": {
-            "file_path": "C:\\Windows\\System32\\reg.exe",
-            "arguments": "add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Ports\" /v LPMCHybridPort /t REG_SZ /d \"\" /f",
-            "timeout_seconds": 30,
-            "window_style": "Hidden",
-            "run_as_logged_in_user": false
-          }
-        },
-        {
           "type": "SetTcpPort",
           "description": "Crear/actualizar LPMCHybridPort apuntando a IP de contingencia",
           "parameters": {
@@ -141,17 +152,6 @@
             "service_name": "Spooler",
             "graceful_timeout_seconds": 30,
             "force_kill_on_timeout": true
-          }
-        },
-        {
-          "type": "RunProcess",
-          "description": "Agregar puerto NUL: en registro de puertos si no existe",
-          "parameters": {
-            "file_path": "C:\\Windows\\System32\\reg.exe",
-            "arguments": "add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Ports\" /v NUL: /t REG_SZ /d \"\" /f",
-            "timeout_seconds": 30,
-            "window_style": "Hidden",
-            "run_as_logged_in_user": false
           }
         },
         {

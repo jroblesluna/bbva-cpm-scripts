@@ -858,7 +858,13 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
     name: vlan.name,
     description: vlan.description,
     cidr_ranges: [...vlan.cidr_ranges],
+    vlan_metadata: vlan.vlan_metadata || null,
   })
+  const [metadataEntries, setMetadataEntries] = useState<Array<{ key: string; value: string }>>(
+    vlan.vlan_metadata
+      ? Object.entries(vlan.vlan_metadata).map(([key, value]) => ({ key, value: String(value) }))
+      : []
+  )
 
   // Cargar dispositivos de la VLAN al abrir el modal
   useEffect(() => {
@@ -882,7 +888,11 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
     if (!formData.name?.trim() || validCidrs.length === 0) return
     try {
       setLoading(true)
-      await apiClient.put(`/vlans/${vlan.id}`, { ...formData, cidr_ranges: validCidrs })
+      // Construir metadata desde las entradas clave-valor
+      const metadata = metadataEntries.length > 0
+        ? Object.fromEntries(metadataEntries.filter(e => e.key.trim()).map(e => [e.key.trim(), e.value]))
+        : null
+      await apiClient.put(`/vlans/${vlan.id}`, { ...formData, cidr_ranges: validCidrs, vlan_metadata: metadata })
       // Actualizar impresora predeterminada si cambió
       if (selectedDefaultDevice !== vlan.default_device_id) {
         const params = selectedDefaultDevice ? { device_id: selectedDefaultDevice } : {}
@@ -975,6 +985,51 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                   ))}
                 </select>
               )}
+            </div>
+            {/* Metadata de la VLAN (pares clave-valor) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('metadataLabel')}</label>
+              <p className="text-xs text-gray-500 mb-2">{t('metadataHelper')}</p>
+              <div className="space-y-2">
+                {metadataEntries.map((entry, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={entry.key}
+                      onChange={(e) => {
+                        const updated = [...metadataEntries]
+                        updated[index] = { ...updated[index], key: e.target.value }
+                        setMetadataEntries(updated)
+                      }}
+                      placeholder={t('metadataKeyPlaceholder')}
+                      className="w-1/3 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={entry.value}
+                      onChange={(e) => {
+                        const updated = [...metadataEntries]
+                        updated[index] = { ...updated[index], value: e.target.value }
+                        setMetadataEntries(updated)
+                      }}
+                      placeholder={t('metadataValuePlaceholder')}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                    <Button type="button" variant="outline" size="sm" onClick={() => setMetadataEntries(metadataEntries.filter((_, i) => i !== index))}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setMetadataEntries([...metadataEntries, { key: '', value: '' }])}
+                className="mt-2"
+              >
+                <Plus className="mr-2 h-4 w-4" />{t('metadataAdd')}
+              </Button>
             </div>
           </form>
           {/* Sección de Action Config para esta VLAN (colapsable) */}
