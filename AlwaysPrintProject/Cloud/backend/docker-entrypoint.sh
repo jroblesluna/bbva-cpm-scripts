@@ -36,50 +36,26 @@ echo "✓ Conexión a base de datos establecida"
 echo ""
 echo "Ejecutando migraciones de base de datos..."
 
-# Verificar si la BD tiene una revisión que ya no existe en el código
-# o si el schema está desactualizado (columnas faltantes por migración consolidada modificada)
+# Verificar estado actual de Alembic
 current_rev=$(alembic current 2>&1 || true)
-needs_recreate=false
 
 if echo "$current_rev" | grep -q "Can't locate revision"; then
-    echo "⚠ Revisión obsoleta detectada en la BD."
-    needs_recreate=true
-fi
-
-# Verificar si la tabla organizations tiene la columna target_version
-# (detecta cuando la migración consolidada fue modificada después de aplicarse)
-if [ "$needs_recreate" = "false" ]; then
-    column_check=$(python -c "
-from app.core.database import engine
-from sqlalchemy import text, inspect
-insp = inspect(engine)
-if insp.has_table('organizations'):
-    cols = [c['name'] for c in insp.get_columns('organizations')]
-    if 'target_version' not in cols:
-        print('MISSING')
-    else:
-        print('OK')
-else:
-    print('OK')
-" 2>/dev/null || echo "OK")
-    if [ "$column_check" = "MISSING" ]; then
-        echo "⚠ Schema desactualizado (columnas faltantes). Recreando..."
-        needs_recreate=true
-    fi
-fi
-
-if [ "$needs_recreate" = "true" ]; then
-    echo "Recreando esquema desde cero..."
-    python -c "
-from app.core.database import engine
-from sqlalchemy import text
-with engine.connect() as conn:
-    conn.execute(text('DROP SCHEMA public CASCADE'))
-    conn.execute(text('CREATE SCHEMA public'))
-    conn.commit()
-print('Schema recreado')
-" 2>/dev/null || true
-    echo "✓ Schema limpio. Aplicando migración consolidada..."
+    echo "═══════════════════════════════════════════════════════════"
+    echo "ERROR CRÍTICO: La BD tiene una revisión que no existe en el código."
+    echo "Revisión actual en BD:"
+    echo "$current_rev"
+    echo ""
+    echo "Esto puede ocurrir si se renombró o eliminó una migración."
+    echo "SOLUCIÓN MANUAL REQUERIDA:"
+    echo "  1. Conectar a la BD: psql \$DATABASE_URL"
+    echo "  2. Ver revisión actual: SELECT * FROM alembic_version;"
+    echo "  3. Actualizar a la revisión correcta:"
+    echo "     UPDATE alembic_version SET version_num = '<revision_correcta>';"
+    echo "  4. Reiniciar el contenedor"
+    echo ""
+    echo "NO se borrarán datos automáticamente. El backend NO arrancará."
+    echo "═══════════════════════════════════════════════════════════"
+    exit 1
 fi
 
 alembic upgrade head

@@ -15,8 +15,8 @@ db_username               = "alwaysprint_admin"
 db_instance_class         = "db.t3.micro"
 db_allocated_storage      = 20
 db_max_allocated_storage  = 100
-rds_deletion_protection   = false
-rds_backup_retention_days = 0  # Free Tier no permite > 0; cambiar al actualizar plan
+rds_deletion_protection   = true
+rds_backup_retention_days = 1
 
 zone_name      = "apps.iol.pe"
 subdomain      = "alwaysprint"
@@ -47,5 +47,3 @@ backend_env_vars = {
   S3_ARTIFACTS_BUCKET         = "alwaysprint-prod-artifacts"
   DEFAULT_BOOTSTRAP_DOMAINS   = "apps.iol.pe,sistemas.com.pe"
 }
-
-# CI/CD via GitHub Actions - no requiere variables aqui
