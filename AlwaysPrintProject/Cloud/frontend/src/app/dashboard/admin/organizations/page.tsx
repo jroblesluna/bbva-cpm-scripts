@@ -44,7 +44,6 @@ import {
 import type { Organization, OrganizationCreate, OrganizationUpdate, PublicIPCreate } from '@/types'
 import { ActionConfigSection } from '@/components/config/ActionConfigSection'
 import { useToast } from '@/hooks/use-toast'
-import { organizationsApi } from '@/lib/api'
 
 export default function AccountsPage() {
   const queryClient = useQueryClient()
