@@ -1,14 +1,7 @@
-/**
- * Página de auditoría del sistema.
- * Paginación basada en cursor con 15 elementos por página.
- */
-
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { apiClient } from '@/lib/api'
-import { useAuth } from '@/hooks/useAuth'
+import { auditApi } from '@/lib/api'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,14 +22,10 @@ import { useUserTimezone } from '@/hooks/useUserTimezone'
 const PAGE_SIZE = 15
 
 export default function AuditPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { getAuthHeaders } = useAuth()
   const timezone = useUserTimezone()
   const t = useTranslations('audit')
   const tCommon = useTranslations('common')
 
-  // Estado de datos
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [stats, setStats] = useState<AuditLogStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -44,35 +33,25 @@ export default function AuditPage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
 
-  // Historial de cursores para navegación hacia atrás
   const [cursorHistory, setCursorHistory] = useState<string[]>([])
+  const [currentCursor, setCurrentCursor] = useState<string | undefined>(undefined)
 
-  // Filtros locales (búsqueda en cliente)
   const [searchTerm, setSearchTerm] = useState('')
-
-  // Filtros que se envían al servidor
   const [filterActionType, setFilterActionType] = useState<ActionType | null>(null)
   const [filterEntityType, setFilterEntityType] = useState<string>('')
 
-  // Leer cursor desde query params
-  const currentCursor = searchParams.get('cursor') || undefined
-
   const isInitialLoad = logs.length === 0 && loading
 
-  /**
-   * Carga los logs de auditoría usando paginación por cursor.
-   */
   const loadLogs = useCallback(async (cursor?: string) => {
     try {
       if (logs.length === 0) setLoading(true)
 
-      const params = new URLSearchParams({ limit: PAGE_SIZE.toString() })
-      if (cursor) params.append('cursor', cursor)
-      if (filterActionType) params.append('action_type', filterActionType)
-      if (filterEntityType) params.append('entity_type', filterEntityType)
-
-      const response = await apiClient.get(`/audit/?${params.toString()}`)
-      const data = response.data
+      const data = await auditApi.search({
+        limit: PAGE_SIZE,
+        cursor,
+        ...(filterActionType ? { action_type: filterActionType } : {}),
+        ...(filterEntityType ? { entity_type: filterEntityType } : {}),
+      })
 
       setLogs(data.logs || [])
       setTotal(data.total || 0)
@@ -87,14 +66,13 @@ export default function AuditPage() {
 
   const loadStats = async () => {
     try {
-      const response = await apiClient.get('/audit/stats')
-      setStats(response.data)
+      const data = await auditApi.stats()
+      setStats(data)
     } catch (error) {
       console.error('Error al cargar estadísticas:', error)
     }
   }
 
-  // Cargar datos cuando cambian los filtros o el cursor en la URL
   useEffect(() => {
     loadLogs(currentCursor)
   }, [currentCursor, filterActionType, filterEntityType, loadLogs])
@@ -103,65 +81,33 @@ export default function AuditPage() {
     loadStats()
   }, [])
 
-  /**
-   * Navegar a la siguiente página usando el cursor.
-   */
   const goToNextPage = () => {
     if (!nextCursor) return
-
-    // Guardar cursor actual en el historial para poder volver
-    const history = [...cursorHistory]
-    history.push(currentCursor || '')
-    setCursorHistory(history)
-
-    // Actualizar URL con el nuevo cursor
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('cursor', nextCursor)
-    router.push(`/dashboard/audit?${params.toString()}`)
+    setCursorHistory(prev => [...prev, currentCursor || ''])
+    setCurrentCursor(nextCursor)
   }
 
-  /**
-   * Navegar a la página anterior usando el historial de cursores.
-   */
   const goToPreviousPage = () => {
     if (cursorHistory.length === 0) return
-
     const history = [...cursorHistory]
     const previousCursor = history.pop()!
     setCursorHistory(history)
-
-    // Actualizar URL
-    const params = new URLSearchParams(searchParams.toString())
-    if (previousCursor) {
-      params.set('cursor', previousCursor)
-    } else {
-      params.delete('cursor')
-    }
-    router.push(`/dashboard/audit?${params.toString()}`)
+    setCurrentCursor(previousCursor || undefined)
   }
 
-  /**
-   * Volver a la primera página (sin cursor).
-   */
   const goToFirstPage = () => {
     setCursorHistory([])
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete('cursor')
-    router.push(`/dashboard/audit?${params.toString()}`)
+    setCurrentCursor(undefined)
   }
 
-  /**
-   * Resetear filtros y volver a la primera página.
-   */
   const resetFilters = () => {
     setFilterActionType(null)
     setFilterEntityType('')
     setSearchTerm('')
     setCursorHistory([])
-    router.push('/dashboard/audit')
+    setCurrentCursor(undefined)
   }
 
-  // Filtrado local por término de búsqueda
   const filteredLogs = logs.filter((log) => {
     const s = searchTerm.toLowerCase()
     if (!s) return true
@@ -199,7 +145,6 @@ export default function AuditPage() {
     return colors[type] || 'bg-gray-100 text-gray-800'
   }
 
-  // Número de página actual (basado en historial)
   const currentPageNumber = cursorHistory.length + 1
 
   if (isInitialLoad) {
@@ -220,7 +165,6 @@ export default function AuditPage() {
         <p className="mt-2 text-gray-600">{t('subtitle')}</p>
       </div>
 
-      {/* Tarjetas de estadísticas */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white rounded-lg shadow p-6">
@@ -262,7 +206,6 @@ export default function AuditPage() {
         </div>
       )}
 
-      {/* Distribución por tipo */}
       {stats && Object.keys(stats.actions_by_type).length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4">{t('distribution')}</h3>
@@ -279,7 +222,6 @@ export default function AuditPage() {
         </div>
       )}
 
-      {/* Filtros */}
       <div className="bg-white rounded-lg shadow p-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="relative">
@@ -297,7 +239,7 @@ export default function AuditPage() {
             onChange={(e) => {
               setFilterActionType(e.target.value === 'all' ? null : (e.target.value as ActionType))
               setCursorHistory([])
-              router.push('/dashboard/audit')
+              setCurrentCursor(undefined)
             }}
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
@@ -317,7 +259,7 @@ export default function AuditPage() {
             onChange={(e) => {
               setFilterEntityType(e.target.value)
               setCursorHistory([])
-              router.push('/dashboard/audit')
+              setCurrentCursor(undefined)
             }}
           />
           <Button variant="outline" onClick={resetFilters} className="flex items-center gap-2">
@@ -327,7 +269,6 @@ export default function AuditPage() {
         </div>
       </div>
 
-      {/* Tabla de logs */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {filteredLogs.length === 0 ? (
           <div className="text-center py-12">
@@ -385,7 +326,6 @@ export default function AuditPage() {
           </div>
         )}
 
-        {/* Paginación por cursor */}
         {(hasMore || cursorHistory.length > 0) && (
           <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
             <div className="flex-1 flex items-center justify-between">

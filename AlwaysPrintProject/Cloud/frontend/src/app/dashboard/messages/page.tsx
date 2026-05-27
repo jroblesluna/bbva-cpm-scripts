@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { apiClient } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
@@ -258,8 +258,8 @@ export default function MessagesPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredMessages.map((message) => (
-                  <>
-                    <tr key={message.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => toggleExpand(message.id)}>
+                  <Fragment key={message.id}>
+                    <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => toggleExpand(message.id)}>
                       <td className="px-4 py-4">
                         {(message.total_deliveries ?? 0) > 0 && (
                           expandedMessages.has(message.id)
@@ -356,7 +356,7 @@ export default function MessagesPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
