@@ -272,6 +272,12 @@ namespace AlwaysPrintService.Actions
 
                 case ActionTypes.ReadPrintQueuePort:
                     return ExecuteReadPrintQueuePort(action);
+
+                case ActionTypes.ReadAppSetting:
+                    return ExecuteReadAppSetting(action);
+
+                case ActionTypes.WriteAppSetting:
+                    return ExecuteWriteAppSetting(action);
                 
                 default:
                     AlwaysPrintLogger.WriteWarning($"ActionEngine: tipo de acción desconocido: {action.Type}");
@@ -868,6 +874,112 @@ namespace AlwaysPrintService.Actions
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteError($"ReadPrintQueuePort: error: {ex.Message}", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Lee un valor del registro de la aplicación (ruta según build: AlwaysPrint o AlwaysPrint-DEV).
+        /// Parámetros: value_name (string), default_value (string, opcional).
+        /// Almacena el resultado en la variable indicada por store_result_in.
+        /// No requiere especificar key_path — usa RegistryConfigManager.RegistryPath automáticamente.
+        /// </summary>
+        private bool ExecuteReadAppSetting(ActionConfig action)
+        {
+            try
+            {
+                string valueName = GetParameter<string>(action, "value_name") ?? "";
+                string defaultValue = GetParameter<string>(action, "default_value") ?? "";
+
+                valueName = ReplaceTemplates(valueName);
+
+                if (string.IsNullOrEmpty(valueName))
+                {
+                    AlwaysPrintLogger.WriteWarning("ReadAppSetting: value_name vacío");
+                    return false;
+                }
+
+                string keyPath = RegistryConfigManager.RegistryPath;
+                AlwaysPrintLogger.WriteInfo($"ReadAppSetting: leyendo {valueName} de HKLM\\{keyPath}");
+
+                string result = defaultValue;
+                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(keyPath, writable: false))
+                {
+                    if (key != null)
+                    {
+                        var regValue = key.GetValue(valueName);
+                        if (regValue != null)
+                            result = regValue.ToString() ?? defaultValue;
+                    }
+                }
+
+                AlwaysPrintLogger.WriteInfo($"ReadAppSetting: {valueName} = '{result}'");
+
+                if (!string.IsNullOrEmpty(action.StoreResultIn))
+                {
+                    _variables[action.StoreResultIn] = result;
+                    _configVariables[action.StoreResultIn] = result;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"ReadAppSetting: error: {ex.Message}", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Escribe un valor en el registro de la aplicación (ruta según build: AlwaysPrint o AlwaysPrint-DEV).
+        /// Parámetros: value_name (string), value (string), value_type (string: "dword" o "string", default "string").
+        /// No requiere especificar key_path — usa RegistryConfigManager.RegistryPath automáticamente.
+        /// </summary>
+        private bool ExecuteWriteAppSetting(ActionConfig action)
+        {
+            try
+            {
+                string valueName = GetParameter<string>(action, "value_name") ?? "";
+                string value = GetParameter<string>(action, "value") ?? "";
+                string valueType = GetParameter<string>(action, "value_type") ?? "string";
+
+                valueName = ReplaceTemplates(valueName);
+                value = ReplaceTemplates(value);
+
+                if (string.IsNullOrEmpty(valueName))
+                {
+                    AlwaysPrintLogger.WriteWarning("WriteAppSetting: value_name vacío");
+                    return false;
+                }
+
+                string keyPath = RegistryConfigManager.RegistryPath;
+                AlwaysPrintLogger.WriteInfo($"WriteAppSetting: escribiendo {valueName} = '{value}' ({valueType}) en HKLM\\{keyPath}");
+
+                using (var key = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(keyPath, writable: true))
+                {
+                    if (key == null)
+                    {
+                        AlwaysPrintLogger.WriteError("WriteAppSetting: no se pudo abrir/crear la clave de registro");
+                        return false;
+                    }
+
+                    if (valueType.Equals("dword", StringComparison.OrdinalIgnoreCase))
+                    {
+                        int intValue = int.TryParse(value, out int parsed) ? parsed : 0;
+                        key.SetValue(valueName, intValue, Microsoft.Win32.RegistryValueKind.DWord);
+                    }
+                    else
+                    {
+                        key.SetValue(valueName, value, Microsoft.Win32.RegistryValueKind.String);
+                    }
+                }
+
+                AlwaysPrintLogger.WriteInfo($"WriteAppSetting: {valueName} escrito exitosamente");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"WriteAppSetting: error: {ex.Message}", ex);
                 return false;
             }
         }

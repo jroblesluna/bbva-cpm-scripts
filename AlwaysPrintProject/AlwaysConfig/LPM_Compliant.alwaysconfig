@@ -1,7 +1,7 @@
 {
-  "version": "5.6",
+  "version": "5.7",
   "name": "LPM_Compliant",
-  "description": "Configuración de cumplimiento para Lexmark Print Management (modo Print Server). Gestiona contingencia creando/eliminando cola local con puerto TCP híbrido. Persiste estado en registro para sobrevivir reinicios. Valida existencia de cola y puerto antes de actuar.",
+  "description": "Configuración de cumplimiento para Lexmark Print Management (modo Print Server). Gestiona contingencia creando/eliminando cola local con puerto TCP híbrido. Persiste estado con ReadAppSetting/WriteAppSetting (ruta según build).",
   "created_at": "2026-06-01T12:00:00Z",
   "triggers": [
     {
@@ -9,21 +9,18 @@
       "description": "Habilitar auto-actualización. Leer semáforo de contingencia y aplicar estado correspondiente.",
       "actions": [
         {
-          "type": "RunProcess",
-          "description": "Escribir AutoUpdateEnabled=1 en registro de AlwaysPrint",
+          "type": "WriteAppSetting",
+          "description": "Habilitar auto-actualización",
           "parameters": {
-            "file_path": "C:\\Windows\\System32\\reg.exe",
-            "arguments": "add \"HKLM\\SOFTWARE\\Robles.AI\\AlwaysPrint\" /v AutoUpdateEnabled /t REG_DWORD /d 1 /f",
-            "timeout_seconds": 30,
-            "window_style": "Hidden",
-            "run_as_logged_in_user": false
+            "value_name": "AutoUpdateEnabled",
+            "value": "1",
+            "value_type": "dword"
           }
         },
         {
-          "type": "ReadRegistryValue",
-          "description": "Leer semáforo ContingencyEnabled del registro",
+          "type": "ReadAppSetting",
+          "description": "Leer semáforo ContingencyEnabled",
           "parameters": {
-            "key_path": "SOFTWARE\\Robles.AI\\AlwaysPrint",
             "value_name": "ContingencyEnabled",
             "default_value": "0"
           },
@@ -40,10 +37,9 @@
             },
             "actions": [
               {
-                "type": "ReadRegistryValue",
+                "type": "ReadAppSetting",
                 "description": "Leer IP de contingencia persistida",
                 "parameters": {
-                  "key_path": "SOFTWARE\\Robles.AI\\AlwaysPrint",
                   "value_name": "ContingencyPrinterIp",
                   "default_value": ""
                 },
@@ -357,25 +353,21 @@
           }
         },
         {
-          "type": "RunProcess",
-          "description": "Persistir ContingencyEnabled=1 en registro",
+          "type": "WriteAppSetting",
+          "description": "Persistir ContingencyEnabled=1",
           "parameters": {
-            "file_path": "C:\\Windows\\System32\\reg.exe",
-            "arguments": "add \"HKLM\\SOFTWARE\\Robles.AI\\AlwaysPrint\" /v ContingencyEnabled /t REG_DWORD /d 1 /f",
-            "timeout_seconds": 10,
-            "window_style": "Hidden",
-            "run_as_logged_in_user": false
+            "value_name": "ContingencyEnabled",
+            "value": "1",
+            "value_type": "dword"
           }
         },
         {
-          "type": "RunProcess",
-          "description": "Persistir ContingencyPrinterIp en registro",
+          "type": "WriteAppSetting",
+          "description": "Persistir ContingencyPrinterIp",
           "parameters": {
-            "file_path": "C:\\Windows\\System32\\reg.exe",
-            "arguments": "add \"HKLM\\SOFTWARE\\Robles.AI\\AlwaysPrint\" /v ContingencyPrinterIp /t REG_SZ /d \"{{contingency_printer_ip}}\" /f",
-            "timeout_seconds": 10,
-            "window_style": "Hidden",
-            "run_as_logged_in_user": false
+            "value_name": "ContingencyPrinterIp",
+            "value": "{{contingency_printer_ip}}",
+            "value_type": "string"
           }
         }
       ]
@@ -418,14 +410,12 @@
           }
         },
         {
-          "type": "RunProcess",
-          "description": "Limpiar semáforo ContingencyEnabled=0 en registro",
+          "type": "WriteAppSetting",
+          "description": "Limpiar semáforo ContingencyEnabled=0",
           "parameters": {
-            "file_path": "C:\\Windows\\System32\\reg.exe",
-            "arguments": "add \"HKLM\\SOFTWARE\\Robles.AI\\AlwaysPrint\" /v ContingencyEnabled /t REG_DWORD /d 0 /f",
-            "timeout_seconds": 10,
-            "window_style": "Hidden",
-            "run_as_logged_in_user": false
+            "value_name": "ContingencyEnabled",
+            "value": "0",
+            "value_type": "dword"
           }
         }
       ]
