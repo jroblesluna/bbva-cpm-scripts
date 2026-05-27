@@ -1,38 +1,25 @@
 {
-  "version": "4.5",
+  "version": "5.0",
   "name": "CPM_Compliant",
-  "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager",
+  "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
   "triggers": [
     {
       "event": "OnTrayLaunched",
-      "description": "Ejecutar después de que el Tray se haya iniciado correctamente",
+      "description": "Habilitar auto-actualización, limpiar datos de usuarios inactivos, validar estado de contingencia.",
       "actions": [
         {
-          "type": "RunProcess",
-          "description": "Escribir AutoUpdateEnabled=1 en registro de AlwaysPrint",
+          "type": "WriteAppSetting",
+          "description": "Habilitar auto-actualización",
           "parameters": {
-            "file_path": "C:\\Windows\\System32\\reg.exe",
-            "arguments": "add \"HKLM\\SOFTWARE\\Robles.AI\\AlwaysPrint\" /v AutoUpdateEnabled /t REG_DWORD /d 1 /f",
-            "timeout_seconds": 30,
-            "window_style": "Hidden",
-            "run_as_logged_in_user": false
-          }
-        },
-        {
-          "type": "RunProcess",
-          "description": "Escribir AutoUpdateEnabled=1 en registro de AlwaysPrint-DEV",
-          "parameters": {
-            "file_path": "C:\\Windows\\System32\\reg.exe",
-            "arguments": "add \"HKLM\\SOFTWARE\\Robles.AI\\AlwaysPrint-DEV\" /v AutoUpdateEnabled /t REG_DWORD /d 1 /f",
-            "timeout_seconds": 30,
-            "window_style": "Hidden",
-            "run_as_logged_in_user": false
+            "value_name": "AutoUpdateEnabled",
+            "value": "1",
+            "value_type": "dword"
           }
         },
         {
           "type": "PropagatePermissions",
-          "description": "Propagar permisos de C:\\ProgramData\\LPMC\\ a todas las subcarpetas",
+          "description": "Propagar permisos de C:\\ProgramData\\LPMC\\",
           "parameters": {
             "path": "C:\\ProgramData\\LPMC\\",
             "recursive": true,
@@ -42,7 +29,7 @@
         },
         {
           "type": "GetLoggedInUsers",
-          "description": "Obtener lista de usuarios con sesión activa",
+          "description": "Obtener usuarios inactivos con sesión",
           "parameters": {
             "exclude_active_console_user": true
           },
@@ -50,74 +37,75 @@
         },
         {
           "type": "Conditional",
-          "description": "Si hay usuarios inactivos con sesión, limpiar sus datos",
-          "condition": {
-            "variable": "inactive_users",
-            "operator": "count_greater_than",
-            "value": 0
-          },
-          "actions": [
-            {
-              "type": "StopService",
-              "description": "Detener servicio lpmc_universal_service",
-              "parameters": {
-                "service_name": "lpmc_universal_service",
-                "graceful_timeout_seconds": 30,
-                "force_kill_on_timeout": true
-              }
+          "description": "Si hay usuarios inactivos: limpiar datos CPM",
+          "parameters": {
+            "condition": {
+              "variable": "inactive_users",
+              "operator": "not_empty"
             },
-            {
-              "type": "KillProcessesByName",
-              "description": "Cerrar procesos lpmc-systemtray-app.exe de usuarios inactivos",
-              "parameters": {
-                "process_name": "lpmc-systemtray-app.exe",
-                "filter_by_users": "{{inactive_users}}",
-                "force": true
+            "actions": [
+              {
+                "type": "StopService",
+                "description": "Detener lpmc_universal_service",
+                "parameters": {
+                  "service_name": "lpmc_universal_service",
+                  "graceful_timeout_seconds": 30,
+                  "force_kill_on_timeout": true
+                }
+              },
+              {
+                "type": "KillProcessesByName",
+                "description": "Cerrar lpmc-systemtray-app.exe de usuarios inactivos",
+                "parameters": {
+                  "process_name": "lpmc-systemtray-app.exe",
+                  "filter_by_users": "{{inactive_users}}",
+                  "force": true
+                }
+              },
+              {
+                "type": "DeleteFolderContents",
+                "description": "Eliminar carpetas pre de usuarios inactivos",
+                "parameters": {
+                  "path_template": "C:\\ProgramData\\LPMC\\Jobs\\{{username}}\\CloudHybrid\\pre",
+                  "iterate_users": "{{inactive_users}}",
+                  "recursive": true,
+                  "ignore_errors": true
+                }
+              },
+              {
+                "type": "DeleteFolderContents",
+                "description": "Eliminar carpetas post de usuarios inactivos",
+                "parameters": {
+                  "path_template": "C:\\ProgramData\\LPMC\\Jobs\\{{username}}\\CloudHybrid\\post",
+                  "iterate_users": "{{inactive_users}}",
+                  "recursive": true,
+                  "ignore_errors": true
+                }
+              },
+              {
+                "type": "DeleteOrphanedFolders",
+                "description": "Eliminar carpetas de usuarios sin sesión",
+                "parameters": {
+                  "base_path": "C:\\ProgramData\\LPMC\\Jobs",
+                  "exclude_active_console_user": true,
+                  "exclude_users_variable": "inactive_users"
+                }
+              },
+              {
+                "type": "StartService",
+                "description": "Iniciar lpmc_universal_service",
+                "parameters": {
+                  "service_name": "lpmc_universal_service",
+                  "wait_for_running": true,
+                  "timeout_seconds": 30
+                }
               }
-            },
-            {
-              "type": "DeleteFolderContents",
-              "description": "Eliminar contenido de carpetas pre de usuarios inactivos",
-              "parameters": {
-                "path_template": "C:\\ProgramData\\LPMC\\Jobs\\{{username}}\\CloudHybrid\\pre",
-                "iterate_users": "{{inactive_users}}",
-                "recursive": true,
-                "ignore_errors": true
-              }
-            },
-            {
-              "type": "DeleteFolderContents",
-              "description": "Eliminar contenido de carpetas post de usuarios inactivos",
-              "parameters": {
-                "path_template": "C:\\ProgramData\\LPMC\\Jobs\\{{username}}\\CloudHybrid\\post",
-                "iterate_users": "{{inactive_users}}",
-                "recursive": true,
-                "ignore_errors": true
-              }
-            },
-            {
-              "type": "DeleteOrphanedFolders",
-              "description": "Eliminar carpetas completas de usuarios sin sesión abierta",
-              "parameters": {
-                "base_path": "C:\\ProgramData\\LPMC\\Jobs",
-                "exclude_active_console_user": true,
-                "exclude_users_variable": "inactive_users"
-              }
-            },
-            {
-              "type": "StartService",
-              "description": "Iniciar servicio lpmc_universal_service",
-              "parameters": {
-                "service_name": "lpmc_universal_service",
-                "wait_for_running": true,
-                "timeout_seconds": 30
-              }
-            }
-          ]
+            ]
+          }
         },
         {
           "type": "RunProcess",
-          "description": "Ejecutar script de actualización de mapeado hostname→IP para servidor Linux",
+          "description": "Ejecutar update_winhostuser.bat (mapeado hostname→IP)",
           "parameters": {
             "file_path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\update_winhostuser.bat",
             "arguments": "",
@@ -125,12 +113,63 @@
             "window_style": "Hidden",
             "run_as_logged_in_user": true
           }
+        },
+        {
+          "type": "ReadAppSetting",
+          "description": "Leer semáforo ContingencyEnabled",
+          "parameters": {
+            "value_name": "ContingencyEnabled",
+            "default_value": "0"
+          },
+          "store_result_in": "contingency_enabled"
+        },
+        {
+          "type": "Conditional",
+          "description": "Si contingencia activa: asegurar puerto apunta a IP directa. Si no: asegurar puerto apunta a CPM local.",
+          "parameters": {
+            "condition": {
+              "variable": "contingency_enabled",
+              "operator": "equals",
+              "value": "1"
+            },
+            "actions": [
+              {
+                "type": "ReadAppSetting",
+                "description": "Leer IP de contingencia persistida",
+                "parameters": {
+                  "value_name": "ContingencyPrinterIp",
+                  "default_value": ""
+                },
+                "store_result_in": "contingency_printer_ip"
+              },
+              {
+                "type": "SetTcpPort",
+                "description": "Asegurar LPMCHybridPort apunta a IP de contingencia",
+                "parameters": {
+                  "port_name": "LPMCHybridPort",
+                  "host_address": "{{contingency_printer_ip}}",
+                  "port_number": 9100
+                }
+              }
+            ],
+            "else_actions": [
+              {
+                "type": "SetTcpPort",
+                "description": "Asegurar LPMCHybridPort apunta a CPM local (127.0.0.1:9167)",
+                "parameters": {
+                  "port_name": "LPMCHybridPort",
+                  "host_address": "127.0.0.1",
+                  "port_number": 9167
+                }
+              }
+            ]
+          }
         }
       ]
     },
     {
       "event": "OnConfigChange",
-      "description": "Ejecutar cuando se recibe una nueva configuración",
+      "description": "Reiniciar Tray al recibir nueva configuración",
       "actions": [
         {
           "type": "StopTray",
@@ -142,7 +181,7 @@
         },
         {
           "type": "StartTray",
-          "description": "Iniciar App Tray con permisos de usuario loggedin",
+          "description": "Relanzar App Tray en sesión interactiva",
           "parameters": {
             "wait_for_ready": true,
             "timeout_seconds": 60
@@ -152,7 +191,7 @@
     },
     {
       "event": "OnContingencyActivated",
-      "description": "Activar modo contingencia: bypass CPM, imprimir directo a IP",
+      "description": "Activar contingencia: detener CPM, redirigir LPMCHybridPort a IP directa, persistir estado",
       "actions": [
         {
           "type": "StopService",
@@ -172,33 +211,8 @@
           }
         },
         {
-          "type": "PausePrintQueue",
-          "description": "Pausar cola corporativa antes de cambiar puerto",
-          "parameters": {
-            "queue_name": "{{corporate_queue_name}}"
-          }
-        },
-        {
-          "type": "StopService",
-          "description": "Detener Spooler para aplicar cambio de puerto",
-          "parameters": {
-            "service_name": "Spooler",
-            "graceful_timeout_seconds": 30,
-            "force_kill_on_timeout": true
-          }
-        },
-        {
-          "type": "StartService",
-          "description": "Reiniciar Spooler con nuevo puerto asignado",
-          "parameters": {
-            "service_name": "Spooler",
-            "wait_for_running": true,
-            "timeout_seconds": 30
-          }
-        },
-        {
           "type": "SetTcpPort",
-          "description": "Redirigir puerto LPMCHybridPort a IP de contingencia directa",
+          "description": "Redirigir LPMCHybridPort a IP de contingencia directa",
           "parameters": {
             "port_name": "LPMCHybridPort",
             "host_address": "{{contingency_printer_ip}}",
@@ -206,74 +220,36 @@
           }
         },
         {
-          "type": "UnpausePrintQueue",
-          "description": "Reanudar cola corporativa con nuevo destino",
+          "type": "WriteAppSetting",
+          "description": "Persistir ContingencyEnabled=1",
           "parameters": {
-            "queue_name": "{{corporate_queue_name}}"
+            "value_name": "ContingencyEnabled",
+            "value": "1",
+            "value_type": "dword"
+          }
+        },
+        {
+          "type": "WriteAppSetting",
+          "description": "Persistir ContingencyPrinterIp",
+          "parameters": {
+            "value_name": "ContingencyPrinterIp",
+            "value": "{{contingency_printer_ip}}",
+            "value_type": "string"
           }
         }
       ]
     },
     {
       "event": "OnContingencyDeactivated",
-      "description": "Desactivar modo contingencia: restaurar flujo CPM",
+      "description": "Desactivar contingencia: restaurar LPMCHybridPort a CPM local, reiniciar CPM, limpiar semáforo",
       "actions": [
         {
-          "type": "StopService",
-          "description": "Detener servicio CPM",
-          "parameters": {
-            "service_name": "lpmc_universal_service",
-            "graceful_timeout_seconds": 10,
-            "force_kill_on_timeout": true
-          }
-        },
-        {
-          "type": "KillProcessesByName",
-          "description": "Eliminar procesos CPM tray huérfanos",
-          "parameters": {
-            "process_name": "lpmc-systemtray-app.exe",
-            "force": true
-          }
-        },
-        {
-          "type": "PausePrintQueue",
-          "description": "Pausar cola corporativa antes de restaurar puerto",
-          "parameters": {
-            "queue_name": "{{corporate_queue_name}}"
-          }
-        },
-        {
-          "type": "StopService",
-          "description": "Detener Spooler para aplicar cambio de puerto",
-          "parameters": {
-            "service_name": "Spooler",
-            "graceful_timeout_seconds": 30,
-            "force_kill_on_timeout": false
-          }
-        },
-        {
-          "type": "StartService",
-          "description": "Reiniciar Spooler con puerto CPM restaurado",
-          "parameters": {
-            "service_name": "Spooler",
-            "wait_for_running": true,
-            "timeout_seconds": 30
-          }
-        },
-        {
           "type": "SetTcpPort",
-          "description": "Restaurar puerto LPMCHybridPort a CPM local (127.0.0.1:9167)",
+          "description": "Restaurar LPMCHybridPort a CPM local (127.0.0.1:9167)",
           "parameters": {
             "port_name": "LPMCHybridPort",
             "host_address": "127.0.0.1",
             "port_number": 9167
-          }
-        },
-        {
-          "type": "UnpausePrintQueue",
-          "description": "Reanudar cola corporativa con puerto CPM",
-          "parameters": {
-            "queue_name": "{{corporate_queue_name}}"
           }
         },
         {
@@ -283,6 +259,15 @@
             "service_name": "lpmc_universal_service",
             "wait_for_running": true,
             "timeout_seconds": 30
+          }
+        },
+        {
+          "type": "WriteAppSetting",
+          "description": "Limpiar semáforo ContingencyEnabled=0",
+          "parameters": {
+            "value_name": "ContingencyEnabled",
+            "value": "0",
+            "value_type": "dword"
           }
         }
       ]
