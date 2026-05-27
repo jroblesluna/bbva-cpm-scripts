@@ -561,6 +561,17 @@ async def _handle_telemetry(
         )
         return "request_reregister"
 
+    # Telemetría recibida exitosamente: asegurar que is_online=True
+    # Esto cubre el caso donde el WebSocket se reconectó pero is_online quedó en False
+    from app.models.workstation import Workstation as WS
+    from datetime import datetime, timezone
+    ws = db.query(WS).filter(WS.id == workstation_id).first()
+    if ws and not ws.is_online:
+        ws.is_online = True
+        ws.last_connection = datetime.now(timezone.utc).replace(tzinfo=None)
+        db.commit()
+        logger.info("Telemetría restauró is_online=True para workstation_id=%s", workstation_id)
+
     # Persistencia exitosa: broadcast 'telemetry_received' a operadores de la organización
     await connection_manager.broadcast_to_organization(
         organization_id=organization_id,
