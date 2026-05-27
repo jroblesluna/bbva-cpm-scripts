@@ -30,7 +30,21 @@
     "deleting": "Deleting...",
     "lastUpdated": "Last updated: {time}",
     "first": "First",
-    "reset": "Reset"
+    "reset": "Reset",
+    "confirm": "Confirm",
+    "sending": "Sending...",
+    "error": "Error",
+    "viewCards": "Card view",
+    "viewTable": "Table view",
+    "bulkRestartService": "Restart Service",
+    "bulkRestartTray": "Restart Tray",
+    "bulkCheckUpdate": "Check Update",
+    "bulkCommandSent": "Command sent",
+    "bulkCommandError": "Could not send the command.",
+    "bulkConfirmBtn": "Confirm — {action}",
+    "bulkRestartServiceTooltip": "Restart Service (all WS)",
+    "bulkRestartTrayTooltip": "Restart Tray (all WS)",
+    "bulkCheckUpdateTooltip": "Check Update (all WS)"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -185,7 +199,11 @@
     "pageNumber": "Page {page}",
     "deleteTitle": "Delete workstation",
     "deleteConfirmMessage": "Delete {name}? This action cannot be undone.",
-    "deleting": "Deleting…"
+    "deleting": "Deleting…",
+    "bulkCommandSentDesc": "\"{action}\" sent successfully.",
+    "commandRestartService": "Restart Service",
+    "commandRestartTray": "Restart Tray",
+    "commandCheckUpdate": "Check Update"
   },
   "vlans": {
     "title": "VLANs",
@@ -253,7 +271,15 @@
     "metadataHelper": "Key-value pairs available to workstations (e.g. remote_queue_path)",
     "metadataKeyPlaceholder": "Key (e.g. remote_queue_path)",
     "metadataValuePlaceholder": "Value (e.g. \\\\server\\queue)",
-    "metadataAdd": "Add metadata"
+    "metadataAdd": "Add metadata",
+    "bulkCommandSentDesc": "\"{action}\" sent to {count} online workstation(s) in VLAN \"{name}\".",
+    "bulkRestartServiceDesc": "The restart service command will be sent to all online workstations in VLAN \"{name}\".",
+    "bulkRestartTrayDesc": "The restart Tray command will be sent to all online workstations in VLAN \"{name}\".",
+    "bulkCheckUpdateDesc": "An update check will be forced on all online workstations in VLAN \"{name}\".",
+    "bulkRestartServiceWarning": "In-progress prints may be interrupted. The service will restore automatically in seconds.",
+    "bulkRestartTrayWarning": "The Tray will close and the service will relaunch it automatically in seconds.",
+    "bulkCheckUpdateWarning": "If a new version is available, it will be downloaded and installed automatically.",
+    "bulkModalTitle": "{action} — VLAN"
   },
   "messages": {
     "title": "Messages",
@@ -496,6 +522,19 @@
     "forcedContingencyActivated": "Forced contingency activated for this organization.",
     "forcedContingencyDeactivated": "Forced contingency deactivated for this organization.",
     "forcedContingencyError": "Error changing forced contingency.",
+    "loadError": "Error loading organizations. Please try again.",
+    "moreIps": "+{count} more",
+    "createdLabel": "Created: {date}",
+    "editAccount": "Edit account",
+    "deleteAccount": "Delete account",
+    "bulkCommandSentDesc": "\"{action}\" sent to {count} online workstation(s) in \"{name}\".",
+    "bulkRestartServiceDesc": "The restart service command will be sent to all online workstations in organization \"{name}\".",
+    "bulkRestartTrayDesc": "The restart Tray command will be sent to all online workstations in organization \"{name}\".",
+    "bulkCheckUpdateDesc": "An update check will be forced on all online workstations in organization \"{name}\".",
+    "bulkRestartServiceWarning": "In-progress prints may be interrupted. The service will restore automatically in seconds.",
+    "bulkRestartTrayWarning": "The Tray will close and the service will relaunch it automatically in seconds.",
+    "bulkCheckUpdateWarning": "If a new version is available, it will be downloaded and installed automatically.",
+    "bulkModalTitle": "{action} — Organization",
     "pagination": "Showing {start} to {end} of {total} organizations",
     "pageNumber": "Page {page}"
   },

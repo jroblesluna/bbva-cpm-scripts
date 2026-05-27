@@ -30,7 +30,21 @@
     "deleting": "Eliminando...",
     "lastUpdated": "Última actualización: {time}",
     "first": "Primera",
-    "reset": "Limpiar"
+    "reset": "Limpiar",
+    "confirm": "Confirmar",
+    "sending": "Enviando...",
+    "error": "Error",
+    "viewCards": "Vista de tarjetas",
+    "viewTable": "Vista de tabla",
+    "bulkRestartService": "Reiniciar Servicio",
+    "bulkRestartTray": "Reiniciar Tray",
+    "bulkCheckUpdate": "Verificar Actualización",
+    "bulkCommandSent": "Comando enviado",
+    "bulkCommandError": "No se pudo enviar el comando.",
+    "bulkConfirmBtn": "Confirmar — {action}",
+    "bulkRestartServiceTooltip": "Reiniciar Servicio (todas las WS)",
+    "bulkRestartTrayTooltip": "Reiniciar Tray (todas las WS)",
+    "bulkCheckUpdateTooltip": "Verificar Actualización (todas las WS)"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -185,7 +199,11 @@
     "pageNumber": "Página {page}",
     "deleteTitle": "Eliminar workstation",
     "deleteConfirmMessage": "¿Eliminar {name}? Esta acción no se puede deshacer.",
-    "deleting": "Eliminando…"
+    "deleting": "Eliminando…",
+    "bulkCommandSentDesc": "\"{action}\" enviado exitosamente.",
+    "commandRestartService": "Reiniciar Servicio",
+    "commandRestartTray": "Reiniciar Tray",
+    "commandCheckUpdate": "Verificar Actualización"
   },
   "vlans": {
     "title": "VLANs",
@@ -253,7 +271,15 @@
     "metadataHelper": "Pares clave-valor disponibles para las workstations (ej: remote_queue_path)",
     "metadataKeyPlaceholder": "Clave (ej: remote_queue_path)",
     "metadataValuePlaceholder": "Valor (ej: \\\\server\\queue)",
-    "metadataAdd": "Agregar metadato"
+    "metadataAdd": "Agregar metadato",
+    "bulkCommandSentDesc": "\"{action}\" enviado a {count} workstation(s) online en VLAN \"{name}\".",
+    "bulkRestartServiceDesc": "Se enviará la orden de reiniciar el servicio AlwaysPrint a todas las workstations online de la VLAN \"{name}\".",
+    "bulkRestartTrayDesc": "Se enviará la orden de reiniciar la aplicación Tray a todas las workstations online de la VLAN \"{name}\".",
+    "bulkCheckUpdateDesc": "Se forzará la verificación de actualizaciones disponibles en todas las workstations online de la VLAN \"{name}\".",
+    "bulkRestartServiceWarning": "Las impresiones en curso pueden interrumpirse. El servicio se restablecerá automáticamente en segundos.",
+    "bulkRestartTrayWarning": "El Tray se cerrará y el servicio lo relanzará automáticamente en segundos.",
+    "bulkCheckUpdateWarning": "Si hay una nueva versión disponible, se descargará e instalará automáticamente.",
+    "bulkModalTitle": "{action} — VLAN"
   },
   "messages": {
     "title": "Mensajes",
@@ -496,6 +522,19 @@
     "forcedContingencyActivated": "Contingencia forzada activada para esta organización.",
     "forcedContingencyDeactivated": "Contingencia forzada desactivada para esta organización.",
     "forcedContingencyError": "Error al cambiar contingencia forzada.",
+    "loadError": "Error al cargar organizaciones. Por favor, intenta de nuevo.",
+    "moreIps": "+{count} más",
+    "createdLabel": "Creada: {date}",
+    "editAccount": "Editar cuenta",
+    "deleteAccount": "Eliminar cuenta",
+    "bulkCommandSentDesc": "\"{action}\" enviado a {count} workstation(s) online en \"{name}\".",
+    "bulkRestartServiceDesc": "Se enviará la orden de reiniciar el servicio AlwaysPrint a todas las workstations online de la organización \"{name}\".",
+    "bulkRestartTrayDesc": "Se enviará la orden de reiniciar la aplicación Tray a todas las workstations online de la organización \"{name}\".",
+    "bulkCheckUpdateDesc": "Se forzará la verificación de actualizaciones disponibles en todas las workstations online de la organización \"{name}\".",
+    "bulkRestartServiceWarning": "Las impresiones en curso pueden interrumpirse. El servicio se restablecerá automáticamente en segundos.",
+    "bulkRestartTrayWarning": "El Tray se cerrará y el servicio lo relanzará automáticamente en segundos.",
+    "bulkCheckUpdateWarning": "Si hay una nueva versión disponible, se descargará e instalará automáticamente.",
+    "bulkModalTitle": "{action} — Organización",
     "pagination": "Mostrando {start} a {end} de {total} organizaciones",
     "pageNumber": "Página {page}"
   },

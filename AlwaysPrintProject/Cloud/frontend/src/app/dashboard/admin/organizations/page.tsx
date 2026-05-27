@@ -40,6 +40,7 @@ import {
   RotateCcw,
   RefreshCcw,
   Download,
+  Terminal,
 } from 'lucide-react'
 import type { Organization, OrganizationCreate, OrganizationUpdate, PublicIPCreate } from '@/types'
 import { ActionConfigSection } from '@/components/config/ActionConfigSection'
@@ -178,16 +179,16 @@ export default function AccountsPage() {
     try {
       const result = await organizationsApi.sendCommand(bulkCommandTarget.org.id, bulkCommandTarget.commandType)
       const labels: Record<string, string> = {
-        restart_service: 'Reiniciar Servicio',
-        restart_tray: 'Reiniciar Tray',
-        check_update: 'Verificar Actualización',
+        restart_service: tCommon('bulkRestartService'),
+        restart_tray: tCommon('bulkRestartTray'),
+        check_update: tCommon('bulkCheckUpdate'),
       }
       toast({
-        title: 'Comando enviado',
-        description: `"${labels[bulkCommandTarget.commandType]}" enviado a ${result.dispatched} workstation(s) online en "${bulkCommandTarget.org.name}".`,
+        title: tCommon('bulkCommandSent'),
+        description: t('bulkCommandSentDesc', { action: labels[bulkCommandTarget.commandType], count: result.dispatched, name: bulkCommandTarget.org.name }),
       })
     } catch {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo enviar el comando.' })
+      toast({ variant: 'destructive', title: tCommon('error'), description: tCommon('bulkCommandError') })
     } finally {
       setBulkCommandPending(false)
       setBulkCommandTarget(null)
@@ -228,7 +229,7 @@ export default function AccountsPage() {
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Error al cargar organizaciones. Por favor, intenta de nuevo.
+            {t('loadError')}
           </AlertDescription>
         </Alert>
       </div>
@@ -430,24 +431,24 @@ export default function AccountsPage() {
         const { org, commandType } = bulkCommandTarget
         const labels: Record<string, { title: string; icon: React.ReactNode; desc: string; warning: string; color: string }> = {
           restart_service: {
-            title: 'Reiniciar Servicio',
-            icon: <RotateCcw className="w-5 h-5 text-amber-600" />,
-            desc: `Se enviará la orden de reiniciar el servicio AlwaysPrint a todas las workstations online de la organización "${org.name}".`,
-            warning: 'Las impresiones en curso pueden interrumpirse. El servicio se restablecerá automáticamente en segundos.',
+            title: tCommon('bulkRestartService'),
+            icon: <RotateCcw className="w-5 h-5 text-gray-600" />,
+            desc: t('bulkRestartServiceDesc', { name: org.name }),
+            warning: t('bulkRestartServiceWarning'),
             color: 'bg-amber-600 hover:bg-amber-700',
           },
           restart_tray: {
-            title: 'Reiniciar Tray',
-            icon: <RefreshCcw className="w-5 h-5 text-amber-600" />,
-            desc: `Se enviará la orden de reiniciar la aplicación Tray a todas las workstations online de la organización "${org.name}".`,
-            warning: 'El Tray se cerrará y el servicio lo relanzará automáticamente en segundos.',
+            title: tCommon('bulkRestartTray'),
+            icon: <Terminal className="w-5 h-5 text-gray-600" />,
+            desc: t('bulkRestartTrayDesc', { name: org.name }),
+            warning: t('bulkRestartTrayWarning'),
             color: 'bg-amber-600 hover:bg-amber-700',
           },
           check_update: {
-            title: 'Verificar Actualización',
-            icon: <Download className="w-5 h-5 text-blue-600" />,
-            desc: `Se forzará la verificación de actualizaciones disponibles en todas las workstations online de la organización "${org.name}".`,
-            warning: 'Si hay una nueva versión disponible, se descargará e instalará automáticamente.',
+            title: tCommon('bulkCheckUpdate'),
+            icon: <Download className="w-5 h-5 text-gray-600" />,
+            desc: t('bulkCheckUpdateDesc', { name: org.name }),
+            warning: t('bulkCheckUpdateWarning'),
             color: 'bg-blue-600 hover:bg-blue-700',
           },
         }
@@ -457,7 +458,7 @@ export default function AccountsPage() {
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
               <div className="flex items-center gap-2 mb-4">
                 {meta.icon}
-                <h2 className="text-lg font-bold text-gray-900">{meta.title} — Organización</h2>
+                <h2 className="text-lg font-bold text-gray-900">{t('bulkModalTitle', { action: meta.title })}</h2>
               </div>
               <p className="text-sm text-gray-600 mb-3">{meta.desc}</p>
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-4">{meta.warning}</p>
@@ -467,14 +468,14 @@ export default function AccountsPage() {
                   onClick={() => setBulkCommandTarget(null)}
                   disabled={bulkCommandPending}
                 >
-                  Cancelar
+                  {tCommon('cancel')}
                 </button>
                 <button
                   className={`px-4 py-2 rounded text-white text-sm ${meta.color} disabled:opacity-60`}
                   onClick={handleBulkCommand}
                   disabled={bulkCommandPending}
                 >
-                  {bulkCommandPending ? 'Enviando...' : `Confirmar — ${meta.title}`}
+                  {bulkCommandPending ? tCommon('sending') : tCommon('bulkConfirmBtn', { action: meta.title })}
                 </button>
               </div>
             </div>
@@ -514,7 +515,7 @@ export default function AccountsPage() {
                         </div>
                         <div className="flex items-center">
                           <CheckCircle className="w-4 h-4 mr-1 shrink-0" />
-                          <span>Creada: {formatDateWithTimezone(account.created_at, userTimezone)}</span>
+                          <span>{t('createdLabel', { date: formatDateWithTimezone(account.created_at, userTimezone) })}</span>
                         </div>
                       </div>
 
@@ -528,7 +529,7 @@ export default function AccountsPage() {
                           ))}
                           {account.public_ips.length > 5 && (
                             <Badge variant="outline" className="text-xs text-gray-400">
-                              +{account.public_ips.length - 5} más
+                              {t('moreIps', { count: account.public_ips.length - 5 })}
                             </Badge>
                           )}
                         </div>
@@ -541,8 +542,7 @@ export default function AccountsPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => setBulkCommandTarget({ org: account, commandType: 'restart_service' })}
-                      title="Reiniciar Servicio (todas las WS)"
-                      className="text-amber-600 hover:text-amber-700 border-amber-200"
+                      title={tCommon('bulkRestartServiceTooltip')}
                     >
                       <RotateCcw className="w-4 h-4" />
                     </Button>
@@ -550,17 +550,15 @@ export default function AccountsPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => setBulkCommandTarget({ org: account, commandType: 'restart_tray' })}
-                      title="Reiniciar Tray (todas las WS)"
-                      className="text-amber-600 hover:text-amber-700 border-amber-200"
+                      title={tCommon('bulkRestartTrayTooltip')}
                     >
-                      <RefreshCcw className="w-4 h-4" />
+                      <Terminal className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setBulkCommandTarget({ org: account, commandType: 'check_update' })}
-                      title="Verificar Actualización (todas las WS)"
-                      className="text-blue-600 hover:text-blue-700 border-blue-200"
+                      title={tCommon('bulkCheckUpdateTooltip')}
                     >
                       <Download className="w-4 h-4" />
                     </Button>
@@ -588,7 +586,7 @@ export default function AccountsPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => router.push(`/dashboard/admin/organizations/${account.id}/edit`)}
-                      title="Editar cuenta"
+                      title={t('editAccount')}
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
@@ -601,9 +599,9 @@ export default function AccountsPage() {
                         }
                       }}
                       disabled={deleteMutation.isPending}
-                      title="Eliminar cuenta"
+                      title={t('deleteAccount')}
                     >
-                      <Trash2 className="w-4 h-4 text-red-600" />
+                      <Trash2 className="w-4 h-4 text-red-400" />
                     </Button>
                   </div>
                 </div>

@@ -172,13 +172,13 @@ export default function WorkstationsPage() {
       workstationsApi.sendCommand(id, commandType),
     onSuccess: (_data, variables) => {
       const labels: Record<string, string> = {
-        restart_service: 'Reiniciar Servicio',
-        restart_tray: 'Reiniciar Tray',
-        check_update: 'Verificar Actualización',
+        restart_service: t('commandRestartService'),
+        restart_tray: t('commandRestartTray'),
+        check_update: t('commandCheckUpdate'),
       };
       toast({
-        title: 'Comando enviado',
-        description: `"${labels[variables.commandType]}" enviado exitosamente.`,
+        title: tCommon('bulkCommandSent'),
+        description: t('bulkCommandSentDesc', { action: labels[variables.commandType] }),
       });
       setRestartTarget(null);
       // Refrescar estado de workstations tras reinicio
@@ -543,7 +543,7 @@ export default function WorkstationsPage() {
                 variant={viewMode === 'cards' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => handleViewModeChange('cards')}
-                title="Vista de tarjetas"
+                title={tCommon('viewCards')}
                 className="h-8 w-8 p-0"
               >
                 <LayoutGrid className="w-4 h-4" />
@@ -552,7 +552,7 @@ export default function WorkstationsPage() {
                 variant={viewMode === 'table' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => handleViewModeChange('table')}
-                title="Vista de tabla"
+                title={tCommon('viewTable')}
                 className="h-8 w-8 p-0"
               >
                 <List className="w-4 h-4" />
@@ -1010,7 +1010,7 @@ function WorkstationCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  title="Reiniciar Servicio"
+                  title={t('restartServiceTitle')}
                   onClick={() => onCommand('restart_service')}
                   disabled={isCommandPending}
                 >
@@ -1019,7 +1019,7 @@ function WorkstationCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  title="Reiniciar Tray"
+                  title={t('restartTrayTitle')}
                   onClick={() => onCommand('restart_tray')}
                   disabled={isCommandPending}
                 >
@@ -1028,7 +1028,7 @@ function WorkstationCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  title="Verificar Actualización"
+                  title={t('commandCheckUpdate')}
                   onClick={() => onCommand('check_update')}
                   disabled={isCommandPending}
                 >
@@ -1136,7 +1136,7 @@ function WorkstationCard({
             size="sm"
             onClick={onEdit}
             className="h-8 w-8 p-0"
-            title="Editar"
+            title={t('editTitle', { ip: workstation.ip_private })}
           >
             <Edit className="w-4 h-4" />
           </Button>
@@ -1155,7 +1155,7 @@ function WorkstationCard({
               <Button
                 variant="outline"
                 size="sm"
-                title="Reiniciar Servicio"
+                title={t('restartServiceTitle')}
                 onClick={() => onCommand('restart_service')}
                 disabled={isCommandPending}
                 className="h-8 w-8 p-0"
@@ -1165,7 +1165,7 @@ function WorkstationCard({
               <Button
                 variant="outline"
                 size="sm"
-                title="Reiniciar Tray"
+                title={t('restartTrayTitle')}
                 onClick={() => onCommand('restart_tray')}
                 disabled={isCommandPending}
                 className="h-8 w-8 p-0"
@@ -1175,7 +1175,7 @@ function WorkstationCard({
               <Button
                 variant="outline"
                 size="sm"
-                title="Verificar Actualización"
+                title={t('commandCheckUpdate')}
                 onClick={() => onCommand('check_update')}
                 disabled={isCommandPending}
                 className="h-8 w-8 p-0"
@@ -1190,7 +1190,7 @@ function WorkstationCard({
             onClick={onDelete}
             disabled={isDeletePending}
             className="h-8 w-8 p-0"
-            title="Eliminar"
+            title={t('deleteTitle')}
           >
             <Trash2 className="w-4 h-4" />
           </Button>
@@ -1357,7 +1357,7 @@ function WorkstationTable({
                         variant="ghost"
                         size="sm"
                         onClick={() => onEdit(ws)}
-                        title="Editar"
+                        title={t('editTitle', { ip: ws.ip_private })}
                         className="h-7 w-7 p-0"
                       >
                         <Edit className="w-3.5 h-3.5" />
@@ -1377,7 +1377,7 @@ function WorkstationTable({
                           <Button
                             variant="ghost"
                             size="sm"
-                            title="Reiniciar Servicio"
+                            title={t('restartServiceTitle')}
                             onClick={() => onCommand(ws.id, 'restart_service')}
                             disabled={isCommandPending}
                             className="h-7 w-7 p-0"
@@ -1387,7 +1387,7 @@ function WorkstationTable({
                           <Button
                             variant="ghost"
                             size="sm"
-                            title="Reiniciar Tray"
+                            title={t('restartTrayTitle')}
                             onClick={() => onCommand(ws.id, 'restart_tray')}
                             disabled={isCommandPending}
                             className="h-7 w-7 p-0"
@@ -1397,7 +1397,7 @@ function WorkstationTable({
                           <Button
                             variant="ghost"
                             size="sm"
-                            title="Verificar Actualización"
+                            title={t('commandCheckUpdate')}
                             onClick={() => onCommand(ws.id, 'check_update')}
                             disabled={isCommandPending}
                             className="h-7 w-7 p-0"
@@ -1411,7 +1411,7 @@ function WorkstationTable({
                         size="sm"
                         onClick={() => onDelete(ws)}
                         disabled={isDeletePending}
-                        title="Eliminar"
+                        title={t('deleteTitle')}
                         className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
