@@ -72,3 +72,5 @@ AlwaysPrintProject/Client/logo*.png
 AlwaysPrintProject/Cloud/frontend/public/alwaysprint-logo.*
 AlwaysPrintProject/Cloud/frontend/public/favicon.ico
 !.kiro
+
+script_docs

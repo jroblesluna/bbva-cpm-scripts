@@ -1,7 +1,7 @@
-# Análisis Completo del Proyecto — Sistemas de Impresión Corporativa BBVA
+# Análisis del Proyecto AlwaysPrint
 
 **Fecha**: Mayo 2026  
-**Versión del documento**: 1.0  
+**Versión del documento**: 2.0  
 **Propósito**: Documento base para generar presentaciones, documentación técnica y comercial.
 
 ---
@@ -9,18 +9,19 @@
 ## 1. Resumen Ejecutivo
 
 ### Problema
-BBVA utiliza Lexmark Cloud Print Manager (CPM) como sistema de impresión corporativa. Cuando CPM falla, las workstations quedan sin capacidad de impresión hasta que se restaure el servicio manualmente.
+
+BBVA utiliza Lexmark Cloud Print Manager (CPM) como sistema de impresión corporativa. Cuando CPM falla — ya sea por caída del módulo de Lexmark, cruces en las sesiones de los usuarios que impiden enviar correctamente la impresión, u otros motivos — las estaciones de trabajo (PC individual) quedan sin capacidad de impresión hasta que se restaure el servicio o un personal capacitado configure manualmente la solución.
 
 ### Solución
-**AlwaysPrint** es un sistema de contingencia que coexiste con Lexmark CPM en las workstations Windows. Detecta automáticamente fallas de CPM y redirige el tráfico de impresión directamente a las impresoras físicas (bypass completo), garantizando continuidad operativa.
+
+**AlwaysPrint** es un sistema de contingencia que coexiste con Lexmark CPM en las workstations Windows (10/11). Evita y soluciona cruces de sesiones, detecta automáticamente caídas de CPM y redirige el tráfico de impresión directamente a las impresoras físicas de contingencia, garantizando continuidad operativa.
 
 ### Componentes del Proyecto
 
-| Sistema | Rol | Estado |
-|---------|-----|--------|
-| Lexmark CPM (Producción) | Impresión corporativa principal | ✅ Producción activa |
-| AlwaysPrint Client (Contingencia) | Detección de fallas + redirección | ⏳ ~85% completo |
-| AlwaysPrint Cloud Manager | Gestión centralizada SaaS | ✅ Funcional |
+| Componente | Rol |
+|---|---|
+| AlwaysPrint Client (Windows) | Monitoreo, detección de fallas y redirección de impresión |
+| AlwaysPrint Cloud Manager | Gestión centralizada SaaS (configuración, monitoreo, acciones remotas) |
 
 ---
 
@@ -31,12 +32,12 @@ BBVA utiliza Lexmark Cloud Print Manager (CPM) como sistema de impresión corpor
 - **Experiencia en producción**: Transparente, no nota el sistema
 - **Experiencia en contingencia**: Recibe notificación balloon tip de que se activó contingencia
 - **Interfaz**: Icono en bandeja del sistema (AlwaysPrintTray) con menú contextual
-  - About (versión, estado)
+  - About (versión, estado, usuario)
   - Configuration (ver configuración activa)
-  - My Printers (impresoras disponibles)
+  - My Printers (impresoras disponibles en VLAN y gestionar las favoritas)
   - Check Updates (verificar actualizaciones)
 
-### 2.2 Administrador de TI (Operador)
+### 2.2 Administrador por Organización (Operador)
 - **Interfaz**: Dashboard web (Cloud Manager)
 - **Funciones**:
   - Monitorear estado de workstations en tiempo real
@@ -49,18 +50,19 @@ BBVA utiliza Lexmark Cloud Print Manager (CPM) como sistema de impresión corpor
   - Descargar logs remotos de workstations
   - Análisis de logs con IA (LLM)
   - Enviar mensajes a workstations
+  - Autorización de IPs públicas
+  - Gestión de configuraciones de acciones (.alwaysconfig)
 
-### 2.3 Superadministrador (Multi-tenant)
+### 2.3 Administrador Global (Admin)
 - **Interfaz**: Dashboard web (sección Admin)
 - **Funciones**:
   - CRUD de organizaciones (BBVA, Ripley, etc.)
-  - Gestión de usuarios administradores
-  - Autorización de IPs públicas
-  - Gestión de configuraciones de acciones (.alwaysconfig)
+  - Gestión de usuarios (operarios, administradores)
   - Gestión de actualizaciones automáticas
   - Configuración de modelos LLM por organización
+  - Funciones de operador
 
-### 2.4 Workstation (Actor automatizado)
+### 2.4 Workstation (PC de trabajo)
 - **Interacción**: Comunicación automática con Cloud Manager
 - **Funciones**:
   - Registro automático por IP pública
@@ -74,69 +76,40 @@ BBVA utiliza Lexmark Cloud Print Manager (CPM) como sistema de impresión corpor
 
 ## 3. Arquitectura del Sistema
 
-### 3.1 Diagrama de Arquitectura General
+### 3.1 Arquitectura General
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    WORKSTATION WINDOWS (x N estaciones)              │
 │                                                                      │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  PRODUCCIÓN: Lexmark CPM Client                              │   │
-│  │  • Cola LexmarkBBVA (driver Lexmark Universal v2 XL)        │   │
-│  │  • Puertos internos 9167, 9443                              │   │
-│  │  • LPD Service (puerto 515)                                 │   │
-│  │  • LpdServiceMonitor (watchdog)                             │   │
-│  └──────────────────────────┬──────────────────────────────────┘   │
-│                              │                                       │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  CONTINGENCIA: AlwaysPrint                                   │   │
+│  │  AlwaysPrint Client                                          │   │
 │  │  • AlwaysPrintService.exe (LocalSystem, sin Internet)       │   │
 │  │  • AlwaysPrintTray.exe (sesión usuario, con Internet)       │   │
 │  │  • Comunicación IPC: Named Pipe (\\.\pipe\AlwaysPrintService)│   │
+│  │                                                              │   │
+│  │  Funciones:                                                  │   │
+│  │  • Detecta falla CPM → redirige a IP:puerto impresora      │   │
+│  │  • Ejecuta acciones administrativas remotas                 │   │
+│  │  • Reporta telemetría y estado al Cloud                     │   │
 │  └──────────────────────────┬──────────────────────────────────┘   │
 └─────────────────────────────┼───────────────────────────────────────┘
                               │
-          ┌───────────────────┼───────────────────┐
-          │                   │                   │
-          ▼                   ▼                   ▼
-┌──────────────────┐ ┌───────────────┐ ┌──────────────────────────┐
-│ Servidor Linux   │ │ Impresora     │ │ AWS Cloud (us-west-2)    │
-│ SUSE 12 (BBVA)  │ │ Física        │ │                          │
-│ • CUPS           │ │ (IP:puerto)   │ │ EC2 + RDS + ECR + S3    │
-│ • Filtros custom │ │ Bypass directo│ │ • Backend FastAPI        │
-│ • Tea4Cups (PDF) │ │ en contingencia│ │ • Frontend Next.js      │
-│ • Puerto 515     │ │               │ │ • PostgreSQL 16          │
-└──────────────────┘ └───────────────┘ │ • Redis                  │
-                                        │ • Nginx + SSL            │
-                                        └──────────────────────────┘
+                              │ HTTPS/WSS (vía Proxy Corporativo)
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  ALWAYSPRINT CLOUD MANAGER (AWS us-west-2)                          │
+│                                                                      │
+│  EC2 + RDS + ECR + S3                                               │
+│  • Backend FastAPI (Python 3.12)                                    │
+│  • Frontend Next.js 15 (TypeScript)                                 │
+│  • PostgreSQL 16 + Redis 7                                          │
+│  • Nginx + SSL/TLS 1.3                                              │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.2 Diagrama de Flujo — Modo Producción (Normal)
-
-```
-Usuario imprime
-    │
-    ▼
-Cola LexmarkBBVA (Windows)
-    │
-    ▼
-Lexmark CPM Client (puertos 9167/9443)
-    │
-    ▼
-Servidor Linux SUSE 12 (CUPS)
-    │
-    ├─► filtro_nacarpr_pro.cpm
-    │     • Extrae puesto/usuario del mapfile
-    │     • Construye cabecera PJL
-    │     • Crea/actualiza cola CUPS dinámica
-    │     • Envía a impresora vía LPD
-    │
-    └─► Tea4Cups (opcional)
-          • Genera PDF del trabajo
-          • Accesible vía web interna
-```
-
-### 3.3 Diagrama de Flujo — Modo Contingencia (Falla CPM)
+### 3.2 Flujo de Contingencia
 
 ```
 AlwaysPrintService detecta falla CPM
@@ -145,7 +118,7 @@ AlwaysPrintService detecta falla CPM
 Activa modo contingencia
     │
     ├─► Redirige tráfico de cola Windows → IP:puerto impresora
-    │   (bypass completo de CPM y servidor Linux)
+    │   (bypass completo de CPM)
     │
     ├─► Notifica a AlwaysPrintTray vía Named Pipe
     │     • Tray muestra balloon tip al usuario
@@ -156,7 +129,7 @@ Activa modo contingencia
           • Operador puede intervenir remotamente
 ```
 
-### 3.4 Diagrama de Comunicación Client ↔ Cloud
+### 3.3 Comunicación Client ↔ Cloud
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -193,7 +166,6 @@ Activa modo contingencia
 │       ├─► WebSocket (/ws/workstation/{id})                  │
 │       │     • Estado en tiempo real                         │
 │       │     • Comandos remotos (push)                       │
-│       │     • Configuración push                            │
 │       │                                                      │
 │       └─► WebSocket (/ws/operator/{token})                  │
 │             • Dashboard tiempo real                          │
@@ -201,7 +173,7 @@ Activa modo contingencia
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 3.5 Diagrama de Infraestructura AWS
+### 3.4 Infraestructura AWS
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -246,9 +218,9 @@ Activa modo contingencia
 
 ---
 
-## 4. Stack Tecnológico Completo
+## 4. Stack Tecnológico
 
-### 4.1 Cliente Windows (AlwaysPrint)
+### 4.1 Cliente Windows
 
 | Categoría | Tecnología | Versión |
 |-----------|-----------|---------|
@@ -293,18 +265,7 @@ Activa modo contingencia
 | WebSocket | Cliente custom | — |
 | Fechas | date-fns + zonas horarias | — |
 
-### 4.4 Sistema de Producción (Linux)
-
-| Categoría | Tecnología | Versión |
-|-----------|-----------|---------|
-| OS | SUSE Linux | 12 |
-| Shell | Bash | 4.x |
-| Impresión | CUPS | — |
-| Protocolo | LPD (puerto 515) | — |
-| PDF | Tea4Cups | — |
-| Servicio | xinetd (cups-lpd) | — |
-
-### 4.5 DevOps / Infraestructura
+### 4.4 DevOps / Infraestructura
 
 | Categoría | Tecnología | Detalle |
 |-----------|-----------|---------|
@@ -322,9 +283,7 @@ Activa modo contingencia
 
 ## 5. Funcionalidades Detalladas
 
-### 5.1 Cliente Windows — Funcionalidades
-
-#### AlwaysPrintService (Servicio Windows)
+### 5.1 AlwaysPrintService (Servicio Windows)
 
 | # | Funcionalidad | Descripción |
 |---|--------------|-------------|
@@ -338,7 +297,7 @@ Activa modo contingencia
 | 8 | Cola de tareas | Gestión de tareas pendientes (TaskQueueManager) |
 | 9 | Recarga de configuración | Aplica cambios de .alwaysconfig en caliente |
 
-#### AlwaysPrintTray (Aplicación de bandeja)
+### 5.2 AlwaysPrintTray (Aplicación de bandeja)
 
 | # | Funcionalidad | Descripción |
 |---|--------------|-------------|
@@ -354,7 +313,7 @@ Activa modo contingencia
 | 10 | Gestión offline | Almacena datos cuando no hay conexión |
 | 11 | Localización | Soporte multi-idioma (es/en) |
 
-#### Acciones Administrativas Remotas
+### 5.3 Acciones Administrativas Remotas
 
 | # | Acción | Descripción |
 |---|--------|-------------|
@@ -376,7 +335,7 @@ Activa modo contingencia
 | 16 | ReadPrintQueuePort | Leer puerto de cola de impresión |
 | 17 | ReadAppSetting / WriteAppSetting | Lectura/escritura de configuración |
 
-### 5.2 Cloud Manager — Backend (API REST)
+### 5.4 Cloud Manager — Backend (API REST)
 
 #### Endpoints por Módulo
 
@@ -413,7 +372,7 @@ Activa modo contingencia
 | 9 | Health check | Con métricas de pool de conexiones |
 | 10 | Análisis con IA | Logs analizados por LLM (AWS Bedrock / OpenAI) |
 
-### 5.3 Cloud Manager — Frontend (Dashboard Web)
+### 5.5 Cloud Manager — Frontend (Dashboard Web)
 
 #### Páginas y Funcionalidades
 
@@ -453,7 +412,7 @@ Activa modo contingencia
 
 ## 6. Modelo de Datos
 
-### 6.1 Diagrama Entidad-Relación (Simplificado)
+### 6.1 Diagrama Entidad-Relación
 
 ```
 ┌──────────────────┐       ┌──────────────────┐
@@ -632,7 +591,6 @@ Push a main
 | Client MSI | `1.YY.MMDD.HHmm` | `1.26.0527.1430` |
 | Backend | Git SHA (8 chars) | `a1b2c3d4` |
 | Frontend | Git SHA (8 chars) | `a1b2c3d4` |
-| Filtros Linux | `vYYYYMMDDhhmm` | `v202603070100` |
 
 ### 8.3 Entornos
 
@@ -643,219 +601,124 @@ Push a main
 
 ---
 
-## 9. Diagramas Necesarios para Documentación
+## 9. Sistema de Configuración de Acciones (.alwaysconfig)
 
-### 9.1 Diagramas para Presentación Ejecutiva
+### 9.1 Descripción
 
-| # | Diagrama | Herramienta sugerida | Propósito |
-|---|----------|---------------------|-----------|
-| 1 | Arquitectura de alto nivel (2 sistemas) | Draw.io / Lucidchart | Mostrar coexistencia CPM + AlwaysPrint |
-| 2 | Flujo normal vs contingencia | Draw.io | Comparar ambos modos |
-| 3 | Mapa de valor (problema → solución → beneficio) | PowerPoint | Presentación comercial |
+Sistema que permite definir y ejecutar acciones administrativas en workstations de forma centralizada. Las configuraciones se definen en archivos `.alwaysconfig` (JSON) y se descargan automáticamente.
 
-### 9.2 Diagramas Técnicos
+### 9.2 Flujo de Operación
 
-| # | Diagrama | Tipo | Propósito |
-|---|----------|------|-----------|
-| 4 | Infraestructura AWS | Diagrama de red | VPC, subnets, EC2, RDS, servicios |
-| 5 | Modelo de datos (ER) | ERD | Relaciones entre entidades |
-| 6 | Secuencia: registro de workstation | Sequence diagram | Flujo de auth por IP |
-| 7 | Secuencia: activación de contingencia | Sequence diagram | Detección de falla → redirección |
-| 8 | Secuencia: descarga de .alwaysconfig | Sequence diagram | Hash check → descarga → ejecución |
-| 9 | Componentes del cliente Windows | Component diagram | Service ↔ Tray ↔ Cloud |
-| 10 | Pipeline CI/CD | Flowchart | Build → Push → Deploy |
+1. **Admin sube config** → Frontend valida JSON → Backend guarda con hash
+2. **Workstation conecta** → Tray verifica hash local vs Cloud
+3. **Si difiere** → Descarga nueva config → Guarda en `active.alwaysconfig`
+4. **Notifica Service** → Named Pipe mensaje `ActionConfigChanged`
+5. **Service recarga** → ActionEngine ejecuta trigger `OnConfigChange`
 
-### 9.3 Diagramas de UX/UI
+### 9.3 Triggers Soportados
+
+| Trigger | Descripción |
+|---------|-------------|
+| `OnServiceStart` | Al iniciar el servicio |
+| `OnTrayLaunched` | Después de inicializar Tray |
+| `OnConfigChange` | Al recibir nueva configuración |
+| `OnUserLogon` | Al iniciar sesión usuario |
+| `OnUserLogoff` | Al cerrar sesión usuario |
+
+### 9.4 Características Avanzadas
+
+- **Variables**: Almacenar resultados de acciones (`store_result_in`)
+- **Templates**: Reemplazo de variables `{{variable}}` en parámetros
+- **Condicionales**: Evaluación de condiciones (equals, not_equals, contains, etc.)
+- **Iteración**: Iterar sobre listas de usuarios (`iterate_users`)
+- **Herencia jerárquica**: Scope org → vlan → workstation
+- **Hash Verification**: SHA256 (8 chars) para integridad
+
+### 9.5 Ejemplo de Configuración
+
+```json
+{
+  "version": "1.0",
+  "name": "CPM_Compliant",
+  "triggers": [
+    {
+      "event": "OnTrayLaunched",
+      "actions": [
+        {
+          "type": "PropagatePermissions",
+          "parameters": {
+            "path": "C:\\ProgramData\\LPMC\\",
+            "recursive": true
+          }
+        },
+        {
+          "type": "GetLoggedInUsers",
+          "parameters": {
+            "exclude_active_console_user": true
+          },
+          "store_result_in": "inactive_users"
+        },
+        {
+          "type": "Conditional",
+          "parameters": {
+            "condition": {
+              "variable": "inactive_users",
+              "operator": "not_empty"
+            },
+            "actions": [
+              {
+                "type": "StopService",
+                "parameters": { "service_name": "LPDSVC" }
+              },
+              {
+                "type": "DeleteFolderContents",
+                "parameters": {
+                  "path_template": "C:\\Users\\{{username}}\\AppData\\Local\\Lexmark\\",
+                  "iterate_users": "inactive_users"
+                }
+              },
+              {
+                "type": "StartService",
+                "parameters": { "service_name": "LPDSVC" }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## 10. Diagramas Recomendados para Documentación
+
+### Para Presentación Ejecutiva
 
 | # | Diagrama | Propósito |
 |---|----------|-----------|
-| 11 | Wireframes del dashboard | Mostrar layout de páginas principales |
+| 1 | Arquitectura de alto nivel | Mostrar Client + Cloud + flujo |
+| 2 | Flujo normal vs contingencia | Comparar ambos modos |
+| 3 | Mapa de valor (problema → solución → beneficio) | Presentación comercial |
+
+### Diagramas Técnicos
+
+| # | Diagrama | Propósito |
+|---|----------|-----------|
+| 4 | Infraestructura AWS | VPC, subnets, EC2, RDS, servicios |
+| 5 | Modelo de datos (ER) | Relaciones entre entidades |
+| 6 | Secuencia: registro de workstation | Flujo de auth por IP |
+| 7 | Secuencia: activación de contingencia | Detección de falla → redirección |
+| 8 | Secuencia: descarga de .alwaysconfig | Hash check → descarga → ejecución |
+| 9 | Componentes del cliente Windows | Service ↔ Tray ↔ Cloud |
+| 10 | Pipeline CI/CD | Build → Push → Deploy |
+
+### Diagramas de UX/UI
+
+| # | Diagrama | Propósito |
+|---|----------|-----------|
+| 11 | Wireframes del dashboard | Layout de páginas principales |
 | 12 | Flujo de usuario admin | Navegación entre secciones |
 | 13 | Flujo de usuario final | Experiencia en bandeja del sistema |
 | 14 | Mapa de navegación del frontend | Sitemap del dashboard |
-
-### 9.4 Diagramas de Operación
-
-| # | Diagrama | Propósito |
-|---|----------|-----------|
-| 15 | Topología de red BBVA | Workstations → Proxy → Cloud |
-| 16 | Flujo de impresión completo (producción) | Desde usuario hasta impresora física |
-| 17 | Flujo de contingencia completo | Detección → bypass → restauración |
-| 18 | Diagrama de estados del servicio | Starting → Running → Contingency |
-
----
-
-## 10. Software Necesario para Desarrollo
-
-### 10.1 Desarrollo del Cliente Windows
-
-| Software | Propósito | Versión |
-|----------|-----------|---------|
-| Visual Studio 2022 | IDE principal | Community+ |
-| .NET Framework 4.8 Developer Pack | Compilación | 4.8 |
-| .NET SDK | dotnet CLI | 8.x |
-| WiX Toolset | Generación de MSI | 4.0.5 |
-| Git | Control de versiones | latest |
-
-### 10.2 Desarrollo del Backend
-
-| Software | Propósito | Versión |
-|----------|-----------|---------|
-| Python | Runtime | 3.12 |
-| Conda/Miniconda | Gestión de entornos | latest |
-| PostgreSQL | BD local (opcional, puede usar SQLite) | 16 |
-| Redis | Cache local | 7 |
-| Docker Desktop | Contenedores locales | latest |
-| Git | Control de versiones | latest |
-
-### 10.3 Desarrollo del Frontend
-
-| Software | Propósito | Versión |
-|----------|-----------|---------|
-| Node.js | Runtime | 20+ LTS |
-| npm | Gestión de paquetes | 10+ |
-| Git | Control de versiones | latest |
-
-### 10.4 Infraestructura y DevOps
-
-| Software | Propósito | Versión |
-|----------|-----------|---------|
-| AWS CLI | Gestión de recursos AWS | v2 |
-| Terraform | Infrastructure as Code | latest |
-| Docker | Build de imágenes | latest |
-| GitHub CLI (gh) | Gestión de PRs | latest |
-
-### 10.5 Herramientas de Documentación
-
-| Software | Propósito |
-|----------|-----------|
-| Draw.io / Lucidchart | Diagramas de arquitectura |
-| Figma / Excalidraw | Wireframes y mockups |
-| PowerPoint / Google Slides | Presentaciones ejecutivas |
-| Mermaid (en Markdown) | Diagramas embebidos en docs |
-
----
-
-## 11. Métricas y KPIs del Proyecto
-
-### 11.1 Métricas Técnicas
-
-| Métrica | Valor actual |
-|---------|-------------|
-| Endpoints REST | ~50+ |
-| Modelos de BD | 12+ tablas |
-| Páginas frontend | 18+ rutas |
-| Acciones administrativas | 17+ tipos |
-| Workflows CI/CD | 6 |
-| Entornos desplegados | 2 (DEV + PROD) |
-| Servicios AWS | 7 (EC2, RDS, ECR, S3, SES, Secrets Manager, SSM) |
-
-### 11.2 KPIs de Negocio (a medir)
-
-| KPI | Descripción | Meta |
-|-----|-------------|------|
-| Tiempo de detección | Segundos desde falla CPM hasta activación de contingencia | < 30s |
-| Tiempo de recuperación | Segundos desde activación hasta primera impresión exitosa | < 60s |
-| Disponibilidad | % de tiempo con capacidad de impresión (producción + contingencia) | 99.9% |
-| Workstations monitoreadas | Número de estaciones gestionadas simultáneamente | 500+ |
-| Latencia de telemetría | Tiempo entre evento y visualización en dashboard | < 5s |
-
----
-
-## 12. Estado Actual y Pendientes
-
-### 12.1 Implementado ✅
-
-- [x] Sistema de producción CPM completo (filtros Linux, workstations)
-- [x] Cliente Windows: Service + Tray + Shared library
-- [x] Motor de acciones administrativas (ActionEngine) con 17+ acciones
-- [x] Backend FastAPI completo con todos los endpoints
-- [x] Frontend Next.js con dashboard completo
-- [x] WebSocket en tiempo real
-- [x] Autenticación JWT + autorización por IP
-- [x] Multi-tenancy con aislamiento por organización
-- [x] Sistema de configuración jerárquica (Org → VLAN → Workstation)
-- [x] CI/CD completo (6 workflows)
-- [x] Infraestructura AWS vía Terraform
-- [x] Auto-actualización del cliente
-- [x] Telemetría y checks de conectividad
-- [x] Password reset vía AWS SES
-- [x] Análisis de logs con LLM (Bedrock/OpenAI)
-- [x] Gestión de dispositivos/impresoras
-- [x] Soporte multi-idioma (es/en)
-
-### 12.2 Pendiente ⏳
-
-- [ ] Integración completa heartbeat Tray ↔ Cloud (parcial)
-- [ ] Alertas automáticas (workstation offline > X minutos)
-- [ ] SSO (SAML/OAuth) para login corporativo
-- [ ] Reportes exportables (PDF/Excel)
-- [ ] Pruebas de carga (stress testing)
-- [ ] Documentación de usuario final
-
----
-
-## 13. Documentos a Generar (Próximos Pasos)
-
-Basándose en este análisis, los documentos a producir son:
-
-### 13.1 Documentación Comercial
-
-| # | Documento | Audiencia | Contenido |
-|---|-----------|-----------|-----------|
-| 1 | Presentación Ejecutiva (PPT) | C-Level, Gerencia TI | Problema, solución, beneficios, ROI |
-| 2 | Brochure / One-pager | Decisores | Resumen visual de capacidades |
-| 3 | Caso de uso BBVA | Stakeholders | Escenario real, métricas, resultados |
-
-### 13.2 Documentación Técnica
-
-| # | Documento | Audiencia | Contenido |
-|---|-----------|-----------|-----------|
-| 4 | Guía de Arquitectura | Arquitectos, DevOps | Diagramas detallados, decisiones técnicas |
-| 5 | Manual de API | Desarrolladores | OpenAPI/Swagger exportado |
-| 6 | Guía de Integración | Equipo cliente | Cómo integrar con infraestructura existente |
-| 7 | Runbook de Operaciones | SRE/Ops | Procedimientos de mantenimiento, troubleshooting |
-
-### 13.3 Documentación de Usuario
-
-| # | Documento | Audiencia | Contenido |
-|---|-----------|-----------|-----------|
-| 8 | Manual de Administrador | Admin TI | Uso del dashboard, configuración |
-| 9 | Guía de Usuario Final | Empleados | Qué hacer cuando aparece el icono de contingencia |
-| 10 | FAQ | Todos | Preguntas frecuentes |
-
-### 13.4 Documentación de Despliegue
-
-| # | Documento | Audiencia | Contenido |
-|---|-----------|-----------|-----------|
-| 11 | Guía de Instalación Client | Soporte TI | Instalación MSI, GPO, configuración |
-| 12 | Guía de Despliegue Cloud | DevOps | Terraform, Docker, CI/CD |
-| 13 | Plan de Disaster Recovery | Ops | Procedimientos de recuperación |
-
----
-
-## 14. Glosario
-
-| Término | Definición |
-|---------|-----------|
-| CPM | Cloud Print Manager (Lexmark) — sistema de producción |
-| AlwaysPrint | Sistema de contingencia desarrollado por Robles.AI |
-| Contingencia | Modo activado cuando CPM falla, bypass directo a impresora |
-| VLAN | Agrupación lógica de workstations por red |
-| ActionConfig | Archivo .alwaysconfig con acciones administrativas remotas |
-| Tenant | Organización cliente (BBVA, Ripley, etc.) en modelo multi-tenant |
-| Named Pipe | Mecanismo IPC entre Service y Tray en Windows |
-| Tray | Aplicación de bandeja del sistema (AlwaysPrintTray.exe) |
-| Service | Servicio Windows (AlwaysPrintService.exe, LocalSystem) |
-| SSM | AWS Systems Manager — acceso al servidor sin SSH |
-| ECR | Elastic Container Registry — almacén de imágenes Docker |
-
----
-
-**Robles.AI**  
-Email: antonio@robles.ai  
-Web: https://robles.ai
-
----
-
-© 2026 Inversiones On Line SAC - Todos los derechos reservados
