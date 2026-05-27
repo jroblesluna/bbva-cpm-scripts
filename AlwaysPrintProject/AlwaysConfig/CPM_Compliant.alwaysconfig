@@ -1,5 +1,5 @@
 {
-  "version": "5.0",
+  "version": "5.1",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -38,70 +38,68 @@
         {
           "type": "Conditional",
           "description": "Si hay usuarios inactivos: limpiar datos CPM",
-          "parameters": {
-            "condition": {
-              "variable": "inactive_users",
-              "operator": "not_empty"
-            },
-            "actions": [
-              {
-                "type": "StopService",
-                "description": "Detener lpmc_universal_service",
-                "parameters": {
-                  "service_name": "lpmc_universal_service",
-                  "graceful_timeout_seconds": 30,
-                  "force_kill_on_timeout": true
-                }
-              },
-              {
-                "type": "KillProcessesByName",
-                "description": "Cerrar lpmc-systemtray-app.exe de usuarios inactivos",
-                "parameters": {
-                  "process_name": "lpmc-systemtray-app.exe",
-                  "filter_by_users": "{{inactive_users}}",
-                  "force": true
-                }
-              },
-              {
-                "type": "DeleteFolderContents",
-                "description": "Eliminar carpetas pre de usuarios inactivos",
-                "parameters": {
-                  "path_template": "C:\\ProgramData\\LPMC\\Jobs\\{{username}}\\CloudHybrid\\pre",
-                  "iterate_users": "{{inactive_users}}",
-                  "recursive": true,
-                  "ignore_errors": true
-                }
-              },
-              {
-                "type": "DeleteFolderContents",
-                "description": "Eliminar carpetas post de usuarios inactivos",
-                "parameters": {
-                  "path_template": "C:\\ProgramData\\LPMC\\Jobs\\{{username}}\\CloudHybrid\\post",
-                  "iterate_users": "{{inactive_users}}",
-                  "recursive": true,
-                  "ignore_errors": true
-                }
-              },
-              {
-                "type": "DeleteOrphanedFolders",
-                "description": "Eliminar carpetas de usuarios sin sesión",
-                "parameters": {
-                  "base_path": "C:\\ProgramData\\LPMC\\Jobs",
-                  "exclude_active_console_user": true,
-                  "exclude_users_variable": "inactive_users"
-                }
-              },
-              {
-                "type": "StartService",
-                "description": "Iniciar lpmc_universal_service",
-                "parameters": {
-                  "service_name": "lpmc_universal_service",
-                  "wait_for_running": true,
-                  "timeout_seconds": 30
-                }
+          "condition": {
+            "variable": "inactive_users",
+            "operator": "not_empty"
+          },
+          "actions": [
+            {
+              "type": "StopService",
+              "description": "Detener lpmc_universal_service",
+              "parameters": {
+                "service_name": "lpmc_universal_service",
+                "graceful_timeout_seconds": 30,
+                "force_kill_on_timeout": true
               }
-            ]
-          }
+            },
+            {
+              "type": "KillProcessesByName",
+              "description": "Cerrar lpmc-systemtray-app.exe de usuarios inactivos",
+              "parameters": {
+                "process_name": "lpmc-systemtray-app.exe",
+                "filter_by_users": "{{inactive_users}}",
+                "force": true
+              }
+            },
+            {
+              "type": "DeleteFolderContents",
+              "description": "Eliminar carpetas pre de usuarios inactivos",
+              "parameters": {
+                "path_template": "C:\\ProgramData\\LPMC\\Jobs\\{{username}}\\CloudHybrid\\pre",
+                "iterate_users": "{{inactive_users}}",
+                "recursive": true,
+                "ignore_errors": true
+              }
+            },
+            {
+              "type": "DeleteFolderContents",
+              "description": "Eliminar carpetas post de usuarios inactivos",
+              "parameters": {
+                "path_template": "C:\\ProgramData\\LPMC\\Jobs\\{{username}}\\CloudHybrid\\post",
+                "iterate_users": "{{inactive_users}}",
+                "recursive": true,
+                "ignore_errors": true
+              }
+            },
+            {
+              "type": "DeleteOrphanedFolders",
+              "description": "Eliminar carpetas de usuarios sin sesión",
+              "parameters": {
+                "base_path": "C:\\ProgramData\\LPMC\\Jobs",
+                "exclude_active_console_user": true,
+                "exclude_users_variable": "inactive_users"
+              }
+            },
+            {
+              "type": "StartService",
+              "description": "Iniciar lpmc_universal_service",
+              "parameters": {
+                "service_name": "lpmc_universal_service",
+                "wait_for_running": true,
+                "timeout_seconds": 30
+              }
+            }
+          ]
         },
         {
           "type": "RunProcess",
@@ -126,44 +124,42 @@
         {
           "type": "Conditional",
           "description": "Si contingencia activa: asegurar puerto apunta a IP directa. Si no: asegurar puerto apunta a CPM local.",
-          "parameters": {
-            "condition": {
-              "variable": "contingency_enabled",
-              "operator": "equals",
-              "value": "1"
-            },
-            "actions": [
-              {
-                "type": "ReadAppSetting",
-                "description": "Leer IP de contingencia persistida",
-                "parameters": {
-                  "value_name": "ContingencyPrinterIp",
-                  "default_value": ""
-                },
-                "store_result_in": "contingency_printer_ip"
+          "condition": {
+            "variable": "contingency_enabled",
+            "operator": "equals",
+            "value": "1"
+          },
+          "actions": [
+            {
+              "type": "ReadAppSetting",
+              "description": "Leer IP de contingencia persistida",
+              "parameters": {
+                "value_name": "ContingencyPrinterIp",
+                "default_value": ""
               },
-              {
-                "type": "SetTcpPort",
-                "description": "Asegurar LPMCHybridPort apunta a IP de contingencia",
-                "parameters": {
-                  "port_name": "LPMCHybridPort",
-                  "host_address": "{{contingency_printer_ip}}",
-                  "port_number": 9100
-                }
+              "store_result_in": "contingency_printer_ip"
+            },
+            {
+              "type": "SetTcpPort",
+              "description": "Asegurar LPMCHybridPort apunta a IP de contingencia",
+              "parameters": {
+                "port_name": "LPMCHybridPort",
+                "host_address": "{{contingency_printer_ip}}",
+                "port_number": 9100
               }
-            ],
-            "else_actions": [
-              {
-                "type": "SetTcpPort",
-                "description": "Asegurar LPMCHybridPort apunta a CPM local (127.0.0.1:9167)",
-                "parameters": {
-                  "port_name": "LPMCHybridPort",
-                  "host_address": "127.0.0.1",
-                  "port_number": 9167
-                }
+            }
+          ],
+          "else_actions": [
+            {
+              "type": "SetTcpPort",
+              "description": "Asegurar LPMCHybridPort apunta a CPM local (127.0.0.1:9167)",
+              "parameters": {
+                "port_name": "LPMCHybridPort",
+                "host_address": "127.0.0.1",
+                "port_number": 9167
               }
-            ]
-          }
+            }
+          ]
         }
       ]
     },
