@@ -263,18 +263,18 @@ async def workstation_websocket(
             })
             print(f"[WS] Contingencia forzada sincronizada: source={forced_source}, printer_ip={printer_ip}", flush=True)
 
-        elif workstation.contingency_active:
-            # No hay contingencia forzada activa, pero la workstation reportó que está en contingencia.
-            # Esto ocurre si se desactivó la contingencia mientras estaba offline.
-            # Enviar orden de desactivación para que restaure el flujo normal.
+        else:
+            # No hay contingencia forzada activa. Enviar estado explícito para que
+            # el cliente sincronice su semáforo local (ContingencyEnabled=0).
+            # Cubre el caso donde la Cloud desactivó contingencia mientras la workstation
+            # estaba offline y el semáforo local quedó en 1.
             await websocket.send_json({
                 "type": "forced_contingency",
                 "enabled": False,
                 "source": "sync",
-                "source_name": "reconnection",
+                "source_name": "normal",
                 "printer_ip": None,
             })
-            print(f"[WS] Contingencia desactivada por sincronización (estaba activa offline)", flush=True)
 
         print(f"[WS] Entrando al loop", flush=True)
         
