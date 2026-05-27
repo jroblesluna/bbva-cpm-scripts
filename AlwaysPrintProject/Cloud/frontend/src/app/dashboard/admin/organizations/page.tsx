@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import {
   Building2,
@@ -61,6 +62,8 @@ export default function AccountsPage() {
   const [contingencyTarget, setContingencyTarget] = useState<Organization | null>(null)
   const [bulkCommandTarget, setBulkCommandTarget] = useState<{ org: Organization; commandType: 'restart_service' | 'restart_tray' | 'check_update' } | null>(null)
   const [bulkCommandPending, setBulkCommandPending] = useState(false)
+  const [orgToDelete, setOrgToDelete] = useState<{ id: string; name: string } | null>(null)
+  const [deleteConfirmName, setDeleteConfirmName] = useState('')
   const [page, setPage] = useState(1)
   const pageSize = 10
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
@@ -593,11 +596,7 @@ export default function AccountsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        if (confirm(t('deleteAccountConfirm', { name: account.name }))) {
-                          deleteMutation.mutate(account.id)
-                        }
-                      }}
+                      onClick={() => { setOrgToDelete({ id: account.id, name: account.name }); setDeleteConfirmName('') }}
                       disabled={deleteMutation.isPending}
                       title={t('deleteAccount')}
                     >
@@ -655,6 +654,45 @@ export default function AccountsPage() {
           </div>
         </div>
       )}
+
+      {/* Modal de confirmación para eliminar organización */}
+      <Dialog open={!!orgToDelete} onOpenChange={(open) => { if (!open) { setOrgToDelete(null); setDeleteConfirmName('') } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{tCommon('confirmDelete')}</DialogTitle>
+            <DialogDescription>
+              {orgToDelete && t('deleteAccountConfirm', { name: orgToDelete.name })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-2">
+            <p className="text-sm text-gray-700">{t('deleteOrgTypeToConfirm')}</p>
+            <Input
+              value={deleteConfirmName}
+              onChange={(e) => setDeleteConfirmName(e.target.value)}
+              placeholder={orgToDelete?.name}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setOrgToDelete(null); setDeleteConfirmName('') }}>
+              {tCommon('cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteConfirmName !== orgToDelete?.name || deleteMutation.isPending}
+              onClick={() => {
+                if (orgToDelete) {
+                  deleteMutation.mutate(orgToDelete.id)
+                  setOrgToDelete(null)
+                  setDeleteConfirmName('')
+                }
+              }}
+            >
+              {deleteMutation.isPending ? tCommon('deleting') : tCommon('delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -916,6 +954,7 @@ function IPManagementForm({
   const tCommon = useTranslations('common')
   const [newIP, setNewIP] = useState('')
   const [newIPDescription, setNewIPDescription] = useState('')
+  const [ipToDelete, setIpToDelete] = useState<{ id: string; ip: string } | null>(null)
 
   const handleAddIP = (e: React.FormEvent) => {
     e.preventDefault()
@@ -1012,11 +1051,7 @@ function IPManagementForm({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    if (confirm(t('deleteIpConfirm', { ip: ip.ip_address }))) {
-                      onRemoveIP(ip.id)
-                    }
-                  }}
+                  onClick={() => setIpToDelete({ id: ip.id, ip: ip.ip_address })}
                   disabled={isLoading}
                 >
                   <Trash2 className="w-4 h-4 text-red-600" />
@@ -1040,6 +1075,31 @@ function IPManagementForm({
           {t('autoAssignNote')}
         </AlertDescription>
       </Alert>
+
+      <Dialog open={!!ipToDelete} onOpenChange={(open) => { if (!open) setIpToDelete(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{tCommon('confirmDelete')}</DialogTitle>
+            <DialogDescription>
+              {ipToDelete && t('deleteIpConfirm', { ip: ipToDelete.ip })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIpToDelete(null)}>
+              {tCommon('cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (ipToDelete) onRemoveIP(ipToDelete.id)
+                setIpToDelete(null)
+              }}
+            >
+              {tCommon('delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

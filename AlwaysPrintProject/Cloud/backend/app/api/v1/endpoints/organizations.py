@@ -259,11 +259,7 @@ def delete_organization(
         "timezone": organization.timezone
     }
     
-    # Eliminar organización (cascada automática)
-    db.delete(organization)
-    db.commit()
-    
-    # Registrar en auditoría
+    # Registrar en auditoría antes de eliminar para que el FK sea válido al insertar
     audit_service = AuditService()
     audit_service.log_delete(
         db=db,
@@ -274,6 +270,10 @@ def delete_organization(
         entity_data=old_values,
         ip_address=get_client_ip(request)
     )
+
+    # Eliminar organización (cascada automática; SET NULL en audit_logs)
+    db.delete(organization)
+    db.commit()
     
     return None
 

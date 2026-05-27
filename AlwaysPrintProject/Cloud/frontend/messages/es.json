@@ -510,6 +510,7 @@
     "noIpsSuggestion": "Agrega IPs para que las estaciones se asignen automáticamente.",
     "autoAssignNote": "Auto-asignación: Cuando una estación se conecta desde una de estas IPs públicas, se asignará automáticamente a esta organización.",
     "deleteAccountConfirm": "¿Eliminar la organización \"{name}\"? Esto eliminará todos los usuarios, estaciones y configuraciones. No se puede deshacer.",
+    "deleteOrgTypeToConfirm": "Para confirmar, escribe el nombre de la organización:",
     "deleteIpConfirm": "¿Eliminar la IP {ip}? Las estaciones que se conecten desde esta IP ya no se asignarán automáticamente.",
     "forcedContingency": "Contingencia Forzada",
     "forcedContingencyOn": "Contingencia ON",

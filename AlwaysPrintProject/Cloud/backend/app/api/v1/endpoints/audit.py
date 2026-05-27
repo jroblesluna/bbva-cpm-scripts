@@ -84,6 +84,23 @@ def _resolve_entity_names(db: Session, logs: list) -> list[dict]:
     # Construir respuesta con entity_name
     result = []
     for log in logs:
+        entity_name = names.get(str(log.entity_id))
+
+        # Fallback: extraer nombre de old_values o new_values si la entidad ya no existe
+        if entity_name is None:
+            for values in (log.old_values, log.new_values):
+                if isinstance(values, dict):
+                    candidate = (
+                        values.get("name")
+                        or values.get("hostname")
+                        or values.get("full_name")
+                        or values.get("email")
+                        or (values.get("content", "")[:40] if "content" in values else None)
+                    )
+                    if candidate:
+                        entity_name = candidate
+                        break
+
         log_dict = {
             "id": log.id,
             "user_id": log.user_id,
@@ -92,7 +109,7 @@ def _resolve_entity_names(db: Session, logs: list) -> list[dict]:
             "action_type": log.action_type,
             "entity_type": log.entity_type,
             "entity_id": log.entity_id,
-            "entity_name": names.get(str(log.entity_id)),
+            "entity_name": entity_name,
             "old_values": log.old_values,
             "new_values": log.new_values,
             "ip_address": log.ip_address,

@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConnectivityCheckEditor } from '@/components/ConnectivityCheckEditor'
 import { LocaleSelector } from '@/components/LocaleSelector'
@@ -94,6 +95,7 @@ export default function EditOrganizationPage() {
   const [newIp, setNewIp] = useState('')
   const [newIpDesc, setNewIpDesc] = useState('')
   const [savingIp, setSavingIp] = useState(false)
+  const [ipToDelete, setIpToDelete] = useState<{ id: string; ip: string } | null>(null)
 
   // === QUERIES ===
   const { data: org, isLoading: orgLoading, refetch: refetchOrg } = useQuery({
@@ -246,11 +248,17 @@ export default function EditOrganizationPage() {
     } finally { setSavingIp(false) }
   }
 
-  const handleRemoveIp = async (ipId: string) => {
-    if (!confirm(tAccounts('deleteIpConfirm', { ip: '' }))) return
+  const handleRemoveIp = (ipId: string, ipAddress: string) => {
+    setIpToDelete({ id: ipId, ip: ipAddress })
+  }
+
+  const confirmDeleteIp = async () => {
+    if (!ipToDelete) return
+    const { id } = ipToDelete
+    setIpToDelete(null)
     setSavingIp(true)
     try {
-      await organizationsApi.removePublicIP(orgId, ipId)
+      await organizationsApi.removePublicIP(orgId, id)
       refetchOrg()
     } catch { /* silently */ }
     finally { setSavingIp(false) }
@@ -579,7 +587,7 @@ export default function EditOrganizationPage() {
                           {ip.description && <p className="text-xs text-gray-500">{ip.description}</p>}
                         </div>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => handleRemoveIp(ip.id)} disabled={savingIp}>
+                      <Button variant="outline" size="sm" onClick={() => handleRemoveIp(ip.id, ip.ip_address)} disabled={savingIp}>
                         <Trash2 className="w-4 h-4 text-red-600" />
                       </Button>
                     </div>
@@ -602,6 +610,25 @@ export default function EditOrganizationPage() {
         )}
         </div>
       </div>
+
+      <Dialog open={!!ipToDelete} onOpenChange={(open) => { if (!open) setIpToDelete(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{tCommon('confirmDelete')}</DialogTitle>
+            <DialogDescription>
+              {ipToDelete && tAccounts('deleteIpConfirm', { ip: ipToDelete.ip })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIpToDelete(null)}>
+              {tCommon('cancel')}
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteIp}>
+              {tCommon('delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
