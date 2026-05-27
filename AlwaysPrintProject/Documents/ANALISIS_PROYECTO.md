@@ -37,7 +37,7 @@ BBVA utiliza Lexmark Cloud Print Manager (CPM) como sistema de impresión corpor
   - My Printers (impresoras disponibles en VLAN y gestionar las favoritas)
   - Check Updates (verificar actualizaciones)
 
-### 2.2 Administrador por Organización (Operador)
+### 2.2 Administrador TI (por Organización)
 - **Interfaz**: Dashboard web (Cloud Manager)
 - **Funciones**:
   - Monitorear estado de workstations en tiempo real
@@ -60,7 +60,7 @@ BBVA utiliza Lexmark Cloud Print Manager (CPM) como sistema de impresión corpor
   - Gestión de usuarios (operarios, administradores)
   - Gestión de actualizaciones automáticas
   - Configuración de modelos LLM por organización
-  - Funciones de operador
+  - Funciones de administrador TI
 
 ### 2.4 Workstation (PC de trabajo)
 - **Interacción**: Comunicación automática con Cloud Manager
@@ -126,7 +126,7 @@ Activa modo contingencia
     │
     └─► Cloud Manager registra evento
           • Dashboard muestra alerta
-          • Operador puede intervenir remotamente
+          • Administrador TI puede intervenir remotamente
 ```
 
 ### 3.3 Comunicación Client ↔ Cloud
@@ -304,7 +304,7 @@ Activa modo contingencia
 | 1 | Icono de bandeja | NotifyIcon con menú contextual |
 | 2 | Conexión WebSocket | Comunicación tiempo real con Cloud |
 | 3 | Registro automático | Se registra en Cloud por IP pública |
-| 4 | Sincronización de config | Descarga configuración global y específica |
+| 4 | Sincronización de config | Descarga configuración de organización y específica |
 | 5 | Telemetría | Envío periódico de métricas al Cloud |
 | 6 | Checks de conectividad | HTTP, TCP, Ping, DNS configurables |
 | 7 | Auto-actualización | Descarga MSI + solicita instalación al Service |
@@ -342,12 +342,12 @@ Activa modo contingencia
 | Módulo | Prefix | Endpoints principales |
 |--------|--------|----------------------|
 | Auth | `/api/v1/auth` | Login, refresh token, password reset |
-| Setup | `/api/v1/setup` | Creación primer superadmin |
+| Setup | `/api/v1/setup` | Creación primer administrador global |
 | Organizations | `/api/v1/organizations` | CRUD orgs, IPs públicas, auto-update config |
 | Users | `/api/v1/users` | CRUD usuarios admin por organización |
 | Workstations | `/api/v1/workstations` | Registro, listado, stats, comandos, delete, logs |
 | VLANs | `/api/v1/vlans` | CRUD VLANs por organización |
-| Config | `/api/v1/config` | Configuración global y por workstation |
+| Config | `/api/v1/config` | Configuración de organización y por workstation |
 | Messages | `/api/v1/messages` | Broadcast a workstations |
 | Audit | `/api/v1/audit` | Logs de auditoría |
 | Telemetry | (sub-router) | Historial y estadísticas por workstation/org |
@@ -362,9 +362,9 @@ Activa modo contingencia
 | # | Funcionalidad | Descripción |
 |---|--------------|-------------|
 | 1 | Multi-tenancy | Aislamiento por `organization_id` en todas las queries |
-| 2 | Auth JWT | Tokens con expiración, roles (ADMIN/OPERATOR/READONLY) |
+| 2 | Auth JWT | Tokens con expiración, roles (ADMIN=Admin Global, OPERATOR=Admin TI, READONLY=Solo lectura) |
 | 3 | Auth por IP | Workstations autenticadas por IP pública autorizada |
-| 4 | WebSocket | Tiempo real para workstations y operadores |
+| 4 | WebSocket | Tiempo real para workstations y administradores |
 | 5 | Rate limiting | Por IP y por ruta |
 | 6 | Security headers | HSTS, X-Frame-Options, CSP |
 | 7 | Auditoría | Log de todas las acciones administrativas |
@@ -387,7 +387,7 @@ Activa modo contingencia
 | Auditoría | `/dashboard/audit` | Logs de acciones con filtros |
 | Telemetría | `/dashboard/telemetry` | Métricas de impresión, gráficos |
 | Conectividad | `/dashboard/connectivity` | Resultados de checks por workstation |
-| Organizaciones | `/dashboard/admin/organizations` | CRUD organizaciones (superadmin) |
+| Organizaciones | `/dashboard/admin/organizations` | CRUD organizaciones (administrador global) |
 | Usuarios | `/dashboard/admin/users` | Gestión de usuarios admin |
 | IPs Pendientes | `/dashboard/admin/pending-ips` | Autorización de IPs nuevas |
 | Action Configs | `/dashboard/admin/action-configs` | Upload/gestión de .alwaysconfig |
@@ -488,7 +488,7 @@ Activa modo contingencia
          │                 └──────────────────┘
          │
          │  Tablas adicionales:
-         ├── GlobalConfig (1:1 con Organization)
+         ├── GlobalConfig (1:1 con Organization) — Config de organización
          ├── WorkstationConfig (1:1 con Workstation)
          ├── Message (broadcast, target_type/target_id)
          ├── AuditLog (acciones de admin)
@@ -505,10 +505,10 @@ Activa modo contingencia
 | Workstation | ip_private (unique), hostname, is_online, contingency_active, forced_contingency, tray_version, cidr | Identificada por IP privada |
 | License | serial_number (MD5 últimos 8 chars de ip_private), is_active | Licenciamiento |
 | VLAN | name, cidr | Agrupación de workstations |
-| User | email, role (ADMIN/OPERATOR/READONLY), password_hash | Admins del dashboard |
+| User | email, role (ADMIN=Admin Global, OPERATOR=Admin TI, READONLY), password_hash | Admins del dashboard |
 | ActionConfig | scope (org/vlan/workstation), config_json, config_hash (SHA256 8 chars), is_active | Herencia jerárquica |
 | Device | name, ip_address, port, is_active | Impresoras físicas |
-| GlobalConfig | JSON de configuración por organización | Heredada a workstations |
+| GlobalConfig | JSON de configuración de organización | Heredada a workstations |
 
 ---
 
