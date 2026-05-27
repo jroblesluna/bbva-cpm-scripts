@@ -1,7 +1,7 @@
 {
-  "version": "5.7",
+  "version": "5.8",
   "name": "LPM_Compliant",
-  "description": "Configuración de cumplimiento para Lexmark Print Management (modo Print Server). Gestiona contingencia creando/eliminando cola local con puerto TCP híbrido. Persiste estado con ReadAppSetting/WriteAppSetting (ruta según build).",
+  "description": "Configuración de cumplimiento para Lexmark Print Management (modo Print Server). Gestiona contingencia creando/eliminando cola local con puerto TCP híbrido. Persiste estado con ReadAppSetting/WriteAppSetting (ruta según build). Soporta else_actions.",
   "created_at": "2026-06-01T12:00:00Z",
   "triggers": [
     {
@@ -28,7 +28,7 @@
         },
         {
           "type": "Conditional",
-          "description": "Si contingencia está activa (=1): asegurar cola local con puerto correcto",
+          "description": "Si contingencia activa: asegurar cola local. Si no: asegurar cola remota.",
           "parameters": {
             "condition": {
               "variable": "contingency_enabled",
@@ -64,7 +64,7 @@
               },
               {
                 "type": "Conditional",
-                "description": "Si cola NO existe: crearla con LPMCHybridPort",
+                "description": "Si cola no existe: crearla. Si existe: verificar puerto.",
                 "parameters": {
                   "condition": {
                     "variable": "queue_exists",
@@ -83,19 +83,8 @@
                         "run_as_logged_in_user": false
                       }
                     }
-                  ]
-                }
-              },
-              {
-                "type": "Conditional",
-                "description": "Si cola SÍ existe: verificar que tenga el puerto correcto",
-                "parameters": {
-                  "condition": {
-                    "variable": "queue_exists",
-                    "operator": "equals",
-                    "value": "true"
-                  },
-                  "actions": [
+                  ],
+                  "else_actions": [
                     {
                       "type": "ReadPrintQueuePort",
                       "description": "Leer puerto actual de la cola",
@@ -106,7 +95,7 @@
                     },
                     {
                       "type": "Conditional",
-                      "description": "Si puerto no es LPMCHybridPort: reasignar vía registro",
+                      "description": "Si puerto no es LPMCHybridPort: reasignar",
                       "parameters": {
                         "condition": {
                           "variable": "current_port",
@@ -160,19 +149,8 @@
                   "run_as_logged_in_user": true
                 }
               }
-            ]
-          }
-        },
-        {
-          "type": "Conditional",
-          "description": "Si contingencia NO está activa (=0): asegurar cola remota conectada",
-          "parameters": {
-            "condition": {
-              "variable": "contingency_enabled",
-              "operator": "equals",
-              "value": "0"
-            },
-            "actions": [
+            ],
+            "else_actions": [
               {
                 "type": "RunProcess",
                 "description": "Conectar a cola remota del print server (silencioso)",
@@ -256,7 +234,7 @@
         },
         {
           "type": "Conditional",
-          "description": "Si cola NO existe: crearla",
+          "description": "Si cola no existe: crearla. Si existe: verificar puerto.",
           "parameters": {
             "condition": {
               "variable": "queue_exists",
@@ -275,19 +253,8 @@
                   "run_as_logged_in_user": false
                 }
               }
-            ]
-          }
-        },
-        {
-          "type": "Conditional",
-          "description": "Si cola SÍ existe: verificar puerto y corregir si necesario",
-          "parameters": {
-            "condition": {
-              "variable": "queue_exists",
-              "operator": "equals",
-              "value": "true"
-            },
-            "actions": [
+            ],
+            "else_actions": [
               {
                 "type": "ReadPrintQueuePort",
                 "description": "Leer puerto actual de la cola",

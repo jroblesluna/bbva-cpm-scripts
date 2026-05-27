@@ -63,6 +63,9 @@ namespace AlwaysPrint.Shared.Configuration
         
         [JsonProperty("actions")]
         public List<ActionConfig>? Actions { get; set; }
+
+        [JsonProperty("else_actions")]
+        public List<ActionConfig>? ElseActions { get; set; }
     }
     
     /// <summary>

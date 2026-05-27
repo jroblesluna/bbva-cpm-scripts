@@ -420,6 +420,11 @@ namespace AlwaysPrintService.Actions
             {
                 return ExecuteActions(action.Actions);
             }
+            else if (!conditionMet && action.ElseActions != null && action.ElseActions.Count > 0)
+            {
+                AlwaysPrintLogger.WriteInfo("ActionEngine: ejecutando else_actions");
+                return ExecuteActions(action.ElseActions);
+            }
             
             return true;
         }
