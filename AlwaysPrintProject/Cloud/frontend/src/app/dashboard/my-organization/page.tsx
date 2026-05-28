@@ -630,11 +630,16 @@ export default function MyOrganizationPage() {
                     </p>
                   </div>
                 </div>
-                <Switch
-                  checked={forcedContingency}
-                  onCheckedChange={handleRequestToggleContingency}
+                <Button
+                  variant={forcedContingency ? 'destructive' : 'outline'}
+                  size="sm"
                   disabled={togglingContingency}
-                />
+                  onClick={() => handleRequestToggleContingency(!forcedContingency)}
+                  className={forcedContingency ? '' : 'border-orange-300 text-orange-700 hover:bg-orange-50'}
+                >
+                  <ShieldAlert className="h-4 w-4 mr-2" />
+                  {forcedContingency ? t('controlContingencyDeactivateBtn') : t('controlContingencyActivateBtn')}
+                </Button>
               </div>
 
               {/* Comandos masivos */}
