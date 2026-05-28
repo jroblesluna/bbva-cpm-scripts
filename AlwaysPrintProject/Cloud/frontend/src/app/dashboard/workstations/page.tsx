@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { workstationsApi, organizationsApi, vlansApi, devicesApi } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,6 +59,8 @@ type SortField = 'ip_private' | 'hostname' | 'current_user' | 'organization' | '
 type SortDirection = 'asc' | 'desc';
 
 export default function WorkstationsPage() {
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === 'admin';
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const userTimezone = useUserTimezone();
@@ -462,6 +465,7 @@ export default function WorkstationsPage() {
                 <option value="offline">{t('offline')}</option>
               </select>
             </div>
+            {isAdmin && (
             <div>
               <select
                 value={filterOrgId || 'all'}
@@ -483,6 +487,7 @@ export default function WorkstationsPage() {
                   ))}
               </select>
             </div>
+            )}
             {filterOrgId && (
               <div>
                 <select

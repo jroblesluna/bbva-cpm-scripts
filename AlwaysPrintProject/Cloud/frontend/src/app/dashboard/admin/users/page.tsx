@@ -488,13 +488,18 @@ function UserForm({
         {/* Organización (solo admin) */}
         {isAdmin && (
         <div className="space-y-2">
-          <Label htmlFor="organization_id">{t('orgLabel')}</Label>
+          <Label htmlFor="organization_id">
+            {t('orgLabel')}
+            {formData.role === 'operator' && (
+              <span className="text-red-500 ml-1">*</span>
+            )}
+          </Label>
           <select
             id="organization_id"
             value={formData.organization_id}
             onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
             disabled={isLoading}
-            className="w-full px-3 py-2 border rounded-md"
+            className={`w-full px-3 py-2 border rounded-md ${formData.role === 'operator' && !formData.organization_id ? 'border-red-400' : ''}`}
           >
             <option value="">{t('timezoneDefault')}</option>
             {accountList.map((account) => (
@@ -580,7 +585,10 @@ function UserForm({
         <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
           {tCommon('cancel')}
         </Button>
-        <Button type="submit" disabled={isLoading}>
+        <Button
+          type="submit"
+          disabled={isLoading || (formData.role === 'operator' && !formData.organization_id)}
+        >
           {isLoading ? (isEdit ? tCommon('updating') : tCommon('creating')) : (isEdit ? t('updateBtn') : t('createBtn'))}
         </Button>
       </div>
