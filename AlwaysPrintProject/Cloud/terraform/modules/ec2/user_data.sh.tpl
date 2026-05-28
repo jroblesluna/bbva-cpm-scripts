@@ -158,6 +158,9 @@ if [ "\$SERVICE" = "frontend" ] || [ "\$SERVICE" = "all" ]; then
   docker compose pull frontend
   docker compose up -d frontend
 fi
+
+# Limpiar imágenes Docker antiguas no utilizadas (evita llenar disco)
+docker image prune -af --filter 'until=24h' > /dev/null 2>&1 || true
 DEPLOY
 chmod +x $APP_DIR/deploy.sh
 
