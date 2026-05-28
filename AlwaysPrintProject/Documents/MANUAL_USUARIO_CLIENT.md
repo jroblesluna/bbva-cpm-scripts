@@ -157,6 +157,8 @@ AlwaysPrint detecta la falla y redirige automáticamente los trabajos a la impre
 | RAM libre | 2 GB mínimo |
 | Disco | 100 MB (instalación + logs) |
 
+ℹ️ Compatible con todas las ediciones de Windows 10 y Windows 11 (Pro, Enterprise, LTSC) en arquitectura x64.
+
 ### 3.2 Requisitos de red
 
 | Destino | Puerto | Dirección | Propósito |
@@ -388,10 +390,18 @@ Lista las impresoras físicas disponibles para contingencia en la red (VLAN) de 
 
 El usuario puede seleccionar una impresora como **favorita**. En modo contingencia, la impresora favorita se usa como destino prioritario.
 
-**Establecer favorita:**
-1. Seleccionar una impresora de la lista
-2. Click en "⭐ Establecer favorita"
-3. La impresora queda marcada con badge amarillo "⭐ Favorita"
+**Establecer favorita desde el Client (Tray):**
+1. Click derecho → Mis Impresoras
+2. Seleccionar una impresora de la lista
+3. Click en "⭐ Establecer favorita"
+4. La impresora queda marcada con badge amarillo "⭐ Favorita"
+
+**Establecer favorita desde Cloud Manager (APCM):**
+1. Ir a Workstations → [seleccionar workstation] → Editar
+2. En el campo "Impresora favorita", seleccionar el dispositivo deseado
+3. Guardar
+
+Ambas vías son equivalentes: el resultado se sincroniza entre el Client y Cloud Manager.
 
 **Quitar favorita:**
 1. Seleccionar la impresora marcada como favorita
@@ -506,11 +516,35 @@ Cuando el Client se instala por primera vez y no tiene configuración Cloud:
 
 1. El Tray inicia el ciclo de **CloudRegistration**
 2. Detecta la IP pública y el CIDR de la red local
-3. Envía solicitud de registro al Cloud Manager
-4. Si la IP no está autorizada → queda en estado "pendiente de aprobación"
-5. Un administrador autoriza la IP desde Cloud Manager
-6. El Client se registra exitosamente → recibe `workstation_id` y `cloud_api_url`
-7. Se activa la integración Cloud completa
+3. Hace health check de dominios bootstrap para encontrar el servidor Cloud
+4. Envía solicitud de registro al Cloud Manager con: IP privada, hostname, CIDR, versión
+
+**El resultado depende de si la IP pública está autorizada:**
+
+| Escenario | Resultado | Acción requerida |
+|-----------|-----------|-----------------|
+| IP pública **ya autorizada** en una organización | Registro inmediato. La workstation se crea, se asigna a la organización y se le asigna VLAN automáticamente por CIDR | Ninguna — operativo de inmediato |
+| IP pública **no autorizada** (primera vez desde esa red) | Queda en estado "pendiente de aprobación". Se muestra notificación al usuario | Un administrador debe autorizar la IP desde Cloud Manager → IPs Pendientes |
+
+**Flujo detallado — IP ya autorizada (registro inmediato):**
+```
+Workstation nueva → Envía registro → IP pública reconocida →
+Registro exitoso → Recibe workstation_id + cloud_api_url →
+Se activa CloudEnabled → Se asigna VLAN por CIDR (se crea si no existe) →
+Operativo
+```
+
+**Flujo detallado — IP no autorizada (pendiente):**
+```
+Workstation nueva → Envía registro → IP pública desconocida →
+Se registra IP como pendiente (403) → Notificación "Pendiente de aprobación" →
+Reintenta cada 5 minutos → Admin autoriza IP en APCM →
+Siguiente reintento → Registro exitoso → Operativo
+```
+
+ℹ️ La autorización es **por IP pública** (la IP con la que la red corporativa sale a Internet), no por VLAN. Una vez que una IP pública está autorizada para una organización, **todas las workstations que se conecten desde esa misma IP pública se registran inmediatamente** sin intervención del administrador.
+
+💡 En la práctica, esto significa que si una sede ya tiene workstations registradas (su IP pública ya está autorizada), cualquier workstation nueva en esa misma sede se registrará automáticamente al instalar AlwaysPrint.
 
 ### 11.2 Conexión con Cloud Manager
 
@@ -531,10 +565,12 @@ Si se pierde la conexión con Cloud Manager:
 
 - La impresión **sigue funcionando** normalmente (offline-first)
 - Se usa la última configuración guardada localmente
+- Las acciones administrativas siguen ejecutándose con la última `active.alwaysconfig` descargada — no se requiere conexión para que los triggers funcionen
 - Se muestra notificación "Usando configuración guardada. Sin conexión a la nube"
 - Al reconectarse, se muestra "Conexión con la nube restaurada"
+- Al reconectarse, si hay una nueva configuración de acciones disponible, se descarga automáticamente
 
-💡 AlwaysPrint está diseñado con principio **offline-first**: la operación de impresión nunca depende de la conectividad con Cloud Manager.
+💡 AlwaysPrint está diseñado con principio **offline-first**: tanto la operación de impresión como la ejecución de acciones administrativas funcionan sin conectividad con Cloud Manager. La conexión solo es necesaria para recibir *nuevas* configuraciones o actualizaciones.
 
 ### 11.4 Sincronización de configuración
 
@@ -573,6 +609,8 @@ Son tareas que se ejecutan automáticamente en la workstation ante ciertos event
 3. Descarga el archivo y lo guarda como `active.alwaysconfig`
 4. Notifica al Service vía Named Pipe (mensaje `ActionConfigChanged`)
 5. El Service recarga la configuración y ejecuta el trigger `OnConfigChange`
+
+ℹ️ **Comportamiento offline**: Una vez descargada, la `active.alwaysconfig` se almacena localmente en `C:\ProgramData\AlwaysPrint\config\`. Si la workstation pierde conexión a Internet, las acciones siguen ejecutándose normalmente con la última configuración descargada. No se requiere conexión para que los triggers funcionen.
 
 ### 12.3 Eventos disponibles (triggers)
 
@@ -846,10 +884,10 @@ Solo con autorización de TI. La desinstalación elimina la protección de conti
 Espere 2 minutos. Si no aparece, reinicie el equipo. Si persiste, contacte a Soporte TI.
 
 **¿Puedo elegir a qué impresora se redirige en contingencia?**  
-Sí. Desde "Mis Impresoras" puede establecer una impresora favorita que se usará como destino prioritario.
+Sí. Desde "Mis Impresoras" (click derecho en el icono) puede establecer una impresora favorita. También el administrador puede asignarla desde Cloud Manager (APCM) en la configuración de la workstation. La favorita se usa como destino prioritario en contingencia.
 
 **¿Qué pasa si Cloud Manager no está disponible?**  
-La impresión sigue funcionando normalmente. Cloud Manager es para gestión y monitoreo, no para la operación de impresión.
+La impresión sigue funcionando normalmente. Las acciones administrativas también siguen ejecutándose con la última `active.alwaysconfig` descargada. Cloud Manager solo es necesario para recibir nuevas configuraciones o actualizaciones.
 
 **¿Las acciones administrativas pueden afectar mi trabajo?**  
 Las acciones están diseñadas para ejecutarse de forma transparente. En casos excepcionales (reinicio de servicios), puede haber una pausa breve en la impresión.
