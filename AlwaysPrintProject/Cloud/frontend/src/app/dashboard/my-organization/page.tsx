@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 import { formatDateWithTimezone, COMMON_TIMEZONES } from '@/lib/dateUtils'
-import { apiClient } from '@/lib/api'
+import { apiClient, organizationsApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -35,12 +35,15 @@ import {
   Pin,
   Globe,
   Trash2,
+  Server,
+  RotateCcw,
+  RefreshCw,
 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import type { Organization } from '@/types'
 import type { GlobalConfig, GlobalConfigUpdate, SearchTargets, ConnectivityCheck } from '@/types/config'
 
-type TabKey = 'general' | 'printing' | 'network' | 'connectivity' | 'updates' | 'actions' | 'ips'
+type TabKey = 'general' | 'printing' | 'network' | 'connectivity' | 'updates' | 'actions' | 'ips' | 'control'
 
 interface TabDef {
   key: TabKey
@@ -56,6 +59,7 @@ const TABS: TabDef[] = [
   { key: 'updates', labelKey: 'tabUpdates', icon: Download },
   { key: 'actions', labelKey: 'tabActions', icon: Cog },
   { key: 'ips', labelKey: 'tabIps', icon: Globe },
+  { key: 'control', labelKey: 'tabControl', icon: Server },
 ]
 
 export default function MyOrganizationPage() {
@@ -105,6 +109,12 @@ export default function MyOrganizationPage() {
   const [newIpDesc, setNewIpDesc] = useState('')
   const [savingIp, setSavingIp] = useState(false)
 
+  // === CONTROL TAB STATE ===
+  const [forcedContingency, setForcedContingency] = useState(false)
+  const [togglingContingency, setTogglingContingency] = useState(false)
+  const [sendingOrgCommand, setSendingOrgCommand] = useState(false)
+  const [confirmOrgAction, setConfirmOrgAction] = useState<'restart_service' | 'restart_tray' | 'check_update' | null>(null)
+
   // === CARGAR ORGANIZACIÓN ===
   useEffect(() => {
     if (!user?.organization_id) return
@@ -122,6 +132,7 @@ export default function MyOrganizationPage() {
         setAutoUpdateEnabled(data.auto_update_enabled)
         setTargetVersion(data.target_version || null)
         setAutoReregisterEnabled(data.auto_reregister_enabled)
+        setForcedContingency(data.forced_contingency ?? false)
       } catch (e) {
         console.error('Error cargando organización:', e)
       } finally {
@@ -265,6 +276,37 @@ export default function MyOrganizationPage() {
     finally { setSavingIp(false) }
   }
 
+  // === HANDLERS: CONTROL ===
+  const handleToggleContingency = async (enabled: boolean) => {
+    if (!user?.organization_id) return
+    setTogglingContingency(true)
+    try {
+      await organizationsApi.toggleForcedContingency(user.organization_id, enabled)
+      setForcedContingency(enabled)
+      toast({ title: enabled ? 'Contingencia activada' : 'Contingencia desactivada' })
+    } catch (e: unknown) {
+      const err = e as { detail?: string }
+      toast({ title: tCommon('error'), description: err.detail || tCommon('error'), variant: 'destructive' })
+    } finally {
+      setTogglingContingency(false)
+    }
+  }
+
+  const handleOrgCommand = async (commandType: 'restart_service' | 'restart_tray' | 'check_update') => {
+    if (!user?.organization_id) return
+    setSendingOrgCommand(true)
+    setConfirmOrgAction(null)
+    try {
+      const res = await organizationsApi.sendCommand(user.organization_id, commandType)
+      toast({ title: t('controlCommandSent', { count: res.dispatched }) })
+    } catch (e: unknown) {
+      const err = e as { detail?: string }
+      toast({ title: tCommon('error'), description: err.detail || tCommon('error'), variant: 'destructive' })
+    } finally {
+      setSendingOrgCommand(false)
+    }
+  }
+
   // === SEARCH TARGETS HELPERS ===
   const addSearchIp = () => { setSearchIps([...searchIps, '']); setConfigDirty(true) }
   const removeSearchIp = (i: number) => { setSearchIps(searchIps.filter((_, idx) => idx !== i)); setConfigDirty(true) }
@@ -295,6 +337,7 @@ export default function MyOrganizationPage() {
   }
 
   return (
+    <>
     <div className="space-y-6">
       {/* Header + Tabs + Content */}
       <div className="bg-white rounded-lg shadow">
@@ -562,8 +605,94 @@ export default function MyOrganizationPage() {
               </Alert>
             </div>
           )}
+
+          {/* === TAB: CONTROL === */}
+          {activeTab === 'control' && (
+            <div className="space-y-5">
+              <p className="text-sm text-gray-500">{t('controlDesc')}</p>
+
+              {/* Contingencia Forzada */}
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <Label className="text-sm font-medium">{t('controlContingencyLabel')}</Label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {forcedContingency ? t('controlContingencyEnabledDesc') : t('controlContingencyDisabledDesc')}
+                  </p>
+                </div>
+                <Switch
+                  checked={forcedContingency}
+                  onCheckedChange={handleToggleContingency}
+                  disabled={togglingContingency}
+                />
+              </div>
+
+              {/* Comandos masivos */}
+              <div className="border rounded-lg p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{t('controlCommandsTitle')}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{t('controlCommandsDesc')}</p>
+                </div>
+                <div className="flex flex-wrap gap-3 pt-1">
+                  <Button
+                    variant="outline"
+                    disabled={sendingOrgCommand}
+                    onClick={() => setConfirmOrgAction('restart_service')}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    {t('controlRestartService')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={sendingOrgCommand}
+                    onClick={() => setConfirmOrgAction('restart_tray')}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    {t('controlRestartTray')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={sendingOrgCommand}
+                    onClick={() => setConfirmOrgAction('check_update')}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    {t('controlCheckUpdate')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
     </div>
+
+      {/* === MODAL CONFIRMACIÓN COMANDO ORG === */}
+      {confirmOrgAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
+            <h3 className="text-base font-semibold text-gray-900 mb-2">{t('controlConfirmTitle')}</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              {confirmOrgAction === 'restart_service'
+                ? t('controlConfirmService')
+                : confirmOrgAction === 'restart_tray'
+                ? t('controlConfirmTray')
+                : t('controlConfirmCheckUpdate')}
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" size="sm" onClick={() => setConfirmOrgAction(null)}>
+                {t('controlCancel')}
+              </Button>
+              <Button
+                size="sm"
+                disabled={sendingOrgCommand}
+                onClick={() => handleOrgCommand(confirmOrgAction)}
+              >
+                {t('controlConfirm')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

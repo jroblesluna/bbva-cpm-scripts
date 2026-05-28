@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_admin
+from app.core.security import get_current_user, require_admin, require_operator_or_admin
 from app.core.utils import get_client_ip
 from app.models.user import User, UserRole
 from app.models.organization import Organization, PublicIP
@@ -932,13 +932,19 @@ async def toggle_auto_update(
 async def toggle_forced_contingency(
     org_id: UUID,
     body: AutoUpdateToggleRequest,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_operator_or_admin),
     db: Session = Depends(get_db)
 ):
     """
     Activar o desactivar contingencia forzada para una organización.
     Todas las workstations de la organización heredan este estado.
     """
+    if current_user.role == UserRole.OPERATOR and current_user.organization_id != org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para modificar esta organización"
+        )
+
     organization = db.query(Organization).filter(Organization.id == org_id).first()
 
     if not organization:
@@ -1072,7 +1078,7 @@ def set_target_version(
 async def send_org_command(
     org_id: UUID,
     command_type: str = Query(..., description="Tipo de comando: restart_service, restart_tray, check_update"),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_operator_or_admin),
     db: Session = Depends(get_db)
 ):
     """
@@ -1083,6 +1089,12 @@ async def send_org_command(
     - restart_tray: Reinicia la aplicación Tray
     - check_update: Fuerza verificación de actualización
     """
+    if current_user.role == UserRole.OPERATOR and current_user.organization_id != org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para enviar comandos a esta organización"
+        )
+
     organization = db.query(Organization).filter(Organization.id == org_id).first()
     if not organization:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organización no encontrada")
