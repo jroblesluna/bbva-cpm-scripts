@@ -57,6 +57,7 @@
     "messages": "Messages",
     "audit": "Audit",
     "accounts": "Organizations",
+    "myOrganization": "My Organization",
     "users": "Users",
     "pendingIps": "Pending IPs",
     "updates": "Updates",
@@ -537,7 +538,8 @@
     "bulkCheckUpdateWarning": "If a new version is available, it will be downloaded and installed automatically.",
     "bulkModalTitle": "{action} — Organization",
     "pagination": "Showing {start} to {end} of {total} organizations",
-    "pageNumber": "Page {page}"
+    "pageNumber": "Page {page}",
+    "noOrg": "You don't have an organization assigned. Contact the administrator."
   },
   "pendingIps": {
     "title": "Pending Public IPs",

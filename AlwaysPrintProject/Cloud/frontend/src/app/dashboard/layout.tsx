@@ -41,6 +41,7 @@ interface NavItem {
   href: string
   icon: React.ComponentType<{ className?: string }>
   adminOnly?: boolean
+  operatorOnly?: boolean
   subLabel?: string // Sub-encabezado dentro del grupo
 }
 
@@ -68,9 +69,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     },
     {
       labelKey: 'groupAdmin',
-      adminOnly: true,
       items: [
         { key: 'accounts', href: '/dashboard/admin/organizations', icon: Building2, adminOnly: true, subLabel: 'subInfrastructure' },
+        { key: 'myOrganization', href: '/dashboard/my-organization', icon: Building2, operatorOnly: true, subLabel: 'subInfrastructure' },
         { key: 'vlans', href: '/dashboard/vlans', icon: Network, subLabel: 'subInfrastructure' },
         { key: 'workstations', href: '/dashboard/workstations', icon: Monitor, subLabel: 'subInfrastructure' },
         { key: 'pendingIps', href: '/dashboard/admin/pending-ips', icon: Globe, adminOnly: true, subLabel: 'subRequests' },
@@ -88,10 +89,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     },
     {
       labelKey: 'groupSystem',
-      adminOnly: true,
       items: [
-        { key: 'users', href: '/dashboard/admin/users', icon: Users, adminOnly: true },
-        { key: 'updates', href: '/dashboard/admin/updates', icon: Download, adminOnly: true },
+        { key: 'users', href: '/dashboard/admin/users', icon: Users },
+        { key: 'updates', href: '/dashboard/admin/updates', icon: Download },
         { key: 'config', href: '/dashboard/config', icon: Settings, adminOnly: true },
       ],
     },
@@ -102,7 +102,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     .filter((group) => !group.adminOnly || isAdmin())
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => !item.adminOnly || isAdmin()),
+      items: group.items.filter((item) => {
+        if (item.adminOnly && !isAdmin()) return false
+        if (item.operatorOnly && isAdmin()) return false
+        return true
+      }),
     }))
     .filter((group) => group.items.length > 0)
 

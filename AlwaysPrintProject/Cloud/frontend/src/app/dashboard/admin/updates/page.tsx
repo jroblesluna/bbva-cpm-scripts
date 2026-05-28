@@ -177,7 +177,8 @@ export default function UpdatesPage() {
         }
       } else if (user?.organization_id) {
         try {
-          const acc = await organizationsApi.get(user.organization_id);
+          const res = await apiClient.get('/organizations/me');
+          const acc = res.data;
           setOrganizations([
             {
               orgId: acc.id,
@@ -190,6 +191,21 @@ export default function UpdatesPage() {
           ]);
         } catch {
           setOrganizations([]);
+        }
+
+        // Operadores también pueden ver versiones
+        try {
+          const versionsResponse = await apiClient.get<MsiInfo[]>('/updates/versions');
+          setVersions(
+            versionsResponse.data.map((v: any) => ({
+              version: v.version,
+              buildDate: v.build_date,
+              commitHash: v.commit_hash,
+              fileSize: v.file_size,
+            }))
+          );
+        } catch {
+          setVersions([]);
         }
       }
     } catch {
@@ -539,7 +555,7 @@ export default function UpdatesPage() {
           )}
 
           {/* Historial de versiones con acciones */}
-          {isAdmin && versions.length > 0 && (
+          {versions.length > 0 && (
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -547,15 +563,17 @@ export default function UpdatesPage() {
                     <History className="h-5 w-5 text-primary" />
                     <CardTitle>{t('availableVersions')}</CardTitle>
                   </div>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={selectedVersions.size === 0 || isDeleting}
-                    onClick={handleDeleteClick}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    {t('deleteSelected', { count: selectedVersions.size })}
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={selectedVersions.size === 0 || isDeleting}
+                      onClick={handleDeleteClick}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      {t('deleteSelected', { count: selectedVersions.size })}
+                    </Button>
+                  )}
                 </div>
                 <CardDescription>
                   {t('availableVersionsDesc')}
@@ -566,6 +584,7 @@ export default function UpdatesPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b">
+                        {isAdmin && (
                         <th className="text-left py-2 px-3 font-medium w-10">
                           {eligibleVersions.length > 0 && (
                             <Checkbox
@@ -576,6 +595,7 @@ export default function UpdatesPage() {
                             />
                           )}
                         </th>
+                        )}
                         <th className="text-left py-2 px-3 font-medium">{t('colVersion')}</th>
                         <th className="text-left py-2 px-3 font-medium">{t('colBuildDate')}</th>
                         <th className="text-left py-2 px-3 font-medium">{t('colCommit')}</th>
@@ -594,6 +614,7 @@ export default function UpdatesPage() {
                         const isEligible = !isLatest && !isPinned;
                         return (
                           <tr key={v.version} className="border-b hover:bg-muted/50">
+                            {isAdmin && (
                             <td className="py-2 px-3">
                               {isEligible ? (
                                 <Checkbox
@@ -610,6 +631,7 @@ export default function UpdatesPage() {
                                 }>—</span>
                               )}
                             </td>
+                            )}
                             <td className="py-2 px-3 font-mono">
                               {v.version}
                               {isLatest && (

@@ -87,7 +87,7 @@ export default function VLANsPage() {
 
   useEffect(() => {
     if (!user) return
-    loadAccounts()
+    if (user.role === 'admin') loadAccounts()
     loadVlans()
   }, [user, filterOrgId])
 

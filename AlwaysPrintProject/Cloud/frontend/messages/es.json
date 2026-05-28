@@ -57,6 +57,7 @@
     "messages": "Mensajes",
     "audit": "Auditoría",
     "accounts": "Organizaciones",
+    "myOrganization": "Mi Organización",
     "users": "Usuarios",
     "pendingIps": "IPs Pendientes",
     "updates": "Actualizaciones",
@@ -537,7 +538,8 @@
     "bulkCheckUpdateWarning": "Si hay una nueva versión disponible, se descargará e instalará automáticamente.",
     "bulkModalTitle": "{action} — Organización",
     "pagination": "Mostrando {start} a {end} de {total} organizaciones",
-    "pageNumber": "Página {page}"
+    "pageNumber": "Página {page}",
+    "noOrg": "No tienes una organización asignada. Contacta al administrador."
   },
   "pendingIps": {
     "title": "IPs Públicas Pendientes",

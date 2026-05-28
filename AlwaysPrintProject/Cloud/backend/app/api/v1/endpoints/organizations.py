@@ -91,6 +91,332 @@ def list_organizations(
     )
 
 
+# === ENDPOINTS PARA OPERADORES (su propia organización) ===
+
+
+@router.get("/me", response_model=OrganizationDetailResponse)
+def get_my_organization(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtener la organización del usuario autenticado.
+    
+    Disponible para operadores y admins. Los operadores solo pueden ver
+    su propia organización asignada.
+    """
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario sin organización asignada"
+        )
+    
+    organization = db.query(Organization).filter(
+        Organization.id == current_user.organization_id
+    ).first()
+    
+    if not organization:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organización no encontrada"
+        )
+    
+    # Contar usuarios y workstations
+    user_count = len(organization.users)
+    workstation_count = len(organization.workstations)
+    online_count = sum(1 for ws in organization.workstations if ws.is_online)
+    
+    response = OrganizationDetailResponse(
+        **organization.__dict__,
+        public_ips=[PublicIPResponse(**ip.__dict__) for ip in organization.public_ips if ip.is_authorized],
+        user_count=user_count,
+        workstation_count=workstation_count,
+        online_count=online_count,
+    )
+    
+    return response
+
+
+@router.put("/me", response_model=OrganizationResponse)
+def update_my_organization(
+    request: Request,
+    org_data: OrganizationUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Actualizar la organización del usuario autenticado.
+    
+    Disponible para operadores. Permite editar configuración básica
+    de su propia organización (nombre, descripción, timezone, idioma).
+    No permite cambiar is_active ni campos sensibles de admin.
+    """
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuario sin organización asignada"
+        )
+    
+    organization = db.query(Organization).filter(
+        Organization.id == current_user.organization_id
+    ).first()
+    
+    if not organization:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organización no encontrada"
+        )
+    
+    # Guardar valores anteriores para auditoría
+    old_values = {
+        "name": organization.name,
+        "description": organization.description,
+        "timezone": organization.timezone
+    }
+    
+    # Operadores no pueden cambiar campos sensibles de activación
+    update_data = org_data.model_dump(exclude_unset=True)
+    if current_user.role == UserRole.OPERATOR:
+        # Remover campos que solo admin puede modificar
+        sensitive_fields = ["is_active"]
+        for field in sensitive_fields:
+            update_data.pop(field, None)
+    
+    # Verificar nombre único si se está actualizando
+    if "name" in update_data and update_data["name"] != organization.name:
+        existing = db.query(Organization).filter(Organization.name == update_data["name"]).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Ya existe una organización con el nombre '{update_data['name']}'"
+            )
+    
+    for field, value in update_data.items():
+        setattr(organization, field, value)
+    
+    db.commit()
+    db.refresh(organization)
+    
+    # Registrar en auditoría
+    audit_service = AuditService()
+    audit_service.log_update(
+        db=db,
+        entity_type="organization",
+        entity_id=str(organization.id),
+        user_id=str(current_user.id),
+        organization_id=str(organization.id),
+        old_data=old_values,
+        new_data=update_data,
+        ip_address=get_client_ip(request)
+    )
+    
+    return organization
+
+
+@router.patch("/me/auto-update", response_model=AutoUpdateToggleResponse)
+async def toggle_my_auto_update(
+    body: AutoUpdateToggleRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Activar/desactivar actualizaciones automáticas de la organización del operador.
+    Al habilitar, envía check_update a todas las workstations online de la org.
+    """
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuario sin organización asignada"
+        )
+    
+    organization = db.query(Organization).filter(
+        Organization.id == current_user.organization_id
+    ).first()
+    
+    if not organization:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organización no encontrada"
+        )
+    
+    organization.auto_update_enabled = body.enabled
+    db.commit()
+    db.refresh(organization)
+    
+    logger.info(
+        "Auto-update actualizado (operador): org_id=%s, enabled=%s, user_id=%s",
+        organization.id, body.enabled, current_user.id,
+    )
+    
+    # Si se habilita, enviar check_update a workstations online
+    if body.enabled:
+        workstations = db.query(Workstation).filter(
+            Workstation.organization_id == organization.id
+        ).all()
+        
+        import uuid as uuid_module
+        for ws in workstations:
+            ws_id = str(ws.id)
+            if connection_manager.is_workstation_online(ws_id):
+                await connection_manager.send_to_workstation(ws_id, {
+                    "type": "command",
+                    "command_id": str(uuid_module.uuid4()),
+                    "command_type": "check_update",
+                    "params": {},
+                })
+    
+    return AutoUpdateToggleResponse(
+        auto_update_enabled=organization.auto_update_enabled,
+        organization_id=str(organization.id),
+        updated_at=organization.updated_at,
+    )
+
+
+@router.put("/me/pin-version")
+async def pin_my_version(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Pinear una versión específica para la organización del operador.
+    Body: { "version": "1.x.x.x" } o { "version": null } para despinear.
+    """
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuario sin organización asignada"
+        )
+    
+    organization = db.query(Organization).filter(
+        Organization.id == current_user.organization_id
+    ).first()
+    
+    if not organization:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organización no encontrada"
+        )
+    
+    body = await request.json()
+    version = body.get("version")
+    
+    organization.target_version = version if version else None
+    db.commit()
+    db.refresh(organization)
+    
+    logger.info(
+        "Versión pineada (operador): org_id=%s, version=%s, user_id=%s",
+        organization.id, version, current_user.id,
+    )
+    
+    return {
+        "target_version": organization.target_version,
+        "organization_id": str(organization.id),
+        "updated_at": str(organization.updated_at),
+    }
+
+
+@router.post("/me/public-ips", response_model=PublicIPResponse, status_code=status.HTTP_201_CREATED)
+def add_my_public_ip(
+    request: Request,
+    ip_data: PublicIPCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Agregar una IP pública a la organización del operador.
+    """
+    if not current_user.organization_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario sin organización asignada")
+    
+    org_id = current_user.organization_id
+    organization = db.query(Organization).filter(Organization.id == org_id).first()
+    if not organization:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organización no encontrada")
+    
+    # Verificar que la IP no existe
+    existing = db.query(PublicIP).filter(PublicIP.ip_address == ip_data.ip_address).first()
+    if existing:
+        if existing.is_authorized:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"La IP {ip_data.ip_address} ya está registrada")
+        # Si existe como pendiente, autorizarla para esta org
+        existing.organization_id = org_id
+        existing.is_authorized = True
+        existing.description = ip_data.description
+        from datetime import datetime, timezone
+        existing.authorized_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        db.commit()
+        db.refresh(existing)
+        return existing
+    
+    from datetime import datetime, timezone
+    new_ip = PublicIP(
+        ip_address=ip_data.ip_address,
+        description=ip_data.description,
+        organization_id=org_id,
+        is_authorized=True,
+        first_seen=datetime.now(timezone.utc).replace(tzinfo=None),
+        authorized_at=datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+    db.add(new_ip)
+    db.commit()
+    db.refresh(new_ip)
+    
+    audit_service = AuditService()
+    audit_service.log_create(
+        db=db,
+        entity_type="public_ip",
+        entity_id=str(new_ip.id),
+        user_id=str(current_user.id),
+        organization_id=str(org_id),
+        entity_data={"ip_address": new_ip.ip_address},
+        ip_address=get_client_ip(request)
+    )
+    
+    return new_ip
+
+
+@router.delete("/me/public-ips/{ip_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_my_public_ip(
+    request: Request,
+    ip_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Eliminar una IP pública de la organización del operador.
+    """
+    if not current_user.organization_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario sin organización asignada")
+    
+    org_id = current_user.organization_id
+    
+    public_ip = db.query(PublicIP).filter(
+        PublicIP.id == ip_id,
+        PublicIP.organization_id == org_id
+    ).first()
+    
+    if not public_ip:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="IP pública no encontrada")
+    
+    db.delete(public_ip)
+    db.commit()
+    
+    audit_service = AuditService()
+    audit_service.log_delete(
+        db=db,
+        entity_type="public_ip",
+        entity_id=str(ip_id),
+        user_id=str(current_user.id),
+        organization_id=str(org_id),
+        entity_data={"ip_address": public_ip.ip_address},
+        ip_address=get_client_ip(request)
+    )
+    
+    return None
+
+
 @router.post("/", response_model=OrganizationResponse, status_code=status.HTTP_201_CREATED)
 def create_organization(
     request: Request,

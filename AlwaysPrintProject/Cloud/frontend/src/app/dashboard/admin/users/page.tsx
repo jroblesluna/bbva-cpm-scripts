@@ -62,10 +62,12 @@ export default function UsersPage() {
     queryFn: () => usersApi.list(),
   })
 
-  // Query para organizaciones
+  // Query para organizaciones (solo admin)
+  const isAdmin = currentUser?.role === 'admin'
   const { data: accounts } = useQuery({
     queryKey: ['accounts'],
     queryFn: () => organizationsApi.list(),
+    enabled: isAdmin,
   })
 
   // Mutation para crear usuario
@@ -165,6 +167,8 @@ export default function UsersPage() {
             <CardContent>
               <UserForm
                 accounts={accounts || []}
+                isAdmin={isAdmin}
+                currentUser={currentUser}
                 onSubmit={(data) => createMutation.mutate(data as UserCreate)}
                 onCancel={() => setShowCreateForm(false)}
                 isLoading={createMutation.isPending}
@@ -189,6 +193,8 @@ export default function UsersPage() {
               <UserForm
                 user={editingUser}
                 accounts={accounts || []}
+                isAdmin={isAdmin}
+                currentUser={currentUser}
                 onSubmit={(data) => updateMutation.mutate({ id: editingUser.id, data })}
                 onCancel={() => setEditingUser(null)}
                 isLoading={updateMutation.isPending}
@@ -263,6 +269,7 @@ export default function UsersPage() {
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
+                    {isAdmin && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -272,6 +279,7 @@ export default function UsersPage() {
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -341,6 +349,8 @@ export default function UsersPage() {
 function UserForm({
   user,
   accounts,
+  isAdmin,
+  currentUser: parentUser,
   onSubmit,
   onCancel,
   isLoading,
@@ -348,6 +358,8 @@ function UserForm({
 }: {
   user?: User
   accounts: Organization[]
+  isAdmin?: boolean
+  currentUser?: User | null
   onSubmit: (data: UserCreate | UserUpdate) => void
   onCancel: () => void
   isLoading: boolean
@@ -377,8 +389,8 @@ function UserForm({
     const data: any = {
       email: formData.email,
       full_name: formData.full_name,
-      role: formData.role,
-      organization_id: formData.organization_id || undefined,
+      role: isAdmin ? formData.role : 'operator',
+      organization_id: isAdmin ? (formData.organization_id || undefined) : (currentUser?.organization_id || undefined),
       timezone: formData.timezone || undefined,
       language: formData.language || 'en',
     }
@@ -462,18 +474,19 @@ function UserForm({
           <Label htmlFor="role">{t('roleLabel')}</Label>
           <select
             id="role"
-            value={formData.role}
+            value={isAdmin ? formData.role : 'operator'}
             onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-            disabled={isLoading}
+            disabled={isLoading || !isAdmin}
             className="w-full px-3 py-2 border rounded-md"
             required
           >
             <option value="operator">{t('roleOperator')}</option>
-            <option value="admin">{t('roleAdmin')}</option>
+            {isAdmin && <option value="admin">{t('roleAdmin')}</option>}
           </select>
         </div>
 
-        {/* Organización */}
+        {/* Organización (solo admin) */}
+        {isAdmin && (
         <div className="space-y-2">
           <Label htmlFor="organization_id">{t('orgLabel')}</Label>
           <select
@@ -489,6 +502,7 @@ function UserForm({
             ))}
           </select>
         </div>
+        )}
 
         {/* Timezone */}
         <div className="space-y-2">

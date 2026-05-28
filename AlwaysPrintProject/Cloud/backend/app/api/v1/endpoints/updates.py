@@ -18,7 +18,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import decode_access_token, require_admin
+from app.core.security import decode_access_token, require_admin, get_current_user
 from app.core.utils import get_client_ip
 from app.models.organization import Organization, PublicIP
 from app.models.user import User, UserRole
@@ -44,10 +44,10 @@ router = APIRouter(prefix="/updates", tags=["Actualizaciones"])
 )
 def list_versions(
     request: Request,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Lista todas las versiones disponibles en S3. Solo accesible por admin."""
+    """Lista todas las versiones disponibles en S3."""
     try:
         s3_service = S3UpdateService()
         versions = s3_service.list_versions()
@@ -174,10 +174,10 @@ async def pin_version(
 def admin_download_version(
     version: str,
     request: Request,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Genera una URL presigned para descargar una versión específica. Solo admin."""
+    """Genera una URL presigned para descargar una versión específica."""
     try:
         s3_service = S3UpdateService()
         target_key = f"versions/{version}/AlwaysPrint.msi"
