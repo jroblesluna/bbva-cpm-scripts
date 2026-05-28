@@ -428,13 +428,16 @@ def check_update(
             user_id = payload.get("sub")
             if user_id:
                 user = db.query(User).filter(User.id == user_id).first()
-                if user and (user.role == UserRole.ADMIN or str(user.role.value if hasattr(user.role, 'value') else user.role) == "admin"):
-                    # Admin: retornar solo metadata del MSI (sin requerir workstation)
+                is_admin_user = user and (user.role == UserRole.ADMIN or str(user.role.value if hasattr(user.role, 'value') else user.role) == "admin")
+                is_operator_user = user and (user.role == UserRole.OPERATOR or str(user.role.value if hasattr(user.role, 'value') else user.role) == "operator")
+
+                if user and (is_admin_user or is_operator_user):
+                    # Admin/Operador: retornar solo metadata del MSI (sin requerir workstation)
                     try:
                         s3_service = S3UpdateService()
                         msi_metadata = s3_service.get_msi_metadata()
                     except (ClientError, Exception) as e:
-                        logger.error("S3 no disponible para admin check: %s", str(e))
+                        logger.error("S3 no disponible para check: %s", str(e))
                         raise HTTPException(
                             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                             detail="No se puede determinar la versión disponible"
@@ -448,10 +451,10 @@ def check_update(
                         commit_hash=msi_metadata['commit_hash'],
                     )
                 elif user:
-                    # Usuario autenticado pero no es admin — no caer al flujo workstation
+                    # Usuario autenticado pero sin rol suficiente — no caer al flujo workstation
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Se requieren permisos de administrador"
+                        detail="Acceso no permitido"
                     )
         except HTTPException:
             raise  # Re-lanzar HTTPExceptions (403, 503)
