@@ -660,7 +660,7 @@ print_header "6. ESTADÍSTICAS DE LA INSTANCIA"
 if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
     echo -e "  ${CYAN}Consultando recursos...${NC}"
     
-    STATS=$(ssm_exec "$INSTANCE_ID" '["echo \"=== MEMORIA ===\"; free -h | grep -E \"Mem:|Swap:\"; echo; echo \"=== DISCO ===\"; df -h / | tail -1; echo; echo \"=== CPU ===\"; uptime; echo; echo \"=== DOCKER ===\"; docker stats --no-stream --format \"table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\" 2>/dev/null | head -5; echo; echo \"=== UPTIME CONTAINERS ===\"; docker ps --format \"table {{.Names}}\t{{.Status}}\t{{.Ports}}\" 2>/dev/null"]' 8)
+    STATS=$(ssm_exec "$INSTANCE_ID" '["echo \"=== MEMORIA ===\"; free -h | grep -E \"Mem:|Swap:\"; echo; echo \"=== DISCO ===\"; df -h / | tail -1; echo; echo \"=== CPU ===\"; uptime; echo; echo \"=== DOCKER ===\"; docker stats --no-stream --format \"table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\" 2>/dev/null | head -5; echo; echo \"=== UPTIME CONTAINERS ===\"; docker ps --format \"table {{.Names}}\t{{.Status}}\t{{.Ports}}\" 2>/dev/null; echo; echo \"=== SWAP ===\"; swapon --show 2>/dev/null || echo none; cat /proc/sys/vm/swappiness 2>/dev/null"]' 8)
     
     if [ -n "$STATS" ]; then
         echo ""
@@ -685,6 +685,22 @@ if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
         MEM_AVAIL=$(echo "$STATS" | grep "Mem:" | awk '{print $7}')
         if [ -n "$MEM_AVAIL" ]; then
             check_ok "Memoria disponible: $MEM_AVAIL"
+        fi
+        
+        # Verificar swap
+        SWAP_LINE=$(echo "$STATS" | grep "Swap:" | head -1)
+        SWAP_TOTAL=$(echo "$SWAP_LINE" | awk '{print $2}')
+        SWAP_USED=$(echo "$SWAP_LINE" | awk '{print $3}')
+        SWAP_FILE=$(echo "$STATS" | grep -A1 "=== SWAP ===" | grep -v "===" | grep -v "^$" | head -1)
+        SWAPPINESS=$(echo "$STATS" | tail -1 | grep -E "^[0-9]+$")
+        
+        if [ "$SWAP_TOTAL" = "0B" ] || [ -z "$SWAP_TOTAL" ]; then
+            check_warn "Swap no configurado — riesgo de thrashing con poca RAM"
+            recommend "Configurar swap: fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile"
+        elif echo "$SWAP_FILE" | grep -q "swapfile\|partition"; then
+            check_ok "Swap activo: $SWAP_TOTAL total, $SWAP_USED usado (swappiness=${SWAPPINESS:-?})"
+        else
+            check_ok "Swap: $SWAP_TOTAL total, $SWAP_USED usado"
         fi
     else
         check_warn "No se pudieron obtener estadísticas"

@@ -23,6 +23,7 @@ from app.api.v1.endpoints import (
     updates,
     devices,
     log_analysis,
+    system_status,
 )
 
 # Router principal de la API v1
@@ -150,6 +151,13 @@ api_router.include_router(
     devices.router,
     prefix="/devices",
     tags=["Dispositivos"]
+)
+
+# Monitoreo de estado del sistema (solo Admin)
+api_router.include_router(
+    system_status.router,
+    prefix="/system-status",
+    tags=["System Status"]
 )
 
 

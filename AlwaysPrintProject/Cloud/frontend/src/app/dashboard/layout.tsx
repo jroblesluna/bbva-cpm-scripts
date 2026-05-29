@@ -33,6 +33,7 @@ import {
   Printer,
   ChevronDown,
   ChevronRight,
+  Server,
 } from 'lucide-react'
 
 // Definición de items de navegación
@@ -81,6 +82,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     {
       labelKey: 'groupMonitoring',
       items: [
+        { key: 'systemStatus', href: '/dashboard/admin/system-status', icon: Server, adminOnly: true },
         { key: 'telemetry', href: '/dashboard/telemetry', icon: Activity },
         { key: 'connectivity', href: '/dashboard/connectivity', icon: Wifi },
         { key: 'audit', href: '/dashboard/audit', icon: FileText },
