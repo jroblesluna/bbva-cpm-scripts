@@ -9,7 +9,7 @@ export interface Toast {
   id: string;
   title?: string;
   description?: string;
-  variant?: 'default' | 'destructive';
+  variant?: 'default' | 'destructive' | 'warning';
 }
 
 interface ToasterToast extends Toast {
@@ -20,7 +20,7 @@ interface ToasterToast extends Toast {
 }
 
 const TOAST_LIMIT = 1;
-const TOAST_REMOVE_DELAY = 3000;
+const TOAST_REMOVE_DELAY = 5000;
 
 type ToastActionElement = React.ReactElement;
 

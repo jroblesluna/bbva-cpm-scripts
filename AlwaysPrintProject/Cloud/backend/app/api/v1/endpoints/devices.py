@@ -130,9 +130,14 @@ def create_device(
         Device.ip_address == device_data.ip_address
     ).first()
     if existing:
+        existing_vlan = db.query(VLAN).filter(VLAN.id == existing.vlan_id).first() if existing.vlan_id else None
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Ya existe un dispositivo con la IP {device_data.ip_address} en esta organización"
+            detail={
+                "code": "IP_DUPLICATE",
+                "ip": str(device_data.ip_address),
+                "vlan_name": existing_vlan.name if existing_vlan else None,
+            }
         )
     
     device = Device(

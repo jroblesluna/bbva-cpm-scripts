@@ -92,6 +92,16 @@ export default function WorkstationsPage() {
     setPage(1);
   };
 
+  const filters = {
+    search: searchTerm || undefined,
+    is_online: filterOnline,
+    contingency_active: filterContingency,
+    organization_id: filterOrgId,
+    vlan_id: filterVlanId,
+    page,
+    page_size: pageSize,
+  };
+
   const {
     data: workstationsData,
     isLoading,
@@ -99,16 +109,7 @@ export default function WorkstationsPage() {
     error,
   } = useQuery({
     queryKey: ['workstations', searchTerm, filterOnline, filterContingency, filterOrgId, filterVlanId, page, pageSize],
-    queryFn: () =>
-      workstationsApi.list({
-        search: searchTerm || undefined,
-        is_online: filterOnline,
-        contingency_active: filterContingency,
-        organization_id: filterOrgId,
-        vlan_id: filterVlanId,
-        page,
-        page_size: pageSize,
-      }),
+    queryFn: () => isAdmin ? workstationsApi.list(filters) : workstationsApi.listMine(filters),
     placeholderData: (prev) => prev,
   });
 
@@ -120,6 +121,7 @@ export default function WorkstationsPage() {
   const { data: accounts } = useQuery({
     queryKey: ['accounts'],
     queryFn: () => organizationsApi.list(),
+    enabled: isAdmin,
   });
 
   // Obtener VLANs de la organización seleccionada para el filtro

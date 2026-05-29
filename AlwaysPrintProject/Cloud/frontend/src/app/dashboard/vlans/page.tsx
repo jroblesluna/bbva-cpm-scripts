@@ -1416,6 +1416,7 @@ function CreateDeviceFromVLANModal({
 }) {
   const t = useTranslations('devices')
   const tCommon = useTranslations('common')
+  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [ipError, setIpError] = useState('')
   const [formData, setFormData] = useState<DeviceCreate>({
@@ -1443,8 +1444,23 @@ function CreateDeviceFromVLANModal({
       await apiClient.post('/devices/', formData)
       onSuccess()
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { detail?: string } } }
-      alert(err.response?.data?.detail || 'Error al crear dispositivo')
+      const err = error as { status?: number; detail?: string | { code?: string; ip?: string; vlan_name?: string | null } }
+      if (err.status === 409 && typeof err.detail === 'object' && err.detail?.code === 'IP_DUPLICATE') {
+        const vlanName = err.detail.vlan_name
+        toast({
+          variant: 'warning',
+          title: t('ipDuplicateTitle'),
+          description: vlanName
+            ? t('ipDuplicateWithVlan', { ip: formData.ip_address, vlan: vlanName })
+            : t('ipDuplicateNoVlan', { ip: formData.ip_address }),
+        })
+      } else {
+        toast({
+          variant: 'destructive',
+          title: tCommon('error'),
+          description: (typeof err.detail === 'string' ? err.detail : null) || t('createError'),
+        })
+      }
     } finally {
       setLoading(false)
     }

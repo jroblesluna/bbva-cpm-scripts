@@ -12,6 +12,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { workstationsApi } from '@/lib/api'
+import { useAuth } from '@/components/providers/AuthProvider'
 import type {
   Workstation,
   WorkstationUpdate,
@@ -25,9 +26,11 @@ import type {
  * Hook para listar workstations con filtros.
  */
 export function useWorkstations(filters?: WorkstationFilter) {
+  const { isOperator } = useAuth()
+
   return useQuery({
     queryKey: ['workstations', filters],
-    queryFn: () => workstationsApi.list(filters),
+    queryFn: () => isOperator() ? workstationsApi.listMine(filters) : workstationsApi.list(filters),
   })
 }
 

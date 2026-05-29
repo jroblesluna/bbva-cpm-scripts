@@ -25,6 +25,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api'
+import { useToast } from '@/hooks/use-toast'
 import type { Device, DeviceCreate, DeviceUpdate } from '@/types/device'
 import type { VLAN } from '@/types/vlan'
 import { formatDateWithTimezone } from '@/lib/dateUtils'
@@ -437,6 +438,7 @@ function CreateDeviceModal({ onClose, onSuccess }: { onClose: () => void; onSucc
   const { user, isAdmin } = useAuth()
   const t = useTranslations('devices')
   const tCommon = useTranslations('common')
+  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
   const [vlans, setVlans] = useState<VLAN[]>([])
@@ -495,9 +497,23 @@ function CreateDeviceModal({ onClose, onSuccess }: { onClose: () => void; onSucc
       await apiClient.post('/devices/', payload)
       onSuccess()
     } catch (error: unknown) {
-      console.error('Error:', error)
-      const err = error as { response?: { data?: { detail?: string } } }
-      alert(err.response?.data?.detail || 'Error al crear dispositivo')
+      const err = error as { status?: number; detail?: string | { code?: string; ip?: string; vlan_name?: string | null } }
+      if (err.status === 409 && typeof err.detail === 'object' && err.detail?.code === 'IP_DUPLICATE') {
+        const vlanName = err.detail.vlan_name
+        toast({
+          variant: 'warning',
+          title: t('ipDuplicateTitle'),
+          description: vlanName
+            ? t('ipDuplicateWithVlan', { ip: formData.ip_address, vlan: vlanName })
+            : t('ipDuplicateNoVlan', { ip: formData.ip_address }),
+        })
+      } else {
+        toast({
+          variant: 'destructive',
+          title: tCommon('error'),
+          description: (typeof err.detail === 'string' ? err.detail : null) || t('createError'),
+        })
+      }
     } finally {
       setLoading(false)
     }

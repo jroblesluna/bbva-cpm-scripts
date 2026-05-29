@@ -424,10 +424,20 @@ export const usersApi = {
 
 export const workstationsApi = {
   /**
-   * Listar workstations con filtros.
+   * Listar workstations con filtros (solo Admin).
    */
   list: async (filters?: WorkstationFilter): Promise<WorkstationListResponse> => {
     const response = await apiClient.get<WorkstationListResponse>('/workstations/', {
+      params: filters,
+    })
+    return response.data
+  },
+
+  /**
+   * Listar workstations de la organización propia (Operator).
+   */
+  listMine: async (filters?: WorkstationFilter): Promise<WorkstationListResponse> => {
+    const response = await apiClient.get<WorkstationListResponse>('/organizations/me/workstations', {
       params: filters,
     })
     return response.data
