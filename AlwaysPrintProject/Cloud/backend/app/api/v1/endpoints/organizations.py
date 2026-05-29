@@ -19,6 +19,7 @@ from app.core.utils import get_client_ip
 from app.models.user import User, UserRole
 from app.models.organization import Organization, PublicIP
 from app.models.workstation import Workstation
+from app.schemas import WorkstationListResponse
 from app.services.websocket_manager import connection_manager
 from app.schemas.organization import (
     OrganizationCreate,
@@ -135,6 +136,46 @@ def get_my_organization(
     )
     
     return response
+
+
+@router.get("/me/workstations", response_model=WorkstationListResponse)
+def list_my_workstations(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    search: Optional[str] = Query(None, description="Buscar por hostname o IP"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Listar workstations de la organización del usuario autenticado.
+    Disponible para operadores y admins.
+    """
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario sin organización asignada"
+        )
+
+    query = db.query(Workstation).filter(
+        Workstation.organization_id == current_user.organization_id
+    )
+
+    if search:
+        query = query.filter(
+            Workstation.hostname.ilike(f"%{search}%") |
+            Workstation.ip_private.ilike(f"%{search}%")
+        )
+
+    total = query.count()
+    offset = (page - 1) * page_size
+    workstations = query.offset(offset).limit(page_size).all()
+
+    return WorkstationListResponse(
+        items=workstations,
+        total=total,
+        skip=offset,
+        limit=page_size
+    )
 
 
 @router.put("/me", response_model=OrganizationResponse)
