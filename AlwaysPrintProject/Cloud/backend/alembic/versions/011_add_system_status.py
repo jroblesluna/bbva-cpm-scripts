@@ -37,12 +37,10 @@ def upgrade() -> None:
             "END $$;"
         )
 
-    # Para SQLite usamos String como fallback (no soporta enums nativos)
-    overall_status_type = (
-        sa.Enum('healthy', 'degraded', 'critical', name='overallstatus', create_type=False)
-        if connection.dialect.name == 'postgresql'
-        else sa.String(20)
-    )
+    # Usar String(20) para la columna — el tipo enum ya fue creado manualmente arriba.
+    # No usar sa.Enum() en create_table porque SQLAlchemy intenta CREATE TYPE
+    # incluso con create_type=False cuando se asocia a una tabla nueva.
+    overall_status_type = sa.String(20)
 
     # === TABLA: status_snapshots ===
     op.create_table(
