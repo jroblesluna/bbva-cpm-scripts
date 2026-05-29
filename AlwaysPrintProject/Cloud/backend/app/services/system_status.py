@@ -382,7 +382,7 @@ class SystemStatusCollector:
         # Verificar cada servicio de forma independiente
         results.append(await self._check_backend())
         results.append(await self._check_frontend())
-        results.append(self._check_nginx())
+        results.append(await self._check_nginx())
         results.append(self._check_redis())
         results.append(self._check_rds(db))
         results.append(self._check_ssl(ssl_domain))
@@ -470,7 +470,7 @@ class SystemStatusCollector:
             async with httpx.AsyncClient(
                 timeout=10.0, follow_redirects=False
             ) as client:
-                response = await client.get("http://localhost:3000")
+                response = await client.get("http://frontend:3000")
             latency_ms = round((time.time() - start) * 1000, 1)
             is_available = response.status_code in (200, 302, 307)
             return HealthCheckResponse(
@@ -501,47 +501,52 @@ class SystemStatusCollector:
                 error_message=f"Error de conexión: {e}",
             )
 
-    def _check_nginx(self) -> HealthCheckResponse:
+    async def _check_nginx(self) -> HealthCheckResponse:
         """
-        Verifica estado de Nginx via systemctl is-active.
+        Verifica estado de Nginx via HTTP GET al host.
 
-        El servicio se considera disponible si systemctl retorna "active".
-        Timeout de 10 segundos para el comando.
+        Desde dentro del contenedor Docker, no se puede usar systemctl.
+        En su lugar, se hace una petición HTTP al gateway del contenedor
+        (host donde corre nginx) en el puerto 80.
+        El servicio se considera disponible si responde con cualquier código HTTP.
+        Timeout de 10 segundos.
 
         Returns:
             HealthCheckResponse con el resultado de la verificación
         """
         start = time.time()
         try:
-            result = subprocess.run(
-                ["systemctl", "is-active", "nginx"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
+            # Desde el contenedor, el host es accesible via el gateway de la red Docker
+            # Usamos la IP del gateway o host.docker.internal
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    "http://host.docker.internal:80",
+                    follow_redirects=False,
+                )
             latency_ms = round((time.time() - start) * 1000, 1)
-            is_available = result.stdout.strip() == "active"
+            # Nginx responde si devuelve cualquier código (incluso 301/302 redirect a HTTPS)
+            is_available = response.status_code < 500
             return HealthCheckResponse(
                 service_name="nginx",
                 is_available=is_available,
                 latency_ms=latency_ms,
                 error_message=(
                     None if is_available
-                    else f"Estado de nginx: {result.stdout.strip() or 'desconocido'}"
+                    else f"Nginx respondió con error: {response.status_code}"
                 ),
             )
-        except subprocess.TimeoutExpired:
+        except httpx.TimeoutException:
             latency_ms = round((time.time() - start) * 1000, 1)
             logger.warning("Health check nginx: timeout después de 10 segundos")
             return HealthCheckResponse(
                 service_name="nginx",
                 is_available=False,
                 latency_ms=latency_ms,
-                error_message="Timeout: systemctl no respondió en 10 segundos",
+                error_message="Timeout: nginx no respondió en 10 segundos",
             )
         except Exception as e:
             latency_ms = round((time.time() - start) * 1000, 1)
-            logger.warning(f"Health check nginx: error al ejecutar systemctl: {e}")
+            logger.warning(f"Health check nginx: error de conexión: {e}")
             return HealthCheckResponse(
                 service_name="nginx",
                 is_available=False,
@@ -1056,6 +1061,13 @@ class SystemStatusCollector:
         db.flush()
 
         # Crear MetricRecords para cada métrica del sistema operativo
+        # Calcular porcentaje de swap (evitar división por cero)
+        swap_percent = (
+            round((os_metrics.swap_used_mb / os_metrics.swap_total_mb) * 100, 1)
+            if os_metrics.swap_total_mb > 0
+            else 0.0
+        )
+
         metric_definitions = [
             ("memory_percent", os_metrics.memory_percent, "percent"),
             ("memory_total_mb", os_metrics.memory_total_mb, "mb"),
@@ -1066,6 +1078,7 @@ class SystemStatusCollector:
             ("disk_used_mb", os_metrics.disk_used_mb, "mb"),
             ("disk_available_mb", os_metrics.disk_available_mb, "mb"),
             ("cpu_percent", os_metrics.cpu_percent, "percent"),
+            ("swap_percent", swap_percent, "percent"),
             ("swap_total_mb", os_metrics.swap_total_mb, "mb"),
             ("swap_used_mb", os_metrics.swap_used_mb, "mb"),
             ("swap_available_mb", os_metrics.swap_available_mb, "mb"),

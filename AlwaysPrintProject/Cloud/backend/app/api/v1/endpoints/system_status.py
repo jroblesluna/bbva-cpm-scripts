@@ -128,7 +128,7 @@ def _get_metric_name_for_query(metric: str) -> str:
         "cpu": "cpu_percent",
         "memory": "memory_percent",
         "disk": "disk_percent",
-        "swap": "swap_used_mb",
+        "swap": "swap_percent",
     }
     return metric_map.get(metric, metric)
 
