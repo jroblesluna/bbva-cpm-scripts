@@ -124,11 +124,13 @@ export default function WorkstationsPage() {
     enabled: isAdmin,
   });
 
-  // Obtener VLANs de la organización seleccionada para el filtro
+  // Obtener VLANs para el filtro:
+  // - Admin: requiere seleccionar organización primero
+  // - Operador: siempre carga sus VLANs (backend filtra por su organización)
   const { data: vlans } = useQuery({
     queryKey: ['vlans', filterOrgId],
     queryFn: () => vlansApi.list({ organization_id: filterOrgId }),
-    enabled: !!filterOrgId,
+    enabled: isAdmin ? !!filterOrgId : true,
   });
 
   const updateMutation = useMutation({
@@ -490,7 +492,7 @@ export default function WorkstationsPage() {
               </select>
             </div>
             )}
-            {filterOrgId && (
+            {(filterOrgId || !isAdmin) && (
               <div>
                 <select
                   value={filterVlanId || 'all'}
