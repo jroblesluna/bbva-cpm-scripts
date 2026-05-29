@@ -160,6 +160,20 @@ from app.schemas.device import (
     DeviceListResponse,
 )
 
+# === SYSTEM STATUS SCHEMAS ===
+from app.schemas.system_status import (
+    HistoryQueryParams,
+    OsMetricsResponse,
+    ContainerMetricsResponse,
+    HealthCheckResponse,
+    AlertResponse,
+    StatusSnapshotResponse,
+    HistoryDataPoint,
+    MetricStats,
+    HistoryResponse,
+    ServiceUptimeResponse,
+)
+
 # === UPDATE SCHEMAS ===
 from app.schemas.updates import (
     UpdateCheckResponse,
@@ -280,4 +294,15 @@ __all__ = [
     "DeviceUpdate",
     "DeviceResponse",
     "DeviceListResponse",
+    # System Status
+    "HistoryQueryParams",
+    "OsMetricsResponse",
+    "ContainerMetricsResponse",
+    "HealthCheckResponse",
+    "AlertResponse",
+    "StatusSnapshotResponse",
+    "HistoryDataPoint",
+    "MetricStats",
+    "HistoryResponse",
+    "ServiceUptimeResponse",
 ]

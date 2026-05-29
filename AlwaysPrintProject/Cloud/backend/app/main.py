@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.services.websocket_manager import connection_manager
+from app.services.status_scheduler import status_scheduler
 from app.api.v1.router import api_router
 from app.api.v1.websocket import workstation, operator
 from app.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
@@ -34,9 +35,15 @@ async def lifespan(app: FastAPI):
     ping_task = asyncio.create_task(
         connection_manager.start_ping_loop(SessionLocal)
     )
+
+    # Startup: Iniciar scheduler de recolección de métricas
+    status_scheduler.start()
     
     yield
     
+    # Shutdown: Detener scheduler de recolección de métricas
+    status_scheduler.stop()
+
     # Shutdown: Detener ping loop
     connection_manager.stop_ping_loop()
     ping_task.cancel()
