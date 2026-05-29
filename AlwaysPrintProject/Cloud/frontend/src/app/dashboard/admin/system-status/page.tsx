@@ -299,11 +299,19 @@ export default function SystemStatusPage() {
   };
 
   // Obtener badge de estado del contenedor
-  const getContainerStatusBadge = (status: ContainerMetrics['status']) => {
+  // Contenedores del sistema que no son parte de la aplicación
+  const SYSTEM_CONTAINERS = ['ecs-agent', 'amazon-ssm-agent', 'aws-otel-collector'];
+
+  // Obtener badge de estado del contenedor
+  const getContainerStatusBadge = (status: ContainerMetrics['status'], name: string) => {
     switch (status) {
       case 'running':
         return <Badge className="bg-green-100 text-green-800">{t('containerRunning')}</Badge>;
       case 'stopped':
+        // Contenedores del sistema en gris, los de la app en rojo
+        if (SYSTEM_CONTAINERS.some(sc => name.includes(sc))) {
+          return <Badge className="bg-gray-100 text-gray-600">{t('containerStopped')}</Badge>;
+        }
         return <Badge variant="destructive">{t('containerStopped')}</Badge>;
       case 'restarting':
         return <Badge className="bg-yellow-100 text-yellow-800">{t('containerRestarting')}</Badge>;
@@ -586,7 +594,7 @@ function OverallStatusBadge({ status, t }: OverallStatusBadgeProps) {
 interface ContainerCardProps {
   container: ContainerMetrics;
   t: ReturnType<typeof useTranslations>;
-  getStatusBadge: (status: ContainerMetrics['status']) => React.ReactNode;
+  getStatusBadge: (status: ContainerMetrics['status'], name: string) => React.ReactNode;
 }
 
 function ContainerCard({ container, t, getStatusBadge }: ContainerCardProps) {
@@ -595,7 +603,7 @@ function ContainerCard({ container, t, getStatusBadge }: ContainerCardProps) {
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-3">
           <span className="font-medium text-sm truncate">{container.name}</span>
-          {getStatusBadge(container.status)}
+          {getStatusBadge(container.status, container.name)}
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div>

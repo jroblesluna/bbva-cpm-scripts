@@ -75,6 +75,7 @@ def _snapshot_to_response(
     )
 
     # Construir métricas de contenedores Docker
+    # Mostrar todos los contenedores (running y stopped)
     docker_metrics = [
         ContainerMetricsResponse(
             name=cm.container_name,
