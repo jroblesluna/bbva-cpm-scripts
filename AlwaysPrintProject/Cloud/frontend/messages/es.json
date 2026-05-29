@@ -881,28 +881,6 @@
     "metric_cpu_percent": "CPU",
     "metric_swap_percent": "Swap"
   },
-  "systemStatus": {
-    "historyTitle": "Evolución Histórica",
-    "historyDays": "{days} días",
-    "historyLoading": "Cargando datos históricos...",
-    "historyLoadError": "Error al cargar datos históricos",
-    "historyNoData": "Sin datos para este período",
-    "historyNoUptime": "Sin datos de disponibilidad",
-    "historyStatsTitle": "Estadísticas del Período",
-    "historyUptimeTitle": "Disponibilidad por Servicio",
-    "historyServiceName": "Servicio",
-    "historyUptimePercent": "Uptime",
-    "historyChecksTotal": "Checks Totales",
-    "historyChecksOk": "Checks OK",
-    "historyAvg": "Promedio",
-    "historyMax": "Máximo",
-    "historyMin": "Mínimo",
-    "historyCoverage": "{percent}% cobertura",
-    "metric_memory_percent": "Memoria",
-    "metric_disk_percent": "Disco",
-    "metric_cpu_percent": "CPU",
-    "metric_swap_percent": "Swap"
-  },
   "logAnalysis": {
     "buttonLabel": "Análisis IA de Log",
     "buttonTitle": "Analizar log del día con inteligencia artificial",
@@ -941,10 +919,5 @@
     "processingDuration": "Duración del procesamiento",
     "originalFilename": "Archivo original",
     "noAnalysisText": "No hay contenido de análisis disponible."
-  },
-  "systemStatus": {
-    "title": "Estado del Sistema",
-    "subtitle": "Monitoreo de infraestructura y métricas del sistema",
-    "comingSoon": "El dashboard de monitoreo estará disponible próximamente"
   }
 }
