@@ -795,9 +795,16 @@ class SystemStatusCollector:
                         severity="warning",
                     ))
 
+        # Contenedores del sistema que no generan alertas (no son parte de la aplicación)
+        _EXCLUDED_CONTAINERS = {"ecs-agent", "amazon-ssm-agent", "aws-otel-collector"}
+
         # Verificar contenedores no running: genera alerta warning por cada uno
+        # (excluye contenedores del sistema que pueden estar detenidos normalmente)
         for container in docker_metrics:
             if container.status != "running":
+                # No alertar por contenedores del sistema
+                if container.name in _EXCLUDED_CONTAINERS:
+                    continue
                 alerts.append(AlertResponse(
                     metric_name=f"container_{container.name}",
                     current_value=0.0,
