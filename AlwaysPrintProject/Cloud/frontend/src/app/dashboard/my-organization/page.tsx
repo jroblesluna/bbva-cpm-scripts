@@ -38,6 +38,7 @@ import {
   Server,
   RotateCcw,
   RefreshCw,
+  ShieldAlert,
 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import type { Organization } from '@/types'
@@ -114,6 +115,7 @@ export default function MyOrganizationPage() {
   const [togglingContingency, setTogglingContingency] = useState(false)
   const [sendingOrgCommand, setSendingOrgCommand] = useState(false)
   const [confirmOrgAction, setConfirmOrgAction] = useState<'restart_service' | 'restart_tray' | 'check_update' | null>(null)
+  const [confirmContingency, setConfirmContingency] = useState<boolean | null>(null)
 
   // === CARGAR ORGANIZACIÓN ===
   useEffect(() => {
@@ -277,13 +279,19 @@ export default function MyOrganizationPage() {
   }
 
   // === HANDLERS: CONTROL ===
-  const handleToggleContingency = async (enabled: boolean) => {
-    if (!user?.organization_id) return
+  const handleRequestToggleContingency = (enabled: boolean) => {
+    setConfirmContingency(enabled)
+  }
+
+  const handleConfirmContingency = async () => {
+    if (confirmContingency === null || !user?.organization_id) return
+    const enabled = confirmContingency
+    setConfirmContingency(null)
     setTogglingContingency(true)
     try {
       await organizationsApi.toggleForcedContingency(user.organization_id, enabled)
       setForcedContingency(enabled)
-      toast({ title: enabled ? 'Contingencia activada' : 'Contingencia desactivada' })
+      toast({ title: enabled ? t('controlContingencyActivated') : t('controlContingencyDeactivated') })
     } catch (e: unknown) {
       const err = e as { detail?: string }
       toast({ title: tCommon('error'), description: err.detail || tCommon('error'), variant: 'destructive' })
@@ -613,17 +621,25 @@ export default function MyOrganizationPage() {
 
               {/* Contingencia Forzada */}
               <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <Label className="text-sm font-medium">{t('controlContingencyLabel')}</Label>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {forcedContingency ? t('controlContingencyEnabledDesc') : t('controlContingencyDisabledDesc')}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <ShieldAlert className={`w-5 h-5 ${forcedContingency ? 'text-orange-600' : 'text-gray-400'}`} />
+                  <div>
+                    <Label className="text-sm font-medium">{t('controlContingencyLabel')}</Label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {forcedContingency ? t('controlContingencyEnabledDesc') : t('controlContingencyDisabledDesc')}
+                    </p>
+                  </div>
                 </div>
-                <Switch
-                  checked={forcedContingency}
-                  onCheckedChange={handleToggleContingency}
+                <Button
+                  variant={forcedContingency ? 'destructive' : 'outline'}
+                  size="sm"
                   disabled={togglingContingency}
-                />
+                  onClick={() => handleRequestToggleContingency(!forcedContingency)}
+                  className={forcedContingency ? '' : 'border-orange-300 text-orange-700 hover:bg-orange-50'}
+                >
+                  <ShieldAlert className="h-4 w-4 mr-2" />
+                  {forcedContingency ? t('controlContingencyDeactivateBtn') : t('controlContingencyActivateBtn')}
+                </Button>
               </div>
 
               {/* Comandos masivos */}
@@ -665,6 +681,44 @@ export default function MyOrganizationPage() {
       </div>
 
     </div>
+
+      {/* === MODAL CONFIRMACIÓN CONTINGENCIA === */}
+      {confirmContingency !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
+            <div className="flex items-center gap-2 mb-4">
+              <ShieldAlert className={`w-5 h-5 ${confirmContingency ? 'text-orange-600' : 'text-green-600'}`} />
+              <h3 className="text-base font-semibold text-gray-900">
+                {confirmContingency ? t('controlContingencyConfirmActivateTitle') : t('controlContingencyConfirmDeactivateTitle')}
+              </h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-2">
+              {confirmContingency ? t('controlContingencyConfirmActivateDesc') : t('controlContingencyConfirmDeactivateDesc')}
+            </p>
+            {confirmContingency && (
+              <Alert className="mb-4">
+                <ShieldAlert className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  {t('controlContingencyWarning')}
+                </AlertDescription>
+              </Alert>
+            )}
+            <div className="flex justify-end gap-3 mt-4">
+              <Button variant="outline" size="sm" onClick={() => setConfirmContingency(null)}>
+                {t('controlCancel')}
+              </Button>
+              <Button
+                size="sm"
+                variant={confirmContingency ? 'destructive' : 'default'}
+                disabled={togglingContingency}
+                onClick={handleConfirmContingency}
+              >
+                {confirmContingency ? t('controlContingencyActivateBtn') : t('controlContingencyDeactivateBtn')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* === MODAL CONFIRMACIÓN COMANDO ORG === */}
       {confirmOrgAction && (

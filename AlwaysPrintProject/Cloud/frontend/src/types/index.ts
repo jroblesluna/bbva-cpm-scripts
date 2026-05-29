@@ -38,6 +38,9 @@ export * from './log-analysis'
 // Log Analysis types
 export * from './log-analysis'
 
+// System Status types
+export * from './system-status'
+
 // ============================================================================
 // TIPOS COMUNES
 // ============================================================================

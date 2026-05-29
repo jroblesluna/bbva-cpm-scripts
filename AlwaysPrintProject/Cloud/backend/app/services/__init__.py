@@ -12,6 +12,7 @@ from app.services.websocket_manager import ConnectionManager, connection_manager
 from app.services.connectivity import ConnectivityService
 from app.services.telemetry import TelemetryService
 from app.services.s3_update_service import S3UpdateService
+from app.services.system_status import SystemStatusCollector
 
 __all__ = [
     "AuthService",
@@ -25,4 +26,5 @@ __all__ = [
     "ConnectivityService",
     "TelemetryService",
     "S3UpdateService",
+    "SystemStatusCollector",
 ]

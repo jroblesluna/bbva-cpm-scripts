@@ -15,6 +15,18 @@ systemctl start docker
 systemctl enable amazon-ssm-agent
 systemctl restart amazon-ssm-agent
 
+# ── Swap (1 GB) — evita thrashing por memoria limitada en t3.micro ────
+if [ ! -f /swapfile ]; then
+  fallocate -l 1G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
+fi
+# Reducir swappiness para que solo use swap bajo presión real
+echo 'vm.swappiness=10' > /etc/sysctl.d/99-swap.conf
+sysctl -p /etc/sysctl.d/99-swap.conf
+
 # Docker Compose plugin
 mkdir -p /usr/local/lib/docker/cli-plugins
 curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
@@ -58,6 +70,12 @@ services:
     env_file: /opt/alwaysprint/.env
     ports:
       - "127.0.0.1:${backend_port}:${backend_port}"
+    volumes:
+      # Montar Docker socket para que el backend pueda recolectar métricas de contenedores
+      - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      # Permitir acceso al host desde dentro del contenedor (para verificar nginx)
+      - "host.docker.internal:host-gateway"
     command: >
       sh -c "alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port ${backend_port} --workers 1 --ws-ping-interval 300 --ws-ping-timeout 300"
@@ -158,6 +176,9 @@ if [ "\$SERVICE" = "frontend" ] || [ "\$SERVICE" = "all" ]; then
   docker compose pull frontend
   docker compose up -d frontend
 fi
+
+# Limpiar imágenes Docker antiguas no utilizadas (evita llenar disco)
+docker image prune -af --filter 'until=24h' > /dev/null 2>&1 || true
 DEPLOY
 chmod +x $APP_DIR/deploy.sh
 

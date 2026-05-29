@@ -97,12 +97,15 @@ recommend() {
     RECOMMENDATIONS+=("$1")
 }
 
-# Ejecutar comando SSM y esperar resultado
+# Ejecutar comando SSM y esperar resultado (con reintentos y detalle)
 ssm_exec() {
     local instance_id="$1"
     local commands="$2"
     local wait_seconds="${3:-8}"
-    
+    local max_retries=3
+    local retry=0
+
+    # Enviar comando
     local cmd_id=$(aws ssm send-command \
         --instance-ids "$instance_id" \
         --document-name "AWS-RunShellScript" \
@@ -110,20 +113,70 @@ ssm_exec() {
         --query "Command.CommandId" \
         --output text \
         --region "$AWS_REGION" 2>/dev/null)
-    
+
     if [ -z "$cmd_id" ] || [ "$cmd_id" = "None" ]; then
-        echo ""
+        echo "" >&2
+        echo "  ⚠ SSM: no se pudo enviar comando (send-command falló)" >&2
         return 1
     fi
-    
-    sleep "$wait_seconds"
-    
-    aws ssm get-command-invocation \
+
+    # Esperar resultado con reintentos
+    while [ $retry -lt $max_retries ]; do
+        sleep "$wait_seconds"
+        
+        local status=$(aws ssm get-command-invocation \
+            --command-id "$cmd_id" \
+            --instance-id "$instance_id" \
+            --query 'Status' \
+            --output text \
+            --region "$AWS_REGION" 2>/dev/null)
+
+        case "$status" in
+            Success)
+                aws ssm get-command-invocation \
+                    --command-id "$cmd_id" \
+                    --instance-id "$instance_id" \
+                    --query 'StandardOutputContent' \
+                    --output text \
+                    --region "$AWS_REGION" 2>/dev/null
+                return 0
+                ;;
+            Failed)
+                echo "" >&2
+                echo "  ⚠ SSM: comando falló (cmd_id=$cmd_id)" >&2
+                return 1
+                ;;
+            InProgress)
+                retry=$((retry + 1))
+                if [ $retry -lt $max_retries ]; then
+                    echo "  ⏳ SSM: aún en progreso (intento $retry/$max_retries, cmd_id=${cmd_id:0:8}...)" >&2
+                fi
+                ;;
+            *)
+                retry=$((retry + 1))
+                if [ $retry -lt $max_retries ]; then
+                    echo "  ⏳ SSM: estado=$status (intento $retry/$max_retries)" >&2
+                fi
+                ;;
+        esac
+    done
+
+    # Último intento: obtener lo que haya
+    local output=$(aws ssm get-command-invocation \
         --command-id "$cmd_id" \
         --instance-id "$instance_id" \
         --query 'StandardOutputContent' \
         --output text \
-        --region "$AWS_REGION" 2>/dev/null
+        --region "$AWS_REGION" 2>/dev/null)
+
+    if [ -n "$output" ] && [ "$output" != "None" ]; then
+        echo "$output"
+        return 0
+    fi
+
+    echo "" >&2
+    echo "  ⚠ SSM: timeout después de $max_retries intentos (cmd_id=${cmd_id:0:8}...)" >&2
+    return 1
 }
 
 # =============================================================================
@@ -468,7 +521,7 @@ else
             SSL_AUTOFIX=true
         fi
     else
-        check_fail "No se pudo conectar vía SSM"
+        check_fail "SSM: no se obtuvo respuesta de containers (ver detalle arriba)"
         recommend "SSM no responde. Verificar IAM role con AmazonSSMManagedInstanceCore"
     fi
 fi
@@ -607,7 +660,7 @@ print_header "6. ESTADÍSTICAS DE LA INSTANCIA"
 if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
     echo -e "  ${CYAN}Consultando recursos...${NC}"
     
-    STATS=$(ssm_exec "$INSTANCE_ID" '["echo \"=== MEMORIA ===\"; free -h | grep -E \"Mem:|Swap:\"; echo; echo \"=== DISCO ===\"; df -h / | tail -1; echo; echo \"=== CPU ===\"; uptime; echo; echo \"=== DOCKER ===\"; docker stats --no-stream --format \"table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\" 2>/dev/null | head -5; echo; echo \"=== UPTIME CONTAINERS ===\"; docker ps --format \"table {{.Names}}\t{{.Status}}\t{{.Ports}}\" 2>/dev/null"]' 8)
+    STATS=$(ssm_exec "$INSTANCE_ID" '["echo \"=== MEMORIA ===\"; free -h | grep -E \"Mem:|Swap:\"; echo; echo \"=== DISCO ===\"; df -h / | tail -1; echo; echo \"=== CPU ===\"; uptime; echo; echo \"=== DOCKER ===\"; docker stats --no-stream --format \"table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\" 2>/dev/null | head -5; echo; echo \"=== UPTIME CONTAINERS ===\"; docker ps --format \"table {{.Names}}\t{{.Status}}\t{{.Ports}}\" 2>/dev/null; echo; echo \"=== SWAP ===\"; swapon --show 2>/dev/null || echo none; cat /proc/sys/vm/swappiness 2>/dev/null"]' 8)
     
     if [ -n "$STATS" ]; then
         echo ""
@@ -632,6 +685,22 @@ if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
         MEM_AVAIL=$(echo "$STATS" | grep "Mem:" | awk '{print $7}')
         if [ -n "$MEM_AVAIL" ]; then
             check_ok "Memoria disponible: $MEM_AVAIL"
+        fi
+        
+        # Verificar swap
+        SWAP_LINE=$(echo "$STATS" | grep "Swap:" | head -1)
+        SWAP_TOTAL=$(echo "$SWAP_LINE" | awk '{print $2}')
+        SWAP_USED=$(echo "$SWAP_LINE" | awk '{print $3}')
+        SWAP_FILE=$(echo "$STATS" | grep -A1 "=== SWAP ===" | grep -v "===" | grep -v "^$" | head -1)
+        SWAPPINESS=$(echo "$STATS" | tail -1 | grep -E "^[0-9]+$")
+        
+        if [ "$SWAP_TOTAL" = "0B" ] || [ -z "$SWAP_TOTAL" ]; then
+            check_warn "Swap no configurado — riesgo de thrashing con poca RAM"
+            recommend "Configurar swap: fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile"
+        elif echo "$SWAP_FILE" | grep -q "swapfile\|partition"; then
+            check_ok "Swap activo: $SWAP_TOTAL total, $SWAP_USED usado (swappiness=${SWAPPINESS:-?})"
+        else
+            check_ok "Swap: $SWAP_TOTAL total, $SWAP_USED usado"
         fi
     else
         check_warn "No se pudieron obtener estadísticas"
