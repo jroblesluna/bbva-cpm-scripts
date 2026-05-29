@@ -4,6 +4,7 @@ Schemas Pydantic para VLAN.
 Este módulo define los schemas de validación para VLANs (segmentos de red).
 """
 
+import re
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -12,6 +13,51 @@ import ipaddress
 
 
 # === SCHEMAS DE VLAN ===
+
+def _validate_unc_path(value: str) -> str:
+    """
+    Valida que un valor sea un UNC path válido: \\\\host\\share
+    - host debe ser hostname, FQDN o IP (sin espacios)
+    - share puede contener espacios (nombre de cola/recurso compartido)
+    """
+    if not value.startswith('\\\\'):
+        raise ValueError(
+            f"UNC path inválido: '{value}'. Debe comenzar con \\\\ (ej: \\\\servidor\\cola)"
+        )
+    # Separar host y share (después de \\)
+    parts = value[2:].split('\\', 1)
+    if len(parts) < 2 or not parts[0] or not parts[1]:
+        raise ValueError(
+            f"UNC path inválido: '{value}'. Formato requerido: \\\\host\\recurso"
+        )
+    host = parts[0]
+    # Validar que el host no tenga espacios
+    if ' ' in host:
+        raise ValueError(
+            f"UNC path inválido: '{value}'. El host '{host}' no puede contener espacios. "
+            "Debe ser un hostname, FQDN o dirección IP válida."
+        )
+    # Validar formato de host (hostname, FQDN o IP)
+    host_regex = re.compile(r'^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$')
+    if not host_regex.match(host):
+        raise ValueError(
+            f"UNC path inválido: '{value}'. El host '{host}' no es un hostname, FQDN o IP válido."
+        )
+    return value
+
+
+def _validate_metadata_unc_paths(metadata: Optional[dict]) -> Optional[dict]:
+    """Valida que los valores de metadata que sean UNC paths tengan formato correcto."""
+    if metadata is None:
+        return None
+    for key, value in metadata.items():
+        if not isinstance(value, str):
+            continue
+        # Si el valor comienza con \\ se asume que es un UNC path y se valida
+        if value.startswith('\\\\'):
+            _validate_unc_path(value)
+    return metadata
+
 
 class VLANCreate(BaseModel):
     """Schema para crear una VLAN."""
@@ -34,6 +80,12 @@ class VLANCreate(BaseModel):
             except ValueError:
                 raise ValueError(f"CIDR inválido: {cidr}")
         return validated
+
+    @field_validator("metadata")
+    @classmethod
+    def validate_metadata(cls, v: Optional[dict]) -> Optional[dict]:
+        """Valida UNC paths en metadata."""
+        return _validate_metadata_unc_paths(v)
 
 
 class VLANUpdate(BaseModel):
@@ -58,6 +110,12 @@ class VLANUpdate(BaseModel):
             except ValueError:
                 raise ValueError(f"CIDR inválido: {cidr}")
         return validated
+
+    @field_validator("metadata")
+    @classmethod
+    def validate_metadata(cls, v: Optional[dict]) -> Optional[dict]:
+        """Valida UNC paths en metadata."""
+        return _validate_metadata_unc_paths(v)
 
 
 class VLANResponse(BaseModel):

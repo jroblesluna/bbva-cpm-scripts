@@ -274,6 +274,7 @@
     "metadataKeyPlaceholder": "Key (e.g. remote_queue_path)",
     "metadataValuePlaceholder": "Value (e.g. \\\\server\\queue)",
     "metadataAdd": "Add metadata",
+    "metadataUncInvalid": "Invalid UNC path. Format: \\\\host\\share (host must be a hostname, FQDN or IP without spaces)",
     "bulkCommandSentDesc": "\"{action}\" sent to {count} online workstation(s) in VLAN \"{name}\".",
     "bulkRestartServiceDesc": "The restart service command will be sent to all online workstations in VLAN \"{name}\".",
     "bulkRestartTrayDesc": "The restart Tray command will be sent to all online workstations in VLAN \"{name}\".",

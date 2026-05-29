@@ -51,6 +51,30 @@ import {
 
 type ViewMode = 'cards' | 'table'
 
+/**
+ * Valida si un valor es un UNC path válido: \\host\share
+ * - host debe ser hostname, FQDN o IP (sin espacios)
+ * - share puede contener espacios (nombre de cola/recurso compartido)
+ * Retorna true si es válido o si no es un UNC path (no empieza con \\)
+ */
+function isValidUncPath(value: string): boolean {
+  // Solo validar si parece un UNC path (empieza con \\)
+  if (!value.startsWith('\\\\')) return true
+  // Separar host y share (después de \\)
+  const withoutPrefix = value.substring(2)
+  const separatorIndex = withoutPrefix.indexOf('\\')
+  if (separatorIndex <= 0) return false
+  const host = withoutPrefix.substring(0, separatorIndex)
+  const share = withoutPrefix.substring(separatorIndex + 1)
+  // El host no puede tener espacios
+  if (host.includes(' ')) return false
+  // El host debe ser hostname, FQDN o IP válido
+  const hostRegex = /^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/
+  if (!hostRegex.test(host)) return false
+  // El share no puede estar vacío
+  if (!share.trim()) return false
+  return true
+}
 export default function VLANsPage() {
   const { user, getAuthHeaders } = useAuth()
   const router = useRouter()
@@ -1019,6 +1043,9 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
     e.preventDefault()
     const validCidrs = formData.cidr_ranges?.filter((c) => c.trim()) || []
     if (!formData.name?.trim() || validCidrs.length === 0) return
+    // Validar UNC paths en metadata
+    const invalidUnc = metadataEntries.find(entry => entry.value && !isValidUncPath(entry.value))
+    if (invalidUnc) return
     try {
       setLoading(true)
       // Construir metadata desde las entradas clave-valor
@@ -1125,7 +1152,8 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
               <p className="text-xs text-gray-500 mb-2">{t('metadataHelper')}</p>
               <div className="space-y-2">
                 {metadataEntries.map((entry, index) => (
-                  <div key={index} className="flex gap-2">
+                  <div key={index} className="flex flex-col gap-1">
+                    <div className="flex gap-2">
                     <input
                       type="text"
                       value={entry.key}
@@ -1146,11 +1174,19 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                         setMetadataEntries(updated)
                       }}
                       placeholder={t('metadataValuePlaceholder')}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-sm ${
+                        entry.value && !isValidUncPath(entry.value)
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-gray-300 focus:ring-blue-500'
+                      }`}
                     />
                     <Button type="button" variant="outline" size="sm" onClick={() => setMetadataEntries(metadataEntries.filter((_, i) => i !== index))}>
                       <X className="h-4 w-4" />
                     </Button>
+                    </div>
+                    {entry.value && !isValidUncPath(entry.value) && (
+                      <p className="text-xs text-red-600 ml-[calc(33.333%+0.5rem)]">{t('metadataUncInvalid')}</p>
+                    )}
                   </div>
                 ))}
               </div>

@@ -274,6 +274,7 @@
     "metadataKeyPlaceholder": "Clave (ej: remote_queue_path)",
     "metadataValuePlaceholder": "Valor (ej: \\\\server\\queue)",
     "metadataAdd": "Agregar metadato",
+    "metadataUncInvalid": "UNC path inválido. Formato: \\\\host\\recurso (host debe ser hostname, FQDN o IP sin espacios)",
     "bulkCommandSentDesc": "\"{action}\" enviado a {count} workstation(s) online en VLAN \"{name}\".",
     "bulkRestartServiceDesc": "Se enviará la orden de reiniciar el servicio AlwaysPrint a todas las workstations online de la VLAN \"{name}\".",
     "bulkRestartTrayDesc": "Se enviará la orden de reiniciar la aplicación Tray a todas las workstations online de la VLAN \"{name}\".",
