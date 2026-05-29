@@ -516,8 +516,8 @@ class SystemStatusCollector:
         """
         start = time.time()
         try:
-            # Desde el contenedor, el host es accesible via el gateway de la red Docker
-            # Usamos la IP del gateway o host.docker.internal
+            # Desde el contenedor, el host es accesible via host.docker.internal
+            # (configurado con extra_hosts: host-gateway en docker-compose)
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(
                     "http://host.docker.internal:80",

@@ -73,6 +73,9 @@ services:
     volumes:
       # Montar Docker socket para que el backend pueda recolectar métricas de contenedores
       - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      # Permitir acceso al host desde dentro del contenedor (para verificar nginx)
+      - "host.docker.internal:host-gateway"
     command: >
       sh -c "alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port ${backend_port} --workers 1 --ws-ping-interval 300 --ws-ping-timeout 300"
