@@ -96,7 +96,7 @@ export default function WorkstationsPage() {
     search: searchTerm || undefined,
     is_online: filterOnline,
     contingency_active: filterContingency,
-    organization_id: filterOrgId,
+    organization_id: isAdmin ? filterOrgId : undefined,
     vlan_id: filterVlanId,
     page,
     page_size: pageSize,
@@ -109,7 +109,7 @@ export default function WorkstationsPage() {
     error,
   } = useQuery({
     queryKey: ['workstations', searchTerm, filterOnline, filterContingency, filterOrgId, filterVlanId, page, pageSize],
-    queryFn: () => isAdmin ? workstationsApi.list(filters) : workstationsApi.listMine(filters),
+    queryFn: () => workstationsApi.list(filters),
     placeholderData: (prev) => prev,
   });
 
