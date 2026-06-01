@@ -45,6 +45,7 @@ export default function DevicesPage() {
   const [filterOrgId, setFilterOrgId] = useState<string | undefined>(undefined)
   const [filterVlanId, setFilterVlanId] = useState<string | undefined>(undefined)
   const [filterActive, setFilterActive] = useState<string>('all')
+  const [filterWithVlan, setFilterWithVlan] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -112,13 +113,15 @@ export default function DevicesPage() {
 
   const filteredDevices = devices.filter((device) => {
     const s = searchTerm.toLowerCase()
-    return (
+    const matchesSearch = (
       device.name.toLowerCase().includes(s) ||
       device.ip_address.includes(s) ||
       device.description?.toLowerCase().includes(s) ||
       device.model?.toLowerCase().includes(s) ||
       device.location?.toLowerCase().includes(s)
     )
+    const matchesVlan = !filterWithVlan || !device.vlan_id
+    return matchesSearch && matchesVlan
   })
 
   const totalFiltered = filteredDevices.length
@@ -271,14 +274,23 @@ export default function DevicesPage() {
             <option value="false">{t('statusInactive')}</option>
           </select>
         </div>
-        {(searchTerm || filterOrgId || filterVlanId || filterActive !== 'all') && (
-          <div className="mt-4">
-            <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterOrgId(undefined); setFilterVlanId(undefined); setFilterActive('all') }}>
+        <div className="flex items-center justify-between mt-4">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={filterWithVlan}
+              onChange={(e) => { setFilterWithVlan(e.target.checked); setPage(1) }}
+              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700">{t('filterWithVlan')}</span>
+          </label>
+          {(searchTerm || filterOrgId || filterVlanId || filterActive !== 'all' || filterWithVlan) && (
+            <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterOrgId(undefined); setFilterVlanId(undefined); setFilterActive('all'); setFilterWithVlan(false); setPage(1) }}>
               <X className="mr-2 h-4 w-4" />
               {tCommon('clearFilters')}
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Tabla de dispositivos */}
