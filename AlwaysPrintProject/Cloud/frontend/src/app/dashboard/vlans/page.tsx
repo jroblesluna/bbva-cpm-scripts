@@ -901,6 +901,24 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
     cidr_ranges: [''],
   })
 
+  /** Valida si un string es un CIDR válido (IPv4). */
+  const isValidCidr = (cidr: string): boolean => {
+    const trimmed = cidr.trim()
+    if (!trimmed) return false
+    const cidrRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/
+    const match = trimmed.match(cidrRegex)
+    if (!match) return false
+    const [, o1, o2, o3, o4, mask] = match
+    const octets = [Number(o1), Number(o2), Number(o3), Number(o4)]
+    if (octets.some((o) => o > 255)) return false
+    const maskNum = Number(mask)
+    if (maskNum > 32) return false
+    return true
+  }
+
+  /** Verifica si hay algún CIDR inválido entre los que tienen contenido. */
+  const hasInvalidCidrs = formData.cidr_ranges.some((c) => c.trim() && !isValidCidr(c))
+
   useEffect(() => {
     if (!isAdmin()) return
     const load = async () => {
@@ -916,6 +934,7 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
     e.preventDefault()
     const validCidrs = formData.cidr_ranges.filter((c) => c.trim())
     if (!formData.name.trim() || !formData.organization_id || validCidrs.length === 0) return
+    if (hasInvalidCidrs) return
 
     try {
       setLoading(true)
@@ -972,17 +991,26 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('cidrLabel')}</label>
               <div className="space-y-2">
-                {formData.cidr_ranges.map((cidr, index) => (
-                  <div key={index} className="flex gap-2">
-                    <input type="text" value={cidr} onChange={(e) => updateCidrField(index, e.target.value)}
-                      placeholder="Ej: 192.168.1.0/24" className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    {formData.cidr_ranges.length > 1 && (
-                      <Button type="button" variant="outline" size="sm" onClick={() => removeCidrField(index)}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
+                {formData.cidr_ranges.map((cidr, index) => {
+                  const showError = cidr.trim() && !isValidCidr(cidr)
+                  return (
+                    <div key={index}>
+                      <div className="flex gap-2">
+                        <input type="text" value={cidr} onChange={(e) => updateCidrField(index, e.target.value)}
+                          placeholder="Ej: 192.168.1.0/24"
+                          className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${showError ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
+                        {formData.cidr_ranges.length > 1 && (
+                          <Button type="button" variant="outline" size="sm" onClick={() => removeCidrField(index)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      {showError && (
+                        <p className="mt-1 text-xs text-red-600">{t('cidrInvalid')}</p>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
               <Button type="button" variant="outline" size="sm" onClick={addCidrField} className="mt-2">
                 <Plus className="mr-2 h-4 w-4" />{t('addRange')}
@@ -991,7 +1019,7 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
             </div>
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={onClose} disabled={loading}>{tCommon('cancel')}</Button>
-              <Button type="submit" disabled={loading}>{loading ? tCommon('creating') : t('createTitle')}</Button>
+              <Button type="submit" disabled={loading || hasInvalidCidrs}>{loading ? tCommon('creating') : t('createTitle')}</Button>
             </div>
           </form>
         </div>
@@ -1023,6 +1051,24 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
       : []
   )
 
+  /** Valida si un string es un CIDR válido (IPv4). */
+  const isValidCidr = (cidr: string): boolean => {
+    const trimmed = cidr.trim()
+    if (!trimmed) return false
+    const cidrRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/
+    const match = trimmed.match(cidrRegex)
+    if (!match) return false
+    const [, o1, o2, o3, o4, mask] = match
+    const octets = [Number(o1), Number(o2), Number(o3), Number(o4)]
+    if (octets.some((o) => o > 255)) return false
+    const maskNum = Number(mask)
+    if (maskNum > 32) return false
+    return true
+  }
+
+  /** Verifica si hay algún CIDR inválido entre los que tienen contenido. */
+  const hasInvalidCidrs = (formData.cidr_ranges || []).some((c) => c.trim() && !isValidCidr(c))
+
   // Cargar dispositivos de la VLAN al abrir el modal
   useEffect(() => {
     const loadDevices = async () => {
@@ -1043,6 +1089,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
     e.preventDefault()
     const validCidrs = formData.cidr_ranges?.filter((c) => c.trim()) || []
     if (!formData.name?.trim() || validCidrs.length === 0) return
+    if (hasInvalidCidrs) return
     // Validar UNC paths en metadata
     const invalidUnc = metadataEntries.find(entry => entry.value && !isValidUncPath(entry.value))
     if (invalidUnc) return
@@ -1108,17 +1155,26 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('cidrLabel')}</label>
               <div className="space-y-2">
-                {(formData.cidr_ranges || []).map((cidr, index) => (
-                  <div key={index} className="flex gap-2">
-                    <input type="text" value={cidr} onChange={(e) => updateCidrField(index, e.target.value)}
-                      placeholder="Ej: 192.168.1.0/24" className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    {(formData.cidr_ranges?.length || 0) > 1 && (
-                      <Button type="button" variant="outline" size="sm" onClick={() => removeCidrField(index)}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
+                {(formData.cidr_ranges || []).map((cidr, index) => {
+                  const showError = cidr.trim() && !isValidCidr(cidr)
+                  return (
+                    <div key={index}>
+                      <div className="flex gap-2">
+                        <input type="text" value={cidr} onChange={(e) => updateCidrField(index, e.target.value)}
+                          placeholder="Ej: 192.168.1.0/24"
+                          className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${showError ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
+                        {(formData.cidr_ranges?.length || 0) > 1 && (
+                          <Button type="button" variant="outline" size="sm" onClick={() => removeCidrField(index)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      {showError && (
+                        <p className="mt-1 text-xs text-red-600">{t('cidrInvalid')}</p>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
               <Button type="button" variant="outline" size="sm" onClick={addCidrField} className="mt-2">
                 <Plus className="mr-2 h-4 w-4" />{t('addRange')}
@@ -1221,7 +1277,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
           </details>
           <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-gray-200">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>{tCommon('cancel')}</Button>
-            <Button type="submit" form="edit-vlan-form" disabled={loading}>{loading ? tCommon('updating') : tCommon('update')}</Button>
+            <Button type="submit" form="edit-vlan-form" disabled={loading || hasInvalidCidrs}>{loading ? tCommon('updating') : tCommon('update')}</Button>
           </div>
         </div>
       </div>

@@ -182,6 +182,25 @@ class VLANSummaryItem(BaseModel):
     workstation_count: int = Field(0, description="Cantidad de workstations en la VLAN")
     has_vlan_config: bool = Field(False, description="Si la VLAN tiene action config activa a su nivel")
     workstations_with_config: int = Field(0, description="Cantidad de workstations con action config propia")
+    forced_contingency: bool = Field(False, description="Si la VLAN tiene contingencia forzada activa")
+
+
+class WorkstationConfigItem(BaseModel):
+    """Workstation que tiene action config propia."""
+    id: str
+    ip_private: str
+    hostname: Optional[str] = None
+    vlan_name: Optional[str] = None
+    config_name: str = Field(description="Nombre de la action config asignada")
+
+
+class OrganizationInfo(BaseModel):
+    """Info de la organización del operador para el dashboard."""
+    id: str
+    name: str
+    forced_contingency: bool = Field(False, description="Si la organización tiene contingencia forzada")
+    has_org_config: bool = Field(False, description="Si la organización tiene action config activa a nivel org")
+    action_config_mandatory: bool = Field(False, description="Si la config de la org es obligatoria para todas las VLANs/WS")
 
 
 class WorkstationStatsResponse(BaseModel):
@@ -194,3 +213,5 @@ class WorkstationStatsResponse(BaseModel):
     by_vlan: Optional[Dict[str, int]] = Field(None, description="Distribución por VLAN")
     by_organization: Optional[Dict[str, Dict[str, Any]]] = Field(None, description="Distribución por organización (solo admin)")
     vlan_summary: Optional[list["VLANSummaryItem"]] = Field(None, description="Resumen de VLANs con estado de dispositivos y configs")
+    organization_info: Optional["OrganizationInfo"] = Field(None, description="Info de la organización (solo operadores)")
+    workstations_with_config: Optional[list["WorkstationConfigItem"]] = Field(None, description="Workstations con action config propia")
