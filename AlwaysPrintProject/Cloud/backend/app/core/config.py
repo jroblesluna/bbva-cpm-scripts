@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     AWS_REGION: str = "us-west-2"
     AWS_PROFILE: Optional[str] = None
     S3_ARTIFACTS_BUCKET: str = "alwaysprint-prod-artifacts"
-    S3_DOCS_BUCKET: str = "alwaysprint-prod-docs"
+    S3_DOCS_BUCKET: str = "alwaysprint-dev-docs"
     FRONTEND_URL: str = "http://localhost:3000"
 
     # === CONFIGURACIÓN DE REDIS (CACHÉ) ===
