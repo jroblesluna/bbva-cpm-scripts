@@ -142,7 +142,15 @@ class VLANDetailResponse(VLANResponse):
     model_config = {"from_attributes": True, "populate_by_name": True}
 
 
+class VLANListStats(BaseModel):
+    """Estadísticas calculadas del listado de VLANs."""
+    without_devices: int = Field(0, description="VLANs sin dispositivos activos")
+    with_config: int = Field(0, description="VLANs con metadata/config")
+    in_contingency: int = Field(0, description="VLANs con contingencia forzada")
+
+
 class VLANListResponse(BaseModel):
     """Schema de respuesta para lista de VLANs."""
     total: int
     vlans: list[VLANResponse]
+    stats: Optional[VLANListStats] = None
