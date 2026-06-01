@@ -91,6 +91,7 @@ export default function VLANsPage() {
   const [filterOrgId, setFilterOrgId] = useState<string | undefined>(undefined)
   const [filterContingency, setFilterContingency] = useState(false)
   const [filterWithConfig, setFilterWithConfig] = useState(false)
+  const [filterWithDevices, setFilterWithDevices] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -199,7 +200,8 @@ export default function VLANsPage() {
     )
     const matchesContingency = !filterContingency || vlan.forced_contingency
     const matchesConfig = !filterWithConfig || (vlan.metadata && Object.keys(vlan.metadata).length > 0)
-    return matchesSearch && matchesContingency && matchesConfig
+    const matchesDevices = !filterWithDevices || (activeDeviceCounts[vlan.id] ?? 0) === 0
+    return matchesSearch && matchesContingency && matchesConfig && matchesDevices
   })
 
   const totalFiltered = filteredVlans.length
@@ -422,6 +424,15 @@ export default function VLANsPage() {
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
+                checked={filterWithDevices}
+                onChange={(e) => { setFilterWithDevices(e.target.checked); setPage(1) }}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">{t('filterWithDevices')}</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
                 checked={filterContingency}
                 onChange={(e) => { setFilterContingency(e.target.checked); setPage(1) }}
                 className="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
@@ -439,8 +450,8 @@ export default function VLANsPage() {
             </label>
           </div>
           <div className="flex items-center gap-2">
-            {(searchTerm || filterOrgId || filterContingency || filterWithConfig) && (
-              <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterOrgId(undefined); setFilterContingency(false); setFilterWithConfig(false); setPage(1) }}>
+            {(searchTerm || filterOrgId || filterContingency || filterWithConfig || filterWithDevices) && (
+              <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterOrgId(undefined); setFilterContingency(false); setFilterWithConfig(false); setFilterWithDevices(false); setPage(1) }}>
                 <X className="mr-2 h-4 w-4" />
                 {tCommon('clearFilters')}
               </Button>

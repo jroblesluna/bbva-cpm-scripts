@@ -855,7 +855,11 @@ class WorkstationService:
     
     def get_contingency_count(self, db: Session, organization_id: Optional[str] = None) -> int:
         """
-        Obtiene el número de workstations en contingencia.
+        Obtiene el número de workstations en contingencia (activa o forzada).
+        
+        Incluye workstations con contingency_active=True O forced_contingency=True
+        O que pertenecen a una VLAN con forced_contingency=True
+        O cuya organización tiene forced_contingency=True.
         
         Args:
             db: Sesión de base de datos
@@ -864,12 +868,43 @@ class WorkstationService:
         Returns:
             Número de workstations en contingencia
         """
-        query = db.query(Workstation).filter(Workstation.contingency_active.is_(True))
+        from sqlalchemy import or_
+        from app.models.vlan import VLAN
+        from app.models.organization import Organization
+        
+        # Si la organización tiene contingencia forzada, todas sus workstations están en contingencia
+        if organization_id:
+            org = db.query(Organization).filter(Organization.id == organization_id).first()
+            if org and org.forced_contingency:
+                query = db.query(Workstation).filter(Workstation.organization_id == organization_id)
+                return query.count()
+        
+        # Contar workstations con contingencia propia (activa o forzada)
+        query = db.query(Workstation).filter(
+            or_(
+                Workstation.contingency_active.is_(True),
+                Workstation.forced_contingency.is_(True),
+            )
+        )
         
         if organization_id is not None:
             query = query.filter(Workstation.organization_id == organization_id)
         
-        return query.count()
+        direct_count = query.count()
+        
+        # Contar workstations en VLANs con contingencia forzada (que no ya estén contadas)
+        vlan_forced_query = db.query(Workstation).join(
+            VLAN, Workstation.vlan_id == VLAN.id
+        ).filter(
+            VLAN.forced_contingency.is_(True),
+            Workstation.contingency_active.is_(False),
+            Workstation.forced_contingency.is_(False),
+        )
+        
+        if organization_id is not None:
+            vlan_forced_query = vlan_forced_query.filter(Workstation.organization_id == organization_id)
+        
+        return direct_count + vlan_forced_query.count()
     
     def get_total_count(self, db: Session, organization_id: Optional[str] = None) -> int:
         """
