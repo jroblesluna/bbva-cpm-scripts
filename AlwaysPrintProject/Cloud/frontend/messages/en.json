@@ -292,7 +292,9 @@
     "forcedContingencyActivated": "Forced contingency activated for this VLAN.",
     "forcedContingencyDeactivated": "Forced contingency deactivated for this VLAN.",
     "forcedContingencyError": "Error changing forced contingency.",
-    "contingencyNoDevices": "No active devices configured for contingency",
+    "contingencyNoDevices": "No printers assigned — can still activate, but users won't be able to print in contingency until one is assigned.",
+    "contingencyNoDevicesWarning": "This VLAN has no printers assigned. Users will not be able to print in contingency until a printer is assigned to this VLAN.",
+    "contingencyNoDevicesWarningSaved": "Contingency activated. Warning: without printers assigned, users will not be able to print in contingency.",
     "contingencyPrinterUsed": "Printer that will be used:",
     "contingencyNoPrinters": "No active printers found in this VLAN",
     "contingencyMoreDevices": "+{count} additional printer(s) available",
@@ -581,7 +583,11 @@
     "bulkModalTitle": "{action} — Organization",
     "pagination": "Showing {start} to {end} of {total} organizations",
     "pageNumber": "Page {page}",
-    "noOrg": "You don't have an organization assigned. Contact the administrator."
+    "noOrg": "You don't have an organization assigned. Contact the administrator.",
+    "checkingVlans": "Checking VLANs...",
+    "orgVlansWithoutDevicesWarning": "{count} VLAN(s) without assigned printers. Users in these VLANs won't be able to print in contingency mode until a printer is assigned.",
+    "orgVlansSeeMore": "View affected VLANs",
+    "orgVlansHideList": "Hide list"
   },
   "pendingIps": {
     "title": "Pending Public IPs",

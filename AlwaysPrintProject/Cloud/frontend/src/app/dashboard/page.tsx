@@ -28,6 +28,7 @@ interface WorkstationStats {
   offline: number
   contingency_active: number
   total_vlans: number
+  vlans_in_contingency?: number
   by_account?: Record<string, {
     name: string
     total: number
@@ -811,7 +812,9 @@ function ContingencyDonuts({
   orgStats: OrgStats
   t: ReturnType<typeof useTranslations>
 }) {
-  const vlansInContingency = stats.vlan_summary?.filter(v => v.forced_contingency).length ?? 0
+  const vlansInContingency = stats.vlan_summary
+    ? stats.vlan_summary.filter(v => v.forced_contingency).length
+    : (stats.vlans_in_contingency ?? 0)
   const totalVlans = stats.vlan_summary?.length ?? stats.total_vlans
 
   return (

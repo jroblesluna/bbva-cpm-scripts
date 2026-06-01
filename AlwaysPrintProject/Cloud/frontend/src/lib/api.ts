@@ -340,6 +340,14 @@ export const organizationsApi = {
   },
 
   /**
+   * Obtener VLANs de una organización que no tienen dispositivos activos.
+   */
+  getVlansWithoutDevices: async (id: string): Promise<{ count: number; total_vlans: number; vlans: { id: string; name: string }[] }> => {
+    const response = await apiClient.get(`/organizations/${id}/vlans-without-devices`)
+    return response.data
+  },
+
+  /**
    * Enviar comando remoto a todas las workstations online de una organización.
    */
   sendCommand: async (

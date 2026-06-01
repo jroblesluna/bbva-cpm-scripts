@@ -240,16 +240,20 @@ export default function VLANsPage() {
 
   const handleToggleForcedContingency = async (vlan: VLAN, enabled: boolean) => {
     try {
-      await apiClient.patch(`/vlans/${vlan.id}/forced-contingency`, null, { params: { enabled } })
+      const res = await apiClient.patch(`/vlans/${vlan.id}/forced-contingency`, null, { params: { enabled } })
       setVlans((prev) =>
         prev.map((v) => (v.id === vlan.id ? { ...v, forced_contingency: enabled } : v))
       )
       setContingencyTarget(null)
+      const hasNoDevicesWarning = enabled && res.data?.warning === 'no_devices'
       toast({
+        variant: hasNoDevicesWarning ? 'warning' : 'default',
         title: t('forcedContingency'),
-        description: enabled
-          ? t('forcedContingencyActivated')
-          : t('forcedContingencyDeactivated'),
+        description: hasNoDevicesWarning
+          ? t('contingencyNoDevicesWarningSaved')
+          : enabled
+            ? t('forcedContingencyActivated')
+            : t('forcedContingencyDeactivated'),
       })
     } catch (error: unknown) {
       const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
@@ -551,9 +555,8 @@ export default function VLANsPage() {
                           variant={vlan.forced_contingency ? 'destructive' : 'ghost'}
                           size="sm"
                           onClick={() => setContingencyTarget(vlan)}
-                          disabled={(activeDeviceCounts[vlan.id] ?? 0) === 0 && !vlan.forced_contingency}
                           title={vlan.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
-                          className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''} ${(activeDeviceCounts[vlan.id] ?? 0) === 0 && !vlan.forced_contingency ? 'text-gray-400 cursor-not-allowed opacity-50' : ''}`}
+                          className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}`}
                         >
                           <ShieldAlert className="h-4 w-4" />
                         </Button>
@@ -689,9 +692,8 @@ export default function VLANsPage() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => setContingencyTarget(vlan)}
-                                  disabled={(activeDeviceCounts[vlan.id] ?? 0) === 0 && !vlan.forced_contingency}
                                   title={vlan.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
-                                  className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : ''} ${(activeDeviceCounts[vlan.id] ?? 0) === 0 && !vlan.forced_contingency ? 'text-gray-400 cursor-not-allowed opacity-50' : ''}`}
+                                  className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : ''}`}
                                 >
                                   <ShieldAlert className="h-4 w-4" />
                                 </Button>
@@ -806,11 +808,12 @@ export default function VLANsPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded">
+                  <div className="p-3 bg-amber-50 border border-amber-300 rounded space-y-1">
                     <div className="flex items-center gap-2">
-                      <Printer className="h-4 w-4 text-red-500" />
-                      <span className="text-sm font-medium text-red-700">{t('contingencyNoPrinters')}</span>
+                      <Printer className="h-4 w-4 text-amber-600 shrink-0" />
+                      <span className="text-sm font-semibold text-amber-800">{t('contingencyNoPrinters')}</span>
                     </div>
+                    <p className="text-xs text-amber-700 ml-6">{t('contingencyNoDevicesWarning')}</p>
                   </div>
                 )}
               </div>

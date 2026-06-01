@@ -292,7 +292,9 @@
     "forcedContingencyActivated": "Contingencia forzada activada para esta VLAN.",
     "forcedContingencyDeactivated": "Contingencia forzada desactivada para esta VLAN.",
     "forcedContingencyError": "Error al cambiar contingencia forzada.",
-    "contingencyNoDevices": "No hay dispositivos activos configurados para contingencia",
+    "contingencyNoDevices": "Sin impresoras asignadas — se puede activar pero los usuarios no podrán imprimir en contingencia hasta que se asigne una.",
+    "contingencyNoDevicesWarning": "Esta VLAN no tiene impresoras asignadas. Los usuarios no podrán imprimir en contingencia hasta que se asigne una impresora a esta VLAN.",
+    "contingencyNoDevicesWarningSaved": "Contingencia activada. Atención: sin impresoras asignadas los usuarios no podrán imprimir en contingencia.",
     "contingencyPrinterUsed": "Impresora que se utilizará:",
     "contingencyNoPrinters": "No se encontraron impresoras activas en esta VLAN",
     "contingencyMoreDevices": "+{count} impresora(s) adicional(es) disponible(s)",
@@ -581,7 +583,11 @@
     "bulkModalTitle": "{action} — Organización",
     "pagination": "Mostrando {start} a {end} de {total} organizaciones",
     "pageNumber": "Página {page}",
-    "noOrg": "No tienes una organización asignada. Contacta al administrador."
+    "noOrg": "No tienes una organización asignada. Contacta al administrador.",
+    "checkingVlans": "Verificando VLANs...",
+    "orgVlansWithoutDevicesWarning": "{count} VLAN(s) sin impresoras asignadas. Los usuarios de estas VLANs no podrán imprimir en contingencia hasta que se les asigne una impresora.",
+    "orgVlansSeeMore": "Ver VLANs afectadas",
+    "orgVlansHideList": "Ocultar lista"
   },
   "pendingIps": {
     "title": "IPs Públicas Pendientes",

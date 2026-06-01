@@ -331,8 +331,9 @@ async def toggle_vlan_forced_contingency(
     if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
 
-    # Si se activa contingencia, verificar que hay al menos un dispositivo activo en la VLAN
+    # Obtener dispositivos activos de la VLAN (solo relevante al activar)
     active_devices = []
+    no_devices_warning = False
     if enabled:
         active_devices = db.query(Device).filter(
             Device.vlan_id == vlan_id,
@@ -340,10 +341,7 @@ async def toggle_vlan_forced_contingency(
             Device.is_active == True
         ).all()
         if not active_devices:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No se puede activar contingencia VLAN: no hay dispositivos activos configurados"
-            )
+            no_devices_warning = True
 
     vlan.forced_contingency = enabled
     db.commit()
@@ -391,6 +389,7 @@ async def toggle_vlan_forced_contingency(
         "forced_contingency": vlan.forced_contingency,
         "vlan_id": str(vlan.id),
         "updated_at": vlan.updated_at,
+        "warning": "no_devices" if no_devices_warning else None,
     }
 
 

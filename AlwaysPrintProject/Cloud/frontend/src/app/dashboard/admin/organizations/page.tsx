@@ -60,6 +60,9 @@ export default function AccountsPage() {
   const [editingAccount, setEditingAccount] = useState<Organization | null>(null)
   const [managingIPsOrg, setManagingIPsOrg] = useState<Organization | null>(null)
   const [contingencyTarget, setContingencyTarget] = useState<Organization | null>(null)
+  const [vlansWithoutDevices, setVlansWithoutDevices] = useState<{ id: string; name: string }[] | null>(null)
+  const [loadingVlansCheck, setLoadingVlansCheck] = useState(false)
+  const [showVlansWithoutDevicesList, setShowVlansWithoutDevicesList] = useState(false)
   const [bulkCommandTarget, setBulkCommandTarget] = useState<{ org: Organization; commandType: 'restart_service' | 'restart_tray' | 'check_update' } | null>(null)
   const [bulkCommandPending, setBulkCommandPending] = useState(false)
   const [orgToDelete, setOrgToDelete] = useState<{ id: string; name: string } | null>(null)
@@ -380,6 +383,41 @@ export default function AccountsPage() {
                   </AlertDescription>
                 </Alert>
               )}
+              {!contingencyTarget.forced_contingency && loadingVlansCheck && (
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                  {t('checkingVlans')}
+                </div>
+              )}
+              {!contingencyTarget.forced_contingency && !loadingVlansCheck && vlansWithoutDevices && vlansWithoutDevices.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-amber-800 font-medium">
+                        {t('orgVlansWithoutDevicesWarning', { count: vlansWithoutDevices.length })}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowVlansWithoutDevicesList(!showVlansWithoutDevicesList)}
+                        className="text-xs text-amber-700 underline mt-1"
+                      >
+                        {showVlansWithoutDevicesList ? t('orgVlansHideList') : t('orgVlansSeeMore')}
+                      </button>
+                      {showVlansWithoutDevicesList && (
+                        <ul className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+                          {vlansWithoutDevices.map(v => (
+                            <li key={v.id} className="text-xs text-amber-700 flex items-center gap-1.5">
+                              <Network className="w-3 h-3 shrink-0" />
+                              {v.name}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setContingencyTarget(null)}>
                   {tCommon('cancel')}
@@ -568,7 +606,18 @@ export default function AccountsPage() {
                     <Button
                       variant={account.forced_contingency ? 'destructive' : 'outline'}
                       size="sm"
-                      onClick={() => setContingencyTarget(account)}
+                      onClick={() => {
+                        setContingencyTarget(account)
+                        setShowVlansWithoutDevicesList(false)
+                        setVlansWithoutDevices(null)
+                        if (!account.forced_contingency) {
+                          setLoadingVlansCheck(true)
+                          organizationsApi.getVlansWithoutDevices(account.id)
+                            .then(data => setVlansWithoutDevices(data.vlans))
+                            .catch(() => setVlansWithoutDevices([]))
+                            .finally(() => setLoadingVlansCheck(false))
+                        }
+                      }}
                       disabled={forcedContingencyMutation.isPending}
                       title={account.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
                       className={account.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}

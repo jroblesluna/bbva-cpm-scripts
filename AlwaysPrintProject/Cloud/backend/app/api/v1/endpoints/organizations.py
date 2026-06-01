@@ -993,6 +993,37 @@ async def toggle_auto_update(
 
 # === TARGET VERSION ===
 
+@router.get(
+    "/{org_id}/vlans-without-devices",
+    summary="VLANs sin dispositivos activos",
+)
+def get_vlans_without_devices(
+    org_id: UUID,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Retorna las VLANs de la organización que no tienen dispositivos activos asignados."""
+    from app.models.vlan import VLAN as VLANModel
+    from app.models.device import Device
+
+    vlans = db.query(VLANModel).filter(VLANModel.organization_id == org_id).all()
+
+    vlans_without = []
+    for vlan in vlans:
+        count = db.query(Device).filter(
+            Device.vlan_id == vlan.id,
+            Device.is_active == True,
+        ).count()
+        if count == 0:
+            vlans_without.append({"id": str(vlan.id), "name": vlan.name})
+
+    return {
+        "count": len(vlans_without),
+        "total_vlans": len(vlans),
+        "vlans": vlans_without,
+    }
+
+
 @router.patch(
     "/{org_id}/forced-contingency",
     summary="Activar/desactivar contingencia forzada",
@@ -1027,11 +1058,18 @@ async def toggle_forced_contingency(
         )
 
     organization.forced_contingency = body.enabled
+
+    # Propagar a todas las VLANs de la organización
+    from app.models.vlan import VLAN as VLANModel
+    db.query(VLANModel).filter(
+        VLANModel.organization_id == org_id
+    ).update({"forced_contingency": body.enabled}, synchronize_session=False)
+
     db.commit()
     db.refresh(organization)
 
     logger.info(
-        "Contingencia forzada actualizada: org_id=%s, enabled=%s, admin_id=%s",
+        "Contingencia forzada actualizada: org_id=%s, enabled=%s, vlans_actualizadas=True, admin_id=%s",
         org_id,
         body.enabled,
         current_user.id,

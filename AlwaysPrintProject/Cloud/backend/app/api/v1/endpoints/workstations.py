@@ -672,17 +672,23 @@ def get_workstation_stats(
         from app.models.vlan import VLAN
         if org_id:
             total_vlans = db.query(VLAN).filter(VLAN.organization_id == org_id).count()
+            vlans_in_contingency = db.query(VLAN).filter(
+                VLAN.organization_id == org_id,
+                VLAN.forced_contingency == True
+            ).count()
         else:
             # Admin: contar todas las VLANs
             total_vlans = db.query(VLAN).count()
-        
+            vlans_in_contingency = db.query(VLAN).filter(VLAN.forced_contingency == True).count()
+
         # Preparar respuesta base
         response = WorkstationStatsResponse(
             total=total,
             online=online,
             offline=total - online,
             contingency_active=contingency,
-            total_vlans=total_vlans
+            total_vlans=total_vlans,
+            vlans_in_contingency=vlans_in_contingency,
         )
         
         # Si es admin, agregar estadísticas por cuenta
