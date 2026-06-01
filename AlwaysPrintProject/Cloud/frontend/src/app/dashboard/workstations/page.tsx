@@ -1001,6 +1001,18 @@ function WorkstationCard({
                 {t('forcedContingencyBadge')}
               </Badge>
             )}
+            {/* Indicador de nivel de contingencia */}
+            {(workstation.contingency_active || workstation.forced_contingency) && (
+              <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
+                {workstation.organization?.forced_contingency
+                  ? t('contingencyLevelOrg')
+                  : workstation.vlan?.forced_contingency
+                    ? t('contingencyLevelVlan')
+                    : workstation.forced_contingency
+                      ? t('contingencyLevelStation')
+                      : t('contingencyLevelStation')}
+              </Badge>
+            )}
           </div>
 
           {/* Acciones: visibles en desktop en la misma fila */}
@@ -1335,6 +1347,15 @@ function WorkstationTable({
                       {ws.contingency_active && (
                         <Badge variant="destructive" className="text-[10px] px-1 py-0">
                           C
+                        </Badge>
+                      )}
+                      {(ws.contingency_active || ws.forced_contingency) && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 border-orange-300 text-orange-700 bg-orange-50">
+                          {ws.organization?.forced_contingency
+                            ? t('contingencyLevelOrg')
+                            : ws.vlan?.forced_contingency
+                              ? t('contingencyLevelVlan')
+                              : t('contingencyLevelStation')}
                         </Badge>
                       )}
                     </div>

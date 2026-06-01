@@ -124,6 +124,7 @@ class OrganizationBasicResponse(BaseModel):
     name: str
     is_active: bool
     timezone: str = "UTC"
+    forced_contingency: bool = False
     
     model_config = {"from_attributes": True}
 
