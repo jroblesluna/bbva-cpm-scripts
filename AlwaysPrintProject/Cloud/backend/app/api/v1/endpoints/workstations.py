@@ -688,7 +688,6 @@ def get_workstation_stats(
         # Si es admin, agregar estadísticas por cuenta
         if current_user.role == UserRole.ADMIN:
             from app.models.organization import Organization
-            import uuid
             
             # Obtener todas las organizaciones
             organizations = db.query(Organization).all()
@@ -784,9 +783,61 @@ def get_workstation_stats(
                     workstation_count=ws_count,
                     has_vlan_config=has_vlan_config,
                     workstations_with_config=ws_with_config,
+                    forced_contingency=v.forced_contingency or False,
                 ))
             
             response.vlan_summary = vlan_summary_list
+        
+        # Agregar info de la organización para operadores
+        if target_org_id:
+            from app.models.organization import Organization
+            from app.models.action_config import ActionConfig, ActionConfigScope
+            from app.schemas.workstation import OrganizationInfo, WorkstationConfigItem
+            
+            org = db.query(Organization).filter(Organization.id == target_org_id).first()
+            if org:
+                # Verificar si tiene action config activa a nivel org
+                has_org_config = db.query(ActionConfig).filter(
+                    ActionConfig.organization_id == target_org_id,
+                    ActionConfig.scope == ActionConfigScope.ORG,
+                    ActionConfig.is_active == True
+                ).count() > 0
+                
+                response.organization_info = OrganizationInfo(
+                    id=str(org.id) if isinstance(org.id, uuid.UUID) else org.id,
+                    name=org.name,
+                    forced_contingency=org.forced_contingency or False,
+                    has_org_config=has_org_config,
+                    action_config_mandatory=org.action_config_mandatory or False,
+                )
+            
+            # Obtener workstations con action config propia
+            ws_configs = db.query(ActionConfig).filter(
+                ActionConfig.organization_id == target_org_id,
+                ActionConfig.scope == ActionConfigScope.WORKSTATION,
+                ActionConfig.is_active == True,
+                ActionConfig.workstation_id.isnot(None),
+            ).all()
+            
+            if ws_configs:
+                ws_config_items = []
+                for ac in ws_configs:
+                    ws = db.query(Workstation).filter(Workstation.id == ac.workstation_id).first()
+                    if ws:
+                        # Obtener nombre de VLAN si tiene
+                        vlan_name = None
+                        if ws.vlan_id:
+                            vlan_obj = db.query(VLAN).filter(VLAN.id == ws.vlan_id).first()
+                            if vlan_obj:
+                                vlan_name = vlan_obj.name
+                        ws_config_items.append(WorkstationConfigItem(
+                            id=str(ws.id) if isinstance(ws.id, uuid.UUID) else ws.id,
+                            ip_private=ws.ip_private,
+                            hostname=ws.hostname,
+                            vlan_name=vlan_name,
+                            config_name=ac.name,
+                        ))
+                response.workstations_with_config = ws_config_items
         
         return response
     except HTTPException:

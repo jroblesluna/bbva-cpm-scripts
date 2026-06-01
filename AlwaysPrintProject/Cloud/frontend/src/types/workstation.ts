@@ -64,6 +64,13 @@ export interface WorkstationStats {
     offline: number
     contingency: number
   }>
+  workstations_with_config?: Array<{
+    id: string
+    ip_private: string
+    hostname: string | null
+    vlan_name: string | null
+    config_name: string
+  }>
 }
 
 export interface WorkstationFilter {

@@ -45,6 +45,7 @@ import {
   ChevronRight,
   Printer,
   Sparkles,
+  Settings,
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
@@ -70,6 +71,7 @@ export default function WorkstationsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOnline, setFilterOnline] = useState<boolean | undefined>(undefined);
   const [filterContingency, setFilterContingency] = useState<boolean | undefined>(undefined);
+  const [filterWithConfig, setFilterWithConfig] = useState<boolean | undefined>(undefined);
   const [filterOrgId, setFilterOrgId] = useState<string | undefined>(() => searchParams.get('org_id') || undefined);
   const [filterVlanId, setFilterVlanId] = useState<string | undefined>(() => searchParams.get('vlan_id') || undefined);
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
@@ -267,8 +269,13 @@ export default function WorkstationsPage() {
     }
   };
 
-  const workstations = workstationsData?.items || [];
-  const totalItems = workstationsData?.total || 0;
+  const workstations = (() => {
+    const items = workstationsData?.items || [];
+    if (!filterWithConfig) return items;
+    const configIds = new Set(stats?.workstations_with_config?.map(w => w.id) || []);
+    return items.filter(ws => configIds.has(ws.id));
+  })();
+  const totalItems = filterWithConfig ? workstations.length : (workstationsData?.total || 0);
   const totalPages = Math.ceil(totalItems / pageSize);
   const paginationStart = (page - 1) * pageSize + 1;
   const paginationEnd = Math.min(page * pageSize, totalItems);
@@ -387,7 +394,7 @@ export default function WorkstationsPage() {
       </div>
 
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6 mb-6">
           <Card>
             <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
@@ -404,7 +411,7 @@ export default function WorkstationsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{t('online')}</p>
-                  <p className="text-2xl md:text-3xl font-bold text-green-600">{stats.online}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-gray-900">{stats.online}</p>
                 </div>
                 <CheckCircle className="w-8 h-8 md:w-12 md:h-12 text-green-600" />
               </div>
@@ -421,16 +428,29 @@ export default function WorkstationsPage() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className={stats.contingency_active > 0 ? 'border-orange-200 bg-orange-50' : ''}>
             <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{t('contingency')}</p>
-                  <p className="text-2xl md:text-3xl font-bold text-amber-600">
+                  <p className="text-2xl md:text-3xl font-bold text-gray-900">
                     {stats.contingency_active}
                   </p>
                 </div>
-                <Activity className="w-8 h-8 md:w-12 md:h-12 text-amber-600" />
+                <ShieldAlert className={`w-8 h-8 md:w-12 md:h-12 ${stats.contingency_active > 0 ? 'text-orange-600' : 'text-orange-400'}`} />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">{t('withConfig')}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-gray-900">
+                    {stats.workstations_with_config?.length || 0}
+                  </p>
+                </div>
+                <Settings className="w-8 h-8 md:w-12 md:h-12 text-green-600" />
               </div>
             </CardContent>
           </Card>
@@ -515,19 +535,29 @@ export default function WorkstationsPage() {
             )}
           </div>
           <div className="flex items-center justify-between mt-4">
-            <div className="flex items-center space-x-4">
-              <label className="flex items-center space-x-2 cursor-pointer">
+            <div className="flex items-center gap-6">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={filterContingency === true}
                   onChange={(e) => { setFilterContingency(e.target.checked ? true : undefined); setPage(1); }}
-                  className="rounded"
+                  className="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
                 />
                 <span className="text-sm text-gray-700">{t('onlyContingency')}</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={filterWithConfig === true}
+                  onChange={(e) => { setFilterWithConfig(e.target.checked ? true : undefined); setPage(1); }}
+                  className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                />
+                <span className="text-sm text-gray-700">{t('withConfig')}</span>
               </label>
               {(searchTerm ||
                 filterOnline !== undefined ||
                 filterContingency !== undefined ||
+                filterWithConfig !== undefined ||
                 filterOrgId ||
                 filterVlanId) && (
                 <Button
@@ -537,6 +567,7 @@ export default function WorkstationsPage() {
                     setSearchTerm('');
                     setFilterOnline(undefined);
                     setFilterContingency(undefined);
+                    setFilterWithConfig(undefined);
                     setFilterOrgId(undefined);
                     setFilterVlanId(undefined);
                     setPage(1);
