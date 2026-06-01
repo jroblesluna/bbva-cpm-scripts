@@ -979,10 +979,18 @@ function WorkstationCard({
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex items-center gap-3">
             <div
-              className={`rounded-full p-2 md:p-3 shrink-0 ${workstation.is_online ? 'bg-green-100' : 'bg-gray-100'}`}
+              className={`rounded-full p-2 md:p-3 shrink-0 ${
+                (workstation.contingency_active || workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency)
+                  ? 'bg-orange-100'
+                  : workstation.is_online ? 'bg-green-100' : 'bg-gray-100'
+              }`}
             >
               <Monitor
-                className={`w-5 h-5 md:w-6 md:h-6 ${workstation.is_online ? 'text-green-600' : 'text-gray-400'}`}
+                className={`w-5 h-5 md:w-6 md:h-6 ${
+                  (workstation.contingency_active || workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency)
+                    ? 'text-orange-600'
+                    : workstation.is_online ? 'text-green-600' : 'text-gray-400'
+                }`}
               />
             </div>
             <h3 className="text-lg md:text-xl font-semibold text-gray-900">
@@ -991,18 +999,18 @@ function WorkstationCard({
             <Badge variant={workstation.is_online ? 'default' : 'secondary'}>
               {workstation.is_online ? t('online') : t('offline')}
             </Badge>
-            {workstation.contingency_active && (
+            {(workstation.contingency_active || workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency) && (
               <Badge variant="destructive">
                 {t('contingency')}
               </Badge>
             )}
-            {workstation.forced_contingency && (
+            {(workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency) && (
               <Badge variant="destructive" className="bg-orange-600">
                 {t('forcedContingencyBadge')}
               </Badge>
             )}
             {/* Indicador de nivel de contingencia */}
-            {(workstation.contingency_active || workstation.forced_contingency) && (
+            {(workstation.contingency_active || workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency) && (
               <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
                 {workstation.organization?.forced_contingency
                   ? t('contingencyLevelOrg')
@@ -1022,15 +1030,17 @@ function WorkstationCard({
               variant={workstation.forced_contingency ? 'destructive' : 'outline'}
               size="sm"
               onClick={() => onToggleForcedContingency()}
-              disabled={isForcedContingencyPending || workstation.vlan?.forced_contingency === true}
+              disabled={isForcedContingencyPending || workstation.vlan?.forced_contingency === true || workstation.organization?.forced_contingency === true}
               title={
-                workstation.vlan?.forced_contingency
-                  ? t('contingencyControlledByVlan')
-                  : workstation.forced_contingency
-                    ? t('forcedContingencyDeactivate')
-                    : t('forcedContingencyActivate')
+                workstation.organization?.forced_contingency
+                  ? t('contingencyControlledByOrg')
+                  : workstation.vlan?.forced_contingency
+                    ? t('contingencyControlledByVlan')
+                    : workstation.forced_contingency
+                      ? t('forcedContingencyDeactivate')
+                      : t('forcedContingencyActivate')
               }
-              className={`${workstation.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''} ${workstation.vlan?.forced_contingency ? 'cursor-not-allowed opacity-50' : ''}`}
+              className={`${workstation.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''} ${(workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency) ? 'cursor-not-allowed opacity-50' : ''}`}
             >
               <ShieldAlert className="w-4 h-4" />
             </Button>
@@ -1162,15 +1172,17 @@ function WorkstationCard({
             variant={workstation.forced_contingency ? 'destructive' : 'outline'}
             size="sm"
             onClick={() => onToggleForcedContingency()}
-            disabled={isForcedContingencyPending || workstation.vlan?.forced_contingency === true}
+            disabled={isForcedContingencyPending || workstation.vlan?.forced_contingency === true || workstation.organization?.forced_contingency === true}
             title={
-              workstation.vlan?.forced_contingency
-                ? t('contingencyControlledByVlan')
-                : workstation.forced_contingency
-                  ? t('forcedContingencyDeactivate')
-                  : t('forcedContingencyActivate')
+              workstation.organization?.forced_contingency
+                ? t('contingencyControlledByOrg')
+                : workstation.vlan?.forced_contingency
+                  ? t('contingencyControlledByVlan')
+                  : workstation.forced_contingency
+                    ? t('forcedContingencyDeactivate')
+                    : t('forcedContingencyActivate')
             }
-            className={`h-8 w-8 p-0 ${workstation.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''} ${workstation.vlan?.forced_contingency ? 'cursor-not-allowed opacity-50' : ''}`}
+            className={`h-8 w-8 p-0 ${workstation.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''} ${(workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency) ? 'cursor-not-allowed opacity-50' : ''}`}
           >
             <ShieldAlert className="w-4 h-4" />
           </Button>
@@ -1344,12 +1356,12 @@ function WorkstationTable({
                       <span
                         className={`w-2.5 h-2.5 rounded-full shrink-0 ${ws.is_online ? 'bg-green-500' : 'bg-gray-400'}`}
                       />
-                      {ws.contingency_active && (
+                      {(ws.contingency_active || ws.forced_contingency || ws.vlan?.forced_contingency || ws.organization?.forced_contingency) && (
                         <Badge variant="destructive" className="text-[10px] px-1 py-0">
                           C
                         </Badge>
                       )}
-                      {(ws.contingency_active || ws.forced_contingency) && (
+                      {(ws.contingency_active || ws.forced_contingency || ws.vlan?.forced_contingency || ws.organization?.forced_contingency) && (
                         <Badge variant="outline" className="text-[10px] px-1 py-0 border-orange-300 text-orange-700 bg-orange-50">
                           {ws.organization?.forced_contingency
                             ? t('contingencyLevelOrg')
@@ -1393,15 +1405,17 @@ function WorkstationTable({
                         variant="ghost"
                         size="sm"
                         onClick={() => onToggleForcedContingency(ws.id)}
-                        disabled={isForcedContingencyPending || ws.vlan?.forced_contingency === true}
+                        disabled={isForcedContingencyPending || ws.vlan?.forced_contingency === true || ws.organization?.forced_contingency === true}
                         title={
-                          ws.vlan?.forced_contingency
-                            ? t('contingencyControlledByVlan')
-                            : ws.forced_contingency
-                              ? t('forcedContingencyDeactivate')
-                              : t('forcedContingencyActivate')
+                          ws.organization?.forced_contingency
+                            ? t('contingencyControlledByOrg')
+                            : ws.vlan?.forced_contingency
+                              ? t('contingencyControlledByVlan')
+                              : ws.forced_contingency
+                                ? t('forcedContingencyDeactivate')
+                                : t('forcedContingencyActivate')
                         }
-                        className={`h-7 w-7 p-0 ${ws.forced_contingency ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : ''} ${ws.vlan?.forced_contingency ? 'cursor-not-allowed opacity-50' : ''}`}
+                        className={`h-7 w-7 p-0 ${ws.forced_contingency ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : ''} ${(ws.vlan?.forced_contingency || ws.organization?.forced_contingency) ? 'cursor-not-allowed opacity-50' : ''}`}
                       >
                         <ShieldAlert className="w-3.5 h-3.5" />
                       </Button>
