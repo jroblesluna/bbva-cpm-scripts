@@ -69,7 +69,39 @@ def list_vlans(
     # Si es Admin sin filtro, ve todas las VLANs
     
     vlans = query.all()
-    return VLANListResponse(total=len(vlans), vlans=vlans)
+    
+    # Calcular estadísticas
+    from app.models.device import Device
+    from app.schemas.vlan import VLANListStats
+    
+    without_devices = 0
+    with_config = 0
+    in_contingency = 0
+    
+    for vlan in vlans:
+        # Contar dispositivos activos en la VLAN
+        device_count = db.query(Device).filter(
+            Device.vlan_id == vlan.id,
+            Device.is_active == True
+        ).count()
+        if device_count == 0:
+            without_devices += 1
+        
+        # Verificar si tiene metadata/config
+        if vlan.vlan_metadata and len(vlan.vlan_metadata) > 0:
+            with_config += 1
+        
+        # Contingencia forzada
+        if vlan.forced_contingency:
+            in_contingency += 1
+    
+    stats = VLANListStats(
+        without_devices=without_devices,
+        with_config=with_config,
+        in_contingency=in_contingency,
+    )
+    
+    return VLANListResponse(total=len(vlans), vlans=vlans, stats=stats)
 
 
 @router.post("/", response_model=VLANResponse, status_code=status.HTTP_201_CREATED)
