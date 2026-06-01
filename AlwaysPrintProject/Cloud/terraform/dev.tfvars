@@ -45,5 +45,6 @@ backend_env_vars = {
   CACHE_TTL_SECONDS           = "60"
   API_V1_STR                  = "/api/v1"
   S3_ARTIFACTS_BUCKET         = "alwaysprint-dev-artifacts"
+  S3_DOCS_BUCKET              = "alwaysprint-dev-docs"
   DEFAULT_BOOTSTRAP_DOMAINS   = "dev.iol.pe"
 }

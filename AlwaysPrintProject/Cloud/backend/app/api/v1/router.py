@@ -22,6 +22,7 @@ from app.api.v1.endpoints import (
     organizations,
     updates,
     devices,
+    documents,
     log_analysis,
     system_status,
 )
@@ -151,6 +152,13 @@ api_router.include_router(
     devices.router,
     prefix="/devices",
     tags=["Dispositivos"]
+)
+
+# Documentos del sistema
+api_router.include_router(
+    documents.router,
+    prefix="/documents",
+    tags=["Documentos"]
 )
 
 # Monitoreo de estado del sistema (solo Admin)

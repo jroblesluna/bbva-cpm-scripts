@@ -72,7 +72,8 @@
     "subInfrastructure": "Infraestructura",
     "subResources": "Recursos",
     "groupMonitoring": "Monitoreo / Operaciones",
-    "groupSystem": "Sistema"
+    "groupSystem": "Sistema",
+    "documentation": "Documentación"
   },
   "login": {
     "title": "AlwaysPrint Cloud Manager",
@@ -984,5 +985,43 @@
     "processingDuration": "Duración del procesamiento",
     "originalFilename": "Archivo original",
     "noAnalysisText": "No hay contenido de análisis disponible."
+  },
+  "documentation": {
+    "title": "Documentación",
+    "subtitle": "Documentos de actualización del sistema",
+    "createBtn": "Nuevo Documento",
+    "searchPlaceholder": "Buscar por título o descripción...",
+    "viewCards": "Vista de tarjetas",
+    "viewTable": "Vista de tabla",
+    "noDocuments": "No hay documentos disponibles",
+    "uploadFirst": "Subir el primer documento",
+    "download": "Descargar",
+    "pagination": "Mostrando {start} a {end} de {total} documentos",
+    "columnTitle": "Título",
+    "columnSize": "Tamaño",
+    "columnDate": "Fecha",
+    "columnAuthor": "Autor",
+    "createTitle": "Nuevo Documento",
+    "createDescription": "Sube un documento PDF con título y descripción",
+    "editTitle": "Editar Documento",
+    "editDescription": "Modifica el título y la descripción del documento",
+    "fieldTitle": "Título",
+    "fieldTitlePlaceholder": "Título del documento",
+    "fieldDescription": "Descripción",
+    "fieldDescriptionPlaceholder": "Descripción breve del contenido...",
+    "fieldFile": "Archivo PDF",
+    "fileHint": "Solo archivos PDF, máximo 50 MB",
+    "uploading": "Subiendo...",
+    "createSuccess": "Documento creado",
+    "createSuccessDesc": "El documento se subió correctamente",
+    "updateSuccess": "Documento actualizado",
+    "updateSuccessDesc": "Los cambios se guardaron correctamente",
+    "deleteSuccess": "Documento eliminado",
+    "deleteSuccessDesc": "El documento se eliminó correctamente",
+    "deleteConfirm": "¿Estás seguro de eliminar \"{title}\"? Esta acción no se puede deshacer.",
+    "errorTitle": "Error",
+    "errorCreate": "No se pudo crear el documento",
+    "errorUpdate": "No se pudo actualizar el documento",
+    "errorDelete": "No se pudo eliminar el documento"
   }
 }

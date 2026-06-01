@@ -72,7 +72,8 @@
     "subInfrastructure": "Infrastructure",
     "subResources": "Resources",
     "groupMonitoring": "Monitoring / Operations",
-    "groupSystem": "System"
+    "groupSystem": "System",
+    "documentation": "Documentation"
   },
   "login": {
     "title": "AlwaysPrint Cloud Manager",
@@ -984,5 +985,43 @@
     "processingDuration": "Processing duration",
     "originalFilename": "Original file",
     "noAnalysisText": "No analysis content available."
+  },
+  "documentation": {
+    "title": "Documentation",
+    "subtitle": "System update documents",
+    "createBtn": "New Document",
+    "searchPlaceholder": "Search by title or description...",
+    "viewCards": "Card view",
+    "viewTable": "Table view",
+    "noDocuments": "No documents available",
+    "uploadFirst": "Upload the first document",
+    "download": "Download",
+    "pagination": "Showing {start} to {end} of {total} documents",
+    "columnTitle": "Title",
+    "columnSize": "Size",
+    "columnDate": "Date",
+    "columnAuthor": "Author",
+    "createTitle": "New Document",
+    "createDescription": "Upload a PDF document with title and description",
+    "editTitle": "Edit Document",
+    "editDescription": "Modify the document title and description",
+    "fieldTitle": "Title",
+    "fieldTitlePlaceholder": "Document title",
+    "fieldDescription": "Description",
+    "fieldDescriptionPlaceholder": "Brief description of the content...",
+    "fieldFile": "PDF File",
+    "fileHint": "PDF files only, max 50 MB",
+    "uploading": "Uploading...",
+    "createSuccess": "Document created",
+    "createSuccessDesc": "The document was uploaded successfully",
+    "updateSuccess": "Document updated",
+    "updateSuccessDesc": "Changes were saved successfully",
+    "deleteSuccess": "Document deleted",
+    "deleteSuccessDesc": "The document was deleted successfully",
+    "deleteConfirm": "Are you sure you want to delete \"{title}\"? This action cannot be undone.",
+    "errorTitle": "Error",
+    "errorCreate": "Could not create the document",
+    "errorUpdate": "Could not update the document",
+    "errorDelete": "Could not delete the document"
   }
 }

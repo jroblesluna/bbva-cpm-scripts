@@ -34,6 +34,7 @@ import {
   ChevronDown,
   ChevronRight,
   Server,
+  BookOpen,
 } from 'lucide-react'
 
 // Definición de items de navegación
@@ -94,6 +95,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       items: [
         { key: 'users', href: '/dashboard/admin/users', icon: Users },
         { key: 'updates', href: '/dashboard/admin/updates', icon: Download },
+        { key: 'documentation', href: '/dashboard/documentation', icon: BookOpen },
         { key: 'config', href: '/dashboard/config', icon: Settings, adminOnly: true },
       ],
     },
