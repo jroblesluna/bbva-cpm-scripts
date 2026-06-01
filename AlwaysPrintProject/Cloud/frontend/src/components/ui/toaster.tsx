@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast'
 import { X, AlertTriangle, AlertCircle, CheckCircle } from 'lucide-react'
 
 export function Toaster() {
-  const { toasts, dismiss } = useToast()
+  const { toasts, dismiss, remove } = useToast()
 
   useEffect(() => {
     if (toasts.length === 0) return
@@ -65,7 +65,7 @@ export function Toaster() {
 
             {/* Cerrar */}
             <button
-              onClick={() => dismiss(toast.id)}
+              onClick={() => remove(toast.id)}
               className="shrink-0 opacity-40 hover:opacity-70 transition-opacity"
             >
               <X className="w-3.5 h-3.5" />

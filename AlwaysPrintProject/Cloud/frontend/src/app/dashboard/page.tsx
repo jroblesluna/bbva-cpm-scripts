@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Monitor, CheckCircle, Building2, Network, AlertCircle, Globe, RefreshCw, Printer, Settings, AlertTriangle, X, Eye, ShieldAlert, Lock } from 'lucide-react'
+import { PieChart, Pie, Cell } from 'recharts'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -264,66 +265,65 @@ export default function DashboardPage() {
 
       {/* Sección Organizaciones — solo admin */}
       {isAdmin() && orgStats && (
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-700 mb-4">{t('orgSectionTitle')}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
-              <CardContent className="p-6">
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-blue-600" />
+              {t('orgSectionTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 border border-gray-200 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">{t('orgTotal')}</p>
-                    <p className="text-3xl font-bold text-gray-900">{orgStats.total}</p>
+                    <p className="text-xs text-gray-500">{t('orgTotal')}</p>
+                    <p className="text-2xl font-bold text-gray-900">{orgStats.total}</p>
                   </div>
-                  <div className="bg-blue-100 rounded-full p-3">
-                    <Building2 className="w-6 h-6 text-blue-600" />
+                  <div className="bg-blue-100 rounded-full p-2">
+                    <Building2 className="w-5 h-5 text-blue-600" />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            <Card>
-              <CardContent className="p-6">
+              <div className="p-4 border border-gray-200 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">{t('orgWithConfig')}</p>
-                    <p className="text-3xl font-bold text-indigo-600">{orgStats.with_config}</p>
+                    <p className="text-xs text-gray-500">{t('orgWithConfig')}</p>
+                    <p className="text-2xl font-bold text-indigo-600">{orgStats.with_config}</p>
                   </div>
-                  <div className="bg-indigo-100 rounded-full p-3">
-                    <Settings className="w-6 h-6 text-indigo-600" />
+                  <div className="bg-indigo-100 rounded-full p-2">
+                    <Settings className="w-5 h-5 text-indigo-600" />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            <Card>
-              <CardContent className="p-6">
+              <div className="p-4 border border-gray-200 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">{t('orgApplyingMandatory')}</p>
-                    <p className="text-3xl font-bold text-green-600">{orgStats.applying_mandatory}</p>
+                    <p className="text-xs text-gray-500">{t('orgApplyingMandatory')}</p>
+                    <p className="text-2xl font-bold text-green-600">{orgStats.applying_mandatory}</p>
                   </div>
-                  <div className="bg-green-100 rounded-full p-3">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
+                  <div className="bg-green-100 rounded-full p-2">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            <Card>
-              <CardContent className="p-6">
+              <div className={`p-4 border rounded-lg ${orgStats.in_contingency > 0 ? 'border-orange-200 bg-orange-50' : 'border-gray-200'}`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">{t('orgInContingency')}</p>
-                    <p className="text-3xl font-bold text-orange-600">{orgStats.in_contingency}</p>
+                    <p className="text-xs text-gray-500">{t('orgInContingency')}</p>
+                    <p className="text-2xl font-bold text-orange-600">{orgStats.in_contingency}</p>
                   </div>
-                  <div className="bg-orange-100 rounded-full p-3">
-                    <AlertTriangle className="w-6 h-6 text-orange-600" />
+                  <div className={`rounded-full p-2 ${orgStats.in_contingency > 0 ? 'bg-orange-100' : 'bg-orange-50'}`}>
+                    <AlertTriangle className={`w-5 h-5 ${orgStats.in_contingency > 0 ? 'text-orange-600' : 'text-orange-400'}`} />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* === SECCIÓN 1: ORGANIZACIÓN === */}
@@ -338,6 +338,11 @@ export default function DashboardPage() {
 
       {/* === SECCIÓN 3: ESTACIONES === */}
       <StationsSection stats={stats} t={t} />
+
+      {/* Donuts de contingencia — solo admin */}
+      {isAdmin() && stats && orgStats && (
+        <ContingencyDonuts stats={stats} orgStats={orgStats} t={t} />
+      )}
 
       {/* Distribución por Cuenta (solo admin) */}
       {stats?.by_account && Object.keys(stats.by_account).length > 0 && (
@@ -740,5 +745,102 @@ function VLANStatusSection({ stats, t }: { stats: WorkstationStats; t: ReturnTyp
         </div>
       )}
     </>
+  )
+}
+
+// ============================================================================
+// Componente: Donuts de contingencia
+// ============================================================================
+
+const DONUT_COLORS = {
+  contingency: '#f97316',
+  normal: '#e5e7eb',
+}
+
+function DonutChart({ active, total, label }: { active: number; total: number; label: string }) {
+  const pct = total > 0 ? Math.round((active / total) * 100) : 0
+  const data = [
+    { value: active },
+    { value: Math.max(total - active, 0) },
+  ]
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative">
+        <PieChart width={140} height={140}>
+          <Pie
+            data={data}
+            cx={65}
+            cy={65}
+            innerRadius={46}
+            outerRadius={62}
+            startAngle={90}
+            endAngle={-270}
+            dataKey="value"
+            strokeWidth={0}
+          >
+            <Cell fill={DONUT_COLORS.contingency} />
+            <Cell fill={DONUT_COLORS.normal} />
+          </Pie>
+        </PieChart>
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <span className="text-2xl font-bold text-orange-500">{pct}%</span>
+          <span className="text-xs text-gray-400">{active}/{total}</span>
+        </div>
+      </div>
+      <p className="text-sm font-medium text-gray-700 text-center">{label}</p>
+      <div className="flex items-center gap-3 text-xs text-gray-500">
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-orange-500" />
+          Contingencia
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-gray-200 border border-gray-300" />
+          Normal
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function ContingencyDonuts({
+  stats,
+  orgStats,
+}: {
+  stats: WorkstationStats
+  orgStats: OrgStats
+  t: ReturnType<typeof useTranslations>
+}) {
+  const vlansInContingency = stats.vlan_summary?.filter(v => v.forced_contingency).length ?? 0
+  const totalVlans = stats.vlan_summary?.length ?? stats.total_vlans
+
+  return (
+    <Card className="mb-8">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <AlertTriangle className="w-4 h-4 text-orange-500" />
+          Contingencia activa
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-3 gap-6 justify-items-center">
+          <DonutChart
+            active={stats.contingency_active}
+            total={stats.total}
+            label="Estaciones"
+          />
+          <DonutChart
+            active={vlansInContingency}
+            total={totalVlans}
+            label="VLANs"
+          />
+          <DonutChart
+            active={orgStats.in_contingency}
+            total={orgStats.total}
+            label="Organizaciones"
+          />
+        </div>
+      </CardContent>
+    </Card>
   )
 }
