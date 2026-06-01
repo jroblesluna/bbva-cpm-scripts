@@ -23,6 +23,7 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
+  AlertTriangle,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
@@ -128,6 +129,7 @@ export default function DevicesPage() {
 
   const activeCount = devices.filter((d) => d.is_active).length
   const inactiveCount = devices.filter((d) => !d.is_active).length
+  const noVlanCount = devices.filter((d) => !d.vlan_id).length
 
   const handleEdit = (device: Device) => {
     setSelectedDevice(device)
@@ -180,7 +182,7 @@ export default function DevicesPage() {
       </div>
 
       {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
             <div className="p-3 bg-blue-100 rounded-lg"><Printer className="h-6 w-6 text-blue-600" /></div>
@@ -195,7 +197,7 @@ export default function DevicesPage() {
             <div className="p-3 bg-green-100 rounded-lg"><CheckCircle className="h-6 w-6 text-green-600" /></div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">{t('activeDevices')}</p>
-              <p className="text-2xl font-bold text-green-600">{activeCount}</p>
+              <p className="text-2xl font-bold text-gray-900">{activeCount}</p>
             </div>
           </div>
         </div>
@@ -204,7 +206,18 @@ export default function DevicesPage() {
             <div className="p-3 bg-gray-100 rounded-lg"><XCircle className="h-6 w-6 text-gray-500" /></div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">{t('inactiveDevices')}</p>
-              <p className="text-2xl font-bold text-gray-600">{inactiveCount}</p>
+              <p className="text-2xl font-bold text-gray-900">{inactiveCount}</p>
+            </div>
+          </div>
+        </div>
+        <div className={`bg-white rounded-lg shadow p-6 ${noVlanCount > 0 ? 'border border-orange-200 bg-orange-50' : ''}`}>
+          <div className="flex items-center">
+            <div className={`p-3 rounded-lg ${noVlanCount > 0 ? 'bg-orange-100' : 'bg-gray-100'}`}>
+              <AlertTriangle className={`h-6 w-6 ${noVlanCount > 0 ? 'text-orange-600' : 'text-gray-400'}`} />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">{t('noVlanDevices')}</p>
+              <p className="text-2xl font-bold text-gray-900">{noVlanCount}</p>
             </div>
           </div>
         </div>
@@ -302,10 +315,10 @@ export default function DevicesPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {paginatedDevices.map((device) => (
-                  <tr key={device.id} className="hover:bg-gray-50">
+                  <tr key={device.id} className={`hover:bg-gray-50 ${!device.vlan_id ? 'bg-orange-50 border-l-4 border-l-orange-400' : ''}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <Printer className="h-5 w-5 text-gray-400 mr-2" />
+                        <Printer className={`h-5 w-5 mr-2 ${!device.vlan_id ? 'text-orange-500' : 'text-gray-400'}`} />
                         <div>
                           <span className="text-sm font-medium text-gray-900">{device.name}</span>
                           {device.description && (
@@ -324,7 +337,10 @@ export default function DevicesPage() {
                       {device.vlan_name ? (
                         <Badge variant="secondary">{device.vlan_name}</Badge>
                       ) : (
-                        <span className="text-sm text-gray-400">-</span>
+                        <Badge variant="outline" className="border-orange-300 text-orange-700 bg-orange-50">
+                          <AlertTriangle className="w-3 h-3 mr-1" />
+                          {t('noVlan')}
+                        </Badge>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

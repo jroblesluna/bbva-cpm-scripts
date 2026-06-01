@@ -34,6 +34,8 @@ import {
   RefreshCcw,
   Download,
   Terminal,
+  AlertTriangle,
+  Settings,
 } from 'lucide-react'
 import { apiClient, vlansApi } from '@/lib/api'
 import type { VLAN, VLANCreate, VLANUpdate, VLANDetail } from '@/types/vlan'
@@ -87,6 +89,8 @@ export default function VLANsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterOrgId, setFilterOrgId] = useState<string | undefined>(undefined)
+  const [filterContingency, setFilterContingency] = useState(false)
+  const [filterWithConfig, setFilterWithConfig] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -186,11 +190,14 @@ export default function VLANsPage() {
 
   const filteredVlans = vlans.filter((vlan) => {
     const s = searchTerm.toLowerCase()
-    return (
+    const matchesSearch = (
       vlan.name.toLowerCase().includes(s) ||
       vlan.description?.toLowerCase().includes(s) ||
       vlan.cidr_ranges.some((cidr) => cidr.includes(s))
     )
+    const matchesContingency = !filterContingency || vlan.forced_contingency
+    const matchesConfig = !filterWithConfig || (vlan.metadata && Object.keys(vlan.metadata).length > 0)
+    return matchesSearch && matchesContingency && matchesConfig
   })
 
   const totalFiltered = filteredVlans.length
@@ -329,11 +336,11 @@ export default function VLANsPage() {
       </div>
 
       {/* Tarjetas de estadísticas */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
         <div className="bg-white rounded-lg shadow p-4 md:p-6">
           <div className="flex items-center">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Network className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
+            <div className="p-3 bg-purple-100 rounded-lg">
+              <Network className="h-5 w-5 md:h-6 md:w-6 text-purple-600" />
             </div>
             <div className="ml-3 md:ml-4">
               <p className="text-xs md:text-sm font-medium text-gray-600">{t('totalVlans')}</p>
@@ -341,31 +348,41 @@ export default function VLANsPage() {
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4 md:p-6">
+        <div className={`bg-white rounded-lg shadow p-4 md:p-6 ${vlans.filter(v => (activeDeviceCounts[v.id] ?? 0) === 0).length > 0 ? 'border border-orange-200 bg-orange-50' : ''}`}>
           <div className="flex items-center">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <Monitor className="h-5 w-5 md:h-6 md:w-6 text-green-600" />
+            <div className={`p-3 rounded-lg ${vlans.filter(v => (activeDeviceCounts[v.id] ?? 0) === 0).length > 0 ? 'bg-orange-100' : 'bg-gray-100'}`}>
+              <AlertTriangle className={`h-5 w-5 md:h-6 md:w-6 ${vlans.filter(v => (activeDeviceCounts[v.id] ?? 0) === 0).length > 0 ? 'text-orange-600' : 'text-gray-400'}`} />
             </div>
             <div className="ml-3 md:ml-4">
-              <p className="text-xs md:text-sm font-medium text-gray-600">{t('stations')}</p>
+              <p className="text-xs md:text-sm font-medium text-gray-600">{t('statsNoDevices')}</p>
               <p className="text-xl md:text-2xl font-bold text-gray-900">
-                {vlans.reduce((acc, v) => {
-                  const detail = v as VLAN & { workstation_count?: number }
-                  return acc + (detail.workstation_count ?? 0)
-                }, 0)}
+                {vlans.filter(v => (activeDeviceCounts[v.id] ?? 0) === 0).length}
               </p>
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4 md:p-6 col-span-2 md:col-span-1">
+        <div className="bg-white rounded-lg shadow p-4 md:p-6">
           <div className="flex items-center">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <Network className="h-5 w-5 md:h-6 md:w-6 text-purple-600" />
+            <div className="p-3 bg-green-100 rounded-lg">
+              <Settings className="h-5 w-5 md:h-6 md:w-6 text-green-600" />
             </div>
             <div className="ml-3 md:ml-4">
-              <p className="text-xs md:text-sm font-medium text-gray-600">{t('cidrRanges')}</p>
+              <p className="text-xs md:text-sm font-medium text-gray-600">{t('statsWithConfig')}</p>
               <p className="text-xl md:text-2xl font-bold text-gray-900">
-                {vlans.reduce((acc, v) => acc + v.cidr_ranges.length, 0)}
+                {vlans.filter(v => v.metadata && Object.keys(v.metadata).length > 0).length}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className={`bg-white rounded-lg shadow p-4 md:p-6 ${vlans.filter(v => v.forced_contingency).length > 0 ? 'border border-orange-200 bg-orange-50' : ''}`}>
+          <div className="flex items-center">
+            <div className={`p-3 rounded-lg ${vlans.filter(v => v.forced_contingency).length > 0 ? 'bg-orange-100' : 'bg-orange-50'}`}>
+              <ShieldAlert className={`h-5 w-5 md:h-6 md:w-6 ${vlans.filter(v => v.forced_contingency).length > 0 ? 'text-orange-600' : 'text-orange-400'}`} />
+            </div>
+            <div className="ml-3 md:ml-4">
+              <p className="text-xs md:text-sm font-medium text-gray-600">{t('statsInContingency')}</p>
+              <p className="text-xl md:text-2xl font-bold text-gray-900">
+                {vlans.filter(v => v.forced_contingency).length}
               </p>
             </div>
           </div>
@@ -399,34 +416,54 @@ export default function VLANsPage() {
           )}
         </div>
         <div className="flex items-center justify-between mt-4">
-          <div className="flex items-center">
-            {(searchTerm || filterOrgId) && (
-              <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterOrgId(undefined); setPage(1) }}>
+          <div className="flex items-center gap-6">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={filterContingency}
+                onChange={(e) => { setFilterContingency(e.target.checked); setPage(1) }}
+                className="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+              />
+              <span className="text-sm text-gray-700">{t('filterContingencyOnly')}</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={filterWithConfig}
+                onChange={(e) => { setFilterWithConfig(e.target.checked); setPage(1) }}
+                className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              />
+              <span className="text-sm text-gray-700">{t('filterWithConfigOnly')}</span>
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            {(searchTerm || filterOrgId || filterContingency || filterWithConfig) && (
+              <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterOrgId(undefined); setFilterContingency(false); setFilterWithConfig(false); setPage(1) }}>
                 <X className="mr-2 h-4 w-4" />
                 {tCommon('clearFilters')}
               </Button>
             )}
-          </div>
-          {/* Toggle de vista: tarjetas / tabla */}
-          <div className="flex items-center gap-1 border rounded-md p-0.5">
-            <Button
-              variant={viewMode === 'cards' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => { setViewMode('cards'); setPage(1) }}
-              title={tCommon('viewCards')}
-              className="h-8 w-8 p-0"
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'table' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => { setViewMode('table'); setPage(1) }}
-              title={tCommon('viewTable')}
-              className="h-8 w-8 p-0"
-            >
-              <List className="w-4 h-4" />
-            </Button>
+            {/* Toggle de vista: tarjetas / tabla */}
+            <div className="flex items-center gap-1 border rounded-md p-0.5">
+              <Button
+                variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => { setViewMode('cards'); setPage(1) }}
+                title={tCommon('viewCards')}
+                className="h-8 w-8 p-0"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => { setViewMode('table'); setPage(1) }}
+                title={tCommon('viewTable')}
+                className="h-8 w-8 p-0"
+              >
+                <List className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
