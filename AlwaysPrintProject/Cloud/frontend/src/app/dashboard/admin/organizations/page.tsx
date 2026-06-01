@@ -60,6 +60,7 @@ export default function AccountsPage() {
   const [editingAccount, setEditingAccount] = useState<Organization | null>(null)
   const [managingIPsOrg, setManagingIPsOrg] = useState<Organization | null>(null)
   const [contingencyTarget, setContingencyTarget] = useState<Organization | null>(null)
+  const [deactivateForceAll, setDeactivateForceAll] = useState(false)
   const [vlansWithoutDevices, setVlansWithoutDevices] = useState<{ id: string; name: string }[] | null>(null)
   const [loadingVlansCheck, setLoadingVlansCheck] = useState(false)
   const [showVlansWithoutDevicesList, setShowVlansWithoutDevicesList] = useState(false)
@@ -106,8 +107,8 @@ export default function AccountsPage() {
 
   // Mutation para toggle de contingencia forzada
   const forcedContingencyMutation = useMutation({
-    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
-      organizationsApi.toggleForcedContingency(id, enabled),
+    mutationFn: ({ id, enabled, forceAll }: { id: string; enabled: boolean; forceAll?: boolean }) =>
+      organizationsApi.toggleForcedContingency(id, enabled, forceAll),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       setContingencyTarget(null)
@@ -383,6 +384,26 @@ export default function AccountsPage() {
                   </AlertDescription>
                 </Alert>
               )}
+              {/* Toggle desactivación — solo al desactivar */}
+              {contingencyTarget.forced_contingency && (
+                <div className="flex items-start justify-between gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800">{t('deactivateForceAllLabel')}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {deactivateForceAll ? t('deactivateForceAllHint') : t('deactivateSmartHint')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDeactivateForceAll(!deactivateForceAll)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${deactivateForceAll ? 'bg-orange-500' : 'bg-gray-300'}`}
+                    role="switch"
+                    aria-checked={deactivateForceAll}
+                  >
+                    <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${deactivateForceAll ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+              )}
               {!contingencyTarget.forced_contingency && loadingVlansCheck && (
                 <div className="flex items-center gap-2 text-xs text-gray-500">
                   <RefreshCw className="w-3 h-3 animate-spin" />
@@ -427,6 +448,7 @@ export default function AccountsPage() {
                   onClick={() => forcedContingencyMutation.mutate({
                     id: contingencyTarget.id,
                     enabled: !contingencyTarget.forced_contingency,
+                    forceAll: contingencyTarget.forced_contingency ? deactivateForceAll : undefined,
                   })}
                   disabled={forcedContingencyMutation.isPending}
                   className={!contingencyTarget.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
@@ -608,6 +630,7 @@ export default function AccountsPage() {
                       size="sm"
                       onClick={() => {
                         setContingencyTarget(account)
+                        setDeactivateForceAll(false)
                         setShowVlansWithoutDevicesList(false)
                         setVlansWithoutDevices(null)
                         if (!account.forced_contingency) {

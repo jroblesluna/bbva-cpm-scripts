@@ -102,6 +102,7 @@ export default function VLANsPage() {
   const [devicesVlan, setDevicesVlan] = useState<VLAN | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [contingencyTarget, setContingencyTarget] = useState<VLAN | null>(null)
+  const [vlanDeactivateForceAll, setVlanDeactivateForceAll] = useState(false)
   const [contingencyDevices, setContingencyDevices] = useState<Device[]>([])
   const [contingencyDevicesLoading, setContingencyDevicesLoading] = useState(false)
   const [activeDeviceCounts, setActiveDeviceCounts] = useState<Record<string, number>>({})
@@ -238,9 +239,9 @@ export default function VLANsPage() {
     }
   }
 
-  const handleToggleForcedContingency = async (vlan: VLAN, enabled: boolean) => {
+  const handleToggleForcedContingency = async (vlan: VLAN, enabled: boolean, forceAll = false) => {
     try {
-      const res = await apiClient.patch(`/vlans/${vlan.id}/forced-contingency`, null, { params: { enabled } })
+      const res = await apiClient.patch(`/vlans/${vlan.id}/forced-contingency`, null, { params: { enabled, force_all: forceAll } })
       setVlans((prev) =>
         prev.map((v) => (v.id === vlan.id ? { ...v, forced_contingency: enabled } : v))
       )
@@ -554,7 +555,7 @@ export default function VLANsPage() {
                         <Button
                           variant={vlan.forced_contingency ? 'destructive' : 'ghost'}
                           size="sm"
-                          onClick={() => setContingencyTarget(vlan)}
+                          onClick={() => { setContingencyTarget(vlan); setVlanDeactivateForceAll(false) }}
                           title={vlan.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
                           className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}`}
                         >
@@ -691,7 +692,7 @@ export default function VLANsPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => setContingencyTarget(vlan)}
+                                  onClick={() => { setContingencyTarget(vlan); setVlanDeactivateForceAll(false) }}
                                   title={vlan.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
                                   className={`h-8 w-8 p-0 ${vlan.forced_contingency ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : ''}`}
                                 >
@@ -787,6 +788,26 @@ export default function VLANsPage() {
                 {t('forcedContingencyNotification')}
               </p>
             )}
+            {/* Toggle desactivación — solo al desactivar */}
+            {contingencyTarget.forced_contingency && (
+              <div className="flex items-start justify-between gap-3 p-3 mb-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800">{t('deactivateForceAllLabel')}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {vlanDeactivateForceAll ? t('deactivateForceAllHint') : t('deactivateSmartHint')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVlanDeactivateForceAll(!vlanDeactivateForceAll)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${vlanDeactivateForceAll ? 'bg-orange-500' : 'bg-gray-300'}`}
+                  role="switch"
+                  aria-checked={vlanDeactivateForceAll}
+                >
+                  <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${vlanDeactivateForceAll ? 'translate-x-4' : 'translate-x-0'}`} />
+                </button>
+              </div>
+            )}
             {/* Información de impresora al activar contingencia */}
             {!contingencyTarget.forced_contingency && (
               <div className="mb-4">
@@ -822,7 +843,11 @@ export default function VLANsPage() {
               <Button variant="outline" onClick={() => setContingencyTarget(null)}>{tCommon('cancel')}</Button>
               <Button
                 variant={contingencyTarget.forced_contingency ? 'default' : 'destructive'}
-                onClick={() => handleToggleForcedContingency(contingencyTarget, !contingencyTarget.forced_contingency)}
+                onClick={() => handleToggleForcedContingency(
+                  contingencyTarget,
+                  !contingencyTarget.forced_contingency,
+                  contingencyTarget.forced_contingency ? vlanDeactivateForceAll : false,
+                )}
                 className={!contingencyTarget.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
               >
                 {contingencyTarget.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}

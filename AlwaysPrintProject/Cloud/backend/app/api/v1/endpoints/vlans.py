@@ -312,6 +312,7 @@ def list_vlan_workstations(
 async def toggle_vlan_forced_contingency(
     vlan_id: UUID,
     enabled: bool = Query(..., description="Activar o desactivar contingencia forzada"),
+    force_all: bool = Query(False, description="Si True al desactivar, afecta a TODAS las workstations de la VLAN independientemente de su estado individual"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -344,16 +345,28 @@ async def toggle_vlan_forced_contingency(
             no_devices_warning = True
 
     vlan.forced_contingency = enabled
+    if not enabled and force_all:
+        # Forzar desactivación total: también limpiar forced_contingency individual de workstations
+        db.query(Workstation).filter(Workstation.vlan_id == vlan_id).update(
+            {"forced_contingency": False}, synchronize_session=False
+        )
     db.commit()
     db.refresh(vlan)
 
     log_module.getLogger(__name__).info(
-        "Contingencia forzada VLAN actualizada: vlan_id=%s, enabled=%s, user_id=%s",
-        vlan_id, enabled, current_user.id,
+        "Contingencia forzada VLAN actualizada: vlan_id=%s, enabled=%s, force_all=%s, user_id=%s",
+        vlan_id, enabled, force_all, current_user.id,
     )
 
-    # Notificar a workstations online de esta VLAN vía WebSocket
-    workstations = db.query(Workstation).filter(Workstation.vlan_id == vlan_id).all()
+    # Seleccionar workstations a notificar según el modo de desactivación
+    if not enabled and not force_all:
+        # Smart: solo workstations sin contingencia individual propia
+        workstations = db.query(Workstation).filter(
+            Workstation.vlan_id == vlan_id,
+            Workstation.forced_contingency == False,
+        ).all()
+    else:
+        workstations = db.query(Workstation).filter(Workstation.vlan_id == vlan_id).all()
 
     for ws in workstations:
         # Resolver printer_ip para cada workstation:

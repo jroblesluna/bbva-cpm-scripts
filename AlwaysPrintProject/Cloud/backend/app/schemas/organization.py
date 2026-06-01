@@ -143,6 +143,12 @@ class AutoUpdateToggleRequest(BaseModel):
     enabled: bool = Field(..., description="Habilitar o deshabilitar actualizaciones automáticas")
 
 
+class ForcedContingencyRequest(BaseModel):
+    """Schema de request para toggle de contingencia forzada."""
+    enabled: bool = Field(..., description="Activar o desactivar contingencia forzada")
+    force_all: bool = Field(False, description="Si True, desactiva TODAS las hijas independientemente de su estado previo")
+
+
 class AutoUpdateToggleResponse(BaseModel):
     """Schema de response para el toggle de auto-actualización."""
     auto_update_enabled: bool = Field(..., description="Estado actual del flag de auto-actualización")

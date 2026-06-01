@@ -331,10 +331,10 @@ export const organizationsApi = {
   /**
    * Activar/desactivar contingencia forzada para una organización.
    */
-  toggleForcedContingency: async (id: string, enabled: boolean): Promise<{ forced_contingency: boolean }> => {
+  toggleForcedContingency: async (id: string, enabled: boolean, forceAll = false): Promise<{ forced_contingency: boolean }> => {
     const response = await apiClient.patch<{ forced_contingency: boolean }>(
       `/organizations/${id}/forced-contingency`,
-      { enabled }
+      { enabled, force_all: forceAll }
     )
     return response.data
   },

@@ -137,10 +137,10 @@ def get_db() -> Generator[Session, None, None]:
 def init_db() -> None:
     """
     Inicializa la base de datos creando todas las tablas.
-    
+
     Esta función debe llamarse al iniciar la aplicación si no se usan
     migraciones de Alembic, o para crear la base de datos inicial.
-    
+
     Nota: En producción, usar Alembic para gestionar el esquema.
     """
     Base.metadata.create_all(bind=engine)

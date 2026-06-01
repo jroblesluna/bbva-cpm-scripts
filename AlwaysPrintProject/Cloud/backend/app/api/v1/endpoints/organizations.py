@@ -35,6 +35,7 @@ from app.schemas.organization import (
     PublicIPAuthorizeRequest,
     AutoUpdateToggleRequest,
     AutoUpdateToggleResponse,
+    ForcedContingencyRequest,
     TargetVersionRequest,
     TargetVersionResponse,
 )
@@ -1035,14 +1036,22 @@ def get_vlans_without_devices(
 )
 async def toggle_forced_contingency(
     org_id: UUID,
-    body: AutoUpdateToggleRequest,
+    body: ForcedContingencyRequest,
     current_user: User = Depends(require_operator_or_admin),
     db: Session = Depends(get_db)
 ):
     """
     Activar o desactivar contingencia forzada para una organización.
-    Todas las workstations de la organización heredan este estado.
+
+    Al ACTIVAR: solo propaga a VLANs que no estaban en contingencia (marca contingency_inherited=True).
+    Al DESACTIVAR con force_all=False (default): solo deshabilita VLANs con contingency_inherited=True.
+    Al DESACTIVAR con force_all=True: deshabilita TODAS las VLANs y workstations de la org.
     """
+    from app.models.vlan import VLAN as VLANModel
+    from app.models.workstation import Workstation
+    from app.models.device import Device
+    from app.services.websocket_manager import connection_manager
+
     if current_user.role == UserRole.OPERATOR and current_user.organization_id != org_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1050,45 +1059,70 @@ async def toggle_forced_contingency(
         )
 
     organization = db.query(Organization).filter(Organization.id == org_id).first()
-
     if not organization:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Organización no encontrada"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organización no encontrada")
 
     organization.forced_contingency = body.enabled
 
-    # Propagar a todas las VLANs de la organización
-    from app.models.vlan import VLAN as VLANModel
-    db.query(VLANModel).filter(
-        VLANModel.organization_id == org_id
-    ).update({"forced_contingency": body.enabled}, synchronize_session=False)
+    # Determinar qué workstations notificar vía WebSocket
+    workstations_to_notify: list[Workstation] = []
+
+    if body.enabled:
+        # Activación: solo afecta VLANs que aún no estaban en contingencia
+        vlans_to_activate = db.query(VLANModel).filter(
+            VLANModel.organization_id == org_id,
+            VLANModel.forced_contingency == False,
+        ).all()
+        for vlan in vlans_to_activate:
+            vlan.forced_contingency = True
+            vlan.contingency_inherited = True
+
+        # Notificar a TODAS las workstations (el mensaje incluye la IP de impresora)
+        workstations_to_notify = db.query(Workstation).filter(
+            Workstation.organization_id == org_id
+        ).all()
+
+    else:
+        if body.force_all:
+            # Desactivación forzada: deshabilitar TODAS las VLANs y limpiar flag
+            db.query(VLANModel).filter(
+                VLANModel.organization_id == org_id
+            ).update({"forced_contingency": False, "contingency_inherited": False}, synchronize_session=False)
+
+            # Limpiar forced_contingency individual de todas las workstations de la org
+            db.query(Workstation).filter(
+                Workstation.organization_id == org_id
+            ).update({"forced_contingency": False}, synchronize_session=False)
+
+            workstations_to_notify = db.query(Workstation).filter(
+                Workstation.organization_id == org_id
+            ).all()
+        else:
+            # Desactivación inteligente: solo VLANs heredadas por esta org
+            inherited_vlans = db.query(VLANModel).filter(
+                VLANModel.organization_id == org_id,
+                VLANModel.contingency_inherited == True,
+            ).all()
+            for vlan in inherited_vlans:
+                vlan.forced_contingency = False
+                vlan.contingency_inherited = False
+                # Solo workstations sin contingencia individual propia
+                ws_list = db.query(Workstation).filter(
+                    Workstation.vlan_id == vlan.id,
+                    Workstation.forced_contingency == False,
+                ).all()
+                workstations_to_notify.extend(ws_list)
 
     db.commit()
     db.refresh(organization)
 
     logger.info(
-        "Contingencia forzada actualizada: org_id=%s, enabled=%s, vlans_actualizadas=True, admin_id=%s",
-        org_id,
-        body.enabled,
-        current_user.id,
+        "Contingencia org actualizada: org_id=%s, enabled=%s, force_all=%s, admin_id=%s",
+        org_id, body.enabled, body.force_all, current_user.id,
     )
 
-    # Notificar a todas las workstations online de esta organización vía WebSocket
-    from app.services.websocket_manager import connection_manager
-    from app.models.workstation import Workstation
-    from app.models.device import Device
-
-    workstations = db.query(Workstation).filter(
-        Workstation.organization_id == org_id
-    ).all()
-
-    for ws in workstations:
-        # Resolver printer_ip para cada workstation:
-        # 1. Desde default_printer_id de la workstation (favorita individual)
-        # 2. Desde default_device_id de la VLAN (predeterminada de VLAN)
-        # 3. Fallback: primer dispositivo activo en la VLAN de la workstation
+    # Notificar vía WebSocket
+    for ws in workstations_to_notify:
         printer_ip = None
         if body.enabled:
             if ws.default_printer_id:
@@ -1096,7 +1130,6 @@ async def toggle_forced_contingency(
                 if printer:
                     printer_ip = printer.ip_address
             if not printer_ip and ws.vlan_id:
-                from app.models.vlan import VLAN as VLANModel
                 ws_vlan = db.query(VLANModel).filter(VLANModel.id == ws.vlan_id).first()
                 if ws_vlan and ws_vlan.default_device_id:
                     default_dev = db.query(Device).filter(Device.id == ws_vlan.default_device_id).first()
@@ -1106,7 +1139,7 @@ async def toggle_forced_contingency(
                 first_device = db.query(Device).filter(
                     Device.vlan_id == ws.vlan_id,
                     Device.organization_id == org_id,
-                    Device.is_active == True
+                    Device.is_active == True,
                 ).order_by(Device.ip_address).first()
                 if first_device:
                     printer_ip = first_device.ip_address
@@ -1118,7 +1151,6 @@ async def toggle_forced_contingency(
             "source_name": organization.name,
             "printer_ip": printer_ip,
         }
-
         ws_id_str = str(ws.id)
         if connection_manager.is_workstation_online(ws_id_str):
             await connection_manager.send_to_workstation(ws_id_str, message)

@@ -37,6 +37,11 @@ class VLAN(Base):
     # Cuando está activo, TODAS las workstations de esta VLAN entran en modo contingencia
     forced_contingency = Column(Boolean, nullable=False, default=False, server_default='false')
 
+    # True cuando la contingencia fue activada por herencia del padre (organización),
+    # False/None cuando fue activada individualmente.
+    # Usado para la desactivación inteligente (no afecta VLANs activadas independientemente).
+    contingency_inherited = Column(Boolean, nullable=True, default=False)
+
     # Impresora predeterminada de la VLAN
     # Las workstations de esta VLAN que no tengan impresora favorita individual usarán esta.
     default_device_id = Column(GUID, ForeignKey("devices.id", ondelete="SET NULL"), nullable=True)
