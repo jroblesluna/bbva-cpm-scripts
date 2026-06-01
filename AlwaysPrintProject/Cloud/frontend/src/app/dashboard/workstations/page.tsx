@@ -1009,16 +1009,20 @@ function WorkstationCard({
                 {t('forcedContingencyBadge')}
               </Badge>
             )}
-            {/* Indicador de nivel de contingencia */}
-            {(workstation.contingency_active || workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency) && (
+            {/* Indicadores de nivel de contingencia — acumulativos */}
+            {workstation.forced_contingency && (
               <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
-                {workstation.organization?.forced_contingency
-                  ? t('contingencyLevelOrg')
-                  : workstation.vlan?.forced_contingency
-                    ? t('contingencyLevelVlan')
-                    : workstation.forced_contingency
-                      ? t('contingencyLevelStation')
-                      : t('contingencyLevelStation')}
+                {t('contingencyLevelStation')}
+              </Badge>
+            )}
+            {workstation.vlan?.forced_contingency && (
+              <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
+                {t('contingencyLevelVlan')}
+              </Badge>
+            )}
+            {workstation.organization?.forced_contingency && (
+              <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
+                {t('contingencyLevelOrg')}
               </Badge>
             )}
           </div>

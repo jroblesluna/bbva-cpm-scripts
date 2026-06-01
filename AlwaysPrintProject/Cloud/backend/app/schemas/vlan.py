@@ -126,6 +126,7 @@ class VLANResponse(BaseModel):
     description: Optional[str] = None
     cidr_ranges: list[str]
     forced_contingency: bool = False
+    contingency_inherited: Optional[bool] = None
     default_device_id: Optional[UUID] = None
     vlan_metadata: Optional[dict] = Field(None, serialization_alias="metadata")
     action_config_mandatory: bool = False

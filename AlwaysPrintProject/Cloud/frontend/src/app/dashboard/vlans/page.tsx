@@ -85,7 +85,7 @@ export default function VLANsPage() {
   const t = useTranslations('vlans')
   const tCommon = useTranslations('common')
   const [vlans, setVlans] = useState<VLAN[]>([])
-  const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
+  const [accounts, setAccounts] = useState<Array<{ id: string; name: string; forced_contingency: boolean }>>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterOrgId, setFilterOrgId] = useState<string | undefined>(undefined)
@@ -510,13 +510,26 @@ export default function VLANsPage() {
         <div className="space-y-4">
           {paginatedVlans.map((vlan) => (
             <div key={vlan.id} className="bg-white rounded-lg shadow p-4 md:p-6">
-              {/* Fila 1: Nombre + CidrHealthBadge */}
+              {/* Fila 1: Nombre + CidrHealthBadge + niveles de contingencia */}
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0 flex-wrap">
                   <Network className="h-5 w-5 text-gray-400 flex-shrink-0" />
                   <span className="text-sm md:text-base font-medium text-gray-900 truncate">
                     {vlan.name}
                   </span>
+                  {vlan.forced_contingency && !vlan.contingency_inherited && (
+                    <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
+                      {t('contingencyLevelVlan')}
+                    </Badge>
+                  )}
+                  {(() => {
+                    const org = accounts.find((a) => a.id === vlan.organization_id)
+                    return org?.forced_contingency ? (
+                      <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
+                        {t('contingencyLevelOrg')}
+                      </Badge>
+                    ) : null
+                  })()}
                 </div>
                 <CidrHealthBadge cidrCount={vlan.cidr_ranges.length} />
               </div>
@@ -656,10 +669,20 @@ export default function VLANsPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {paginatedVlans.map((vlan) => (
                   <tr key={vlan.id} className="hover:bg-gray-50">
-                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Network className="h-5 w-5 text-gray-400" />
+                    <td className="px-4 md:px-6 py-4">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Network className="h-5 w-5 text-gray-400 flex-shrink-0" />
                         <span className="text-sm font-medium text-gray-900">{vlan.name}</span>
+                        {vlan.forced_contingency && (
+                          <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
+                            {t('contingencyLevelVlan')}
+                          </Badge>
+                        )}
+                        {accounts.find((a) => a.id === vlan.organization_id)?.forced_contingency && (
+                          <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
+                            {t('contingencyLevelOrg')}
+                          </Badge>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 md:px-6 py-4 whitespace-nowrap">
@@ -971,7 +994,7 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   const t = useTranslations('vlans')
   const tCommon = useTranslations('common')
   const [loading, setLoading] = useState(false)
-  const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
+  const [accounts, setAccounts] = useState<Array<{ id: string; name: string; forced_contingency: boolean }>>([])
   const [formData, setFormData] = useState<VLANCreate>({
     organization_id: user?.organization_id || '',
     name: '',

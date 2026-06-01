@@ -9,6 +9,7 @@ export interface VLAN {
   description: string | null
   cidr_ranges: string[]
   forced_contingency: boolean
+  contingency_inherited: boolean | null
   default_device_id: string | null
   metadata: Record<string, string> | null
   created_at: string

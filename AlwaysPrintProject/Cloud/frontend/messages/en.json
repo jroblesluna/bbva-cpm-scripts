@@ -297,6 +297,8 @@
     "forcedContingencyActivated": "Forced contingency activated for this VLAN.",
     "forcedContingencyDeactivated": "Forced contingency deactivated for this VLAN.",
     "forcedContingencyError": "Error changing forced contingency.",
+    "contingencyLevelVlan": "Level: VLAN",
+    "contingencyLevelOrg": "Level: Organization",
     "contingencyNoDevices": "No printers assigned — can still activate, but users won't be able to print in contingency until one is assigned.",
     "contingencyNoDevicesWarning": "This VLAN has no printers assigned. Users will not be able to print in contingency until a printer is assigned to this VLAN.",
     "contingencyNoDevicesWarningSaved": "Contingency activated. Warning: without printers assigned, users will not be able to print in contingency.",
