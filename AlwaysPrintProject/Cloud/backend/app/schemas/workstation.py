@@ -173,6 +173,17 @@ class WorkstationListResponse(BaseModel):
     limit: int
 
 
+class VLANSummaryItem(BaseModel):
+    """Resumen de una VLAN para el dashboard del operador."""
+    id: str
+    name: str
+    has_devices: bool = Field(description="Si la VLAN tiene al menos un dispositivo asignado")
+    device_count: int = Field(0, description="Cantidad de dispositivos en la VLAN")
+    workstation_count: int = Field(0, description="Cantidad de workstations en la VLAN")
+    has_vlan_config: bool = Field(False, description="Si la VLAN tiene action config activa a su nivel")
+    workstations_with_config: int = Field(0, description="Cantidad de workstations con action config propia")
+
+
 class WorkstationStatsResponse(BaseModel):
     """Schema de respuesta para estadísticas de workstations."""
     total: int
@@ -182,3 +193,4 @@ class WorkstationStatsResponse(BaseModel):
     total_vlans: int = Field(0, description="Total de VLANs creadas en la organización")
     by_vlan: Optional[Dict[str, int]] = Field(None, description="Distribución por VLAN")
     by_organization: Optional[Dict[str, Dict[str, Any]]] = Field(None, description="Distribución por organización (solo admin)")
+    vlan_summary: Optional[list["VLANSummaryItem"]] = Field(None, description="Resumen de VLANs con estado de dispositivos y configs")

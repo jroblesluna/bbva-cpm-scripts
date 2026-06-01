@@ -38,6 +38,7 @@ from app.schemas.workstation import (
     WorkstationStatusUpdate,
     WorkstationListResponse,
     WorkstationStatsResponse,
+    VLANSummaryItem,
     OrganizationBasicResponse,
     WorkstationRegisterRequest,
     WorkstationRegisterResponse,

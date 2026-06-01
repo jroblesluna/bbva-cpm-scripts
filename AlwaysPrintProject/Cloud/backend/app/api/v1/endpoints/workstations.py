@@ -725,6 +725,69 @@ def get_workstation_stats(
             
             response.by_organization = by_organization
         
+        # Generar resumen de VLANs (para operadores y admins con org_id)
+        # Muestra: VLANs sin dispositivos, VLANs con config, workstations con config por VLAN
+        target_org_id = None
+        if current_user.role in (UserRole.OPERATOR, UserRole.READONLY):
+            target_org_id = str(current_user.organization_id) if current_user.organization_id else None
+        
+        if target_org_id:
+            from app.models.device import Device
+            from app.models.action_config import ActionConfig, ActionConfigScope
+            from app.schemas.workstation import VLANSummaryItem
+            
+            org_vlans = db.query(VLAN).filter(VLAN.organization_id == target_org_id).all()
+            vlan_summary_list = []
+            
+            for v in org_vlans:
+                vlan_id_str = str(v.id) if isinstance(v.id, uuid.UUID) else v.id
+                
+                # Contar dispositivos en la VLAN
+                device_count = db.query(Device).filter(
+                    Device.vlan_id == v.id,
+                    Device.is_active == True
+                ).count()
+                
+                # Contar workstations en la VLAN
+                ws_count = db.query(Workstation).filter(
+                    Workstation.vlan_id == v.id
+                ).count()
+                
+                # Verificar si la VLAN tiene action config activa a su nivel
+                has_vlan_config = db.query(ActionConfig).filter(
+                    ActionConfig.organization_id == target_org_id,
+                    ActionConfig.scope == ActionConfigScope.VLAN,
+                    ActionConfig.vlan_id == v.id,
+                    ActionConfig.is_active == True
+                ).count() > 0
+                
+                # Contar workstations de esta VLAN que tienen action config propia
+                ws_ids_in_vlan = [
+                    ws.id for ws in db.query(Workstation.id).filter(
+                        Workstation.vlan_id == v.id
+                    ).all()
+                ]
+                ws_with_config = 0
+                if ws_ids_in_vlan:
+                    ws_with_config = db.query(ActionConfig).filter(
+                        ActionConfig.organization_id == target_org_id,
+                        ActionConfig.scope == ActionConfigScope.WORKSTATION,
+                        ActionConfig.workstation_id.in_(ws_ids_in_vlan),
+                        ActionConfig.is_active == True
+                    ).count()
+                
+                vlan_summary_list.append(VLANSummaryItem(
+                    id=vlan_id_str,
+                    name=v.name,
+                    has_devices=device_count > 0,
+                    device_count=device_count,
+                    workstation_count=ws_count,
+                    has_vlan_config=has_vlan_config,
+                    workstations_with_config=ws_with_config,
+                ))
+            
+            response.vlan_summary = vlan_summary_list
+        
         return response
     except HTTPException:
         # Re-raise HTTP exceptions

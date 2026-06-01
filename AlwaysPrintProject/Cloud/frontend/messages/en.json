@@ -137,7 +137,14 @@
     "connectionError": "Connection error. Backend is not responding.",
     "retry": "Retry",
     "loadError": "Error loading statistics. Please try again.",
-    "lastUpdated": "Last updated: {time}"
+    "lastUpdated": "Last updated: {time}",
+    "vlanSummaryTitle": "VLAN Status Overview",
+    "vlanSummaryNoDevices": "without devices",
+    "vlanSummaryDevices": "device(s)",
+    "vlanSummaryNoDevicesLabel": "No devices",
+    "vlanSummaryHasConfig": "VLAN config",
+    "vlanSummaryNoConfig": "No VLAN config",
+    "vlanSummaryWsWithConfig": "{count} WS with config"
   },
   "workstations": {
     "title": "Workstations",

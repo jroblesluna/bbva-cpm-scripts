@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Monitor, CheckCircle, Building2, Network, AlertCircle, Globe, RefreshCw } from 'lucide-react'
+import { Monitor, CheckCircle, Building2, Network, AlertCircle, Globe, RefreshCw, Printer, Settings, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -35,6 +35,17 @@ interface WorkstationStats {
     contingency: number
   }>
   by_vlan?: Record<string, number>
+  vlan_summary?: VLANSummaryItem[]
+}
+
+interface VLANSummaryItem {
+  id: string
+  name: string
+  has_devices: boolean
+  device_count: number
+  workstation_count: number
+  has_vlan_config: boolean
+  workstations_with_config: number
 }
 
 interface PendingIP {
@@ -293,6 +304,82 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-500">{count} {t('stations')}</p>
                   </div>
                   <Badge variant="secondary">{count}</Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Resumen de VLANs — estado de dispositivos y configuraciones */}
+      {stats?.vlan_summary && stats.vlan_summary.length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>{t('vlanSummaryTitle')}</CardTitle>
+              <div className="flex items-center gap-2">
+                {stats.vlan_summary.filter(v => !v.has_devices).length > 0 && (
+                  <Badge variant="destructive" className="text-xs">
+                    {stats.vlan_summary.filter(v => !v.has_devices).length} {t('vlanSummaryNoDevices')}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {stats.vlan_summary.map((vlan) => (
+                <div
+                  key={vlan.id}
+                  className={`flex flex-col md:flex-row md:items-center md:justify-between p-4 border rounded-lg gap-3 ${
+                    !vlan.has_devices ? 'border-red-200 bg-red-50' : 'border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Network className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{vlan.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {vlan.workstation_count} {t('stations')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Estado de dispositivos */}
+                    {vlan.has_devices ? (
+                      <Badge variant="outline" className="text-xs gap-1">
+                        <Printer className="w-3 h-3" />
+                        {vlan.device_count} {t('vlanSummaryDevices')}
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive" className="text-xs gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        {t('vlanSummaryNoDevicesLabel')}
+                      </Badge>
+                    )}
+
+                    {/* Estado de config a nivel VLAN */}
+                    {vlan.has_vlan_config ? (
+                      <Badge variant="outline" className="text-xs gap-1 border-green-300 text-green-700">
+                        <Settings className="w-3 h-3" />
+                        {t('vlanSummaryHasConfig')}
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs gap-1">
+                        <Settings className="w-3 h-3" />
+                        {t('vlanSummaryNoConfig')}
+                      </Badge>
+                    )}
+
+                    {/* Workstations con config propia */}
+                    {vlan.workstations_with_config > 0 && (
+                      <Badge variant="outline" className="text-xs gap-1 border-blue-300 text-blue-700">
+                        <Monitor className="w-3 h-3" />
+                        {t('vlanSummaryWsWithConfig', { count: vlan.workstations_with_config })}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
