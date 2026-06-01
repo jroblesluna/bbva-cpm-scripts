@@ -48,6 +48,13 @@ interface VLANSummaryItem {
   workstations_with_config: number
 }
 
+interface OrgStats {
+  total: number
+  with_config: number
+  applying_mandatory: number
+  in_contingency: number
+}
+
 interface PendingIP {
   id: string
   ip_address: string
@@ -59,6 +66,7 @@ export default function DashboardPage() {
   const t = useTranslations('dashboard')
   const userTimezone = useUserTimezone()
   const [stats, setStats] = useState<WorkstationStats | null>(null)
+  const [orgStats, setOrgStats] = useState<OrgStats | null>(null)
   const [pendingIPs, setPendingIPs] = useState<PendingIP[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -94,12 +102,23 @@ export default function DashboardPage() {
     }
   }, [user])
 
+  const loadOrgStats = useCallback(async () => {
+    if (!user || !isAdmin()) return
+    try {
+      const response = await apiClient.get('/organizations/stats')
+      setOrgStats(response.data)
+    } catch (err) {
+      console.error('Error loading org stats:', err)
+    }
+  }, [user])
+
   // Carga inicial
   useEffect(() => {
     if (!user) return
     loadStats()
     loadPendingIPs()
-  }, [user, loadStats, loadPendingIPs])
+    loadOrgStats()
+  }, [user, loadStats, loadPendingIPs, loadOrgStats])
 
   // Polling cada 10 segundos
   useEffect(() => {
@@ -108,6 +127,7 @@ export default function DashboardPage() {
     pollingRef.current = setInterval(() => {
       loadStats(true) // silent = true para no mostrar skeleton
       loadPendingIPs()
+      loadOrgStats()
     }, POLLING_INTERVAL)
 
     return () => {
@@ -115,7 +135,7 @@ export default function DashboardPage() {
         clearInterval(pollingRef.current)
       }
     }
-  }, [user, loadStats, loadPendingIPs])
+  }, [user, loadStats, loadPendingIPs, loadOrgStats])
 
   /**
    * Formatea la fecha/hora de última actualización con timezone del usuario.
@@ -285,6 +305,70 @@ export default function DashboardPage() {
           </Card>
         )}
       </div>
+
+      {/* Sección Organizaciones — solo admin */}
+      {isAdmin() && orgStats && (
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-700 mb-4">{t('orgSectionTitle')}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">{t('orgTotal')}</p>
+                    <p className="text-3xl font-bold text-gray-900">{orgStats.total}</p>
+                  </div>
+                  <div className="bg-blue-100 rounded-full p-3">
+                    <Building2 className="w-6 h-6 text-blue-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">{t('orgWithConfig')}</p>
+                    <p className="text-3xl font-bold text-indigo-600">{orgStats.with_config}</p>
+                  </div>
+                  <div className="bg-indigo-100 rounded-full p-3">
+                    <Settings className="w-6 h-6 text-indigo-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">{t('orgApplyingMandatory')}</p>
+                    <p className="text-3xl font-bold text-green-600">{orgStats.applying_mandatory}</p>
+                  </div>
+                  <div className="bg-green-100 rounded-full p-3">
+                    <CheckCircle className="w-6 h-6 text-green-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">{t('orgInContingency')}</p>
+                    <p className="text-3xl font-bold text-orange-600">{orgStats.in_contingency}</p>
+                  </div>
+                  <div className="bg-orange-100 rounded-full p-3">
+                    <AlertTriangle className="w-6 h-6 text-orange-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
 
       {/* Distribución por VLAN */}
       {stats?.by_vlan && Object.keys(stats.by_vlan).length > 0 && (

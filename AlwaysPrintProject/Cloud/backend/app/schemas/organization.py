@@ -151,3 +151,11 @@ class AutoUpdateToggleResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
+class OrganizationStats(BaseModel):
+    """Estadísticas agregadas de organizaciones para el dashboard."""
+    total: int = Field(..., description="Total de organizaciones")
+    with_config: int = Field(..., description="Organizaciones con action config configurada a nivel org")
+    applying_mandatory: int = Field(..., description="Organizaciones aplicando config como mandatory")
+    in_contingency: int = Field(..., description="Organizaciones en contingencia forzada")
+

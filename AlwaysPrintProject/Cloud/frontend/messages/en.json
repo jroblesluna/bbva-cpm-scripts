@@ -144,7 +144,12 @@
     "vlanSummaryNoDevicesLabel": "No devices",
     "vlanSummaryHasConfig": "VLAN config",
     "vlanSummaryNoConfig": "No VLAN config",
-    "vlanSummaryWsWithConfig": "{count} WS with config"
+    "vlanSummaryWsWithConfig": "{count} WS with config",
+    "orgSectionTitle": "Organizations",
+    "orgTotal": "Total Organizations",
+    "orgWithConfig": "With Configuration",
+    "orgApplyingMandatory": "Mandatory Config",
+    "orgInContingency": "In Contingency"
   },
   "workstations": {
     "title": "Workstations",

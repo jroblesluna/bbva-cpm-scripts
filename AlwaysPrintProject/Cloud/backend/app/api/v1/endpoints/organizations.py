@@ -19,6 +19,7 @@ from app.core.utils import get_client_ip
 from app.models.user import User, UserRole
 from app.models.organization import Organization, PublicIP
 from app.models.workstation import Workstation
+from app.models.action_config import ActionConfig, ActionConfigScope
 from app.schemas import WorkstationListResponse
 from app.services.websocket_manager import connection_manager
 from app.schemas.organization import (
@@ -27,6 +28,7 @@ from app.schemas.organization import (
     OrganizationResponse,
     OrganizationDetailResponse,
     OrganizationListResponse,
+    OrganizationStats,
     PublicIPCreate,
     PublicIPResponse,
     PublicIPPendingResponse,
@@ -89,6 +91,36 @@ def list_organizations(
         total=total,
         skip=offset,
         limit=page_size
+    )
+
+
+@router.get("/stats", response_model=OrganizationStats)
+def get_organization_stats(
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Estadísticas agregadas de organizaciones para el dashboard (solo Admin)."""
+    from sqlalchemy import func
+
+    total = db.query(func.count(Organization.id)).scalar()
+
+    with_config = db.query(func.count(Organization.id)).filter(
+        Organization.action_configs.any(ActionConfig.scope == ActionConfigScope.ORG)
+    ).scalar()
+
+    applying_mandatory = db.query(func.count(Organization.id)).filter(
+        Organization.action_config_mandatory == True
+    ).scalar()
+
+    in_contingency = db.query(func.count(Organization.id)).filter(
+        Organization.forced_contingency == True
+    ).scalar()
+
+    return OrganizationStats(
+        total=total or 0,
+        with_config=with_config or 0,
+        applying_mandatory=applying_mandatory or 0,
+        in_contingency=in_contingency or 0,
     )
 
 

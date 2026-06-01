@@ -74,6 +74,7 @@ class Settings(BaseSettings):
     SES_ENABLED: bool = False
     SES_FROM_EMAIL: str = "noreply@apps.iol.pe"
     AWS_REGION: str = "us-west-2"
+    AWS_PROFILE: Optional[str] = None
     S3_ARTIFACTS_BUCKET: str = "alwaysprint-prod-artifacts"
     FRONTEND_URL: str = "http://localhost:3000"
 

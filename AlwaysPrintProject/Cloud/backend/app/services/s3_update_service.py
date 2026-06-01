@@ -32,7 +32,11 @@ class S3UpdateService:
 
     def __init__(self):
         """Inicializa el cliente S3 con la región configurada."""
-        self._client = boto3.client('s3', region_name=settings.AWS_REGION)
+        session = boto3.Session(
+            region_name=settings.AWS_REGION,
+            profile_name=settings.AWS_PROFILE or None,
+        )
+        self._client = session.client('s3')
         self._bucket = settings.S3_ARTIFACTS_BUCKET
         self._key = 'latest/AlwaysPrint.msi'
 
