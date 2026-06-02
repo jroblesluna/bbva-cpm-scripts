@@ -116,6 +116,9 @@ export default function VLANsPage() {
   const pageSize = viewMode === 'cards' ? 10 : 20
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [refreshing, setRefreshing] = useState(false)
+  const [selectedVlanIds, setSelectedVlanIds] = useState<Set<string>>(new Set())
+  const [vlanBulkAction, setVlanBulkAction] = useState<'contingency_on' | 'contingency_off' | 'restart_service' | 'restart_tray' | null>(null)
+  const [vlanBulkPending, setVlanBulkPending] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -301,6 +304,47 @@ export default function VLANsPage() {
   const handleAddDevice = (vlan: VLAN) => {
     setAddDeviceVlan(vlan)
     setShowAddDeviceModal(true)
+  }
+
+  const toggleVlanSelect = (id: string) => {
+    setSelectedVlanIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+  const clearVlanSelection = () => setSelectedVlanIds(new Set())
+  const isAllPageSelected = paginatedVlans.length > 0 && paginatedVlans.every(v => selectedVlanIds.has(v.id))
+  const toggleSelectAll = () => {
+    if (isAllPageSelected) {
+      setSelectedVlanIds(prev => { const next = new Set(prev); paginatedVlans.forEach(v => next.delete(v.id)); return next })
+    } else {
+      setSelectedVlanIds(prev => { const next = new Set(prev); paginatedVlans.forEach(v => next.add(v.id)); return next })
+    }
+  }
+
+  const handleVlanBulkExecute = async () => {
+    if (!vlanBulkAction) return
+    setVlanBulkPending(true)
+    const ids = [...selectedVlanIds]
+    const action = vlanBulkAction
+    try {
+      if (action === 'restart_service' || action === 'restart_tray') {
+        await Promise.allSettled(ids.map(id => vlansApi.sendCommand(id, action)))
+      } else if (action === 'contingency_on') {
+        await Promise.allSettled(ids.map(id => apiClient.patch(`/vlans/${id}/forced-contingency`, null, { params: { enabled: true, force_all: false } })))
+      } else {
+        await Promise.allSettled(ids.map(id => apiClient.patch(`/vlans/${id}/forced-contingency`, null, { params: { enabled: false, force_all: false } })))
+      }
+      loadVlans(true)
+      clearVlanSelection()
+      setVlanBulkAction(null)
+      toast({ title: 'Acción ejecutada', description: `Acción aplicada a ${ids.length} VLAN${ids.length !== 1 ? 's' : ''}.` })
+    } catch {
+      toast({ variant: 'destructive', title: tCommon('error'), description: 'Error al ejecutar la acción masiva.' })
+    } finally {
+      setVlanBulkPending(false)
+    }
   }
 
   const handleSetDefaultDevice = async (vlan: VLAN, deviceId: string | null) => {
@@ -496,6 +540,35 @@ export default function VLANsPage() {
         </div>
       </div>
 
+      {/* Barra de selección masiva */}
+      {filteredVlans.length > 0 && (
+        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isAllPageSelected}
+              onChange={toggleSelectAll}
+              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-600 font-medium">
+              {isAllPageSelected ? 'Deseleccionar página' : 'Seleccionar página'}
+            </span>
+          </label>
+          {selectedVlanIds.size > 0 ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">
+                <span className="font-semibold text-blue-600">{selectedVlanIds.size}</span> seleccionada{selectedVlanIds.size !== 1 ? 's' : ''}
+              </span>
+              <button onClick={clearVlanSelection} className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors">
+                Limpiar
+              </button>
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400">Selecciona VLANs para ejecutar acciones en conjunto</span>
+          )}
+        </div>
+      )}
+
       {/* Contenido principal: vista de tarjetas o tabla */}
       {filteredVlans.length === 0 ? (
         <div className="bg-white rounded-lg shadow">
@@ -519,10 +592,17 @@ export default function VLANsPage() {
         /* Vista de tarjetas (responsive) */
         <div className="space-y-4">
           {paginatedVlans.map((vlan) => (
-            <div key={vlan.id} className="bg-white rounded-lg shadow p-4 md:p-6">
+            <div key={vlan.id} className={`bg-white rounded-lg shadow p-4 md:p-6 ${selectedVlanIds.has(vlan.id) ? 'ring-2 ring-blue-500' : ''}`}>
               {/* Fila 1: Nombre + CidrHealthBadge + niveles de contingencia */}
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                  <input
+                    type="checkbox"
+                    checked={selectedVlanIds.has(vlan.id)}
+                    onChange={() => toggleVlanSelect(vlan.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0 cursor-pointer"
+                  />
                   <Network className="h-5 w-5 text-gray-400 flex-shrink-0" />
                   <span className="text-sm md:text-base font-medium text-gray-900 truncate">
                     {vlan.name}
@@ -667,6 +747,14 @@ export default function VLANsPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-3 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={isAllPageSelected}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </th>
                   <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colName')}</th>
                   <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colOrganization')}</th>
                   <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colDescription')}</th>
@@ -678,7 +766,15 @@ export default function VLANsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {paginatedVlans.map((vlan) => (
-                  <tr key={vlan.id} className="hover:bg-gray-50">
+                  <tr key={vlan.id} className={`hover:bg-gray-50 ${selectedVlanIds.has(vlan.id) ? 'bg-blue-50' : ''}`}>
+                    <td className="px-3 py-4 w-8">
+                      <input
+                        type="checkbox"
+                        checked={selectedVlanIds.has(vlan.id)}
+                        onChange={() => toggleVlanSelect(vlan.id)}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-4 md:px-6 py-4">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Network className="h-5 w-5 text-gray-400 flex-shrink-0" />
@@ -986,6 +1082,160 @@ export default function VLANsPage() {
                 >
                   {bulkCommandPending ? tCommon('sending') : tCommon('bulkConfirmBtn', { action: meta.title })}
                 </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Toolbar flotante de acciones masivas */}
+      {selectedVlanIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-0 rounded-xl border border-white/10 bg-gray-950/95 shadow-2xl backdrop-blur-sm ring-1 ring-black/20 overflow-hidden">
+          {/* Contador */}
+          <div className="flex items-center gap-2.5 px-4 py-3 border-r border-white/10">
+            <span className="flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-blue-500 px-1.5 text-xs font-bold text-white tabular-nums">
+              {selectedVlanIds.size}
+            </span>
+            <span className="text-sm font-medium text-gray-200 whitespace-nowrap">
+              VLAN{selectedVlanIds.size !== 1 ? 's' : ''}
+            </span>
+            <button onClick={clearVlanSelection} className="ml-0.5 rounded p-0.5 text-gray-500 transition-colors hover:text-gray-200" title="Limpiar selección">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {/* Contingencia */}
+          <div className="flex items-center border-r border-white/10">
+            <button
+              onClick={() => setVlanBulkAction('contingency_on')}
+              className="flex items-center gap-2 px-3.5 py-3 text-sm font-medium text-orange-400 transition-colors hover:bg-orange-500/10 hover:text-orange-300 whitespace-nowrap"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              Activar Contingencia
+            </button>
+            <div className="w-px h-5 bg-white/10" />
+            <button
+              onClick={() => setVlanBulkAction('contingency_off')}
+              className="flex items-center gap-2 px-3.5 py-3 text-sm font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-gray-200 whitespace-nowrap"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              Desactivar
+            </button>
+          </div>
+          {/* Reinicio */}
+          <div className="flex items-center">
+            <button
+              onClick={() => setVlanBulkAction('restart_service')}
+              className="flex items-center gap-2 px-3.5 py-3 text-sm font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-gray-200 whitespace-nowrap"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reiniciar Servicio
+            </button>
+            <div className="w-px h-5 bg-white/10" />
+            <button
+              onClick={() => setVlanBulkAction('restart_tray')}
+              className="flex items-center gap-2 px-3.5 py-3 text-sm font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-gray-200 whitespace-nowrap"
+            >
+              <Terminal className="w-4 h-4" />
+              Reiniciar Tray
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación de acción masiva */}
+      {vlanBulkAction && (() => {
+        const meta = {
+          contingency_on: {
+            icon: <ShieldAlert className="w-5 h-5 text-orange-500" />,
+            accent: 'bg-orange-50 border-orange-100',
+            label: 'Activar contingencia',
+            description: 'Se activará la contingencia forzada en las VLANs seleccionadas.',
+            confirmClass: 'bg-orange-600 hover:bg-orange-700 text-white',
+            confirmLabel: 'Activar contingencia',
+            showWarning: true,
+          },
+          contingency_off: {
+            icon: <ShieldAlert className="w-5 h-5 text-gray-500" />,
+            accent: 'bg-gray-50 border-gray-100',
+            label: 'Desactivar contingencia',
+            description: 'Se desactivará la contingencia forzada en las VLANs seleccionadas.',
+            confirmClass: '',
+            confirmLabel: 'Desactivar contingencia',
+            showWarning: false,
+          },
+          restart_service: {
+            icon: <RotateCcw className="w-5 h-5 text-amber-500" />,
+            accent: 'bg-amber-50 border-amber-100',
+            label: 'Reiniciar servicio de impresión',
+            description: 'Se enviará el comando de reinicio del servicio a todos los dispositivos de las VLANs seleccionadas.',
+            confirmClass: 'bg-amber-600 hover:bg-amber-700 text-white',
+            confirmLabel: 'Reiniciar servicio',
+            showWarning: false,
+          },
+          restart_tray: {
+            icon: <Terminal className="w-5 h-5 text-amber-500" />,
+            accent: 'bg-amber-50 border-amber-100',
+            label: 'Reiniciar Tray',
+            description: 'Se enviará el comando de reinicio del Tray a todos los dispositivos de las VLANs seleccionadas.',
+            confirmClass: 'bg-amber-600 hover:bg-amber-700 text-white',
+            confirmLabel: 'Reiniciar Tray',
+            showWarning: false,
+          },
+        }[vlanBulkAction]
+        const selected = paginatedVlans.filter(v => selectedVlanIds.has(v.id))
+        return (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 !mt-0">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+              <div className={`flex items-start gap-4 p-6 border-b ${meta.accent}`}>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm border border-gray-100">
+                  {meta.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-base font-semibold text-gray-900">{meta.label}</h2>
+                  <p className="mt-0.5 text-sm text-gray-500">{meta.description}</p>
+                </div>
+                <button onClick={() => setVlanBulkAction(null)} className="shrink-0 rounded-lg p-1 text-gray-400 hover:bg-black/5 hover:text-gray-600 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-6">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">VLANs afectadas</span>
+                  <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600">{selected.length}</span>
+                </div>
+                <div className="max-h-52 overflow-y-auto rounded-xl border border-gray-100 divide-y divide-gray-50">
+                  {selected.map(v => (
+                    <div key={v.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                      <Network className="h-4 w-4 text-gray-400 shrink-0" />
+                      <span className="text-sm font-medium text-gray-900">{v.name}</span>
+                      {v.forced_contingency && (
+                        <Badge variant="outline" className="text-[10px] border-orange-300 text-orange-700 bg-orange-50 ml-1">C</Badge>
+                      )}
+                      <span className="ml-auto text-xs text-gray-400 truncate shrink-0">
+                        {accounts.find(a => a.id === v.organization_id)?.name || ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {meta.showWarning && (
+                  <div className="mt-4 flex gap-2.5 rounded-lg border border-orange-100 bg-orange-50 p-3">
+                    <ShieldAlert className="h-4 w-4 shrink-0 text-orange-500 mt-0.5" />
+                    <p className="text-xs text-orange-700 leading-relaxed">{t('forcedContingencyNotification')}</p>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50/80 px-6 py-4">
+                <Button variant="outline" onClick={() => setVlanBulkAction(null)} disabled={vlanBulkPending} className="min-w-[80px]">
+                  {tCommon('cancel')}
+                </Button>
+                <Button onClick={handleVlanBulkExecute} disabled={vlanBulkPending} className={`min-w-[160px] ${meta.confirmClass}`}>
+                  {vlanBulkPending ? (
+                    <span className="flex items-center gap-2">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Ejecutando…
+                    </span>
+                  ) : meta.confirmLabel}
+                </Button>
               </div>
             </div>
           </div>
