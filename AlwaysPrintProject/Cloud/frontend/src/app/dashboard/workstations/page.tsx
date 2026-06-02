@@ -626,44 +626,46 @@ export default function WorkstationsPage() {
                 </Button>
               )}
             </div>
-            {/* Modo selección masiva */}
-            {selectionMode ? (
-              <button
-                onClick={() => clearSelection(true)}
-                className="flex items-center gap-1.5 rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm ring-1 ring-blue-600 hover:bg-blue-700 transition-colors"
-              >
-                <X className="w-3.5 h-3.5" />
-                Cancelar selección
-              </button>
-            ) : (
-              <button
-                onClick={() => setSelectionMode(true)}
-                className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-              >
-                <ListChecks className="w-3.5 h-3.5" />
-                Seleccionar
-              </button>
-            )}
-            {/* Toggle de vista: tarjetas / tabla */}
-            <div className="flex items-center gap-1 border rounded-md p-0.5">
-              <Button
-                variant={viewMode === 'cards' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => handleViewModeChange('cards')}
-                title={tCommon('viewCards')}
-                className="h-8 w-8 p-0"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </Button>
-              <Button
-                variant={viewMode === 'table' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => handleViewModeChange('table')}
-                title={tCommon('viewTable')}
-                className="h-8 w-8 p-0"
-              >
-                <List className="w-4 h-4" />
-              </Button>
+            <div className="flex items-center gap-2">
+              {/* Modo selección masiva */}
+              {selectionMode ? (
+                <button
+                  onClick={() => clearSelection(true)}
+                  className="flex items-center gap-1.5 rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm ring-1 ring-blue-600 hover:bg-blue-700 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Cancelar selección
+                </button>
+              ) : (
+                <button
+                  onClick={() => setSelectionMode(true)}
+                  className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                >
+                  <ListChecks className="w-3.5 h-3.5" />
+                  Seleccionar
+                </button>
+              )}
+              {/* Toggle de vista: tarjetas / tabla */}
+              <div className="flex items-center gap-1 border rounded-md p-0.5">
+                <Button
+                  variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => handleViewModeChange('cards')}
+                  title={tCommon('viewCards')}
+                  className="h-8 w-8 p-0"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => handleViewModeChange('table')}
+                  title={tCommon('viewTable')}
+                  className="h-8 w-8 p-0"
+                >
+                  <List className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>
