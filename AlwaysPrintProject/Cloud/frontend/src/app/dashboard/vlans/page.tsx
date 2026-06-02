@@ -594,7 +594,7 @@ export default function VLANsPage() {
               <span className="text-sm text-gray-500">
                 <span className="font-semibold text-blue-600">{selectedVlanIds.size}</span> seleccionada{selectedVlanIds.size !== 1 ? 's' : ''}
               </span>
-              <button onClick={clearVlanSelection} className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors">
+              <button onClick={() => clearVlanSelection()} className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors">
                 Limpiar
               </button>
             </div>
