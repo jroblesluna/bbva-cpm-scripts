@@ -4,7 +4,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -55,11 +55,14 @@ export default function DevicesPage() {
   const pageSize = 20
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [refreshing, setRefreshing] = useState(false)
+  const initialLoadDone = useRef(false)
 
   useEffect(() => {
     if (!user) return
+    const silent = initialLoadDone.current
+    initialLoadDone.current = true
     if (user.role === 'admin') loadAccounts()
-    loadDevices()
+    loadDevices(silent)
   }, [user, filterOrgId, filterVlanId, filterActive])
 
   useEffect(() => {
@@ -86,9 +89,9 @@ export default function DevicesPage() {
     }
   }
 
-  const loadDevices = async () => {
+  const loadDevices = async (silent = false) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       const params: Record<string, string> = {}
       if (filterOrgId) params.organization_id = filterOrgId
       if (filterVlanId) params.vlan_id = filterVlanId

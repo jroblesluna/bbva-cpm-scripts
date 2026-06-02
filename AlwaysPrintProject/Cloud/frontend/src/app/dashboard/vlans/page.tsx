@@ -5,7 +5,7 @@
 
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
@@ -84,6 +84,7 @@ export default function VLANsPage() {
   const { toast } = useToast()
   const t = useTranslations('vlans')
   const tCommon = useTranslations('common')
+  const initialLoadDone = useRef(false)
   const [vlans, setVlans] = useState<VLAN[]>([])
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string; forced_contingency: boolean }>>([])
   const [loading, setLoading] = useState(true)
@@ -118,6 +119,8 @@ export default function VLANsPage() {
 
   useEffect(() => {
     if (!user) return
+    const silent = initialLoadDone.current
+    initialLoadDone.current = true
     if (user.role === 'admin') {
       loadAccounts()
     } else if (user.organization_id) {
@@ -126,7 +129,7 @@ export default function VLANsPage() {
         .then((res) => setAccounts([{ id: res.data.id, name: res.data.name, forced_contingency: res.data.forced_contingency }]))
         .catch(() => {})
     }
-    loadVlans()
+    loadVlans(silent)
   }, [user, filterOrgId])
 
   // Cargar dispositivos activos cuando se abre el modal de contingencia (solo al activar)
