@@ -484,34 +484,46 @@ export default function VLANsPage() {
           )}
         </div>
         <div className="flex items-center justify-between mt-4">
-          <div className="flex items-center gap-6">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={filterWithDevices}
-                onChange={(e) => { setFilterWithDevices(e.target.checked); setPage(1) }}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700">{t('filterWithDevices')}</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={filterContingency}
-                onChange={(e) => { setFilterContingency(e.target.checked); setPage(1) }}
-                className="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-              />
-              <span className="text-sm text-gray-700">{t('filterContingencyOnly')}</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={filterWithConfig}
-                onChange={(e) => { setFilterWithConfig(e.target.checked); setPage(1) }}
-                className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-              />
-              <span className="text-sm text-gray-700">{t('filterWithConfigOnly')}</span>
-            </label>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => { setFilterWithDevices(!filterWithDevices); setPage(1) }}
+              className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-all select-none ${
+                filterWithDevices
+                  ? 'border-orange-300 bg-orange-50 text-orange-700'
+                  : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              }`}
+            >
+              <span className={`flex w-3.5 h-3.5 items-center justify-center rounded-sm border shrink-0 transition-colors ${filterWithDevices ? 'border-orange-500 bg-orange-500' : 'border-gray-300 bg-white'}`}>
+                {filterWithDevices && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 5l2.5 2.5L8 3"/></svg>}
+              </span>
+              {t('filterWithDevices')}
+            </button>
+            <button
+              onClick={() => { setFilterContingency(!filterContingency); setPage(1) }}
+              className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-all select-none ${
+                filterContingency
+                  ? 'border-orange-300 bg-orange-50 text-orange-700'
+                  : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              }`}
+            >
+              <span className={`flex w-3.5 h-3.5 items-center justify-center rounded-sm border shrink-0 transition-colors ${filterContingency ? 'border-orange-500 bg-orange-500' : 'border-gray-300 bg-white'}`}>
+                {filterContingency && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 5l2.5 2.5L8 3"/></svg>}
+              </span>
+              {t('filterContingencyOnly')}
+            </button>
+            <button
+              onClick={() => { setFilterWithConfig(!filterWithConfig); setPage(1) }}
+              className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-all select-none ${
+                filterWithConfig
+                  ? 'border-green-300 bg-green-50 text-green-700'
+                  : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              }`}
+            >
+              <span className={`flex w-3.5 h-3.5 items-center justify-center rounded-sm border shrink-0 transition-colors ${filterWithConfig ? 'border-green-500 bg-green-500' : 'border-gray-300 bg-white'}`}>
+                {filterWithConfig && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 5l2.5 2.5L8 3"/></svg>}
+              </span>
+              {t('filterWithConfigOnly')}
+            </button>
           </div>
           <div className="flex items-center gap-2">
             {(searchTerm || filterOrgId || filterContingency || filterWithConfig || filterWithDevices) && (
