@@ -87,6 +87,9 @@ export default function WorkstationsPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [page, setPage] = useState(1);
   const pageSize = viewMode === 'cards' ? 10 : 20;
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<'contingency_on' | 'contingency_off' | 'restart_tray' | 'restart_service' | null>(null);
+  const [bulkPending, setBulkPending] = useState(false);
 
   // Resetear página al cambiar vista (el pageSize cambia)
   const handleViewModeChange = (mode: ViewMode) => {
@@ -346,6 +349,47 @@ export default function WorkstationsPage() {
   const handleRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['workstations'], refetchType: 'all' });
   }, [queryClient]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+  const isAllPageSelected = workstations.length > 0 && workstations.every(w => selectedIds.has(w.id));
+  const toggleSelectAll = () => {
+    if (isAllPageSelected) {
+      setSelectedIds(prev => { const next = new Set(prev); workstations.forEach(w => next.delete(w.id)); return next; });
+    } else {
+      setSelectedIds(prev => { const next = new Set(prev); workstations.forEach(w => next.add(w.id)); return next; });
+    }
+  };
+
+  const handleBulkExecute = async () => {
+    if (!bulkAction) return;
+    setBulkPending(true);
+    const ids = [...selectedIds];
+    const action = bulkAction;
+    try {
+      if (action === 'restart_service' || action === 'restart_tray') {
+        await Promise.allSettled(ids.map(id => workstationsApi.sendCommand(id, action)));
+      } else if (action === 'contingency_on') {
+        await Promise.allSettled(ids.map(id => workstationsApi.toggleForcedContingency(id, true)));
+      } else {
+        await Promise.allSettled(ids.map(id => workstationsApi.toggleForcedContingency(id, false)));
+      }
+      queryClient.invalidateQueries({ queryKey: ['workstations'] });
+      clearSelection();
+      setBulkAction(null);
+      toast({ title: 'Acción ejecutada', description: `Acción aplicada a ${ids.length} estaciones.` });
+    } catch {
+      toast({ variant: 'destructive', title: 'Error', description: 'Error al ejecutar la acción masiva.' });
+    } finally {
+      setBulkPending(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -660,6 +704,38 @@ export default function WorkstationsPage() {
         </div>
       )}
 
+      {/* Barra de selección masiva */}
+      {workstations.length > 0 && (
+        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isAllPageSelected}
+              onChange={toggleSelectAll}
+              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-600 font-medium">
+              {isAllPageSelected ? 'Deseleccionar página' : 'Seleccionar página'}
+            </span>
+          </label>
+          {selectedIds.size > 0 ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">
+                <span className="font-semibold text-blue-600">{selectedIds.size}</span> seleccionada{selectedIds.size !== 1 ? 's' : ''}
+              </span>
+              <button
+                onClick={clearSelection}
+                className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
+              >
+                Limpiar
+              </button>
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400">Selecciona estaciones para ejecutar acciones en conjunto</span>
+          )}
+        </div>
+      )}
+
       {/* Contenido principal: vista de tarjetas o tabla */}
       {viewMode === 'cards' ? (
         <div className="space-y-4">
@@ -670,6 +746,8 @@ export default function WorkstationsPage() {
                 workstation={workstation}
                 userTimezone={userTimezone}
                 t={t}
+                isSelected={selectedIds.has(workstation.id)}
+                onToggleSelect={() => toggleSelect(workstation.id)}
                 onViewDetails={() => setSelectedWorkstation(workstation)}
                 onEdit={() => setEditingWorkstation(workstation)}
                 onDelete={() => handleDelete(workstation)}
@@ -694,6 +772,10 @@ export default function WorkstationsPage() {
           sortField={sortField}
           sortDirection={sortDirection}
           onSort={handleSort}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          isAllSelected={isAllPageSelected}
+          onSelectAll={toggleSelectAll}
           onViewDetails={(ws) => setSelectedWorkstation(ws)}
           onEdit={(ws) => setEditingWorkstation(ws)}
           onDelete={handleDelete}
@@ -933,6 +1015,176 @@ export default function WorkstationsPage() {
           </Card>
         </div>
       )}
+
+      {/* Barra flotante de acciones masivas */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-0 rounded-xl border border-white/10 bg-gray-950/95 shadow-2xl backdrop-blur-sm ring-1 ring-black/20 overflow-hidden">
+          {/* Contador */}
+          <div className="flex items-center gap-2.5 px-4 py-3 border-r border-white/10">
+            <span className="flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-blue-500 px-1.5 text-xs font-bold text-white tabular-nums">
+              {selectedIds.size}
+            </span>
+            <span className="text-sm font-medium text-gray-200 whitespace-nowrap">
+              {selectedIds.size === 1 ? 'estación' : 'estaciones'}
+            </span>
+            <button
+              onClick={clearSelection}
+              className="ml-0.5 rounded p-0.5 text-gray-500 transition-colors hover:text-gray-200"
+              title="Limpiar selección"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Acciones de contingencia */}
+          <div className="flex items-center border-r border-white/10">
+            <button
+              onClick={() => setBulkAction('contingency_on')}
+              className="flex items-center gap-2 px-3.5 py-3 text-sm font-medium text-orange-400 transition-colors hover:bg-orange-500/10 hover:text-orange-300 whitespace-nowrap"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              Activar Contingencia
+            </button>
+            <div className="w-px h-5 bg-white/10" />
+            <button
+              onClick={() => setBulkAction('contingency_off')}
+              className="flex items-center gap-2 px-3.5 py-3 text-sm font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-gray-200 whitespace-nowrap"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              Desactivar
+            </button>
+          </div>
+
+          {/* Acciones de reinicio */}
+          <div className="flex items-center">
+            <button
+              onClick={() => setBulkAction('restart_service')}
+              className="flex items-center gap-2 px-3.5 py-3 text-sm font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-gray-200 whitespace-nowrap"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reiniciar Servicio
+            </button>
+            <div className="w-px h-5 bg-white/10" />
+            <button
+              onClick={() => setBulkAction('restart_tray')}
+              className="flex items-center gap-2 px-3.5 py-3 text-sm font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-gray-200 whitespace-nowrap"
+            >
+              <Terminal className="w-4 h-4" />
+              Reiniciar Tray
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación de acción masiva */}
+      {bulkAction && (() => {
+        const meta = {
+          contingency_on: {
+            icon: <ShieldAlert className="w-5 h-5 text-orange-500" />,
+            accent: 'bg-orange-50 border-orange-100',
+            label: 'Activar contingencia',
+            description: 'Se activará la contingencia forzada en las estaciones seleccionadas.',
+            confirmClass: 'bg-orange-600 hover:bg-orange-700 text-white',
+            confirmLabel: 'Activar contingencia',
+          },
+          contingency_off: {
+            icon: <ShieldAlert className="w-5 h-5 text-gray-500" />,
+            accent: 'bg-gray-50 border-gray-100',
+            label: 'Desactivar contingencia',
+            description: 'Se desactivará la contingencia forzada en las estaciones seleccionadas.',
+            confirmClass: '',
+            confirmLabel: 'Desactivar contingencia',
+          },
+          restart_service: {
+            icon: <RotateCcw className="w-5 h-5 text-amber-500" />,
+            accent: 'bg-amber-50 border-amber-100',
+            label: 'Reiniciar servicio de impresión',
+            description: 'Se enviará el comando de reinicio del servicio. Solo afecta estaciones en línea.',
+            confirmClass: 'bg-amber-600 hover:bg-amber-700 text-white',
+            confirmLabel: 'Reiniciar servicio',
+          },
+          restart_tray: {
+            icon: <Terminal className="w-5 h-5 text-amber-500" />,
+            accent: 'bg-amber-50 border-amber-100',
+            label: 'Reiniciar Tray',
+            description: 'Se enviará el comando de reinicio del Tray. Solo afecta estaciones en línea.',
+            confirmClass: 'bg-amber-600 hover:bg-amber-700 text-white',
+            confirmLabel: 'Reiniciar Tray',
+          },
+        }[bulkAction];
+        const selected = workstations.filter(ws => selectedIds.has(ws.id));
+        return (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 !mt-0">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+              {/* Header con acento de color */}
+              <div className={`flex items-start gap-4 p-6 border-b ${meta.accent}`}>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm border border-gray-100">
+                  {meta.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-base font-semibold text-gray-900">{meta.label}</h2>
+                  <p className="mt-0.5 text-sm text-gray-500">{meta.description}</p>
+                </div>
+                <button
+                  onClick={() => setBulkAction(null)}
+                  className="shrink-0 rounded-lg p-1 text-gray-400 hover:bg-black/5 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Lista de estaciones */}
+              <div className="p-6">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    Estaciones afectadas
+                  </span>
+                  <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600">
+                    {selected.length}
+                  </span>
+                </div>
+                <div className="max-h-52 overflow-y-auto rounded-xl border border-gray-100 divide-y divide-gray-50">
+                  {selected.map(ws => (
+                    <div key={ws.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${ws.is_online ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                      <span className="font-mono text-sm font-medium text-gray-900 tabular-nums">{ws.ip_private}</span>
+                      {ws.hostname && <span className="text-sm text-gray-400 truncate">{ws.hostname}</span>}
+                      {ws.current_user && (
+                        <span className="ml-auto text-xs text-gray-400 truncate shrink-0">{ws.current_user}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {bulkAction === 'contingency_on' && (
+                  <div className="mt-4 flex gap-2.5 rounded-lg border border-orange-100 bg-orange-50 p-3">
+                    <ShieldAlert className="h-4 w-4 shrink-0 text-orange-500 mt-0.5" />
+                    <p className="text-xs text-orange-700 leading-relaxed">{t('forcedContingencyNotification')}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50/80 px-6 py-4">
+                <Button variant="outline" onClick={() => setBulkAction(null)} disabled={bulkPending} className="min-w-[80px]">
+                  {tCommon('cancel')}
+                </Button>
+                <Button
+                  onClick={handleBulkExecute}
+                  disabled={bulkPending}
+                  className={`min-w-[160px] ${meta.confirmClass}`}
+                >
+                  {bulkPending ? (
+                    <span className="flex items-center gap-2">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Ejecutando…
+                    </span>
+                  ) : meta.confirmLabel}
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -945,6 +1197,8 @@ interface WorkstationCardProps {
   workstation: Workstation;
   userTimezone: string;
   t: ReturnType<typeof useTranslations>;
+  isSelected: boolean;
+  onToggleSelect: () => void;
   onViewDetails: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -961,6 +1215,8 @@ function WorkstationCard({
   workstation,
   userTimezone,
   t,
+  isSelected,
+  onToggleSelect,
   onViewDetails,
   onEdit,
   onDelete,
@@ -973,11 +1229,18 @@ function WorkstationCard({
   isForcedContingencyPending,
 }: WorkstationCardProps) {
   return (
-    <Card className="hover:shadow-md transition">
+    <Card className={`hover:shadow-md transition ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
       <CardContent className="p-4 md:p-6">
         {/* Fila 1: Icono + IP + Badges + Acciones (desktop) */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={onToggleSelect}
+              onClick={(e) => e.stopPropagation()}
+              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0 cursor-pointer"
+            />
             <div
               className={`rounded-full p-2 md:p-3 shrink-0 ${
                 (workstation.contingency_active || workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency)
@@ -1279,6 +1542,10 @@ interface WorkstationTableProps {
   sortField: SortField;
   sortDirection: SortDirection;
   onSort: (field: SortField) => void;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  isAllSelected: boolean;
+  onSelectAll: () => void;
   onViewDetails: (ws: Workstation) => void;
   onEdit: (ws: Workstation) => void;
   onDelete: (ws: Workstation) => void;
@@ -1298,6 +1565,10 @@ function WorkstationTable({
   sortField,
   sortDirection,
   onSort,
+  selectedIds,
+  onToggleSelect,
+  isAllSelected,
+  onSelectAll,
   onViewDetails,
   onEdit,
   onDelete,
@@ -1339,6 +1610,14 @@ function WorkstationTable({
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
+                <th className="px-3 py-3 w-8">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={onSelectAll}
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                </th>
                 <SortHeader field="is_online">Estado</SortHeader>
                 <SortHeader field="ip_private">IP</SortHeader>
                 <SortHeader field="hostname">Hostname</SortHeader>
@@ -1353,7 +1632,15 @@ function WorkstationTable({
             </thead>
             <tbody className="divide-y divide-gray-200">
               {workstations.map((ws) => (
-                <tr key={ws.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={ws.id} className={`hover:bg-gray-50 transition-colors ${selectedIds.has(ws.id) ? 'bg-blue-50' : ''}`}>
+                  <td className="px-3 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(ws.id)}
+                      onChange={() => onToggleSelect(ws.id)}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </td>
                   {/* Estado */}
                   <td className="px-3 py-3 whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
