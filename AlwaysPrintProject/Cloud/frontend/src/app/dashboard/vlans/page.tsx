@@ -36,7 +36,7 @@ import {
   Terminal,
   AlertTriangle,
   Settings,
-  CheckSquare,
+  ListChecks,
 } from 'lucide-react'
 import { apiClient, vlansApi } from '@/lib/api'
 import type { VLAN, VLANCreate, VLANUpdate, VLANDetail } from '@/types/vlan'
@@ -521,17 +521,23 @@ export default function VLANsPage() {
               </Button>
             )}
             {/* Modo selección masiva */}
-            <Button
-              variant={selectionMode ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => {
-                if (selectionMode) { clearVlanSelection(true) } else { setSelectionMode(true) }
-              }}
-              title="Selección masiva"
-              className="h-8 w-8 p-0"
-            >
-              <CheckSquare className="w-4 h-4" />
-            </Button>
+            {selectionMode ? (
+              <button
+                onClick={() => clearVlanSelection(true)}
+                className="flex items-center gap-1.5 rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm ring-1 ring-blue-600 hover:bg-blue-700 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+                Cancelar selección
+              </button>
+            ) : (
+              <button
+                onClick={() => setSelectionMode(true)}
+                className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+              >
+                <ListChecks className="w-3.5 h-3.5" />
+                Seleccionar
+              </button>
+            )}
             {/* Toggle de vista: tarjetas / tabla */}
             <div className="flex items-center gap-1 border rounded-md p-0.5">
               <Button
