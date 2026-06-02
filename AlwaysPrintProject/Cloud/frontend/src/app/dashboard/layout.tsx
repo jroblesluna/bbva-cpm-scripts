@@ -10,6 +10,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { LanguageSelector } from '@/components/LanguageSelector'
@@ -60,6 +61,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, isAuthenticated, isLoading, logout, isAdmin } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const t = useTranslations('nav')
+  const queryClient = useQueryClient()
+
+  // Refrescar datos silenciosamente al navegar entre páginas del sidebar
+  useEffect(() => {
+    queryClient.invalidateQueries()
+  }, [pathname, queryClient])
 
   // Grupos de navegación
   const navGroups: NavGroup[] = [

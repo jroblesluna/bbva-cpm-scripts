@@ -40,6 +40,7 @@ export interface VLANBasic {
   name: string
   cidr: string
   forced_contingency: boolean
+  contingency_inherited?: boolean | null
 }
 
 export interface WorkstationUpdate {

@@ -1000,10 +1000,17 @@ async def toggle_auto_update(
 )
 def get_vlans_without_devices(
     org_id: UUID,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_operator_or_admin),
     db: Session = Depends(get_db),
 ):
     """Retorna las VLANs de la organización que no tienen dispositivos activos asignados."""
+    # Operador solo puede consultar su propia organización
+    if current_user.role == UserRole.OPERATOR and str(current_user.organization_id) != str(org_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo puede consultar su propia organización",
+        )
+
     from app.models.vlan import VLAN as VLANModel
     from app.models.device import Device
 

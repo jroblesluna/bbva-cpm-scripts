@@ -1015,7 +1015,7 @@ function WorkstationCard({
                 {t('contingencyLevelStation')}
               </Badge>
             )}
-            {workstation.vlan?.forced_contingency && (
+            {workstation.vlan?.forced_contingency && !workstation.vlan?.contingency_inherited && (
               <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
                 {t('contingencyLevelVlan')}
               </Badge>
@@ -1365,13 +1365,19 @@ function WorkstationTable({
                           C
                         </Badge>
                       )}
-                      {(ws.contingency_active || ws.forced_contingency || ws.vlan?.forced_contingency || ws.organization?.forced_contingency) && (
+                      {ws.forced_contingency && (
                         <Badge variant="outline" className="text-[10px] px-1 py-0 border-orange-300 text-orange-700 bg-orange-50">
-                          {ws.organization?.forced_contingency
-                            ? t('contingencyLevelOrg')
-                            : ws.vlan?.forced_contingency
-                              ? t('contingencyLevelVlan')
-                              : t('contingencyLevelStation')}
+                          {t('contingencyLevelStation')}
+                        </Badge>
+                      )}
+                      {ws.vlan?.forced_contingency && !ws.vlan?.contingency_inherited && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 border-orange-300 text-orange-700 bg-orange-50">
+                          {t('contingencyLevelVlan')}
+                        </Badge>
+                      )}
+                      {ws.organization?.forced_contingency && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 border-orange-300 text-orange-700 bg-orange-50">
+                          {t('contingencyLevelOrg')}
                         </Badge>
                       )}
                     </div>

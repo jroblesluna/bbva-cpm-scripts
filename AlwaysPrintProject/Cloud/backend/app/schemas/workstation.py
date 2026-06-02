@@ -135,6 +135,7 @@ class VLANBasicResponse(BaseModel):
     id: UUID
     name: str
     forced_contingency: bool = False
+    contingency_inherited: Optional[bool] = None
     
     model_config = {"from_attributes": True}
 

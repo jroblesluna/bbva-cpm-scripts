@@ -118,7 +118,14 @@ export default function VLANsPage() {
 
   useEffect(() => {
     if (!user) return
-    if (user.role === 'admin') loadAccounts()
+    if (user.role === 'admin') {
+      loadAccounts()
+    } else if (user.organization_id) {
+      // Operario: cargar solo su organización para mostrar estado de contingencia
+      apiClient.get('/organizations/me')
+        .then((res) => setAccounts([{ id: res.data.id, name: res.data.name, forced_contingency: res.data.forced_contingency }]))
+        .catch(() => {})
+    }
     loadVlans()
   }, [user, filterOrgId])
 
@@ -673,7 +680,7 @@ export default function VLANsPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <Network className="h-5 w-5 text-gray-400 flex-shrink-0" />
                         <span className="text-sm font-medium text-gray-900">{vlan.name}</span>
-                        {vlan.forced_contingency && (
+                        {vlan.forced_contingency && !vlan.contingency_inherited && (
                           <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
                             {t('contingencyLevelVlan')}
                           </Badge>

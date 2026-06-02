@@ -116,6 +116,10 @@ export default function MyOrganizationPage() {
   const [sendingOrgCommand, setSendingOrgCommand] = useState(false)
   const [confirmOrgAction, setConfirmOrgAction] = useState<'restart_service' | 'restart_tray' | 'check_update' | null>(null)
   const [confirmContingency, setConfirmContingency] = useState<boolean | null>(null)
+  const [deactivateForceAll, setDeactivateForceAll] = useState(false)
+  const [vlansWithoutDevices, setVlansWithoutDevices] = useState<{ id: string; name: string }[] | null>(null)
+  const [loadingVlansCheck, setLoadingVlansCheck] = useState(false)
+  const [showVlansWithoutDevicesList, setShowVlansWithoutDevicesList] = useState(false)
 
   // === CARGAR ORGANIZACIÓN ===
   useEffect(() => {
@@ -280,7 +284,18 @@ export default function MyOrganizationPage() {
 
   // === HANDLERS: CONTROL ===
   const handleRequestToggleContingency = (enabled: boolean) => {
+    setDeactivateForceAll(false)
+    setShowVlansWithoutDevicesList(false)
+    setVlansWithoutDevices(null)
     setConfirmContingency(enabled)
+    // Al activar, verificar VLANs sin dispositivos
+    if (enabled && user?.organization_id) {
+      setLoadingVlansCheck(true)
+      organizationsApi.getVlansWithoutDevices(user.organization_id)
+        .then(data => setVlansWithoutDevices(data.vlans))
+        .catch(() => setVlansWithoutDevices([]))
+        .finally(() => setLoadingVlansCheck(false))
+    }
   }
 
   const handleConfirmContingency = async () => {
@@ -289,8 +304,9 @@ export default function MyOrganizationPage() {
     setConfirmContingency(null)
     setTogglingContingency(true)
     try {
-      await organizationsApi.toggleForcedContingency(user.organization_id, enabled)
+      await organizationsApi.toggleForcedContingency(user.organization_id, enabled, !enabled ? deactivateForceAll : false)
       setForcedContingency(enabled)
+      setDeactivateForceAll(false)
       toast({ title: enabled ? t('controlContingencyActivated') : t('controlContingencyDeactivated') })
     } catch (e: unknown) {
       const err = e as { detail?: string }
@@ -685,35 +701,99 @@ export default function MyOrganizationPage() {
       {/* === MODAL CONFIRMACIÓN CONTINGENCIA === */}
       {confirmContingency !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
-            <div className="flex items-center gap-2 mb-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full mx-4 space-y-4">
+            <div className="flex items-center gap-2">
               <ShieldAlert className={`w-5 h-5 ${confirmContingency ? 'text-orange-600' : 'text-green-600'}`} />
               <h3 className="text-base font-semibold text-gray-900">
                 {confirmContingency ? t('controlContingencyConfirmActivateTitle') : t('controlContingencyConfirmDeactivateTitle')}
               </h3>
             </div>
-            <p className="text-sm text-gray-600 mb-2">
+            <p className="text-sm text-gray-600">
               {confirmContingency ? t('controlContingencyConfirmActivateDesc') : t('controlContingencyConfirmDeactivateDesc')}
             </p>
+            {/* Alerta al activar */}
             {confirmContingency && (
-              <Alert className="mb-4">
+              <Alert>
                 <ShieldAlert className="h-4 w-4" />
                 <AlertDescription className="text-xs">
                   {t('controlContingencyWarning')}
                 </AlertDescription>
               </Alert>
             )}
-            <div className="flex justify-end gap-3 mt-4">
+            {/* Toggle desactivación — solo al desactivar */}
+            {!confirmContingency && (
+              <div className="flex items-start justify-between gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800">{t('controlDeactivateForceAllLabel')}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {deactivateForceAll ? t('controlDeactivateForceAllHint') : t('controlDeactivateSmartHint')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDeactivateForceAll(!deactivateForceAll)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${deactivateForceAll ? 'bg-orange-500' : 'bg-gray-300'}`}
+                  role="switch"
+                  aria-checked={deactivateForceAll}
+                >
+                  <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${deactivateForceAll ? 'translate-x-4' : 'translate-x-0'}`} />
+                </button>
+              </div>
+            )}
+            {/* Cargando VLANs sin dispositivos al activar */}
+            {confirmContingency && loadingVlansCheck && (
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                {t('controlCheckingVlans')}
+              </div>
+            )}
+            {/* Warning VLANs sin dispositivos */}
+            {confirmContingency && !loadingVlansCheck && vlansWithoutDevices && vlansWithoutDevices.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-amber-800 font-medium">
+                      {t('controlVlansWithoutDevicesWarning', { count: vlansWithoutDevices.length })}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowVlansWithoutDevicesList(!showVlansWithoutDevicesList)}
+                      className="text-xs text-amber-700 underline mt-1"
+                    >
+                      {showVlansWithoutDevicesList ? t('controlVlansHideList') : t('controlVlansSeeMore')}
+                    </button>
+                    {showVlansWithoutDevicesList && (
+                      <ul className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+                        {vlansWithoutDevices.map(v => (
+                          <li key={v.id} className="text-xs text-amber-700 flex items-center gap-1.5">
+                            <Network className="w-3 h-3 shrink-0" />
+                            {v.name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
               <Button variant="outline" size="sm" onClick={() => setConfirmContingency(null)}>
-                {t('controlCancel')}
+                {tCommon('cancel')}
               </Button>
               <Button
                 size="sm"
                 variant={confirmContingency ? 'destructive' : 'default'}
                 disabled={togglingContingency}
                 onClick={handleConfirmContingency}
+                className={confirmContingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
               >
-                {confirmContingency ? t('controlContingencyActivateBtn') : t('controlContingencyDeactivateBtn')}
+                {togglingContingency
+                  ? tCommon('updating')
+                  : confirmContingency
+                    ? t('controlContingencyActivateBtn')
+                    : t('controlContingencyDeactivateBtn')
+                }
               </Button>
             </div>
           </div>
