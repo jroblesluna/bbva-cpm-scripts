@@ -46,6 +46,7 @@ import {
   Printer,
   Sparkles,
   Settings,
+  CheckSquare,
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
@@ -87,6 +88,7 @@ export default function WorkstationsPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [page, setPage] = useState(1);
   const pageSize = viewMode === 'cards' ? 10 : 20;
+  const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<'contingency_on' | 'contingency_off' | 'restart_tray' | 'restart_service' | null>(null);
   const [bulkPending, setBulkPending] = useState(false);
@@ -357,7 +359,10 @@ export default function WorkstationsPage() {
       return next;
     });
   };
-  const clearSelection = () => setSelectedIds(new Set());
+  const clearSelection = (exitMode = false) => {
+    setSelectedIds(new Set());
+    if (exitMode) setSelectionMode(false);
+  };
   const isAllPageSelected = workstations.length > 0 && workstations.every(w => selectedIds.has(w.id));
   const toggleSelectAll = () => {
     if (isAllPageSelected) {
@@ -381,7 +386,7 @@ export default function WorkstationsPage() {
         await Promise.allSettled(ids.map(id => workstationsApi.toggleForcedContingency(id, false)));
       }
       queryClient.invalidateQueries({ queryKey: ['workstations'] });
-      clearSelection();
+      clearSelection(true);
       setBulkAction(null);
       toast({ title: 'Acción ejecutada', description: `Acción aplicada a ${ids.length} estaciones.` });
     } catch {
@@ -621,6 +626,16 @@ export default function WorkstationsPage() {
                 </Button>
               )}
             </div>
+            {/* Modo selección masiva */}
+            <Button
+              variant={selectionMode ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => { if (selectionMode) { clearSelection(true); } else { setSelectionMode(true); } }}
+              title="Selección masiva"
+              className="h-8 w-8 p-0"
+            >
+              <CheckSquare className="w-4 h-4" />
+            </Button>
             {/* Toggle de vista: tarjetas / tabla */}
             <div className="flex items-center gap-1 border rounded-md p-0.5">
               <Button
@@ -705,7 +720,7 @@ export default function WorkstationsPage() {
       )}
 
       {/* Barra de selección masiva */}
-      {workstations.length > 0 && (
+      {selectionMode && workstations.length > 0 && (
         <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
           <label className="flex items-center gap-2.5 cursor-pointer select-none">
             <input
@@ -724,7 +739,7 @@ export default function WorkstationsPage() {
                 <span className="font-semibold text-blue-600">{selectedIds.size}</span> seleccionada{selectedIds.size !== 1 ? 's' : ''}
               </span>
               <button
-                onClick={clearSelection}
+                onClick={() => clearSelection()}
                 className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
               >
                 Limpiar
@@ -746,6 +761,7 @@ export default function WorkstationsPage() {
                 workstation={workstation}
                 userTimezone={userTimezone}
                 t={t}
+                selectionMode={selectionMode}
                 isSelected={selectedIds.has(workstation.id)}
                 onToggleSelect={() => toggleSelect(workstation.id)}
                 onViewDetails={() => setSelectedWorkstation(workstation)}
@@ -772,6 +788,7 @@ export default function WorkstationsPage() {
           sortField={sortField}
           sortDirection={sortDirection}
           onSort={handleSort}
+          selectionMode={selectionMode}
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
           isAllSelected={isAllPageSelected}
@@ -1028,7 +1045,7 @@ export default function WorkstationsPage() {
               {selectedIds.size === 1 ? 'estación' : 'estaciones'}
             </span>
             <button
-              onClick={clearSelection}
+              onClick={() => clearSelection(true)}
               className="ml-0.5 rounded p-0.5 text-gray-500 transition-colors hover:text-gray-200"
               title="Limpiar selección"
             >
@@ -1197,6 +1214,7 @@ interface WorkstationCardProps {
   workstation: Workstation;
   userTimezone: string;
   t: ReturnType<typeof useTranslations>;
+  selectionMode: boolean;
   isSelected: boolean;
   onToggleSelect: () => void;
   onViewDetails: () => void;
@@ -1215,6 +1233,7 @@ function WorkstationCard({
   workstation,
   userTimezone,
   t,
+  selectionMode,
   isSelected,
   onToggleSelect,
   onViewDetails,
@@ -1229,18 +1248,20 @@ function WorkstationCard({
   isForcedContingencyPending,
 }: WorkstationCardProps) {
   return (
-    <Card className={`hover:shadow-md transition ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
+    <Card className={`hover:shadow-md transition ${selectionMode && isSelected ? 'ring-2 ring-blue-500' : ''}`}>
       <CardContent className="p-4 md:p-6">
         {/* Fila 1: Icono + IP + Badges + Acciones (desktop) */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={onToggleSelect}
-              onClick={(e) => e.stopPropagation()}
-              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0 cursor-pointer"
-            />
+            {selectionMode && (
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={onToggleSelect}
+                onClick={(e) => e.stopPropagation()}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0 cursor-pointer"
+              />
+            )}
             <div
               className={`rounded-full p-2 md:p-3 shrink-0 ${
                 (workstation.contingency_active || workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency)
@@ -1542,6 +1563,7 @@ interface WorkstationTableProps {
   sortField: SortField;
   sortDirection: SortDirection;
   onSort: (field: SortField) => void;
+  selectionMode: boolean;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
   isAllSelected: boolean;
@@ -1565,6 +1587,7 @@ function WorkstationTable({
   sortField,
   sortDirection,
   onSort,
+  selectionMode,
   selectedIds,
   onToggleSelect,
   isAllSelected,
@@ -1610,14 +1633,16 @@ function WorkstationTable({
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-3 py-3 w-8">
-                  <input
-                    type="checkbox"
-                    checked={isAllSelected}
-                    onChange={onSelectAll}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                  />
-                </th>
+                {selectionMode && (
+                  <th className="px-3 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={onSelectAll}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </th>
+                )}
                 <SortHeader field="is_online">Estado</SortHeader>
                 <SortHeader field="ip_private">IP</SortHeader>
                 <SortHeader field="hostname">Hostname</SortHeader>
@@ -1632,15 +1657,17 @@ function WorkstationTable({
             </thead>
             <tbody className="divide-y divide-gray-200">
               {workstations.map((ws) => (
-                <tr key={ws.id} className={`hover:bg-gray-50 transition-colors ${selectedIds.has(ws.id) ? 'bg-blue-50' : ''}`}>
-                  <td className="px-3 py-3 w-8">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(ws.id)}
-                      onChange={() => onToggleSelect(ws.id)}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                    />
-                  </td>
+                <tr key={ws.id} className={`hover:bg-gray-50 transition-colors ${selectionMode && selectedIds.has(ws.id) ? 'bg-blue-50' : ''}`}>
+                  {selectionMode && (
+                    <td className="px-3 py-3 w-8">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(ws.id)}
+                        onChange={() => onToggleSelect(ws.id)}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </td>
+                  )}
                   {/* Estado */}
                   <td className="px-3 py-3 whitespace-nowrap">
                     <div className="flex items-center gap-1.5">

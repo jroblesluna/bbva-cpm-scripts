@@ -36,6 +36,7 @@ import {
   Terminal,
   AlertTriangle,
   Settings,
+  CheckSquare,
 } from 'lucide-react'
 import { apiClient, vlansApi } from '@/lib/api'
 import type { VLAN, VLANCreate, VLANUpdate, VLANDetail } from '@/types/vlan'
@@ -116,6 +117,7 @@ export default function VLANsPage() {
   const pageSize = viewMode === 'cards' ? 10 : 20
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [refreshing, setRefreshing] = useState(false)
+  const [selectionMode, setSelectionMode] = useState(false)
   const [selectedVlanIds, setSelectedVlanIds] = useState<Set<string>>(new Set())
   const [vlanBulkAction, setVlanBulkAction] = useState<'contingency_on' | 'contingency_off' | 'restart_service' | 'restart_tray' | null>(null)
   const [vlanBulkPending, setVlanBulkPending] = useState(false)
@@ -313,7 +315,10 @@ export default function VLANsPage() {
       return next
     })
   }
-  const clearVlanSelection = () => setSelectedVlanIds(new Set())
+  const clearVlanSelection = (exitMode = false) => {
+    setSelectedVlanIds(new Set())
+    if (exitMode) setSelectionMode(false)
+  }
   const isAllPageSelected = paginatedVlans.length > 0 && paginatedVlans.every(v => selectedVlanIds.has(v.id))
   const toggleSelectAll = () => {
     if (isAllPageSelected) {
@@ -337,7 +342,7 @@ export default function VLANsPage() {
         await Promise.allSettled(ids.map(id => apiClient.patch(`/vlans/${id}/forced-contingency`, null, { params: { enabled: false, force_all: false } })))
       }
       loadVlans(true)
-      clearVlanSelection()
+      clearVlanSelection(true)
       setVlanBulkAction(null)
       toast({ title: 'Acción ejecutada', description: `Acción aplicada a ${ids.length} VLAN${ids.length !== 1 ? 's' : ''}.` })
     } catch {
@@ -515,6 +520,18 @@ export default function VLANsPage() {
                 {tCommon('clearFilters')}
               </Button>
             )}
+            {/* Modo selección masiva */}
+            <Button
+              variant={selectionMode ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => {
+                if (selectionMode) { clearVlanSelection(true) } else { setSelectionMode(true) }
+              }}
+              title="Selección masiva"
+              className="h-8 w-8 p-0"
+            >
+              <CheckSquare className="w-4 h-4" />
+            </Button>
             {/* Toggle de vista: tarjetas / tabla */}
             <div className="flex items-center gap-1 border rounded-md p-0.5">
               <Button
@@ -541,7 +558,7 @@ export default function VLANsPage() {
       </div>
 
       {/* Barra de selección masiva */}
-      {filteredVlans.length > 0 && (
+      {selectionMode && filteredVlans.length > 0 && (
         <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
           <label className="flex items-center gap-2.5 cursor-pointer select-none">
             <input
@@ -596,13 +613,15 @@ export default function VLANsPage() {
               {/* Fila 1: Nombre + CidrHealthBadge + niveles de contingencia */}
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                  <input
-                    type="checkbox"
-                    checked={selectedVlanIds.has(vlan.id)}
-                    onChange={() => toggleVlanSelect(vlan.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0 cursor-pointer"
-                  />
+                  {selectionMode && (
+                    <input
+                      type="checkbox"
+                      checked={selectedVlanIds.has(vlan.id)}
+                      onChange={() => toggleVlanSelect(vlan.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0 cursor-pointer"
+                    />
+                  )}
                   <Network className="h-5 w-5 text-gray-400 flex-shrink-0" />
                   <span className="text-sm md:text-base font-medium text-gray-900 truncate">
                     {vlan.name}
@@ -747,14 +766,16 @@ export default function VLANsPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 py-3 w-8">
-                    <input
-                      type="checkbox"
-                      checked={isAllPageSelected}
-                      onChange={toggleSelectAll}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                    />
-                  </th>
+                  {selectionMode && (
+                    <th className="px-3 py-3 w-8">
+                      <input
+                        type="checkbox"
+                        checked={isAllPageSelected}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </th>
+                  )}
                   <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colName')}</th>
                   <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colOrganization')}</th>
                   <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colDescription')}</th>
@@ -767,14 +788,16 @@ export default function VLANsPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {paginatedVlans.map((vlan) => (
                   <tr key={vlan.id} className={`hover:bg-gray-50 ${selectedVlanIds.has(vlan.id) ? 'bg-blue-50' : ''}`}>
-                    <td className="px-3 py-4 w-8">
-                      <input
-                        type="checkbox"
-                        checked={selectedVlanIds.has(vlan.id)}
-                        onChange={() => toggleVlanSelect(vlan.id)}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                      />
-                    </td>
+                    {selectionMode && (
+                      <td className="px-3 py-4 w-8">
+                        <input
+                          type="checkbox"
+                          checked={selectedVlanIds.has(vlan.id)}
+                          onChange={() => toggleVlanSelect(vlan.id)}
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </td>
+                    )}
                     <td className="px-4 md:px-6 py-4">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Network className="h-5 w-5 text-gray-400 flex-shrink-0" />
@@ -1099,7 +1122,7 @@ export default function VLANsPage() {
             <span className="text-sm font-medium text-gray-200 whitespace-nowrap">
               VLAN{selectedVlanIds.size !== 1 ? 's' : ''}
             </span>
-            <button onClick={clearVlanSelection} className="ml-0.5 rounded p-0.5 text-gray-500 transition-colors hover:text-gray-200" title="Limpiar selección">
+            <button onClick={() => clearVlanSelection(true)} className="ml-0.5 rounded p-0.5 text-gray-500 transition-colors hover:text-gray-200" title="Salir de selección">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
