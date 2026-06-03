@@ -68,7 +68,7 @@ def list_vlans(
         query = query.filter(VLAN.organization_id == organization_id)
     # Si es Admin sin filtro, ve todas las VLANs
     
-    vlans = query.all()
+    vlans = query.order_by(VLAN.name).all()
     
     # Calcular estadísticas
     from app.models.device import Device

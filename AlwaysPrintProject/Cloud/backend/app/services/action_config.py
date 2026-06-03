@@ -171,22 +171,38 @@ class ActionConfigService:
         # Calcular hash
         config_hash = calculate_config_hash(data.config_json)
         
-        # Verificar duplicado en la organización
-        existing = db.query(ActionConfig).filter(
+        # Verificar duplicado dentro del mismo scope/target (no globalmente)
+        # El mismo archivo puede subirse a diferentes VLANs/workstations,
+        # pero no puede existir duplicado dentro del mismo scope+target.
+        dup_query = db.query(ActionConfig).filter(
             and_(
                 ActionConfig.organization_id == organization_id,
-                ActionConfig.config_hash == config_hash
+                ActionConfig.config_hash == config_hash,
+                ActionConfig.scope == scope
             )
-        ).first()
+        )
+        
+        if scope == "vlan" and vlan_id:
+            dup_query = dup_query.filter(ActionConfig.vlan_id == vlan_id)
+        elif scope == "workstation" and workstation_id:
+            dup_query = dup_query.filter(ActionConfig.workstation_id == workstation_id)
+        elif scope == "org":
+            dup_query = dup_query.filter(
+                ActionConfig.vlan_id == None,
+                ActionConfig.workstation_id == None
+            )
+        
+        existing = dup_query.first()
         
         if existing:
             logger.warning(
-                f"Configuración duplicada: org={organization_id}, hash={config_hash}, "
+                f"Configuración duplicada: org={organization_id}, scope={scope}, "
+                f"vlan_id={vlan_id}, workstation_id={workstation_id}, hash={config_hash}, "
                 f"existente_id={existing.id}, nombre='{existing.name}'"
             )
             raise DuplicateConfigError(
-                f"Ya existe una configuración con el mismo contenido (hash: {config_hash}). "
-                f"Configuración existente: '{existing.name}' (id: {existing.id})"
+                f"Ya existe una configuración con el mismo contenido (hash: {config_hash}) "
+                f"en este scope. No se puede subir un archivo idéntico al mismo destino."
             )
         
         # Si is_active=True, desactivar configuración activa previa del mismo scope/target
