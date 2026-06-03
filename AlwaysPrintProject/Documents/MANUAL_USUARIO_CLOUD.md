@@ -35,12 +35,13 @@ clasificación: Confidencial — Uso interno
 8. [Configuración centralizada](#8-configuración-centralizada)
 9. [Acciones administrativas remotas](#9-acciones-administrativas-remotas)
 10. [Contingencia de impresión](#10-contingencia-de-impresión)
-11. [Administración avanzada](#11-administración-avanzada)
-12. [Seguridad y roles](#12-seguridad-y-roles)
-13. [Solución de problemas](#13-solución-de-problemas)
-14. [Preguntas frecuentes](#14-preguntas-frecuentes)
-15. [Glosario](#15-glosario)
-16. [Soporte y contacto](#16-soporte-y-contacto)
+11. [Documentación](#11-documentación)
+12. [Administración avanzada](#12-administración-avanzada)
+13. [Seguridad y roles](#13-seguridad-y-roles)
+14. [Solución de problemas](#14-solución-de-problemas)
+15. [Preguntas frecuentes](#15-preguntas-frecuentes)
+16. [Glosario](#16-glosario)
+17. [Soporte y contacto](#17-soporte-y-contacto)
 
 ---
 
@@ -148,6 +149,7 @@ Setup → Login → Autorizar IPs → Workstations visibles → Configurar → M
 │  Telemetría  │                                               │
 │  Conectividad│                                               │
 │  Auditoría   │                                               │
+│  Documentación│                                              │
 │              │                                               │
 │  Admin       │                                               │
 │  ──────────  │                                               │
@@ -178,6 +180,7 @@ Setup → Login → Autorizar IPs → Workstations visibles → Configurar → M
 | **Conectividad** | Resultados de las verificaciones de red ejecutadas por las workstations |
 | **Auditoría** | Registro histórico de todas las acciones realizadas en la plataforma |
 | **Mensajes** | Envío de notificaciones a workstations |
+| **Documentación** | Repositorio de documentos PDF para consulta y descarga |
 
 ### 4.4 Secciones de sistema (solo Administrador Global)
 
@@ -600,9 +603,83 @@ Un administrador puede forzar la contingencia manualmente. Útil para:
 
 ---
 
-## 11. Administración avanzada
+## 11. Documentación
 
-### 11.1 Gestión de organizaciones
+### 11.1 ¿Qué es?
+
+La sección **Documentación** es un repositorio centralizado de documentos PDF accesible desde el menú lateral del dashboard. Permite a los administradores compartir manuales, guías, procedimientos y cualquier documentación relevante con los operadores de TI de la organización.
+
+### 11.2 Permisos por rol
+
+| Acción | Admin Global | Operador TI |
+|--------|:-----------:|:----------:|
+| Ver listado de documentos | ✅ | ✅ |
+| Descargar documentos (PDF) | ✅ | ✅ |
+| Buscar documentos | ✅ | ✅ |
+| Subir nuevos documentos | ✅ | — |
+| Editar título y descripción | ✅ | — |
+| Eliminar documentos | ✅ | — |
+
+### 11.3 Ver documentos
+
+1. Ir a **Documentación** en el menú lateral
+2. Se muestra el listado de documentos disponibles
+3. Usar la barra de búsqueda para filtrar por título o descripción
+4. Alternar entre vista de tarjetas y vista de tabla con los botones de la esquina superior derecha
+
+Cada documento muestra:
+- **Título** — nombre descriptivo del documento
+- **Descripción** — resumen opcional del contenido
+- **Tamaño** — peso del archivo PDF
+- **Fecha de creación** — cuándo se subió
+- **Autor** — quién subió el documento
+
+### 11.4 Descargar un documento
+
+1. Localizar el documento en el listado
+2. Click en el botón de descarga (ícono ⬇)
+3. El archivo PDF se abre o descarga según la configuración del navegador
+
+### 11.5 Subir un nuevo documento (solo Admin)
+
+1. Click en **"Crear documento"** (botón superior derecho)
+2. Completar el formulario:
+   - **Título** (obligatorio): nombre descriptivo del documento
+   - **Descripción** (opcional): breve resumen del contenido
+   - **Archivo** (obligatorio): seleccionar un archivo PDF
+3. Click en **"Crear documento"** para subir
+
+ℹ️ Solo se aceptan archivos en formato PDF.
+
+### 11.6 Editar un documento (solo Admin)
+
+1. Localizar el documento en el listado
+2. Click en el botón de edición (ícono lápiz ✏️)
+3. Modificar el título o la descripción
+4. Click en **"Guardar"**
+
+⚠️ La edición solo permite cambiar título y descripción. Para reemplazar el archivo PDF, eliminar el documento y subir uno nuevo.
+
+### 11.7 Eliminar un documento (solo Admin)
+
+1. Localizar el documento en el listado
+2. Click en el botón de eliminar (ícono 🗑️)
+3. Confirmar la eliminación en el diálogo
+
+⚠️ Esta acción es irreversible. El archivo se elimina permanentemente del sistema.
+
+### 11.8 Casos de uso típicos
+
+- Compartir manuales de procedimientos de impresión
+- Distribuir guías de configuración de workstations
+- Publicar documentación de troubleshooting para operadores
+- Almacenar políticas y normativas de TI
+
+---
+
+## 12. Administración avanzada
+
+### 12.1 Gestión de organizaciones
 
 Para entornos multi-organización:
 
@@ -612,7 +689,7 @@ Para entornos multi-organización:
 
 Cada organización tiene aislamiento completo: sus workstations, usuarios, configuración y datos son independientes.
 
-### 11.2 Gestión de usuarios
+### 12.2 Gestión de usuarios
 
 1. Ir a **Sistema → Usuarios**
 2. Crear usuario: email, rol, contraseña temporal
@@ -623,7 +700,7 @@ Cada organización tiene aislamiento completo: sus workstations, usuarios, confi
 | Administrador Global | Acceso completo + gestión de organizaciones y usuarios |
 | Operador TI | Monitoreo, workstations, VLANs, dispositivos y comandos remotos |
 
-### 11.3 Autorización de IPs
+### 12.3 Autorización de IPs
 
 Las workstations se identifican ante el Cloud Manager por su IP pública. Cuando una workstation nueva intenta conectarse por primera vez, su IP queda en estado "pendiente" hasta que un administrador la autorice.
 
@@ -636,7 +713,7 @@ Las workstations se identifican ante el Cloud Manager por su IP pública. Cuando
 
 ⚠️ No autorizar IPs desconocidas sin verificar su origen. Una IP autorizada incorrectamente podría dar acceso a equipos no corporativos.
 
-### 11.4 Gestión de actualizaciones
+### 12.4 Gestión de actualizaciones
 
 Permite controlar qué versión del cliente AlwaysPrint se instala en las workstations. Las actualizaciones se distribuyen de forma silenciosa sin intervención del usuario final.
 
@@ -651,7 +728,7 @@ Permite controlar qué versión del cliente AlwaysPrint se instala en las workst
 
 💡 Se recomienda fijar una versión específica en entornos de producción para evitar actualizaciones no planificadas. Una vez validada la nueva versión en un grupo piloto, actualizar la versión fijada para el resto.
 
-### 11.5 Envío de mensajes
+### 12.5 Envío de mensajes
 
 Permite enviar notificaciones directamente a los usuarios finales en sus workstations. El mensaje aparece como una notificación emergente (balloon tip) en la bandeja del sistema.
 
@@ -673,16 +750,16 @@ Permite enviar notificaciones directamente a los usuarios finales en sus worksta
 
 ---
 
-## 12. Seguridad y roles
+## 13. Seguridad y roles
 
-### 12.1 Autenticación
+### 13.1 Autenticación
 
 | Método | Aplica a |
 |--------|----------|
 | Email + contraseña (JWT) | Administradores del dashboard |
 | IP pública autorizada | Workstations (sin credenciales de usuario) |
 
-### 12.2 Permisos por rol
+### 13.2 Permisos por rol
 
 | Acción | Admin Global | Operador TI |
 |--------|:-----------:|:----------:|
@@ -695,9 +772,11 @@ Permite enviar notificaciones directamente a los usuarios finales en sus worksta
 | Gestionar usuarios | ✅ | — |
 | Autorizar IPs | ✅ | — |
 | Gestionar action configs | ✅ | — |
+| Gestionar documentación (subir/editar/eliminar) | ✅ | — |
+| Ver y descargar documentación | ✅ | ✅ |
 | Gestionar organizaciones | ✅ | — |
 
-### 12.3 Seguridad de la plataforma
+### 13.3 Seguridad de la plataforma
 
 | Capa | Protección |
 |------|-----------|
@@ -707,7 +786,7 @@ Permite enviar notificaciones directamente a los usuarios finales en sus worksta
 | Auditoría | Registro de todas las acciones administrativas |
 | Sesiones | Tokens JWT con expiración automática |
 
-### 12.4 Buenas prácticas
+### 13.4 Buenas prácticas
 
 - 💡 Usar contraseñas de al menos 12 caracteres
 - 💡 No compartir credenciales entre usuarios
@@ -717,9 +796,9 @@ Permite enviar notificaciones directamente a los usuarios finales en sus worksta
 
 ---
 
-## 13. Solución de problemas
+## 14. Solución de problemas
 
-### 13.1 Problemas de acceso al dashboard
+### 14.1 Problemas de acceso al dashboard
 
 | Problema | Solución |
 |----------|----------|
@@ -728,7 +807,7 @@ Permite enviar notificaciones directamente a los usuarios finales en sus worksta
 | Página en blanco | Limpiar caché del navegador y recargar |
 | Error 502 (Bad Gateway) | El backend no responde. Contactar a Robles.AI |
 
-### 13.2 Problemas con workstations
+### 14.2 Problemas con workstations
 
 | Problema | Solución |
 |----------|----------|
@@ -737,7 +816,7 @@ Permite enviar notificaciones directamente a los usuarios finales en sus worksta
 | Configuración no se aplica | Verificar que el JSON es válido. Esperar a que la workstation se reconecte |
 | Contingencia no se activa | Revisar logs del servicio en la workstation (Event Viewer) |
 
-### 13.3 Comandos de diagnóstico (DevOps)
+### 14.3 Comandos de diagnóstico (DevOps)
 
 ```bash
 # Acceso al servidor (sin SSH, vía AWS SSM)
@@ -758,7 +837,7 @@ curl https://alwaysprint.apps.iol.pe/api/v1/health
 
 ---
 
-## 14. Preguntas frecuentes
+## 15. Preguntas frecuentes
 
 **¿Cuántas workstations puedo gestionar?**  
 No hay límite definido. El sistema soporta 500+ workstations por organización.
@@ -786,7 +865,7 @@ Sí, si su usuario tiene rol de Administrador Global con acceso multi-organizaci
 
 ---
 
-## 15. Glosario
+## 16. Glosario
 
 | Término | Definición |
 |---------|-----------|
@@ -805,7 +884,7 @@ Sí, si su usuario tiene rol de Administrador Global con acceso multi-organizaci
 
 ---
 
-## 16. Soporte y contacto
+## 17. Soporte y contacto
 
 ### Soporte de primer nivel (Administrador de la organización)
 
