@@ -45,6 +45,16 @@ namespace AlwaysPrintTray.Cloud
         private CancellationTokenSource  _cts = new CancellationTokenSource();
         private bool _disposed;
 
+        // === Serialización de envíos ===
+        // ClientWebSocket solo permite un SendAsync en vuelo a la vez.
+        // Sin este semáforo, envíos concurrentes (pong + status_update + resources)
+        // abortan el socket con "There is already one outstanding SendAsync call".
+        private readonly SemaphoreSlim _sendLock = new SemaphoreSlim(1, 1);
+
+        // === Diagnóstico de conexión ===
+        private DateTime _connectedSince = DateTime.MinValue;
+        private DateTime _lastPingReceived = DateTime.MinValue;
+
         // Tamaño del buffer de recepción (16 KB)
         private const int ReceiveBufferSize = 16 * 1024;
 
@@ -104,6 +114,8 @@ namespace AlwaysPrintTray.Cloud
 
         /// <summary>
         /// Envía un mensaje JSON al servidor con el tipo y payload especificados.
+        /// Serializa las llamadas a SendAsync mediante SemaphoreSlim para evitar
+        /// que dos envíos concurrentes aborten el socket.
         /// </summary>
         public void Send(string type, object? payload)
         {
@@ -122,11 +134,21 @@ namespace AlwaysPrintTray.Cloud
             var json = msg.ToString(Formatting.None);
             var bytes = Encoding.UTF8.GetBytes(json);
 
-            // Enviar de forma asíncrona sin bloquear
+            // Enviar de forma asíncrona sin bloquear, serializado por semáforo
             Task.Run(async () =>
             {
+                if (!await _sendLock.WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false))
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"CloudWebSocketClient: timeout esperando turno de envío para mensaje tipo='{type}'. Descartando.");
+                    return;
+                }
+
                 try
                 {
+                    // Verificar estado del socket dentro del lock (pudo cerrarse mientras esperaba)
+                    if (ws.State != WebSocketState.Open) return;
+
                     var segment = new ArraySegment<byte>(bytes);
                     await ws.SendAsync(segment, WebSocketMessageType.Text, true, _cts.Token)
                         .ConfigureAwait(false);
@@ -134,7 +156,11 @@ namespace AlwaysPrintTray.Cloud
                 catch (Exception ex)
                 {
                     AlwaysPrintLogger.WriteTrayWarning(
-                        $"CloudWebSocketClient: error enviando mensaje. {ex.Message}");
+                        $"CloudWebSocketClient: error enviando mensaje tipo='{type}'. {ex.Message}");
+                }
+                finally
+                {
+                    _sendLock.Release();
                 }
             });
         }
@@ -158,6 +184,7 @@ namespace AlwaysPrintTray.Cloud
             _disposed = true;
             Disconnect();
             _cts.Dispose();
+            _sendLock.Dispose();
             HttpClient?.Dispose();
         }
 
@@ -202,6 +229,7 @@ namespace AlwaysPrintTray.Cloud
                     IsConnected     = true;
                     _currentDelayMs = InitialDelayMs;
                     _longRetryMode  = false;
+                    _connectedSince = DateTime.UtcNow;
                 }
 
                 AlwaysPrintLogger.WriteTrayInfo(
@@ -276,14 +304,59 @@ namespace AlwaysPrintTray.Cloud
             }
             catch (WebSocketException ex)
             {
+                // Diagnóstico detallado de desconexión no limpia
+                var duration = _connectedSince != DateTime.MinValue
+                    ? (DateTime.UtcNow - _connectedSince)
+                    : TimeSpan.Zero;
+                var lastPingAgo = _lastPingReceived != DateTime.MinValue
+                    ? (DateTime.UtcNow - _lastPingReceived)
+                    : TimeSpan.Zero;
+
+                string wsState = "desconocido";
+                string closeStatus = "N/A";
+                try { wsState = ws.State.ToString(); } catch { }
+                try { closeStatus = ws.CloseStatus?.ToString() ?? "null"; } catch { }
+
+                var innerMsg = ex.InnerException != null
+                    ? $"{ex.InnerException.GetType().Name}: {ex.InnerException.Message}"
+                    : "ninguna";
+
                 AlwaysPrintLogger.WriteTrayError(
-                    $"CloudWebSocketClient: error en bucle de recepción. {ex.Message}");
+                    $"CloudWebSocketClient: desconexión no limpia detectada. " +
+                    $"WebSocketError={ex.WebSocketErrorCode}, " +
+                    $"State={wsState}, " +
+                    $"CloseStatus={closeStatus}, " +
+                    $"InnerException=[{innerMsg}], " +
+                    $"DuraciónConexión={duration.TotalMinutes:F1}min, " +
+                    $"ÚltimoPingServidor=hace {lastPingAgo.TotalSeconds:F0}s, " +
+                    $"Mensaje={ex.Message}");
                 Error?.Invoke(ex);
             }
             catch (Exception ex)
             {
+                // Diagnóstico para errores inesperados (no WebSocketException)
+                var duration = _connectedSince != DateTime.MinValue
+                    ? (DateTime.UtcNow - _connectedSince)
+                    : TimeSpan.Zero;
+                var lastPingAgo = _lastPingReceived != DateTime.MinValue
+                    ? (DateTime.UtcNow - _lastPingReceived)
+                    : TimeSpan.Zero;
+
+                string wsState = "desconocido";
+                try { wsState = ws.State.ToString(); } catch { }
+
+                var innerMsg = ex.InnerException != null
+                    ? $"{ex.InnerException.GetType().Name}: {ex.InnerException.Message}"
+                    : "ninguna";
+
                 AlwaysPrintLogger.WriteTrayError(
-                    $"CloudWebSocketClient: error inesperado en recepción. {ex.Message}");
+                    $"CloudWebSocketClient: error inesperado en recepción. " +
+                    $"Tipo={ex.GetType().Name}, " +
+                    $"State={wsState}, " +
+                    $"InnerException=[{innerMsg}], " +
+                    $"DuraciónConexión={duration.TotalMinutes:F1}min, " +
+                    $"ÚltimoPingServidor=hace {lastPingAgo.TotalSeconds:F0}s, " +
+                    $"Mensaje={ex.Message}");
                 Error?.Invoke(ex);
             }
             finally
@@ -311,11 +384,15 @@ namespace AlwaysPrintTray.Cloud
         /// <summary>
         /// Maneja el cierre remoto del WebSocket.
         /// Detecta código 1008 (IP no autorizada) para activar modo de reintento largo.
+        /// Incluye diagnóstico de duración de conexión para análisis de patrones.
         /// </summary>
         private void HandleRemoteClose(ClientWebSocket ws, WebSocketReceiveResult result)
         {
             var closeStatus = result.CloseStatus ?? WebSocketCloseStatus.Empty;
             var closeDescription = result.CloseStatusDescription ?? "";
+            var duration = _connectedSince != DateTime.MinValue
+                ? (DateTime.UtcNow - _connectedSince)
+                : TimeSpan.Zero;
 
             // Código 1008 = Policy Violation (IP no autorizada en APCM)
             if ((int)closeStatus == 1008)
@@ -325,19 +402,22 @@ namespace AlwaysPrintTray.Cloud
                     _longRetryMode = true;
                     AlwaysPrintLogger.WriteTrayWarning(
                         "CloudWebSocketClient: conexión rechazada por APCM (código 1008 — IP no autorizada). " +
+                        $"DuraciónConexión={duration.TotalMinutes:F1}min. " +
                         $"Reintentando cada {LongRetryDelayMs / 1000}s.");
                 }
                 else
                 {
                     AlwaysPrintLogger.WriteTrayWarning(
                         $"CloudWebSocketClient: conexión cerrada con código 1008 pero razón no indica IP no autorizada " +
-                        $"(razón: '{closeDescription}'). Usando backoff normal.");
+                        $"(razón: '{closeDescription}'). DuraciónConexión={duration.TotalMinutes:F1}min. Usando backoff normal.");
                 }
             }
             else
             {
                 AlwaysPrintLogger.WriteTrayWarning(
-                    $"CloudWebSocketClient: servidor cerró conexión. Código: {(int)closeStatus}, Razón: '{closeDescription}'");
+                    $"CloudWebSocketClient: servidor cerró conexión. " +
+                    $"Código: {(int)closeStatus}, Razón: '{closeDescription}', " +
+                    $"DuraciónConexión={duration.TotalMinutes:F1}min");
             }
 
             // Intentar cerrar limpiamente desde nuestro lado
@@ -351,6 +431,7 @@ namespace AlwaysPrintTray.Cloud
 
         /// <summary>
         /// Parsea el mensaje JSON recibido y dispara el evento MessageReceived.
+        /// Registra timestamp del último ping recibido del servidor para diagnóstico.
         /// </summary>
         private void ProcessMessage(string json)
         {
@@ -358,6 +439,13 @@ namespace AlwaysPrintTray.Cloud
             {
                 var obj  = JObject.Parse(json);
                 var type = obj["type"]?.ToString() ?? "unknown";
+
+                // Trackear último ping del servidor para diagnóstico de desconexiones
+                if (type == "ping")
+                {
+                    _lastPingReceived = DateTime.UtcNow;
+                }
+
                 MessageReceived?.Invoke(type, json);
             }
             catch (Exception ex)

@@ -456,6 +456,60 @@ class ConnectionManager:
             # Limpiar el waiter
             self._pending_command_responses.pop(command_id, None)
 
+    async def graceful_shutdown_workstations(self, reason: str = "Servidor reiniciando"):
+        """
+        Cierra todas las conexiones WebSocket de workstations de forma limpia
+        antes de un shutdown del servidor.
+        
+        Envía un close frame con código 1001 (Going Away) y la razón explícita.
+        Esto permite al cliente distinguir un reciclaje/deploy del servidor
+        de un corte inesperado de red/proxy.
+        
+        Args:
+            reason: Razón del cierre (se envía en el close frame, máx 123 bytes)
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Truncar razón a 123 bytes (límite del protocolo WebSocket para control frames)
+        truncated_reason = reason[:123]
+        
+        async with self._lock:
+            workstation_ids = list(self.workstation_connections.keys())
+        
+        if not workstation_ids:
+            logger.info("[SHUTDOWN] No hay workstations conectadas. Nada que cerrar.")
+            return
+        
+        logger.info(
+            f"[SHUTDOWN] Cerrando {len(workstation_ids)} conexiones WebSocket de workstations. "
+            f"Razón: '{truncated_reason}'"
+        )
+        
+        closed_count = 0
+        error_count = 0
+        
+        for ws_id in workstation_ids:
+            try:
+                async with self._lock:
+                    ws = self.workstation_connections.get(ws_id)
+                
+                if ws:
+                    # Enviar close frame con código 1001 (Going Away) y razón descriptiva
+                    await ws.close(code=1001, reason=truncated_reason)
+                    closed_count += 1
+            except Exception as e:
+                error_count += 1
+                logger.warning(
+                    f"[SHUTDOWN] Error cerrando WebSocket de workstation {ws_id}: "
+                    f"{type(e).__name__}: {e}"
+                )
+        
+        logger.info(
+            f"[SHUTDOWN] Graceful shutdown completado. "
+            f"Cerradas: {closed_count}, Errores: {error_count}, Total: {len(workstation_ids)}"
+        )
+
 
 # Instancia global del ConnectionManager
 connection_manager = ConnectionManager()

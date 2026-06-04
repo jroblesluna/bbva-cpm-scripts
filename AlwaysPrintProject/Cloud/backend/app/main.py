@@ -44,6 +44,13 @@ async def lifespan(app: FastAPI):
     # Shutdown: Detener scheduler de recolección de métricas
     status_scheduler.stop()
 
+    # Shutdown: Notificar a todas las workstations conectadas antes de cerrar
+    # Envía close frame con razón explícita para que los clientes distingan
+    # un reciclaje/deploy de un corte inesperado de red/proxy
+    await connection_manager.graceful_shutdown_workstations(
+        reason="Servidor reiniciando (deploy/reciclaje)"
+    )
+
     # Shutdown: Detener ping loop
     connection_manager.stop_ping_loop()
     ping_task.cancel()
