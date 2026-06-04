@@ -1,5 +1,5 @@
 {
-  "version": "6.1",
+  "version": "6.3",
   "name": "LPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Print Management (modo Print Server). Gestiona contingencia creando/eliminando cola local con puerto TCP híbrido. Persiste estado con ReadAppSetting/WriteAppSetting (ruta según build). Soporta else_actions.",
   "created_at": "2026-06-01T12:00:00Z",
@@ -391,14 +391,15 @@
     {
       "event": "OnScheduledTask",
       "interval_seconds": 300,
-      "description": "Limpieza periódica: eliminar procesos Clave*.exe, detener servicios LexRestart residuales, y validar estado de colas de impresión",
+      "description": "Limpieza periódica: eliminar procesos Clave*.exe, detener servicios LexRestart. Si se eliminó algún Clave* y no hay contingencia: reconectar cola remota.",
       "actions": [
         {
           "type": "KillProcessesByName",
           "description": "Eliminar procesos Clave*.exe",
           "parameters": {
             "process_name": "Clave*"
-          }
+          },
+          "store_result_in": "clave_killed"
         },
         {
           "type": "StopService",
@@ -419,166 +420,55 @@
           }
         },
         {
-          "type": "ReadAppSetting",
-          "description": "Leer semáforo ContingencyEnabled",
-          "parameters": {
-            "value_name": "ContingencyEnabled",
-            "default_value": "0"
-          },
-          "store_result_in": "contingency_enabled"
-        },
-        {
           "type": "Conditional",
-          "description": "Si contingencia activa: asegurar cola local. Si no: asegurar cola remota.",
+          "description": "Si se eliminó algún proceso Clave*: verificar si debe reconectar cola remota",
           "condition": {
-            "variable": "contingency_enabled",
-            "operator": "equals",
-            "value": "1"
+            "variable": "clave_killed",
+            "operator": "not_equals",
+            "value": "0"
           },
           "actions": [
             {
               "type": "ReadAppSetting",
-              "description": "Leer IP de contingencia persistida",
+              "description": "Leer semáforo ContingencyEnabled",
               "parameters": {
-                "value_name": "ContingencyPrinterIp",
-                "default_value": ""
+                "value_name": "ContingencyEnabled",
+                "default_value": "0"
               },
-              "store_result_in": "contingency_printer_ip"
-            },
-            {
-              "type": "SetTcpPort",
-              "description": "Asegurar LPMCHybridPort apunta a IP de contingencia (crea o actualiza)",
-              "parameters": {
-                "port_name": "LPMCHybridPort",
-                "host_address": "{{contingency_printer_ip}}",
-                "port_number": 9100
-              }
-            },
-            {
-              "type": "CheckPrintQueueExists",
-              "description": "Verificar si la cola corporativa ya existe",
-              "parameters": {
-                "queue_name": "{{corporate_queue_name}}"
-              },
-              "store_result_in": "queue_exists"
+              "store_result_in": "contingency_enabled"
             },
             {
               "type": "Conditional",
-              "description": "Si cola no existe: crearla. Si existe: verificar puerto.",
+              "description": "Si no hay contingencia activa: reconectar cola remota del print server",
               "condition": {
-                "variable": "queue_exists",
+                "variable": "contingency_enabled",
                 "operator": "equals",
-                "value": "false"
+                "value": "0"
               },
               "actions": [
                 {
                   "type": "RunProcess",
-                  "description": "Crear cola local con puerto LPMCHybridPort",
+                  "description": "Conectar a cola remota del print server (silencioso)",
                   "parameters": {
                     "file_path": "C:\\Windows\\System32\\rundll32.exe",
-                    "arguments": "printui.dll,PrintUIEntry /q /if /b \"{{corporate_queue_name}}\" /r \"LPMCHybridPort\" /m \"Lexmark Universal v2 XL\" /z",
+                    "arguments": "printui.dll,PrintUIEntry /q /in /n \"{{remote_queue_path}}\"",
                     "timeout_seconds": 60,
                     "window_style": "Hidden",
-                    "run_as_logged_in_user": false
+                    "run_as_logged_in_user": true
                   }
-                }
-              ],
-              "else_actions": [
-                {
-                  "type": "ReadPrintQueuePort",
-                  "description": "Leer puerto actual de la cola",
-                  "parameters": {
-                    "queue_name": "{{corporate_queue_name}}"
-                  },
-                  "store_result_in": "current_port"
                 },
                 {
-                  "type": "Conditional",
-                  "description": "Si puerto no es LPMCHybridPort: reasignar",
-                  "condition": {
-                    "variable": "current_port",
-                    "operator": "not_equals",
-                    "value": "LPMCHybridPort"
-                  },
-                  "actions": [
-                    {
-                      "type": "StopService",
-                      "description": "Detener Spooler para cambiar puerto",
-                      "parameters": {
-                        "service_name": "Spooler",
-                        "graceful_timeout_seconds": 30,
-                        "force_kill_on_timeout": true
-                      }
-                    },
-                    {
-                      "type": "RunProcess",
-                      "description": "Actualizar puerto de la cola a LPMCHybridPort en registro",
-                      "parameters": {
-                        "file_path": "C:\\Windows\\System32\\reg.exe",
-                        "arguments": "add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\{{corporate_queue_name}}\" /v Port /t REG_SZ /d LPMCHybridPort /f",
-                        "timeout_seconds": 30,
-                        "window_style": "Hidden",
-                        "run_as_logged_in_user": false
-                      }
-                    },
-                    {
-                      "type": "StartService",
-                      "description": "Reiniciar Spooler",
-                      "parameters": {
-                        "service_name": "Spooler",
-                        "wait_for_running": true,
-                        "timeout_seconds": 30
-                      }
-                    }
-                  ]
+                  "type": "RunProcess",
+                  "description": "Establecer cola remota como impresora predeterminada",
+                  "parameters": {
+                    "file_path": "C:\\Windows\\System32\\rundll32.exe",
+                    "arguments": "printui.dll,PrintUIEntry /q /y /n \"{{remote_queue_path}}\"",
+                    "timeout_seconds": 30,
+                    "window_style": "Hidden",
+                    "run_as_logged_in_user": true
+                  }
                 }
               ]
-            },
-            {
-              "type": "RunProcess",
-              "description": "Establecer cola corporativa como impresora predeterminada",
-              "parameters": {
-                "file_path": "C:\\Windows\\System32\\rundll32.exe",
-                "arguments": "printui.dll,PrintUIEntry /q /y /n \"{{corporate_queue_name}}\"",
-                "timeout_seconds": 30,
-                "window_style": "Hidden",
-                "run_as_logged_in_user": true
-              }
-            }
-          ],
-          "else_actions": [
-            {
-              "type": "RunProcess",
-              "description": "Eliminar cola local corporativa si existe (limpieza de contingencia anterior, silencioso)",
-              "parameters": {
-                "file_path": "C:\\Windows\\System32\\rundll32.exe",
-                "arguments": "printui.dll,PrintUIEntry /q /dl /n \"{{corporate_queue_name}}\"",
-                "timeout_seconds": 30,
-                "window_style": "Hidden",
-                "run_as_logged_in_user": false
-              }
-            },
-            {
-              "type": "RunProcess",
-              "description": "Conectar a cola remota del print server (silencioso)",
-              "parameters": {
-                "file_path": "C:\\Windows\\System32\\rundll32.exe",
-                "arguments": "printui.dll,PrintUIEntry /q /in /n \"{{remote_queue_path}}\"",
-                "timeout_seconds": 60,
-                "window_style": "Hidden",
-                "run_as_logged_in_user": true
-              }
-            },
-            {
-              "type": "RunProcess",
-              "description": "Establecer cola remota como impresora predeterminada",
-              "parameters": {
-                "file_path": "C:\\Windows\\System32\\rundll32.exe",
-                "arguments": "printui.dll,PrintUIEntry /q /y /n \"{{remote_queue_path}}\"",
-                "timeout_seconds": 30,
-                "window_style": "Hidden",
-                "run_as_logged_in_user": true
-              }
             }
           ]
         }
