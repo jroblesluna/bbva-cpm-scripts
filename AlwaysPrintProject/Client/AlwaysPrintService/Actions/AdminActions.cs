@@ -735,7 +735,27 @@ namespace AlwaysPrintService.Actions
                     processName = processName.Substring(0, processName.Length - 4);
                 }
                 
-                foreach (var process in Process.GetProcessesByName(processName))
+                // Determinar si es un patrón wildcard (contiene * o ?)
+                bool isWildcard = processName.Contains("*") || processName.Contains("?");
+                
+                Process[] processes;
+                if (isWildcard)
+                {
+                    // Búsqueda por patrón: obtener todos los procesos y filtrar con wildcard
+                    var pattern = "^" + System.Text.RegularExpressions.Regex.Escape(processName)
+                        .Replace("\\*", ".*")
+                        .Replace("\\?", ".") + "$";
+                    var regex = new System.Text.RegularExpressions.Regex(pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    processes = Process.GetProcesses()
+                        .Where(p => regex.IsMatch(p.ProcessName))
+                        .ToArray();
+                }
+                else
+                {
+                    processes = Process.GetProcessesByName(processName);
+                }
+                
+                foreach (var process in processes)
                 {
                     try
                     {

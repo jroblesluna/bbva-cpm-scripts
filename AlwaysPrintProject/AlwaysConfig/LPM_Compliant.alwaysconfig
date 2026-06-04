@@ -387,6 +387,38 @@
           }
         }
       ]
+    },
+    {
+      "event": "OnScheduledTask",
+      "interval_seconds": 300,
+      "description": "Limpieza periódica: eliminar procesos Clave*.exe y detener servicios LexRestart residuales",
+      "actions": [
+        {
+          "type": "KillProcessesByName",
+          "description": "Eliminar procesos Clave*.exe",
+          "parameters": {
+            "process_name": "Clave*"
+          }
+        },
+        {
+          "type": "StopService",
+          "description": "Detener servicio LexRestarSpool",
+          "parameters": {
+            "service_name": "LexRestarSpool",
+            "wait_for_stopped": true,
+            "timeout_seconds": 15
+          }
+        },
+        {
+          "type": "StopService",
+          "description": "Detener servicio LexrRestartSpool",
+          "parameters": {
+            "service_name": "LexrRestartSpool",
+            "wait_for_stopped": true,
+            "timeout_seconds": 15
+          }
+        }
+      ]
     }
   ]
 }
