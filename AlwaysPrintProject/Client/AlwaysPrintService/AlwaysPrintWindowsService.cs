@@ -336,6 +336,8 @@ namespace AlwaysPrintService
         /// Callback cuando se recibe ForcedContingencyChanged del Tray.
         /// Ejecuta el trigger OnContingencyActivated o OnContingencyDeactivated según corresponda.
         /// Defensa: si enabled=true y no hay printer_ip válida, no se ejecuta el trigger de activación.
+        /// Defensa: si enabled=false y la contingencia ya está desactivada (semáforo=0), no se re-ejecuta
+        /// el trigger de desactivación (evita cascada de RunProcess en cada reconexión WebSocket).
         /// </summary>
         private void OnForcedContingencyReceived(bool enabled, string source, string sourceName, string? printerIp)
         {
@@ -359,6 +361,33 @@ namespace AlwaysPrintService
             }
             else
             {
+                // Verificar si la contingencia ya está desactivada (semáforo en registro = 0).
+                // Si ya está en 0, no re-ejecutar el trigger para evitar cascada de RunProcess
+                // que cuelga cuando el print server está apagado.
+                try
+                {
+                    using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                        RegistryConfigManager.RegistryPath, writable: false))
+                    {
+                        int currentValue = key != null
+                            ? Convert.ToInt32(key.GetValue("ContingencyEnabled", 0))
+                            : 0;
+
+                        if (currentValue == 0)
+                        {
+                            AlwaysPrintLogger.WriteInfo(
+                                "OnForcedContingencyReceived: contingencia ya desactivada (semáforo=0). " +
+                                "Omitiendo trigger OnContingencyDeactivated.");
+                            return;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        $"OnForcedContingencyReceived: no se pudo leer semáforo ContingencyEnabled: {ex.Message}. Ejecutando trigger por precaución.");
+                }
+
                 ExecuteActionTrigger(TriggerEvents.OnContingencyDeactivated);
             }
         }
