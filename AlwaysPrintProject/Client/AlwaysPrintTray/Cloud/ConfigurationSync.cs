@@ -23,16 +23,21 @@ namespace AlwaysPrintTray.Cloud
     public sealed class ConfigurationSync
     {
         private readonly string _cloudApiUrl;
-        private readonly string _workstationId;
         private readonly CloudCredentialsManager _credentials;
         private readonly PipeClient _pipe;
         private readonly CloudWebSocketClient _wsClient;
 
         /// <summary>
+        /// Obtiene el workstation_id actual desde CloudCredentialsManager.
+        /// Siempre lee el valor más reciente (cubre re-registros donde el ID cambia).
+        /// </summary>
+        private string WorkstationId => _credentials.WorkstationId!;
+
+        /// <summary>
         /// Crea una nueva instancia de ConfigurationSync.
         /// </summary>
         /// <param name="cloudApiUrl">URL base de la API Cloud (ej: https://alwaysprint.robles.ai).</param>
-        /// <param name="workstationId">Identificador único de la workstation en APCM.</param>
+        /// <param name="workstationId">No utilizado (mantenido por compatibilidad). Se lee de credentials.</param>
         /// <param name="credentials">Gestor de credenciales y cache en HKCU.</param>
         /// <param name="pipe">Cliente Named Pipe para comunicación con el Service.</param>
         /// <param name="wsClient">Cliente WebSocket para enviar reportes a APCM.</param>
@@ -44,7 +49,7 @@ namespace AlwaysPrintTray.Cloud
             CloudWebSocketClient wsClient)
         {
             _cloudApiUrl = cloudApiUrl;
-            _workstationId = workstationId;
+            // workstationId del parámetro ya no se almacena — se lee de _credentials en cada uso
             _credentials = credentials;
             _pipe = pipe;
             _wsClient = wsClient;
@@ -211,7 +216,7 @@ namespace AlwaysPrintTray.Cloud
         /// </summary>
         private string? DownloadConfig()
         {
-            string url = $"{_cloudApiUrl}/api/v1/workstations/{_workstationId}/config";
+            string url = $"{_cloudApiUrl}/api/v1/workstations/{WorkstationId}/config";
 
             try
             {
