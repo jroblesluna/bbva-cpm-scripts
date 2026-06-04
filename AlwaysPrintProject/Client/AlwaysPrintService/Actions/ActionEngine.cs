@@ -1153,5 +1153,20 @@ namespace AlwaysPrintService.Actions
             return _config.Triggers.Any(t => 
                 t.Event.Equals(eventName, StringComparison.OrdinalIgnoreCase));
         }
+
+        /// <summary>
+        /// Obtiene el interval_seconds configurado para un trigger específico.
+        /// Retorna el valor configurado o 300 (5 min) como default si no está definido.
+        /// </summary>
+        public int GetTriggerIntervalSeconds(string eventName)
+        {
+            if (_config == null)
+                return 300;
+
+            var trigger = _config.Triggers.FirstOrDefault(t =>
+                t.Event.Equals(eventName, StringComparison.OrdinalIgnoreCase));
+
+            return trigger?.IntervalSeconds ?? 300;
+        }
     }
 }

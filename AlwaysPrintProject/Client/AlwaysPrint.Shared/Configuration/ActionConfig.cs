@@ -28,6 +28,7 @@ namespace AlwaysPrint.Shared.Configuration
     
     /// <summary>
     /// Trigger que ejecuta acciones cuando ocurre un evento específico.
+    /// Para OnScheduledTask, se puede definir un intervalo de ejecución periódica.
     /// </summary>
     public class TriggerConfig
     {
@@ -36,6 +37,13 @@ namespace AlwaysPrint.Shared.Configuration
         
         [JsonProperty("description")]
         public string Description { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// Intervalo en segundos para triggers periódicos (OnScheduledTask).
+        /// Mínimo 60 segundos. Ignorado para otros eventos.
+        /// </summary>
+        [JsonProperty("interval_seconds")]
+        public int? IntervalSeconds { get; set; }
         
         [JsonProperty("actions")]
         public List<ActionConfig> Actions { get; set; } = new List<ActionConfig>();
@@ -95,6 +103,7 @@ namespace AlwaysPrint.Shared.Configuration
         public const string OnUserLogoff = "OnUserLogoff";
         public const string OnContingencyActivated = "OnContingencyActivated";
         public const string OnContingencyDeactivated = "OnContingencyDeactivated";
+        public const string OnScheduledTask = "OnScheduledTask";
     }
     
     /// <summary>

@@ -40,6 +40,9 @@ namespace AlwaysPrintService
         private Thread? _startupThread;
         private CancellationTokenSource _cts = new CancellationTokenSource();
         
+        // Timer para ejecución periódica de OnScheduledTask
+        private System.Threading.Timer? _scheduledTaskTimer;
+        
         // Ruta del archivo de configuración de acciones.
         // Se usa ProgramData para que tanto el Tray (usuario normal, solo lectura) como el
         // Service (LocalSystem, lectura/escritura) puedan acceder al mismo archivo.
@@ -131,6 +134,7 @@ namespace AlwaysPrintService
         {
             _state.Transition(ServiceState.Stopping);
             _cts.Cancel();
+            StopScheduledTaskTimer();
             _userArrivedGate.Set();
             _pipeServer?.Stop();
             _taskQueue.Stop();
@@ -605,6 +609,9 @@ namespace AlwaysPrintService
                         
                         // Ejecutar trigger OnServiceStart si existe
                         ExecuteActionTrigger(TriggerEvents.OnServiceStart);
+                        
+                        // Iniciar timer periódico si hay trigger OnScheduledTask configurado
+                        StartScheduledTaskTimer();
                     }
                     else
                     {
@@ -683,6 +690,64 @@ namespace AlwaysPrintService
             }
         }
         
+        /// <summary>
+        /// Inicia el timer periódico para ejecutar triggers OnScheduledTask.
+        /// Lee el interval_seconds del trigger configurado en el .alwaysconfig.
+        /// Mínimo 60 segundos. Si no hay trigger OnScheduledTask, no hace nada.
+        /// </summary>
+        private void StartScheduledTaskTimer()
+        {
+            // Detener timer anterior si existe (recarga de configuración)
+            StopScheduledTaskTimer();
+
+            if (!_actionEngine.HasTrigger(TriggerEvents.OnScheduledTask))
+                return;
+
+            // Obtener el intervalo del trigger configurado
+            int intervalSeconds = _actionEngine.GetTriggerIntervalSeconds(TriggerEvents.OnScheduledTask);
+            if (intervalSeconds < 60)
+                intervalSeconds = 60; // Mínimo 60 segundos
+
+            AlwaysPrintLogger.WriteInfo(
+                $"ScheduledTask: timer periódico iniciado. Intervalo={intervalSeconds}s");
+
+            _scheduledTaskTimer = new System.Threading.Timer(
+                OnScheduledTaskTick,
+                null,
+                TimeSpan.FromSeconds(intervalSeconds),  // Primera ejecución después del intervalo
+                TimeSpan.FromSeconds(intervalSeconds));  // Repetir cada intervalo
+        }
+
+        /// <summary>
+        /// Detiene el timer periódico de OnScheduledTask.
+        /// </summary>
+        private void StopScheduledTaskTimer()
+        {
+            if (_scheduledTaskTimer != null)
+            {
+                _scheduledTaskTimer.Dispose();
+                _scheduledTaskTimer = null;
+            }
+        }
+
+        /// <summary>
+        /// Callback del timer periódico. Ejecuta el trigger OnScheduledTask.
+        /// </summary>
+        private void OnScheduledTaskTick(object? state)
+        {
+            if (_cts.IsCancellationRequested) return;
+
+            try
+            {
+                ExecuteActionTrigger(TriggerEvents.OnScheduledTask);
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"ScheduledTask: error en ejecución periódica: {ex.Message}", ex);
+            }
+        }
+
         /// <summary>
         /// Ejecuta un trigger de acciones si está configurado.
         /// </summary>
