@@ -965,8 +965,9 @@ namespace AlwaysPrintService.Actions
 
                 var pi = new PROCESS_INFORMATION();
 
-                // CREATE_NEW_CONSOLE | CREATE_UNICODE_ENVIRONMENT (necesario cuando se usa CreateEnvironmentBlock)
-                uint creationFlags = 0x00000010 | 0x00000400;
+                // CREATE_NEW_CONSOLE | CREATE_UNICODE_ENVIRONMENT | CREATE_SUSPENDED
+                // CREATE_SUSPENDED permite asignar al Job Object antes de que el proceso inicie
+                uint creationFlags = 0x00000010 | 0x00000400 | 0x00000004;
 
                 bool created = CreateProcessAsUser(
                     duplicateToken,
@@ -991,16 +992,52 @@ namespace AlwaysPrintService.Actions
                     return false;
                 }
 
+                // Crear Job Object con KILL_ON_JOB_CLOSE para matar todo el árbol de procesos al cerrar el handle
+                IntPtr hJob = CreateJobObject(IntPtr.Zero, null);
+                if (hJob != IntPtr.Zero)
+                {
+                    var jobInfo = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
+                    jobInfo.BasicLimitInformation.LimitFlags = 0x00002000; // JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+                    int infoSize = Marshal.SizeOf(typeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
+                    IntPtr infoPtr = Marshal.AllocHGlobal(infoSize);
+                    try
+                    {
+                        Marshal.StructureToPtr(jobInfo, infoPtr, false);
+                        SetInformationJobObject(hJob, 9 /* JobObjectExtendedLimitInformation */, infoPtr, (uint)infoSize);
+                    }
+                    finally
+                    {
+                        Marshal.FreeHGlobal(infoPtr);
+                    }
+                    AssignProcessToJobObject(hJob, pi.hProcess);
+                }
+
+                // Reanudar el proceso (fue creado suspendido)
+                ResumeThread(pi.hThread);
+
                 // Esperar a que termine
                 uint waitResult = WaitForSingleObject(pi.hProcess, (uint)(timeoutSeconds * 1000));
                 if (waitResult != 0) // WAIT_OBJECT_0
                 {
-                    AlwaysPrintLogger.WriteWarning($"RunProcess: timeout ({timeoutSeconds}s) alcanzado para '{filePath}' (como usuario). Terminando.");
-                    TerminateProcess(pi.hProcess, 1);
+                    AlwaysPrintLogger.WriteWarning($"RunProcess: timeout ({timeoutSeconds}s) alcanzado para '{filePath}' (como usuario). Terminando árbol de procesos.");
+                    // Cerrar el Job Object mata todos los procesos del grupo (cmd.exe + rundll32.exe + hijos)
+                    if (hJob != IntPtr.Zero)
+                    {
+                        TerminateJobObject(hJob, 1);
+                        CloseHandle(hJob);
+                        hJob = IntPtr.Zero;
+                    }
+                    else
+                    {
+                        TerminateProcess(pi.hProcess, 1);
+                    }
                     CloseHandle(pi.hProcess);
                     CloseHandle(pi.hThread);
                     return false;
                 }
+
+                // Limpiar Job Object después de terminación normal
+                if (hJob != IntPtr.Zero) CloseHandle(hJob);
 
                 uint exitCode = 0;
                 GetExitCodeProcess(pi.hProcess, out exitCode);
@@ -1127,6 +1164,61 @@ namespace AlwaysPrintService.Actions
         
         [DllImport("kernel32.dll")]
         private static extern uint WTSGetActiveConsoleSessionId();
+        
+        // ═══════════════════════════════════════════════════════════════════════
+        // P/INVOKE para Job Objects (matar árbol de procesos en timeout)
+        // ═══════════════════════════════════════════════════════════════════════
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern IntPtr CreateJobObject(IntPtr lpJobAttributes, string? lpName);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool AssignProcessToJobObject(IntPtr hJob, IntPtr hProcess);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetInformationJobObject(IntPtr hJob, int jobObjectInfoClass, IntPtr lpJobObjectInfo, uint cbJobObjectInfoLength);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool TerminateJobObject(IntPtr hJob, uint uExitCode);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern uint ResumeThread(IntPtr hThread);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JOBOBJECT_BASIC_LIMIT_INFORMATION
+        {
+            public long PerProcessUserTimeLimit;
+            public long PerJobUserTimeLimit;
+            public uint LimitFlags;
+            public UIntPtr MinimumWorkingSetSize;
+            public UIntPtr MaximumWorkingSetSize;
+            public uint ActiveProcessLimit;
+            public UIntPtr Affinity;
+            public uint PriorityClass;
+            public uint SchedulingClass;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct IO_COUNTERS
+        {
+            public ulong ReadOperationCount;
+            public ulong WriteOperationCount;
+            public ulong OtherOperationCount;
+            public ulong ReadTransferCount;
+            public ulong WriteTransferCount;
+            public ulong OtherTransferCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+        {
+            public JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
+            public IO_COUNTERS IoInfo;
+            public UIntPtr ProcessMemoryLimit;
+            public UIntPtr JobMemoryLimit;
+            public UIntPtr PeakProcessMemoryUsed;
+            public UIntPtr PeakJobMemoryUsed;
+        }
         
         [DllImport("wtsapi32.dll", SetLastError = true)]
         private static extern bool WTSEnumerateSessions(
