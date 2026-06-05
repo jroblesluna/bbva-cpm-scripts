@@ -475,6 +475,11 @@ async def workstation_websocket(
                     "type": "error",
                     "message": f"Unknown message type: {message_type}"
                 })
+            
+            # Liberar objetos cacheados de la sesión de BD después de cada mensaje.
+            # Conexiones WebSocket son de larga duración (horas/días) y sin esto,
+            # la identity map de SQLAlchemy acumula objetos indefinidamente.
+            db.expire_all()
     
     except WebSocketDisconnect:
         # Cliente desconectado
