@@ -137,15 +137,15 @@ export default function ConnectivityDashboardPage() {
   return (
     <div className="max-w-screen-2xl mx-auto">
       {/* Encabezado */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Conectividad</h1>
           <p className="text-gray-600 mt-2">
             Monitoreo en tiempo real de checks de conectividad
           </p>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-500">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
             {tCommon('lastUpdated', { time: formatDateWithTimezone(lastUpdated, userTimezone) })}
           </span>
           <Button
@@ -335,19 +335,19 @@ function WorkstationConnectivityCard({
       onClick={onSelect}
     >
       {/* Encabezado de workstation */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2">
           {workstation.is_online ? (
-            <Wifi className="w-4 h-4 text-green-600" />
+            <Wifi className="w-4 h-4 text-green-600 flex-shrink-0" />
           ) : (
-            <WifiOff className="w-4 h-4 text-gray-400" />
+            <WifiOff className="w-4 h-4 text-gray-400 flex-shrink-0" />
           )}
           <span className="font-medium text-gray-900">{displayName}</span>
-          <Badge variant={workstation.is_online ? 'success' : 'secondary'}>
+          <Badge variant={workstation.is_online ? 'success' : 'secondary'} className="whitespace-nowrap">
             {workstation.is_online ? 'En línea' : 'Desconectada'}
           </Badge>
         </div>
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-gray-500 whitespace-nowrap">
           {checks.length} check{checks.length !== 1 ? 's' : ''}
         </span>
       </div>

@@ -198,14 +198,14 @@ export default function TelemetryDashboardPage() {
   return (
     <div className="max-w-screen-2xl mx-auto">
       {/* Encabezado */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
           <p className="text-gray-600 mt-2">
             {t('subtitle')}
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           {isAdmin && (
             <select
               value={selectedOrgId ?? ''}
@@ -218,7 +218,7 @@ export default function TelemetryDashboardPage() {
               ))}
             </select>
           )}
-          <span className="text-sm text-gray-500">
+          <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
             {tCommon('lastUpdated', { time: formatDateWithTimezone(lastUpdated, userTimezone) })}
           </span>
           <Button

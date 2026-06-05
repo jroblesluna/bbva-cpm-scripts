@@ -228,11 +228,11 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-screen-2xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-8">
         <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
         <div className="flex items-center gap-3">
           {lastUpdated && (
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-500 whitespace-nowrap">
               {t('lastUpdated', { time: formatLastUpdated(lastUpdated) })}
             </span>
           )}
@@ -790,12 +790,12 @@ function DonutChart({ active, total, label }: { active: number; total: number; l
         </div>
       </div>
       <p className="text-sm font-medium text-gray-700 text-center">{label}</p>
-      <div className="flex items-center gap-3 text-xs text-gray-500">
-        <span className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+        <span className="flex items-center gap-1 whitespace-nowrap">
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-orange-500" />
           Contingencia
         </span>
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1 whitespace-nowrap">
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-gray-200 border border-gray-300" />
           Normal
         </span>
@@ -826,7 +826,7 @@ function ContingencyDonuts({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-3 gap-6 justify-items-center">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 justify-items-center">
           <DonutChart
             active={stats.contingency_active}
             total={stats.total}
