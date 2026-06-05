@@ -686,6 +686,7 @@ namespace AlwaysPrintTray
                         // 5. Iniciar CloudManager con la configuración actualizada
                         var credentials = new CloudCredentialsManager();
                         _cloudManager = new CloudManager(cfg, credentials, _pipe, _uiContext, _trayIcon);
+                        _cloudManager.Registered += () => OnCloudManagerRegistered(cfg);
                         _cloudManager.CheckUpdateRequested += OnCheckUpdateRequested;
                         _cloudManager.Start();
                         
