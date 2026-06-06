@@ -18,7 +18,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.models.workstation import Workstation
 from app.models.organization import Organization, PublicIP
 from app.schemas.websocket import RegisterMessage, TelemetryMessage, ConnectivityResultMessage
@@ -476,10 +476,11 @@ async def workstation_websocket(
                     "message": f"Unknown message type: {message_type}"
                 })
             
-            # Liberar objetos cacheados de la sesión de BD después de cada mensaje.
-            # Conexiones WebSocket son de larga duración (horas/días) y sin esto,
-            # la identity map de SQLAlchemy acumula objetos indefinidamente.
-            db.expire_all()
+            # Liberar sesión de BD después de cada mensaje y reciclar.
+            # Sin esto, cada WebSocket retiene una conexión del pool permanentemente.
+            # Con 21+ workstations conectadas, el pool de 25 se agota y el backend deja de responder.
+            db.close()
+            db = SessionLocal()
     
     except WebSocketDisconnect:
         # Cliente desconectado
