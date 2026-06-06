@@ -1032,5 +1032,50 @@
     "errorCreate": "No se pudo crear el documento",
     "errorUpdate": "No se pudo actualizar el documento",
     "errorDelete": "No se pudo eliminar el documento"
+  },
+  "systemMetrics": {
+    "title": "Métricas de Escalabilidad",
+    "refresh": "Actualizar",
+    "websocket": {
+      "label": "Conexiones WebSocket",
+      "total": "Total conexiones",
+      "workstations": "Workstations",
+      "operators": "Operadores"
+    },
+    "memory": {
+      "label": "Memoria Python",
+      "rss": "RSS del proceso",
+      "container": "Total contenedor",
+      "perWorkstation": "Promedio por workstation",
+      "unit": "MB"
+    },
+    "fileDescriptors": {
+      "label": "File Descriptors",
+      "open": "Abiertos",
+      "limit": "Límite",
+      "usage": "Uso"
+    },
+    "network": {
+      "label": "Tráfico de Red",
+      "rxBytes": "Bytes recibidos",
+      "txBytes": "Bytes transmitidos",
+      "rxRate": "Tasa de recepción",
+      "txRate": "Tasa de transmisión",
+      "unit": "B/s"
+    },
+    "dbPool": {
+      "label": "Pool de Base de Datos",
+      "checkedOut": "En uso",
+      "idle": "Disponibles",
+      "poolSize": "Tamaño del pool",
+      "overflow": "Overflow",
+      "pgActive": "Conexiones PostgreSQL activas",
+      "usage": "Uso del pool"
+    },
+    "states": {
+      "loading": "Cargando métricas...",
+      "error": "Error al cargar las métricas",
+      "unavailable": "No disponible"
+    }
   }
 }

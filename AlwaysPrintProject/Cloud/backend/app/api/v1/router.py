@@ -25,6 +25,7 @@ from app.api.v1.endpoints import (
     documents,
     log_analysis,
     system_status,
+    system_metrics,
 )
 
 # Router principal de la API v1
@@ -166,6 +167,13 @@ api_router.include_router(
     system_status.router,
     prefix="/system-status",
     tags=["System Status"]
+)
+
+# Métricas de escalabilidad del sistema (solo Admin)
+api_router.include_router(
+    system_metrics.router,
+    prefix="/system",
+    tags=["system-metrics"]
 )
 
 

@@ -11,8 +11,10 @@
 #   2. Verifica infraestructura AWS (EC2, RDS, ECR)
 #   3. Verifica containers y aplicación vía SSM
 #   4. Verifica endpoints públicos (HTTPS, SSL)
-#   5. Muestra errores recientes
-#   6. Muestra acciones recomendadas si hay problemas
+#   5. Consulta métricas de escalabilidad (WebSocket, memoria, FD, pool BD, red)
+#   6. Valida variables de entorno
+#   7. Muestra estadísticas de la instancia
+#   8. Muestra errores recientes y acciones recomendadas
 # =============================================================================
 
 set -o pipefail
@@ -596,9 +598,213 @@ else
 fi
 
 # =============================================================================
-# 5. VALIDACIÓN DE VARIABLES DE ENTORNO
+# 5. MÉTRICAS DE ESCALABILIDAD
 # =============================================================================
-print_header "5. VALIDACIÓN DE VARIABLES DE ENTORNO"
+print_header "5. MÉTRICAS DE ESCALABILIDAD"
+
+echo -e "  ${CYAN}Consultando /api/v1/system/metrics...${NC}"
+
+# Necesitamos un token admin para consultar el endpoint protegido
+# Intentar obtener métricas vía SSM (curl interno sin auth desde el backend)
+if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ] && [ "$BACKEND_STATUS" = "running" ]; then
+    METRICS_JSON=$(ssm_exec "$INSTANCE_ID" '["docker exec alwaysprint-backend-1 python -c \"import asyncio; from app.services.scalability_metrics import scalability_collector; import json; m = asyncio.run(scalability_collector.collect_all_metrics()); print(m.model_dump_json())\" 2>/dev/null || echo FAIL"]' 10)
+
+    if [ -n "$METRICS_JSON" ] && [ "$METRICS_JSON" != "FAIL" ] && echo "$METRICS_JSON" | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
+        echo ""
+
+        # Parsear métricas con python3
+        METRICS_PARSED=$(echo "$METRICS_JSON" | python3 -c "
+import sys, json
+m = json.load(sys.stdin)
+
+# WebSocket
+ws = m.get('websocket')
+if ws:
+    total = ws.get('total', 0)
+    avail = ws.get('data_available', True)
+    if not avail:
+        print('WS_STATUS=unavailable')
+    elif total > 4500:
+        print(f'WS_STATUS=critical')
+    elif total > 3000:
+        print(f'WS_STATUS=warning')
+    else:
+        print(f'WS_STATUS=ok')
+    print(f'WS_TOTAL={total}')
+    print(f'WS_WORKSTATIONS={ws.get(\"workstation_count\", 0)}')
+    print(f'WS_OPERATORS={ws.get(\"operator_count\", 0)}')
+else:
+    print('WS_STATUS=null')
+
+# Memoria Python
+mem = m.get('python_memory')
+if mem:
+    rss = mem.get('rss_mb')
+    avg = mem.get('avg_per_workstation_mb')
+    container = mem.get('container_total_mb')
+    print(f'MEM_RSS={rss if rss is not None else \"N/A\"}')
+    print(f'MEM_AVG_WS={avg if avg is not None else \"N/A\"}')
+    print(f'MEM_CONTAINER={container if container is not None else \"N/A\"}')
+    if avg is not None and avg > 0:
+        if avg > 4.0:
+            print('MEM_STATUS=critical')
+        elif avg > 2.0:
+            print('MEM_STATUS=warning')
+        else:
+            print('MEM_STATUS=ok')
+    else:
+        print('MEM_STATUS=ok')
+else:
+    print('MEM_STATUS=null')
+
+# File descriptors
+fd = m.get('file_descriptors')
+if fd:
+    pct = fd.get('usage_percent')
+    print(f'FD_OPEN={fd.get(\"open_count\", \"N/A\")}')
+    print(f'FD_LIMIT={fd.get(\"limit\", \"N/A\")}')
+    print(f'FD_PCT={pct if pct is not None else \"N/A\"}')
+    if pct is not None:
+        if pct > 80.0:
+            print('FD_STATUS=critical')
+        elif pct > 60.0:
+            print('FD_STATUS=warning')
+        else:
+            print('FD_STATUS=ok')
+    else:
+        print('FD_STATUS=null')
+else:
+    print('FD_STATUS=null')
+
+# Pool BD
+pool = m.get('db_pool')
+if pool:
+    pct = pool.get('usage_percent')
+    print(f'POOL_CHECKED={pool.get(\"checked_out\", \"N/A\")}')
+    print(f'POOL_IDLE={pool.get(\"idle\", \"N/A\")}')
+    print(f'POOL_SIZE={pool.get(\"pool_size\", \"N/A\")}')
+    print(f'POOL_PG={pool.get(\"pg_active_connections\", \"N/A\")}')
+    print(f'POOL_PCT={pct if pct is not None else \"N/A\"}')
+    if pct is not None:
+        if pct > 80.0:
+            print('POOL_STATUS=critical')
+        elif pct > 60.0:
+            print('POOL_STATUS=warning')
+        else:
+            print('POOL_STATUS=ok')
+    else:
+        print('POOL_STATUS=null')
+else:
+    print('POOL_STATUS=null')
+
+# Red
+net = m.get('network')
+if net:
+    tx_rate = net.get('tx_rate_bps')
+    rx_rate = net.get('rx_rate_bps')
+    print(f'NET_RX_BYTES={net.get(\"rx_bytes\", \"N/A\")}')
+    print(f'NET_TX_BYTES={net.get(\"tx_bytes\", \"N/A\")}')
+    if tx_rate is not None:
+        tx_mbs = round(tx_rate / (1024*1024), 2)
+        print(f'NET_TX_MBS={tx_mbs}')
+        if tx_mbs > 80.0:
+            print('NET_STATUS=critical')
+        elif tx_mbs > 50.0:
+            print('NET_STATUS=warning')
+        else:
+            print('NET_STATUS=ok')
+    else:
+        print('NET_TX_MBS=N/A')
+        print('NET_STATUS=first_read')
+else:
+    print('NET_STATUS=null')
+" 2>/dev/null)
+
+        if [ -n "$METRICS_PARSED" ]; then
+            eval "$METRICS_PARSED"
+
+            # WebSocket
+            echo -e "\n  ${BLUE}WebSocket Connections:${NC}"
+            if [ "$WS_STATUS" = "ok" ]; then
+                check_ok "Total: $WS_TOTAL (ws: $WS_WORKSTATIONS, ops: $WS_OPERATORS) — verde"
+            elif [ "$WS_STATUS" = "warning" ]; then
+                check_warn "Total: $WS_TOTAL (ws: $WS_WORKSTATIONS, ops: $WS_OPERATORS) — umbral 3000 superado"
+            elif [ "$WS_STATUS" = "critical" ]; then
+                check_fail "Total: $WS_TOTAL (ws: $WS_WORKSTATIONS, ops: $WS_OPERATORS) — CRÍTICO (>4500)"
+                recommend "Conexiones WebSocket en zona crítica ($WS_TOTAL). Considerar escalado horizontal."
+            elif [ "$WS_STATUS" = "unavailable" ]; then
+                check_warn "ConnectionManager no disponible"
+            else
+                check_warn "Métrica no disponible"
+            fi
+
+            # Memoria Python
+            echo -e "\n  ${BLUE}Memoria Python:${NC}"
+            if [ "$MEM_STATUS" = "ok" ]; then
+                check_ok "RSS: ${MEM_RSS} MB | Por WS: ${MEM_AVG_WS} MB/ws — verde"
+            elif [ "$MEM_STATUS" = "warning" ]; then
+                check_warn "RSS: ${MEM_RSS} MB | Por WS: ${MEM_AVG_WS} MB/ws — umbral 2 MB/ws superado"
+            elif [ "$MEM_STATUS" = "critical" ]; then
+                check_fail "RSS: ${MEM_RSS} MB | Por WS: ${MEM_AVG_WS} MB/ws — CRÍTICO (>4 MB/ws)"
+                recommend "Memoria por workstation en zona crítica (${MEM_AVG_WS} MB/ws). Investigar memory leaks."
+            else
+                check_warn "Métrica no disponible"
+            fi
+
+            # File Descriptors
+            echo -e "\n  ${BLUE}File Descriptors:${NC}"
+            if [ "$FD_STATUS" = "ok" ]; then
+                check_ok "Abiertos: $FD_OPEN / $FD_LIMIT (${FD_PCT}%) — verde"
+            elif [ "$FD_STATUS" = "warning" ]; then
+                check_warn "Abiertos: $FD_OPEN / $FD_LIMIT (${FD_PCT}%) — umbral 60% superado"
+            elif [ "$FD_STATUS" = "critical" ]; then
+                check_fail "Abiertos: $FD_OPEN / $FD_LIMIT (${FD_PCT}%) — CRÍTICO (>80%)"
+                recommend "File descriptors en zona crítica (${FD_PCT}%). Verificar fugas de conexiones."
+            else
+                check_warn "Métrica no disponible"
+            fi
+
+            # Pool BD
+            echo -e "\n  ${BLUE}Pool de Base de Datos:${NC}"
+            if [ "$POOL_STATUS" = "ok" ]; then
+                check_ok "En uso: $POOL_CHECKED / $POOL_SIZE (${POOL_PCT}%) | PG activas: $POOL_PG — verde"
+            elif [ "$POOL_STATUS" = "warning" ]; then
+                check_warn "En uso: $POOL_CHECKED / $POOL_SIZE (${POOL_PCT}%) | PG activas: $POOL_PG — umbral 60% superado"
+            elif [ "$POOL_STATUS" = "critical" ]; then
+                check_fail "En uso: $POOL_CHECKED / $POOL_SIZE (${POOL_PCT}%) | PG activas: $POOL_PG — CRÍTICO (>80%)"
+                recommend "Pool de BD en zona crítica (${POOL_PCT}%). Considerar aumentar pool_size o investigar conexiones sin liberar."
+            else
+                check_warn "Métrica no disponible"
+            fi
+
+            # Red
+            echo -e "\n  ${BLUE}Tráfico de Red:${NC}"
+            if [ "$NET_STATUS" = "ok" ]; then
+                check_ok "TX rate: ${NET_TX_MBS} MB/s — verde"
+            elif [ "$NET_STATUS" = "warning" ]; then
+                check_warn "TX rate: ${NET_TX_MBS} MB/s — umbral 50 MB/s superado"
+            elif [ "$NET_STATUS" = "critical" ]; then
+                check_fail "TX rate: ${NET_TX_MBS} MB/s — CRÍTICO (>80 MB/s)"
+                recommend "Tráfico de red en zona crítica (${NET_TX_MBS} MB/s). Verificar saturación de ancho de banda."
+            elif [ "$NET_STATUS" = "first_read" ]; then
+                check_ok "Bytes TX: $NET_TX_BYTES (primera lectura, tasa disponible en próxima consulta)"
+            else
+                check_warn "Métrica no disponible"
+            fi
+        else
+            check_warn "No se pudieron parsear las métricas de escalabilidad"
+        fi
+    else
+        check_warn "No se pudieron obtener métricas de escalabilidad (backend puede estar inicializando)"
+    fi
+else
+    check_warn "No se pueden consultar métricas (backend no disponible)"
+fi
+
+# =============================================================================
+# 6. VALIDACIÓN DE VARIABLES DE ENTORNO
+# =============================================================================
+print_header "6. VALIDACIÓN DE VARIABLES DE ENTORNO"
 
 if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
     echo -e "  ${CYAN}Verificando variables del backend...${NC}"
@@ -653,9 +859,9 @@ else
 fi
 
 # =============================================================================
-# 6. ESTADÍSTICAS DE LA INSTANCIA
+# 7. ESTADÍSTICAS DE LA INSTANCIA
 # =============================================================================
-print_header "6. ESTADÍSTICAS DE LA INSTANCIA"
+print_header "7. ESTADÍSTICAS DE LA INSTANCIA"
 
 if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
     echo -e "  ${CYAN}Consultando recursos...${NC}"
@@ -710,9 +916,9 @@ else
 fi
 
 # =============================================================================
-# 7. ERRORES RECIENTES
+# 8. ERRORES RECIENTES
 # =============================================================================
-print_header "7. ERRORES RECIENTES"
+print_header "8. ERRORES RECIENTES"
 
 if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
     LOGS=$(ssm_exec "$INSTANCE_ID" '["echo \"=== BACKEND ===\"; docker logs alwaysprint-backend-1 --tail 50 2>&1 | grep -i \"error\\|traceback\\|critical\" | grep -v \"favicon\\|_next/static\" | tail -5 || echo \"Sin errores\"; echo; echo \"=== FRONTEND ===\"; docker logs alwaysprint-frontend-1 --tail 50 2>&1 | grep -i \"error\" | grep -v \"favicon\\|_next/static\\|chunk\" | cut -c1-200 | tail -3 || echo \"Sin errores\""]' 8)

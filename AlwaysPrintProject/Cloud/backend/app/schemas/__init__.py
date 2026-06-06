@@ -177,6 +177,16 @@ from app.schemas.system_status import (
     ServiceUptimeResponse,
 )
 
+# === SCALABILITY METRICS SCHEMAS ===
+from app.schemas.scalability_metrics import (
+    WebSocketMetricsResponse,
+    PythonMemoryResponse,
+    FileDescriptorResponse,
+    NetworkTrafficResponse,
+    DbPoolResponse,
+    ScalabilityMetricsResponse,
+)
+
 # === UPDATE SCHEMAS ===
 from app.schemas.updates import (
     UpdateCheckResponse,
@@ -309,4 +319,11 @@ __all__ = [
     "MetricStats",
     "HistoryResponse",
     "ServiceUptimeResponse",
+    # Scalability Metrics
+    "WebSocketMetricsResponse",
+    "PythonMemoryResponse",
+    "FileDescriptorResponse",
+    "NetworkTrafficResponse",
+    "DbPoolResponse",
+    "ScalabilityMetricsResponse",
 ]

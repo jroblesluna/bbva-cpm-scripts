@@ -1,5 +1,5 @@
 {
-  "version": "6.3",
+  "version": "6.4",
   "name": "LPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Print Management (modo Print Server). Gestiona contingencia creando/eliminando cola local con puerto TCP híbrido. Persiste estado con ReadAppSetting/WriteAppSetting (ruta según build). Soporta else_actions.",
   "created_at": "2026-06-01T12:00:00Z",
@@ -390,7 +390,7 @@
     },
     {
       "event": "OnScheduledTask",
-      "interval_seconds": 300,
+      "interval_seconds": 60,
       "description": "Limpieza periódica: eliminar procesos Clave*.exe, detener servicios LexRestart. Si se eliminó algún Clave* y no hay contingencia: reconectar cola remota.",
       "actions": [
         {

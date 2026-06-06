@@ -53,6 +53,7 @@ import type {
   Alert,
 } from '@/types/system-status';
 import HistoryTab from './components/HistoryTab';
+import MetricsCard from './components/MetricsCard';
 
 // === CONSTANTES DE UMBRALES ===
 const THRESHOLD_MEMORY = 80;
@@ -463,6 +464,9 @@ export default function SystemStatusPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Métricas de escalabilidad */}
+          <MetricsCard />
 
           {/* Contenedores Docker */}
           <Card>

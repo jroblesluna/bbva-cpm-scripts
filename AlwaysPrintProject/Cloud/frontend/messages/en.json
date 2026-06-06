@@ -1032,5 +1032,50 @@
     "errorCreate": "Could not create the document",
     "errorUpdate": "Could not update the document",
     "errorDelete": "Could not delete the document"
+  },
+  "systemMetrics": {
+    "title": "Scalability Metrics",
+    "refresh": "Refresh",
+    "websocket": {
+      "label": "WebSocket Connections",
+      "total": "Total connections",
+      "workstations": "Workstations",
+      "operators": "Operators"
+    },
+    "memory": {
+      "label": "Python Memory",
+      "rss": "Process RSS",
+      "container": "Container total",
+      "perWorkstation": "Average per workstation",
+      "unit": "MB"
+    },
+    "fileDescriptors": {
+      "label": "File Descriptors",
+      "open": "Open",
+      "limit": "Limit",
+      "usage": "Usage"
+    },
+    "network": {
+      "label": "Network Traffic",
+      "rxBytes": "Bytes received",
+      "txBytes": "Bytes transmitted",
+      "rxRate": "Receive rate",
+      "txRate": "Transmit rate",
+      "unit": "B/s"
+    },
+    "dbPool": {
+      "label": "Database Pool",
+      "checkedOut": "Checked out",
+      "idle": "Idle",
+      "poolSize": "Pool size",
+      "overflow": "Overflow",
+      "pgActive": "Active PostgreSQL connections",
+      "usage": "Pool usage"
+    },
+    "states": {
+      "loading": "Loading metrics...",
+      "error": "Error loading metrics",
+      "unavailable": "Unavailable"
+    }
   }
 }

@@ -43,12 +43,14 @@ from app.models.system_status import (
     OverallStatus,
     StatusSnapshot,
 )
+from app.schemas.scalability_metrics import ScalabilityMetricsResponse
 from app.schemas.system_status import (
     AlertResponse,
     ContainerMetricsResponse,
     HealthCheckResponse,
     OsMetricsResponse,
 )
+from app.services.scalability_metrics import scalability_collector
 
 
 # Configurar logger para el módulo
@@ -711,6 +713,7 @@ class SystemStatusCollector:
         os_metrics: OsMetricsResponse,
         health_checks: List[HealthCheckResponse],
         docker_metrics: List[ContainerMetricsResponse],
+        scalability_metrics: Optional[ScalabilityMetricsResponse] = None,
     ) -> Tuple[str, List[AlertResponse]]:
         """
         Calcula el estado general del sistema y genera alertas por umbrales superados.
@@ -722,8 +725,20 @@ class SystemStatusCollector:
         - SSL < 14 días → alerta severity "warning"
         - Contenedor no running → alerta severity "warning"
 
+        Umbrales de escalabilidad:
+        - WebSocket total > 4500 → alerta severity "critical"
+        - WebSocket total > 3000 → alerta severity "warning"
+        - Memoria Python por workstation > 4 MB/ws → alerta severity "critical"
+        - Memoria Python por workstation > 2 MB/ws → alerta severity "warning"
+        - File descriptors > 80% → alerta severity "critical"
+        - File descriptors > 60% → alerta severity "warning"
+        - Pool BD > 80% → alerta severity "critical"
+        - Pool BD > 60% → alerta severity "warning"
+        - Tasa de transmisión de red > 80 MB/s → alerta severity "critical"
+        - Tasa de transmisión de red > 50 MB/s → alerta severity "warning"
+
         Estado general:
-        - "critical": si alguna alerta tiene severity "critical" (CPU > 90%)
+        - "critical": si alguna alerta tiene severity "critical"
         - "degraded": si hay alertas pero ninguna es critical
         - "healthy": si no hay alertas
 
@@ -731,6 +746,7 @@ class SystemStatusCollector:
             os_metrics: Métricas del sistema operativo
             health_checks: Lista de resultados de health checks
             docker_metrics: Lista de métricas de contenedores Docker
+            scalability_metrics: Métricas de escalabilidad (opcional)
 
         Returns:
             Tupla (overall_status, alerts):
@@ -795,6 +811,105 @@ class SystemStatusCollector:
                     severity="warning",
                 ))
 
+        # === MÉTRICAS DE ESCALABILIDAD ===
+        # Verificar umbrales de las métricas de escalabilidad si están disponibles
+        if scalability_metrics is not None:
+            # WebSocket total: > 4500 critical, > 3000 warning
+            if scalability_metrics.websocket is not None:
+                ws_total = scalability_metrics.websocket.total
+                if ws_total > 4500:
+                    alerts.append(AlertResponse(
+                        metric_name="ws_connections",
+                        current_value=float(ws_total),
+                        threshold=4500.0,
+                        severity="critical",
+                    ))
+                elif ws_total > 3000:
+                    alerts.append(AlertResponse(
+                        metric_name="ws_connections",
+                        current_value=float(ws_total),
+                        threshold=3000.0,
+                        severity="warning",
+                    ))
+
+            # Memoria Python por workstation: > 4 MB/ws critical, > 2 MB/ws warning
+            if scalability_metrics.python_memory is not None:
+                avg_mem = scalability_metrics.python_memory.avg_per_workstation_mb
+                if avg_mem is not None and avg_mem > 0:
+                    if avg_mem > 4.0:
+                        alerts.append(AlertResponse(
+                            metric_name="memory_per_ws",
+                            current_value=avg_mem,
+                            threshold=4.0,
+                            severity="critical",
+                        ))
+                    elif avg_mem > 2.0:
+                        alerts.append(AlertResponse(
+                            metric_name="memory_per_ws",
+                            current_value=avg_mem,
+                            threshold=2.0,
+                            severity="warning",
+                        ))
+
+            # File descriptors: > 80% critical, > 60% warning
+            if scalability_metrics.file_descriptors is not None:
+                fd_pct = scalability_metrics.file_descriptors.usage_percent
+                if fd_pct is not None:
+                    if fd_pct > 80.0:
+                        alerts.append(AlertResponse(
+                            metric_name="file_descriptors",
+                            current_value=fd_pct,
+                            threshold=80.0,
+                            severity="critical",
+                        ))
+                    elif fd_pct > 60.0:
+                        alerts.append(AlertResponse(
+                            metric_name="file_descriptors",
+                            current_value=fd_pct,
+                            threshold=60.0,
+                            severity="warning",
+                        ))
+
+            # Pool de BD: > 80% critical, > 60% warning
+            if scalability_metrics.db_pool is not None:
+                pool_pct = scalability_metrics.db_pool.usage_percent
+                if pool_pct is not None:
+                    if pool_pct > 80.0:
+                        alerts.append(AlertResponse(
+                            metric_name="db_pool_usage",
+                            current_value=pool_pct,
+                            threshold=80.0,
+                            severity="critical",
+                        ))
+                    elif pool_pct > 60.0:
+                        alerts.append(AlertResponse(
+                            metric_name="db_pool_usage",
+                            current_value=pool_pct,
+                            threshold=60.0,
+                            severity="warning",
+                        ))
+
+            # Tasa de transmisión de red: > 80 MB/s critical, > 50 MB/s warning
+            if scalability_metrics.network is not None:
+                tx_rate = scalability_metrics.network.tx_rate_bps
+                if tx_rate is not None:
+                    # Convertir bytes/s a MB/s para comparar con umbrales
+                    tx_rate_mbs = tx_rate / (1024 * 1024)
+                    if tx_rate_mbs > 80.0:
+                        alerts.append(AlertResponse(
+                            metric_name="network_tx_rate",
+                            current_value=round(tx_rate_mbs, 2),
+                            threshold=80.0,
+                            severity="critical",
+                        ))
+                    elif tx_rate_mbs > 50.0:
+                        alerts.append(AlertResponse(
+                            metric_name="network_tx_rate",
+                            current_value=round(tx_rate_mbs, 2),
+                            threshold=50.0,
+                            severity="warning",
+                        ))
+
         # Determinar estado general según severidad de alertas
         has_critical = any(alert.severity == "critical" for alert in alerts)
 
@@ -855,6 +970,7 @@ class SystemStatusCollector:
         2. Recolección de métricas de contenedores Docker
         3. Verificación de health checks de servicios
         4. Cálculo de estado general y generación de alertas
+        5. Recolección de métricas de escalabilidad
 
         Args:
             db: Sesión de SQLAlchemy para verificaciones de RDS
@@ -869,6 +985,8 @@ class SystemStatusCollector:
             - health_summary: dict con conteos ok/warning/failed
             - overall_status: str (healthy/degraded/critical)
             - alerts: lista de AlertResponse
+            - scalability_metrics: ScalabilityMetricsResponse o None
+            - scalability_metrics_json: str (JSON serializado) o None
         """
         logger.info("Iniciando recolección completa de métricas del sistema")
 
@@ -895,9 +1013,29 @@ class SystemStatusCollector:
             f"{health_summary['failed_count']} fallidos"
         )
 
-        # 4. Calcular estado general y generar alertas
+        # 4. Recolectar métricas de escalabilidad
+        scalability_metrics = None
+        scalability_metrics_json = None
+        try:
+            scalability_metrics = await scalability_collector.collect_all_metrics(db=db)
+            # Serializar como JSON para persistencia en el snapshot
+            scalability_metrics_json = scalability_metrics.model_dump_json()
+            logger.info("Métricas de escalabilidad recolectadas correctamente")
+        except Exception as e:
+            logger.error(
+                "Error en recolección de métricas de escalabilidad",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error_detail": str(e),
+                },
+            )
+            scalability_metrics = None
+            scalability_metrics_json = None
+
+        # 5. Calcular estado general y generar alertas (incluye escalabilidad)
         overall_status, alerts = self.calculate_overall_status(
-            os_metrics, health_checks, docker_metrics
+            os_metrics, health_checks, docker_metrics,
+            scalability_metrics=scalability_metrics,
         )
         logger.info(
             f"Estado general del sistema: {overall_status} "
@@ -912,6 +1050,8 @@ class SystemStatusCollector:
             "health_summary": health_summary,
             "overall_status": overall_status,
             "alerts": alerts,
+            "scalability_metrics": scalability_metrics,
+            "scalability_metrics_json": scalability_metrics_json,
         }
 
     # =========================================================================

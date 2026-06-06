@@ -87,6 +87,13 @@ class StatusSnapshot(Base):
     uptime_seconds = Column(Integer, nullable=False, comment="Uptime del SO en segundos")
     docker_available = Column(Boolean, nullable=False, comment="Si Docker respondió correctamente")
 
+    # Métricas de escalabilidad (JSON serializado)
+    scalability_metrics_json = Column(
+        Text,
+        nullable=True,
+        comment="JSON serializado de métricas de escalabilidad"
+    )
+
     # Auditoría
     created_at = Column(
         DateTime(timezone=True),

@@ -41,6 +41,9 @@ export * from './log-analysis'
 // System Status types
 export * from './system-status'
 
+// Scalability Metrics types
+export * from './scalability-metrics'
+
 // ============================================================================
 // TIPOS COMUNES
 // ============================================================================
