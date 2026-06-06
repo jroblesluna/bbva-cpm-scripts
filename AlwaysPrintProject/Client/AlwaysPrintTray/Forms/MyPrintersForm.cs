@@ -12,23 +12,6 @@ namespace AlwaysPrintTray.Forms
 {
     public sealed class MyPrintersForm : Form
     {
-        // ── Palette ──────────────────────────────────────────────────────────
-        private static readonly Color CHeaderBg   = Color.FromArgb( 27,  46,  75);
-        private static readonly Color CHeaderFg   = Color.White;
-        private static readonly Color CHeaderSub  = Color.FromArgb(175, 198, 220);
-        private static readonly Color CBodyBg     = Color.FromArgb(245, 247, 250);
-        private static readonly Color CRowEven    = Color.White;
-        private static readonly Color CRowOdd     = Color.FromArgb(248, 249, 251);
-        private static readonly Color CRowSel     = Color.FromArgb(219, 234, 254);
-        private static readonly Color CRowSelFg   = Color.FromArgb( 15,  40,  80);
-        private static readonly Color CFavBg      = Color.FromArgb(251, 191,  36);
-        private static readonly Color CFavFg      = Color.FromArgb(120,  53,  15);
-        private static readonly Color CDefBg      = Color.FromArgb( 99, 102, 241);
-        private static readonly Color CDefFg      = Color.White;
-        private static readonly Color CActionsBg  = Color.FromArgb(236, 239, 244);
-        private static readonly Color CSep        = Color.FromArgb(210, 218, 228);
-        private static readonly Color CPrimary    = Color.FromArgb(  0, 120, 212);
-
         // ── Fields ───────────────────────────────────────────────────────────
         private readonly string     _cloudApiUrl;
         private readonly string     _workstationId;
@@ -39,9 +22,9 @@ namespace AlwaysPrintTray.Forms
         private Label    _lblVlan = null!;
         private ListView _listView = null!;
         private Panel    _pnlActions = null!;
-        private APButton _btnFavorite = null!;
-        private APButton _btnRefresh = null!;
-        private APButton _btnClose = null!;
+        private AppButton _btnFavorite = null!;
+        private AppButton _btnRefresh = null!;
+        private AppButton _btnClose = null!;
         private Panel    _pnlStatus = null!;
         private Label    _lblStatusIcon = null!;
         private Label    _lblStatus = null!;
@@ -63,28 +46,24 @@ namespace AlwaysPrintTray.Forms
         // ── UI Construction ──────────────────────────────────────────────────
         private void InitializeComponents()
         {
-            Text            = "Mis Impresoras – Contingencia";
-            ClientSize      = new Size(700, 510);
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-            MaximizeBox     = false;
-            MinimizeBox     = false;
-            StartPosition   = FormStartPosition.CenterScreen;
-            ShowInTaskbar   = false;
-            BackColor       = CBodyBg;
-            Font            = new Font("Segoe UI", 9f);
+            Text       = "Mis Impresoras – Contingencia";
+            ClientSize = new Size(700, 510);
+            AppTheme.ApplyFormStyle(this);
 
             // ── Header ───────────────────────────────────────────────────────
             _pnlHeader = new Panel
             {
                 Location  = new Point(0, 0),
                 Size      = new Size(700, 75),
-                BackColor = CHeaderBg
+                BackColor = AppTheme.HeaderBg
             };
+            _pnlHeader.Paint += (s, e) => AppTheme.DrawHeaderAccent(e.Graphics, 700, 75);
+
             _lblTitle = new Label
             {
                 Text      = "🖨  Mis Impresoras",
-                ForeColor = CHeaderFg,
-                Font      = new Font("Segoe UI", 14f, FontStyle.Bold),
+                ForeColor = AppTheme.TextOnDark,
+                Font      = AppTheme.FontTitle,
                 AutoSize  = true,
                 Location  = new Point(20, 11),
                 BackColor = Color.Transparent
@@ -92,8 +71,8 @@ namespace AlwaysPrintTray.Forms
             _lblVlan = new Label
             {
                 Text      = "Cargando información de red…",
-                ForeColor = CHeaderSub,
-                Font      = new Font("Segoe UI", 9f),
+                ForeColor = AppTheme.TextSubtitle,
+                Font      = AppTheme.FontRegular,
                 AutoSize  = true,
                 Location  = new Point(22, 44),
                 BackColor = Color.Transparent
@@ -111,7 +90,7 @@ namespace AlwaysPrintTray.Forms
                 GridLines      = false,
                 MultiSelect    = false,
                 OwnerDraw      = true,
-                Font           = new Font("Segoe UI", 9f),
+                Font           = AppTheme.FontRegular,
                 BorderStyle    = BorderStyle.None,
                 BackColor      = Color.White,
                 HeaderStyle    = ColumnHeaderStyle.Nonclickable
@@ -130,55 +109,48 @@ namespace AlwaysPrintTray.Forms
             {
                 Location  = new Point(15, 90),
                 Size      = new Size(670, 300),
-                BackColor = CSep
+                BackColor = AppTheme.Border
             };
             listWrapper.Controls.Add(_listView);
 
             // ── Separator 1 ──────────────────────────────────────────────────
-            var sep1 = new Panel { Location = new Point(0, 403), Size = new Size(700, 1), BackColor = CSep };
+            var sep1 = new Panel { Location = new Point(0, 403), Size = new Size(700, 1), BackColor = AppTheme.Divider };
 
             // ── Actions panel ─────────────────────────────────────────────────
             _pnlActions = new Panel
             {
                 Location  = new Point(0, 404),
                 Size      = new Size(700, 48),
-                BackColor = CActionsBg
+                BackColor = AppTheme.FooterBg
             };
 
-            _btnFavorite = new APButton
+            _btnFavorite = new AppButton
             {
                 Text      = "⭐  Establecer favorita",
                 Location  = new Point(16, 8),
                 Size      = new Size(190, 32),
                 Enabled   = false,
-                BackColor = CPrimary,
-                ForeColor = Color.White,
-                Font      = new Font("Segoe UI", 9f, FontStyle.Bold)
+                IsPrimary = true
             };
             _btnFavorite.Click += OnFavoriteClick;
 
-            _btnRefresh = new APButton
+            _btnRefresh = new AppButton
             {
-                Text       = "↺",
-                Location   = new Point(590, 8),
-                Size       = new Size(40, 32),
-                BackColor  = Color.White,
-                ForeColor  = Color.FromArgb(60, 75, 95),
-                Font       = new Font("Segoe UI", 14f),
-                ShowBorder = true
+                Text      = "↺",
+                Location  = new Point(590, 8),
+                Size      = new Size(40, 32),
+                IsPrimary = false,
+                Font      = new Font("Segoe UI", 14f)
             };
             _btnRefresh.Click += (_, __) => LoadPrinters();
 
-            _btnClose = new APButton
+            _btnClose = new AppButton
             {
                 Text         = "Cerrar",
                 Location     = new Point(640, 8),
                 Size         = new Size(58, 32),
-                DialogResult = DialogResult.OK,
-                BackColor    = Color.White,
-                ForeColor    = Color.FromArgb(60, 75, 95),
-                Font         = new Font("Segoe UI", 9f),
-                ShowBorder   = true
+                IsPrimary    = false,
+                DialogResult = DialogResult.OK
             };
             _pnlActions.Controls.AddRange(new Control[]
             {
@@ -186,7 +158,7 @@ namespace AlwaysPrintTray.Forms
             });
 
             // ── Separator 2 ──────────────────────────────────────────────────
-            var sep2 = new Panel { Location = new Point(0, 452), Size = new Size(700, 1), BackColor = CSep };
+            var sep2 = new Panel { Location = new Point(0, 452), Size = new Size(700, 1), BackColor = AppTheme.Divider };
 
             // ── Status panel ─────────────────────────────────────────────────
             _pnlStatus = new Panel
@@ -208,8 +180,8 @@ namespace AlwaysPrintTray.Forms
                 Text      = "",
                 Location  = new Point(46, 10),
                 Size      = new Size(640, 40),
-                Font      = new Font("Segoe UI", 9f),
-                ForeColor = SystemColors.GrayText,
+                Font      = AppTheme.FontRegular,
+                ForeColor = AppTheme.TextMuted,
                 BackColor = Color.Transparent
             };
             _pnlStatus.Controls.Add(_lblStatusIcon);
@@ -225,17 +197,17 @@ namespace AlwaysPrintTray.Forms
         // ── Owner-draw ───────────────────────────────────────────────────────
         private void OnDrawColumnHeader(object? sender, DrawListViewColumnHeaderEventArgs e)
         {
-            using var bg = new SolidBrush(Color.FromArgb(241, 244, 248));
+            using var bg = new SolidBrush(AppTheme.FooterBg);
             e.Graphics.FillRectangle(bg, e.Bounds);
 
-            using var sep = new Pen(CSep);
+            using var sep = new Pen(AppTheme.Divider);
             e.Graphics.DrawLine(sep,
                 e.Bounds.Left,  e.Bounds.Bottom - 1,
                 e.Bounds.Right, e.Bounds.Bottom - 1);
 
             var tr  = new RectangleF(e.Bounds.X + 10, e.Bounds.Y, e.Bounds.Width - 12, e.Bounds.Height);
             var fmt = new StringFormat { LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter };
-            using var fg   = new SolidBrush(Color.FromArgb(55, 70, 90));
+            using var fg   = new SolidBrush(AppTheme.TextMuted);
             using var font = new Font("Segoe UI", 8.5f, FontStyle.Bold);
             e.Graphics.DrawString(e.Header?.Text ?? "", font, fg, tr, fmt);
         }
@@ -247,11 +219,11 @@ namespace AlwaysPrintTray.Forms
             bool sel     = e.Item.Selected;
             bool odd     = e.ItemIndex % 2 == 1;
 
-            var bgColor = sel ? CRowSel : (odd ? CRowOdd : CRowEven);
+            var bgColor = sel ? AppTheme.RowSelected : (odd ? AppTheme.RowOdd : AppTheme.RowEven);
             using (var brush = new SolidBrush(bgColor))
                 e.Graphics.FillRectangle(brush, e.Bounds);
 
-            using (var rowSep = new Pen(Color.FromArgb(232, 236, 242)))
+            using (var rowSep = new Pen(AppTheme.Divider))
                 e.Graphics.DrawLine(rowSep,
                     e.Bounds.Left,  e.Bounds.Bottom - 1,
                     e.Bounds.Right, e.Bounds.Bottom - 1);
@@ -262,19 +234,19 @@ namespace AlwaysPrintTray.Forms
                 return;
             }
 
-            var fgColor = sel ? CRowSelFg : Color.FromArgb(35, 45, 60);
+            var fgColor = sel ? AppTheme.RowSelectedText : AppTheme.TextPrimary;
             var fmt     = new StringFormat { LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter };
             var tr      = new RectangleF(e.Bounds.X + 10, e.Bounds.Y, e.Bounds.Width - 14, e.Bounds.Height);
 
             using var fgBrush = new SolidBrush(fgColor);
             if (e.ColumnIndex == 0)
             {
-                using var bold = new Font("Segoe UI", 9f, FontStyle.Bold);
+                using var bold = AppTheme.FontBold;
                 e.Graphics.DrawString(e.SubItem.Text, bold, fgBrush, tr, fmt);
             }
             else
             {
-                using var reg = new Font("Segoe UI", 9f);
+                using var reg = AppTheme.FontRegular;
                 e.Graphics.DrawString(e.SubItem.Text, reg, fgBrush, tr, fmt);
             }
         }
@@ -285,8 +257,8 @@ namespace AlwaysPrintTray.Forms
             string? label = null;
             Color bg = Color.Transparent, fg = Color.Transparent;
 
-            if (p.IsFavorite)     { label = "⭐ Favorita"; bg = CFavBg; fg = CFavFg; }
-            else if (p.IsDefault) { label = "📌 Default";  bg = CDefBg; fg = CDefFg; }
+            if (p.IsFavorite)     { label = "⭐ Favorita"; bg = AppTheme.BadgeFavBg; fg = AppTheme.BadgeFavFg; }
+            else if (p.IsDefault) { label = "📌 Default";  bg = AppTheme.BadgeDefBg; fg = AppTheme.BadgeDefFg; }
             if (label == null) return;
 
             using var font = new Font("Segoe UI", 7.5f, FontStyle.Bold);
@@ -299,7 +271,7 @@ namespace AlwaysPrintTray.Forms
             var rc  = new Rectangle(bx, by, bw, bh);
 
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            using var path    = RoundedPath(rc, 8);
+            using var path    = AppTheme.RoundedPath(rc, 8);
             using var bgBrush = new SolidBrush(bg);
             g.FillPath(bgBrush, path);
             using var fgBrush = new SolidBrush(fg);
@@ -308,16 +280,7 @@ namespace AlwaysPrintTray.Forms
             g.SmoothingMode = SmoothingMode.Default;
         }
 
-        private static GraphicsPath RoundedPath(Rectangle r, int rad)
-        {
-            var p = new GraphicsPath();
-            p.AddArc(r.X,               r.Y,                rad * 2, rad * 2, 180, 90);
-            p.AddArc(r.Right - rad * 2, r.Y,                rad * 2, rad * 2, 270, 90);
-            p.AddArc(r.Right - rad * 2, r.Bottom - rad * 2, rad * 2, rad * 2,   0, 90);
-            p.AddArc(r.X,               r.Bottom - rad * 2, rad * 2, rad * 2,  90, 90);
-            p.CloseFigure();
-            return p;
-        }
+        private static GraphicsPath RoundedPath(Rectangle r, int rad) => AppTheme.RoundedPath(r, rad);
 
         // ── Data loading ─────────────────────────────────────────────────────
         private async void LoadPrinters()
@@ -426,30 +389,21 @@ namespace AlwaysPrintTray.Forms
 
             if (sel == null)
             {
-                _btnFavorite.Enabled    = false;
-                _btnFavorite.Text       = "⭐  Establecer favorita";
-                _btnFavorite.BackColor  = CPrimary;
-                _btnFavorite.ForeColor  = Color.White;
-                _btnFavorite.Font       = new Font("Segoe UI", 9f, FontStyle.Bold);
-                _btnFavorite.ShowBorder = false;
+                _btnFavorite.Enabled   = false;
+                _btnFavorite.Text      = "⭐  Establecer favorita";
+                _btnFavorite.IsPrimary = true;
             }
             else if (sel.IsFavorite)
             {
-                _btnFavorite.Enabled    = true;
-                _btnFavorite.Text       = "✕  Quitar favorita";
-                _btnFavorite.BackColor  = Color.White;
-                _btnFavorite.ForeColor  = Color.FromArgb(60, 75, 95);
-                _btnFavorite.Font       = new Font("Segoe UI", 9f);
-                _btnFavorite.ShowBorder = true;
+                _btnFavorite.Enabled   = true;
+                _btnFavorite.Text      = "✕  Quitar favorita";
+                _btnFavorite.IsPrimary = false;
             }
             else
             {
-                _btnFavorite.Enabled    = true;
-                _btnFavorite.Text       = "⭐  Establecer favorita";
-                _btnFavorite.BackColor  = CPrimary;
-                _btnFavorite.ForeColor  = Color.White;
-                _btnFavorite.Font       = new Font("Segoe UI", 9f, FontStyle.Bold);
-                _btnFavorite.ShowBorder = false;
+                _btnFavorite.Enabled   = true;
+                _btnFavorite.Text      = "⭐  Establecer favorita";
+                _btnFavorite.IsPrimary = true;
             }
             _btnFavorite.Invalidate();
         }
@@ -507,76 +461,6 @@ namespace AlwaysPrintTray.Forms
             public string Location  { get; set; } = "";
             public bool   IsFavorite { get; set; }
             public bool   IsDefault  { get; set; }
-        }
-    }
-
-    // ── Custom button with rounded corners + hover ────────────────────────────
-    internal sealed class APButton : Button
-    {
-        private bool _hovered;
-        public bool ShowBorder { get; set; }
-
-        public APButton()
-        {
-            SetStyle(
-                ControlStyles.UserPaint |
-                ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.OptimizedDoubleBuffer, true);
-            FlatStyle = FlatStyle.Flat;
-            FlatAppearance.BorderSize = 0;
-        }
-
-        protected override void OnMouseEnter(EventArgs e) { _hovered = true;  Invalidate(); base.OnMouseEnter(e); }
-        protected override void OnMouseLeave(EventArgs e) { _hovered = false; Invalidate(); base.OnMouseLeave(e); }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            var g  = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-
-            Color bg;
-            if (!Enabled)
-                bg = Color.FromArgb(218, 222, 230);
-            else if (_hovered)
-                bg = Color.FromArgb(
-                    Math.Max(0, Math.Min(255, BackColor.R - 18)),
-                    Math.Max(0, Math.Min(255, BackColor.G - 18)),
-                    Math.Max(0, Math.Min(255, BackColor.B - 18)));
-            else
-                bg = BackColor;
-
-            var rect = new Rectangle(0, 0, Width - 1, Height - 1);
-            using var path  = RoundedPath(rect, 5);
-            using var brush = new SolidBrush(bg);
-            g.FillPath(brush, path);
-
-            if (ShowBorder)
-            {
-                using var pen = new Pen(Color.FromArgb(180, 190, 205));
-                g.DrawPath(pen, path);
-            }
-
-            var fg  = Enabled ? ForeColor : Color.FromArgb(140, 150, 165);
-            var fmt = new StringFormat
-            {
-                Alignment     = StringAlignment.Center,
-                LineAlignment = StringAlignment.Center,
-                FormatFlags   = StringFormatFlags.NoWrap,
-                Trimming      = StringTrimming.EllipsisCharacter
-            };
-            using var fgBrush = new SolidBrush(fg);
-            g.DrawString(Text, Font, fgBrush, new RectangleF(0, 0, Width, Height), fmt);
-        }
-
-        private static GraphicsPath RoundedPath(Rectangle r, int rad)
-        {
-            var p = new GraphicsPath();
-            p.AddArc(r.X,               r.Y,                rad * 2, rad * 2, 180, 90);
-            p.AddArc(r.Right - rad * 2, r.Y,                rad * 2, rad * 2, 270, 90);
-            p.AddArc(r.Right - rad * 2, r.Bottom - rad * 2, rad * 2, rad * 2,   0, 90);
-            p.AddArc(r.X,               r.Bottom - rad * 2, rad * 2, rad * 2,  90, 90);
-            p.CloseFigure();
-            return p;
         }
     }
 }

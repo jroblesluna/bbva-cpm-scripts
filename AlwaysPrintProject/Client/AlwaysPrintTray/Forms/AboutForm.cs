@@ -1,22 +1,17 @@
 using System;
 using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Reflection;
 using System.Windows.Forms;
 
 namespace AlwaysPrintTray.Forms
 {
+    /// <summary>
+    /// Formulario "Acerca de" con estilo corporativo AlwaysPrint.
+    /// Se cierra automáticamente a los 30 segundos.
+    /// </summary>
     public sealed class AboutForm : Form
     {
-        private static readonly Color HeaderBg     = Color.FromArgb(15, 23, 42);
-        private static readonly Color AccentColor  = Color.FromArgb(99, 102, 241);
-        private static readonly Color BodyBg       = Color.FromArgb(248, 250, 252);
-        private static readonly Color FooterBg     = Color.FromArgb(241, 245, 249);
-        private static readonly Color TextColor    = Color.FromArgb(30, 41, 59);
-        private static readonly Color MutedColor   = Color.FromArgb(100, 116, 139);
-        private static readonly Color DividerColor = Color.FromArgb(226, 232, 240);
-
         private readonly Timer _autoCloseTimer;
 
         public AboutForm()
@@ -25,30 +20,19 @@ namespace AlwaysPrintTray.Forms
             var currentUser  = Environment.UserName;
             var processStart = Process.GetCurrentProcess().StartTime;
 
-            Text            = "Acerca de AlwaysPrint";
-            ClientSize      = new Size(460, 440);
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-            MaximizeBox     = false;
-            MinimizeBox     = false;
-            StartPosition   = FormStartPosition.CenterScreen;
-            ShowInTaskbar   = false;
-            BackColor       = BodyBg;
-            Font            = new Font("Segoe UI", 9);
-            KeyPreview      = true;
+            Text       = "Acerca de AlwaysPrint";
+            ClientSize = new Size(460, 440);
+            KeyPreview = true;
+            AppTheme.ApplyFormStyle(this);
 
             // ── Header ──────────────────────────────────────────────────────
             var header = new Panel
             {
                 Location  = new Point(0, 0),
                 Size      = new Size(460, 170),
-                BackColor = HeaderBg
+                BackColor = AppTheme.HeaderBg
             };
-
-            header.Paint += (s, e) =>
-            {
-                using var brush = new SolidBrush(AccentColor);
-                e.Graphics.FillRectangle(brush, 0, header.Height - 3, header.Width, 3);
-            };
+            header.Paint += (s, e) => AppTheme.DrawHeaderAccent(e.Graphics, 460, 170);
 
             var pic = new PictureBox
             {
@@ -62,8 +46,8 @@ namespace AlwaysPrintTray.Forms
             var lblAppName = new Label
             {
                 Text      = "AlwaysPrint",
-                Font      = new Font("Segoe UI", 18, FontStyle.Bold),
-                ForeColor = Color.White,
+                Font      = AppTheme.FontHeading,
+                ForeColor = AppTheme.TextOnDark,
                 BackColor = Color.Transparent,
                 Location  = new Point(10, 96),
                 Size      = new Size(440, 42),
@@ -73,8 +57,8 @@ namespace AlwaysPrintTray.Forms
             var lblVer = new Label
             {
                 Text      = $"Versión  {version}",
-                Font      = new Font("Segoe UI", 8.5f),
-                ForeColor = Color.FromArgb(148, 163, 184),
+                Font      = AppTheme.FontSmall,
+                ForeColor = AppTheme.TextSubtitle,
                 BackColor = Color.Transparent,
                 Location  = new Point(10, 138),
                 Size      = new Size(440, 24),
@@ -88,25 +72,19 @@ namespace AlwaysPrintTray.Forms
             {
                 Location  = new Point(0, 170),
                 Size      = new Size(460, 205),
-                BackColor = BodyBg
+                BackColor = AppTheme.BodyBg
             };
 
             var lblDesc = new Label
             {
                 Text      = "Servicio de impresión corporativa",
                 Font      = new Font("Segoe UI", 9, FontStyle.Italic),
-                ForeColor = MutedColor,
+                ForeColor = AppTheme.TextMuted,
                 Location  = new Point(30, 16),
                 AutoSize  = true
             };
-
             body.Controls.Add(lblDesc);
-
-            body.Paint += (s, e) =>
-            {
-                using var pen = new Pen(DividerColor, 1);
-                e.Graphics.DrawLine(pen, 30, 42, 430, 42);
-            };
+            body.Paint += (s, e) => AppTheme.DrawDivider(e.Graphics, 30, 42, 430);
 
             AddRow(body, "Usuario",  currentUser,                                    54);
             AddRow(body, "Iniciado", processStart.ToString("yyyy-MM-dd  HH:mm:ss"),  90);
@@ -114,8 +92,8 @@ namespace AlwaysPrintTray.Forms
             var lblCopyright = new Label
             {
                 Text      = "© 2026 Robles.AI",
-                Font      = new Font("Segoe UI", 8.5f),
-                ForeColor = MutedColor,
+                Font      = AppTheme.FontSmall,
+                ForeColor = AppTheme.TextMuted,
                 Location  = new Point(30, 134),
                 Size      = new Size(400, 20),
                 TextAlign = ContentAlignment.MiddleLeft
@@ -123,8 +101,8 @@ namespace AlwaysPrintTray.Forms
             var lblLegal = new Label
             {
                 Text      = "Inversiones On Line S.A.C.",
-                Font      = new Font("Segoe UI", 8.5f),
-                ForeColor = MutedColor,
+                Font      = AppTheme.FontSmall,
+                ForeColor = AppTheme.TextMuted,
                 Location  = new Point(30, 158),
                 Size      = new Size(400, 20),
                 TextAlign = ContentAlignment.MiddleLeft
@@ -137,20 +115,16 @@ namespace AlwaysPrintTray.Forms
             {
                 Location  = new Point(0, 375),
                 Size      = new Size(460, 65),
-                BackColor = FooterBg
+                BackColor = AppTheme.FooterBg
             };
+            footer.Paint += (s, e) => AppTheme.DrawDivider(e.Graphics, 0, 0, 460);
 
-            footer.Paint += (s, e) =>
+            var btnClose = new AppButton
             {
-                using var pen = new Pen(DividerColor, 1);
-                e.Graphics.DrawLine(pen, 0, 0, footer.Width, 0);
-            };
-
-            var btnClose = new StyledButton
-            {
-                Text     = "Cerrar",
-                Size     = new Size(104, 36),
-                Location = new Point(460 - 104 - 28, 14)
+                Text      = "Cerrar",
+                Size      = new Size(104, 36),
+                Location  = new Point(460 - 104 - 28, 14),
+                IsPrimary = true
             };
             btnClose.Click += (s, e) => Close();
 
@@ -177,33 +151,27 @@ namespace AlwaysPrintTray.Forms
 
         private static void AddRow(Panel parent, string label, string value, int y)
         {
-            var lblKey = new Label
+            parent.Controls.Add(new Label
             {
                 Text      = label,
-                Font      = new Font("Segoe UI", 9, FontStyle.Bold),
-                ForeColor = MutedColor,
+                Font      = AppTheme.FontBold,
+                ForeColor = AppTheme.TextMuted,
                 Location  = new Point(30, y),
                 Size      = new Size(90, 26),
                 TextAlign = ContentAlignment.MiddleLeft
-            };
-            var lblVal = new Label
+            });
+            parent.Controls.Add(new Label
             {
                 Text      = value,
-                Font      = new Font("Segoe UI", 9),
-                ForeColor = TextColor,
+                Font      = AppTheme.FontRegular,
+                ForeColor = AppTheme.TextPrimary,
                 Location  = new Point(128, y),
                 Size      = new Size(302, 26),
                 TextAlign = ContentAlignment.MiddleLeft
-            };
-            parent.Controls.Add(lblKey);
-            parent.Controls.Add(lblVal);
+            });
 
             int capturedY = y;
-            parent.Paint += (s, e) =>
-            {
-                using var pen = new Pen(DividerColor, 1);
-                e.Graphics.DrawLine(pen, 30, capturedY + 30, 430, capturedY + 30);
-            };
+            parent.Paint += (s, e) => AppTheme.DrawDivider(e.Graphics, 30, capturedY + 30, 430);
         }
 
         private static Image? LoadLogoFromResource()
@@ -223,60 +191,6 @@ namespace AlwaysPrintTray.Forms
             }
             catch { }
             return null;
-        }
-
-        /// <summary>
-        /// Botón con estilo personalizado: fondo redondeado sin esquinas negras.
-        /// Limpia el fondo del padre antes de pintar para evitar artefactos.
-        /// </summary>
-        private sealed class StyledButton : Button
-        {
-            private bool _hover;
-
-            public StyledButton()
-            {
-                FlatStyle = FlatStyle.Flat;
-                FlatAppearance.BorderSize = 0;
-                Font      = new Font("Segoe UI", 9, FontStyle.Bold);
-                ForeColor = Color.White;
-                Cursor    = Cursors.Hand;
-                UseVisualStyleBackColor = false;
-            }
-
-            protected override void OnMouseEnter(EventArgs e) { _hover = true;  Invalidate(); base.OnMouseEnter(e); }
-            protected override void OnMouseLeave(EventArgs e) { _hover = false; Invalidate(); base.OnMouseLeave(e); }
-
-            protected override void OnPaint(PaintEventArgs e)
-            {
-                var g = e.Graphics;
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                var rect = new Rectangle(0, 0, Width - 1, Height - 1);
-
-                // Limpiar fondo con el color del padre para evitar esquinas negras
-                var parentBg = Parent?.BackColor ?? Color.White;
-                using (var clearBrush = new SolidBrush(parentBg))
-                    g.FillRectangle(clearBrush, ClientRectangle);
-
-                var bg = _hover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(99, 102, 241);
-                using (var brush = new SolidBrush(bg))
-                using (var path  = RoundedPath(rect, 7))
-                    g.FillPath(brush, path);
-
-                TextRenderer.DrawText(g, Text, Font, rect, Color.White,
-                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-            }
-
-            private static GraphicsPath RoundedPath(Rectangle r, int radius)
-            {
-                int d    = radius * 2;
-                var path = new GraphicsPath();
-                path.AddArc(r.X,         r.Y,          d, d, 180, 90);
-                path.AddArc(r.Right - d, r.Y,          d, d, 270, 90);
-                path.AddArc(r.Right - d, r.Bottom - d, d, d, 0,   90);
-                path.AddArc(r.X,         r.Bottom - d, d, d, 90,  90);
-                path.CloseFigure();
-                return path;
-            }
         }
     }
 }

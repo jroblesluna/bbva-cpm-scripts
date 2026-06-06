@@ -9,9 +9,9 @@ using Newtonsoft.Json;
 namespace AlwaysPrintTray.Forms
 {
     /// <summary>
-    /// Simple configuration editor. Reads current values from the service via Named Pipe,
-    /// lets the user edit them, and sends UpdateConfiguration back through the pipe.
-    /// The Tray never writes HKLM directly – the service is the sole owner of registry persistence.
+    /// Editor de configuración con estilo corporativo AlwaysPrint.
+    /// Lee valores del servicio vía Named Pipe y envía cambios de vuelta.
+    /// El Tray nunca escribe HKLM directamente — el servicio persiste en registro.
     /// </summary>
     public sealed class ConfigurationForm : Form
     {
@@ -37,39 +37,78 @@ namespace AlwaysPrintTray.Forms
         {
             _pipe = pipe ?? throw new ArgumentNullException(nameof(pipe));
             BuildUi();
-            // La carga se hace en el evento Shown para no bloquear el hilo UI durante
-            // la construcción del formulario (la llamada al pipe puede tardar).
             Shown += (_, __) => LoadCurrentConfiguration();
         }
 
         private void BuildUi()
         {
-            Text            = "Configuración de AlwaysPrint";
-            Size            = new Size(520, 460);
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-            MaximizeBox     = false;
-            MinimizeBox     = false;
-            StartPosition   = FormStartPosition.CenterScreen;
-            ShowInTaskbar   = false;
+            Text       = "Configuración de AlwaysPrint";
+            ClientSize = new Size(540, 530);
+            AppTheme.ApplyFormStyle(this);
 
-            int y = 16, lw = 190, cx = 210, lx = 12;
+            int y = 0;
 
-            Label Lbl(string text) => new Label { Text = text, Location = new Point(lx, y + 3), Size = new Size(lw, 20) };
-            TextBox Txt(int w = 290) => new TextBox { Location = new Point(cx, y), Size = new Size(w, 22) };
+            // ── Header ──────────────────────────────────────────────────────
+            var header = new Panel
+            {
+                Location  = new Point(0, 0),
+                Size      = new Size(540, 52),
+                BackColor = AppTheme.HeaderBg
+            };
+            header.Paint += (s, e) => AppTheme.DrawHeaderAccent(e.Graphics, 540, 52);
 
-            // Corporate queue name
+            var lblTitle = new Label
+            {
+                Text      = "⚙  Configuración",
+                Font      = AppTheme.FontTitle,
+                ForeColor = AppTheme.TextOnDark,
+                BackColor = Color.Transparent,
+                Location  = new Point(18, 12),
+                AutoSize  = true
+            };
+            header.Controls.Add(lblTitle);
+            Controls.Add(header);
+
+            y = 68;
+            int lw = 200, cx = 218, lx = 18;
+
+            Label Lbl(string text)
+            {
+                var l = new Label
+                {
+                    Text      = text,
+                    Location  = new Point(lx, y + 3),
+                    Size      = new Size(lw, 20),
+                    ForeColor = AppTheme.TextPrimary,
+                    Font      = AppTheme.FontRegular
+                };
+                return l;
+            }
+
+            TextBox Txt(int w = 290)
+            {
+                var t = new TextBox
+                {
+                    Location = new Point(cx, y),
+                    Size     = new Size(w, 24),
+                    Font     = AppTheme.FontRegular
+                };
+                return t;
+            }
+
+            // Cola corporativa
             Controls.Add(Lbl("Cola corporativa:"));
             _txtQueueName = Txt();
             Controls.Add(_txtQueueName);
             y += 34;
 
-            // Search IPs
+            // IPs
             Controls.Add(Lbl("IPs de búsqueda (CSV):"));
             _txtIps = Txt();
             Controls.Add(_txtIps);
             y += 34;
 
-            // CIDR ranges
+            // CIDR
             Controls.Add(Lbl("Rangos CIDR (CSV):"));
             _txtRanges = Txt();
             Controls.Add(_txtRanges);
@@ -80,10 +119,11 @@ namespace AlwaysPrintTray.Forms
             _numPoll = new NumericUpDown
             {
                 Location = new Point(cx, y),
-                Size     = new Size(80, 22),
+                Size     = new Size(80, 24),
                 Minimum  = 1,
                 Maximum  = 1440,
-                Value    = 3
+                Value    = 3,
+                Font     = AppTheme.FontRegular
             };
             Controls.Add(_numPoll);
             y += 34;
@@ -100,109 +140,121 @@ namespace AlwaysPrintTray.Forms
             Controls.Add(_txtSerial);
             y += 40;
 
-            // === SECCIÓN INTEGRACIÓN CLOUD ===
-
-            // Separador visual
+            // ── Separador: Integración Cloud ────────────────────────────────
             Controls.Add(new Label
             {
                 Text      = "─── Integración Cloud ───",
                 Location  = new Point(lx, y),
-                Size      = new Size(480, 20),
-                ForeColor = SystemColors.GrayText
+                Size      = new Size(500, 20),
+                ForeColor = AppTheme.TextMuted,
+                Font      = AppTheme.FontSmall
             });
             y += 26;
 
-            // Checkbox: Cloud habilitado
+            // Cloud habilitado
             _chkCloudEnabled = new CheckBox
             {
-                Text     = "Integración Cloud habilitada",
-                Location = new Point(cx, y),
-                Size     = new Size(290, 22)
+                Text      = "Integración Cloud habilitada",
+                Location  = new Point(cx, y),
+                Size      = new Size(290, 22),
+                Font      = AppTheme.FontRegular,
+                ForeColor = AppTheme.TextPrimary
             };
-            Controls.Add(new Label { Text = string.Empty, Location = new Point(lx, y + 3), Size = new Size(lw, 20) });
             Controls.Add(_chkCloudEnabled);
             y += 34;
 
-            // URL del servidor Cloud
+            // URL Cloud
             Controls.Add(Lbl("URL del servidor Cloud (APCM):"));
             _txtCloudApiUrl = Txt();
             Controls.Add(_txtCloudApiUrl);
             y += 34;
 
-            // Idioma (locale)
+            // Idioma
             Controls.Add(Lbl("Idioma (locale):"));
             _cmbCloudLocale = new ComboBox
             {
                 Location      = new Point(cx, y),
-                Size          = new Size(150, 22),
-                DropDownStyle = ComboBoxStyle.DropDownList
+                Size          = new Size(150, 24),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font          = AppTheme.FontRegular
             };
             _cmbCloudLocale.Items.AddRange(new object[] { "Auto", "Español", "English" });
             _cmbCloudLocale.SelectedIndex = 0;
             Controls.Add(_cmbCloudLocale);
             y += 40;
 
-            // === SECCIÓN AUTO-ACTUALIZACIÓN ===
-
-            // Separador visual
+            // ── Separador: Actualizaciones ──────────────────────────────────
             Controls.Add(new Label
             {
                 Text      = "─── Actualizaciones ───",
                 Location  = new Point(lx, y),
-                Size      = new Size(480, 20),
-                ForeColor = SystemColors.GrayText
+                Size      = new Size(500, 20),
+                ForeColor = AppTheme.TextMuted,
+                Font      = AppTheme.FontSmall
             });
             y += 26;
 
-            // Checkbox: Habilitar Actualizaciones Automáticas
+            // Auto-actualización
+            Controls.Add(Lbl("Auto-actualización:"));
             _chkAutoUpdate = new CheckBox
             {
-                Text     = "Habilitar Actualizaciones Automáticas",
-                Location = new Point(cx, y),
-                Size     = new Size(290, 22)
+                Text      = "Habilitar Actualizaciones Automáticas",
+                Location  = new Point(cx, y),
+                Size      = new Size(290, 22),
+                Font      = AppTheme.FontRegular,
+                ForeColor = AppTheme.TextPrimary
             };
-            Controls.Add(new Label { Text = "Auto-actualización:", Location = new Point(lx, y + 3), Size = new Size(lw, 20) });
             Controls.Add(_chkAutoUpdate);
             y += 40;
 
-            // Status bar
+            // Status
             _lblStatus = new Label
             {
                 Location  = new Point(lx, y),
-                Size      = new Size(480, 20),
-                ForeColor = SystemColors.GrayText
+                Size      = new Size(500, 20),
+                ForeColor = AppTheme.TextMuted,
+                Font      = AppTheme.FontSmall
             };
             Controls.Add(_lblStatus);
             y += 30;
 
-            // Buttons
-            var btnSave = new Button
+            // ── Footer ──────────────────────────────────────────────────────
+            var footer = new Panel
             {
-                Text     = "Guardar",
-                Location = new Point(320, y),
-                Size     = new Size(80, 28)
+                Location  = new Point(0, y),
+                Size      = new Size(540, 56),
+                BackColor = AppTheme.FooterBg
+            };
+            footer.Paint += (s, e) => AppTheme.DrawDivider(e.Graphics, 0, 0, 540);
+
+            var btnSave = new AppButton
+            {
+                Text      = "Guardar",
+                Location  = new Point(540 - 104 - 84 - 20, 12),
+                Size      = new Size(104, 34),
+                IsPrimary = true
             };
             btnSave.Click += BtnSave_Click;
 
-            var btnCancel = new Button
+            var btnCancel = new AppButton
             {
                 Text         = "Cancelar",
-                DialogResult = DialogResult.Cancel,
-                Location     = new Point(410, y),
-                Size         = new Size(80, 28)
+                Location     = new Point(540 - 84 - 10, 12),
+                Size         = new Size(84, 34),
+                IsPrimary    = false,
+                DialogResult = DialogResult.Cancel
             };
 
-            Controls.AddRange(new Control[] { btnSave, btnCancel });
+            footer.Controls.AddRange(new Control[] { btnSave, btnCancel });
+            Controls.Add(footer);
             CancelButton = btnCancel;
-            ClientSize   = new Size(510, y + 50);
+            ClientSize   = new Size(540, y + 56);
         }
 
         private void LoadCurrentConfiguration()
         {
             _lblStatus.Text = "Cargando configuración...";
 
-            // Cargar flag de auto-actualización directamente del registro
-            // (es independiente de AppConfiguration y no requiere privilegios elevados para lectura)
             var registry = new RegistryConfigManager();
             _chkAutoUpdate.Checked = registry.LoadAutoUpdateEnabled();
 
@@ -217,11 +269,8 @@ namespace AlwaysPrintTray.Forms
             }
             else
             {
-                // Si el pipe falla o devuelve null, mostrar error y dejar controles en estado default
                 _lblStatus.ForeColor = Color.Red;
                 _lblStatus.Text = "No se pudo cargar la configuración del servicio.";
-
-                // Dejar controles Cloud en estado default explícitamente
                 _chkCloudEnabled.Checked  = false;
                 _txtCloudApiUrl.Text      = string.Empty;
                 _cmbCloudLocale.SelectedIndex = 0;
@@ -236,23 +285,18 @@ namespace AlwaysPrintTray.Forms
             _numPoll.Value       = Math.Max(1, Math.Min(1440, cfg.PendingTaskPollingMinutes));
             _txtDomains.Text     = cfg.BootstrapDomains;
             _txtSerial.Text      = cfg.RoblesAiLicenseSerial;
-
-            // === CAMPOS CLOUD ===
             _chkCloudEnabled.Checked = cfg.CloudEnabled;
             _txtCloudApiUrl.Text     = cfg.CloudApiUrl ?? string.Empty;
-
-            // Seleccionar el item del ComboBox según el valor de CloudLocale
             _cmbCloudLocale.SelectedIndex = cfg.CloudLocale switch
             {
                 "es" => 1,
                 "en" => 2,
-                _    => 0   // "" o cualquier otro valor → "Auto"
+                _    => 0
             };
         }
 
         private void BtnSave_Click(object? sender, EventArgs e)
         {
-            // Validar URL Cloud si no está vacía
             string cloudApiUrl = _txtCloudApiUrl.Text.Trim();
             if (!string.IsNullOrEmpty(cloudApiUrl) &&
                 !Uri.IsWellFormedUriString(cloudApiUrl, UriKind.Absolute))
@@ -262,7 +306,6 @@ namespace AlwaysPrintTray.Forms
                 return;
             }
 
-            // Mapear el índice del ComboBox al valor de locale
             string cloudLocale = _cmbCloudLocale.SelectedIndex switch
             {
                 1 => "es",
@@ -281,7 +324,6 @@ namespace AlwaysPrintTray.Forms
                     Ips    = _txtIps.Text.Trim(),
                     Ranges = _txtRanges.Text.Trim()
                 },
-                // === CAMPOS CLOUD ===
                 CloudEnabled = _chkCloudEnabled.Checked,
                 CloudApiUrl  = cloudApiUrl,
                 CloudLocale  = cloudLocale
