@@ -17,6 +17,8 @@ namespace AlwaysPrintTray.Forms
         private static readonly Color MutedColor   = Color.FromArgb(100, 116, 139);
         private static readonly Color DividerColor = Color.FromArgb(226, 232, 240);
 
+        private readonly Timer _autoCloseTimer;
+
         public AboutForm()
         {
             var version      = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
@@ -32,6 +34,7 @@ namespace AlwaysPrintTray.Forms
             ShowInTaskbar   = false;
             BackColor       = BodyBg;
             Font            = new Font("Segoe UI", 9);
+            KeyPreview      = true;
 
             // ── Header ──────────────────────────────────────────────────────
             var header = new Panel
@@ -154,6 +157,22 @@ namespace AlwaysPrintTray.Forms
             footer.Controls.Add(btnClose);
             Controls.AddRange(new Control[] { header, body, footer });
             AcceptButton = btnClose;
+            CancelButton = btnClose;
+
+            // ── Auto-cierre a los 30 segundos ───────────────────────────────
+            _autoCloseTimer = new Timer { Interval = 30_000 };
+            _autoCloseTimer.Tick += (s, e) => Close();
+            _autoCloseTimer.Start();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _autoCloseTimer?.Stop();
+                _autoCloseTimer?.Dispose();
+            }
+            base.Dispose(disposing);
         }
 
         private static void AddRow(Panel parent, string label, string value, int y)
@@ -206,6 +225,10 @@ namespace AlwaysPrintTray.Forms
             return null;
         }
 
+        /// <summary>
+        /// Botón con estilo personalizado: fondo redondeado sin esquinas negras.
+        /// Limpia el fondo del padre antes de pintar para evitar artefactos.
+        /// </summary>
         private sealed class StyledButton : Button
         {
             private bool _hover;
@@ -228,6 +251,11 @@ namespace AlwaysPrintTray.Forms
                 var g = e.Graphics;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 var rect = new Rectangle(0, 0, Width - 1, Height - 1);
+
+                // Limpiar fondo con el color del padre para evitar esquinas negras
+                var parentBg = Parent?.BackColor ?? Color.White;
+                using (var clearBrush = new SolidBrush(parentBg))
+                    g.FillRectangle(clearBrush, ClientRectangle);
 
                 var bg = _hover ? Color.FromArgb(79, 70, 229) : Color.FromArgb(99, 102, 241);
                 using (var brush = new SolidBrush(bg))

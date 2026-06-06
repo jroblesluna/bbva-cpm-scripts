@@ -42,6 +42,9 @@ namespace AlwaysPrintTray
         // Flag para detectar si una búsqueda manual encontró actualización
         private volatile bool _manualCheckFoundUpdate;
 
+        // Control de instancia única de formularios (evita duplicados)
+        private Form? _activeForm;
+
         public TrayApplicationContext()
         {
             _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
@@ -559,7 +562,16 @@ namespace AlwaysPrintTray
 
         private void ShowAbout()
         {
-            using var form = new AboutForm();
+            // Si ya hay un formulario abierto, traerlo al frente y no abrir otro
+            if (_activeForm != null && !_activeForm.IsDisposed)
+            {
+                _activeForm.Activate();
+                return;
+            }
+
+            var form = new AboutForm();
+            _activeForm = form;
+            form.FormClosed += (_, __) => _activeForm = null;
             form.ShowDialog();
         }
 
@@ -598,13 +610,22 @@ namespace AlwaysPrintTray
 
         private void ShowConfiguration()
         {
+            // Si ya hay un formulario abierto, traerlo al frente y no abrir otro
+            if (_activeForm != null && !_activeForm.IsDisposed)
+            {
+                _activeForm.Activate();
+                return;
+            }
+
             if (!_pipe.IsConnected && !_pipe.Connect())
             {
                 MessageBox.Show("No hay conexión con el servicio. Intente de nuevo.",
                     "AlwaysPrint", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-            using var form = new ConfigurationForm(_pipe);
+            var form = new ConfigurationForm(_pipe);
+            _activeForm = form;
+            form.FormClosed += (_, __) => _activeForm = null;
             form.ShowDialog();
         }
 
