@@ -607,7 +607,7 @@ echo -e "  ${CYAN}Consultando /api/v1/system/metrics...${NC}"
 # Necesitamos un token admin para consultar el endpoint protegido
 # Intentar obtener métricas vía SSM (curl interno sin auth desde el backend)
 if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ] && [ "$BACKEND_STATUS" = "running" ]; then
-    METRICS_JSON=$(ssm_exec "$INSTANCE_ID" '["docker exec alwaysprint-backend-1 python -c \"import asyncio; from app.services.scalability_metrics import scalability_collector; import json; m = asyncio.run(scalability_collector.collect_all_metrics()); print(m.model_dump_json())\" 2>/dev/null || echo FAIL"]' 10)
+    METRICS_JSON=$(ssm_exec "$INSTANCE_ID" '["docker exec alwaysprint-backend-1 python -c \"import asyncio; from app.services.scalability_metrics import scalability_collector; from app.core.database import SessionLocal; import json; db = SessionLocal(); m = asyncio.run(scalability_collector.collect_all_metrics(db=db)); db.close(); print(m.model_dump_json())\" 2>/dev/null || echo FAIL"]' 10)
 
     if [ -n "$METRICS_JSON" ] && [ "$METRICS_JSON" != "FAIL" ] && echo "$METRICS_JSON" | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
         echo ""

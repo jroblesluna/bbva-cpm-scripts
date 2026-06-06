@@ -85,6 +85,42 @@ class ScalabilityMetricsCollector:
         self._prev_net_reading: Optional[NetReading] = None
         self._prev_net_timestamp: Optional[float] = None
         self._last_rates: Optional[NetRates] = None
+        # Baseline RSS del proceso capturado al iniciar (antes de conexiones WS)
+        self._baseline_rss_mb: Optional[float] = None
+
+    def capture_baseline(self) -> None:
+        """
+        Captura el RSS actual como baseline de memoria del proceso.
+
+        Debe invocarse una única vez al finalizar el startup del backend,
+        antes de aceptar conexiones WebSocket. Así el cálculo de
+        avg_per_workstation_mb refleja solo el overhead marginal por ws,
+        no la memoria base del framework/código.
+        """
+        try:
+            with open("/proc/self/status", "r") as f:
+                for line in f:
+                    if line.startswith("VmRSS:"):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            vmrss_kb = int(parts[1])
+                            self._baseline_rss_mb = round(vmrss_kb / 1024, 2)
+                            logger.info(
+                                "Baseline de memoria RSS capturado al inicio",
+                                extra={
+                                    "baseline_rss_mb": self._baseline_rss_mb,
+                                },
+                            )
+                        break
+        except (OSError, IOError) as e:
+            logger.warning(
+                "No se pudo capturar baseline de memoria RSS",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error_detail": str(e),
+                },
+            )
+            self._baseline_rss_mb = None
 
     async def collect_all_metrics(self, db=None) -> ScalabilityMetricsResponse:
         """
@@ -296,6 +332,8 @@ class ScalabilityMetricsCollector:
                     pass
 
             # Calcular promedio por workstation
+            # Usa el overhead marginal: (rss_actual - baseline) / ws_count
+            # Si no hay baseline capturado, usa el RSS total como fallback
             avg_per_workstation_mb: float = 0.0
             try:
                 from app.services.websocket_manager import connection_manager
@@ -304,7 +342,13 @@ class ScalabilityMetricsCollector:
                 ws_count = counts.get("workstations", 0)
 
                 if ws_count > 0:
-                    avg_per_workstation_mb = round(rss_mb / ws_count, 2)
+                    if self._baseline_rss_mb is not None and rss_mb > self._baseline_rss_mb:
+                        # Overhead marginal = memoria actual - memoria base
+                        overhead_mb = rss_mb - self._baseline_rss_mb
+                        avg_per_workstation_mb = round(overhead_mb / ws_count, 2)
+                    else:
+                        # Sin baseline o RSS menor al baseline (GC reclamó), usar total
+                        avg_per_workstation_mb = round(rss_mb / ws_count, 2)
                 else:
                     avg_per_workstation_mb = 0.0
             except Exception as e:

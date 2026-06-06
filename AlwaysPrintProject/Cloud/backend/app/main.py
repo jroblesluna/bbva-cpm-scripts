@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.services.websocket_manager import connection_manager
 from app.services.status_scheduler import status_scheduler
+from app.services.scalability_metrics import scalability_collector
 from app.api.v1.router import api_router
 from app.api.v1.websocket import workstation, operator
 from app.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
@@ -38,6 +39,10 @@ async def lifespan(app: FastAPI):
 
     # Startup: Iniciar scheduler de recolección de métricas
     status_scheduler.start()
+
+    # Startup: Capturar baseline de memoria RSS del proceso
+    # (antes de aceptar conexiones WS, refleja solo la memoria base del framework)
+    scalability_collector.capture_baseline()
     
     yield
     
