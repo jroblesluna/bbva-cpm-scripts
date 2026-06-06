@@ -577,6 +577,13 @@ namespace AlwaysPrintTray
 
         private void ShowMyPrinters()
         {
+            // Si ya hay un formulario abierto, traerlo al frente y no abrir otro
+            if (_activeForm != null && !_activeForm.IsDisposed)
+            {
+                _activeForm.Activate();
+                return;
+            }
+
             if (_cloudManager == null || !_cloudManager.IsConnected)
             {
                 MessageBox.Show(
@@ -601,10 +608,12 @@ namespace AlwaysPrintTray
                 return;
             }
 
-            using var form = new MyPrintersForm(
+            var form = new MyPrintersForm(
                 _cloudManager.CloudApiUrl,
                 _cloudManager.WorkstationId,
                 _cloudManager.HttpClient);
+            _activeForm = form;
+            form.FormClosed += (_, __) => _activeForm = null;
             form.ShowDialog();
         }
 
