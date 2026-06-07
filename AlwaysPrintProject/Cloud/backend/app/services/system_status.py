@@ -833,9 +833,13 @@ class SystemStatusCollector:
                     ))
 
             # Memoria Python por workstation: > 4 MB/ws critical, > 2 MB/ws warning
+            # Solo evaluar si hay al menos 10 workstations conectadas (con pocas ws
+            # el promedio no es representativo — incluye warm-up y caches del framework)
             if scalability_metrics.python_memory is not None:
                 avg_mem = scalability_metrics.python_memory.avg_per_workstation_mb
-                if avg_mem is not None and avg_mem > 0:
+                ws_count = (scalability_metrics.websocket.total
+                            if scalability_metrics.websocket else 0)
+                if avg_mem is not None and avg_mem > 0 and ws_count >= 10:
                     if avg_mem > 4.0:
                         alerts.append(AlertResponse(
                             metric_name="memory_per_ws",

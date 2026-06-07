@@ -135,10 +135,15 @@ export default function MetricsCard() {
             label={t('memory.perWorkstation')}
             value={metrics?.python_memory?.avg_per_workstation_mb ?? null}
             unit={t('memory.unit')}
-            thresholdColor={evaluateThreshold(
-              metrics?.python_memory?.avg_per_workstation_mb ?? null,
-              MEMORY_PER_WS_THRESHOLD
-            )}
+            thresholdColor={
+              // Solo aplicar umbral si hay al menos 10 ws (con pocas, el promedio no es representativo)
+              (metrics?.websocket?.total ?? 0) >= 10
+                ? evaluateThreshold(
+                    metrics?.python_memory?.avg_per_workstation_mb ?? null,
+                    MEMORY_PER_WS_THRESHOLD
+                  )
+                : null
+            }
             t={t}
           />
 
