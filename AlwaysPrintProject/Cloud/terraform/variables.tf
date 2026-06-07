@@ -24,7 +24,7 @@ variable "backend_port" { type = number }
 variable "frontend_port" { type = number }
 
 variable "ec2_instance_type" {
-  description = "Tipo de instancia EC2 (t3.small = free tier, 2 GB RAM)"
+  description = "Tipo de instancia EC2 (t4g.small = ARM64, 2 GB RAM)"
   type        = string
 }
 
