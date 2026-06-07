@@ -244,6 +244,7 @@ class StatusScheduler:
             overall_status=result["overall_status"],
             alerts=result["alerts"],
             timestamp=timestamp,
+            scalability_metrics_json=result.get("scalability_metrics_json"),
         )
 
         if snapshot is None:

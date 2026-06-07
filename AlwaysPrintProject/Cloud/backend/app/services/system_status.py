@@ -1068,6 +1068,7 @@ class SystemStatusCollector:
         overall_status: str,
         alerts: List[AlertResponse],
         timestamp: datetime,
+        scalability_metrics_json: Optional[str] = None,
     ) -> Optional[StatusSnapshot]:
         """
         Persiste un snapshot completo en PostgreSQL con transacción atómica.
@@ -1107,6 +1108,7 @@ class SystemStatusCollector:
                     health_checks=health_checks,
                     overall_status=overall_status,
                     timestamp=timestamp,
+                    scalability_metrics_json=scalability_metrics_json,
                 )
                 logger.info(
                     f"Snapshot persistido correctamente en intento {intento} "
@@ -1143,6 +1145,7 @@ class SystemStatusCollector:
         health_checks: List[HealthCheckResponse],
         overall_status: str,
         timestamp: datetime,
+        scalability_metrics_json: Optional[str] = None,
     ) -> StatusSnapshot:
         """
         Ejecuta la transacción atómica de persistencia del snapshot.
@@ -1185,6 +1188,7 @@ class SystemStatusCollector:
             swap_available_mb=os_metrics.swap_available_mb,
             uptime_seconds=os_metrics.uptime_seconds,
             docker_available=docker_available,
+            scalability_metrics_json=scalability_metrics_json,
         )
         db.add(snapshot)
         # Flush para obtener el ID del snapshot sin hacer commit
@@ -1257,6 +1261,81 @@ class SystemStatusCollector:
                 uptime_seconds=container.uptime_seconds,
             )
             db.add(container_metric)
+
+        # Crear MetricRecords para métricas de escalabilidad (historial)
+        if scalability_metrics_json:
+            try:
+                import json as _json
+                sm = _json.loads(scalability_metrics_json)
+
+                # Conexiones WebSocket totales
+                ws = sm.get("websocket")
+                if ws and ws.get("data_available"):
+                    db.add(MetricRecord(
+                        snapshot_id=snapshot.id,
+                        metric_name="ws_connections_total",
+                        value=float(ws.get("total", 0)),
+                        unit="count",
+                        timestamp=timestamp,
+                    ))
+
+                # Memoria promedio por workstation (MB/ws)
+                mem = sm.get("python_memory")
+                if mem and mem.get("avg_per_workstation_mb") is not None:
+                    db.add(MetricRecord(
+                        snapshot_id=snapshot.id,
+                        metric_name="memory_per_ws_mb",
+                        value=float(mem["avg_per_workstation_mb"]),
+                        unit="mb",
+                        timestamp=timestamp,
+                    ))
+
+                # RSS del proceso Python (MB)
+                if mem and mem.get("rss_mb") is not None:
+                    db.add(MetricRecord(
+                        snapshot_id=snapshot.id,
+                        metric_name="python_rss_mb",
+                        value=float(mem["rss_mb"]),
+                        unit="mb",
+                        timestamp=timestamp,
+                    ))
+
+                # File descriptors (%)
+                fd = sm.get("file_descriptors")
+                if fd and fd.get("usage_percent") is not None:
+                    db.add(MetricRecord(
+                        snapshot_id=snapshot.id,
+                        metric_name="fd_usage_percent",
+                        value=float(fd["usage_percent"]),
+                        unit="percent",
+                        timestamp=timestamp,
+                    ))
+
+                # Pool de BD (%)
+                pool = sm.get("db_pool")
+                if pool and pool.get("usage_percent") is not None:
+                    db.add(MetricRecord(
+                        snapshot_id=snapshot.id,
+                        metric_name="db_pool_percent",
+                        value=float(pool["usage_percent"]),
+                        unit="percent",
+                        timestamp=timestamp,
+                    ))
+
+                # Tasa de transmisión de red (MB/s)
+                net = sm.get("network")
+                if net and net.get("tx_rate_bps") is not None:
+                    tx_mbs = round(net["tx_rate_bps"] / (1024 * 1024), 2)
+                    db.add(MetricRecord(
+                        snapshot_id=snapshot.id,
+                        metric_name="network_tx_mbs",
+                        value=tx_mbs,
+                        unit="mbs",
+                        timestamp=timestamp,
+                    ))
+            except Exception:
+                # Si falla el parseo de métricas de escalabilidad, no interrumpir la persistencia
+                pass
 
         # Commit atómico: todo o nada
         db.commit()

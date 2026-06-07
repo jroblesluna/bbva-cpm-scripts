@@ -130,6 +130,12 @@ def _get_metric_name_for_query(metric: str) -> str:
         "memory": "memory_percent",
         "disk": "disk_percent",
         "swap": "swap_percent",
+        "ws_connections": "ws_connections_total",
+        "memory_per_ws": "memory_per_ws_mb",
+        "python_rss": "python_rss_mb",
+        "fd_usage": "fd_usage_percent",
+        "db_pool": "db_pool_percent",
+        "network_tx": "network_tx_mbs",
     }
     return metric_map.get(metric, metric)
 
@@ -142,12 +148,16 @@ def _get_metric_unit(metric_name: str) -> str:
         metric_name: Nombre de la métrica almacenada
 
     Returns:
-        Unidad de medida (percent, mb)
+        Unidad de medida (percent, mb, count, mbs)
     """
     if metric_name.endswith("_percent"):
         return "percent"
     if metric_name.endswith("_mb"):
         return "mb"
+    if metric_name.endswith("_mbs"):
+        return "mbs"
+    if metric_name.endswith("_total"):
+        return "count"
     return "percent"
 
 
