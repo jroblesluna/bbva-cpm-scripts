@@ -7,8 +7,17 @@ terraform {
   }
 }
 
+locals {
+  # Mapeo automático de workspace a AWS profile — evita olvidar export AWS_PROFILE
+  aws_profiles = {
+    dev  = "AlwaysPrint-dev-040982755196"
+    prod = "AlwaysPrint-prod-425642439683"
+  }
+}
+
 provider "aws" {
-  region = var.aws_region
+  region  = var.aws_region
+  profile = local.aws_profiles[terraform.workspace]
   default_tags {
     tags = {
       Project     = var.project_name
