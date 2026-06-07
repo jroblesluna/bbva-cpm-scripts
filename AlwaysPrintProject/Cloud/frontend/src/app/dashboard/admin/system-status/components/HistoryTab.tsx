@@ -244,7 +244,7 @@ export default function HistoryTab() {
         <h3 className="text-lg font-semibold mb-4">{t('historyStatsTitle')}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {Object.entries(metricsData).map(([key, data]) => (
-            <StatsCard key={key} metricKey={key} stats={data.stats} t={t} />
+            <StatsCard key={key} metricKey={key} stats={data.stats} data={data} t={t} />
           ))}
         </div>
       </div>
@@ -454,14 +454,19 @@ function ThresholdDot({
 function StatsCard({
   metricKey,
   stats,
+  data,
   t,
 }: {
   metricKey: string
   stats: MetricStats
+  data?: MetricChartData
   t: ReturnType<typeof useTranslations>
 }) {
   const threshold = THRESHOLDS[metricKey]
   const isMaxAboveThreshold = stats.maximum > threshold
+  const isPercent = !data || data.unit === 'percent'
+  const unitSuffix = isPercent ? '%' : ` ${data?.unit === 'mb' ? 'MB' : (data?.unit ?? '')}`
+  const decimals = isPercent ? 1 : 2
 
   return (
     <Card>
@@ -477,7 +482,7 @@ function StatsCard({
               <Minus className="h-3 w-3" />
               {t('historyAvg')}
             </span>
-            <span className="text-sm font-medium">{stats.average.toFixed(1)}%</span>
+            <span className="text-sm font-medium">{stats.average.toFixed(decimals)}{unitSuffix}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -487,7 +492,7 @@ function StatsCard({
             <span
               className={`text-sm font-medium ${isMaxAboveThreshold ? 'text-red-600' : ''}`}
             >
-              {stats.maximum.toFixed(1)}%
+              {stats.maximum.toFixed(decimals)}{unitSuffix}
             </span>
           </div>
           <div className="flex items-center justify-between">
@@ -495,7 +500,7 @@ function StatsCard({
               <TrendingDown className="h-3 w-3" />
               {t('historyMin')}
             </span>
-            <span className="text-sm font-medium">{stats.minimum.toFixed(1)}%</span>
+            <span className="text-sm font-medium">{stats.minimum.toFixed(decimals)}{unitSuffix}</span>
           </div>
         </div>
       </CardContent>
