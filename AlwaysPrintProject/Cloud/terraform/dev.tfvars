@@ -25,8 +25,8 @@ ses_from_email = "noreply@dev.iol.pe"
 backend_port  = 8000
 frontend_port = 3000
 
-# Free tier: t4g.small (2 GB RAM, ARM64 — 20% más barato, 40% mejor rendimiento)
-ec2_instance_type = "t4g.small"
+# Free tier: t3.small (2 GB RAM — soporta ~900 ws concurrentes)
+ec2_instance_type = "t3.small"
 
 backend_env_vars = {
   LOG_LEVEL                   = "DEBUG"
