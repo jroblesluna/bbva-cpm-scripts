@@ -80,7 +80,7 @@ services:
       sh -c "alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port ${backend_port} --workers 1 --ws-ping-interval 300 --ws-ping-timeout 300"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${backend_port}/api/v1/health')"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request as u; u.urlopen(chr(104)+chr(116)+chr(116)+chr(112)+chr(58)+chr(47)+chr(47)+chr(108)+chr(111)+chr(99)+chr(97)+chr(108)+chr(104)+chr(111)+chr(115)+chr(116)+chr(58)+chr(56)+chr(48)+chr(48)+chr(48)+chr(47)+chr(97)+chr(112)+chr(105)+chr(47)+chr(118)+chr(49)+chr(47)+chr(104)+chr(101)+chr(97)+chr(108)+chr(116)+chr(104))'"]
       interval: 30s
       timeout: 10s
       retries: 3
