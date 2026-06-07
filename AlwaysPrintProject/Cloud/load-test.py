@@ -126,7 +126,7 @@ def _make_telemetry_msg() -> dict:
     """Crea mensaje de telemetría simulado."""
     return {
         "type": "telemetry",
-        "queue_status": random.choice(["ok", "ok", "ok", "warning"]),
+        "queue_status": random.choice(["ok", "ok", "ok", "missing"]),
         "contingency_active": random.random() < 0.02,  # 2% en contingencia
         "jobs_identified": random.randint(0, 20),
         "avg_release_time_ms": random.randint(500, 3000),
@@ -135,10 +135,14 @@ def _make_telemetry_msg() -> dict:
 
 
 def _get_rss_mb() -> float:
-    """Obtiene RSS del proceso actual en MB (solo Linux/macOS)."""
+    """Obtiene RSS del proceso actual en MB."""
     try:
         import resource
-        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024  # macOS en KB
+        usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # macOS reporta en bytes, Linux en KB
+        if sys.platform == "darwin":
+            return usage / (1024 * 1024)
+        return usage / 1024
     except Exception:
         return 0.0
 
