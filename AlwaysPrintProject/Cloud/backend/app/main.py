@@ -32,6 +32,10 @@ async def lifespan(app: FastAPI):
         from app.core.database import init_db
         init_db()
 
+    # Startup: Capturar baseline de memoria RSS del proceso
+    # (antes de iniciar ping loop y aceptar conexiones WS)
+    scalability_collector.capture_baseline()
+
     # Startup: Iniciar ping loop
     ping_task = asyncio.create_task(
         connection_manager.start_ping_loop(SessionLocal)
@@ -39,10 +43,6 @@ async def lifespan(app: FastAPI):
 
     # Startup: Iniciar scheduler de recolección de métricas
     status_scheduler.start()
-
-    # Startup: Capturar baseline de memoria RSS del proceso
-    # (antes de aceptar conexiones WS, refleja solo la memoria base del framework)
-    scalability_collector.capture_baseline()
     
     yield
     
