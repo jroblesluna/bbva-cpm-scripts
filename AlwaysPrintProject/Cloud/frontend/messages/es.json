@@ -954,7 +954,8 @@
     "metric_memory_percent": "Memoria",
     "metric_disk_percent": "Disco",
     "metric_cpu_percent": "CPU",
-    "metric_swap_percent": "Swap"
+    "metric_swap_percent": "Swap",
+    "metric_memory_per_ws_mb": "Memoria por WS"
   },
   "logAnalysis": {
     "buttonLabel": "Análisis IA de Log",

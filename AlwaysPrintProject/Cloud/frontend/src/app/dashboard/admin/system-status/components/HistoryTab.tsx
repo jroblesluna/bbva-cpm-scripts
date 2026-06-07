@@ -34,6 +34,7 @@ import {
   Cpu,
   MemoryStick,
   Server,
+  Users,
   Loader2,
   AlertTriangle,
 } from 'lucide-react'
@@ -56,6 +57,7 @@ const THRESHOLDS: Record<string, number> = {
   disk_percent: 85,
   cpu_percent: 90,
   swap_percent: 80,
+  memory_per_ws_mb: 4,
 }
 
 /** Colores para cada métrica en los gráficos */
@@ -64,6 +66,7 @@ const METRIC_COLORS: Record<string, string> = {
   disk_percent: '#f59e0b',
   cpu_percent: '#3b82f6',
   swap_percent: '#10b981',
+  memory_per_ws_mb: '#ec4899',
 }
 
 /** Opciones de rango de días */
@@ -76,6 +79,7 @@ const METRIC_API_NAMES: Record<string, string> = {
   disk_percent: 'disk',
   cpu_percent: 'cpu',
   swap_percent: 'swap',
+  memory_per_ws_mb: 'memory_per_ws',
 }
 
 // === TIPOS INTERNOS ===
@@ -113,15 +117,16 @@ export default function HistoryTab() {
     try {
       // Cargar todas las métricas en paralelo
       const metricKeys = Object.keys(METRIC_API_NAMES)
-      const [memoryRes, diskRes, cpuRes, swapRes, uptimeRes] = await Promise.all([
+      const [memoryRes, diskRes, cpuRes, swapRes, memPerWsRes, uptimeRes] = await Promise.all([
         getSystemStatusHistory(selectedRange, METRIC_API_NAMES.memory_percent),
         getSystemStatusHistory(selectedRange, METRIC_API_NAMES.disk_percent),
         getSystemStatusHistory(selectedRange, METRIC_API_NAMES.cpu_percent),
         getSystemStatusHistory(selectedRange, METRIC_API_NAMES.swap_percent),
+        getSystemStatusHistory(selectedRange, METRIC_API_NAMES.memory_per_ws_mb),
         getServicesUptime(selectedRange),
       ])
 
-      const responses: HistoryResponse[] = [memoryRes, diskRes, cpuRes, swapRes]
+      const responses: HistoryResponse[] = [memoryRes, diskRes, cpuRes, swapRes, memPerWsRes]
       const newMetricsData: Record<string, MetricChartData> = {}
 
       metricKeys.forEach((metricKey, index) => {
@@ -224,6 +229,12 @@ export default function HistoryTab() {
           metricKey="swap_percent"
           data={metricsData.swap_percent}
           icon={<Activity className="h-4 w-4" />}
+          t={t}
+        />
+        <MetricChart
+          metricKey="memory_per_ws_mb"
+          data={metricsData.memory_per_ws_mb}
+          icon={<Users className="h-4 w-4" />}
           t={t}
         />
       </div>
