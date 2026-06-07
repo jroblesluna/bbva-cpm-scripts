@@ -341,6 +341,11 @@ function MetricChart({
   const color = METRIC_COLORS[metricKey]
   const coverage = data.stats.data_coverage_percent
 
+  // Determinar unidad y dominio del eje Y según la métrica
+  const isPercent = data.unit === 'percent'
+  const unitLabel = isPercent ? '%' : ` ${data.unit === 'mb' ? 'MB' : data.unit}`
+  const yDomain: [number | string, number | string] = isPercent ? [0, 100] : [0, 'auto']
+
   return (
     <Card>
       <CardContent className="p-4">
@@ -363,10 +368,11 @@ function MetricChart({
                 tickCount={6}
               />
               <YAxis
-                domain={[0, 100]}
+                domain={yDomain}
                 tick={{ fontSize: 10 }}
-                tickFormatter={(value: number) => `${value}%`}
-                width={40}
+                tickFormatter={(value: number) => isPercent ? `${value}%` : `${value}`}
+                width={45}
+                label={!isPercent ? { value: unitLabel.trim(), angle: -90, position: 'insideLeft', fontSize: 10, fill: '#6b7280' } : undefined}
               />
               <Tooltip
                 content={({ active, payload }) => {
@@ -376,7 +382,7 @@ function MetricChart({
                     <div className="bg-popover border rounded-md shadow-md p-2 text-xs">
                       <p className="font-medium">{point.formattedTime}</p>
                       <p className={point.aboveThreshold ? 'text-red-600 font-semibold' : ''}>
-                        {point.value.toFixed(1)}%
+                        {point.value.toFixed(isPercent ? 1 : 2)}{unitLabel}
                       </p>
                     </div>
                   )
@@ -388,7 +394,7 @@ function MetricChart({
                 strokeDasharray="4 4"
                 strokeWidth={1.5}
                 label={{
-                  value: `${threshold}%`,
+                  value: `${threshold}${unitLabel}`,
                   position: 'right',
                   fontSize: 10,
                   fill: '#ef4444',
