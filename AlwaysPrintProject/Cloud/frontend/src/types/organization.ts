@@ -14,6 +14,7 @@ export interface Organization {
   auto_reregister_enabled: boolean
   forced_contingency: boolean
   action_config_mandatory: boolean
+  offline_timeout_minutes: number
   llm_model_id?: string | null
   openai_api_key?: string | null
   created_at: string
@@ -35,6 +36,7 @@ export interface OrganizationCreate {
   is_active?: boolean
   timezone?: string
   language?: string
+  offline_timeout_minutes?: number
 }
 
 export interface OrganizationUpdate {
@@ -43,6 +45,7 @@ export interface OrganizationUpdate {
   is_active?: boolean
   timezone?: string
   language?: string
+  offline_timeout_minutes?: number
   llm_model_id?: string | null
   openai_api_key?: string | null
 }

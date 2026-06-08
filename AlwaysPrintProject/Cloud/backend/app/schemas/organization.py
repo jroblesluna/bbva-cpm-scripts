@@ -87,6 +87,7 @@ class OrganizationUpdate(BaseModel):
     action_config_mandatory: Optional[bool] = Field(None, description="Si la action config de org es obligatoria para VLANs/workstations")
     llm_model_id: Optional[str] = Field(None, max_length=100, description="Modelo LLM para análisis de logs (NULL = usar default global)")
     openai_api_key: Optional[str] = Field(None, max_length=200, description="API Key de OpenAI (si se configura, se usa OpenAI en vez de Bedrock)")
+    offline_timeout_minutes: Optional[int] = Field(None, ge=1, description="Minutos de inactividad antes de enviar Death Ping")
 
 
 class OrganizationResponse(OrganizationBase):
@@ -102,6 +103,7 @@ class OrganizationResponse(OrganizationBase):
     action_config_mandatory: bool = False
     llm_model_id: Optional[str] = None
     openai_api_key: Optional[str] = None
+    offline_timeout_minutes: int = 10
     public_ips: list[PublicIPResponse] = []
     created_at: datetime
     updated_at: datetime

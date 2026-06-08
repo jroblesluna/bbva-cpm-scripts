@@ -8,7 +8,7 @@ Este módulo define:
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, TypeDecorator
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, TypeDecorator
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
 
@@ -94,6 +94,9 @@ class Organization(Base):
     # Flag que indica si la action config de la organización es obligatoria para todas las VLANs/workstations
     # Si es True, las VLANs y workstations NO pueden tener su propia action config
     action_config_mandatory = Column(Boolean, nullable=False, default=False, server_default='false')
+
+    # Minutos de inactividad antes de enviar Death Ping (default: 10)
+    offline_timeout_minutes = Column(Integer, nullable=False, default=10, server_default='10')
 
     # Modelo LLM asignado a esta organización para análisis de logs
     # Si es NULL, se usa el modelo por defecto global (settings.LOG_ANALYZER_LLM_MODEL_ID)

@@ -180,11 +180,12 @@ async def workstation_websocket(
             await _safe_close(websocket, 1011, f"Error: {str(e)}")
             return
         
-        # Conectar WebSocket
+        # Conectar WebSocket (incluye organization_id para rastreo de inactividad por org)
         await connection_manager.connect_workstation(
             workstation_id=workstation_id,
             websocket=websocket,
-            db=db
+            db=db,
+            organization_id=str(workstation.organization_id)
         )
         print(f"[WS] Conectado al manager", flush=True)
         
@@ -302,10 +303,13 @@ async def workstation_websocket(
             message_type = data.get("type")
             
             if message_type == "pong":
-                # Registrar pong
+                # Registrar pong y actualizar última actividad
                 await connection_manager.handle_pong(workstation_id)
+                await connection_manager.update_last_activity(workstation_id)
             
             elif message_type == "status_update":
+                # Actualizar última actividad al recibir status_update
+                await connection_manager.update_last_activity(workstation_id)
                 # Verificar que la workstation aún existe en BD antes de actualizar
                 ws_exists = db.query(Workstation).filter(
                     Workstation.id == workstation_id
@@ -427,6 +431,8 @@ async def workstation_websocket(
                 )
             
             elif message_type == "telemetry":
+                # Actualizar última actividad al recibir telemetría
+                await connection_manager.update_last_activity(workstation_id)
                 # Procesar mensaje de telemetría periódica
                 result = await _handle_telemetry(
                     data=data,
@@ -461,6 +467,8 @@ async def workstation_websocket(
                         )
             
             elif message_type == "connectivity_result":
+                # Actualizar última actividad al recibir resultado de conectividad
+                await connection_manager.update_last_activity(workstation_id)
                 # Procesar resultado de chequeo de conectividad
                 await _handle_connectivity_result(
                     data=data,
