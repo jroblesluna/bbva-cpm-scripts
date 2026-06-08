@@ -35,6 +35,7 @@ import {
   MemoryStick,
   Server,
   Users,
+  Database,
   Loader2,
   AlertTriangle,
 } from 'lucide-react'
@@ -58,6 +59,7 @@ const THRESHOLDS: Record<string, number> = {
   cpu_percent: 90,
   swap_percent: 80,
   memory_per_ws_mb: 4,
+  db_pool_percent: 80,
 }
 
 /** Colores para cada métrica en los gráficos */
@@ -67,6 +69,7 @@ const METRIC_COLORS: Record<string, string> = {
   cpu_percent: '#3b82f6',
   swap_percent: '#10b981',
   memory_per_ws_mb: '#ec4899',
+  db_pool_percent: '#f97316',
 }
 
 /** Opciones de rango de días */
@@ -80,6 +83,7 @@ const METRIC_API_NAMES: Record<string, string> = {
   cpu_percent: 'cpu',
   swap_percent: 'swap',
   memory_per_ws_mb: 'memory_per_ws',
+  db_pool_percent: 'db_pool',
 }
 
 // === TIPOS INTERNOS ===
@@ -117,16 +121,17 @@ export default function HistoryTab() {
     try {
       // Cargar todas las métricas en paralelo
       const metricKeys = Object.keys(METRIC_API_NAMES)
-      const [memoryRes, diskRes, cpuRes, swapRes, memPerWsRes, uptimeRes] = await Promise.all([
+      const [memoryRes, diskRes, cpuRes, swapRes, memPerWsRes, dbPoolRes, uptimeRes] = await Promise.all([
         getSystemStatusHistory(selectedRange, METRIC_API_NAMES.memory_percent),
         getSystemStatusHistory(selectedRange, METRIC_API_NAMES.disk_percent),
         getSystemStatusHistory(selectedRange, METRIC_API_NAMES.cpu_percent),
         getSystemStatusHistory(selectedRange, METRIC_API_NAMES.swap_percent),
         getSystemStatusHistory(selectedRange, METRIC_API_NAMES.memory_per_ws_mb),
+        getSystemStatusHistory(selectedRange, METRIC_API_NAMES.db_pool_percent),
         getServicesUptime(selectedRange),
       ])
 
-      const responses: HistoryResponse[] = [memoryRes, diskRes, cpuRes, swapRes, memPerWsRes]
+      const responses: HistoryResponse[] = [memoryRes, diskRes, cpuRes, swapRes, memPerWsRes, dbPoolRes]
       const newMetricsData: Record<string, MetricChartData> = {}
 
       metricKeys.forEach((metricKey, index) => {
@@ -235,6 +240,12 @@ export default function HistoryTab() {
           metricKey="memory_per_ws_mb"
           data={metricsData.memory_per_ws_mb}
           icon={<Users className="h-4 w-4" />}
+          t={t}
+        />
+        <MetricChart
+          metricKey="db_pool_percent"
+          data={metricsData.db_pool_percent}
+          icon={<Database className="h-4 w-4" />}
           t={t}
         />
       </div>
