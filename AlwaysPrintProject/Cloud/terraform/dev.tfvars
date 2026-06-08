@@ -25,8 +25,8 @@ ses_from_email = "noreply@dev.iol.pe"
 backend_port  = 8000
 frontend_port = 3000
 
-# t3.micro (1 GB RAM — suficiente para desarrollo)
-ec2_instance_type = "t3.micro"
+# t3.small (2 GB RAM — testing de carga con ~900 ws)
+ec2_instance_type = "t3.small"
 
 backend_env_vars = {
   LOG_LEVEL                   = "DEBUG"
