@@ -42,6 +42,7 @@ import {
   RefreshCcw,
   Download,
   Terminal,
+  Clock,
 } from 'lucide-react'
 import type { Organization, OrganizationCreate, OrganizationUpdate, PublicIPCreate } from '@/types'
 import { ActionConfigSection } from '@/components/config/ActionConfigSection'
@@ -577,6 +578,10 @@ export default function AccountsPage() {
                           <span>{account.public_ips?.length || 0} {t('publicIps')}</span>
                         </div>
                         <div className="flex items-center">
+                          <Clock className="w-4 h-4 mr-1 shrink-0" />
+                          <span>{t('offlineTimeoutValue', { minutes: account.offline_timeout_minutes ?? 10 })}</span>
+                        </div>
+                        <div className="flex items-center">
                           <CheckCircle className="w-4 h-4 mr-1 shrink-0" />
                           <span>{t('createdLabel', { date: formatDateWithTimezone(account.created_at, userTimezone) })}</span>
                         </div>
@@ -863,12 +868,13 @@ function AccountForm({
 }) {
   const t = useTranslations('accounts')
   const tCommon = useTranslations('common')
-  const [formData, setFormData] = useState<OrganizationCreate & { llm_model_id?: string | null; openai_api_key?: string | null }>({
+  const [formData, setFormData] = useState<OrganizationCreate & { llm_model_id?: string | null; openai_api_key?: string | null; offline_timeout_minutes?: number }>({
     name: initialData?.name || '',
     description: initialData?.description || '',
     is_active: initialData?.is_active ?? true,
     timezone: initialData?.timezone || 'UTC',
     language: initialData?.language || 'en',
+    offline_timeout_minutes: initialData?.offline_timeout_minutes ?? 10,
     llm_model_id: initialData?.llm_model_id || null,
     openai_api_key: initialData?.openai_api_key || null,
   })
@@ -965,6 +971,33 @@ function AccountForm({
         />
         <Label htmlFor="is_active" className="cursor-pointer">{t('activeLabel')}</Label>
       </div>
+
+      {/* Timeout de inactividad (solo al editar) */}
+      {initialData && (
+        <div className="space-y-2">
+          <Label htmlFor="offline_timeout_minutes">{t('offlineTimeoutLabel')}</Label>
+          <Input
+            id="offline_timeout_minutes"
+            type="number"
+            min={1}
+            step={1}
+            placeholder="10"
+            value={formData.offline_timeout_minutes ?? 10}
+            onChange={(e) => {
+              const val = parseInt(e.target.value, 10)
+              setFormData({ ...formData, offline_timeout_minutes: Number.isNaN(val) || val < 1 ? 1 : val })
+            }}
+            onBlur={(e) => {
+              const val = parseInt(e.target.value, 10)
+              if (Number.isNaN(val) || val < 1) {
+                setFormData({ ...formData, offline_timeout_minutes: 1 })
+              }
+            }}
+            disabled={isLoading}
+          />
+          <p className="text-xs text-gray-500">{t('offlineTimeoutHelper')}</p>
+        </div>
+      )}
 
       {/* Selector de modelo LLM (solo al editar) - dos niveles: Provider → Modelo */}
       {initialData && (

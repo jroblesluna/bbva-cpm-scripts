@@ -5,21 +5,29 @@ Este módulo implementa el ConnectionManager que gestiona:
 - Conexiones persistentes con Tray Clients (workstations)
 - Conexiones de operadores (frontend)
 - Envío/recepción de mensajes
-- Ping/pong para detección de conexiones muertas
+- Death Ping selectivo para detección de conexiones muertas por inactividad
 - Encolado de mensajes para workstations offline
 - Espera de respuestas de comandos (request-response sobre WebSocket)
 """
 
 import asyncio
 import json
+import logging
 from typing import Any, Dict, List, Optional, Set, Tuple
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from fastapi import WebSocket
 from sqlalchemy.orm import Session
 
 from app.services.workstation import WorkstationService
 from app.services.message import MessageService
 from app.services.config import ConfigService
+
+
+logger = logging.getLogger(__name__)
+
+
+# Segundos de espera máxima para pong tras Death Ping
+PONG_TIMEOUT_SECONDS: int = 30
 
 
 class ConnectionManager:
@@ -54,6 +62,15 @@ class ConnectionManager:
         self._disconnect_flush_task: Optional[asyncio.Task] = None
         self._db_session_factory = None
         
+        # Última actividad por workstation: {workstation_id: datetime (UTC naive)}
+        self.last_activity: Dict[str, datetime] = {}
+        
+        # Organización de cada workstation conectada: {workstation_id: str(org_id)}
+        self.org_ids: Dict[str, str] = {}
+        
+        # Death pings pendientes de respuesta: {workstation_id: datetime_enviado}
+        self._pending_pongs: Dict[str, datetime] = {}
+        
         # Respuestas pendientes de comandos: {command_id: (asyncio.Event, dict|None)}
         # Permite esperar la respuesta de un comando específico
         self._pending_command_responses: Dict[str, Tuple[asyncio.Event, List[Optional[dict]]]] = {}
@@ -62,19 +79,25 @@ class ConnectionManager:
         self, 
         workstation_id: str, 
         websocket: WebSocket,
-        db: Session
+        db: Session,
+        organization_id: str
     ):
         """
         Registra conexión de un Tray Client.
+        Inicializa last_activity y almacena org_id para Death Ping selectivo.
         
         Args:
             workstation_id: UUID de la workstation
             websocket: Conexión WebSocket (ya aceptada por el endpoint)
             db: Sesión de base de datos
+            organization_id: UUID de la organización a la que pertenece la workstation
         """
         async with self._lock:
             self.workstation_connections[workstation_id] = websocket
             self.last_pong[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
+            # Inicializar actividad y org para Death Ping selectivo
+            self.last_activity[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
+            self.org_ids[workstation_id] = organization_id
         
         # Actualizar estado en base de datos
         workstation_service = WorkstationService()
@@ -84,6 +107,15 @@ class ConnectionManager:
             is_online=True
         )
     
+    async def update_last_activity(self, workstation_id: str):
+        """
+        Actualiza el timestamp de última actividad de una workstation.
+        Se invoca al recibir cualquier mensaje válido (register, telemetry, pong, status_update, connectivity_result).
+        """
+        async with self._lock:
+            if workstation_id in self.workstation_connections:
+                self.last_activity[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
+
     async def disconnect_workstation(
         self, 
         workstation_id: str,
@@ -118,6 +150,12 @@ class ConnectionManager:
             
             if should_mark_offline and workstation_id in self.last_pong:
                 del self.last_pong[workstation_id]
+            
+            # Limpiar registros de actividad, organización y pongs pendientes
+            if should_mark_offline:
+                self.last_activity.pop(workstation_id, None)
+                self.org_ids.pop(workstation_id, None)
+                self._pending_pongs.pop(workstation_id, None)
         
         # Encolar para batch update en vez de query individual
         if should_mark_offline:
@@ -344,28 +382,36 @@ class ConnectionManager:
     async def handle_pong(self, workstation_id: str):
         """
         Registra recepción de pong de una workstation.
+        Remueve de pending_pongs para confirmar que está viva y evitar
+        que sea marcada como muerta en el siguiente ciclo del Death Ping.
         
         Args:
             workstation_id: UUID de la workstation
         """
         async with self._lock:
             self.last_pong[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
+            # Confirmar que respondió al Death Ping — no marcar como muerta
+            self._pending_pongs.pop(workstation_id, None)
     
     async def start_ping_loop(self, db_session_factory):
         """
-        Inicia loop de ping/pong para detectar conexiones muertas.
+        Loop de verificación de inactividad selectivo (Death Ping).
         
-        Envía ping cada WS_PING_INTERVAL segundos y verifica pong.
-        Si no hay pong en WS_PING_TIMEOUT segundos, cierra la conexión.
-        Usa batch update para marcar offline múltiples ws en una sola query.
+        Cada CHECK_INTERVAL (60s):
+        1. Verificar pending_pongs del ciclo anterior (timeout 30s → dead)
+        2. Consultar offline_timeout_minutes de cada org con ws conectadas
+        3. Identificar ws inactivas (last_activity > timeout de su org)
+        4. Enviar Death Ping solo a inactivas
+        5. Batch disconnect de las muertas (remover de dicts + UPDATE en BD)
         
         Args:
             db_session_factory: Factory para crear sesiones de BD
         """
         from app.core.config import settings
+        from app.models.organization import Organization
+        from app.models.workstation import Workstation
         
         ping_interval = int(getattr(settings, 'WS_PING_INTERVAL', 60))
-        ping_timeout = int(getattr(settings, 'WS_PING_TIMEOUT', 120))
         
         self._ping_loop_running = True
         self._db_session_factory = db_session_factory
@@ -374,56 +420,139 @@ class ConnectionManager:
             await asyncio.sleep(ping_interval)
             
             current_time = datetime.now(timezone.utc).replace(tzinfo=None)
-            dead_workstations = []
+            dead_workstations: List[str] = []
             
+            # === FASE 1: Verificar pending_pongs del ciclo anterior ===
+            async with self._lock:
+                for ws_id, ping_sent_at in list(self._pending_pongs.items()):
+                    if (current_time - ping_sent_at).total_seconds() > PONG_TIMEOUT_SECONDS:
+                        dead_workstations.append(ws_id)
+                
+                # Limpiar pending_pongs de las muertas
+                for ws_id in dead_workstations:
+                    self._pending_pongs.pop(ws_id, None)
+            
+            if dead_workstations:
+                logger.info(
+                    f"Fase 1: {len(dead_workstations)} workstations sin respuesta de pong "
+                    f"(>{PONG_TIMEOUT_SECONDS}s) → marcadas como muertas"
+                )
+            
+            # === FASE 2: Consultar timeouts por organización ===
+            org_timeouts: Dict[str, int] = {}
+            async with self._lock:
+                org_ids_unicos = set(self.org_ids.values())
+            
+            if org_ids_unicos:
+                try:
+                    db = db_session_factory()
+                    try:
+                        results = db.query(
+                            Organization.id, Organization.offline_timeout_minutes
+                        ).filter(
+                            Organization.id.in_(list(org_ids_unicos))
+                        ).all()
+                        
+                        for org_id, timeout_min in results:
+                            org_timeouts[str(org_id)] = timeout_min
+                    finally:
+                        db.close()
+                except Exception as e:
+                    logger.warning(
+                        f"Error consultando timeouts de organizaciones: {e}. "
+                        f"Usando default de 10 minutos para todas."
+                    )
+                    # Si falla la consulta, usar default 10 para todas
+                    org_timeouts = {}
+            
+            # === FASE 3: Identificar inactivas y enviar Death Ping ===
             async with self._lock:
                 workstation_ids = list(self.workstation_connections.keys())
             
-            # Enviar ping a todas las workstations
+            pings_enviados = 0
             for ws_id in workstation_ids:
-                try:
-                    # Verificar si hay pong reciente
-                    last_pong_time = self.last_pong.get(ws_id)
-                    if last_pong_time:
-                        seconds_since_pong = (current_time - last_pong_time).total_seconds()
-                        if seconds_since_pong > ping_timeout:
-                            # Sin pong en el timeout configurado, marcar como muerta
+                async with self._lock:
+                    # Si ya tiene ping pendiente, no enviar otro
+                    if ws_id in self._pending_pongs:
+                        continue
+                    
+                    # Obtener org_id y last_activity de esta ws
+                    org_id = self.org_ids.get(ws_id)
+                    ws_last_activity = self.last_activity.get(ws_id)
+                
+                if org_id is None or ws_last_activity is None:
+                    continue
+                
+                # Determinar timeout: usar el de la org o default 10
+                timeout_minutes = org_timeouts.get(org_id, 10)
+                threshold = current_time - timedelta(minutes=timeout_minutes)
+                
+                if ws_last_activity < threshold:
+                    # Workstation inactiva → enviar Death Ping
+                    try:
+                        sent = await self.send_to_workstation(ws_id, {"type": "ping"})
+                        if sent:
+                            async with self._lock:
+                                self._pending_pongs[ws_id] = current_time
+                            pings_enviados += 1
+                        else:
+                            # No se pudo enviar (ws ya no existe en conexiones)
                             dead_workstations.append(ws_id)
-                            continue
-                    
-                    # Enviar ping
-                    await self.send_to_workstation(ws_id, {"type": "ping"})
-                    
-                except Exception:
-                    dead_workstations.append(ws_id)
+                    except Exception as e:
+                        logger.warning(
+                            f"Excepción enviando Death Ping a {ws_id}: {e}. "
+                            f"Marcada como muerta."
+                        )
+                        dead_workstations.append(ws_id)
             
-            # Desconectar workstations muertas con batch update
+            if pings_enviados > 0:
+                logger.info(
+                    f"Fase 3: {pings_enviados} Death Pings enviados a workstations inactivas "
+                    f"(de {len(workstation_ids)} conectadas)"
+                )
+            
+            # === FASE 4: Batch disconnect de muertas ===
             if dead_workstations:
-                # Remover del dict de conexiones en batch
+                # Eliminar duplicados
+                dead_workstations = list(set(dead_workstations))
+                
+                # Remover de dicts en memoria
                 async with self._lock:
                     for ws_id in dead_workstations:
                         self.workstation_connections.pop(ws_id, None)
+                        self.last_activity.pop(ws_id, None)
                         self.last_pong.pop(ws_id, None)
+                        self.org_ids.pop(ws_id, None)
+                        self._pending_pongs.pop(ws_id, None)
                 
-                # Batch update en BD: una sola query para todas las desconectadas
-                db = db_session_factory()
+                # Batch UPDATE en BD
                 try:
-                    from app.models.workstation import Workstation
-                    db.query(Workstation).filter(
-                        Workstation.id.in_(dead_workstations)
-                    ).update(
-                        {Workstation.is_online: False},
-                        synchronize_session=False
-                    )
-                    db.commit()
+                    db = db_session_factory()
+                    try:
+                        updated = db.query(Workstation).filter(
+                            Workstation.id.in_(dead_workstations)
+                        ).update(
+                            {Workstation.is_online: False},
+                            synchronize_session=False
+                        )
+                        db.commit()
+                        logger.info(
+                            f"Fase 4: Batch disconnect completado — "
+                            f"{updated} workstations marcadas offline "
+                            f"(de {len(dead_workstations)} muertas detectadas)"
+                        )
+                    except Exception as e:
+                        db.rollback()
+                        logger.error(
+                            f"Error en batch disconnect de {len(dead_workstations)} ws: {e}. "
+                            f"Se hizo rollback."
+                        )
+                    finally:
+                        db.close()
                 except Exception as e:
-                    db.rollback()
-                    import logging
-                    logging.getLogger(__name__).error(
-                        f"Error en batch disconnect de {len(dead_workstations)} ws: {e}"
+                    logger.error(
+                        f"Error creando sesión para batch disconnect: {e}"
                     )
-                finally:
-                    db.close()
     
     def stop_ping_loop(self):
         """Detiene el loop de ping/pong."""
