@@ -169,46 +169,53 @@ class ConnectionManager:
     async def _flush_disconnect_queue(self):
         """
         Espera 3 segundos y luego hace batch UPDATE de todas las ws encoladas.
+        Repite mientras sigan llegando desconexiones a la cola.
         Esto agrupa desconexiones masivas (ej: 500 ws desconectándose a la vez)
-        en una sola query a la BD.
+        en queries batch a la BD.
         """
-        await asyncio.sleep(3)
-        
-        # Tomar todos los IDs pendientes
-        ids_to_flush = self._disconnect_queue.copy()
-        self._disconnect_queue.clear()
-        
-        if not ids_to_flush and self._db_session_factory is None:
-            return
-        
-        if not ids_to_flush:
-            return
-        
         import logging
         logger = logging.getLogger(__name__)
         
-        try:
-            db = self._db_session_factory()
+        while True:
+            await asyncio.sleep(3)
+            
+            # Tomar todos los IDs pendientes
+            ids_to_flush = self._disconnect_queue.copy()
+            self._disconnect_queue.clear()
+            
+            if not ids_to_flush:
+                # Cola vacía — terminar el loop
+                return
+            
+            if self._db_session_factory is None:
+                logger.warning(
+                    f"_flush_disconnect_queue: {len(ids_to_flush)} ws pendientes "
+                    f"pero _db_session_factory es None. Descartando."
+                )
+                return
+            
             try:
-                from app.models.workstation import Workstation
-                updated = db.query(Workstation).filter(
-                    Workstation.id.in_(ids_to_flush)
-                ).update(
-                    {Workstation.is_online: False},
-                    synchronize_session=False
-                )
-                db.commit()
-                logger.info(
-                    f"Batch disconnect: {updated} workstations marcadas offline "
-                    f"(de {len(ids_to_flush)} encoladas)"
-                )
+                db = self._db_session_factory()
+                try:
+                    from app.models.workstation import Workstation
+                    updated = db.query(Workstation).filter(
+                        Workstation.id.in_(ids_to_flush)
+                    ).update(
+                        {Workstation.is_online: False},
+                        synchronize_session=False
+                    )
+                    db.commit()
+                    logger.info(
+                        f"Batch disconnect: {updated} workstations marcadas offline "
+                        f"(de {len(ids_to_flush)} encoladas)"
+                    )
+                except Exception as e:
+                    db.rollback()
+                    logger.error(f"Error en batch disconnect: {e}")
+                finally:
+                    db.close()
             except Exception as e:
-                db.rollback()
-                logger.error(f"Error en batch disconnect: {e}")
-            finally:
-                db.close()
-        except Exception as e:
-            logger.error(f"Error creando sesión para batch disconnect: {e}")
+                logger.error(f"Error creando sesión para flush disconnect: {e}")
     
     async def connect_operator(
         self, 
