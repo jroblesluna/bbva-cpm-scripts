@@ -423,6 +423,47 @@ class ConnectionManager:
         self._ping_loop_running = True
         self._db_session_factory = db_session_factory
         
+        # === LIMPIEZA INICIAL: marcar offline workstations fantasma ===
+        # Al reiniciar el backend, la BD puede tener ws con is_online=True
+        # que ya no tienen conexión WebSocket activa (ej: crash, deploy, test previo)
+        try:
+            db = db_session_factory()
+            try:
+                async with self._lock:
+                    connected_ids = list(self.workstation_connections.keys())
+                
+                if connected_ids:
+                    # Marcar offline las que están en BD como online pero NO conectadas
+                    cleaned = db.query(Workstation).filter(
+                        Workstation.is_online == True,
+                        ~Workstation.id.in_(connected_ids)
+                    ).update(
+                        {Workstation.is_online: False},
+                        synchronize_session=False
+                    )
+                else:
+                    # No hay nadie conectado — marcar TODAS como offline
+                    cleaned = db.query(Workstation).filter(
+                        Workstation.is_online == True
+                    ).update(
+                        {Workstation.is_online: False},
+                        synchronize_session=False
+                    )
+                
+                db.commit()
+                if cleaned > 0:
+                    logger.info(
+                        f"Limpieza inicial: {cleaned} workstations fantasma marcadas offline "
+                        f"({len(connected_ids)} realmente conectadas)"
+                    )
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error en limpieza inicial de workstations: {e}")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"Error creando sesión para limpieza inicial: {e}")
+        
         while self._ping_loop_running:
             await asyncio.sleep(ping_interval)
             
