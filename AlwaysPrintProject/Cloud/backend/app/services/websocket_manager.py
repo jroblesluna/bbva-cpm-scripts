@@ -48,6 +48,11 @@ class ConnectionManager:
         
         # Flag para detener el ping loop
         self._ping_loop_running = False
+
+        # Cola de desconexiones pendientes de persistir en BD (batch)
+        self._disconnect_queue: List[str] = []
+        self._disconnect_flush_task: Optional[asyncio.Task] = None
+        self._db_session_factory = None
         
         # Respuestas pendientes de comandos: {command_id: (asyncio.Event, dict|None)}
         # Permite esperar la respuesta de un comando específico
@@ -86,15 +91,18 @@ class ConnectionManager:
         websocket: WebSocket = None
     ):
         """
-        Desconecta un Tray Client y marca como offline.
+        Desconecta un Tray Client y encola el mark-offline para batch update.
         
         Solo marca offline si el WebSocket que se desconecta es el mismo que está
         actualmente registrado. Si ya fue reemplazado por una nueva conexión
         (reconexión rápida tras StopTray/StartTray), no se marca offline.
         
+        El UPDATE a BD se encola y se ejecuta en batch cada 3 segundos para
+        evitar saturar el pool en desconexiones masivas.
+        
         Args:
             workstation_id: UUID de la workstation
-            db: Sesión de base de datos
+            db: Sesión de base de datos (conservada por compatibilidad, no se usa directamente)
             websocket: WebSocket que se está desconectando (para comparar con el activo)
         """
         should_mark_offline = False
@@ -111,14 +119,58 @@ class ConnectionManager:
             if should_mark_offline and workstation_id in self.last_pong:
                 del self.last_pong[workstation_id]
         
-        # Solo actualizar estado en BD si esta era la conexión activa
+        # Encolar para batch update en vez de query individual
         if should_mark_offline:
-            workstation_service = WorkstationService()
-            workstation_service.update_workstation_status(
-                db=db,
-                workstation_id=workstation_id,
-                is_online=False
-            )
+            self._disconnect_queue.append(workstation_id)
+            # Iniciar flush task si no existe
+            if self._disconnect_flush_task is None or self._disconnect_flush_task.done():
+                self._disconnect_flush_task = asyncio.create_task(
+                    self._flush_disconnect_queue()
+                )
+
+    async def _flush_disconnect_queue(self):
+        """
+        Espera 3 segundos y luego hace batch UPDATE de todas las ws encoladas.
+        Esto agrupa desconexiones masivas (ej: 500 ws desconectándose a la vez)
+        en una sola query a la BD.
+        """
+        await asyncio.sleep(3)
+        
+        # Tomar todos los IDs pendientes
+        ids_to_flush = self._disconnect_queue.copy()
+        self._disconnect_queue.clear()
+        
+        if not ids_to_flush and self._db_session_factory is None:
+            return
+        
+        if not ids_to_flush:
+            return
+        
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            db = self._db_session_factory()
+            try:
+                from app.models.workstation import Workstation
+                updated = db.query(Workstation).filter(
+                    Workstation.id.in_(ids_to_flush)
+                ).update(
+                    {Workstation.is_online: False},
+                    synchronize_session=False
+                )
+                db.commit()
+                logger.info(
+                    f"Batch disconnect: {updated} workstations marcadas offline "
+                    f"(de {len(ids_to_flush)} encoladas)"
+                )
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error en batch disconnect: {e}")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"Error creando sesión para batch disconnect: {e}")
     
     async def connect_operator(
         self, 
@@ -303,16 +355,23 @@ class ConnectionManager:
         """
         Inicia loop de ping/pong para detectar conexiones muertas.
         
-        Envía ping cada 30 segundos y verifica pong.
-        Si no hay pong en 60 segundos, cierra la conexión.
+        Envía ping cada WS_PING_INTERVAL segundos y verifica pong.
+        Si no hay pong en WS_PING_TIMEOUT segundos, cierra la conexión.
+        Usa batch update para marcar offline múltiples ws en una sola query.
         
         Args:
             db_session_factory: Factory para crear sesiones de BD
         """
+        from app.core.config import settings
+        
+        ping_interval = int(getattr(settings, 'WS_PING_INTERVAL', 60))
+        ping_timeout = int(getattr(settings, 'WS_PING_TIMEOUT', 120))
+        
         self._ping_loop_running = True
+        self._db_session_factory = db_session_factory
         
         while self._ping_loop_running:
-            await asyncio.sleep(30)  # Ping cada 30 segundos
+            await asyncio.sleep(ping_interval)
             
             current_time = datetime.now(timezone.utc).replace(tzinfo=None)
             dead_workstations = []
@@ -327,8 +386,8 @@ class ConnectionManager:
                     last_pong_time = self.last_pong.get(ws_id)
                     if last_pong_time:
                         seconds_since_pong = (current_time - last_pong_time).total_seconds()
-                        if seconds_since_pong > 60:
-                            # Sin pong en 60 segundos, marcar como muerta
+                        if seconds_since_pong > ping_timeout:
+                            # Sin pong en el timeout configurado, marcar como muerta
                             dead_workstations.append(ws_id)
                             continue
                     
@@ -338,12 +397,31 @@ class ConnectionManager:
                 except Exception:
                     dead_workstations.append(ws_id)
             
-            # Desconectar workstations muertas
+            # Desconectar workstations muertas con batch update
             if dead_workstations:
+                # Remover del dict de conexiones en batch
+                async with self._lock:
+                    for ws_id in dead_workstations:
+                        self.workstation_connections.pop(ws_id, None)
+                        self.last_pong.pop(ws_id, None)
+                
+                # Batch update en BD: una sola query para todas las desconectadas
                 db = db_session_factory()
                 try:
-                    for ws_id in dead_workstations:
-                        await self.disconnect_workstation(ws_id, db)
+                    from app.models.workstation import Workstation
+                    db.query(Workstation).filter(
+                        Workstation.id.in_(dead_workstations)
+                    ).update(
+                        {Workstation.is_online: False},
+                        synchronize_session=False
+                    )
+                    db.commit()
+                except Exception as e:
+                    db.rollback()
+                    import logging
+                    logging.getLogger(__name__).error(
+                        f"Error en batch disconnect de {len(dead_workstations)} ws: {e}"
+                    )
                 finally:
                     db.close()
     
