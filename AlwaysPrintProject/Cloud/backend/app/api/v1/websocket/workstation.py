@@ -297,6 +297,12 @@ async def workstation_websocket(
             # Marcar delivery individual como enviado
             message_service.mark_delivery_as_sent(db, str(msg.id), workstation_id)
         
+        # Liberar sesión de BD después del setup completo.
+        # El registro, config, contingencia y mensajes pendientes ya se procesaron.
+        # La sesión se re-crea on-demand en el loop solo cuando llega un mensaje.
+        db.close()
+        db = None
+        
         # Loop de recepción de mensajes
         while True:
             data = await websocket.receive_json()
@@ -507,11 +513,16 @@ async def workstation_websocket(
     finally:
         # Limpiar conexión
         if workstation_id:
-            await connection_manager.disconnect_workstation(
-                workstation_id=workstation_id,
-                db=db,
-                websocket=websocket
-            )
+            # Crear sesión temporal si no existe (pudo haber sido liberada en el loop)
+            cleanup_db = db if db is not None else SessionLocal()
+            try:
+                await connection_manager.disconnect_workstation(
+                    workstation_id=workstation_id,
+                    db=cleanup_db,
+                    websocket=websocket
+                )
+            finally:
+                cleanup_db.close()
 
 
 async def _handle_telemetry(
