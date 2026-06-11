@@ -300,6 +300,11 @@ async def workstation_websocket(
         # Loop de recepción de mensajes
         while True:
             data = await websocket.receive_json()
+            
+            # Crear sesión de BD solo cuando llega un mensaje (no retener entre mensajes)
+            if db is None:
+                db = SessionLocal()
+            
             message_type = data.get("type")
             
             if message_type == "pong":
@@ -484,11 +489,11 @@ async def workstation_websocket(
                     "message": f"Unknown message type: {message_type}"
                 })
             
-            # Liberar sesión de BD después de cada mensaje y reciclar.
+            # Liberar sesión de BD después de cada mensaje.
             # Sin esto, cada WebSocket retiene una conexión del pool permanentemente.
-            # Con 21+ workstations conectadas, el pool de 25 se agota y el backend deja de responder.
+            # La sesión se re-crea al inicio del siguiente ciclo (receive_json bloquea sin retener pool).
             db.close()
-            db = SessionLocal()
+            db = None
     
     except WebSocketDisconnect:
         # Cliente desconectado
