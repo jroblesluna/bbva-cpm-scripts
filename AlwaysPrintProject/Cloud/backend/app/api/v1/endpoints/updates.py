@@ -674,20 +674,29 @@ def download_update(
 
     # 4. Descargar el MSI desde S3 y servirlo directamente (streaming)
     # Se evita el redirect a presigned URL porque algunos clientes no lo manejan correctamente
+    # IMPORTANTE: Cerrar sesión de BD ANTES del streaming para no retener conexión del pool
+    # durante toda la descarga (que puede tardar minutos con archivos grandes)
+    target_key = None
+    if account.target_version:
+        target_key = f"versions/{account.target_version}/AlwaysPrint.msi"
+    
+    # Capturar datos necesarios antes de cerrar la sesión
+    ws_id = str(workstation.id) if workstation else "N/A (fallback IP)"
+    client_ip = get_client_ip(request)
+    account_name = account.name if account else "desconocida"
+    
+    # Liberar sesión de BD — ya no la necesitamos para el streaming
+    db.close()
+    
     try:
         s3_service = S3UpdateService()
-        if account.target_version:
-            target_key = f"versions/{account.target_version}/AlwaysPrint.msi"
-        else:
-            target_key = None  # Usa la clave por defecto (latest)
-
         s3_response = s3_service.get_object(key=target_key)
     except ClientError:
         logger.error(
             "Error de S3 al descargar MSI: "
             "workstation_id=%s, ip_publica=%s",
-            workstation.id if workstation else "N/A",
-            get_client_ip(request),
+            ws_id,
+            client_ip,
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -697,7 +706,7 @@ def download_update(
         logger.error(
             "Error inesperado al descargar MSI: "
             "workstation_id=%s, error=%s",
-            workstation.id if workstation else "N/A",
+            ws_id,
             str(e),
         )
         raise HTTPException(
@@ -709,9 +718,9 @@ def download_update(
     logger.info(
         "Descarga de actualización autorizada: workstation_id=%s, "
         "ip_publica=%s, organization=%s, status=200",
-        workstation.id if workstation else "N/A (fallback IP)",
-        get_client_ip(request),
-        account.name if account else "desconocida",
+        ws_id,
+        client_ip,
+        account_name,
     )
 
     return StreamingResponse(
