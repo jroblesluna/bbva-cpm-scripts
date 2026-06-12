@@ -624,6 +624,24 @@ def download_update(
                 account.name if account else "desconocida"
             )
         else:
+            # IP no autorizada: registrar como pendiente si no existe
+            existing_ip = db.query(PublicIP).filter(
+                PublicIP.ip_address == client_ip
+            ).first()
+            if not existing_ip:
+                from datetime import datetime, timezone
+                new_pending_ip = PublicIP(
+                    ip_address=client_ip,
+                    is_authorized=False,
+                    organization_id=None,
+                    description=f"Detectada en endpoint /updates/download el {datetime.now(timezone.utc).replace(tzinfo=None).strftime('%Y-%m-%d %H:%M:%S')}",
+                )
+                db.add(new_pending_ip)
+                db.commit()
+                logger.info(
+                    "IP registrada como pendiente de aprobación (desde /updates/download): %s",
+                    client_ip
+                )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Workstation no autenticada"
