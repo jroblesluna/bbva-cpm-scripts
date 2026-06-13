@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
@@ -13,103 +13,238 @@ using AlwaysPrintTray.Pipe;
 namespace AlwaysPrintTray.Forms
 {
     /// <summary>
-    /// Formulario de estado del sistema (WinForms).
+    /// Formulario de estado del sistema (WinForms, UI programática sin diseñador).
     /// Muestra información general, triggers OnDemand y servicios monitoreados.
+    /// Usa posicionamiento absoluto con Y calculado dinámicamente.
+    /// Timer de 5 segundos para refrescar estados de servicios.
+    /// BackgroundWorker para operaciones de pipe (sin async/await).
     /// </summary>
     public sealed class StatusForm : Form
     {
+        // ── Constantes de layout ────────────────────────────────────────────────
+        private const int FormWidth = 580;
+        private const int LabelX = 16;
+        private const int ValueX = 150;
+        private const int StateX = 380;
+        private const int StartButtonX = 460;
+        private const int RowHeight = 22;
+        private const int SectionSpacing = 8;
+
+        // ── Dependencias ────────────────────────────────────────────────────────
         private readonly PipeClient _pipe;
 
-        // Controles dinámicos
+        // ── Controles de información general ────────────────────────────────────
         private Label _valState = null!;
         private Label _valVersion = null!;
         private Label _valQueue = null!;
         private Label _valConfig = null!;
-        private FlowLayoutPanel _triggersPanel = null!;
-        private FlowLayoutPanel _servicesPanel = null!;
+
+        // ── Controles de servicios (para refresh con timer) ─────────────────────
+        private readonly List<ServiceRow> _serviceRows = new List<ServiceRow>();
+
+        // ── Controles de acciones (para estado global busy) ─────────────────────
+        private readonly List<Button> _allActionButtons = new List<Button>();
+        private Label _lblStatus = null!;
+        private Button _btnClose = null!;
+
+        // ── Estado global busy ──────────────────────────────────────────────────
+        private bool _isBusy;
+
+        // ── Timer para refrescar estados de servicios ───────────────────────────
+        private Timer _refreshTimer = null!;
+
+        // ── Estructura interna para fila de servicio ────────────────────────────
+        private class ServiceRow
+        {
+            public MonitoredServiceConfig Config { get; set; } = null!;
+            public Label StateLabel { get; set; } = null!;
+            public Button StartButton { get; set; } = null!;
+        }
 
         public StatusForm(PipeClient pipe)
         {
             _pipe = pipe ?? throw new ArgumentNullException(nameof(pipe));
             BuildUI();
             LoadData();
+            SetupRefreshTimer();
         }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ── Construcción de la UI ───────────────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════════════
 
         private void BuildUI()
         {
+            // Propiedades del formulario
             Text = LocalizationManager.Get("StatusFormTitle");
-            Size = new Size(500, 520);
-            StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
-            BackColor = Color.FromArgb(245, 245, 245);
+            StartPosition = FormStartPosition.CenterScreen;
+            BackColor = Color.FromArgb(0xF5, 0xF5, 0xF5);
             ForeColor = Color.Black;
             Font = new Font("Segoe UI", 9f);
             AutoScaleMode = AutoScaleMode.Dpi;
             KeyPreview = true;
-            KeyDown += (s, e) => { if (e.KeyCode == Keys.Escape) Close(); };
+            KeyDown += OnKeyDown;
 
-            var y = 12;
+            int y = 12;
 
-            // ═══ Información General ═══
+            // ── Sección A: Información General ──────────────────────────────────
             AddSectionHeader(LocalizationManager.Get("StatusSectionGeneralInfo"), ref y);
             _valState = AddFieldRow(LocalizationManager.Get("StatusLabelState"), "...", ref y);
             _valVersion = AddFieldRow(LocalizationManager.Get("StatusLabelVersion"), "...", ref y);
             _valQueue = AddFieldRow(LocalizationManager.Get("StatusLabelActiveQueue"), "...", ref y);
             _valConfig = AddFieldRow(LocalizationManager.Get("StatusLabelConfig"), "...", ref y);
 
-            y += 8;
+            y += SectionSpacing;
             AddSeparator(ref y);
 
-            // ═══ Acciones A Demanda ═══
+            // ── Sección B: Acciones A Demanda ───────────────────────────────────
             AddSectionHeader(LocalizationManager.Get("StatusSectionOnDemand"), ref y);
-            _triggersPanel = new FlowLayoutPanel
-            {
-                Location = new Point(12, y),
-                Size = new Size(420, 30),
-                FlowDirection = FlowDirection.TopDown,
-                AutoSize = true,
-                WrapContents = false
-            };
-            Controls.Add(_triggersPanel);
-            y += 35;
+            BuildTriggersSection(ref y);
 
+            y += SectionSpacing;
             AddSeparator(ref y);
 
-            // ═══ Servicios ═══
+            // ── Sección C: Servicios ────────────────────────────────────────────
             AddSectionHeader(LocalizationManager.Get("StatusSectionServices"), ref y);
-            _servicesPanel = new FlowLayoutPanel
-            {
-                Location = new Point(12, y),
-                Size = new Size(420, 30),
-                FlowDirection = FlowDirection.TopDown,
-                AutoSize = true,
-                WrapContents = false
-            };
-            Controls.Add(_servicesPanel);
+            BuildServicesSection(ref y);
 
-            // Botón Cerrar
-            var btnClose = new Button
+            y += SectionSpacing;
+            AddSeparator(ref y);
+
+            // ── Etiqueta de estado (busy) ───────────────────────────────────────
+            _lblStatus = new Label
+            {
+                Text = "",
+                Location = new Point(LabelX, y),
+                AutoSize = true,
+                ForeColor = Color.FromArgb(0x00, 0x66, 0xCC),
+                Font = new Font("Segoe UI", 9f, FontStyle.Italic),
+                Visible = false
+            };
+            Controls.Add(_lblStatus);
+
+            // ── Botón Cerrar (bottom-right) ─────────────────────────────────────
+            y += 28;
+            _btnClose = new Button
             {
                 Text = LocalizationManager.Get("StatusButtonClose"),
-                Size = new Size(80, 28),
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
-                DialogResult = DialogResult.Cancel
+                Size = new Size(90, 28),
+                Location = new Point(FormWidth - 90 - 20, y),
+                FlatStyle = FlatStyle.Standard
             };
-            btnClose.Click += (s, e) => Close();
-            Controls.Add(btnClose);
+            _btnClose.Click += (s, e) => Close();
+            Controls.Add(_btnClose);
+            CancelButton = _btnClose;
 
-            // Posicionar botón al redimensionar/al final
-            Load += (s, e) =>
-            {
-                btnClose.Location = new Point(ClientSize.Width - btnClose.Width - 16, ClientSize.Height - btnClose.Height - 12);
-            };
-
-            CancelButton = btnClose;
-            AutoSize = true;
-            AutoSizeMode = AutoSizeMode.GrowOnly;
+            // ── Calcular alto total del formulario ──────────────────────────────
+            y += 28 + 16;
+            ClientSize = new Size(FormWidth, y);
         }
+
+        /// <summary>Construye la sección de triggers OnDemand.</summary>
+        private void BuildTriggersSection(ref int y)
+        {
+            var triggers = OnDemandConfigReader.GetOnDemandTriggers();
+
+            if (triggers.Count == 0)
+            {
+                var lbl = new Label
+                {
+                    Text = LocalizationManager.Get("StatusNoActionsAvailable"),
+                    Location = new Point(LabelX, y),
+                    AutoSize = true,
+                    ForeColor = Color.Gray,
+                    Font = new Font("Segoe UI", 9f, FontStyle.Italic)
+                };
+                Controls.Add(lbl);
+                y += RowHeight;
+                return;
+            }
+
+            foreach (var trigger in triggers)
+            {
+                // Etiqueta del trigger
+                var lbl = new Label
+                {
+                    Text = trigger.Label,
+                    Location = new Point(LabelX, y + 4),
+                    AutoSize = true
+                };
+                Controls.Add(lbl);
+
+                // Botón "Ejecutar"
+                var btn = new Button
+                {
+                    Text = LocalizationManager.Get("StatusButtonExecute"),
+                    Location = new Point(StartButtonX, y),
+                    Size = new Size(90, 26),
+                    Tag = trigger,
+                    FlatStyle = FlatStyle.Standard
+                };
+                btn.Click += OnTriggerExecuteClick;
+                Controls.Add(btn);
+                _allActionButtons.Add(btn);
+
+                y += 30;
+            }
+        }
+
+        /// <summary>Construye la sección de servicios monitoreados.</summary>
+        private void BuildServicesSection(ref int y)
+        {
+            var services = OnDemandConfigReader.GetMonitoredServices();
+
+            foreach (var svc in services)
+            {
+                // Nombre del servicio
+                var lblName = new Label
+                {
+                    Text = svc.DisplayName,
+                    Location = new Point(LabelX, y + 4),
+                    AutoSize = true
+                };
+                Controls.Add(lblName);
+
+                // Estado del servicio
+                var lblState = new Label
+                {
+                    Text = "...",
+                    Location = new Point(StateX, y + 4),
+                    AutoSize = true
+                };
+                Controls.Add(lblState);
+
+                // Botón "Iniciar" (visible solo cuando está detenido)
+                var btnStart = new Button
+                {
+                    Text = LocalizationManager.Get("StatusButtonStartService"),
+                    Location = new Point(StartButtonX, y),
+                    Size = new Size(100, 26),
+                    Tag = svc,
+                    Visible = false,
+                    FlatStyle = FlatStyle.Standard
+                };
+                btnStart.Click += OnServiceStartClick;
+                Controls.Add(btnStart);
+                _allActionButtons.Add(btnStart);
+
+                _serviceRows.Add(new ServiceRow
+                {
+                    Config = svc,
+                    StateLabel = lblState,
+                    StartButton = btnStart
+                });
+
+                y += 30;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ── Carga de datos ──────────────────────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════════════
 
         private void LoadData()
         {
@@ -117,128 +252,270 @@ namespace AlwaysPrintTray.Forms
             {
                 // Información general
                 _valState.Text = StatusDisplayHelper.FormatEstadoSistema(IsContingencyEnabled());
-                _valVersion.Text = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0.0";
+                _valVersion.Text = System.Reflection.Assembly.GetExecutingAssembly()
+                    .GetName().Version?.ToString() ?? "0.0.0.0";
                 _valQueue.Text = LoadQueueName();
                 _valConfig.Text = LoadConfigName();
 
-                // Triggers OnDemand
-                var triggers = OnDemandConfigReader.GetOnDemandTriggers();
-                if (triggers.Count == 0)
-                {
-                    _triggersPanel.Controls.Add(new Label
-                    {
-                        Text = LocalizationManager.Get("StatusNoActionsAvailable"),
-                        ForeColor = Color.Gray,
-                        Font = new Font("Segoe UI", 9f, FontStyle.Italic),
-                        AutoSize = true
-                    });
-                }
-                else
-                {
-                    foreach (var trigger in triggers)
-                    {
-                        var panel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 2, 0, 2) };
-                        panel.Controls.Add(new Label { Text = trigger.Label, AutoSize = true, Padding = new Padding(0, 4, 8, 0) });
-                        var btn = new Button { Text = LocalizationManager.Get("StatusButtonExecute"), AutoSize = true, Padding = new Padding(8, 2, 8, 2), Tag = trigger };
-                        btn.Click += TriggerExecuteClick;
-                        panel.Controls.Add(btn);
-                        _triggersPanel.Controls.Add(panel);
-                    }
-                }
-
-                // Servicios monitoreados — lectura síncrona directa con ServiceController
-                var services = OnDemandConfigReader.GetMonitoredServices();
-                foreach (var svc in services)
-                {
-                    var panel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 1, 0, 1) };
-                    var nameLabel = new Label { Text = svc.DisplayName, AutoSize = true, Padding = new Padding(0, 2, 12, 0), ForeColor = Color.Black, BackColor = Color.Transparent };
-
-                    string state;
-                    try
-                    {
-                        using var sc = new System.ServiceProcess.ServiceController(svc.ServiceName);
-                        state = sc.Status.ToString();
-                    }
-                    catch { state = "NotFound"; }
-
-                    var stateLabel = new Label
-                    {
-                        Text = state,
-                        AutoSize = true,
-                        ForeColor = state == "Running" ? Color.FromArgb(0x22, 0x8B, 0x22) : Color.FromArgb(0xCC, 0x00, 0x00),
-                        BackColor = Color.Transparent,
-                        Padding = new Padding(0, 2, 0, 0)
-                    };
-                    panel.Controls.Add(nameLabel);
-                    panel.Controls.Add(stateLabel);
-                    _servicesPanel.Controls.Add(panel);
-                }
+                // Estados de servicios (lectura inicial)
+                RefreshServiceStates();
             }
             catch (Exception ex)
             {
-                AlwaysPrintLogger.WriteTrayError($"StatusForm.LoadData: {ex.Message}", AlwaysPrintLogger.EvtGenericError);
+                AlwaysPrintLogger.WriteTrayError(
+                    $"StatusForm.LoadData: {ex.Message}", AlwaysPrintLogger.EvtGenericError);
             }
         }
 
-        private async void TriggerExecuteClick(object? sender, EventArgs e)
+        // ═══════════════════════════════════════════════════════════════════════
+        // ── Timer de refresco de servicios ──────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════════════
+
+        private void SetupRefreshTimer()
+        {
+            _refreshTimer = new Timer { Interval = 5000 };
+            _refreshTimer.Tick += OnRefreshTimerTick;
+            _refreshTimer.Start();
+        }
+
+        /// <summary>
+        /// Timer callback: refresca estados de servicios directamente en el hilo UI.
+        /// ServiceController.Status es suficientemente rápido para esto.
+        /// </summary>
+        private void OnRefreshTimerTick(object? sender, EventArgs e)
+        {
+            try
+            {
+                RefreshServiceStates();
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"StatusForm.RefreshTimer: {ex.Message}", AlwaysPrintLogger.EvtGenericError);
+            }
+        }
+
+        /// <summary>
+        /// Lee el estado de cada servicio con ServiceController y actualiza la UI.
+        /// Muestra botón "Iniciar" solo cuando el estado es Stopped.
+        /// </summary>
+        private void RefreshServiceStates()
+        {
+            foreach (var row in _serviceRows)
+            {
+                string state;
+                try
+                {
+                    using (var sc = new System.ServiceProcess.ServiceController(row.Config.ServiceName))
+                    {
+                        sc.Refresh();
+                        state = sc.Status.ToString();
+                    }
+                }
+                catch
+                {
+                    state = "NotFound";
+                }
+
+                row.StateLabel.Text = state;
+
+                // Color según estado
+                if (state == "Running")
+                    row.StateLabel.ForeColor = Color.FromArgb(0x22, 0x8B, 0x22);
+                else
+                    row.StateLabel.ForeColor = Color.FromArgb(0xCC, 0x00, 0x00);
+
+                // Botón "Iniciar" visible solo cuando está detenido y no estamos busy
+                row.StartButton.Visible = (state == "Stopped") && !_isBusy;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ── Ejecución de trigger OnDemand ───────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════════════
+
+        private void OnTriggerExecuteClick(object? sender, EventArgs e)
         {
             var btn = sender as Button;
             if (btn == null) return;
             var trigger = btn.Tag as OnDemandTriggerInfo;
             if (trigger == null) return;
 
-            var result = MessageBox.Show(this, trigger.Description,
-                $"¿Ejecutar '{trigger.Label}'?",
-                MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
+            // Confirmación del usuario
+            var result = MessageBox.Show(
+                this,
+                trigger.Description,
+                trigger.Label,
+                MessageBoxButtons.OKCancel,
+                MessageBoxIcon.Question);
+
             if (result != DialogResult.OK) return;
 
-            btn.Enabled = false;
-            try
+            // Activar estado busy global
+            SetBusyState(true);
+
+            // Ejecutar en BackgroundWorker para evitar deadlocks
+            var worker = new BackgroundWorker();
+            worker.DoWork += (s, args) =>
             {
                 if (!_pipe.IsConnected)
                 {
-                    MessageBox.Show(this, "El servicio no está accesible.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    args.Result = new OperationResult { Success = false, Message = "El servicio no está accesible." };
                     return;
                 }
 
                 var payload = new ExecuteOnDemandTriggerPayload { Label = trigger.Label };
                 var request = PipeMessage.Create(MessageType.ExecuteOnDemandTrigger, payload);
-                var response = await Task.Run(() => _pipe.Send(request));
+                var response = _pipe.Send(request);
 
                 if (response?.Type == MessageType.Ack)
                 {
                     var ack = response.GetPayload<AckPayload>();
                     if (ack?.Success == true)
-                        MessageBox.Show(this, $"✓ {trigger.Label} ejecutado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        args.Result = new OperationResult { Success = true, Message = $"✓ {trigger.Label} ejecutado correctamente." };
                     else
-                        MessageBox.Show(this, $"Error: {ack?.Message ?? "desconocido"}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        args.Result = new OperationResult { Success = false, Message = $"Error: {ack?.Message ?? "desconocido"}" };
                 }
                 else
                 {
                     var error = response?.GetPayload<ErrorPayload>();
-                    MessageBox.Show(this, $"Error: {error?.Message ?? "respuesta inesperada"}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    args.Result = new OperationResult { Success = false, Message = $"Error: {error?.Message ?? "respuesta inesperada"}" };
                 }
-            }
-            catch (Exception ex)
+            };
+            worker.RunWorkerCompleted += (s, args) =>
             {
-                MessageBox.Show(this, $"Error: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            finally
-            {
-                btn.Enabled = true;
-            }
+                SetBusyState(false);
+
+                if (args.Error != null)
+                {
+                    MessageBox.Show(this, $"Error: {args.Error.Message}", "Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else if (args.Result is OperationResult opResult)
+                {
+                    var icon = opResult.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning;
+                    var title = opResult.Success ? "OK" : "Error";
+                    MessageBox.Show(this, opResult.Message, title, MessageBoxButtons.OK, icon);
+                }
+
+                worker.Dispose();
+            };
+            worker.RunWorkerAsync();
         }
 
-        // ── Helpers ──
+        // ═══════════════════════════════════════════════════════════════════════
+        // ── Inicio de servicio ──────────────────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════════════
+
+        private void OnServiceStartClick(object? sender, EventArgs e)
+        {
+            var btn = sender as Button;
+            if (btn == null) return;
+            var svc = btn.Tag as MonitoredServiceConfig;
+            if (svc == null) return;
+
+            // Activar estado busy global
+            SetBusyState(true);
+
+            // Ejecutar en BackgroundWorker
+            var worker = new BackgroundWorker();
+            worker.DoWork += (s, args) =>
+            {
+                if (!_pipe.IsConnected)
+                {
+                    args.Result = new OperationResult { Success = false, Message = "El servicio no está accesible." };
+                    return;
+                }
+
+                var payload = new ServiceActionPayload
+                {
+                    ServiceName = svc.ServiceName,
+                    Action = "Start"
+                };
+                var request = PipeMessage.Create(MessageType.ServiceAction, payload);
+                var response = _pipe.Send(request);
+
+                if (response?.Type == MessageType.Ack)
+                {
+                    var ack = response.GetPayload<AckPayload>();
+                    if (ack?.Success == true)
+                        args.Result = new OperationResult { Success = true, Message = $"✓ {svc.DisplayName} iniciado." };
+                    else
+                        args.Result = new OperationResult { Success = false, Message = $"Error: {ack?.Message ?? "desconocido"}" };
+                }
+                else if (response?.Type == MessageType.ServiceActionResponse)
+                {
+                    var resp = response.GetPayload<ServiceActionResponsePayload>();
+                    if (resp?.Success == true)
+                        args.Result = new OperationResult { Success = true, Message = $"✓ {svc.DisplayName} iniciado. Estado: {resp.NewState}" };
+                    else
+                        args.Result = new OperationResult { Success = false, Message = $"Error: {resp?.Message ?? "desconocido"}" };
+                }
+                else
+                {
+                    var error = response?.GetPayload<ErrorPayload>();
+                    args.Result = new OperationResult { Success = false, Message = $"Error: {error?.Message ?? "respuesta inesperada"}" };
+                }
+            };
+            worker.RunWorkerCompleted += (s, args) =>
+            {
+                SetBusyState(false);
+                RefreshServiceStates();
+
+                if (args.Error != null)
+                {
+                    MessageBox.Show(this, $"Error: {args.Error.Message}", "Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else if (args.Result is OperationResult opResult)
+                {
+                    if (!opResult.Success)
+                    {
+                        MessageBox.Show(this, opResult.Message, "Error",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }
+
+                worker.Dispose();
+            };
+            worker.RunWorkerAsync();
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ── Estado busy global ──────────────────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Activa o desactiva el estado busy global.
+        /// Deshabilita todos los botones de acción y muestra/oculta la etiqueta de estado.
+        /// </summary>
+        private void SetBusyState(bool busy)
+        {
+            _isBusy = busy;
+
+            foreach (var btn in _allActionButtons)
+                btn.Enabled = !busy;
+
+            _btnClose.Enabled = !busy;
+
+            _lblStatus.Text = busy ? "Ejecutando..." : "";
+            _lblStatus.Visible = busy;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ── Helpers de datos ────────────────────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════════════
 
         private bool IsContingencyEnabled()
         {
             try
             {
-                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
-                    RegistryConfigManager.RegistryPath);
-                var val = key?.GetValue("ContingencyEnabled");
-                return val?.ToString() == "1";
+                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    RegistryConfigManager.RegistryPath))
+                {
+                    var val = key?.GetValue("ContingencyEnabled");
+                    return val?.ToString() == "1";
+                }
             }
             catch { return false; }
         }
@@ -247,9 +524,11 @@ namespace AlwaysPrintTray.Forms
         {
             try
             {
-                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
-                    RegistryConfigManager.RegistryPath);
-                return key?.GetValue("CorporateQueueName")?.ToString() ?? "N/A";
+                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    RegistryConfigManager.RegistryPath))
+                {
+                    return key?.GetValue("CorporateQueueName")?.ToString() ?? "N/A";
+                }
             }
             catch { return "N/A"; }
         }
@@ -270,6 +549,10 @@ namespace AlwaysPrintTray.Forms
             catch { return "Error al leer"; }
         }
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // ── Helpers de layout ───────────────────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════════════
+
         private void AddSectionHeader(string text, ref int y)
         {
             var lbl = new Label
@@ -277,11 +560,11 @@ namespace AlwaysPrintTray.Forms
                 Text = text,
                 Location = new Point(12, y),
                 AutoSize = true,
-                Font = new Font("Segoe UI Semibold", 10f),
+                Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(0x00, 0x66, 0xCC)
             };
             Controls.Add(lbl);
-            y += 24;
+            y += 26;
         }
 
         private Label AddFieldRow(string label, string value, ref int y)
@@ -289,22 +572,20 @@ namespace AlwaysPrintTray.Forms
             var lbl = new Label
             {
                 Text = label,
-                Location = new Point(16, y),
+                Location = new Point(LabelX, y),
                 AutoSize = true,
-                ForeColor = Color.FromArgb(0x55, 0x55, 0x55),
-                BackColor = Color.Transparent
+                ForeColor = Color.FromArgb(0x55, 0x55, 0x55)
             };
             var val = new Label
             {
                 Text = value,
-                Location = new Point(150, y),
+                Location = new Point(ValueX, y),
                 AutoSize = true,
-                ForeColor = Color.Black,
-                BackColor = Color.Transparent
+                ForeColor = Color.Black
             };
             Controls.Add(lbl);
             Controls.Add(val);
-            y += 22;
+            y += RowHeight;
             return val;
         }
 
@@ -313,11 +594,42 @@ namespace AlwaysPrintTray.Forms
             var sep = new Label
             {
                 Location = new Point(12, y),
-                Size = new Size(420, 1),
+                Size = new Size(FormWidth - 24, 1),
                 BorderStyle = BorderStyle.Fixed3D
             };
             Controls.Add(sep);
-            y += 8;
+            y += SectionSpacing;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ── Eventos del formulario ──────────────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>Escape cierra el formulario.</summary>
+        private void OnKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Escape)
+                Close();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _refreshTimer?.Stop();
+                _refreshTimer?.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ── Estructura interna de resultado de operación ────────────────────────
+        // ═══════════════════════════════════════════════════════════════════════
+
+        private class OperationResult
+        {
+            public bool Success { get; set; }
+            public string Message { get; set; } = string.Empty;
         }
     }
 }
