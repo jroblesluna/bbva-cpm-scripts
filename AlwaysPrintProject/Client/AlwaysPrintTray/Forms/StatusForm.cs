@@ -125,7 +125,6 @@ namespace AlwaysPrintTray.Forms
             try
             {
                 // Información general
-                var helper = new StatusDisplayHelper();
                 _valState.Text = StatusDisplayHelper.FormatEstadoSistema(IsContingencyEnabled());
                 _valVersion.Text = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0.0";
                 _valQueue.Text = LoadQueueName();
@@ -256,7 +255,7 @@ namespace AlwaysPrintTray.Forms
             try
             {
                 using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
-                    new RegistryConfigManager().RegistryPath);
+                    RegistryConfigManager.RegistryPath);
                 var val = key?.GetValue("ContingencyEnabled");
                 return val?.ToString() == "1";
             }
@@ -268,7 +267,7 @@ namespace AlwaysPrintTray.Forms
             try
             {
                 using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
-                    new RegistryConfigManager().RegistryPath);
+                    RegistryConfigManager.RegistryPath);
                 return key?.GetValue("CorporateQueueName")?.ToString() ?? "N/A";
             }
             catch { return "N/A"; }

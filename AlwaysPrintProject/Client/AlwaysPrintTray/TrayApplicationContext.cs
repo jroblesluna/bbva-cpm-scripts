@@ -1010,18 +1010,9 @@ namespace AlwaysPrintTray
                     // Reconstruir submenú OnDemand del menú contextual
                     RebuildOnDemandSubmenu();
 
-                    // Si el StatusForm está abierto, actualizar triggers y campo "Configuración"
-                    if (_statusForm != null && _statusForm.IsLoaded)
-                    {
-                        // Actualizar la lista de triggers OnDemand (preserva ítems en ejecución)
-                        _statusForm.RefreshOnDemandTriggers(triggers);
-
-                        // Actualizar el campo "Configuración" con el nuevo nombre y versión
-                        _statusForm.RefreshConfigActiva();
-
-                        AlwaysPrintLogger.WriteTrayInfo(
-                            "HandleActionConfigChanged: StatusForm actualizado con nueva configuración.");
-                    }
+                    // El StatusForm de WinForms se recarga al reabrir (no tiene refresh dinámico)
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "HandleActionConfigChanged: submenú OnDemand reconstruido.");
                 }
                 catch (Exception ex)
                 {
