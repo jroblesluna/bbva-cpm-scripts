@@ -406,9 +406,25 @@ namespace AlwaysPrintTray.Forms
         /// <summary>Colección observable de triggers OnDemand disponibles para ejecución.</summary>
         public ObservableCollection<OnDemandTriggerItem> TriggersOnDemand { get; }
 
+        // ── Control global de operaciones ──
+
+        /// <summary>
+        /// Establece el flag global de ocupado: cuando hay cualquier operación en curso
+        /// (inicio de servicio o ejecución de trigger), deshabilita todos los controles
+        /// de servicios y triggers para prevenir operaciones concurrentes.
+        /// </summary>
+        private void SetGlobalBusy(bool busy)
+        {
+            foreach (var svc in Servicios)
+                svc.IsGlobalBusy = busy;
+
+            foreach (var trigger in TriggersOnDemand)
+                trigger.IsGlobalBusy = busy;
+        }
+
         // ── Eventos de UI ──
 
-        /// <summary>Manejador de clic en botón de acción de servicio (Iniciar/Reiniciar).</summary>
+        /// <summary>Manejador de clic en botón de acción de servicio (solo Iniciar).</summary>
         private async void ServiceAction_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as System.Windows.Controls.Button;
@@ -417,13 +433,14 @@ namespace AlwaysPrintTray.Forms
             var service = button.Tag as ServiceStatusItem;
             if (service == null) return;
 
-            // Determinar acción según estado actual: Running → Restart, Stopped → Start
-            string action = service.State == "Running" ? "Restart" : "Start";
+            // Solo permite iniciar servicios detenidos
+            string action = "Start";
 
             AlwaysPrintLogger.WriteTrayInfo(
                 $"ServiceAction_Click: usuario solicitó '{action}' para servicio '{service.ServiceName}'.");
 
-            // Deshabilitar control durante operación para prevenir clics duplicados
+            // Activar flag global: deshabilita todos los controles de servicios y triggers
+            SetGlobalBusy(true);
             service.IsOperating = true;
 
             try
@@ -498,6 +515,7 @@ namespace AlwaysPrintTray.Forms
             {
                 // Rehabilitar control tras respuesta (éxito o error)
                 service.IsOperating = false;
+                SetGlobalBusy(false);
             }
         }
 
@@ -526,6 +544,7 @@ namespace AlwaysPrintTray.Forms
 
             // Deshabilitar ítem durante ejecución para prevenir clics duplicados
             trigger.IsExecuting = true;
+            SetGlobalBusy(true);
 
             try
             {
@@ -632,6 +651,7 @@ namespace AlwaysPrintTray.Forms
             {
                 // Rehabilitar ítem tras respuesta (éxito o error)
                 trigger.IsExecuting = false;
+                SetGlobalBusy(false);
             }
         }
 

@@ -11,6 +11,8 @@
         DataContext="{Binding RelativeSource={RelativeSource Self}}">
 
     <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+
         <!-- Estilo base para etiquetas de campo -->
         <Style x:Key="FieldLabel" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Segoe UI"/>
@@ -178,10 +180,11 @@
                             <TextBlock Grid.Column="0" Text="{Binding DisplayName}" Style="{StaticResource FieldValue}"/>
                             <TextBlock Grid.Column="1" Text="{Binding State}" Style="{StaticResource FieldLabel}" FontSize="11"/>
                             <Button Grid.Column="2"
-                                    Content="↻"
+                                    Content="▶"
                                     Style="{StaticResource IconButton}"
-                                    ToolTip="{Binding ActionLabel}"
+                                    ToolTip="Iniciar servicio"
                                     IsEnabled="{Binding IsActionEnabled}"
+                                    Visibility="{Binding IsActionVisible, Converter={StaticResource BoolToVisibility}}"
                                     Click="ServiceAction_Click"
                                     Tag="{Binding}"/>
                         </Grid>

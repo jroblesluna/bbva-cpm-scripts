@@ -12,6 +12,7 @@ namespace AlwaysPrintTray.Forms
         private string _serviceName = string.Empty;
         private string _state = "Desconocido";
         private bool _isOperating;
+        private bool _isGlobalBusy;
 
         /// <summary>Nombre visible en la UI (ej: "Cola de Impresión").</summary>
         public string DisplayName
@@ -35,12 +36,12 @@ namespace AlwaysPrintTray.Forms
             {
                 _state = value;
                 OnPropertyChanged(nameof(State));
-                OnPropertyChanged(nameof(ActionLabel));
+                OnPropertyChanged(nameof(IsActionVisible));
                 OnPropertyChanged(nameof(IsActionEnabled));
             }
         }
 
-        /// <summary>Indica si una operación de Start/Restart está en curso.</summary>
+        /// <summary>Indica si una operación sobre este servicio está en curso.</summary>
         public bool IsOperating
         {
             get => _isOperating;
@@ -52,11 +53,33 @@ namespace AlwaysPrintTray.Forms
             }
         }
 
-        /// <summary>Texto del botón de acción: "Reiniciar" si Running, "Iniciar" si Stopped.</summary>
-        public string ActionLabel => State == "Running" ? "Reiniciar" : "Iniciar";
+        /// <summary>
+        /// Flag global: true cuando hay cualquier operación en curso en el StatusForm
+        /// (inicio de servicio o ejecución de trigger OnDemand).
+        /// Deshabilita todos los controles de servicio.
+        /// </summary>
+        public bool IsGlobalBusy
+        {
+            get => _isGlobalBusy;
+            set
+            {
+                _isGlobalBusy = value;
+                OnPropertyChanged(nameof(IsGlobalBusy));
+                OnPropertyChanged(nameof(IsActionEnabled));
+            }
+        }
 
-        /// <summary>Habilita el botón de acción solo si no hay operación en curso y el estado es conocido.</summary>
-        public bool IsActionEnabled => !IsOperating && State != "Desconocido";
+        /// <summary>
+        /// El botón de acción solo es visible si el servicio está detenido.
+        /// No se muestra opción de reiniciar (solo iniciar servicios detenidos).
+        /// </summary>
+        public bool IsActionVisible => State == "Stopped";
+
+        /// <summary>
+        /// Habilita el botón solo si: servicio está Stopped, no hay operación propia
+        /// en curso, y no hay operación global (otro servicio o trigger ejecutándose).
+        /// </summary>
+        public bool IsActionEnabled => State == "Stopped" && !IsOperating && !IsGlobalBusy;
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
