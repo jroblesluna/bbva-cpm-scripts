@@ -1026,31 +1026,46 @@ namespace AlwaysPrintTray
         {
             _uiContext.Post(_ =>
             {
-                AlwaysPrintLogger.WriteTrayInfo(
-                    "ShowStatusForm: solicitud recibida para mostrar formulario de estado.");
-
-                // Si ya hay un StatusForm abierto, traerlo al frente
-                if (_statusForm != null && _statusForm.IsLoaded)
+                try
                 {
                     AlwaysPrintLogger.WriteTrayInfo(
-                        "ShowStatusForm: formulario ya abierto, trayendo al frente.");
-                    _statusForm.Activate();
-                    if (_statusForm.WindowState == System.Windows.WindowState.Minimized)
-                        _statusForm.WindowState = System.Windows.WindowState.Normal;
-                    return;
+                        "ShowStatusForm: solicitud recibida para mostrar formulario de estado.");
+
+                    // Si ya hay un StatusForm abierto, traerlo al frente
+                    if (_statusForm != null && _statusForm.IsLoaded)
+                    {
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            "ShowStatusForm: formulario ya abierto, trayendo al frente.");
+                        _statusForm.Activate();
+                        if (_statusForm.WindowState == System.Windows.WindowState.Minimized)
+                            _statusForm.WindowState = System.Windows.WindowState.Normal;
+                        return;
+                    }
+
+                    // Asegurar que existe una Application WPF (requerida para ventanas WPF en proceso WinForms)
+                    if (System.Windows.Application.Current == null)
+                    {
+                        new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
+                    }
+
+                    // Crear nueva instancia del StatusForm
+                    _statusForm = new StatusForm(_pipe);
+                    _statusForm.Closed += (s, e) =>
+                    {
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            "ShowStatusForm: formulario cerrado por el usuario.");
+                        _statusForm = null;
+                    };
+                    _statusForm.Show();
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "ShowStatusForm: formulario de estado abierto correctamente.");
                 }
-
-                // Crear nueva instancia del StatusForm
-                _statusForm = new StatusForm(_pipe);
-                _statusForm.Closed += (s, e) =>
+                catch (Exception ex)
                 {
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        "ShowStatusForm: formulario cerrado por el usuario.");
-                    _statusForm = null;
-                };
-                _statusForm.Show();
-                AlwaysPrintLogger.WriteTrayInfo(
-                    "ShowStatusForm: formulario de estado abierto correctamente.");
+                    AlwaysPrintLogger.WriteTrayError(
+                        $"ShowStatusForm: error al mostrar formulario: {ex}",
+                        AlwaysPrintLogger.EvtGenericError);
+                }
             }, null);
         }
 

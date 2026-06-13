@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<test-run start-time="2026-06-13 03:46:13Z">
+  <command-line><![CDATA[/Users/antoniorobles/.dotnet/tools/.store/nunit.consolerunner.netcore/3.22.0/nunit.consolerunner.netcore/3.22.0/tools/net8.0/any/nunit3-console.dll --where "class =~ DisplayFormatTests" /Users/antoniorobles/Dev/bbva-cpm-scripts/AlwaysPrintProject/Client/AlwaysPrint.Tests/bin/Debug/net48/AlwaysPrint.Tests.dll]]></command-line>
+</test-run>
