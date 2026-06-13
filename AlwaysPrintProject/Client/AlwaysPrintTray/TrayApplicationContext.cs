@@ -511,8 +511,8 @@ namespace AlwaysPrintTray
         {
             try
             {
-                // Si no hay UpdateChecker inicializado, no hay conexión Cloud
-                if (_updateChecker == null)
+                // Si no hay CloudManager inicializado, no hay conexión Cloud
+                if (_cloudManager == null)
                 {
                     ShowBalloon(AppTitle,
                         LocalizationManager.Get("BalloonUpdateNoCloud"),
@@ -527,10 +527,24 @@ namespace AlwaysPrintTray
                     LocalizationManager.Get("BalloonCheckingUpdates"),
                     ToolTipIcon.Info);
 
+                // 1. Verificar configuración de acciones (alwaysconfig)
+                AlwaysPrintLogger.WriteTrayInfo("Buscar Actualizaciones: verificando configuración de acciones...");
+                await _cloudManager.CheckActionConfigurationAsync();
+
+                // 2. Verificar actualización de software (MSI)
+                if (_updateChecker == null)
+                {
+                    // Sin UpdateChecker pero con CloudManager: solo se verificó config
+                    ShowBalloon(AppTitle,
+                        "Configuración verificada. No hay actualizador de software disponible.",
+                        ToolTipIcon.Info);
+                    return;
+                }
+
                 // Resetear flag antes de la verificación
                 _manualCheckFoundUpdate = false;
 
-                // Ejecutar verificación inmediata
+                // Ejecutar verificación inmediata de MSI
                 await _updateChecker.CheckNowAsync();
 
                 // Si no se disparó el evento UpdateAvailable, no hay actualización disponible

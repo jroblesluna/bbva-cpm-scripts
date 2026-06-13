@@ -1484,13 +1484,23 @@ namespace AlwaysPrintTray.Cloud
         /// </summary>
         private async void CheckActionConfiguration()
         {
+            await CheckActionConfigurationAsync();
+        }
+
+        /// <summary>
+        /// Verifica y descarga la configuración de acciones desde la Cloud.
+        /// Método público para permitir invocación manual desde "Buscar Actualizaciones".
+        /// Retorna true si la configuración se actualizó o ya está al día.
+        /// </summary>
+        public async Task<bool> CheckActionConfigurationAsync()
+        {
             try
             {
                 if (_configManager == null || !_credentials.IsRegistered)
                 {
                     AlwaysPrintLogger.WriteTrayInfo(
                         "CloudManager: no se puede verificar configuración de acciones (ConfigManager no inicializado o workstation no registrada)");
-                    return;
+                    return false;
                 }
                 
                 AlwaysPrintLogger.WriteTrayInfo("CloudManager: verificando configuración de acciones en Cloud");
@@ -1521,11 +1531,13 @@ namespace AlwaysPrintTray.Cloud
                     AlwaysPrintLogger.WriteTrayWarning(
                         "CloudManager: error verificando configuración de acciones");
                 }
+                return success;
             }
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteTrayError(
-                    $"CloudManager: error en CheckActionConfiguration: {ex.Message}");
+                    $"CloudManager: error en CheckActionConfigurationAsync: {ex.Message}");
+                return false;
             }
         }
 
