@@ -163,6 +163,15 @@
                 "host_address": "{{contingency_printer_ip}}",
                 "port_number": 9100
               }
+            },
+            {
+              "type": "StartService",
+              "description": "Iniciar Spooler (contingencia)",
+              "parameters": {
+                "service_name": "Spooler",
+                "wait_for_running": true,
+                "timeout_seconds": 30
+              }
             }
           ],
           "else_actions": [
@@ -173,6 +182,33 @@
                 "port_name": "LPMCHybridPort",
                 "host_address": "127.0.0.1",
                 "port_number": 9167
+              }
+            },
+            {
+              "type": "StartService",
+              "description": "Iniciar Spooler",
+              "parameters": {
+                "service_name": "Spooler",
+                "wait_for_running": true,
+                "timeout_seconds": 30
+              }
+            },
+            {
+              "type": "StartService",
+              "description": "Iniciar LPDSVC",
+              "parameters": {
+                "service_name": "LPDSVC",
+                "wait_for_running": true,
+                "timeout_seconds": 30
+              }
+            },
+            {
+              "type": "StartService",
+              "description": "Iniciar LpdServiceMonitor",
+              "parameters": {
+                "service_name": "LpdServiceMonitor",
+                "wait_for_running": true,
+                "timeout_seconds": 30
               }
             }
           ]
