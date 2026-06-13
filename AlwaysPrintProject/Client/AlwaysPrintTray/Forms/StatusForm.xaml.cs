@@ -43,22 +43,38 @@ namespace AlwaysPrintTray.Forms
             InitializeComponent();
             Title = LocalizationManager.Get("StatusFormTitle");
 
-            // Construir UI programáticamente (evita bugs de BAML en Win11 + SDK-style + WinForms+WPF)
-            BuildUI();
-
-            // Cargar datos
-            LoadGeneralInfo();
-            _ = LoadServiciosAsync();
-            LoadTriggersOnDemand();
-
-            // Timer para refrescar estado de servicios cada 5 segundos
-            _refreshTimer = new System.Windows.Threading.DispatcherTimer
+            try
             {
-                Interval = TimeSpan.FromSeconds(5)
-            };
-            _refreshTimer.Tick += async (s, e) => await RefreshServiciosEstadoAsync();
-            _refreshTimer.Start();
-            Closed += (s, e) => _refreshTimer.Stop();
+                // Construir UI programáticamente
+                BuildUI();
+
+                // Cargar datos
+                LoadGeneralInfo();
+                _ = LoadServiciosAsync();
+                LoadTriggersOnDemand();
+
+                // Timer para refrescar estado de servicios cada 5 segundos
+                _refreshTimer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(5)
+                };
+                _refreshTimer.Tick += async (s, e) => await RefreshServiciosEstadoAsync();
+                _refreshTimer.Start();
+                Closed += (s, e) => _refreshTimer.Stop();
+            }
+            catch (Exception ex)
+            {
+                // Si falla la construcción de UI, mostrar el error en la ventana
+                AlwaysPrintLogger.WriteTrayError(
+                    $"StatusForm: error construyendo UI: {ex}", AlwaysPrintLogger.EvtGenericError);
+                Content = new System.Windows.Controls.TextBlock
+                {
+                    Text = $"Error: {ex.Message}\n\n{ex.StackTrace}",
+                    Margin = new Thickness(16),
+                    TextWrapping = TextWrapping.Wrap,
+                    FontSize = 11
+                };
+            }
         }
 
         // Campos para controles que se actualizan dinámicamente
