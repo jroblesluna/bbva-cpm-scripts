@@ -35,6 +35,13 @@ namespace AlwaysPrint.Shared.Configuration
         [JsonProperty("event")]
         public string Event { get; set; } = string.Empty;
         
+        /// <summary>
+        /// Etiqueta única del trigger OnDemand. Requerida solo para event="OnDemand".
+        /// Se usa como identificador en la UI y en el payload de ejecución.
+        /// </summary>
+        [JsonProperty("label")]
+        public string? Label { get; set; }
+        
         [JsonProperty("description")]
         public string Description { get; set; } = string.Empty;
         
@@ -104,6 +111,7 @@ namespace AlwaysPrint.Shared.Configuration
         public const string OnContingencyActivated = "OnContingencyActivated";
         public const string OnContingencyDeactivated = "OnContingencyDeactivated";
         public const string OnScheduledTask = "OnScheduledTask";
+        public const string OnDemand = "OnDemand";
     }
     
     /// <summary>

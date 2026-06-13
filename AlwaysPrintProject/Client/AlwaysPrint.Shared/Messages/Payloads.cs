@@ -298,4 +298,50 @@ namespace AlwaysPrint.Shared.Messages
         [JsonProperty("resourcesJson")]
         public string ResourcesJson { get; set; } = string.Empty;
     }
+
+    // ── On-Demand Triggers y acciones de servicio ────────────────────────────────
+
+    /// <summary>
+    /// Payload para solicitar ejecución de un trigger OnDemand.
+    /// Tray → Service.
+    /// </summary>
+    public class ExecuteOnDemandTriggerPayload
+    {
+        [JsonProperty("label")]
+        public string Label { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Payload para solicitar acción sobre un servicio Windows.
+    /// Tray → Service.
+    /// </summary>
+    public class ServiceActionPayload
+    {
+        /// <summary>Nombre del servicio Windows (ej: "lpmc_universal_service").</summary>
+        [JsonProperty("serviceName")]
+        public string ServiceName { get; set; } = string.Empty;
+
+        /// <summary>Acción a ejecutar: "Start" o "Restart".</summary>
+        [JsonProperty("action")]
+        public string Action { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Respuesta del Service al Tray tras una acción sobre servicio.
+    /// </summary>
+    public class ServiceActionResponsePayload
+    {
+        [JsonProperty("serviceName")]
+        public string ServiceName { get; set; } = string.Empty;
+
+        [JsonProperty("success")]
+        public bool Success { get; set; }
+
+        /// <summary>Estado resultante del servicio tras la acción.</summary>
+        [JsonProperty("newState")]
+        public string NewState { get; set; } = string.Empty;
+
+        [JsonProperty("message")]
+        public string? Message { get; set; }
+    }
 }

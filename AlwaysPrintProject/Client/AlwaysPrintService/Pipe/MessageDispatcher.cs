@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.ServiceProcess;
 using System.Text;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
@@ -26,6 +27,7 @@ namespace AlwaysPrintService.Pipe
         private readonly ServiceStateMachine _stateMachine;
         private readonly Action? _reloadActionConfigCallback;
         private readonly Action? _loadResourceVariablesCallback;
+        private readonly Func<string, (bool success, string message)>? _executeOnDemandTriggerCallback;
 
         // Raised when the Tray sends TrayInitialized.
         public event Action<bool, string?>? TrayInitializedReceived;
@@ -38,13 +40,15 @@ namespace AlwaysPrintService.Pipe
             TaskQueueManager taskQueue,
             ServiceStateMachine stateMachine,
             Action? reloadActionConfigCallback = null,
-            Action? loadResourceVariablesCallback = null)
+            Action? loadResourceVariablesCallback = null,
+            Func<string, (bool success, string message)>? executeOnDemandTriggerCallback = null)
         {
             _registry     = registry     ?? throw new ArgumentNullException(nameof(registry));
             _taskQueue    = taskQueue    ?? throw new ArgumentNullException(nameof(taskQueue));
             _stateMachine = stateMachine ?? throw new ArgumentNullException(nameof(stateMachine));
             _reloadActionConfigCallback = reloadActionConfigCallback;
             _loadResourceVariablesCallback = loadResourceVariablesCallback;
+            _executeOnDemandTriggerCallback = executeOnDemandTriggerCallback;
         }
 
         public PipeMessage Dispatch(PipeMessage request)
@@ -65,6 +69,8 @@ namespace AlwaysPrintService.Pipe
                     MessageType.InstallUpdate               => HandleInstallUpdate(request),
                     MessageType.ForcedContingencyChanged    => HandleForcedContingencyChanged(request),
                     MessageType.SaveResources               => HandleSaveResources(request),
+                    MessageType.ServiceAction               => HandleServiceAction(request),
+                    MessageType.ExecuteOnDemandTrigger      => HandleExecuteOnDemandTrigger(request),
                     _ => PipeMessage.Reply(request, MessageType.Error,
                             new ErrorPayload { Code = "UNKNOWN_TYPE", Message = $"Unknown message type: {request.Type}" })
                 };
@@ -378,6 +384,209 @@ namespace AlwaysPrintService.Pipe
                     AlwaysPrintLogger.EvtGenericError);
                 return PipeMessage.Reply(req, MessageType.Ack,
                     new AckPayload { Success = false, Message = $"Error: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Maneja la solicitud del Tray para iniciar o reiniciar un servicio Windows.
+        /// Usa ServiceController para ejecutar la acción y reportar el nuevo estado.
+        /// Restart = Stop + WaitForStatus(Stopped) + Start.
+        /// </summary>
+        private PipeMessage HandleServiceAction(PipeMessage req)
+        {
+            try
+            {
+                var payload = req.GetPayload<ServiceActionPayload>();
+                if (payload == null || string.IsNullOrWhiteSpace(payload.ServiceName))
+                {
+                    return PipeMessage.Reply(req, MessageType.ServiceActionResponse,
+                        new ServiceActionResponsePayload
+                        {
+                            ServiceName = payload?.ServiceName ?? string.Empty,
+                            Success = false,
+                            NewState = string.Empty,
+                            Message = "ServiceName es obligatorio."
+                        });
+                }
+
+                if (string.IsNullOrWhiteSpace(payload.Action) ||
+                    (!payload.Action.Equals("Start", StringComparison.OrdinalIgnoreCase) &&
+                     !payload.Action.Equals("Restart", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return PipeMessage.Reply(req, MessageType.ServiceActionResponse,
+                        new ServiceActionResponsePayload
+                        {
+                            ServiceName = payload.ServiceName,
+                            Success = false,
+                            NewState = string.Empty,
+                            Message = $"Acción inválida: '{payload.Action}'. Valores válidos: Start, Restart."
+                        });
+                }
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"ServiceAction: ejecutando '{payload.Action}' sobre servicio '{payload.ServiceName}'");
+
+                using (var sc = new ServiceController(payload.ServiceName))
+                {
+                    var timeout = TimeSpan.FromSeconds(30);
+
+                    if (payload.Action.Equals("Start", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Start: iniciar el servicio si no está corriendo
+                        if (sc.Status == ServiceControllerStatus.Running)
+                        {
+                            AlwaysPrintLogger.WriteInfo(
+                                $"ServiceAction: '{payload.ServiceName}' ya está corriendo");
+                            return PipeMessage.Reply(req, MessageType.ServiceActionResponse,
+                                new ServiceActionResponsePayload
+                                {
+                                    ServiceName = payload.ServiceName,
+                                    Success = true,
+                                    NewState = sc.Status.ToString(),
+                                    Message = "El servicio ya está corriendo."
+                                });
+                        }
+
+                        if (sc.Status != ServiceControllerStatus.StartPending)
+                        {
+                            sc.Start();
+                        }
+                        sc.WaitForStatus(ServiceControllerStatus.Running, timeout);
+                    }
+                    else // Restart
+                    {
+                        // Restart = Stop + WaitForStatus(Stopped) + Start
+                        if (sc.Status != ServiceControllerStatus.Stopped &&
+                            sc.Status != ServiceControllerStatus.StopPending)
+                        {
+                            sc.Stop();
+                            sc.WaitForStatus(ServiceControllerStatus.Stopped, timeout);
+                        }
+
+                        sc.Refresh();
+                        sc.Start();
+                        sc.WaitForStatus(ServiceControllerStatus.Running, timeout);
+                    }
+
+                    // Obtener estado final tras la acción
+                    sc.Refresh();
+                    string newState = sc.Status.ToString();
+
+                    AlwaysPrintLogger.WriteInfo(
+                        $"ServiceAction: '{payload.Action}' sobre '{payload.ServiceName}' completado. NuevoEstado={newState}");
+
+                    return PipeMessage.Reply(req, MessageType.ServiceActionResponse,
+                        new ServiceActionResponsePayload
+                        {
+                            ServiceName = payload.ServiceName,
+                            Success = true,
+                            NewState = newState,
+                            Message = $"Servicio '{payload.ServiceName}' — {payload.Action} ejecutado correctamente."
+                        });
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Servicio no encontrado o inaccesible
+                var svcName = req.GetPayload<ServiceActionPayload>()?.ServiceName ?? "desconocido";
+                AlwaysPrintLogger.WriteError(
+                    $"ServiceAction: servicio '{svcName}' no encontrado o inaccesible. {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+
+                return PipeMessage.Reply(req, MessageType.ServiceActionResponse,
+                    new ServiceActionResponsePayload
+                    {
+                        ServiceName = svcName,
+                        Success = false,
+                        NewState = "NotFound",
+                        Message = $"Servicio '{svcName}' no encontrado: {ex.Message}"
+                    });
+            }
+            catch (System.TimeoutException ex)
+            {
+                // Timeout esperando que el servicio cambie de estado
+                var svcName = req.GetPayload<ServiceActionPayload>()?.ServiceName ?? "desconocido";
+                AlwaysPrintLogger.WriteWarning(
+                    $"ServiceAction: timeout ejecutando acción sobre '{svcName}'. {ex.Message}");
+
+                // Intentar obtener estado actual pese al timeout
+                string currentState = "Unknown";
+                try
+                {
+                    using var sc2 = new ServiceController(svcName);
+                    currentState = sc2.Status.ToString();
+                }
+                catch { /* ignorar */ }
+
+                return PipeMessage.Reply(req, MessageType.ServiceActionResponse,
+                    new ServiceActionResponsePayload
+                    {
+                        ServiceName = svcName,
+                        Success = false,
+                        NewState = currentState,
+                        Message = $"Timeout ejecutando acción sobre '{svcName}': {ex.Message}"
+                    });
+            }
+            catch (Exception ex)
+            {
+                var svcName = req.GetPayload<ServiceActionPayload>()?.ServiceName ?? "desconocido";
+                AlwaysPrintLogger.WriteError(
+                    $"ServiceAction: error inesperado sobre '{svcName}': {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+
+                return PipeMessage.Reply(req, MessageType.ServiceActionResponse,
+                    new ServiceActionResponsePayload
+                    {
+                        ServiceName = svcName,
+                        Success = false,
+                        NewState = "Unknown",
+                        Message = $"Error inesperado: {ex.Message}"
+                    });
+            }
+        }
+
+        /// <summary>
+        /// Maneja la solicitud del Tray para ejecutar un trigger OnDemand por label.
+        /// Deserializa el payload, delega la ejecución al ActionEngine y responde con Ack o Error.
+        /// </summary>
+        private PipeMessage HandleExecuteOnDemandTrigger(PipeMessage req)
+        {
+            try
+            {
+                var payload = req.GetPayload<ExecuteOnDemandTriggerPayload>();
+                if (payload == null || string.IsNullOrWhiteSpace(payload.Label))
+                {
+                    AlwaysPrintLogger.WriteError(
+                        "ExecuteOnDemandTrigger: payload ausente o label vacío.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    return PipeMessage.Reply(req, MessageType.Error,
+                        new ErrorPayload { Code = "INVALID_PAYLOAD", Message = "Label es obligatorio." });
+                }
+
+                if (_executeOnDemandTriggerCallback == null)
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        "ExecuteOnDemandTrigger: callback no configurado.",
+                        AlwaysPrintLogger.EvtGenericWarning);
+                    return PipeMessage.Reply(req, MessageType.Error,
+                        new ErrorPayload { Code = "NOT_CONFIGURED", Message = "Ejecución OnDemand no configurada." });
+                }
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"ExecuteOnDemandTrigger: solicitud recibida para label '{payload.Label}'");
+
+                var (success, message) = _executeOnDemandTriggerCallback(payload.Label);
+
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = success, Message = message });
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"ExecuteOnDemandTrigger: error inesperado: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = $"Error inesperado: {ex.Message}" });
             }
         }
 
