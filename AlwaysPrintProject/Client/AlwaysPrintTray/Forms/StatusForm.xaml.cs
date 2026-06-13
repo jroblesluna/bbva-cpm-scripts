@@ -695,6 +695,12 @@ namespace AlwaysPrintTray.Forms
             }
         }
 
+        /// <summary>Manejador de clic en botón Cerrar.</summary>
+        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+
         // ── INotifyPropertyChanged ──
 
         public event PropertyChangedEventHandler? PropertyChanged;

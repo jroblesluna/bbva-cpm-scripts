@@ -194,5 +194,11 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </StackPanel>
+
+        <!-- Botón Cerrar -->
+        <Button Grid.Row="4" Content="Cerrar" Style="{StaticResource ActionButton}"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                Margin="0,12,0,0" IsCancel="True"
+                Click="CloseButton_Click"/>
     </Grid>
 </Window>
