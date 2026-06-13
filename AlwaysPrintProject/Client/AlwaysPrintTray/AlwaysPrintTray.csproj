@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>9</LangVersion>
     <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
     <PlatformTarget>x64</PlatformTarget>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Optimize Condition="'$(Configuration)' == 'Release'">true</Optimize>

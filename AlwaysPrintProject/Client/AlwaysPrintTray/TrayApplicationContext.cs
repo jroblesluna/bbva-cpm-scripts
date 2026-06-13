@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.ServiceProcess;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
@@ -10,6 +11,7 @@ using AlwaysPrintTray.Bootstrap;
 using AlwaysPrintTray.Cloud;
 using AlwaysPrintTray.Forms;
 using AlwaysPrintTray.Localization;
+using AlwaysPrintTray.OnDemand;
 using AlwaysPrintTray.Pipe;
 
 namespace AlwaysPrintTray
@@ -45,11 +47,31 @@ namespace AlwaysPrintTray
         // Control de instancia única de formularios (evita duplicados)
         private Form? _activeForm;
 
-        public TrayApplicationContext()
+        // Instancia singleton del StatusForm WPF (null si no está abierto)
+        private StatusForm? _statusForm;
+
+        // ID del mensaje Win32 registrado para recibir broadcast ShowStatus desde segunda instancia
+        private readonly uint _showStatusMsgId;
+
+        // Ventana oculta que escucha el broadcast Win32 para mostrar StatusForm
+        private NativeWindow? _messageWindow;
+
+        // Submenú dinámico de acciones OnDemand y su separador visual
+        private ToolStripMenuItem? _onDemandSubmenu;
+        private ToolStripSeparator? _onDemandSeparator;
+
+        public TrayApplicationContext(uint showStatusMsgId)
         {
+            _showStatusMsgId = showStatusMsgId;
             _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
             _pipe      = new PipeClient();
             _trayIcon  = BuildTrayIcon();
+
+            // Suscribir a mensajes push del Service (ej: ActionConfigChanged)
+            _pipe.MessageReceived += OnPipeMessageReceived;
+
+            // Crear ventana oculta para recibir mensajes broadcast de segunda instancia
+            _messageWindow = new BroadcastListener(this, _showStatusMsgId);
 
             // Bootstrap en hilo de fondo para que el ícono aparezca de inmediato.
             new Thread(BootstrapSequence) { IsBackground = true, Name = "AlwaysPrint-TrayBootstrap" }.Start();
@@ -144,6 +166,9 @@ namespace AlwaysPrintTray
 
                 // 3. Leer configuración.
                 var cfg = _registry.Load();
+
+                // 3.5 Construir submenú OnDemand desde la configuración activa
+                _uiContext.Post(_ => RebuildOnDemandSubmenu(), null);
 
                 // 4. Health check de dominio.
                 AlwaysPrintLogger.WriteTrayInfo("Iniciando health check...");
@@ -766,11 +791,308 @@ namespace AlwaysPrintTray
             }
         }
 
+        /// <summary>
+        /// Construye o reconstruye el submenú de acciones OnDemand en el menú contextual.
+        /// Se llama en bootstrap y ante ActionConfigChanged.
+        /// Posiciona el submenú después de "Buscar Actualizaciones", antes del separador de "Salir".
+        /// Si no hay triggers OnDemand, no muestra el submenú.
+        /// </summary>
+        private void RebuildOnDemandSubmenu()
+        {
+            var triggers = OnDemandConfigReader.GetOnDemandTriggers();
+
+            // Eliminar submenú anterior si existe
+            if (_onDemandSubmenu != null)
+                _trayIcon.ContextMenuStrip.Items.Remove(_onDemandSubmenu);
+            if (_onDemandSeparator != null)
+                _trayIcon.ContextMenuStrip.Items.Remove(_onDemandSeparator);
+
+            if (triggers.Count == 0)
+            {
+                _onDemandSubmenu = null;
+                _onDemandSeparator = null;
+                return;
+            }
+
+            _onDemandSubmenu = new ToolStripMenuItem("Acciones A Demanda");
+            foreach (var trigger in triggers)
+            {
+                var item = new ToolStripMenuItem(trigger.Label);
+                item.Tag = trigger;
+                item.Click += OnDemandMenuItem_Click;
+                _onDemandSubmenu.DropDownItems.Add(item);
+            }
+
+            // Insertar antes del separador final (antes de "Salir")
+            // Estructura del menú: About, Config, MyPrinters, CheckUpdates, [separator], Exit
+            // Queremos insertar: ..., CheckUpdates, [_onDemandSeparator], [_onDemandSubmenu], [separator], Exit
+            int insertIndex = _trayIcon.ContextMenuStrip.Items.Count - 2;
+            _onDemandSeparator = new ToolStripSeparator();
+            _trayIcon.ContextMenuStrip.Items.Insert(insertIndex, _onDemandSeparator);
+            _trayIcon.ContextMenuStrip.Items.Insert(insertIndex + 1, _onDemandSubmenu);
+        }
+
+        /// <summary>
+        /// Handler para clic en un ítem del submenú OnDemand.
+        /// Envía la solicitud de ejecución al Service vía Named Pipe.
+        /// Deshabilita el ítem durante la ejecución y muestra balloon con resultado.
+        /// </summary>
+        private async void OnDemandMenuItem_Click(object sender, EventArgs e)
+        {
+            var item = (ToolStripMenuItem)sender;
+            var trigger = (OnDemandTriggerInfo)item.Tag;
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"OnDemandMenuItem_Click: usuario solicitó ejecución de trigger '{trigger.Label}'.");
+
+            // Deshabilitar ítem durante ejecución para prevenir clics duplicados
+            item.Enabled = false;
+
+            try
+            {
+                // Verificar disponibilidad del pipe
+                if (!_pipe.IsConnected)
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        $"OnDemandMenuItem_Click: pipe no disponible al intentar ejecutar '{trigger.Label}'.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    ShowBalloon(AppTitle,
+                        "El servicio no está accesible",
+                        ToolTipIcon.Error);
+                    return;
+                }
+
+                // Construir y enviar mensaje al Service
+                var payload = new ExecuteOnDemandTriggerPayload { Label = trigger.Label };
+                var request = PipeMessage.Create(MessageType.ExecuteOnDemandTrigger, payload);
+
+                var response = await Task.Run(() => _pipe.Send(request));
+
+                if (response == null)
+                {
+                    // Pipe se desconectó durante la comunicación
+                    AlwaysPrintLogger.WriteTrayError(
+                        $"OnDemandMenuItem_Click: no se recibió respuesta del Service para '{trigger.Label}'.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    ShowBalloon(AppTitle,
+                        "El servicio no está accesible",
+                        ToolTipIcon.Error);
+                    return;
+                }
+
+                if (response.Type == MessageType.Ack)
+                {
+                    var ack = response.GetPayload<AckPayload>();
+                    if (ack?.Success == true)
+                    {
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"OnDemandMenuItem_Click: trigger '{trigger.Label}' ejecutado exitosamente.");
+                        ShowBalloon(AppTitle,
+                            $"✓ {trigger.Label} ejecutado correctamente",
+                            ToolTipIcon.Info);
+                    }
+                    else
+                    {
+                        // Ack con success=false
+                        var errorMsg = ack?.Message ?? "Error desconocido";
+                        AlwaysPrintLogger.WriteTrayError(
+                            $"OnDemandMenuItem_Click: trigger '{trigger.Label}' falló. Mensaje: {errorMsg}",
+                            AlwaysPrintLogger.EvtGenericError);
+                        ShowBalloon(AppTitle,
+                            $"Error ejecutando '{trigger.Label}': {errorMsg}",
+                            ToolTipIcon.Error);
+                    }
+                }
+                else if (response.Type == MessageType.Error)
+                {
+                    var error = response.GetPayload<ErrorPayload>();
+                    var errorMsg = error?.Message ?? "Error desconocido";
+                    AlwaysPrintLogger.WriteTrayError(
+                        $"OnDemandMenuItem_Click: Service retornó error para '{trigger.Label}'. " +
+                        $"Código: {error?.Code}, Mensaje: {errorMsg}",
+                        AlwaysPrintLogger.EvtGenericError);
+                    ShowBalloon(AppTitle,
+                        $"Error ejecutando '{trigger.Label}': {errorMsg}",
+                        ToolTipIcon.Error);
+                }
+                else
+                {
+                    // Tipo de respuesta inesperado
+                    AlwaysPrintLogger.WriteTrayError(
+                        $"OnDemandMenuItem_Click: respuesta inesperada tipo '{response.Type}' para '{trigger.Label}'.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    ShowBalloon(AppTitle,
+                        $"Error ejecutando '{trigger.Label}': respuesta inesperada del servicio",
+                        ToolTipIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"OnDemandMenuItem_Click: excepción al ejecutar '{trigger.Label}': {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+                ShowBalloon(AppTitle,
+                    $"Error ejecutando '{trigger.Label}': {ex.Message}",
+                    ToolTipIcon.Error);
+            }
+            finally
+            {
+                // Rehabilitar ítem tras respuesta (éxito o error)
+                item.Enabled = true;
+            }
+        }
+
+        /// <summary>
+        /// Maneja mensajes push (no solicitados) recibidos del Service vía Named Pipe.
+        /// Actualmente procesa ActionConfigChanged para actualizar dinámicamente el menú y StatusForm.
+        /// Se invoca desde el hilo del PipeClient (no es hilo UI).
+        /// </summary>
+        private void OnPipeMessageReceived(PipeMessage message)
+        {
+            try
+            {
+                switch (message.Type)
+                {
+                    case MessageType.ActionConfigChanged:
+                        HandleActionConfigChanged();
+                        break;
+                    default:
+                        // Otros mensajes push se ignoran aquí (CloudManager los maneja por separado)
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"OnPipeMessageReceived: error procesando mensaje push tipo='{message.Type}'. {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+            }
+        }
+
+        /// <summary>
+        /// Maneja el evento ActionConfigChanged recibido del Service.
+        /// Recarga la configuración OnDemand, reconstruye el submenú y actualiza el StatusForm si está abierto.
+        /// Si hay un trigger en ejecución que fue eliminado de la nueva configuración,
+        /// no se elimina de la UI hasta que su ejecución finalice (el control individual en item.Enabled
+        /// y OnDemandTriggerItem.IsExecuting maneja esto — RefreshOnDemandTriggers preserva ítems en ejecución).
+        /// </summary>
+        private void HandleActionConfigChanged()
+        {
+            AlwaysPrintLogger.WriteTrayInfo(
+                "HandleActionConfigChanged: notificación de cambio de configuración recibida del Service.");
+
+            // Recargar configuración OnDemand desde disco
+            var triggers = OnDemandConfigReader.Reload();
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"HandleActionConfigChanged: configuración recargada. {triggers.Count} triggers OnDemand encontrados.");
+
+            // Actualizar UI en hilo principal (el callback del pipe viene de un hilo de fondo)
+            _uiContext.Post(_ =>
+            {
+                try
+                {
+                    // Reconstruir submenú OnDemand del menú contextual
+                    RebuildOnDemandSubmenu();
+
+                    // Si el StatusForm está abierto, actualizar triggers y campo "Configuración"
+                    if (_statusForm != null && _statusForm.IsLoaded)
+                    {
+                        // Actualizar la lista de triggers OnDemand (preserva ítems en ejecución)
+                        _statusForm.RefreshOnDemandTriggers(triggers);
+
+                        // Actualizar el campo "Configuración" con el nuevo nombre y versión
+                        _statusForm.RefreshConfigActiva();
+
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            "HandleActionConfigChanged: StatusForm actualizado con nueva configuración.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        $"HandleActionConfigChanged: error actualizando UI. {ex.Message}",
+                        AlwaysPrintLogger.EvtGenericError);
+                }
+            }, null);
+        }
+
+        /// <summary>
+        /// Muestra el Status Form o lo trae al frente si ya está abierto.
+        /// Se invoca al recibir el broadcast ShowStatus desde una segunda instancia.
+        /// Implementa patrón singleton: una sola instancia del formulario a la vez.
+        /// </summary>
+        internal void ShowStatusForm()
+        {
+            _uiContext.Post(_ =>
+            {
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "ShowStatusForm: solicitud recibida para mostrar formulario de estado.");
+
+                // Si ya hay un StatusForm abierto, traerlo al frente
+                if (_statusForm != null && _statusForm.IsLoaded)
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "ShowStatusForm: formulario ya abierto, trayendo al frente.");
+                    _statusForm.Activate();
+                    if (_statusForm.WindowState == System.Windows.WindowState.Minimized)
+                        _statusForm.WindowState = System.Windows.WindowState.Normal;
+                    return;
+                }
+
+                // Crear nueva instancia del StatusForm
+                _statusForm = new StatusForm(_pipe);
+                _statusForm.Closed += (s, e) =>
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "ShowStatusForm: formulario cerrado por el usuario.");
+                    _statusForm = null;
+                };
+                _statusForm.Show();
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "ShowStatusForm: formulario de estado abierto correctamente.");
+            }, null);
+        }
+
+        /// <summary>
+        /// Ventana oculta que intercepta el mensaje broadcast para mostrar StatusForm.
+        /// Se registra como message-only window para recibir el Win32 broadcast
+        /// enviado por la segunda instancia del Tray.
+        /// </summary>
+        private sealed class BroadcastListener : NativeWindow
+        {
+            private readonly TrayApplicationContext _owner;
+            private readonly uint _targetMsg;
+
+            public BroadcastListener(TrayApplicationContext owner, uint targetMsg)
+            {
+                _owner = owner;
+                _targetMsg = targetMsg;
+                // Crear ventana message-only para recibir broadcasts
+                CreateHandle(new CreateParams { Parent = IntPtr.Zero });
+            }
+
+            protected override void WndProc(ref Message m)
+            {
+                if ((uint)m.Msg == _targetMsg)
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "Broadcast ShowStatus recibido. Mostrando StatusForm.");
+                    _owner.ShowStatusForm();
+                    return;
+                }
+                base.WndProc(ref m);
+            }
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
                 _cts.Cancel();
+                _pipe.MessageReceived -= OnPipeMessageReceived;
+                _messageWindow?.DestroyHandle();
+                _messageWindow = null;
                 _updateChecker?.Dispose();
                 _cloudManager?.Dispose();
                 _cloudRegistration?.Dispose();

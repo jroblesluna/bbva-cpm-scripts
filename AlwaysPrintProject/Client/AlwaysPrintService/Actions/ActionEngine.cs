@@ -167,6 +167,50 @@ namespace AlwaysPrintService.Actions
             }
         }
         
+        /// <summary>
+        /// Ejecuta un trigger OnDemand buscándolo por label exacto.
+        /// Retorna (success, message) para comunicar resultado al Tray.
+        /// </summary>
+        public (bool success, string message) ExecuteOnDemandTrigger(string label)
+        {
+            if (_config == null)
+                return (false, "No hay configuración cargada");
+            
+            var trigger = _config.Triggers
+                .Where(t => t.Event.Equals("OnDemand", StringComparison.OrdinalIgnoreCase)
+                         && !string.IsNullOrWhiteSpace(t.Label))
+                .FirstOrDefault(t => t.Label!.Equals(label, StringComparison.Ordinal));
+            
+            if (trigger == null)
+                return (false, $"Trigger OnDemand con label '{label}' no encontrado");
+            
+            // Verificar duplicados y advertir
+            var duplicates = _config.Triggers
+                .Where(t => t.Event.Equals("OnDemand", StringComparison.OrdinalIgnoreCase)
+                         && t.Label == label)
+                .Count();
+            if (duplicates > 1)
+                AlwaysPrintLogger.WriteWarning(
+                    $"ActionEngine: existen {duplicates} triggers OnDemand con label '{label}'. " +
+                    "Ejecutando el primero encontrado.");
+            
+            var sw = Stopwatch.StartNew();
+            AlwaysPrintLogger.WriteInfo(
+                $"ActionEngine: iniciando ejecución OnDemand '{label}'");
+            
+            _variables.Clear();
+            bool success = ExecuteActions(trigger.Actions);
+            
+            sw.Stop();
+            AlwaysPrintLogger.WriteInfo(
+                $"ActionEngine: OnDemand '{label}' completado. " +
+                $"Success={success}, Duración={sw.ElapsedMilliseconds}ms");
+            
+            return (success, success 
+                ? $"Trigger '{label}' ejecutado correctamente ({sw.ElapsedMilliseconds}ms)"
+                : $"Trigger '{label}' falló durante ejecución");
+        }
+        
         // ═══════════════════════════════════════════════════════════════════════
         // EJECUCIÓN DE ACCIONES
         // ═══════════════════════════════════════════════════════════════════════

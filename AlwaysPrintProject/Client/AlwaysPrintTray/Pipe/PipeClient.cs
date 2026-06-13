@@ -119,14 +119,16 @@ namespace AlwaysPrintTray.Pipe
         /// <summary>
         /// Determina si un mensaje es un push (no solicitado) del Service.
         /// Un mensaje push no tiene correlationId o su correlationId no coincide con el request enviado.
-        /// Además, se identifica por tipos específicos de mensajes push (ReportTelemetry).
+        /// Además, se identifica por tipos específicos de mensajes push (ReportTelemetry, ContingencyResult, ActionConfigChanged).
         /// </summary>
         private static bool IsPushMessage(PipeMessage msg, string requestId)
         {
-            // Los mensajes ReportTelemetry y ContingencyResult siempre son push del Service
+            // Los mensajes ReportTelemetry, ContingencyResult y ActionConfigChanged siempre son push del Service
             if (msg.Type == MessageType.ReportTelemetry)
                 return true;
             if (msg.Type == MessageType.ContingencyResult)
+                return true;
+            if (msg.Type == MessageType.ActionConfigChanged)
                 return true;
 
             // Si tiene correlationId que coincide con nuestro request, es una respuesta

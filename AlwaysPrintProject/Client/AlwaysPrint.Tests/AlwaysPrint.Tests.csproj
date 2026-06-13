@@ -19,4 +19,12 @@
     <ProjectReference Include="..\AlwaysPrint.Shared\AlwaysPrint.Shared.csproj" />
     <ProjectReference Include="..\AlwaysPrintService\AlwaysPrintService.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Archivos vinculados de AlwaysPrintTray para tests sin referencia al proyecto WinExe -->
+    <Compile Include="..\AlwaysPrintTray\OnDemand\OnDemandConfigReader.cs" Link="OnDemand\OnDemandConfigReader.cs" />
+    <Compile Include="..\AlwaysPrintTray\OnDemand\OnDemandTriggerInfo.cs" Link="OnDemand\OnDemandTriggerInfo.cs" />
+    <Compile Include="..\AlwaysPrintTray\OnDemand\OnDemandTriggerItem.cs" Link="OnDemand\OnDemandTriggerItem.cs" />
+    <Compile Include="..\AlwaysPrintTray\OnDemand\StatusDisplayHelper.cs" Link="OnDemand\StatusDisplayHelper.cs" />
+    <Compile Include="..\AlwaysPrintTray\Forms\ServiceStatusItem.cs" Link="Forms\ServiceStatusItem.cs" />
+  </ItemGroup>
 </Project>

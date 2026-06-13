@@ -16,8 +16,24 @@ namespace AlwaysPrintTray
         // Global mutex name – unique per machine, prevents multiple Tray instances.
         private const string MutexName = "Global\\AlwaysPrintTray-SingleInstance";
 
+        // Nombre del mensaje Win32 registrado para comunicación entre instancias.
+        // Cuando se detecta una segunda instancia, se envía este broadcast para que
+        // la primera instancia muestre el formulario de estado.
+        private const string BroadcastMessageName = "AlwaysPrintTray_ShowStatus";
+
         // AUMID para notificaciones toast en Windows 10/11 (mismo para dev y prod)
         private const string AppUserModelId = "AlwaysPrintTray";
+
+        // Win32 interop: registrar mensaje personalizado por nombre
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern uint RegisterWindowMessage(string lpString);
+
+        // Win32 interop: enviar mensaje a una o más ventanas
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        // Handle especial para enviar mensaje a todas las ventanas top-level
+        private static readonly IntPtr HWND_BROADCAST = new IntPtr(0xFFFF);
 
         [DllImport("shell32.dll", SetLastError = true)]
         private static extern void SetCurrentProcessExplicitAppUserModelID(
@@ -59,6 +75,11 @@ namespace AlwaysPrintTray
                 MutexRights.FullControl,
                 AccessControlType.Allow));
 
+            // Registrar mensaje Win32 personalizado (ambas instancias usan el mismo nombre).
+            // Si la segunda instancia detecta que el mutex está tomado, envía este broadcast
+            // para que la primera instancia muestre el formulario de estado.
+            uint showStatusMsgId = RegisterWindowMessage(BroadcastMessageName);
+
             bool isNew;
             using var mutex = new Mutex(initiallyOwned: false, MutexName, out isNew, mutexSecurity);
 
@@ -78,8 +99,12 @@ namespace AlwaysPrintTray
 
             if (!isNew)
             {
-                AlwaysPrintLogger.WriteTrayWarning("AlwaysPrintTray: another instance is already running. Exiting.",
-                    AlwaysPrintLogger.EvtDuplicateInstance);
+                // Segunda instancia detectada: enviar broadcast ShowStatus y salir.
+                // La primera instancia recibirá este mensaje en su WndProc y mostrará
+                // el formulario de estado.
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "Segunda instancia detectada. Enviando broadcast ShowStatus.");
+                PostMessage(HWND_BROADCAST, showStatusMsgId, IntPtr.Zero, IntPtr.Zero);
                 return;
             }
 
@@ -95,7 +120,7 @@ namespace AlwaysPrintTray
                 Bootstrap.DomainHealthChecker.ConfigureWorkstationHeaders();
 
                 AlwaysPrintLogger.WriteTrayInfo($"AlwaysPrintTray started. Versión: {System.Reflection.Assembly.GetExecutingAssembly().GetName().Version}", AlwaysPrintLogger.EvtServiceStarted);
-                Application.Run(new TrayApplicationContext());
+                Application.Run(new TrayApplicationContext(showStatusMsgId));
             }
             catch (Exception ex)
             {
