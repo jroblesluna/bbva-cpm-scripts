@@ -183,23 +183,31 @@ namespace AlwaysPrintTray.Forms
 
         private async Task RefreshServicesAsync()
         {
-            if (!_pipe.IsConnected) return;
-
             foreach (var (stateLabel, serviceName) in _serviceItems)
             {
                 try
                 {
-                    var request = PipeMessage.Create(MessageType.CheckServiceStatus,
-                        new CheckServiceStatusPayload { ServiceName = serviceName });
-                    var response = await Task.Run(() => _pipe.Send(request));
-                    var payload = response?.GetPayload<CheckServiceStatusResponsePayload>();
-                    if (payload != null && !string.IsNullOrWhiteSpace(payload.State))
+                    // Leer estado directamente con ServiceController (sin pasar por el pipe)
+                    var state = await Task.Run(() =>
                     {
-                        if (IsHandleCreated && !IsDisposed)
-                            BeginInvoke(new Action(() => stateLabel.Text = payload.State));
-                    }
+                        try
+                        {
+                            using var sc = new System.ServiceProcess.ServiceController(serviceName);
+                            return sc.Status.ToString();
+                        }
+                        catch { return "NotFound"; }
+                    });
+
+                    if (IsHandleCreated && !IsDisposed)
+                        BeginInvoke(new Action(() =>
+                        {
+                            stateLabel.Text = state;
+                            stateLabel.ForeColor = state == "Running"
+                                ? Color.FromArgb(0x22, 0x8B, 0x22)
+                                : Color.FromArgb(0xCC, 0x00, 0x00);
+                        }));
                 }
-                catch { /* Ignorar errores individuales en refresh */ }
+                catch { /* Ignorar errores individuales */ }
             }
         }
 
