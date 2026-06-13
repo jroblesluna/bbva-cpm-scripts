@@ -41,8 +41,18 @@ namespace AlwaysPrintTray.Forms
             TriggersOnDemand = new ObservableCollection<OnDemandTriggerItem>();
 
             InitializeComponent();
-            DataContext = this;
+
+            // Setear textos localizados directamente (sin bindings, más robusto)
             Title = LocalizationManager.Get("StatusFormTitle");
+            HeaderGeneral.Text = LocalizationManager.Get("StatusSectionGeneralInfo");
+            LblStateText.Text = LocalizationManager.Get("StatusLabelState");
+            LblVersionText.Text = LocalizationManager.Get("StatusLabelVersion");
+            LblQueueText.Text = LocalizationManager.Get("StatusLabelActiveQueue");
+            LblConfigText.Text = LocalizationManager.Get("StatusLabelConfig");
+            HeaderOnDemand.Text = LocalizationManager.Get("StatusSectionOnDemand");
+            NoTriggersMessage.Text = LocalizationManager.Get("StatusNoActionsAvailable");
+            HeaderServices.Text = LocalizationManager.Get("StatusSectionServices");
+            BtnClose.Content = LocalizationManager.Get("StatusButtonClose");
 
             // Cargar información general al abrir el formulario
             LoadGeneralInfo();
@@ -89,10 +99,16 @@ namespace AlwaysPrintTray.Forms
         /// </summary>
         internal void LoadGeneralInfo()
         {
-            EstadoSistema = LoadEstadoSistema();
-            VersionApp = LoadVersionApp();
-            ColaActiva = LoadColaActiva();
-            ConfigActiva = LoadConfigActiva();
+            ValState.Text = LoadEstadoSistema();
+            ValVersion.Text = LoadVersionApp();
+            ValQueue.Text = LoadColaActiva();
+            ValConfig.Text = LoadConfigActiva();
+
+            // Mantener propiedades por compatibilidad con RefreshConfigActiva
+            EstadoSistema = ValState.Text;
+            VersionApp = ValVersion.Text;
+            ColaActiva = ValQueue.Text;
+            ConfigActiva = ValConfig.Text;
         }
 
         /// <summary>
