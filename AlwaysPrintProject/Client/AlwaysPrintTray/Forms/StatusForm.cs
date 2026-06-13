@@ -38,7 +38,7 @@ namespace AlwaysPrintTray.Forms
         private void BuildUI()
         {
             Text = LocalizationManager.Get("StatusFormTitle");
-            Size = new Size(460, 420);
+            Size = new Size(500, 520);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -46,6 +46,7 @@ namespace AlwaysPrintTray.Forms
             BackColor = Color.FromArgb(245, 245, 245);
             ForeColor = Color.Black;
             Font = new Font("Segoe UI", 9f);
+            AutoScaleMode = AutoScaleMode.Dpi;
             KeyPreview = true;
             KeyDown += (s, e) => { if (e.KeyCode == Keys.Escape) Close(); };
 
@@ -289,14 +290,14 @@ namespace AlwaysPrintTray.Forms
             {
                 Text = label,
                 Location = new Point(16, y),
-                Size = new Size(110, 20),
+                AutoSize = true,
                 ForeColor = Color.FromArgb(0x55, 0x55, 0x55),
                 BackColor = Color.Transparent
             };
             var val = new Label
             {
                 Text = value,
-                Location = new Point(130, y),
+                Location = new Point(150, y),
                 AutoSize = true,
                 ForeColor = Color.Black,
                 BackColor = Color.Transparent
