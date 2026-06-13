@@ -41,7 +41,13 @@ namespace AlwaysPrintTray.Forms
             // Timer para refrescar estado de servicios cada 5 segundos
             _refreshTimer = new Timer { Interval = 5000 };
             _refreshTimer.Tick += async (s, e) => await RefreshServicesAsync();
-            _refreshTimer.Start();
+
+            // Iniciar refresh después de que el form se muestre (evita deadlock en constructor)
+            Shown += async (s, e) =>
+            {
+                await RefreshServicesAsync();
+                _refreshTimer.Start();
+            };
 
             FormClosed += (s, e) => _refreshTimer.Stop();
         }
@@ -55,6 +61,7 @@ namespace AlwaysPrintTray.Forms
             MaximizeBox = false;
             MinimizeBox = false;
             BackColor = Color.FromArgb(245, 245, 245);
+            ForeColor = Color.Black;
             Font = new Font("Segoe UI", 9f);
             KeyPreview = true;
             KeyDown += (s, e) => { if (e.KeyCode == Keys.Escape) Close(); };
@@ -167,9 +174,6 @@ namespace AlwaysPrintTray.Forms
                     _servicesPanel.Controls.Add(panel);
                     _serviceItems.Add((stateLabel, svc.ServiceName));
                 }
-
-                // Consultar estado real de servicios
-                _ = RefreshServicesAsync();
             }
             catch (Exception ex)
             {
@@ -310,14 +314,16 @@ namespace AlwaysPrintTray.Forms
                 Text = label,
                 Location = new Point(16, y),
                 Size = new Size(110, 20),
-                ForeColor = Color.FromArgb(0x55, 0x55, 0x55)
+                ForeColor = Color.FromArgb(0x55, 0x55, 0x55),
+                BackColor = Color.Transparent
             };
             var val = new Label
             {
                 Text = value,
                 Location = new Point(130, y),
                 AutoSize = true,
-                ForeColor = Color.FromArgb(0x1E, 0x1E, 0x1E)
+                ForeColor = Color.Black,
+                BackColor = Color.Transparent
             };
             Controls.Add(lbl);
             Controls.Add(val);
