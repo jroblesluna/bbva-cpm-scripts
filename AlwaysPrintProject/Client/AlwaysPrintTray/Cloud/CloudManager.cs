@@ -9,6 +9,7 @@ using System.Net.Http;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
