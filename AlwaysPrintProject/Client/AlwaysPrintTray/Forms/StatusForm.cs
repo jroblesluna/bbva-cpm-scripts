@@ -139,7 +139,7 @@ namespace AlwaysPrintTray.Forms
                     {
                         var panel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 2, 0, 2) };
                         panel.Controls.Add(new Label { Text = trigger.Label, AutoSize = true, Padding = new Padding(0, 4, 8, 0) });
-                        var btn = new Button { Text = LocalizationManager.Get("StatusButtonExecute"), Size = new Size(70, 26), Tag = trigger };
+                        var btn = new Button { Text = LocalizationManager.Get("StatusButtonExecute"), AutoSize = true, Padding = new Padding(8, 2, 8, 2), Tag = trigger };
                         btn.Click += TriggerExecuteClick;
                         panel.Controls.Add(btn);
                         _triggersPanel.Controls.Add(panel);
@@ -151,7 +151,7 @@ namespace AlwaysPrintTray.Forms
                 foreach (var svc in services)
                 {
                     var panel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 1, 0, 1) };
-                    var nameLabel = new Label { Text = svc.DisplayName, AutoSize = true, Padding = new Padding(0, 2, 0, 0), MinimumSize = new Size(220, 0), ForeColor = Color.Black, BackColor = Color.Transparent };
+                    var nameLabel = new Label { Text = svc.DisplayName, AutoSize = true, Padding = new Padding(0, 2, 12, 0), ForeColor = Color.Black, BackColor = Color.Transparent };
 
                     string state;
                     try
@@ -167,7 +167,7 @@ namespace AlwaysPrintTray.Forms
                         AutoSize = true,
                         ForeColor = state == "Running" ? Color.FromArgb(0x22, 0x8B, 0x22) : Color.FromArgb(0xCC, 0x00, 0x00),
                         BackColor = Color.Transparent,
-                        Padding = new Padding(4, 2, 0, 0)
+                        Padding = new Padding(0, 2, 0, 0)
                     };
                     panel.Controls.Add(nameLabel);
                     panel.Controls.Add(stateLabel);
