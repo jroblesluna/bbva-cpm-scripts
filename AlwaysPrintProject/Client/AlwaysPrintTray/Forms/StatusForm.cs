@@ -22,11 +22,13 @@ namespace AlwaysPrintTray.Forms
     public sealed class StatusForm : Form
     {
         // ── Constantes de layout ────────────────────────────────────────────────
-        private const int FormWidth = 580;
+        private const int FormWidth = 620;
         private const int LabelX = 16;
         private const int ValueX = 150;
-        private const int StateX = 380;
-        private const int StartButtonX = 460;
+        private const int ServiceNameMaxWidth = 340;
+        private const int StateX = 370;
+        private const int StartButtonX = 470;
+        private const int TriggerButtonX = 470;
         private const int RowHeight = 22;
         private const int SectionSpacing = 8;
 
@@ -131,8 +133,8 @@ namespace AlwaysPrintTray.Forms
             _btnClose = new Button
             {
                 Text = LocalizationManager.Get("StatusButtonClose"),
-                Size = new Size(90, 28),
-                Location = new Point(FormWidth - 90 - 20, y),
+                Size = new Size(120, 26),
+                Location = new Point(FormWidth - 120 - 20, y),
                 FlatStyle = FlatStyle.Standard
             };
             _btnClose.Click += (s, e) => Close();
@@ -179,8 +181,8 @@ namespace AlwaysPrintTray.Forms
                 var btn = new Button
                 {
                     Text = LocalizationManager.Get("StatusButtonExecute"),
-                    Location = new Point(StartButtonX, y),
-                    Size = new Size(90, 26),
+                    Location = new Point(TriggerButtonX, y),
+                    Size = new Size(120, 26),
                     Tag = trigger,
                     FlatStyle = FlatStyle.Standard
                 };
@@ -199,12 +201,14 @@ namespace AlwaysPrintTray.Forms
 
             foreach (var svc in services)
             {
-                // Nombre del servicio
+                // Nombre del servicio (con ancho máximo para no invadir columna de estado)
                 var lblName = new Label
                 {
                     Text = svc.DisplayName,
                     Location = new Point(LabelX, y + 4),
-                    AutoSize = true
+                    MaximumSize = new Size(ServiceNameMaxWidth, 0),
+                    AutoSize = true,
+                    AutoEllipsis = true
                 };
                 Controls.Add(lblName);
 
@@ -222,7 +226,7 @@ namespace AlwaysPrintTray.Forms
                 {
                     Text = LocalizationManager.Get("StatusButtonStartService"),
                     Location = new Point(StartButtonX, y),
-                    Size = new Size(100, 26),
+                    Size = new Size(120, 26),
                     Tag = svc,
                     Visible = false,
                     FlatStyle = FlatStyle.Standard
