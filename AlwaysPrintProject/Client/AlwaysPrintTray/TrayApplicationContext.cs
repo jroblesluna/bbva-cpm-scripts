@@ -94,7 +94,7 @@ namespace AlwaysPrintTray
             menu.Items.Add(LocalizationManager.Get("MenuConfiguration"), null, (_, __) => ShowConfiguration());
             menu.Items.Add(LocalizationManager.Get("MenuMyPrinters"),    null, (_, __) => ShowMyPrinters());
             menu.Items.Add(LocalizationManager.Get("MenuCheckUpdates"),  null, (_, __) => CheckForUpdatesManual());
-            menu.Items.Add("Estado del Sistema",                         null, (_, __) => ShowStatusForm());
+            menu.Items.Add(LocalizationManager.Get("MenuSystemStatus"),  null, (_, __) => ShowStatusForm());
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(LocalizationManager.Get("MenuExit"),          null, (_, __) => ExitApplication());
 
@@ -829,7 +829,7 @@ namespace AlwaysPrintTray
                 return;
             }
 
-            _onDemandSubmenu = new ToolStripMenuItem("Acciones A Demanda");
+            _onDemandSubmenu = new ToolStripMenuItem(LocalizationManager.Get("MenuOnDemandActions"));
             foreach (var trigger in triggers)
             {
                 var item = new ToolStripMenuItem(trigger.Label);

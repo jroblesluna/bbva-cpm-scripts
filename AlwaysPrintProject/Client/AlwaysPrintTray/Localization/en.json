@@ -23,5 +23,21 @@
   "BalloonUpdateNoCloud": "Cannot check for updates without cloud connection.",
   "BalloonCidrNotDetected": "Could not detect network configuration (CIDR). Please check your network connection.",
   "BalloonCidrRetrying": "Retrying network detection...",
-  "BalloonCidrDetected": "Network configuration detected successfully. Continuing registration."
+  "BalloonCidrDetected": "Network configuration detected successfully. Continuing registration.",
+  "MenuSystemStatus": "System Status",
+  "MenuOnDemandActions": "On-Demand Actions",
+  "StatusFormTitle": "AlwaysPrint — System Status",
+  "StatusSectionGeneralInfo": "General Information",
+  "StatusLabelState": "Status:",
+  "StatusLabelVersion": "Version:",
+  "StatusLabelActiveQueue": "Active queue:",
+  "StatusLabelConfig": "Configuration:",
+  "StatusStateNormal": "Normal",
+  "StatusStateContingency": "In Contingency",
+  "StatusSectionOnDemand": "On-Demand Actions",
+  "StatusNoActionsAvailable": "No actions available.",
+  "StatusButtonExecute": "Execute",
+  "StatusSectionServices": "Services",
+  "StatusButtonStartService": "Start service",
+  "StatusButtonClose": "Close"
 }

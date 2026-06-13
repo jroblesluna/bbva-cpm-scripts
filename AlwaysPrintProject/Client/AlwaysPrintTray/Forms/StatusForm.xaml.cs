@@ -9,6 +9,7 @@ using System.Windows;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
+using AlwaysPrintTray.Localization;
 using AlwaysPrintTray.OnDemand;
 using AlwaysPrintTray.Pipe;
 using Microsoft.Win32;
@@ -41,6 +42,7 @@ namespace AlwaysPrintTray.Forms
 
             InitializeComponent();
             DataContext = this;
+            Title = LocalizationManager.Get("StatusFormTitle");
 
             // Cargar información general al abrir el formulario
             LoadGeneralInfo();
@@ -64,6 +66,20 @@ namespace AlwaysPrintTray.Forms
         }
 
         private readonly System.Windows.Threading.DispatcherTimer _refreshTimer;
+
+        // ── Propiedades de localización para bindings XAML ──
+
+        public string LblSectionGeneralInfo => LocalizationManager.Get("StatusSectionGeneralInfo");
+        public string LblState => LocalizationManager.Get("StatusLabelState");
+        public string LblVersion => LocalizationManager.Get("StatusLabelVersion");
+        public string LblActiveQueue => LocalizationManager.Get("StatusLabelActiveQueue");
+        public string LblConfig => LocalizationManager.Get("StatusLabelConfig");
+        public string LblSectionOnDemand => LocalizationManager.Get("StatusSectionOnDemand");
+        public string LblNoActions => LocalizationManager.Get("StatusNoActionsAvailable");
+        public string LblExecute => LocalizationManager.Get("StatusButtonExecute");
+        public string LblSectionServices => LocalizationManager.Get("StatusSectionServices");
+        public string LblStartService => LocalizationManager.Get("StatusButtonStartService");
+        public string LblClose => LocalizationManager.Get("StatusButtonClose");
 
         // ── Carga de información general ──
 

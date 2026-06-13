@@ -26,7 +26,9 @@ namespace AlwaysPrintTray.OnDemand
         /// <returns>"En Contingencia" si está activo, "Normal" en caso contrario.</returns>
         public static string FormatEstadoSistema(bool contingencyEnabled)
         {
-            return contingencyEnabled ? "En Contingencia" : "Normal";
+            return contingencyEnabled
+                ? AlwaysPrintTray.Localization.LocalizationManager.Get("StatusStateContingency")
+                : AlwaysPrintTray.Localization.LocalizationManager.Get("StatusStateNormal");
         }
 
         /// <summary>

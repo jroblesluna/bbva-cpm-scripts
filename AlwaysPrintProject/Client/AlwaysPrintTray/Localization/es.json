@@ -23,5 +23,21 @@
   "BalloonUpdateNoCloud": "No se puede buscar actualizaciones sin conexión a la nube.",
   "BalloonCidrNotDetected": "No se pudo detectar la configuración de red (CIDR). Verifique su conexión de red.",
   "BalloonCidrRetrying": "Reintentando detección de red...",
-  "BalloonCidrDetected": "Configuración de red detectada correctamente. Continuando registro."
+  "BalloonCidrDetected": "Configuración de red detectada correctamente. Continuando registro.",
+  "MenuSystemStatus": "Estado del Sistema",
+  "MenuOnDemandActions": "Acciones A Demanda",
+  "StatusFormTitle": "AlwaysPrint — Estado del Sistema",
+  "StatusSectionGeneralInfo": "Información General",
+  "StatusLabelState": "Estado:",
+  "StatusLabelVersion": "Versión:",
+  "StatusLabelActiveQueue": "Cola activa:",
+  "StatusLabelConfig": "Configuración:",
+  "StatusStateNormal": "Normal",
+  "StatusStateContingency": "En Contingencia",
+  "StatusSectionOnDemand": "Acciones A Demanda",
+  "StatusNoActionsAvailable": "No hay acciones disponibles.",
+  "StatusButtonExecute": "Ejecutar",
+  "StatusSectionServices": "Servicios",
+  "StatusButtonStartService": "Iniciar servicio",
+  "StatusButtonClose": "Cerrar"
 }

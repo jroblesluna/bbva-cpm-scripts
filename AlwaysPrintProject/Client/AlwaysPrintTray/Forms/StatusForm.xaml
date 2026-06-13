@@ -86,14 +86,14 @@
 
         <!-- ═══ Sección: Información General ═══ -->
         <StackPanel Grid.Row="0">
-            <TextBlock Text="Información General" Style="{StaticResource SectionHeader}"/>
+            <TextBlock Text="{Binding LblSectionGeneralInfo}" Style="{StaticResource SectionHeader}"/>
 
             <Grid Margin="0,3">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="120"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Estado:" Style="{StaticResource FieldLabel}"/>
+                <TextBlock Grid.Column="0" Text="{Binding LblState}" Style="{StaticResource FieldLabel}"/>
                 <TextBlock Grid.Column="1" Text="{Binding EstadoSistema}" Style="{StaticResource FieldValue}"/>
             </Grid>
 
@@ -102,7 +102,7 @@
                     <ColumnDefinition Width="120"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Versión:" Style="{StaticResource FieldLabel}"/>
+                <TextBlock Grid.Column="0" Text="{Binding LblVersion}" Style="{StaticResource FieldLabel}"/>
                 <TextBlock Grid.Column="1" Text="{Binding VersionApp}" Style="{StaticResource FieldValue}"/>
             </Grid>
 
@@ -111,7 +111,7 @@
                     <ColumnDefinition Width="120"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Cola activa:" Style="{StaticResource FieldLabel}"/>
+                <TextBlock Grid.Column="0" Text="{Binding LblActiveQueue}" Style="{StaticResource FieldLabel}"/>
                 <TextBlock Grid.Column="1" Text="{Binding ColaActiva}" Style="{StaticResource FieldValue}" TextWrapping="Wrap"/>
             </Grid>
 
@@ -120,7 +120,7 @@
                     <ColumnDefinition Width="120"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Configuración:" Style="{StaticResource FieldLabel}"/>
+                <TextBlock Grid.Column="0" Text="{Binding LblConfig}" Style="{StaticResource FieldLabel}"/>
                 <TextBlock Grid.Column="1" Text="{Binding ConfigActiva}" Style="{StaticResource FieldValue}"/>
             </Grid>
         </StackPanel>
@@ -130,10 +130,10 @@
 
         <!-- ═══ Sección: On Demand Triggers ═══ -->
         <StackPanel Grid.Row="2">
-            <TextBlock Text="Acciones A Demanda" Style="{StaticResource SectionHeader}"/>
+            <TextBlock Text="{Binding LblSectionOnDemand}" Style="{StaticResource SectionHeader}"/>
 
             <TextBlock x:Name="NoTriggersMessage"
-                       Text="No hay acciones disponibles."
+                       Text="{Binding LblNoActions}"
                        Style="{StaticResource FieldValue}"
                        Foreground="#888888"
                        FontStyle="Italic"
@@ -151,7 +151,7 @@
                             <TextBlock Grid.Column="0" Text="{Binding Label}" Style="{StaticResource FieldValue}"
                                        VerticalAlignment="Center"/>
                             <Button Grid.Column="1"
-                                    Content="Ejecutar"
+                                    Content="{Binding DataContext.LblExecute, RelativeSource={RelativeSource AncestorType=Window}}"
                                     Style="{StaticResource ActionButton}"
                                     IsEnabled="{Binding IsActionEnabled}"
                                     Click="TriggerExecute_Click"
@@ -167,7 +167,7 @@
 
         <!-- ═══ Sección: Servicios ═══ -->
         <StackPanel Grid.Row="4">
-            <TextBlock Text="Servicios" Style="{StaticResource SectionHeader}"/>
+            <TextBlock Text="{Binding LblSectionServices}" Style="{StaticResource SectionHeader}"/>
 
             <ItemsControl ItemsSource="{Binding Servicios}">
                 <ItemsControl.ItemTemplate>
@@ -184,7 +184,7 @@
                             <Button Grid.Column="2"
                                     Content="▶"
                                     Style="{StaticResource IconButton}"
-                                    ToolTip="Iniciar servicio"
+                                    ToolTip="{Binding DataContext.LblStartService, RelativeSource={RelativeSource AncestorType=Window}}"
                                     IsEnabled="{Binding IsActionEnabled}"
                                     Visibility="{Binding IsActionVisible, Converter={StaticResource BoolToVisibility}}"
                                     Click="ServiceAction_Click"
@@ -196,7 +196,7 @@
         </StackPanel>
 
         <!-- Botón Cerrar -->
-        <Button Grid.Row="4" Content="Cerrar" Style="{StaticResource ActionButton}"
+        <Button Grid.Row="4" Content="{Binding LblClose}" Style="{StaticResource ActionButton}"
                 HorizontalAlignment="Right" VerticalAlignment="Bottom"
                 Margin="0,12,0,0" IsCancel="True"
                 Click="CloseButton_Click"/>
