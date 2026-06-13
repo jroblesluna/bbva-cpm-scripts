@@ -1030,53 +1030,23 @@ namespace AlwaysPrintTray
         /// </summary>
         internal void ShowStatusForm()
         {
-            // WinForms: usar _uiContext para garantizar ejecución en thread UI
-            _uiContext.Post(_ => ShowStatusFormInternal(), null);
+            ShowStatusFormInternal();
         }
 
         private void ShowStatusFormInternal()
         {
-            try
+            // Si ya hay un formulario abierto, traerlo al frente y no abrir otro
+            if (_activeForm != null && !_activeForm.IsDisposed)
             {
-                AlwaysPrintLogger.WriteTrayInfo(
-                    "ShowStatusForm: solicitud recibida para mostrar formulario de estado.");
-
-                // Respetar control de instancia única: no abrir si hay otra ventana activa
-                if (_activeForm != null && !_activeForm.IsDisposed)
-                {
-                    _activeForm.Activate();
-                    return;
-                }
-
-                // Si ya hay un StatusForm abierto, traerlo al frente
-                if (_statusForm != null && !_statusForm.IsDisposed)
-                {
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        "ShowStatusForm: formulario ya abierto, trayendo al frente.");
-                    _statusForm.Activate();
-                    return;
-                }
-
-                // Crear nueva instancia del StatusForm (WinForms)
-                _statusForm = new StatusForm(_pipe);
-                _activeForm = _statusForm;
-                _statusForm.FormClosed += (s, e) =>
-                {
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        "ShowStatusForm: formulario cerrado por el usuario.");
-                    _statusForm = null;
-                    _activeForm = null;
-                };
-                _statusForm.Show();
-                AlwaysPrintLogger.WriteTrayInfo(
-                    "ShowStatusForm: formulario de estado abierto correctamente.");
+                _activeForm.Activate();
+                return;
             }
-            catch (Exception ex)
-            {
-                AlwaysPrintLogger.WriteTrayError(
-                    $"ShowStatusForm: error al mostrar formulario: {ex}",
-                    AlwaysPrintLogger.EvtGenericError);
-            }
+
+            var form = new StatusForm(_pipe);
+            _activeForm = form;
+            _statusForm = form;
+            form.FormClosed += (_, __) => { _activeForm = null; _statusForm = null; };
+            form.ShowDialog();
         }
 
         /// <summary>

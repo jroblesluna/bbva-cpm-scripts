@@ -19,7 +19,6 @@ namespace AlwaysPrintTray.Forms
     public sealed class StatusForm : Form
     {
         private readonly PipeClient _pipe;
-        private readonly Timer _refreshTimer;
 
         // Controles dinámicos
         private Label _valState = null!;
@@ -29,27 +28,11 @@ namespace AlwaysPrintTray.Forms
         private FlowLayoutPanel _triggersPanel = null!;
         private FlowLayoutPanel _servicesPanel = null!;
 
-        // Estado de servicios para refresh
-        private readonly List<(Label stateLabel, string serviceName)> _serviceItems = new();
-
         public StatusForm(PipeClient pipe)
         {
             _pipe = pipe ?? throw new ArgumentNullException(nameof(pipe));
             BuildUI();
             LoadData();
-
-            // Timer para refrescar estado de servicios cada 5 segundos
-            _refreshTimer = new Timer { Interval = 5000 };
-            _refreshTimer.Tick += async (s, e) => await RefreshServicesAsync();
-
-            // Iniciar refresh después de que el form se muestre (evita deadlock en constructor)
-            Shown += (s, e) =>
-            {
-                _ = RefreshServicesAsync();
-                _refreshTimer.Start();
-            };
-
-            FormClosed += (s, e) => _refreshTimer.Stop();
         }
 
         private void BuildUI()
@@ -162,52 +145,37 @@ namespace AlwaysPrintTray.Forms
                     }
                 }
 
-                // Servicios monitoreados
+                // Servicios monitoreados — lectura síncrona directa con ServiceController
                 var services = OnDemandConfigReader.GetMonitoredServices();
                 foreach (var svc in services)
                 {
                     var panel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 1, 0, 1) };
-                    var nameLabel = new Label { Text = svc.DisplayName, AutoSize = true, Padding = new Padding(0, 2, 0, 0), MinimumSize = new Size(220, 0) };
-                    var stateLabel = new Label { Text = "...", AutoSize = true, ForeColor = Color.FromArgb(0x22, 0x8B, 0x22), Padding = new Padding(4, 2, 0, 0) };
+                    var nameLabel = new Label { Text = svc.DisplayName, AutoSize = true, Padding = new Padding(0, 2, 0, 0), MinimumSize = new Size(220, 0), ForeColor = Color.Black, BackColor = Color.Transparent };
+
+                    string state;
+                    try
+                    {
+                        using var sc = new System.ServiceProcess.ServiceController(svc.ServiceName);
+                        state = sc.Status.ToString();
+                    }
+                    catch { state = "NotFound"; }
+
+                    var stateLabel = new Label
+                    {
+                        Text = state,
+                        AutoSize = true,
+                        ForeColor = state == "Running" ? Color.FromArgb(0x22, 0x8B, 0x22) : Color.FromArgb(0xCC, 0x00, 0x00),
+                        BackColor = Color.Transparent,
+                        Padding = new Padding(4, 2, 0, 0)
+                    };
                     panel.Controls.Add(nameLabel);
                     panel.Controls.Add(stateLabel);
                     _servicesPanel.Controls.Add(panel);
-                    _serviceItems.Add((stateLabel, svc.ServiceName));
                 }
             }
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteTrayError($"StatusForm.LoadData: {ex.Message}", AlwaysPrintLogger.EvtGenericError);
-            }
-        }
-
-        private async Task RefreshServicesAsync()
-        {
-            foreach (var (stateLabel, serviceName) in _serviceItems)
-            {
-                try
-                {
-                    // Leer estado directamente con ServiceController (sin pasar por el pipe)
-                    var state = await Task.Run(() =>
-                    {
-                        try
-                        {
-                            using var sc = new System.ServiceProcess.ServiceController(serviceName);
-                            return sc.Status.ToString();
-                        }
-                        catch { return "NotFound"; }
-                    });
-
-                    if (IsHandleCreated && !IsDisposed)
-                        BeginInvoke(new Action(() =>
-                        {
-                            stateLabel.Text = state;
-                            stateLabel.ForeColor = state == "Running"
-                                ? Color.FromArgb(0x22, 0x8B, 0x22)
-                                : Color.FromArgb(0xCC, 0x00, 0x00);
-                        }));
-                }
-                catch { /* Ignorar errores individuales */ }
             }
         }
 
