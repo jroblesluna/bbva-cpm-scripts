@@ -1044,6 +1044,13 @@ namespace AlwaysPrintTray
                 AlwaysPrintLogger.WriteTrayInfo(
                     "ShowStatusForm: solicitud recibida para mostrar formulario de estado.");
 
+                // Respetar control de instancia única: no abrir si hay otra ventana activa
+                if (_activeForm != null && !_activeForm.IsDisposed)
+                {
+                    _activeForm.Activate();
+                    return;
+                }
+
                 // Si ya hay un StatusForm abierto, traerlo al frente
                 if (_statusForm != null && _statusForm.IsLoaded)
                 {
