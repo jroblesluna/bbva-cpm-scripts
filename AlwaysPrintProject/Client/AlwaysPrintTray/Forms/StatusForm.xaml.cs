@@ -41,44 +41,14 @@ namespace AlwaysPrintTray.Forms
             TriggersOnDemand = new ObservableCollection<OnDemandTriggerItem>();
 
             InitializeComponent();
-            DataContext = this;
-
-            // Buscar controles por nombre (más robusto que campos generados en SDK-style)
-            var headerGeneral = (System.Windows.Controls.TextBlock)FindName("HeaderGeneral");
-            var lblStateText = (System.Windows.Controls.TextBlock)FindName("LblStateText");
-            var lblVersionText = (System.Windows.Controls.TextBlock)FindName("LblVersionText");
-            var lblQueueText = (System.Windows.Controls.TextBlock)FindName("LblQueueText");
-            var lblConfigText = (System.Windows.Controls.TextBlock)FindName("LblConfigText");
-            var headerOnDemand = (System.Windows.Controls.TextBlock)FindName("HeaderOnDemand");
-            var noTriggersMsg = (System.Windows.Controls.TextBlock)FindName("NoTriggersMessage");
-            var headerServices = (System.Windows.Controls.TextBlock)FindName("HeaderServices");
-            var btnClose = (System.Windows.Controls.Button)FindName("BtnClose");
-            _valState = (System.Windows.Controls.TextBlock)FindName("ValState");
-            _valVersion = (System.Windows.Controls.TextBlock)FindName("ValVersion");
-            _valQueue = (System.Windows.Controls.TextBlock)FindName("ValQueue");
-            _valConfig = (System.Windows.Controls.TextBlock)FindName("ValConfig");
-            _noTriggersMessage = noTriggersMsg;
-            _triggersListControl = (System.Windows.Controls.ItemsControl)FindName("TriggersListControl");
-
-            // Setear textos localizados directamente
             Title = LocalizationManager.Get("StatusFormTitle");
-            if (headerGeneral != null) headerGeneral.Text = LocalizationManager.Get("StatusSectionGeneralInfo");
-            if (lblStateText != null) lblStateText.Text = LocalizationManager.Get("StatusLabelState");
-            if (lblVersionText != null) lblVersionText.Text = LocalizationManager.Get("StatusLabelVersion");
-            if (lblQueueText != null) lblQueueText.Text = LocalizationManager.Get("StatusLabelActiveQueue");
-            if (lblConfigText != null) lblConfigText.Text = LocalizationManager.Get("StatusLabelConfig");
-            if (headerOnDemand != null) headerOnDemand.Text = LocalizationManager.Get("StatusSectionOnDemand");
-            if (noTriggersMsg != null) noTriggersMsg.Text = LocalizationManager.Get("StatusNoActionsAvailable");
-            if (headerServices != null) headerServices.Text = LocalizationManager.Get("StatusSectionServices");
-            if (btnClose != null) btnClose.Content = LocalizationManager.Get("StatusButtonClose");
 
-            // Cargar información general al abrir el formulario
+            // Construir UI programáticamente (evita bugs de BAML en Win11 + SDK-style + WinForms+WPF)
+            BuildUI();
+
+            // Cargar datos
             LoadGeneralInfo();
-
-            // Cargar estado de servicios monitoreados
             _ = LoadServiciosAsync();
-
-            // Cargar triggers OnDemand disponibles
             LoadTriggersOnDemand();
 
             // Timer para refrescar estado de servicios cada 5 segundos
@@ -88,18 +58,178 @@ namespace AlwaysPrintTray.Forms
             };
             _refreshTimer.Tick += async (s, e) => await RefreshServiciosEstadoAsync();
             _refreshTimer.Start();
-
-            // Detener timer al cerrar la ventana
             Closed += (s, e) => _refreshTimer.Stop();
         }
 
         // Campos para controles que se actualizan dinámicamente
-        private System.Windows.Controls.TextBlock? _valState;
-        private System.Windows.Controls.TextBlock? _valVersion;
-        private System.Windows.Controls.TextBlock? _valQueue;
-        private System.Windows.Controls.TextBlock? _valConfig;
+        private System.Windows.Controls.TextBlock _valState = null!;
+        private System.Windows.Controls.TextBlock _valVersion = null!;
+        private System.Windows.Controls.TextBlock _valQueue = null!;
+        private System.Windows.Controls.TextBlock _valConfig = null!;
         private System.Windows.Controls.TextBlock? _noTriggersMessage;
         private System.Windows.Controls.ItemsControl? _triggersListControl;
+
+        /// <summary>
+        /// Construye toda la UI del StatusForm programáticamente.
+        /// Esto evita el bug de BAML/XAML compilado en proyectos SDK-style
+        /// con WinForms+WPF mezclados que no renderiza contenido en Win11.
+        /// </summary>
+        private void BuildUI()
+        {
+            var root = new System.Windows.Controls.StackPanel { Margin = new Thickness(16) };
+
+            // ── Información General ──
+            root.Children.Add(MakeHeader(LocalizationManager.Get("StatusSectionGeneralInfo")));
+            root.Children.Add(MakeFieldRow(LocalizationManager.Get("StatusLabelState"), out _valState));
+            root.Children.Add(MakeFieldRow(LocalizationManager.Get("StatusLabelVersion"), out _valVersion));
+            root.Children.Add(MakeFieldRow(LocalizationManager.Get("StatusLabelActiveQueue"), out _valQueue));
+            root.Children.Add(MakeFieldRow(LocalizationManager.Get("StatusLabelConfig"), out _valConfig));
+
+            root.Children.Add(new System.Windows.Controls.Separator { Margin = new Thickness(0, 8, 0, 4), Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xDD, 0xDD, 0xDD)) });
+
+            // ── On Demand Triggers ──
+            root.Children.Add(MakeHeader(LocalizationManager.Get("StatusSectionOnDemand")));
+
+            _noTriggersMessage = new System.Windows.Controls.TextBlock
+            {
+                Text = LocalizationManager.Get("StatusNoActionsAvailable"),
+                FontSize = 12,
+                Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x88, 0x88, 0x88)),
+                FontStyle = System.Windows.FontStyles.Italic,
+                Visibility = Visibility.Collapsed,
+                Margin = new Thickness(0, 4, 0, 0)
+            };
+            root.Children.Add(_noTriggersMessage);
+
+            // ItemsControl para triggers (usa binding a TriggersOnDemand)
+            _triggersListControl = new System.Windows.Controls.ItemsControl();
+            var triggerBinding = new System.Windows.Data.Binding("TriggersOnDemand") { Source = this };
+            _triggersListControl.SetBinding(System.Windows.Controls.ItemsControl.ItemsSourceProperty, triggerBinding);
+
+            var triggerTemplate = new DataTemplate();
+            var triggerFactory = new FrameworkElementFactory(typeof(System.Windows.Controls.Grid));
+            triggerFactory.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 3, 0, 0));
+
+            var col1 = new FrameworkElementFactory(typeof(System.Windows.Controls.ColumnDefinition));
+            col1.SetValue(System.Windows.Controls.ColumnDefinition.WidthProperty, new GridLength(1, GridUnitType.Star));
+            var col2 = new FrameworkElementFactory(typeof(System.Windows.Controls.ColumnDefinition));
+            col2.SetValue(System.Windows.Controls.ColumnDefinition.WidthProperty, GridLength.Auto);
+            var colDefs = new FrameworkElementFactory(typeof(System.Windows.Controls.Grid));
+
+            // Simplificar: usar StackPanel horizontal para cada trigger
+            var triggerItemFactory = new FrameworkElementFactory(typeof(System.Windows.Controls.StackPanel));
+            triggerItemFactory.SetValue(System.Windows.Controls.StackPanel.OrientationProperty, System.Windows.Controls.Orientation.Horizontal);
+            triggerItemFactory.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 3, 0, 0));
+
+            var triggerLabel = new FrameworkElementFactory(typeof(System.Windows.Controls.TextBlock));
+            triggerLabel.SetBinding(System.Windows.Controls.TextBlock.TextProperty, new System.Windows.Data.Binding("Label"));
+            triggerLabel.SetValue(System.Windows.Controls.TextBlock.FontSizeProperty, 12.0);
+            triggerLabel.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            triggerLabel.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 12, 0));
+
+            var triggerBtn = new FrameworkElementFactory(typeof(System.Windows.Controls.Button));
+            triggerBtn.SetValue(System.Windows.Controls.Button.ContentProperty, LocalizationManager.Get("StatusButtonExecute"));
+            triggerBtn.SetValue(System.Windows.Controls.Button.PaddingProperty, new Thickness(10, 4, 10, 4));
+            triggerBtn.SetValue(System.Windows.Controls.Button.CursorProperty, System.Windows.Input.Cursors.Hand);
+            triggerBtn.SetBinding(System.Windows.Controls.Button.IsEnabledProperty, new System.Windows.Data.Binding("IsActionEnabled"));
+            triggerBtn.SetBinding(FrameworkElement.TagProperty, new System.Windows.Data.Binding());
+            triggerBtn.AddHandler(System.Windows.Controls.Button.ClickEvent, new RoutedEventHandler(TriggerExecute_Click));
+
+            triggerItemFactory.AppendChild(triggerLabel);
+            triggerItemFactory.AppendChild(triggerBtn);
+            triggerTemplate.VisualTree = triggerItemFactory;
+            _triggersListControl.ItemTemplate = triggerTemplate;
+            root.Children.Add(_triggersListControl);
+
+            root.Children.Add(new System.Windows.Controls.Separator { Margin = new Thickness(0, 8, 0, 4), Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xDD, 0xDD, 0xDD)) });
+
+            // ── Servicios ──
+            root.Children.Add(MakeHeader(LocalizationManager.Get("StatusSectionServices")));
+
+            var servicesControl = new System.Windows.Controls.ItemsControl();
+            var svcBinding = new System.Windows.Data.Binding("Servicios") { Source = this };
+            servicesControl.SetBinding(System.Windows.Controls.ItemsControl.ItemsSourceProperty, svcBinding);
+
+            var svcItemFactory = new FrameworkElementFactory(typeof(System.Windows.Controls.StackPanel));
+            svcItemFactory.SetValue(System.Windows.Controls.StackPanel.OrientationProperty, System.Windows.Controls.Orientation.Horizontal);
+            svcItemFactory.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 2, 0, 0));
+
+            var svcName = new FrameworkElementFactory(typeof(System.Windows.Controls.TextBlock));
+            svcName.SetBinding(System.Windows.Controls.TextBlock.TextProperty, new System.Windows.Data.Binding("DisplayName"));
+            svcName.SetValue(System.Windows.Controls.TextBlock.FontSizeProperty, 12.0);
+            svcName.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            svcName.SetValue(FrameworkElement.MinWidthProperty, 200.0);
+
+            var svcState = new FrameworkElementFactory(typeof(System.Windows.Controls.TextBlock));
+            svcState.SetBinding(System.Windows.Controls.TextBlock.TextProperty, new System.Windows.Data.Binding("State"));
+            svcState.SetValue(System.Windows.Controls.TextBlock.FontSizeProperty, 11.0);
+            svcState.SetValue(System.Windows.Controls.TextBlock.ForegroundProperty, new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x22, 0x8B, 0x22)));
+            svcState.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            svcState.SetValue(FrameworkElement.MarginProperty, new Thickness(8, 0, 0, 0));
+
+            svcItemFactory.AppendChild(svcName);
+            svcItemFactory.AppendChild(svcState);
+
+            var svcTemplate = new DataTemplate();
+            svcTemplate.VisualTree = svcItemFactory;
+            servicesControl.ItemTemplate = svcTemplate;
+            root.Children.Add(servicesControl);
+
+            // ── Botón Cerrar ──
+            var closeBtn = new System.Windows.Controls.Button
+            {
+                Content = LocalizationManager.Get("StatusButtonClose"),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 12, 0, 0),
+                Padding = new Thickness(10, 4, 10, 4),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                IsCancel = true
+            };
+            closeBtn.Click += CloseButton_Click;
+            root.Children.Add(closeBtn);
+
+            Content = root;
+        }
+
+        private static System.Windows.Controls.TextBlock MakeHeader(string text)
+        {
+            return new System.Windows.Controls.TextBlock
+            {
+                Text = text,
+                FontFamily = new System.Windows.Media.FontFamily("Segoe UI Semibold"),
+                FontSize = 13,
+                Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0x66, 0xCC)),
+                Margin = new Thickness(0, 6, 0, 6)
+            };
+        }
+
+        private static System.Windows.Controls.Grid MakeFieldRow(string label, out System.Windows.Controls.TextBlock valueBlock)
+        {
+            var grid = new System.Windows.Controls.Grid { Margin = new Thickness(0, 3, 0, 0) };
+            grid.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(120) });
+            grid.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var lblBlock = new System.Windows.Controls.TextBlock
+            {
+                Text = label,
+                FontSize = 12,
+                Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x55, 0x55, 0x55))
+            };
+            System.Windows.Controls.Grid.SetColumn(lblBlock, 0);
+
+            valueBlock = new System.Windows.Controls.TextBlock
+            {
+                Text = "...",
+                FontSize = 12,
+                Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1E, 0x1E, 0x1E)),
+                TextWrapping = TextWrapping.Wrap
+            };
+            System.Windows.Controls.Grid.SetColumn(valueBlock, 1);
+
+            grid.Children.Add(lblBlock);
+            grid.Children.Add(valueBlock);
+            return grid;
+        }
 
         private readonly System.Windows.Threading.DispatcherTimer _refreshTimer;
 
