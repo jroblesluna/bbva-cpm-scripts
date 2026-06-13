@@ -40,6 +40,7 @@ namespace AlwaysPrintTray.Forms
             TriggersOnDemand = new ObservableCollection<OnDemandTriggerItem>();
 
             InitializeComponent();
+            DataContext = this;
 
             // Cargar información general al abrir el formulario
             LoadGeneralInfo();
