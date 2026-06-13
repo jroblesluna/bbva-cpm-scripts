@@ -1039,16 +1039,8 @@ namespace AlwaysPrintTray
         /// </summary>
         internal void ShowStatusForm()
         {
-            // Usar Invoke del ContextMenuStrip para garantizar ejecución en el thread UI (STA)
-            // El WndProc del BroadcastListener puede invocar desde un contexto no-STA
-            if (_trayIcon.ContextMenuStrip != null && _trayIcon.ContextMenuStrip.InvokeRequired)
-            {
-                _trayIcon.ContextMenuStrip.Invoke(new Action(ShowStatusFormInternal));
-            }
-            else
-            {
-                ShowStatusFormInternal();
-            }
+            // WinForms: usar _uiContext para garantizar ejecución en thread UI
+            _uiContext.Post(_ => ShowStatusFormInternal(), null);
         }
 
         private void ShowStatusFormInternal()
@@ -1066,58 +1058,27 @@ namespace AlwaysPrintTray
                 }
 
                 // Si ya hay un StatusForm abierto, traerlo al frente
-                if (_statusForm != null && _statusForm.IsLoaded)
+                if (_statusForm != null && !_statusForm.IsDisposed)
                 {
                     AlwaysPrintLogger.WriteTrayInfo(
                         "ShowStatusForm: formulario ya abierto, trayendo al frente.");
-                    _statusForm.Dispatcher.Invoke(() =>
-                    {
-                        _statusForm.Activate();
-                        if (_statusForm.WindowState == System.Windows.WindowState.Minimized)
-                            _statusForm.WindowState = System.Windows.WindowState.Normal;
-                    });
+                    _statusForm.Activate();
                     return;
                 }
 
-                // Lanzar StatusForm en thread STA dedicado con Dispatcher propio.
-                // Esto es necesario porque WPF en Win11 requiere un Dispatcher.Run() activo
-                // para procesar el rendering pipeline. El thread UI de WinForms no lo provee.
-                var staThread = new Thread(() =>
+                // Crear nueva instancia del StatusForm (WinForms)
+                _statusForm = new StatusForm(_pipe);
+                _activeForm = _statusForm;
+                _statusForm.FormClosed += (s, e) =>
                 {
-                    try
-                    {
-                        // Asegurar Application WPF
-                        if (System.Windows.Application.Current == null)
-                        {
-                            new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
-                        }
-
-                        _statusForm = new StatusForm(_pipe);
-                        _statusForm.Closed += (s, e) =>
-                        {
-                            AlwaysPrintLogger.WriteTrayInfo(
-                                "ShowStatusForm: formulario cerrado por el usuario.");
-                            _statusForm = null;
-                            System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown();
-                        };
-                        _statusForm.Show();
-                        AlwaysPrintLogger.WriteTrayInfo(
-                            "ShowStatusForm: formulario de estado abierto correctamente.");
-
-                        // Iniciar message loop de WPF (requerido para rendering en Win11)
-                        System.Windows.Threading.Dispatcher.Run();
-                    }
-                    catch (Exception ex)
-                    {
-                        AlwaysPrintLogger.WriteTrayError(
-                            $"ShowStatusForm (STA thread): error: {ex}",
-                            AlwaysPrintLogger.EvtGenericError);
-                    }
-                });
-                staThread.SetApartmentState(ApartmentState.STA);
-                staThread.IsBackground = true;
-                staThread.Name = "AlwaysPrint-StatusForm";
-                staThread.Start();
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "ShowStatusForm: formulario cerrado por el usuario.");
+                    _statusForm = null;
+                    _activeForm = null;
+                };
+                _statusForm.Show();
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "ShowStatusForm: formulario de estado abierto correctamente.");
             }
             catch (Exception ex)
             {

@@ -1,9 +1,0 @@
-<Window x:Class="AlwaysPrintTray.Forms.StatusForm"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AlwaysPrint"
-        Width="480" SizeToContent="Height"
-        WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize"
-        Background="#F5F5F5">
-</Window>
