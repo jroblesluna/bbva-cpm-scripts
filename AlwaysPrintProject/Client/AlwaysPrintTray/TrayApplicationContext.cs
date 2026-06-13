@@ -1070,29 +1070,54 @@ namespace AlwaysPrintTray
                 {
                     AlwaysPrintLogger.WriteTrayInfo(
                         "ShowStatusForm: formulario ya abierto, trayendo al frente.");
-                    _statusForm.Activate();
-                    if (_statusForm.WindowState == System.Windows.WindowState.Minimized)
-                        _statusForm.WindowState = System.Windows.WindowState.Normal;
+                    _statusForm.Dispatcher.Invoke(() =>
+                    {
+                        _statusForm.Activate();
+                        if (_statusForm.WindowState == System.Windows.WindowState.Minimized)
+                            _statusForm.WindowState = System.Windows.WindowState.Normal;
+                    });
                     return;
                 }
 
-                // Asegurar que existe una Application WPF (requerida para ventanas WPF en proceso WinForms)
-                if (System.Windows.Application.Current == null)
+                // Lanzar StatusForm en thread STA dedicado con Dispatcher propio.
+                // Esto es necesario porque WPF en Win11 requiere un Dispatcher.Run() activo
+                // para procesar el rendering pipeline. El thread UI de WinForms no lo provee.
+                var staThread = new Thread(() =>
                 {
-                    new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
-                }
+                    try
+                    {
+                        // Asegurar Application WPF
+                        if (System.Windows.Application.Current == null)
+                        {
+                            new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
+                        }
 
-                // Crear nueva instancia del StatusForm
-                _statusForm = new StatusForm(_pipe);
-                _statusForm.Closed += (s, e) =>
-                {
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        "ShowStatusForm: formulario cerrado por el usuario.");
-                    _statusForm = null;
-                };
-                _statusForm.Show();
-                AlwaysPrintLogger.WriteTrayInfo(
-                    "ShowStatusForm: formulario de estado abierto correctamente.");
+                        _statusForm = new StatusForm(_pipe);
+                        _statusForm.Closed += (s, e) =>
+                        {
+                            AlwaysPrintLogger.WriteTrayInfo(
+                                "ShowStatusForm: formulario cerrado por el usuario.");
+                            _statusForm = null;
+                            System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown();
+                        };
+                        _statusForm.Show();
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            "ShowStatusForm: formulario de estado abierto correctamente.");
+
+                        // Iniciar message loop de WPF (requerido para rendering en Win11)
+                        System.Windows.Threading.Dispatcher.Run();
+                    }
+                    catch (Exception ex)
+                    {
+                        AlwaysPrintLogger.WriteTrayError(
+                            $"ShowStatusForm (STA thread): error: {ex}",
+                            AlwaysPrintLogger.EvtGenericError);
+                    }
+                });
+                staThread.SetApartmentState(ApartmentState.STA);
+                staThread.IsBackground = true;
+                staThread.Name = "AlwaysPrint-StatusForm";
+                staThread.Start();
             }
             catch (Exception ex)
             {
