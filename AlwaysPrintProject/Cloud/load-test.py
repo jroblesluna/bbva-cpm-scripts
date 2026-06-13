@@ -47,6 +47,7 @@ DEFAULT_DURATION = 300  # 5 minutos
 TELEMETRY_INTERVAL = 30  # segundos entre envíos de telemetría
 CONNECT_RAMP_DELAY = 0.1  # segundos entre cada nueva conexión (evita pico simultáneo)
 RECONNECT_DELAY = 5  # segundos antes de reintentar conexión fallida
+MAX_RETRIES = 5  # máximo de reintentos por workstation
 
 
 # === MÉTRICAS ===
@@ -57,6 +58,7 @@ class Metrics:
     connected: int = 0
     failed: int = 0
     pending: int = 0
+    reconnections: int = 0
     messages_sent: int = 0
     messages_received: int = 0
     register_latencies: list = field(default_factory=list)
@@ -89,10 +91,9 @@ def _random_ip() -> str:
     return f"192.168.{random.randint(1, 254)}.{random.randint(1, 254)}"
 
 
-def _random_hostname() -> str:
-    """Genera un hostname tipo workstation Windows."""
-    num = random.randint(1, 9999)
-    return f"W10-WS{num:04d}"
+def _random_hostname(idx: int) -> str:
+    """Genera un hostname único tipo workstation Windows basado en el índice."""
+    return f"W10-LT{idx:04d}"
 
 
 def _random_serial() -> str:
@@ -112,8 +113,8 @@ def _make_register_msg(idx: int) -> dict:
     """Crea mensaje de registro para la workstation simulada."""
     return {
         "type": "register",
-        "ip_private": _random_ip(),
-        "hostname": _random_hostname(),
+        "ip_private": f"192.168.{idx // 254 + 1}.{idx % 254 + 1}",
+        "hostname": _random_hostname(idx),
         "os_serial": _random_serial(),
         "current_user": _random_user(),
         "locale": "es",
@@ -153,79 +154,122 @@ async def simulate_workstation(idx: int, url: str, duration: float):
     """
     Simula una workstation: conecta, registra, envía telemetría periódica.
     Se mantiene viva durante 'duration' segundos respondiendo a pings.
+    Reintenta conexión si falla al conectar o si se desconecta a mitad de sesión.
     """
-    metrics.pending += 1
-    ws: Optional[websockets.WebSocketClientProtocol] = None
+    end_time = time.time() + duration
+    retries = 0
 
-    try:
-        # Conectar con timeout
-        ws = await asyncio.wait_for(
-            websockets.connect(url, ping_interval=None, close_timeout=5),
-            timeout=30
-        )
-        metrics.pending -= 1
+    while time.time() < end_time and retries <= MAX_RETRIES:
+        ws: Optional[websockets.WebSocketClientProtocol] = None
+        was_connected = False
 
-        # Enviar registro
-        register_msg = _make_register_msg(idx)
-        t0 = time.time()
-        await ws.send(json.dumps(register_msg))
-        metrics.messages_sent += 1
+        try:
+            metrics.pending += 1
 
-        # Esperar respuesta de registro
-        response = await asyncio.wait_for(ws.recv(), timeout=15)
-        latency = time.time() - t0
-        metrics.messages_received += 1
-        metrics.register_latencies.append(latency)
-        metrics.connected += 1
+            # Conectar con timeout
+            ws = await asyncio.wait_for(
+                websockets.connect(url, ping_interval=None, close_timeout=5),
+                timeout=30
+            )
+            metrics.pending -= 1
 
-        # Parsear respuesta para obtener workstation_id
-        resp_data = json.loads(response)
-        workstation_id = resp_data.get("workstation_id")
+            # Enviar registro
+            register_msg = _make_register_msg(idx)
+            t0 = time.time()
+            await ws.send(json.dumps(register_msg))
+            metrics.messages_sent += 1
 
-        # Loop de telemetría hasta que expire la duración
-        end_time = time.time() + duration
-        while time.time() < end_time:
-            # Esperar intervalo de telemetría (con variación aleatoria ±5s)
-            wait = TELEMETRY_INTERVAL + random.uniform(-5, 5)
-            try:
-                # Mientras esperamos, recibir pings del servidor
-                msg = await asyncio.wait_for(ws.recv(), timeout=wait)
-                metrics.messages_received += 1
-                data = json.loads(msg)
+            # Esperar respuesta de registro
+            response = await asyncio.wait_for(ws.recv(), timeout=15)
+            latency = time.time() - t0
+            metrics.messages_received += 1
+            metrics.register_latencies.append(latency)
+            metrics.connected += 1
+            was_connected = True
+            retries = 0  # Reset reintentos tras conexión exitosa
 
-                # Responder a pings del servidor
-                if data.get("type") == "ping":
-                    await ws.send(json.dumps({"type": "pong"}))
+            # Parsear respuesta para obtener workstation_id
+            resp_data = json.loads(response)
+            workstation_id = resp_data.get("workstation_id")
+
+            # Loop de telemetría hasta que expire la duración
+            while time.time() < end_time:
+                # Esperar intervalo de telemetría (con variación aleatoria ±5s)
+                wait = TELEMETRY_INTERVAL + random.uniform(-5, 5)
+                try:
+                    # Mientras esperamos, recibir pings del servidor
+                    msg = await asyncio.wait_for(ws.recv(), timeout=wait)
+                    metrics.messages_received += 1
+                    data = json.loads(msg)
+
+                    # Responder a pings del servidor
+                    if data.get("type") == "ping":
+                        await ws.send(json.dumps({"type": "pong"}))
+                        metrics.messages_sent += 1
+
+                except asyncio.TimeoutError:
+                    # Timeout normal — hora de enviar telemetría
+                    pass
+
+                # Enviar telemetría
+                if time.time() < end_time:
+                    telemetry = _make_telemetry_msg()
+                    await ws.send(json.dumps(telemetry))
                     metrics.messages_sent += 1
 
-            except asyncio.TimeoutError:
-                # Timeout normal — hora de enviar telemetría
-                pass
+            # Terminó la duración normalmente — salir del while de reintentos
+            break
 
-            # Enviar telemetría
-            if time.time() < end_time:
-                telemetry = _make_telemetry_msg()
-                await ws.send(json.dumps(telemetry))
-                metrics.messages_sent += 1
+        except asyncio.TimeoutError:
+            metrics.pending = max(0, metrics.pending - 1)
+            retries += 1
+            if retries > MAX_RETRIES:
+                metrics.failed += 1
+                metrics.errors.append(f"WS-{idx}: timeout de conexión (max reintentos alcanzado)")
+            else:
+                metrics.errors.append(f"WS-{idx}: timeout, reintentando ({retries}/{MAX_RETRIES})...")
+                metrics.reconnections += 1
+                await asyncio.sleep(RECONNECT_DELAY)
 
-    except asyncio.TimeoutError:
-        metrics.pending = max(0, metrics.pending - 1)
-        metrics.failed += 1
-        metrics.errors.append(f"WS-{idx}: timeout de conexión")
-    except websockets.exceptions.ConnectionClosed as e:
-        metrics.connected = max(0, metrics.connected - 1)
-        metrics.errors.append(f"WS-{idx}: conexión cerrada ({e.code}: {e.reason})")
-    except Exception as e:
-        metrics.pending = max(0, metrics.pending - 1)
-        metrics.failed += 1
-        metrics.errors.append(f"WS-{idx}: {type(e).__name__}: {e}")
-    finally:
-        if ws:
-            try:
-                await ws.close()
-            except Exception:
-                pass
-        metrics.connected = max(0, metrics.connected - 1)
+        except websockets.exceptions.ConnectionClosed as e:
+            if was_connected:
+                metrics.connected = max(0, metrics.connected - 1)
+            else:
+                metrics.pending = max(0, metrics.pending - 1)
+            retries += 1
+            if retries > MAX_RETRIES or time.time() >= end_time:
+                metrics.failed += 1
+                metrics.errors.append(f"WS-{idx}: conexión cerrada ({e.code}: {e.reason})")
+            else:
+                metrics.errors.append(
+                    f"WS-{idx}: desconectada ({e.code}), reconectando ({retries}/{MAX_RETRIES})..."
+                )
+                metrics.reconnections += 1
+                await asyncio.sleep(RECONNECT_DELAY)
+
+        except Exception as e:
+            if was_connected:
+                metrics.connected = max(0, metrics.connected - 1)
+            else:
+                metrics.pending = max(0, metrics.pending - 1)
+            retries += 1
+            if retries > MAX_RETRIES:
+                metrics.failed += 1
+                metrics.errors.append(f"WS-{idx}: {type(e).__name__}: {e}")
+            else:
+                metrics.errors.append(f"WS-{idx}: {type(e).__name__}, reintentando ({retries}/{MAX_RETRIES})...")
+                metrics.reconnections += 1
+                await asyncio.sleep(RECONNECT_DELAY)
+
+        finally:
+            if ws:
+                try:
+                    await ws.close()
+                except Exception:
+                    pass
+
+    # Al salir del loop, si estaba conectada, decrementar
+    metrics.connected = max(0, metrics.connected - 1)
 
 
 # === MONITOR DE MÉTRICAS ===
@@ -286,6 +330,7 @@ async def main():
     print(f"  Duración total:     {time.time() - metrics.start_time:.0f}s")
     print(f"  Conexiones exitosas: {len(metrics.register_latencies)}")
     print(f"  Conexiones fallidas: {metrics.failed}")
+    print(f"  Reconexiones:        {metrics.reconnections}")
     print(f"  Mensajes enviados:   {metrics.messages_sent}")
     print(f"  Mensajes recibidos:  {metrics.messages_received}")
     if metrics.register_latencies:

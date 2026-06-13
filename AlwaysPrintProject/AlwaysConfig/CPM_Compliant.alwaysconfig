@@ -1,5 +1,5 @@
 {
-  "version": "5.1",
+  "version": "5.4",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -15,6 +15,16 @@
             "value_name": "AutoUpdateEnabled",
             "value": "1",
             "value_type": "dword"
+          }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Otorgar Lectura/Escritura a Everyone en C:\\ProgramData\\LPMC\\",
+          "parameters": {
+            "file_path": "icacls.exe",
+            "arguments": "\"C:\\ProgramData\\LPMC\" /grant Everyone:(OI)(CI)(RX,W) /T /C /Q",
+            "timeout_seconds": 30,
+            "window_style": "Hidden"
           }
         },
         {
@@ -264,6 +274,279 @@
             "value_name": "ContingencyEnabled",
             "value": "0",
             "value_type": "dword"
+          }
+        }
+      ]
+    },
+    {
+      "event": "OnDemand",
+      "label": "Limpiar Sistema de Impresión",
+      "description": "Detiene servicios de impresión, elimina jobs y spools pendientes, valida configuración de puerto y cola, y reinicia todos los servicios. Usar cuando hay trabajos atascados o problemas de conectividad con la impresora.",
+      "actions": [
+        {
+          "type": "StopService",
+          "description": "Detener lpmc_universal_service",
+          "parameters": {
+            "service_name": "lpmc_universal_service",
+            "graceful_timeout_seconds": 30,
+            "force_kill_on_timeout": true
+          }
+        },
+        {
+          "type": "KillProcessesByName",
+          "description": "Cerrar todos los procesos lpmc-systemtray-app.exe",
+          "parameters": {
+            "process_name": "lpmc-systemtray-app.exe",
+            "force": true
+          }
+        },
+        {
+          "type": "DeleteFolderContents",
+          "description": "Eliminar contenido de carpeta Jobs",
+          "parameters": {
+            "path": "C:\\ProgramData\\LPMC\\Jobs\\",
+            "recursive": true,
+            "ignore_errors": true
+          }
+        },
+        {
+          "type": "ReadAppSetting",
+          "description": "Leer semáforo ContingencyEnabled",
+          "parameters": {
+            "value_name": "ContingencyEnabled",
+            "default_value": "0"
+          },
+          "store_result_in": "contingency_enabled"
+        },
+        {
+          "type": "StartService",
+          "description": "Asegurar Spooler activo (requerido por WMI para SetTcpPort)",
+          "parameters": {
+            "service_name": "Spooler",
+            "wait_for_running": true,
+            "timeout_seconds": 30
+          }
+        },
+        {
+          "type": "Conditional",
+          "description": "Si contingencia activa: asegurar puerto apunta a IP directa. Si no: asegurar puerto apunta a CPM local.",
+          "condition": {
+            "variable": "contingency_enabled",
+            "operator": "equals",
+            "value": "1"
+          },
+          "actions": [
+            {
+              "type": "ReadAppSetting",
+              "description": "Leer IP de contingencia persistida",
+              "parameters": {
+                "value_name": "ContingencyPrinterIp",
+                "default_value": ""
+              },
+              "store_result_in": "contingency_printer_ip"
+            },
+            {
+              "type": "SetTcpPort",
+              "description": "Asegurar LPMCHybridPort apunta a IP de contingencia",
+              "parameters": {
+                "port_name": "LPMCHybridPort",
+                "host_address": "{{contingency_printer_ip}}",
+                "port_number": 9100
+              }
+            }
+          ],
+          "else_actions": [
+            {
+              "type": "SetTcpPort",
+              "description": "Asegurar LPMCHybridPort apunta a CPM local (127.0.0.1:9167)",
+              "parameters": {
+                "port_name": "LPMCHybridPort",
+                "host_address": "127.0.0.1",
+                "port_number": 9167
+              }
+            }
+          ]
+        },
+        {
+          "type": "CheckPrintQueueExists",
+          "description": "Verificar si la cola corporativa ya existe",
+          "parameters": {
+            "queue_name": "{{corporate_queue_name}}"
+          },
+          "store_result_in": "queue_exists"
+        },
+        {
+          "type": "Conditional",
+          "description": "Si cola no existe: crearla. Si existe: verificar puerto.",
+          "condition": {
+            "variable": "queue_exists",
+            "operator": "equals",
+            "value": "false"
+          },
+          "actions": [
+            {
+              "type": "RunProcess",
+              "description": "Crear cola local con puerto LPMCHybridPort",
+              "parameters": {
+                "file_path": "C:\\Windows\\System32\\rundll32.exe",
+                "arguments": "printui.dll,PrintUIEntry /q /if /b \"{{corporate_queue_name}}\" /r \"LPMCHybridPort\" /m \"Lexmark Universal v2 XL\" /z",
+                "timeout_seconds": 90,
+                "window_style": "Hidden"
+              }
+            }
+          ],
+          "else_actions": [
+            {
+              "type": "ReadPrintQueuePort",
+              "description": "Leer puerto actual de la cola",
+              "parameters": {
+                "queue_name": "{{corporate_queue_name}}"
+              },
+              "store_result_in": "current_port"
+            },
+            {
+              "type": "Conditional",
+              "description": "Si puerto no es LPMCHybridPort: reasignar",
+              "condition": {
+                "variable": "current_port",
+                "operator": "not_equals",
+                "value": "LPMCHybridPort"
+              },
+              "actions": [
+                {
+                  "type": "StopService",
+                  "description": "Detener Spooler para modificar registro",
+                  "parameters": {
+                    "service_name": "Spooler",
+                    "graceful_timeout_seconds": 15,
+                    "force_kill_on_timeout": true
+                  }
+                },
+                {
+                  "type": "RunProcess",
+                  "description": "Actualizar puerto de la cola a LPMCHybridPort en registro",
+                  "parameters": {
+                    "file_path": "C:\\Windows\\System32\\reg.exe",
+                    "arguments": "add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\{{corporate_queue_name}}\" /v Port /t REG_SZ /d LPMCHybridPort /f",
+                    "timeout_seconds": 15,
+                    "window_style": "Hidden"
+                  }
+                },
+                {
+                  "type": "StartService",
+                  "description": "Reiniciar Spooler tras cambio de registro",
+                  "parameters": {
+                    "service_name": "Spooler",
+                    "wait_for_running": true,
+                    "timeout_seconds": 30
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "RunProcess",
+          "description": "Establecer cola corporativa como impresora predeterminada",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\rundll32.exe",
+            "arguments": "printui.dll,PrintUIEntry /y /n \"{{corporate_queue_name}}\"",
+            "timeout_seconds": 15,
+            "window_style": "Hidden",
+            "run_as_logged_in_user": true
+          }
+        },
+        {
+          "type": "StopService",
+          "description": "Detener LpdServiceMonitor",
+          "parameters": {
+            "service_name": "LpdServiceMonitor",
+            "graceful_timeout_seconds": 15,
+            "force_kill_on_timeout": true
+          }
+        },
+        {
+          "type": "StopService",
+          "description": "Detener LPDSVC",
+          "parameters": {
+            "service_name": "LPDSVC",
+            "graceful_timeout_seconds": 15,
+            "force_kill_on_timeout": true
+          }
+        },
+        {
+          "type": "StopService",
+          "description": "Detener Spooler",
+          "parameters": {
+            "service_name": "Spooler",
+            "graceful_timeout_seconds": 15,
+            "force_kill_on_timeout": true
+          }
+        },
+        {
+          "type": "DeleteFolderContents",
+          "description": "Eliminar contenido de carpeta Spools",
+          "parameters": {
+            "path": "C:\\Windows\\System32\\Spool\\Printers",
+            "recursive": true,
+            "ignore_errors": true
+          }
+        },
+        {
+          "type": "StartService",
+          "description": "Iniciar Spooler",
+          "parameters": {
+            "service_name": "Spooler",
+            "wait_for_running": true,
+            "timeout_seconds": 30
+          }
+        },
+        {
+          "type": "StartService",
+          "description": "Iniciar LPDSVC",
+          "parameters": {
+            "service_name": "LPDSVC",
+            "wait_for_running": true,
+            "timeout_seconds": 30
+          }
+        },
+        {
+          "type": "StartService",
+          "description": "Iniciar LpdServiceMonitor",
+          "parameters": {
+            "service_name": "LpdServiceMonitor",
+            "wait_for_running": true,
+            "timeout_seconds": 30
+          }
+        },
+        {
+          "type": "Conditional",
+          "description": "Si no hay contingencia activa: ejecutar mapeado y reiniciar CPM",
+          "condition": {
+            "variable": "contingency_enabled",
+            "operator": "not_equals",
+            "value": "1"
+          },
+          "actions": [
+            {
+              "type": "RunProcess",
+              "description": "Ejecutar update_winhostuser.bat (mapeado hostname→IP)",
+              "parameters": {
+                "file_path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\update_winhostuser.bat",
+                "arguments": "",
+                "timeout_seconds": 60,
+                "window_style": "Hidden"
+              }
+            }
+          ]
+        },
+        {
+          "type": "StartService",
+          "description": "Iniciar lpmc_universal_service",
+          "parameters": {
+            "service_name": "lpmc_universal_service",
+            "wait_for_running": true,
+            "timeout_seconds": 30
           }
         }
       ]
