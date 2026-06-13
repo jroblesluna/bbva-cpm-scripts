@@ -21,9 +21,30 @@ namespace AlwaysPrint.Shared.Configuration
         
         [JsonProperty("created_at")]
         public DateTime CreatedAt { get; set; }
+
+        /// <summary>
+        /// Lista de servicios Windows a monitorear en el Status Form.
+        /// Si está vacía o ausente, no se muestra la sección de servicios.
+        /// </summary>
+        [JsonProperty("monitored_services")]
+        public List<MonitoredServiceConfig> MonitoredServices { get; set; } = new List<MonitoredServiceConfig>();
         
         [JsonProperty("triggers")]
         public List<TriggerConfig> Triggers { get; set; } = new List<TriggerConfig>();
+    }
+
+    /// <summary>
+    /// Configuración de un servicio Windows a monitorear en el Status Form.
+    /// </summary>
+    public class MonitoredServiceConfig
+    {
+        /// <summary>Nombre visible en la UI (ej: "Cola de Impresión").</summary>
+        [JsonProperty("display_name")]
+        public string DisplayName { get; set; } = string.Empty;
+
+        /// <summary>Nombre real del servicio Windows (ej: "Spooler").</summary>
+        [JsonProperty("service_name")]
+        public string ServiceName { get; set; } = string.Empty;
     }
     
     /// <summary>

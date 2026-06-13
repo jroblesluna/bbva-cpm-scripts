@@ -84,12 +84,14 @@ namespace AlwaysPrintTray
             using var mutex = new Mutex(initiallyOwned: false, MutexName, out isNew, mutexSecurity);
 
             // Intentar adquirir ownership del mutex.
-            // Se usa un timeout de 10 segundos para manejar la race condition durante
-            // actualizaciones: el MSI mata la instancia vieja pero el Mutex tarda un
-            // instante en liberarse. Sin timeout, la nueva instancia se cierra prematuramente.
+            // Timeout corto (1s) para respuesta rápida al doble-click.
+            // Si falla, se asume que hay otra instancia corriendo (caso normal).
+            // El timeout de 10s anterior era para updates MSI, pero eso se maneja mejor
+            // con retry: intentar 1s, si falla verificar si es post-update (servicio
+            // recién mató la instancia vieja), si sí reintentar con timeout largo.
             try
             {
-                isNew = mutex.WaitOne(TimeSpan.FromSeconds(10));
+                isNew = mutex.WaitOne(TimeSpan.FromSeconds(1));
             }
             catch (AbandonedMutexException)
             {

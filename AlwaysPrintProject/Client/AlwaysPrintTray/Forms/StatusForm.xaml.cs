@@ -166,35 +166,28 @@ namespace AlwaysPrintTray.Forms
         // ── Carga de estado de servicios ──
 
         /// <summary>
-        /// Definición estática de los 5 servicios monitoreados.
-        /// Cada tupla contiene (DisplayName, ServiceName).
-        /// </summary>
-        private static readonly (string DisplayName, string ServiceName)[] ServiciosMonitoreados =
-        {
-            ("AlwaysPrintService", "AlwaysPrintService"),
-            ("LPMC", "lpmc_universal_service"),
-            ("LPD Service Monitor", "LpdServiceMonitor"),
-            ("Servicio LPD", "LPDSVC"),
-            ("Cola de Impresión", "Spooler")
-        };
-
-        /// <summary>
-        /// Carga la colección de servicios monitoreados y consulta su estado real
-        /// vía Named Pipe (CheckServiceStatus). Si el pipe no está disponible,
-        /// todos los servicios se muestran con estado "Desconocido" y controles deshabilitados.
+        /// Carga la colección de servicios monitoreados desde la configuración activa
+        /// y consulta su estado real vía Named Pipe (CheckServiceStatus).
+        /// Si el pipe no está disponible, todos se muestran con estado "Desconocido".
         /// </summary>
         internal async Task LoadServiciosAsync()
         {
             Servicios.Clear();
 
+            // Leer servicios desde la configuración activa (no hardcodeados)
+            var monitoredServices = OnDemandConfigReader.GetMonitoredServices();
+
+            if (monitoredServices.Count == 0)
+                return;
+
             // Crear los ítems de servicio con estado inicial "Desconocido"
             var items = new List<ServiceStatusItem>();
-            foreach (var (displayName, serviceName) in ServiciosMonitoreados)
+            foreach (var svc in monitoredServices)
             {
                 items.Add(new ServiceStatusItem
                 {
-                    DisplayName = displayName,
-                    ServiceName = serviceName,
+                    DisplayName = svc.DisplayName,
+                    ServiceName = svc.ServiceName,
                     State = "Desconocido"
                 });
             }

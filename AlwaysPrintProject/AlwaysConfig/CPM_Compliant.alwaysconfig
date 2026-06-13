@@ -3,6 +3,13 @@
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
+  "monitored_services": [
+    { "display_name": "AlwaysPrintService", "service_name": "AlwaysPrintService" },
+    { "display_name": "LPMC", "service_name": "lpmc_universal_service" },
+    { "display_name": "LPD Service Monitor", "service_name": "LpdServiceMonitor" },
+    { "display_name": "Servicio LPD", "service_name": "LPDSVC" },
+    { "display_name": "Cola de Impresión", "service_name": "Spooler" }
+  ],
   "triggers": [
     {
       "event": "OnTrayLaunched",
