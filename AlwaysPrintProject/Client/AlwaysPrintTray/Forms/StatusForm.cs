@@ -43,9 +43,9 @@ namespace AlwaysPrintTray.Forms
             _refreshTimer.Tick += async (s, e) => await RefreshServicesAsync();
 
             // Iniciar refresh después de que el form se muestre (evita deadlock en constructor)
-            Shown += async (s, e) =>
+            Shown += (s, e) =>
             {
-                await RefreshServicesAsync();
+                _ = RefreshServicesAsync();
                 _refreshTimer.Start();
             };
 
@@ -196,7 +196,7 @@ namespace AlwaysPrintTray.Forms
                     if (payload != null && !string.IsNullOrWhiteSpace(payload.State))
                     {
                         if (IsHandleCreated && !IsDisposed)
-                            Invoke(new Action(() => stateLabel.Text = payload.State));
+                            BeginInvoke(new Action(() => stateLabel.Text = payload.State));
                     }
                 }
                 catch { /* Ignorar errores individuales en refresh */ }
