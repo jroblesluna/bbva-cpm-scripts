@@ -41,18 +41,36 @@ namespace AlwaysPrintTray.Forms
             TriggersOnDemand = new ObservableCollection<OnDemandTriggerItem>();
 
             InitializeComponent();
+            DataContext = this;
 
-            // Setear textos localizados directamente (sin bindings, más robusto)
+            // Buscar controles por nombre (más robusto que campos generados en SDK-style)
+            var headerGeneral = (System.Windows.Controls.TextBlock)FindName("HeaderGeneral");
+            var lblStateText = (System.Windows.Controls.TextBlock)FindName("LblStateText");
+            var lblVersionText = (System.Windows.Controls.TextBlock)FindName("LblVersionText");
+            var lblQueueText = (System.Windows.Controls.TextBlock)FindName("LblQueueText");
+            var lblConfigText = (System.Windows.Controls.TextBlock)FindName("LblConfigText");
+            var headerOnDemand = (System.Windows.Controls.TextBlock)FindName("HeaderOnDemand");
+            var noTriggersMsg = (System.Windows.Controls.TextBlock)FindName("NoTriggersMessage");
+            var headerServices = (System.Windows.Controls.TextBlock)FindName("HeaderServices");
+            var btnClose = (System.Windows.Controls.Button)FindName("BtnClose");
+            _valState = (System.Windows.Controls.TextBlock)FindName("ValState");
+            _valVersion = (System.Windows.Controls.TextBlock)FindName("ValVersion");
+            _valQueue = (System.Windows.Controls.TextBlock)FindName("ValQueue");
+            _valConfig = (System.Windows.Controls.TextBlock)FindName("ValConfig");
+            _noTriggersMessage = noTriggersMsg;
+            _triggersListControl = (System.Windows.Controls.ItemsControl)FindName("TriggersListControl");
+
+            // Setear textos localizados directamente
             Title = LocalizationManager.Get("StatusFormTitle");
-            HeaderGeneral.Text = LocalizationManager.Get("StatusSectionGeneralInfo");
-            LblStateText.Text = LocalizationManager.Get("StatusLabelState");
-            LblVersionText.Text = LocalizationManager.Get("StatusLabelVersion");
-            LblQueueText.Text = LocalizationManager.Get("StatusLabelActiveQueue");
-            LblConfigText.Text = LocalizationManager.Get("StatusLabelConfig");
-            HeaderOnDemand.Text = LocalizationManager.Get("StatusSectionOnDemand");
-            NoTriggersMessage.Text = LocalizationManager.Get("StatusNoActionsAvailable");
-            HeaderServices.Text = LocalizationManager.Get("StatusSectionServices");
-            BtnClose.Content = LocalizationManager.Get("StatusButtonClose");
+            if (headerGeneral != null) headerGeneral.Text = LocalizationManager.Get("StatusSectionGeneralInfo");
+            if (lblStateText != null) lblStateText.Text = LocalizationManager.Get("StatusLabelState");
+            if (lblVersionText != null) lblVersionText.Text = LocalizationManager.Get("StatusLabelVersion");
+            if (lblQueueText != null) lblQueueText.Text = LocalizationManager.Get("StatusLabelActiveQueue");
+            if (lblConfigText != null) lblConfigText.Text = LocalizationManager.Get("StatusLabelConfig");
+            if (headerOnDemand != null) headerOnDemand.Text = LocalizationManager.Get("StatusSectionOnDemand");
+            if (noTriggersMsg != null) noTriggersMsg.Text = LocalizationManager.Get("StatusNoActionsAvailable");
+            if (headerServices != null) headerServices.Text = LocalizationManager.Get("StatusSectionServices");
+            if (btnClose != null) btnClose.Content = LocalizationManager.Get("StatusButtonClose");
 
             // Cargar información general al abrir el formulario
             LoadGeneralInfo();
@@ -74,6 +92,14 @@ namespace AlwaysPrintTray.Forms
             // Detener timer al cerrar la ventana
             Closed += (s, e) => _refreshTimer.Stop();
         }
+
+        // Campos para controles que se actualizan dinámicamente
+        private System.Windows.Controls.TextBlock? _valState;
+        private System.Windows.Controls.TextBlock? _valVersion;
+        private System.Windows.Controls.TextBlock? _valQueue;
+        private System.Windows.Controls.TextBlock? _valConfig;
+        private System.Windows.Controls.TextBlock? _noTriggersMessage;
+        private System.Windows.Controls.ItemsControl? _triggersListControl;
 
         private readonly System.Windows.Threading.DispatcherTimer _refreshTimer;
 
@@ -99,16 +125,20 @@ namespace AlwaysPrintTray.Forms
         /// </summary>
         internal void LoadGeneralInfo()
         {
-            ValState.Text = LoadEstadoSistema();
-            ValVersion.Text = LoadVersionApp();
-            ValQueue.Text = LoadColaActiva();
-            ValConfig.Text = LoadConfigActiva();
+            var estado = LoadEstadoSistema();
+            var version = LoadVersionApp();
+            var cola = LoadColaActiva();
+            var config = LoadConfigActiva();
 
-            // Mantener propiedades por compatibilidad con RefreshConfigActiva
-            EstadoSistema = ValState.Text;
-            VersionApp = ValVersion.Text;
-            ColaActiva = ValQueue.Text;
-            ConfigActiva = ValConfig.Text;
+            if (_valState != null) _valState.Text = estado;
+            if (_valVersion != null) _valVersion.Text = version;
+            if (_valQueue != null) _valQueue.Text = cola;
+            if (_valConfig != null) _valConfig.Text = config;
+
+            EstadoSistema = estado;
+            VersionApp = version;
+            ColaActiva = cola;
+            ConfigActiva = config;
         }
 
         /// <summary>
@@ -394,7 +424,9 @@ namespace AlwaysPrintTray.Forms
         /// </summary>
         public void RefreshConfigActiva()
         {
-            ConfigActiva = LoadConfigActiva();
+            var config = LoadConfigActiva();
+            ConfigActiva = config;
+            if (_valConfig != null) _valConfig.Text = config;
         }
 
         /// <summary>
@@ -424,16 +456,16 @@ namespace AlwaysPrintTray.Forms
         /// </summary>
         private void UpdateNoTriggersMessageVisibility()
         {
-            if (NoTriggersMessage != null)
+            if (_noTriggersMessage != null)
             {
-                NoTriggersMessage.Visibility = TriggersOnDemand.Count == 0
+                _noTriggersMessage.Visibility = TriggersOnDemand.Count == 0
                     ? Visibility.Visible
                     : Visibility.Collapsed;
             }
 
-            if (TriggersListControl != null)
+            if (_triggersListControl != null)
             {
-                TriggersListControl.Visibility = TriggersOnDemand.Count > 0
+                _triggersListControl.Visibility = TriggersOnDemand.Count > 0
                     ? Visibility.Visible
                     : Visibility.Collapsed;
             }
