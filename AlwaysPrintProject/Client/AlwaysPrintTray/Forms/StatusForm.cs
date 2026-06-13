@@ -28,8 +28,8 @@ namespace AlwaysPrintTray.Forms
         private const int ServiceNameWidth = 350;
         private const int StateX = 380;
         private const int ButtonX = 490;
-        private const int RowHeight = 22;
-        private const int SectionSpacing = 8;
+        private const int RowHeight = 24;
+        private const int SectionSpacing = 12;
 
         // ── Dependencias ────────────────────────────────────────────────────────
         private readonly PipeClient _pipe;
@@ -143,7 +143,7 @@ namespace AlwaysPrintTray.Forms
             CancelButton = _btnClose;
 
             // ── Calcular alto total del formulario ──────────────────────────────
-            y += 28 + 16;
+            y += 36 + 24;
             ClientSize = new Size(FormWidth, y);
         }
 
@@ -192,7 +192,7 @@ namespace AlwaysPrintTray.Forms
                 Controls.Add(btn);
                 _allActionButtons.Add(btn);
 
-                y += 30;
+                y += 36;
             }
         }
 
@@ -208,7 +208,7 @@ namespace AlwaysPrintTray.Forms
                 {
                     Text = svc.DisplayName,
                     Location = new Point(LabelX, y + 4),
-                    Size = new Size(ServiceNameWidth, 18),
+                    Size = new Size(ServiceNameWidth, 24),
                     AutoEllipsis = true
                 };
                 Controls.Add(lblName);
@@ -244,7 +244,7 @@ namespace AlwaysPrintTray.Forms
                     StartButton = btnStart
                 });
 
-                y += 30;
+                y += 36;
             }
         }
 
