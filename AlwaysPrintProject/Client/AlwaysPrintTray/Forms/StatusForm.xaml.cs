@@ -49,7 +49,20 @@ namespace AlwaysPrintTray.Forms
 
             // Cargar triggers OnDemand disponibles
             LoadTriggersOnDemand();
+
+            // Timer para refrescar estado de servicios cada 5 segundos
+            _refreshTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(5)
+            };
+            _refreshTimer.Tick += async (s, e) => await RefreshServiciosEstadoAsync();
+            _refreshTimer.Start();
+
+            // Detener timer al cerrar la ventana
+            Closed += (s, e) => _refreshTimer.Stop();
         }
+
+        private readonly System.Windows.Threading.DispatcherTimer _refreshTimer;
 
         // ── Carga de información general ──
 
@@ -236,6 +249,40 @@ namespace AlwaysPrintTray.Forms
                         AlwaysPrintLogger.WriteTrayWarning(
                             $"StatusForm.LoadServiciosAsync: error consultando servicio '{item.ServiceName}': {ex.Message}");
                     }
+                });
+            }
+        }
+
+        /// <summary>
+        /// Refresca el estado de los servicios ya cargados sin reconstruir la colección.
+        /// Se ejecuta periódicamente por el DispatcherTimer para reflejar cambios en tiempo real.
+        /// </summary>
+        private async Task RefreshServiciosEstadoAsync()
+        {
+            if (!_pipe.IsConnected || Servicios.Count == 0)
+                return;
+
+            foreach (var item in Servicios)
+            {
+                if (item.IsOperating) continue; // No actualizar servicios en operación
+
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        var request = PipeMessage.Create(
+                            MessageType.CheckServiceStatus,
+                            new CheckServiceStatusPayload { ServiceName = item.ServiceName });
+
+                        var response = _pipe.Send(request);
+                        var payload = response?.GetPayload<CheckServiceStatusResponsePayload>();
+
+                        if (payload != null && !string.IsNullOrWhiteSpace(payload.State))
+                        {
+                            Dispatcher.Invoke(() => item.State = payload.State);
+                        }
+                    }
+                    catch { /* Ignorar errores individuales en refresh periódico */ }
                 });
             }
         }
