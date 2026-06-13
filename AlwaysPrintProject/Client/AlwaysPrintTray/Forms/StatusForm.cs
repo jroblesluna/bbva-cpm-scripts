@@ -22,13 +22,12 @@ namespace AlwaysPrintTray.Forms
     public sealed class StatusForm : Form
     {
         // ── Constantes de layout ────────────────────────────────────────────────
-        private const int FormWidth = 620;
+        private const int FormWidth = 680;
         private const int LabelX = 16;
         private const int ValueX = 150;
-        private const int ServiceNameMaxWidth = 340;
-        private const int StateX = 370;
-        private const int StartButtonX = 470;
-        private const int TriggerButtonX = 470;
+        private const int ServiceNameWidth = 350;
+        private const int StateX = 380;
+        private const int ButtonX = 490;
         private const int RowHeight = 22;
         private const int SectionSpacing = 8;
 
@@ -133,12 +132,14 @@ namespace AlwaysPrintTray.Forms
             _btnClose = new Button
             {
                 Text = LocalizationManager.Get("StatusButtonClose"),
-                Size = new Size(120, 26),
-                Location = new Point(FormWidth - 120 - 20, y),
+                AutoSize = true,
+                Padding = new Padding(12, 2, 12, 2),
                 FlatStyle = FlatStyle.Standard
             };
             _btnClose.Click += (s, e) => Close();
             Controls.Add(_btnClose);
+            // Posicionar después de AutoSize
+            _btnClose.Location = new Point(FormWidth - _btnClose.PreferredSize.Width - 20, y);
             CancelButton = _btnClose;
 
             // ── Calcular alto total del formulario ──────────────────────────────
@@ -181,8 +182,9 @@ namespace AlwaysPrintTray.Forms
                 var btn = new Button
                 {
                     Text = LocalizationManager.Get("StatusButtonExecute"),
-                    Location = new Point(TriggerButtonX, y),
-                    Size = new Size(120, 26),
+                    Location = new Point(ButtonX, y),
+                    AutoSize = true,
+                    Padding = new Padding(12, 2, 12, 2),
                     Tag = trigger,
                     FlatStyle = FlatStyle.Standard
                 };
@@ -206,8 +208,7 @@ namespace AlwaysPrintTray.Forms
                 {
                     Text = svc.DisplayName,
                     Location = new Point(LabelX, y + 4),
-                    MaximumSize = new Size(ServiceNameMaxWidth, 0),
-                    AutoSize = true,
+                    Size = new Size(ServiceNameWidth, 18),
                     AutoEllipsis = true
                 };
                 Controls.Add(lblName);
@@ -225,8 +226,9 @@ namespace AlwaysPrintTray.Forms
                 var btnStart = new Button
                 {
                     Text = LocalizationManager.Get("StatusButtonStartService"),
-                    Location = new Point(StartButtonX, y),
-                    Size = new Size(120, 26),
+                    Location = new Point(ButtonX, y),
+                    AutoSize = true,
+                    Padding = new Padding(12, 2, 12, 2),
                     Tag = svc,
                     Visible = false,
                     FlatStyle = FlatStyle.Standard
