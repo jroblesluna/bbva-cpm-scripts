@@ -69,6 +69,8 @@ export default function EditOrganizationPage() {
   const [isActive, setIsActive] = useState(true)
   const [llmModelId, setLlmModelId] = useState<string | null>(null)
   const [openaiApiKey, setOpenaiApiKey] = useState<string | null>(null)
+  const [jitterWindowSeconds, setJitterWindowSeconds] = useState(30)
+  const [jitterWindowError, setJitterWindowError] = useState('')
   const [generalDirty, setGeneralDirty] = useState(false)
   const [savingGeneral, setSavingGeneral] = useState(false)
 
@@ -120,6 +122,7 @@ export default function EditOrganizationPage() {
       setIsActive(org.is_active)
       setLlmModelId(org.llm_model_id || null)
       setOpenaiApiKey(org.openai_api_key || null)
+      setJitterWindowSeconds(org.jitter_window_seconds ?? 30)
       setAutoUpdateEnabled(org.auto_update_enabled)
       setTargetVersion(org.target_version)
       setAutoReregisterEnabled(org.auto_reregister_enabled)
@@ -164,7 +167,7 @@ export default function EditOrganizationPage() {
   const handleSaveGeneral = async () => {
     setSavingGeneral(true)
     try {
-      const data: OrganizationUpdate = { name, description, is_active: isActive, timezone, language, llm_model_id: llmModelId, openai_api_key: openaiApiKey }
+      const data: OrganizationUpdate = { name, description, is_active: isActive, timezone, language, llm_model_id: llmModelId, openai_api_key: openaiApiKey, jitter_window_seconds: jitterWindowSeconds }
       await organizationsApi.update(orgId, data)
       setGeneralDirty(false)
       refetchOrg()
@@ -418,6 +421,29 @@ export default function EditOrganizationPage() {
               <Label>{tAccounts('openaiKeyLabel')}</Label>
               <Input type="password" placeholder={tAccounts('openaiKeyPlaceholder')} value={openaiApiKey || ''} onChange={(e) => { setOpenaiApiKey(e.target.value || null); setGeneralDirty(true) }} />
               <p className="text-xs text-gray-500">{tAccounts('openaiKeyHelper')}</p>
+            </div>
+
+            {/* Jitter Window */}
+            <div className="space-y-2">
+              <Label>{t('jitterWindowLabel')}</Label>
+              <Input
+                type="number"
+                min={5}
+                max={300}
+                step={1}
+                value={jitterWindowSeconds}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10) || 0
+                  setJitterWindowSeconds(v)
+                  setGeneralDirty(true)
+                  setJitterWindowError(isNaN(v) || v < 5 || v > 300 ? t('jitterWindowValidation') : '')
+                }}
+                className="max-w-xs"
+              />
+              {jitterWindowError && (
+                <p className="text-xs text-red-600">{jitterWindowError}</p>
+              )}
+              <p className="text-xs text-gray-500">{t('jitterWindowHelper')}</p>
             </div>
 
             {/* Save button */}
