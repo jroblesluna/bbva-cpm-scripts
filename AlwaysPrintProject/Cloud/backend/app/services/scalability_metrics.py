@@ -620,7 +620,9 @@ class ScalabilityMetricsCollector:
         pool = engine.pool
         checked_out = pool.checkedout()
         idle = pool.checkedin()
-        pool_size = pool.size()
+        # pool.size() retorna conexiones actualmente gestionadas (puede ser 0 en pool recién creado)
+        # Para el tamaño configurado, usar settings.DB_POOL_SIZE directamente
+        pool_size = settings.DB_POOL_SIZE if settings.is_postgresql else pool.size()
         overflow = pool.overflow()
         max_overflow = pool._max_overflow
 
@@ -683,7 +685,7 @@ class ScalabilityMetricsCollector:
         return DbPoolResponse(
             checked_out=checked_out,
             idle=idle,
-            pool_size=pool_size if pool_size > 0 else None,
+            pool_size=pool_size,
             overflow=overflow,
             max_overflow=max_overflow,
             pg_active_connections=pg_active_connections,
