@@ -335,6 +335,7 @@ async def toggle_my_auto_update(
                 "download_url": update_info["download_url"],
                 "version": update_info["version"],
                 "file_size": update_info["file_size"],
+                "auto_update_enabled": True,
             }
         else:
             logger.warning(
@@ -991,6 +992,7 @@ async def toggle_auto_update(
                 "download_url": update_info["download_url"],
                 "version": update_info["version"],
                 "file_size": update_info["file_size"],
+                "auto_update_enabled": True,
             }
         else:
             logger.warning(
@@ -1304,6 +1306,7 @@ async def send_org_command(
                 "download_url": update_info["download_url"],
                 "version": update_info["version"],
                 "file_size": update_info["file_size"],
+                "auto_update_enabled": True,
             }
         else:
             logger.warning(
