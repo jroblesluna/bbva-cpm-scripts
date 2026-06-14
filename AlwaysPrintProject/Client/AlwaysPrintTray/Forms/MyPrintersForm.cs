@@ -63,7 +63,7 @@ namespace AlwaysPrintTray.Forms
             {
                 Text      = "🖨  Mis Impresoras",
                 ForeColor = AppTheme.TextOnDark,
-                Font      = AppTheme.FontTitle,
+                Font      = (Font)AppTheme.FontTitle.Clone(),
                 AutoSize  = true,
                 Location  = new Point(20, 11),
                 BackColor = Color.Transparent
@@ -72,7 +72,7 @@ namespace AlwaysPrintTray.Forms
             {
                 Text      = "Cargando información de red…",
                 ForeColor = AppTheme.TextSubtitle,
-                Font      = AppTheme.FontRegular,
+                Font      = (Font)AppTheme.FontRegular.Clone(),
                 AutoSize  = true,
                 Location  = new Point(22, 44),
                 BackColor = Color.Transparent
@@ -90,7 +90,7 @@ namespace AlwaysPrintTray.Forms
                 GridLines      = false,
                 MultiSelect    = false,
                 OwnerDraw      = true,
-                Font           = AppTheme.FontRegular,
+                Font           = (Font)AppTheme.FontRegular.Clone(),
                 BorderStyle    = BorderStyle.None,
                 BackColor      = Color.White,
                 HeaderStyle    = ColumnHeaderStyle.Nonclickable
@@ -180,7 +180,7 @@ namespace AlwaysPrintTray.Forms
                 Text      = "",
                 Location  = new Point(46, 10),
                 Size      = new Size(640, 40),
-                Font      = AppTheme.FontRegular,
+                Font      = (Font)AppTheme.FontRegular.Clone(),
                 ForeColor = AppTheme.TextMuted,
                 BackColor = Color.Transparent
             };
@@ -241,13 +241,11 @@ namespace AlwaysPrintTray.Forms
             using var fgBrush = new SolidBrush(fgColor);
             if (e.ColumnIndex == 0)
             {
-                using var bold = AppTheme.FontBold;
-                e.Graphics.DrawString(e.SubItem.Text, bold, fgBrush, tr, fmt);
+                e.Graphics.DrawString(e.SubItem.Text, AppTheme.FontBold, fgBrush, tr, fmt);
             }
             else
             {
-                using var reg = AppTheme.FontRegular;
-                e.Graphics.DrawString(e.SubItem.Text, reg, fgBrush, tr, fmt);
+                e.Graphics.DrawString(e.SubItem.Text, AppTheme.FontRegular, fgBrush, tr, fmt);
             }
         }
 

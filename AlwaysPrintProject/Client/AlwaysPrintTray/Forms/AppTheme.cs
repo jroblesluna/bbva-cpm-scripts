@@ -155,7 +155,7 @@ namespace AlwaysPrintTray.Forms
                 ControlStyles.OptimizedDoubleBuffer, true);
             FlatStyle = FlatStyle.Flat;
             FlatAppearance.BorderSize = 0;
-            Font = AppTheme.FontBold;
+            Font = (Font)AppTheme.FontBold.Clone();
             ForeColor = Color.White;
             Cursor = Cursors.Hand;
         }

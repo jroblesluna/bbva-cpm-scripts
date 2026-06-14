@@ -57,7 +57,7 @@ namespace AlwaysPrintTray.Forms
                     Location  = new Point(lx, y + 3),
                     Size      = new Size(lw, 20),
                     ForeColor = AppTheme.TextPrimary,
-                    Font      = AppTheme.FontRegular
+                    Font      = (Font)AppTheme.FontRegular.Clone()
                 };
                 return l;
             }
@@ -68,7 +68,7 @@ namespace AlwaysPrintTray.Forms
                 {
                     Location = new Point(cx, y),
                     Size     = new Size(w, 24),
-                    Font     = AppTheme.FontRegular
+                    Font     = (Font)AppTheme.FontRegular.Clone()
                 };
                 return t;
             }
@@ -100,7 +100,7 @@ namespace AlwaysPrintTray.Forms
                 Minimum  = 1,
                 Maximum  = 1440,
                 Value    = 3,
-                Font     = AppTheme.FontRegular
+                Font     = (Font)AppTheme.FontRegular.Clone()
             };
             Controls.Add(_numPoll);
             y += 34;
@@ -124,7 +124,7 @@ namespace AlwaysPrintTray.Forms
                 Location  = new Point(lx, y),
                 Size      = new Size(500, 20),
                 ForeColor = AppTheme.TextMuted,
-                Font      = AppTheme.FontSmall
+                Font      = (Font)AppTheme.FontSmall.Clone()
             });
             y += 26;
 
@@ -134,7 +134,7 @@ namespace AlwaysPrintTray.Forms
                 Text      = "Integración Cloud habilitada",
                 Location  = new Point(cx, y),
                 Size      = new Size(290, 22),
-                Font      = AppTheme.FontRegular,
+                Font      = (Font)AppTheme.FontRegular.Clone(),
                 ForeColor = AppTheme.TextPrimary
             };
             Controls.Add(_chkCloudEnabled);
@@ -153,7 +153,7 @@ namespace AlwaysPrintTray.Forms
                 Location      = new Point(cx, y),
                 Size          = new Size(150, 24),
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Font          = AppTheme.FontRegular
+                Font          = (Font)AppTheme.FontRegular.Clone()
             };
             _cmbCloudLocale.Items.AddRange(new object[] { "Auto", "Español", "English" });
             _cmbCloudLocale.SelectedIndex = 0;
@@ -167,7 +167,7 @@ namespace AlwaysPrintTray.Forms
                 Location  = new Point(lx, y),
                 Size      = new Size(500, 20),
                 ForeColor = AppTheme.TextMuted,
-                Font      = AppTheme.FontSmall
+                Font      = (Font)AppTheme.FontSmall.Clone()
             });
             y += 26;
 
@@ -178,7 +178,7 @@ namespace AlwaysPrintTray.Forms
                 Text      = "Habilitar Actualizaciones Automáticas",
                 Location  = new Point(cx, y),
                 Size      = new Size(290, 22),
-                Font      = AppTheme.FontRegular,
+                Font      = (Font)AppTheme.FontRegular.Clone(),
                 ForeColor = AppTheme.TextPrimary
             };
             Controls.Add(_chkAutoUpdate);
@@ -190,7 +190,7 @@ namespace AlwaysPrintTray.Forms
                 Location  = new Point(lx, y),
                 Size      = new Size(500, 20),
                 ForeColor = AppTheme.TextMuted,
-                Font      = AppTheme.FontSmall
+                Font      = (Font)AppTheme.FontSmall.Clone()
             };
             Controls.Add(_lblStatus);
             y += 30;

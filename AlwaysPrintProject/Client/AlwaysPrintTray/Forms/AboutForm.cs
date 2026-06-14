@@ -46,7 +46,7 @@ namespace AlwaysPrintTray.Forms
             var lblAppName = new Label
             {
                 Text      = "AlwaysPrint",
-                Font      = AppTheme.FontHeading,
+                Font      = (Font)AppTheme.FontHeading.Clone(),
                 ForeColor = AppTheme.TextOnDark,
                 BackColor = Color.Transparent,
                 Location  = new Point(10, 96),
@@ -57,7 +57,7 @@ namespace AlwaysPrintTray.Forms
             var lblVer = new Label
             {
                 Text      = $"Versión  {version}",
-                Font      = AppTheme.FontSmall,
+                Font      = (Font)AppTheme.FontSmall.Clone(),
                 ForeColor = AppTheme.TextSubtitle,
                 BackColor = Color.Transparent,
                 Location  = new Point(10, 138),
@@ -92,7 +92,7 @@ namespace AlwaysPrintTray.Forms
             var lblCopyright = new Label
             {
                 Text      = "© 2026 Robles.AI",
-                Font      = AppTheme.FontSmall,
+                Font      = (Font)AppTheme.FontSmall.Clone(),
                 ForeColor = AppTheme.TextMuted,
                 Location  = new Point(30, 134),
                 Size      = new Size(400, 20),
@@ -101,7 +101,7 @@ namespace AlwaysPrintTray.Forms
             var lblLegal = new Label
             {
                 Text      = "Inversiones On Line S.A.C.",
-                Font      = AppTheme.FontSmall,
+                Font      = (Font)AppTheme.FontSmall.Clone(),
                 ForeColor = AppTheme.TextMuted,
                 Location  = new Point(30, 158),
                 Size      = new Size(400, 20),
@@ -154,7 +154,7 @@ namespace AlwaysPrintTray.Forms
             parent.Controls.Add(new Label
             {
                 Text      = label,
-                Font      = AppTheme.FontBold,
+                Font      = (Font)AppTheme.FontBold.Clone(),
                 ForeColor = AppTheme.TextMuted,
                 Location  = new Point(30, y),
                 Size      = new Size(90, 26),
@@ -163,7 +163,7 @@ namespace AlwaysPrintTray.Forms
             parent.Controls.Add(new Label
             {
                 Text      = value,
-                Font      = AppTheme.FontRegular,
+                Font      = (Font)AppTheme.FontRegular.Clone(),
                 ForeColor = AppTheme.TextPrimary,
                 Location  = new Point(128, y),
                 Size      = new Size(302, 26),
