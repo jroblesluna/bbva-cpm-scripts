@@ -445,12 +445,33 @@ async def send_vlan_command(
     # Generar params para el comando
     params = {}
     if command_type == "check_update":
-        # No enviar download_url: el EXE legacy solo instala via flujo legacy
+        # Enriquecer con presigned URL para zero-query updates
         from app.models.organization import Organization
+        from app.services.s3_update_service import S3UpdateService
 
         organization = db.query(Organization).filter(Organization.id == vlan.organization_id).first()
         if organization and organization.auto_update_enabled:
-            params = {"auto_update_enabled": True}
+            try:
+                update_info = S3UpdateService().get_broadcast_update_info(
+                    target_version=organization.target_version
+                )
+                if update_info:
+                    params = {
+                        "download_url": update_info["download_url"],
+                        "version": update_info["version"],
+                        "file_size": update_info["file_size"],
+                        "auto_update_enabled": True,
+                    }
+                else:
+                    log_module.getLogger(__name__).warning(
+                        "S3 no disponible para broadcast check_update VLAN %s, "
+                        "usando fallback legacy (params vacío)", vlan_id
+                    )
+            except Exception as e:
+                log_module.getLogger(__name__).warning(
+                    "Error inesperado al generar presigned URL para VLAN %s: %s. "
+                    "Usando fallback legacy.", vlan_id, str(e)
+                )
 
     dispatched = 0
     for ws in workstations:

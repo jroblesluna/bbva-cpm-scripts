@@ -325,8 +325,23 @@ async def toggle_my_auto_update(
     
     # Si se habilita, enviar check_update a workstations online
     if body.enabled:
-        # No enviar download_url: el EXE legacy solo instala via flujo legacy
-        params = {"auto_update_enabled": True}
+        # Generar params enriquecidos para check_update (zero-query)
+        update_info = S3UpdateService().get_broadcast_update_info(
+            target_version=organization.target_version
+        )
+        params = {}
+        if update_info:
+            params = {
+                "download_url": update_info["download_url"],
+                "version": update_info["version"],
+                "file_size": update_info["file_size"],
+                "auto_update_enabled": True,
+            }
+        else:
+            logger.warning(
+                "S3 no disponible para broadcast check_update, "
+                "usando fallback legacy (params vacío)"
+            )
 
         workstations = db.query(Workstation).filter(
             Workstation.organization_id == organization.id
@@ -967,8 +982,23 @@ async def toggle_auto_update(
 
     # Al habilitar, disparar check_update en todas las workstations online de la org
     if body.enabled:
-        # No enviar download_url: el EXE legacy solo instala via flujo legacy
-        params = {"auto_update_enabled": True}
+        # Generar params enriquecidos para check_update (zero-query)
+        update_info = S3UpdateService().get_broadcast_update_info(
+            target_version=organization.target_version
+        )
+        params = {}
+        if update_info:
+            params = {
+                "download_url": update_info["download_url"],
+                "version": update_info["version"],
+                "file_size": update_info["file_size"],
+                "auto_update_enabled": True,
+            }
+        else:
+            logger.warning(
+                "S3 no disponible para broadcast check_update, "
+                "usando fallback legacy (params vacío)"
+            )
 
         workstations = db.query(Workstation).filter(
             Workstation.organization_id == org_id
@@ -1265,16 +1295,24 @@ async def send_org_command(
 
     workstations = db.query(Workstation).filter(Workstation.organization_id == org_id).all()
 
-    # Generar params para check_update
-    # NOTA: No enviar download_url porque el flujo zero-query del EXE legacy
-    # solo descarga pero no instala. Sin download_url, el cliente usa el flujo
-    # legacy (CheckUpdateRequested → UpdateChecker → descarga + InstallUpdate)
-    # que sí completa la instalación vía msiexec.
+    # Generar params enriquecidos si es check_update con auto_update habilitado (zero-query)
     params = {}
     if command_type == "check_update" and organization.auto_update_enabled:
-        params = {
-            "auto_update_enabled": True,
-        }
+        update_info = S3UpdateService().get_broadcast_update_info(
+            target_version=organization.target_version
+        )
+        if update_info:
+            params = {
+                "download_url": update_info["download_url"],
+                "version": update_info["version"],
+                "file_size": update_info["file_size"],
+                "auto_update_enabled": True,
+            }
+        else:
+            logger.warning(
+                "S3 no disponible para broadcast check_update, "
+                "usando fallback legacy (params vacío)"
+            )
 
     dispatched = 0
     for ws in workstations:
