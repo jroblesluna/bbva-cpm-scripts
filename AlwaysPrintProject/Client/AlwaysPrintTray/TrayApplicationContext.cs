@@ -217,6 +217,32 @@ namespace AlwaysPrintTray
                     AlwaysPrintLogger.WriteTrayWarning($"Tray: bootstrap fallido. {details}", AlwaysPrintLogger.EvtGenericWarning);
                 }
 
+                // 5.5. Aplicar jitter de arranque si corresponde (post-update o post-restart reciente)
+                try
+                {
+                    int jitterWindow = _registry.LoadJitterWindowSeconds();
+                    DateTime? lastUpdate = _registry.LoadLastUpdateTimestamp();
+                    DateTime? lastRestart = _registry.LoadLastRestartTimestamp();
+
+                    var (delayMs, reason) = JitterCalculator.ComputeStartupDelay(
+                        DateTime.UtcNow, lastUpdate, lastRestart, jitterWindow);
+
+                    if (delayMs > 0 && reason != null)
+                    {
+                        double delaySec = delayMs / 1000.0;
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"Aplicando jitter de {delaySec:F1}s por {reason}");
+                        Thread.Sleep(delayMs);
+                    }
+                }
+                catch (Exception exJitter)
+                {
+                    // Fail-open: si hay error en el cálculo de jitter, conectar sin delay
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"Error calculando jitter de arranque, conectando sin delay: {exJitter.Message}",
+                        AlwaysPrintLogger.EvtGenericWarning);
+                }
+
                 // 6. Iniciar integración Cloud si está habilitada
                 if (cfg.CloudEnabled && !string.IsNullOrWhiteSpace(cfg.CloudApiUrl))
                 {

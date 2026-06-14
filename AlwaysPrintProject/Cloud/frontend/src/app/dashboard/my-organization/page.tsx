@@ -6,12 +6,12 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 import { formatDateWithTimezone, COMMON_TIMEZONES } from '@/lib/dateUtils'
-import { apiClient, organizationsApi } from '@/lib/api'
+import { apiClient, organizationsApi, workstationsApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -86,6 +86,15 @@ export default function MyOrganizationPage() {
   const [generalDirty, setGeneralDirty] = useState(false)
   const [savingGeneral, setSavingGeneral] = useState(false)
 
+  // === JITTER WINDOW STATE ===
+  const [jitterWindowSeconds, setJitterWindowSeconds] = useState(30)
+  const [jitterWindowPrevious, setJitterWindowPrevious] = useState(30)
+  const [jitterWindowError, setJitterWindowError] = useState('')
+  const [savingJitter, setSavingJitter] = useState(false)
+  const [activeWorkstationCount, setActiveWorkstationCount] = useState<number>(0)
+  const [debouncedJitterWindow, setDebouncedJitterWindow] = useState(30)
+  const jitterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // === CONFIG TAB STATE ===
   const [corporateQueueName, setCorporateQueueName] = useState('')
   const [pollingMinutes, setPollingMinutes] = useState(5)
@@ -139,6 +148,8 @@ export default function MyOrganizationPage() {
         setTargetVersion(data.target_version || null)
         setAutoReregisterEnabled(data.auto_reregister_enabled)
         setForcedContingency(data.forced_contingency ?? false)
+        setJitterWindowSeconds(data.jitter_window_seconds ?? 30)
+        setJitterWindowPrevious(data.jitter_window_seconds ?? 30)
       } catch (e) {
         console.error('Error cargando organización:', e)
       } finally {
@@ -181,6 +192,36 @@ export default function MyOrganizationPage() {
     loadVersions()
   }, [])
 
+  // === CARGAR WORKSTATIONS ACTIVAS (para cálculo de jitter) ===
+  useEffect(() => {
+    if (!user?.organization_id) return
+    const loadActiveCount = async () => {
+      try {
+        const stats = await workstationsApi.stats()
+        setActiveWorkstationCount(stats.online)
+      } catch {
+        // Si falla, dejar N=0 (se mostrará mensaje sin tasa)
+        setActiveWorkstationCount(0)
+      }
+    }
+    loadActiveCount()
+  }, [user?.organization_id])
+
+  // === DEBOUNCE PARA CÁLCULO DE TASA DE CONEXIONES (300ms) ===
+  useEffect(() => {
+    if (jitterDebounceRef.current) {
+      clearTimeout(jitterDebounceRef.current)
+    }
+    jitterDebounceRef.current = setTimeout(() => {
+      setDebouncedJitterWindow(jitterWindowSeconds)
+    }, 300)
+    return () => {
+      if (jitterDebounceRef.current) {
+        clearTimeout(jitterDebounceRef.current)
+      }
+    }
+  }, [jitterWindowSeconds])
+
   // === HANDLERS: GENERAL ===
   const handleSaveGeneral = async () => {
     setSavingGeneral(true)
@@ -194,6 +235,41 @@ export default function MyOrganizationPage() {
       const err = e as { response?: { data?: { detail?: string } }; message?: string }
       toast({ title: tCommon('error'), description: err.response?.data?.detail || err.message || 'Error', variant: 'destructive' })
     } finally { setSavingGeneral(false) }
+  }
+
+  // === HANDLERS: JITTER WINDOW ===
+  const handleJitterWindowChange = (value: string) => {
+    const numValue = parseInt(value, 10)
+    setJitterWindowSeconds(numValue || 0)
+    // Validación client-side
+    if (isNaN(numValue) || numValue < 5 || numValue > 300) {
+      setJitterWindowError(t('jitterWindowValidation'))
+    } else {
+      setJitterWindowError('')
+    }
+  }
+
+  const handleSaveJitter = async () => {
+    // Validar antes de enviar
+    if (jitterWindowSeconds < 5 || jitterWindowSeconds > 300) {
+      setJitterWindowError(t('jitterWindowValidation'))
+      return
+    }
+    setSavingJitter(true)
+    try {
+      const res = await apiClient.put('/organizations/me', { jitter_window_seconds: jitterWindowSeconds })
+      setOrg(res.data)
+      setJitterWindowPrevious(jitterWindowSeconds)
+      toast({ title: t('jitterWindowSaveSuccess') })
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } }; message?: string }
+      toast({ title: t('jitterWindowSaveError'), description: err.response?.data?.detail || err.message || 'Error', variant: 'destructive' })
+      // Restaurar valor anterior
+      setJitterWindowSeconds(jitterWindowPrevious)
+      setJitterWindowError('')
+    } finally {
+      setSavingJitter(false)
+    }
   }
 
   // === HANDLERS: CONFIG ===
@@ -436,6 +512,48 @@ export default function MyOrganizationPage() {
                 <Label>{tAccounts('openaiKeyLabel')}</Label>
                 <Input type="password" placeholder={tAccounts('openaiKeyPlaceholder')} value={openaiApiKey || ''} onChange={(e) => { setOpenaiApiKey(e.target.value || null); setGeneralDirty(true) }} />
                 <p className="text-xs text-gray-500">{tAccounts('openaiKeyHelper')}</p>
+              </div>
+
+              {/* Jitter Window */}
+              <div className="space-y-2">
+                <Label>{t('jitterWindowLabel')}</Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min={5}
+                    max={300}
+                    step={1}
+                    value={jitterWindowSeconds}
+                    onChange={(e) => handleJitterWindowChange(e.target.value)}
+                    className="max-w-xs"
+                  />
+                  <Button
+                    onClick={handleSaveJitter}
+                    disabled={savingJitter || !!jitterWindowError || jitterWindowSeconds === jitterWindowPrevious}
+                    size="sm"
+                  >
+                    <Save className="mr-2 h-4 w-4" />
+                    {savingJitter ? tCommon('saving') : tCommon('save')}
+                  </Button>
+                </div>
+                {jitterWindowError && (
+                  <p className="text-xs text-red-600">{jitterWindowError}</p>
+                )}
+                <p className="text-xs text-gray-500">{t('jitterWindowHelper')}</p>
+                {/* Cálculo dinámico de tasa de conexiones */}
+                {activeWorkstationCount > 0 && debouncedJitterWindow >= 5 && debouncedJitterWindow <= 300 ? (
+                  <p className="text-xs text-blue-600">
+                    {t('jitterWindowCalculation', {
+                      window: debouncedJitterWindow,
+                      count: activeWorkstationCount,
+                      rate: (activeWorkstationCount / debouncedJitterWindow).toFixed(1),
+                    })}
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-600">
+                    {t('jitterWindowNoWorkstations')}
+                  </p>
+                )}
               </div>
 
               {/* Save button */}

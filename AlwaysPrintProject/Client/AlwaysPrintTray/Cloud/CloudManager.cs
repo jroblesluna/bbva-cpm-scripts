@@ -735,6 +735,9 @@ namespace AlwaysPrintTray.Cloud
                 var configObj = obj["config"] as JObject;
                 var configHash = configObj?["config_hash"]?.ToString();
 
+                // Persistir jitter_window_seconds en Registry si viene en el payload
+                PersistJitterWindowFromConfig(configObj);
+
                 if (string.IsNullOrEmpty(configHash))
                 {
                     AlwaysPrintLogger.WriteTrayWarning(
@@ -765,6 +768,38 @@ namespace AlwaysPrintTray.Cloud
             {
                 AlwaysPrintLogger.WriteTrayError(
                     $"CloudManager: error procesando config_update — {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Extrae y persiste jitter_window_seconds del payload de config_update en el Registry.
+        /// Si el campo no está presente o no es un entero válido, no hace nada.
+        /// Si falla la escritura, loggea el error y continúa con el valor previo.
+        /// </summary>
+        /// <param name="configObj">Objeto JSON "config" del mensaje config_update.</param>
+        private void PersistJitterWindowFromConfig(JObject? configObj)
+        {
+            if (configObj == null)
+                return;
+
+            var jitterToken = configObj["jitter_window_seconds"];
+            if (jitterToken == null)
+                return;
+
+            try
+            {
+                int jitterValue = jitterToken.Value<int>();
+
+                _registry.SaveJitterWindowSeconds(jitterValue);
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: jitter_window_seconds={jitterValue} persistido en Registry.");
+            }
+            catch (Exception ex)
+            {
+                // Si falla, loggear y continuar con el valor previo almacenado en Registry
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"CloudManager: error al persistir jitter_window_seconds en Registry. Se mantiene el valor previo. {ex.Message}");
             }
         }
 

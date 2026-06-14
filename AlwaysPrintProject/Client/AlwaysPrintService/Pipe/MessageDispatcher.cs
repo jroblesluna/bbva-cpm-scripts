@@ -188,7 +188,9 @@ namespace AlwaysPrintService.Pipe
         
         /// <summary>
         /// Maneja la solicitud de instalación de actualización MSI desde el Tray.
-        /// Valida el payload y delega la ejecución al UpdateInstallHandler.
+        /// Valida el payload, delega la ejecución al UpdateInstallHandler y,
+        /// si el script de actualización se lanza exitosamente, persiste el
+        /// LastUpdateTimestamp en el registro para que el Tray aplique jitter al reiniciar.
         /// </summary>
         private PipeMessage HandleInstallUpdate(PipeMessage req)
         {
@@ -208,6 +210,27 @@ namespace AlwaysPrintService.Pipe
 
             var handler = new UpdateInstallHandler();
             var result = handler.Execute(payload.MsiFilePath);
+
+            // Si el script de actualización se lanzó exitosamente, escribir timestamp
+            // para que el Tray detecte el evento masivo y aplique jitter al reconectar
+            if (result.Success)
+            {
+                try
+                {
+                    _registry.SaveLastUpdateTimestamp(DateTime.UtcNow);
+                    AlwaysPrintLogger.WriteInfo(
+                        "InstallUpdate: LastUpdateTimestamp escrito en registro tras lanzar actualización MSI.",
+                        AlwaysPrintLogger.EvtConfigSaved);
+                }
+                catch (Exception ex)
+                {
+                    // Si falla la escritura, loggear error y continuar sin interrumpir la actualización
+                    AlwaysPrintLogger.WriteError(
+                        $"InstallUpdate: no se pudo escribir LastUpdateTimestamp en registro: {ex.Message}",
+                        AlwaysPrintLogger.EvtGenericError);
+                }
+            }
+
             return PipeMessage.Reply(req, MessageType.InstallUpdateResponse, result);
         }
 

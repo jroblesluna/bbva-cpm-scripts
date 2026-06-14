@@ -165,6 +165,20 @@ namespace AlwaysPrintService
             {
                 AlwaysPrintLogger.WriteWarning("Sesión de usuario finalizada. Eliminando Tray y esperando nueva sesión.",
                     AlwaysPrintLogger.EvtTrayKilled);
+
+                // Escribir LastRestartTimestamp antes de matar el Tray para que
+                // aplique jitter al reconectar (prevención de thundering herd).
+                try
+                {
+                    _registry.SaveLastRestartTimestamp(DateTime.UtcNow);
+                }
+                catch (Exception ex)
+                {
+                    AlwaysPrintLogger.WriteError(
+                        $"No se pudo escribir LastRestartTimestamp en registro: {ex.Message}",
+                        AlwaysPrintLogger.EvtGenericError);
+                }
+
                 KillExistingTray();
                 _trayInitGate.Reset();
                 _state.Transition(ServiceState.WaitingUser);
@@ -192,6 +206,22 @@ namespace AlwaysPrintService
                 }
 
                 // 2. Matar instancias huérfanas del Tray.
+                // Escribir LastRestartTimestamp antes de matar para que el Tray
+                // aplique jitter al reconectar (prevención de thundering herd).
+                if (IsTrayRunning())
+                {
+                    try
+                    {
+                        _registry.SaveLastRestartTimestamp(DateTime.UtcNow);
+                    }
+                    catch (Exception ex)
+                    {
+                        AlwaysPrintLogger.WriteError(
+                            $"No se pudo escribir LastRestartTimestamp en registro: {ex.Message}",
+                            AlwaysPrintLogger.EvtGenericError);
+                    }
+                }
+
                 int killedTrays = KillExistingTray();
                 if (killedTrays > 0)
                     AlwaysPrintLogger.WriteWarning($"Se eliminaron {killedTrays} instancia(s) huérfana(s) de AlwaysPrintTray.",

@@ -886,7 +886,14 @@
     "controlConfirmCheckUpdate": "An update check will be sent to all online workstations in your organization. Continue?",
     "controlCommandSent": "Command sent to {count} online workstation(s).",
     "controlCancel": "Cancel",
-    "controlConfirm": "Confirm"
+    "controlConfirm": "Confirm",
+    "jitterWindowLabel": "Jitter Window (seconds)",
+    "jitterWindowHelper": "Time window over which reconnections are distributed after mass events (5-300 seconds)",
+    "jitterWindowValidation": "Value must be between 5 and 300 seconds",
+    "jitterWindowSaveSuccess": "Jitter window updated successfully",
+    "jitterWindowSaveError": "Failed to update jitter window",
+    "jitterWindowCalculation": "With {window} seconds window and {count} active workstations, approximately {rate} connections per second during mass events",
+    "jitterWindowNoWorkstations": "No active workstations to compute connection rate estimate"
   },
   "systemStatus": {
     "title": "System Status",
