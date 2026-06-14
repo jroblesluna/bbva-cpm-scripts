@@ -115,6 +115,14 @@ namespace AlwaysPrint.Shared.Messages
         /// <summary>Origen de la configuración: "cloud" o "cache".</summary>
         [JsonProperty("source")]
         public string Source { get; set; } = "cloud";
+
+        /// <summary>
+        /// Ventana de jitter en segundos recibida de la Cloud (nivel organización).
+        /// El Service lo persiste en HKLM porque tiene privilegios de escritura.
+        /// Null si no vino en el payload (no se modifica el valor existente).
+        /// </summary>
+        [JsonProperty("jitterWindowSeconds")]
+        public int? JitterWindowSeconds { get; set; }
     }
 
     /// <summary>

@@ -12,6 +12,7 @@ using AlwaysPrintTray.Bootstrap;
 using AlwaysPrintTray.Localization;
 using AlwaysPrintTray.Pipe;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace AlwaysPrintTray.Cloud
 {
@@ -343,6 +344,18 @@ namespace AlwaysPrintTray.Cloud
                 ConfigHash = computedHash,
                 Source = "cloud"
             };
+
+            // Extraer jitter_window_seconds del JSON crudo (campo a nivel de org, no de AppConfiguration)
+            try
+            {
+                var rawObj = JObject.Parse(rawJson);
+                var jitterToken = rawObj["jitter_window_seconds"];
+                if (jitterToken != null)
+                {
+                    pipePayload.JitterWindowSeconds = jitterToken.Value<int>();
+                }
+            }
+            catch { /* Si falla la extracción, dejar null — no se modifica el valor existente */ }
             var request = PipeMessage.Create(MessageType.CloudConfigurationReceived, pipePayload);
 
             // 7. Esperar AckPayload del Service con timeout de 10 segundos

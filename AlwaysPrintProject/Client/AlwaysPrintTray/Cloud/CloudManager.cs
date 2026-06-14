@@ -772,9 +772,10 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
-        /// Extrae y persiste jitter_window_seconds del payload de config_update en el Registry.
-        /// Si el campo no está presente o no es un entero válido, no hace nada.
-        /// Si falla la escritura, loggea el error y continúa con el valor previo.
+        /// Extrae jitter_window_seconds del payload de config_update.
+        /// La persistencia en Registry la hace el Service al recibir CloudConfigurationReceived
+        /// (el Tray no tiene permisos de escritura en HKLM).
+        /// Este método solo loguea el valor recibido para diagnóstico.
         /// </summary>
         /// <param name="configObj">Objeto JSON "config" del mensaje config_update.</param>
         private void PersistJitterWindowFromConfig(JObject? configObj)
@@ -789,25 +790,13 @@ namespace AlwaysPrintTray.Cloud
             try
             {
                 int jitterValue = jitterToken.Value<int>();
-
-                bool saved = _registry.SaveJitterWindowSeconds(jitterValue);
-
-                if (saved)
-                {
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        $"CloudManager: jitter_window_seconds={jitterValue} persistido en Registry.");
-                }
-                else
-                {
-                    AlwaysPrintLogger.WriteTrayWarning(
-                        $"CloudManager: no se pudo persistir jitter_window_seconds={jitterValue} en Registry (permisos insuficientes). Se usará el valor previo.");
-                }
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: jitter_window_seconds={jitterValue} recibido de Cloud (persistencia delegada al Service).");
             }
             catch (Exception ex)
             {
-                // Si falla el parsing del valor, loggear y continuar
                 AlwaysPrintLogger.WriteTrayWarning(
-                    $"CloudManager: error al procesar jitter_window_seconds del payload. Se mantiene el valor previo. {ex.Message}");
+                    $"CloudManager: error al leer jitter_window_seconds del payload. {ex.Message}");
             }
         }
 

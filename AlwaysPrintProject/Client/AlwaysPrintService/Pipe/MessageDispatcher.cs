@@ -170,6 +170,13 @@ namespace AlwaysPrintService.Pipe
             {
                 // Save() llama cfg.Validate() internamente; si lanza, no escribe nada.
                 _registry.Save(payload.Configuration);
+
+                // Persistir JitterWindowSeconds si vino en el payload (campo a nivel de org, no de AppConfiguration)
+                if (payload.JitterWindowSeconds.HasValue)
+                {
+                    _registry.SaveJitterWindowSeconds(payload.JitterWindowSeconds.Value);
+                }
+
                 AlwaysPrintLogger.WriteInfo(
                     $"Configuración Cloud aplicada correctamente. Fuente={payload.Source}, Hash={payload.ConfigHash}",
                     AlwaysPrintLogger.EvtConfigSaved);
