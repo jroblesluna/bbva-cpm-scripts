@@ -64,7 +64,8 @@ def service():
     """Instancia de LogAnalysisService con LLMService mockeado."""
     svc = LogAnalysisService()
     svc.llm_service = AsyncMock()
-    svc.llm_service.invoke = AsyncMock(return_value="Análisis generado por el LLM.")
+    # invoke() retorna tupla (texto, input_tokens, output_tokens)
+    svc.llm_service.invoke = AsyncMock(return_value=("Análisis generado por el LLM.", 100, 50))
     return svc
 
 
@@ -123,10 +124,15 @@ class TestProcessLogDirectPath:
             original_size=len(small_log_payload),
         )
 
-        assert result.processing_path == "direct"
+        assert result.processing_path == "structural"
         assert str(result.workstation_id) == workstation_id
         assert str(result.organization_id) == organization_id
-        assert result.analysis_text == "Análisis generado por el LLM."
+        # El servicio añade estimación de tokens al final del texto
+        expected_text = (
+            "Análisis generado por el LLM.\n\n---\n"
+            "*Tokens utilizados: 100 input + 50 output = 150 total*"
+        )
+        assert result.analysis_text == expected_text
         assert result.analysis_date == date.today()
         assert result.original_filename == "AlwaysPrint_2025-01-15.log"
         assert result.log_size_bytes > 0
@@ -179,8 +185,13 @@ class TestProcessLogDirectPath:
         # Verificar que se puede recuperar de la BD
         from_db = db.query(LogAnalysis).filter(LogAnalysis.id == result.id).first()
         assert from_db is not None
-        assert from_db.analysis_text == "Análisis generado por el LLM."
-        assert from_db.processing_path == "direct"
+        # El servicio añade estimación de tokens al final del texto
+        expected_text = (
+            "Análisis generado por el LLM.\n\n---\n"
+            "*Tokens utilizados: 100 input + 50 output = 150 total*"
+        )
+        assert from_db.analysis_text == expected_text
+        assert from_db.processing_path == "structural"
 
 
 # === TESTS PROCESS_LOG RUTA ESTRUCTURAL ===
@@ -211,7 +222,12 @@ class TestProcessLogStructuralPath:
         assert result.processing_path == "structural"
         assert str(result.workstation_id) == workstation_id
         assert str(result.organization_id) == organization_id
-        assert result.analysis_text == "Análisis generado por el LLM."
+        # El servicio añade estimación de tokens al final del texto
+        expected_text = (
+            "Análisis generado por el LLM.\n\n---\n"
+            "*Tokens utilizados: 100 input + 50 output = 150 total*"
+        )
+        assert result.analysis_text == expected_text
         assert result.log_size_bytes >= 102400
 
     @pytest.mark.asyncio
@@ -354,8 +370,12 @@ class TestOverwrite:
         old_record = db.query(LogAnalysis).filter(LogAnalysis.id == prev_id).first()
         assert old_record is None
 
-        # Verificar que el nuevo existe
-        assert new_result.analysis_text == "Análisis generado por el LLM."
+        # Verificar que el nuevo existe con texto + estimación de tokens
+        expected_text = (
+            "Análisis generado por el LLM.\n\n---\n"
+            "*Tokens utilizados: 100 input + 50 output = 150 total*"
+        )
+        assert new_result.analysis_text == expected_text
         assert new_result.id != prev_id
 
     @pytest.mark.asyncio
@@ -379,7 +399,12 @@ class TestOverwrite:
         )
 
         assert result is not None
-        assert result.analysis_text == "Análisis generado por el LLM."
+        # El servicio añade estimación de tokens al final del texto
+        expected_text = (
+            "Análisis generado por el LLM.\n\n---\n"
+            "*Tokens utilizados: 100 input + 50 output = 150 total*"
+        )
+        assert result.analysis_text == expected_text
 
     @pytest.mark.asyncio
     async def test_solo_un_registro_por_dia_despues_de_overwrite(

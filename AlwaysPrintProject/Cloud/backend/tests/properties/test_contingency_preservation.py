@@ -22,7 +22,7 @@ import pytest
 from hypothesis import given, settings as hypothesis_settings, assume
 from hypothesis import strategies as st
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -33,6 +33,10 @@ from app.models.vlan import VLAN
 from app.models.workstation import Workstation
 from app.models.device import Device
 from app.models.user import User, UserRole
+
+# Importar todos los modelos para registrar tablas en Base.metadata
+from app import models as _all_models  # noqa: F401
+
 from app.main import app
 
 
@@ -45,6 +49,16 @@ engine = create_engine(
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
+
+
+# Desactivar foreign keys para evitar errores de dependencia circular al hacer drop_all
+# (el listener global de database.py activa PRAGMA foreign_keys=ON en todos los Engine)
+@event.listens_for(engine, "connect")
+def _disable_fk_for_tests(dbapi_conn, connection_record):
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA foreign_keys=OFF")
+    cursor.close()
+
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

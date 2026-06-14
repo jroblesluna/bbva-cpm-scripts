@@ -350,9 +350,9 @@ class TestSnapshotPersistenceRoundTrip:
                 MetricRecord.snapshot_id == snapshot.id
             ).all()
 
-            # Debe haber 13 métricas del OS (definidas en _persist_snapshot_transaction)
-            assert len(records) == 13, (
-                f"Se esperaban 13 MetricRecords, se encontraron {len(records)}"
+            # Debe haber 14 métricas del OS (definidas en _persist_snapshot_transaction)
+            assert len(records) == 14, (
+                f"Se esperaban 14 MetricRecords, se encontraron {len(records)}"
             )
 
             # Construir diccionario de métricas para verificación
@@ -630,9 +630,9 @@ class TestSnapshotPersistenceRoundTrip:
                 ContainerMetric.snapshot_id == snapshot.id
             ).count()
 
-            # 13 métricas del OS siempre
-            assert metric_count == 13, (
-                f"MetricRecords: esperados 13, encontrados {metric_count}"
+            # 14 métricas del OS siempre (incluyendo swap_percent)
+            assert metric_count == 14, (
+                f"MetricRecords: esperados 14, encontrados {metric_count}"
             )
             assert health_count == len(health_checks), (
                 f"HealthCheckResults: esperados {len(health_checks)}, "
