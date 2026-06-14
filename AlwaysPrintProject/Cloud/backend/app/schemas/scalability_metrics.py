@@ -141,8 +141,8 @@ class DbPoolResponse(BaseModel):
         description="Tamaño base del pool"
     )
     overflow: Optional[int] = Field(
-        None, ge=0,
-        description="Conexiones de overflow actuales"
+        None,
+        description="Conexiones de overflow actuales (negativo indica capacidad disponible)"
     )
     max_overflow: Optional[int] = Field(
         None, ge=0,
