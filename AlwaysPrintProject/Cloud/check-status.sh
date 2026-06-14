@@ -508,6 +508,20 @@ else
             check_warn "Container — ${REDIS_STATUS:-not_found}"
         fi
         
+        # Alembic Migrations
+        echo -e "\n  ${BLUE}Alembic Migrations:${NC}"
+        ALEMBIC_CURRENT=$(ssm_exec "$INSTANCE_ID" '["docker exec alwaysprint-backend-1 alembic current 2>/dev/null || echo FAIL"]' 5)
+        if [ -n "$ALEMBIC_CURRENT" ] && [ "$ALEMBIC_CURRENT" != "FAIL" ]; then
+            ALEMBIC_HEAD=$(echo "$ALEMBIC_CURRENT" | grep "(head)" | sed 's/ (head)//')
+            if [ -n "$ALEMBIC_HEAD" ]; then
+                check_ok "Migración actual — $ALEMBIC_HEAD (head)"
+            else
+                check_warn "Migración — $ALEMBIC_CURRENT (posiblemente no en head)"
+            fi
+        else
+            check_warn "No se pudo consultar estado de migraciones"
+        fi
+
         # Nginx & SSL
         echo -e "\n  ${BLUE}Nginx & SSL:${NC}"
         if [ "$NGINX_STATUS" = "active" ]; then
