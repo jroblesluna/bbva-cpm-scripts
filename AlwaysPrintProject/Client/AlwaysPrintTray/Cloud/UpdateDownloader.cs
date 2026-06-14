@@ -151,6 +151,117 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
+        /// Descarga el MSI directamente desde una presigned URL de S3 (flujo zero-query).
+        /// Verifica la integridad del archivo comparando el tamaño descargado vs esperado.
+        /// Si la presigned URL ha expirado (HTTP 403), retorna null para activar fallback al flujo legacy.
+        /// </summary>
+        /// <param name="downloadUrl">Presigned URL de S3 para descarga directa.</param>
+        /// <param name="expectedSize">Tamaño esperado del archivo en bytes.</param>
+        /// <param name="version">Versión del MSI a descargar.</param>
+        /// <returns>Ruta completa del MSI descargado si la verificación es exitosa; null si falla.</returns>
+        public async Task<string?> DownloadFromUrlAsync(string downloadUrl, long expectedSize, string version)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            string filePath = Path.Combine(UpdatesDir, MsiFileName);
+
+            try
+            {
+                // Crear directorio si no existe
+                if (!Directory.Exists(UpdatesDir))
+                {
+                    Directory.CreateDirectory(UpdatesDir);
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"UpdateDownloader: directorio de actualizaciones creado en '{UpdatesDir}'.");
+                }
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"UpdateDownloader: iniciando descarga directa zero-query. " +
+                    $"Versión: {version}, tamaño esperado: {expectedSize} bytes, URL: [presigned]");
+
+                using (var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
+                {
+                    // Verificar si la URL presigned ha expirado (S3 retorna 403)
+                    if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                    {
+                        stopwatch.Stop();
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            $"UpdateDownloader: presigned URL expirada (HTTP 403). " +
+                            $"Versión: {version}. Se activará fallback al flujo legacy.");
+                        return null;
+                    }
+
+                    response.EnsureSuccessStatusCode();
+
+                    // Guardar contenido como archivo MSI
+                    using (var contentStream = await response.Content.ReadAsStreamAsync())
+                    using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+                    {
+                        await contentStream.CopyToAsync(fileStream);
+                    }
+                }
+
+                stopwatch.Stop();
+
+                // Verificar integridad por tamaño
+                var fileInfo = new FileInfo(filePath);
+                long actualSize = fileInfo.Length;
+
+                if (expectedSize > 0 && actualSize != expectedSize)
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        $"UpdateDownloader: integridad de MSI fallida (zero-query). " +
+                        $"Esperado: {expectedSize} bytes, actual: {actualSize} bytes. " +
+                        $"Versión: {version}. Archivo parcial eliminado.");
+                    DeleteFileSafe(filePath);
+                    return null;
+                }
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"UpdateDownloader: descarga directa zero-query completada. " +
+                    $"Versión: {version}, tamaño: {actualSize} bytes, " +
+                    $"duración: {stopwatch.Elapsed.TotalSeconds:F1} segundos.");
+
+                return filePath;
+            }
+            catch (HttpRequestException ex)
+            {
+                stopwatch.Stop();
+                AlwaysPrintLogger.WriteTrayError(
+                    $"UpdateDownloader: error de red en descarga zero-query: {ex.Message}. " +
+                    $"Versión: {version}. Archivo parcial eliminado.");
+                DeleteFileSafe(filePath);
+                return null;
+            }
+            catch (TaskCanceledException ex)
+            {
+                stopwatch.Stop();
+                AlwaysPrintLogger.WriteTrayError(
+                    $"UpdateDownloader: timeout en descarga zero-query: {ex.Message}. " +
+                    $"Versión: {version}. Archivo parcial eliminado.");
+                DeleteFileSafe(filePath);
+                return null;
+            }
+            catch (IOException ex)
+            {
+                stopwatch.Stop();
+                AlwaysPrintLogger.WriteTrayError(
+                    $"UpdateDownloader: error de I/O en descarga zero-query: {ex.Message}. " +
+                    $"Versión: {version}. Archivo parcial eliminado.");
+                DeleteFileSafe(filePath);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                AlwaysPrintLogger.WriteTrayError(
+                    $"UpdateDownloader: error inesperado en descarga zero-query: {ex.Message}. " +
+                    $"Versión: {version}. Archivo parcial eliminado.");
+                DeleteFileSafe(filePath);
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Elimina archivos antiguos o parciales del directorio de actualizaciones.
         /// Útil para limpiar descargas previas que ya no son necesarias.
         /// </summary>

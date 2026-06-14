@@ -55,9 +55,11 @@ namespace AlwaysPrintTray.Cloud
 
         private readonly AppConfiguration _config;
         private readonly CloudCredentialsManager _credentials;
+        private readonly RegistryConfigManager _registry;
         private readonly PipeClient _pipe;
         private readonly SynchronizationContext _uiContext;
         private readonly NotifyIcon _trayIcon;
+        private readonly UpdateDownloader _updateDownloader;
 
         private CloudWebSocketClient? _wsClient;
         private ConfigurationSync? _configSync;
@@ -73,21 +75,25 @@ namespace AlwaysPrintTray.Cloud
         /// </summary>
         /// <param name="config">Configuración de la aplicación con CloudApiUrl.</param>
         /// <param name="credentials">Gestor de credenciales Cloud en HKCU.</param>
+        /// <param name="registry">Gestor de configuración del registro (flag local auto-update).</param>
         /// <param name="pipe">Cliente Named Pipe para notificar al Service.</param>
         /// <param name="uiContext">Contexto de sincronización del hilo UI.</param>
         /// <param name="trayIcon">Referencia al NotifyIcon del system tray.</param>
         public CloudManager(
             AppConfiguration config,
             CloudCredentialsManager credentials,
+            RegistryConfigManager registry,
             PipeClient pipe,
             SynchronizationContext uiContext,
             NotifyIcon trayIcon)
         {
             _config = config;
             _credentials = credentials;
+            _registry = registry;
             _pipe = pipe;
             _uiContext = uiContext;
             _trayIcon = trayIcon;
+            _updateDownloader = new UpdateDownloader(config.CloudApiUrl);
         }
 
         /// <summary>
@@ -1072,7 +1078,8 @@ namespace AlwaysPrintTray.Cloud
                         break;
 
                     case "check_update":
-                        HandleCheckUpdateCommand(commandId);
+                        var paramsObj = obj["params"] as JObject;
+                        HandleCheckUpdateCommand(commandId, paramsObj);
                         break;
 
                     case "get_latest_log":
@@ -1134,11 +1141,50 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
-        /// Ejecuta el comando check_update: dispara el evento para que TrayApplicationContext
-        /// invoque UpdateChecker.CheckNowAsync().
+        /// Ejecuta el comando check_update: soporta dos flujos:
+        /// 1. Zero-query: si params contiene download_url válida, descarga directa desde S3
+        /// 2. Legacy: si download_url ausente/vacío, dispara CheckUpdateRequested para flujo HTTP
         /// </summary>
-        private void HandleCheckUpdateCommand(string commandId)
+        /// <param name="commandId">ID del comando para reportar resultado.</param>
+        /// <param name="paramsObj">Params del comando WebSocket (puede contener download_url, version, file_size).</param>
+        private void HandleCheckUpdateCommand(string commandId, JObject? paramsObj = null)
         {
+            // Extraer download_url de los params (si viene del broadcast enriquecido zero-query)
+            string? downloadUrl = paramsObj?["download_url"]?.ToString();
+
+            if (!string.IsNullOrEmpty(downloadUrl))
+            {
+                // Flujo zero-query: descarga directa desde presigned URL de S3
+                // Verificar flags de auto-actualización antes de proceder
+                bool localFlag = _registry.LoadAutoUpdateEnabled();
+                // Flag de organización: viene en los params del broadcast o del estado en _config
+                bool orgFlag = paramsObj?["auto_update_enabled"]?.Value<bool>() ?? _config.AutoUpdateEnabled;
+
+                if (!localFlag)
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "CloudManager: check_update con download_url recibido pero flag local de auto-update deshabilitado. Ignorando.");
+                    SendCommandResult(commandId, true, "Flag local de auto-update deshabilitado. Descarga no iniciada.");
+                    return;
+                }
+
+                if (!orgFlag)
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "CloudManager: check_update con download_url recibido pero flag de organización deshabilitado. Ignorando.");
+                    SendCommandResult(commandId, true, "Flag de organización de auto-update deshabilitado. Descarga no iniciada.");
+                    return;
+                }
+
+                // Ambos flags habilitados: iniciar descarga directa desde presigned URL
+                long fileSize = paramsObj?["file_size"]?.Value<long>() ?? 0;
+                string version = paramsObj?["version"]?.ToString() ?? "unknown";
+
+                HandleDirectDownload(downloadUrl, fileSize, version, commandId);
+                return;
+            }
+
+            // Flujo legacy: sin download_url, disparar CheckUpdateRequested para verificación HTTP
             if (CheckUpdateRequested == null)
             {
                 AlwaysPrintLogger.WriteTrayWarning(
@@ -1150,7 +1196,50 @@ namespace AlwaysPrintTray.Cloud
             CheckUpdateRequested.Invoke();
             SendCommandResult(commandId, true, "Verificación de actualización iniciada.");
             AlwaysPrintLogger.WriteTrayInfo(
-                "CloudManager: comando check_update ejecutado. Verificación de actualización disparada.");
+                "CloudManager: comando check_update ejecutado. Verificación de actualización disparada (flujo legacy).");
+        }
+
+        /// <summary>
+        /// Maneja la descarga directa del MSI desde una presigned URL de S3 (flujo zero-query).
+        /// Si la descarga falla (URL expirada, error de red), activa fallback al flujo legacy.
+        /// </summary>
+        /// <param name="downloadUrl">Presigned URL de S3 para descarga directa del MSI.</param>
+        /// <param name="fileSize">Tamaño esperado del archivo en bytes para verificación de integridad.</param>
+        /// <param name="version">Versión del MSI a descargar.</param>
+        /// <param name="commandId">ID del comando para reportar resultado.</param>
+        private async void HandleDirectDownload(string downloadUrl, long fileSize, string version, string commandId)
+        {
+            try
+            {
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: iniciando descarga directa zero-query. Versión: {version}, tamaño: {fileSize} bytes.");
+
+                string? filePath = await _updateDownloader.DownloadFromUrlAsync(downloadUrl, fileSize, version);
+
+                if (filePath != null)
+                {
+                    SendCommandResult(commandId, true, $"Descarga directa completada: {version}");
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: descarga directa zero-query completada exitosamente. Versión: {version}.");
+                }
+                else
+                {
+                    // DownloadFromUrlAsync retornó null → hubo un error o URL expirada
+                    // Fallback al flujo legacy para reintentar vía endpoint del backend
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "CloudManager: descarga directa fallida. Activando fallback a flujo legacy.");
+                    CheckUpdateRequested?.Invoke();
+                    SendCommandResult(commandId, true, "Descarga directa fallida, flujo legacy activado.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Error inesperado: fallback al flujo legacy
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error en descarga directa: {ex.Message}. Activando fallback a flujo legacy.");
+                CheckUpdateRequested?.Invoke();
+                SendCommandResult(commandId, false, $"Error descarga directa: {ex.Message}");
+            }
         }
 
         /// <summary>

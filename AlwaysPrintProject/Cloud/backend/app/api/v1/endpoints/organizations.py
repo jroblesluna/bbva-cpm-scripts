@@ -40,6 +40,7 @@ from app.schemas.organization import (
     TargetVersionResponse,
 )
 from app.services.audit import AuditService
+from app.services.s3_update_service import S3UpdateService
 
 logger = logging.getLogger(__name__)
 
@@ -324,6 +325,23 @@ async def toggle_my_auto_update(
     
     # Si se habilita, enviar check_update a workstations online
     if body.enabled:
+        # Generar params enriquecidos para check_update (zero-query)
+        update_info = S3UpdateService().get_broadcast_update_info(
+            target_version=organization.target_version
+        )
+        params = {}
+        if update_info:
+            params = {
+                "download_url": update_info["download_url"],
+                "version": update_info["version"],
+                "file_size": update_info["file_size"],
+            }
+        else:
+            logger.warning(
+                "S3 no disponible para broadcast check_update, "
+                "usando fallback legacy (params vacío)"
+            )
+
         workstations = db.query(Workstation).filter(
             Workstation.organization_id == organization.id
         ).all()
@@ -336,7 +354,7 @@ async def toggle_my_auto_update(
                     "type": "command",
                     "command_id": str(uuid_module.uuid4()),
                     "command_type": "check_update",
-                    "params": {},
+                    "params": params,
                 })
     
     return AutoUpdateToggleResponse(
@@ -963,6 +981,23 @@ async def toggle_auto_update(
 
     # Al habilitar, disparar check_update en todas las workstations online de la org
     if body.enabled:
+        # Generar params enriquecidos para check_update (zero-query)
+        update_info = S3UpdateService().get_broadcast_update_info(
+            target_version=organization.target_version
+        )
+        params = {}
+        if update_info:
+            params = {
+                "download_url": update_info["download_url"],
+                "version": update_info["version"],
+                "file_size": update_info["file_size"],
+            }
+        else:
+            logger.warning(
+                "S3 no disponible para broadcast check_update, "
+                "usando fallback legacy (params vacío)"
+            )
+
         workstations = db.query(Workstation).filter(
             Workstation.organization_id == org_id
         ).all()
@@ -975,7 +1010,7 @@ async def toggle_auto_update(
                     "type": "command",
                     "command_id": str(uuid4()),
                     "command_type": "check_update",
-                    "params": {},
+                    "params": params,
                 })
                 dispatched += 1
 
@@ -1258,6 +1293,24 @@ async def send_org_command(
 
     workstations = db.query(Workstation).filter(Workstation.organization_id == org_id).all()
 
+    # Generar params enriquecidos si es check_update con auto_update habilitado (zero-query)
+    params = {}
+    if command_type == "check_update" and organization.auto_update_enabled:
+        update_info = S3UpdateService().get_broadcast_update_info(
+            target_version=organization.target_version
+        )
+        if update_info:
+            params = {
+                "download_url": update_info["download_url"],
+                "version": update_info["version"],
+                "file_size": update_info["file_size"],
+            }
+        else:
+            logger.warning(
+                "S3 no disponible para broadcast check_update, "
+                "usando fallback legacy (params vacío)"
+            )
+
     dispatched = 0
     for ws in workstations:
         ws_id = str(ws.id)
@@ -1266,7 +1319,7 @@ async def send_org_command(
                 "type": "command",
                 "command_id": str(uuid4()),
                 "command_type": command_type,
-                "params": {},
+                "params": params,
             })
             dispatched += 1
 

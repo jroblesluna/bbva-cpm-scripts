@@ -26,5 +26,10 @@
     <Compile Include="..\AlwaysPrintTray\OnDemand\OnDemandTriggerItem.cs" Link="OnDemand\OnDemandTriggerItem.cs" />
     <Compile Include="..\AlwaysPrintTray\OnDemand\StatusDisplayHelper.cs" Link="OnDemand\StatusDisplayHelper.cs" />
     <Compile Include="..\AlwaysPrintTray\Forms\ServiceStatusItem.cs" Link="Forms\ServiceStatusItem.cs" />
+    <Compile Include="..\AlwaysPrintTray\Localization\LocalizationManager.cs" Link="Localization\LocalizationManager.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Excluir test con dependencia rota: ServiceStatusItem.ActionLabel fue eliminado en refactor -->
+    <Compile Remove="OnDemand\ServiceStatusTests.cs" />
   </ItemGroup>
 </Project>

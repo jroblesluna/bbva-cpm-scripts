@@ -27,6 +27,12 @@ namespace AlwaysPrint.Shared.Configuration
         public int    TelemetryIntervalSeconds { get; set; } = 300;
 
         /// <summary>
+        /// Flag de auto-actualización a nivel de organización (recibido del backend durante registro/config_update).
+        /// Es un flag runtime, no se persiste en el registro local.
+        /// </summary>
+        public bool AutoUpdateEnabled { get; set; } = false;
+
+        /// <summary>
         /// Valida la configuración Cloud. Lanza excepción si algún valor es inválido.
         /// </summary>
         public void Validate()
