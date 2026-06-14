@@ -40,11 +40,52 @@ from app.schemas.organization import (
     TargetVersionResponse,
 )
 from app.services.audit import AuditService
+from app.services.config import ConfigService
 from app.services.s3_update_service import S3UpdateService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Instancia del servicio de configuración para broadcast
+_config_service = ConfigService()
+
+
+async def _broadcast_config_update_to_org(db: Session, organization_id: str) -> int:
+    """
+    Envía config_update a todas las workstations conectadas de una organización.
+    
+    Se invoca cuando jitter_window_seconds cambia para propagar la nueva
+    configuración efectiva a las workstations en tiempo real.
+    
+    Args:
+        db: Sesión de base de datos
+        organization_id: UUID de la organización como string
+        
+    Returns:
+        Cantidad de workstations a las que se envió el mensaje
+    """
+    workstations = db.query(Workstation).filter(
+        Workstation.organization_id == organization_id
+    ).all()
+    
+    dispatched = 0
+    for ws in workstations:
+        ws_id = str(ws.id)
+        if connection_manager.is_workstation_online(ws_id):
+            config = _config_service.get_effective_config(db, ws_id)
+            await connection_manager.send_to_workstation(ws_id, {
+                "type": "config_update",
+                "config": config,
+            })
+            dispatched += 1
+    
+    logger.info(
+        "config_update broadcast (jitter_window_seconds): org_id=%s, dispatched=%d",
+        organization_id, dispatched,
+    )
+    
+    return dispatched
 
 
 @router.get("/", response_model=OrganizationListResponse)
@@ -213,7 +254,7 @@ def list_my_workstations(
 
 
 @router.put("/me", response_model=OrganizationResponse)
-def update_my_organization(
+async def update_my_organization(
     request: Request,
     org_data: OrganizationUpdate,
     current_user: User = Depends(get_current_user),
@@ -242,12 +283,13 @@ def update_my_organization(
             detail="Organización no encontrada"
         )
     
-    # Guardar valores anteriores para auditoría
+    # Guardar valores anteriores para auditoría y detección de cambios
     old_values = {
         "name": organization.name,
         "description": organization.description,
         "timezone": organization.timezone
     }
+    old_jitter = organization.jitter_window_seconds
     
     # Operadores no pueden cambiar campos sensibles de activación
     update_data = org_data.model_dump(exclude_unset=True)
@@ -284,6 +326,10 @@ def update_my_organization(
         new_data=update_data,
         ip_address=get_client_ip(request)
     )
+    
+    # Si jitter_window_seconds cambió, broadcast config_update a workstations conectadas
+    if "jitter_window_seconds" in update_data and update_data["jitter_window_seconds"] != old_jitter:
+        await _broadcast_config_update_to_org(db, str(organization.id))
     
     return organization
 
@@ -591,7 +637,7 @@ def get_organization(
 
 
 @router.put("/{org_id}", response_model=OrganizationResponse)
-def update_organization(
+async def update_organization(
     request: Request,
     org_id: UUID,
     org_data: OrganizationUpdate,
@@ -609,12 +655,13 @@ def update_organization(
             detail=f"Organización con ID {org_id} no encontrada"
         )
     
-    # Guardar valores anteriores para auditoría
+    # Guardar valores anteriores para auditoría y detección de cambios
     old_values = {
         "name": organization.name,
         "description": organization.description,
         "timezone": organization.timezone
     }
+    old_jitter = organization.jitter_window_seconds
     
     # Actualizar campos
     update_data = org_data.model_dump(exclude_unset=True)
@@ -646,6 +693,10 @@ def update_organization(
         new_data=update_data,
         ip_address=get_client_ip(request)
     )
+    
+    # Si jitter_window_seconds cambió, broadcast config_update a workstations conectadas
+    if "jitter_window_seconds" in update_data and update_data["jitter_window_seconds"] != old_jitter:
+        await _broadcast_config_update_to_org(db, str(organization.id))
     
     return organization
 

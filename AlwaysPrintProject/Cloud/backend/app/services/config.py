@@ -20,6 +20,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.models.config import GlobalConfig, VLANConfig, WorkstationConfig
 from app.models.workstation import Workstation
+from app.models.organization import Organization
 from app.models.vlan import VLAN
 
 
@@ -150,7 +151,13 @@ class ConfigService:
         
         config["source"] = sources
         
-        # 6. Computar config_hash (excluye 'source' y 'config_hash')
+        # 6. Agregar jitter_window_seconds directamente de la organización
+        # Este campo es a nivel de organización (no participa en la jerarquía
+        # GlobalConfig/VLANConfig/WorkstationConfig)
+        org = db.query(Organization).filter_by(id=workstation.organization_id).first()
+        config["jitter_window_seconds"] = org.jitter_window_seconds if org else 30
+        
+        # 7. Computar config_hash (excluye 'source' y 'config_hash')
         config["config_hash"] = compute_config_hash(config)
         
         return config

@@ -886,7 +886,14 @@
     "controlConfirmCheckUpdate": "Se enviará una verificación de actualización a todas las workstations en línea de tu organización. ¿Continuar?",
     "controlCommandSent": "Comando enviado a {count} workstation(s) en línea.",
     "controlCancel": "Cancelar",
-    "controlConfirm": "Confirmar"
+    "controlConfirm": "Confirmar",
+    "jitterWindowLabel": "Ventana de Jitter (segundos)",
+    "jitterWindowHelper": "Ventana temporal en la que se distribuyen las reconexiones tras eventos masivos (5-300 segundos)",
+    "jitterWindowValidation": "El valor debe estar entre 5 y 300 segundos",
+    "jitterWindowSaveSuccess": "Ventana de jitter actualizada correctamente",
+    "jitterWindowSaveError": "Error al actualizar la ventana de jitter",
+    "jitterWindowCalculation": "Con {window} segundos de ventana y {count} workstations activas, aproximadamente {rate} conexiones por segundo durante eventos masivos",
+    "jitterWindowNoWorkstations": "No hay workstations activas para calcular la tasa de conexiones"
   },
   "systemStatus": {
     "title": "Estado del Sistema",

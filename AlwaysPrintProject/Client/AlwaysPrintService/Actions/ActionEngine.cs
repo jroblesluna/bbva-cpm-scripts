@@ -475,6 +475,19 @@ namespace AlwaysPrintService.Actions
         
         private bool ExecuteStopTray(ActionConfig action)
         {
+            // Escribir LastRestartTimestamp antes de matar el Tray para que
+            // aplique jitter al reconectar (prevención de thundering herd).
+            try
+            {
+                var registry = new RegistryConfigManager();
+                registry.SaveLastRestartTimestamp(DateTime.UtcNow);
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"ActionEngine: no se pudo escribir LastRestartTimestamp en registro: {ex.Message}");
+            }
+
             AlwaysPrintLogger.WriteInfo("ActionEngine: StopTray - matando procesos AlwaysPrintTray");
             int killed = AdminActions.KillProcessesByName("AlwaysPrintTray", null, true);
             return killed >= 0;

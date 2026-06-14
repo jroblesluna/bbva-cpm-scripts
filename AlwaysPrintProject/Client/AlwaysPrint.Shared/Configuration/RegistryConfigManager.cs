@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Microsoft.Win32;
 using Newtonsoft.Json;
 using AlwaysPrint.Shared.Logging;
@@ -206,6 +207,198 @@ namespace AlwaysPrint.Shared.Configuration
                     $"RegistryConfigManager.SaveAutoUpdateEnabled: error escribiendo flag de auto-actualización. {ex.Message}",
                     AlwaysPrintLogger.EvtGenericWarning);
                 throw;
+            }
+        }
+
+        // === MÉTODOS DE JITTER (reconexión distribuida) ===
+
+        /// <summary>
+        /// Valor por defecto de JitterWindowSeconds cuando el valor del registro es inválido o ausente.
+        /// </summary>
+        private const int DefaultJitterWindowSeconds = 30;
+
+        /// <summary>
+        /// Lee el valor de JitterWindowSeconds (DWORD) desde el registro.
+        /// Si el valor es ausente, no es un entero válido, o está fuera del rango [5, 300],
+        /// retorna el valor por defecto (30).
+        /// </summary>
+        /// <returns>Ventana de jitter en segundos (30 si ausente o inválido).</returns>
+        public int LoadJitterWindowSeconds()
+        {
+            try
+            {
+                using (var key = Registry.LocalMachine.OpenSubKey(RegistryPath, writable: false))
+                {
+                    if (key == null) return DefaultJitterWindowSeconds;
+
+                    var rawValue = key.GetValue("JitterWindowSeconds");
+                    if (rawValue == null) return DefaultJitterWindowSeconds;
+
+                    int value = Convert.ToInt32(rawValue);
+                    // Si está fuera del rango válido [5, 300], retornar default
+                    if (value < 5 || value > 300) return DefaultJitterWindowSeconds;
+                    return value;
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning(
+                    $"RegistryConfigManager.LoadJitterWindowSeconds: error leyendo JitterWindowSeconds, usando default {DefaultJitterWindowSeconds}. {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericWarning);
+                return DefaultJitterWindowSeconds;
+            }
+        }
+
+        /// <summary>
+        /// Escribe el valor de JitterWindowSeconds (DWORD) en el registro.
+        /// Requiere privilegios de administrador (servicio o Tray elevado).
+        /// </summary>
+        /// <param name="value">Ventana de jitter en segundos a persistir.</param>
+        public void SaveJitterWindowSeconds(int value)
+        {
+            try
+            {
+                using (var key = Registry.LocalMachine.CreateSubKey(RegistryPath, writable: true))
+                {
+                    if (key == null)
+                    {
+                        AlwaysPrintLogger.WriteWarning(
+                            "RegistryConfigManager.SaveJitterWindowSeconds: no se pudo abrir/crear la clave de registro.",
+                            AlwaysPrintLogger.EvtGenericWarning);
+                        return;
+                    }
+                    key.SetValue("JitterWindowSeconds", value, RegistryValueKind.DWord);
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning(
+                    $"RegistryConfigManager.SaveJitterWindowSeconds: error escribiendo JitterWindowSeconds. {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericWarning);
+            }
+        }
+
+        /// <summary>
+        /// Lee el valor de LastUpdateTimestamp (String ISO 8601) desde el registro.
+        /// Retorna null si el valor es ausente, no es un ISO 8601 válido, o representa un tiempo futuro.
+        /// </summary>
+        /// <returns>DateTime en UTC del último update, o null si ausente/inválido/futuro.</returns>
+        public DateTime? LoadLastUpdateTimestamp()
+        {
+            return LoadTimestampFromRegistry("LastUpdateTimestamp");
+        }
+
+        /// <summary>
+        /// Escribe el valor de LastUpdateTimestamp (String ISO 8601) en el registro.
+        /// Llamado por el Service después de una actualización MSI exitosa.
+        /// </summary>
+        /// <param name="utcNow">Momento actual en UTC a persistir.</param>
+        public void SaveLastUpdateTimestamp(DateTime utcNow)
+        {
+            SaveTimestampToRegistry("LastUpdateTimestamp", utcNow);
+        }
+
+        /// <summary>
+        /// Lee el valor de LastRestartTimestamp (String ISO 8601) desde el registro.
+        /// Retorna null si el valor es ausente, no es un ISO 8601 válido, o representa un tiempo futuro.
+        /// </summary>
+        /// <returns>DateTime en UTC del último reinicio de Tray, o null si ausente/inválido/futuro.</returns>
+        public DateTime? LoadLastRestartTimestamp()
+        {
+            return LoadTimestampFromRegistry("LastRestartTimestamp");
+        }
+
+        /// <summary>
+        /// Escribe el valor de LastRestartTimestamp (String ISO 8601) en el registro.
+        /// Llamado por el Service justo antes de reiniciar el Tray.
+        /// </summary>
+        /// <param name="utcNow">Momento actual en UTC a persistir.</param>
+        public void SaveLastRestartTimestamp(DateTime utcNow)
+        {
+            SaveTimestampToRegistry("LastRestartTimestamp", utcNow);
+        }
+
+        /// <summary>
+        /// Lee un timestamp ISO 8601 del registro y lo valida.
+        /// Retorna null si: ausente, formato inválido, o tiempo futuro.
+        /// </summary>
+        /// <param name="valueName">Nombre del valor en el registro.</param>
+        /// <returns>DateTime en UTC si válido y no futuro, null en caso contrario.</returns>
+        private DateTime? LoadTimestampFromRegistry(string valueName)
+        {
+            try
+            {
+                using (var key = Registry.LocalMachine.OpenSubKey(RegistryPath, writable: false))
+                {
+                    if (key == null) return null;
+
+                    var rawValue = key.GetValue(valueName) as string;
+                    if (string.IsNullOrWhiteSpace(rawValue)) return null;
+
+                    // Intentar parsear como ISO 8601 en UTC
+                    if (!DateTime.TryParse(rawValue, CultureInfo.InvariantCulture,
+                            DateTimeStyles.RoundtripKind | DateTimeStyles.AdjustToUniversal, out DateTime parsed))
+                    {
+                        AlwaysPrintLogger.WriteWarning(
+                            $"RegistryConfigManager.{valueName}: valor '{rawValue}' no es un ISO 8601 válido, tratando como ausente.",
+                            AlwaysPrintLogger.EvtGenericWarning);
+                        return null;
+                    }
+
+                    // Asegurar que el resultado esté en UTC
+                    DateTime utcParsed = parsed.Kind == DateTimeKind.Utc ? parsed : parsed.ToUniversalTime();
+
+                    // Si el timestamp es futuro, tratarlo como inválido
+                    if (utcParsed > DateTime.UtcNow)
+                    {
+                        AlwaysPrintLogger.WriteWarning(
+                            $"RegistryConfigManager.{valueName}: timestamp '{rawValue}' es futuro, tratando como ausente.",
+                            AlwaysPrintLogger.EvtGenericWarning);
+                        return null;
+                    }
+
+                    return utcParsed;
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning(
+                    $"RegistryConfigManager.{valueName}: error leyendo timestamp, tratando como ausente. {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericWarning);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Escribe un timestamp en formato ISO 8601 (con segundos, UTC) en el registro.
+        /// Maneja errores sin interrumpir la operación del caller.
+        /// </summary>
+        /// <param name="valueName">Nombre del valor en el registro.</param>
+        /// <param name="utcNow">Momento en UTC a persistir.</param>
+        private void SaveTimestampToRegistry(string valueName, DateTime utcNow)
+        {
+            try
+            {
+                // Formatear como ISO 8601 con precisión de segundos en UTC (ej: "2026-01-15T10:30:00Z")
+                string isoString = utcNow.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+
+                using (var key = Registry.LocalMachine.CreateSubKey(RegistryPath, writable: true))
+                {
+                    if (key == null)
+                    {
+                        AlwaysPrintLogger.WriteWarning(
+                            $"RegistryConfigManager.{valueName}: no se pudo abrir/crear la clave de registro.",
+                            AlwaysPrintLogger.EvtGenericWarning);
+                        return;
+                    }
+                    key.SetValue(valueName, isoString, RegistryValueKind.String);
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning(
+                    $"RegistryConfigManager.{valueName}: error escribiendo timestamp. {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericWarning);
             }
         }
 

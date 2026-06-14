@@ -15,6 +15,7 @@ export interface Organization {
   forced_contingency: boolean
   action_config_mandatory: boolean
   offline_timeout_minutes: number
+  jitter_window_seconds: number
   llm_model_id?: string | null
   openai_api_key?: string | null
   created_at: string
@@ -46,6 +47,7 @@ export interface OrganizationUpdate {
   timezone?: string
   language?: string
   offline_timeout_minutes?: number
+  jitter_window_seconds?: number
   llm_model_id?: string | null
   openai_api_key?: string | null
 }

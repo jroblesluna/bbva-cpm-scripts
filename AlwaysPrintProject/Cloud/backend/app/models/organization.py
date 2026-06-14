@@ -98,6 +98,10 @@ class Organization(Base):
     # Minutos de inactividad antes de enviar Death Ping (default: 10)
     offline_timeout_minutes = Column(Integer, nullable=False, default=10, server_default='10')
 
+    # Ventana de jitter para reconexiones (segundos)
+    # Controla la distribución temporal de reconexiones tras eventos masivos
+    jitter_window_seconds = Column(Integer, nullable=False, default=30, server_default='30')
+
     # Modelo LLM asignado a esta organización para análisis de logs
     # Si es NULL, se usa el modelo por defecto global (settings.LOG_ANALYZER_LLM_MODEL_ID)
     llm_model_id = Column(String(100), nullable=True)

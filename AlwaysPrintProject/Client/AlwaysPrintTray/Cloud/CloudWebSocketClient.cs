@@ -4,6 +4,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -36,6 +37,10 @@ namespace AlwaysPrintTray.Cloud
 
         private int  _currentDelayMs = InitialDelayMs;
         private bool _longRetryMode  = false;
+
+        // Flag de primer reconexión: usa jitter distribuido en vez de delay fijo.
+        // Se resetea a true cuando la conexión se establece exitosamente.
+        private bool _isFirstReconnect = true;
 
         // === Internos ===
         private readonly string _wsUrl;
@@ -229,6 +234,7 @@ namespace AlwaysPrintTray.Cloud
                     IsConnected     = true;
                     _currentDelayMs = InitialDelayMs;
                     _longRetryMode  = false;
+                    _isFirstReconnect = true;
                     _connectedSince = DateTime.UtcNow;
                 }
 
@@ -456,22 +462,44 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
-        /// Programa la reconexión con backoff exponencial.
-        /// En modo normal: 1s, 2s, 4s, 8s... hasta 60s.
+        /// Programa la reconexión con jitter (primer intento) o backoff exponencial.
+        /// Primer intento post-desconexión: delay aleatorio U(0, JitterWindowSeconds) para evitar thundering herd.
+        /// Intentos subsecuentes: backoff exponencial 2s, 4s, 8s... hasta 60s.
         /// En modo largo (código 1008): cada 5 minutos.
         /// </summary>
         private void ScheduleReconnect()
         {
             if (_disposed || _cts.IsCancellationRequested) return;
 
-            var delay = _longRetryMode ? LongRetryDelayMs : _currentDelayMs;
+            int delay;
+
+            if (_isFirstReconnect && !_longRetryMode)
+            {
+                // Primer intento tras desconexión: aplicar jitter distribuido
+                var registry = new RegistryConfigManager();
+                int jitterWindow = registry.LoadJitterWindowSeconds();
+                jitterWindow = JitterCalculator.NormalizeJitterWindow(jitterWindow);
+                delay = JitterCalculator.ComputeReconnectionDelay(jitterWindow);
+
+                _isFirstReconnect = false;
+                _currentDelayMs = 2000; // Siguiente intento arranca en 2s (backoff exponencial)
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudWebSocketClient: primer reconexión con jitter distribuido. " +
+                    $"Ventana={jitterWindow}s, delay={delay / 1000.0:F1}s");
+            }
+            else if (_longRetryMode)
+            {
+                delay = LongRetryDelayMs;
+            }
+            else
+            {
+                delay = _currentDelayMs;
+                _currentDelayMs = Math.Min(_currentDelayMs * 2, MaxDelayMs);
+            }
 
             AlwaysPrintLogger.WriteTrayWarning(
-                $"CloudWebSocketClient: reconectando en {delay / 1000}s...");
-
-            // Avanzar backoff exponencial (solo en modo normal)
-            if (!_longRetryMode)
-                _currentDelayMs = Math.Min(_currentDelayMs * 2, MaxDelayMs);
+                $"CloudWebSocketClient: reconectando en {delay / 1000.0:F1}s...");
 
             // Programar reconexión en el ThreadPool
             ThreadPool.QueueUserWorkItem(_ =>
