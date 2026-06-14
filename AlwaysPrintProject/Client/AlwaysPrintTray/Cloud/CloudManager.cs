@@ -1218,7 +1218,25 @@ namespace AlwaysPrintTray.Cloud
 
                 if (filePath != null)
                 {
-                    SendCommandResult(commandId, true, $"Descarga directa completada: {version}");
+                    // Enviar solicitud InstallUpdate al Service via Named Pipe
+                    // para que ejecute msiexec (mismo flujo que OnUpdateAvailable)
+                    if (_pipe.IsConnected)
+                    {
+                        var installPayload = new InstallUpdatePayload { MsiFilePath = filePath };
+                        var installRequest = PipeMessage.Create(MessageType.InstallUpdate, installPayload);
+                        _pipe.Send(installRequest);
+
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"CloudManager: solicitud InstallUpdate enviada al Service. Ruta MSI: '{filePath}'.");
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            "CloudManager: descarga completada pero pipe desconectado. " +
+                            "No se pudo enviar InstallUpdate al Service.");
+                    }
+
+                    SendCommandResult(commandId, true, $"Descarga directa completada e instalación solicitada: {version}");
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"CloudManager: descarga directa zero-query completada exitosamente. Versión: {version}.");
                 }
