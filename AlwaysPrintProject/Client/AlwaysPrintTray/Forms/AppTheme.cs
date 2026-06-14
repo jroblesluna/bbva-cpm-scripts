@@ -97,10 +97,11 @@ namespace AlwaysPrintTray.Forms
 
         /// <summary>
         /// Aplica estilos base corporativos a un Form (fuente, fondo, borde).
+        /// Se clona el font para evitar que el Dispose del Form libere el font estático compartido.
         /// </summary>
         public static void ApplyFormStyle(Form form)
         {
-            form.Font            = FontRegular;
+            form.Font            = (Font)FontRegular.Clone();
             form.BackColor       = BodyBg;
             form.FormBorderStyle = FormBorderStyle.FixedDialog;
             form.MaximizeBox     = false;

@@ -91,10 +91,23 @@ namespace AlwaysPrintTray
 
             var menu = new ContextMenuStrip();
             menu.Items.Add(LocalizationManager.Get("MenuAbout"),         null, (_, __) => ShowAbout());
+            menu.Items.Add(LocalizationManager.Get("MenuSystemStatus"),  null, (_, __) => ShowStatusForm());
             menu.Items.Add(LocalizationManager.Get("MenuConfiguration"), null, (_, __) => ShowConfiguration());
             menu.Items.Add(LocalizationManager.Get("MenuMyPrinters"),    null, (_, __) => ShowMyPrinters());
             menu.Items.Add(LocalizationManager.Get("MenuCheckUpdates"),  null, (_, __) => CheckForUpdatesManual());
-            menu.Items.Add(LocalizationManager.Get("MenuSystemStatus"),  null, (_, __) => ShowStatusForm());
+
+            // Agregar sección On-Demand Actions solo si hay triggers configurados
+            var onDemandTriggers = OnDemand.OnDemandConfigReader.GetOnDemandTriggers();
+            if (onDemandTriggers.Count > 0)
+            {
+                menu.Items.Add(new ToolStripSeparator());
+                foreach (var trigger in onDemandTriggers)
+                {
+                    var t = trigger; // captura para closure
+                    menu.Items.Add(t.Label, null, (_, __) => ExecuteOnDemandTrigger(t));
+                }
+            }
+
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(LocalizationManager.Get("MenuExit"),          null, (_, __) => ExitApplication());
 
@@ -676,6 +689,50 @@ namespace AlwaysPrintTray
             _activeForm = form;
             form.FormClosed += (_, __) => _activeForm = null;
             form.ShowDialog();
+        }
+
+        private void ExecuteOnDemandTrigger(OnDemandTriggerInfo trigger)
+        {
+            // Confirmación del usuario
+            var result = MessageBox.Show(
+                trigger.Description,
+                trigger.Label,
+                MessageBoxButtons.OKCancel,
+                MessageBoxIcon.Question);
+
+            if (result != DialogResult.OK) return;
+
+            if (!_pipe.IsConnected && !_pipe.Connect())
+            {
+                MessageBox.Show("No hay conexión con el servicio. Intente de nuevo.",
+                    "AlwaysPrint", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var payload = new ExecuteOnDemandTriggerPayload { Label = trigger.Label };
+            var request = PipeMessage.Create(MessageType.ExecuteOnDemandTrigger, payload);
+            var response = _pipe.Send(request);
+
+            if (response?.Type == MessageType.Ack)
+            {
+                var ack = response.GetPayload<AckPayload>();
+                if (ack?.Success == true)
+                {
+                    MessageBox.Show($"✓ {trigger.Label} ejecutado correctamente.",
+                        "OK", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    MessageBox.Show($"Error: {ack?.Message ?? "desconocido"}",
+                        "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+            else
+            {
+                var error = response?.GetPayload<ErrorPayload>();
+                MessageBox.Show($"Error: {error?.Message ?? "respuesta inesperada"}",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         private void ExitApplication()

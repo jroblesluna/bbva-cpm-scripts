@@ -46,30 +46,7 @@ namespace AlwaysPrintTray.Forms
             ClientSize = new Size(540, 530);
             AppTheme.ApplyFormStyle(this);
 
-            int y = 0;
-
-            // ── Header ──────────────────────────────────────────────────────
-            var header = new Panel
-            {
-                Location  = new Point(0, 0),
-                Size      = new Size(540, 52),
-                BackColor = AppTheme.HeaderBg
-            };
-            header.Paint += (s, e) => AppTheme.DrawHeaderAccent(e.Graphics, 540, 52);
-
-            var lblTitle = new Label
-            {
-                Text      = "⚙  Configuración",
-                Font      = AppTheme.FontTitle,
-                ForeColor = AppTheme.TextOnDark,
-                BackColor = Color.Transparent,
-                Location  = new Point(18, 12),
-                AutoSize  = true
-            };
-            header.Controls.Add(lblTitle);
-            Controls.Add(header);
-
-            y = 68;
+            int y = 18;
             int lw = 200, cx = 218, lx = 18;
 
             Label Lbl(string text)
