@@ -44,6 +44,8 @@ interface PendingIP {
   created_at: string;
   last_hostname: string | null;
   last_user: string | null;
+  request_count: number;
+  first_payload: string | null;
 }
 
 interface Account {
@@ -338,7 +340,21 @@ export default function PendingIPsPage() {
                               {ip.last_user}
                             </span>
                           )}
+                          <span className="flex items-center gap-1 text-xs text-gray-600 bg-blue-50 px-2 py-0.5 rounded">
+                            {t('requestCount', { count: ip.request_count })}
+                          </span>
                         </div>
+                      )}
+
+                      {ip.first_payload && (
+                        <details className="mb-1">
+                          <summary className="text-xs text-blue-600 cursor-pointer hover:text-blue-800">
+                            {t('viewPayload')}
+                          </summary>
+                          <pre className="text-xs bg-gray-50 border rounded p-2 mt-1 overflow-x-auto max-w-lg whitespace-pre-wrap">
+                            {JSON.stringify(JSON.parse(ip.first_payload), null, 2)}
+                          </pre>
+                        </details>
                       )}
 
                       <div className="text-xs text-gray-500">

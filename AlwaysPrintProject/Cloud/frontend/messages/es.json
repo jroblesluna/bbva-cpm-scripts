@@ -617,6 +617,8 @@
     "emptyFilter": "No se encontraron IPs con ese criterio de búsqueda.",
     "pending": "Pendiente",
     "firstSeen": "Primera vez:",
+    "requestCount": "{count} solicitudes",
+    "viewPayload": "Ver payload del primer request",
     "authorize": "Autorizar",
     "reject": "Rechazar",
     "authorizing": "Autorizando...",

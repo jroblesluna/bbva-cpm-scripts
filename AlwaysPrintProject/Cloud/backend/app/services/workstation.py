@@ -304,6 +304,7 @@ class WorkstationService:
         public_ip: str,
         hostname: Optional[str] = None,
         current_user: Optional[str] = None,
+        registration_payload: Optional[dict] = None,
     ) -> tuple[Optional[Organization], bool]:
         """
         Registra una IP pública o la pone en cola de autorización.
@@ -311,20 +312,22 @@ class WorkstationService:
         Flujo:
         1. Buscar si la IP ya está registrada
         2. Si está autorizada, devolver la organización
-        3. Si está pendiente, actualizar metadata y devolver None
-        4. Si no existe, crearla como pendiente
+        3. Si está pendiente, incrementar request_count, actualizar metadata y devolver None
+        4. Si no existe, crearla como pendiente con request_count=1 y first_payload
 
         Args:
             db: Sesión de base de datos
             public_ip: Dirección IP pública
             hostname: Hostname de la estación (opcional)
             current_user: Usuario activo en la estación (opcional)
+            registration_payload: Diccionario completo del request de registro (opcional)
 
         Returns:
             Tupla (organization, is_authorized) donde:
             - organization: Organization si está autorizada, None si está pendiente
             - is_authorized: True si está autorizada, False si está pendiente
         """
+        import json
         from app.models.organization import PublicIP
 
         # Buscar IP existente
@@ -338,7 +341,8 @@ class WorkstationService:
                 # Autorizada: devolver organización
                 return public_ip_record.organization, True
             else:
-                # Pendiente: actualizar metadata con la info más reciente
+                # Pendiente: incrementar contador y actualizar metadata con la info más reciente
+                public_ip_record.request_count = (public_ip_record.request_count or 0) + 1
                 if hostname is not None:
                     public_ip_record.last_hostname = hostname
                 if current_user is not None:
@@ -346,7 +350,14 @@ class WorkstationService:
                 db.commit()
                 return None, False
 
-        # IP nueva: registrar como pendiente
+        # IP nueva: registrar como pendiente con payload del primer request
+        payload_json = None
+        if registration_payload:
+            try:
+                payload_json = json.dumps(registration_payload, ensure_ascii=False, default=str)
+            except (TypeError, ValueError):
+                payload_json = None
+
         new_public_ip = PublicIP(
             ip_address=public_ip,
             is_authorized=False,
@@ -354,6 +365,8 @@ class WorkstationService:
             description=f"Detectada automáticamente el {datetime.now(timezone.utc).replace(tzinfo=None).strftime('%Y-%m-%d %H:%M:%S')}",
             last_hostname=hostname,
             last_user=current_user,
+            request_count=1,
+            first_payload=payload_json,
         )
 
         db.add(new_public_ip)
@@ -499,7 +512,16 @@ class WorkstationService:
         
         # 2. Workstation nueva: verificar autorización de IP pública
         account, is_authorized = self.register_or_queue_public_ip(
-            db, public_ip, hostname=hostname, current_user=current_user
+            db, public_ip, hostname=hostname, current_user=current_user,
+            registration_payload={
+                "ip_private": ip_private,
+                "public_ip": public_ip,
+                "hostname": hostname,
+                "os_serial": os_serial,
+                "current_user": current_user,
+                "cidr": cidr,
+                "tray_version": tray_version,
+            }
         )
         
         if not is_authorized:

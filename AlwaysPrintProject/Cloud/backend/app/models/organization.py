@@ -8,7 +8,7 @@ Este módulo define:
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, TypeDecorator
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Text, TypeDecorator
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
 
@@ -159,6 +159,10 @@ class PublicIP(Base):
     # Metadata de la última estación que intentó registrarse desde esta IP
     last_hostname = Column(String(255), nullable=True)
     last_user = Column(String(255), nullable=True)
+
+    # Contador de intentos de registro y payload del primer intento (diagnóstico)
+    request_count = Column(Integer, nullable=False, default=1, server_default='1')
+    first_payload = Column(Text, nullable=True)  # JSON del primer request completo
 
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

@@ -617,6 +617,8 @@
     "emptyFilter": "No IPs found matching that search criteria.",
     "pending": "Pending",
     "firstSeen": "First seen:",
+    "requestCount": "{count} requests",
+    "viewPayload": "View first request payload",
     "authorize": "Authorize",
     "reject": "Reject",
     "authorizing": "Authorizing...",
