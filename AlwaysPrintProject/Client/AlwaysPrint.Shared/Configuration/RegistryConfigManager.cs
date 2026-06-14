@@ -254,7 +254,8 @@ namespace AlwaysPrint.Shared.Configuration
         /// Requiere privilegios de administrador (servicio o Tray elevado).
         /// </summary>
         /// <param name="value">Ventana de jitter en segundos a persistir.</param>
-        public void SaveJitterWindowSeconds(int value)
+        /// <returns>true si la escritura fue exitosa, false si falló.</returns>
+        public bool SaveJitterWindowSeconds(int value)
         {
             try
             {
@@ -265,9 +266,10 @@ namespace AlwaysPrint.Shared.Configuration
                         AlwaysPrintLogger.WriteWarning(
                             "RegistryConfigManager.SaveJitterWindowSeconds: no se pudo abrir/crear la clave de registro.",
                             AlwaysPrintLogger.EvtGenericWarning);
-                        return;
+                        return false;
                     }
                     key.SetValue("JitterWindowSeconds", value, RegistryValueKind.DWord);
+                    return true;
                 }
             }
             catch (Exception ex)
@@ -275,6 +277,7 @@ namespace AlwaysPrint.Shared.Configuration
                 AlwaysPrintLogger.WriteWarning(
                     $"RegistryConfigManager.SaveJitterWindowSeconds: error escribiendo JitterWindowSeconds. {ex.Message}",
                     AlwaysPrintLogger.EvtGenericWarning);
+                return false;
             }
         }
 

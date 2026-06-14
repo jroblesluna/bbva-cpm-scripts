@@ -790,16 +790,24 @@ namespace AlwaysPrintTray.Cloud
             {
                 int jitterValue = jitterToken.Value<int>();
 
-                _registry.SaveJitterWindowSeconds(jitterValue);
+                bool saved = _registry.SaveJitterWindowSeconds(jitterValue);
 
-                AlwaysPrintLogger.WriteTrayInfo(
-                    $"CloudManager: jitter_window_seconds={jitterValue} persistido en Registry.");
+                if (saved)
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: jitter_window_seconds={jitterValue} persistido en Registry.");
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"CloudManager: no se pudo persistir jitter_window_seconds={jitterValue} en Registry (permisos insuficientes). Se usará el valor previo.");
+                }
             }
             catch (Exception ex)
             {
-                // Si falla, loggear y continuar con el valor previo almacenado en Registry
+                // Si falla el parsing del valor, loggear y continuar
                 AlwaysPrintLogger.WriteTrayWarning(
-                    $"CloudManager: error al persistir jitter_window_seconds en Registry. Se mantiene el valor previo. {ex.Message}");
+                    $"CloudManager: error al procesar jitter_window_seconds del payload. Se mantiene el valor previo. {ex.Message}");
             }
         }
 
