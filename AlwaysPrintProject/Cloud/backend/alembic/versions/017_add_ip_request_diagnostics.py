@@ -1,6 +1,6 @@
 """Agregar request_count y first_payload a public_ips
 
-Revision ID: 017_add_request_count_payload_to_public_ips
+Revision ID: 017_add_ip_request_diagnostics
 Revises: 016_add_jitter_window_orgs
 Create Date: 2026-06-14 22:00:00.000000
 
@@ -15,7 +15,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = '017_add_request_count_payload_to_public_ips'
+revision: str = '017_add_ip_request_diagnostics'
 down_revision: Union[str, None] = '016_add_jitter_window_orgs'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
