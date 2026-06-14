@@ -17,7 +17,7 @@ import pytest
 from hypothesis import given, settings as hypothesis_settings
 from hypothesis import strategies as st
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -25,6 +25,8 @@ from app.core.database import Base, get_db
 from app.core.security import require_admin
 from app.models.organization import Organization as Account
 from app.models.user import User, UserRole
+# Importar todos los modelos para que Base.metadata.create_all() cree todas las tablas
+import app.models  # noqa: F401 - Registra todas las tablas en metadata
 from app.main import app
 
 
@@ -37,6 +39,9 @@ engine = create_engine(
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
+
+# Crear todas las tablas una sola vez al inicio del módulo
+Base.metadata.create_all(bind=engine)
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -95,9 +100,6 @@ def test_organization_flag_toggle_consistency(toggle_sequence: list[bool]):
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[require_admin] = override_require_admin
 
-    # Crear tablas frescas para cada ejemplo
-    Base.metadata.create_all(bind=engine)
-
     # Crear una organización de prueba en la BD
     db = TestingSessionLocal()
     org_id = uuid.uuid4()
@@ -135,5 +137,8 @@ def test_organization_flag_toggle_consistency(toggle_sequence: list[bool]):
     )
     db.close()
 
-    # Limpiar tablas después de cada ejemplo
-    Base.metadata.drop_all(bind=engine)
+    # Limpiar datos de la organización de prueba (sin drop_all para evitar FK issues)
+    db = TestingSessionLocal()
+    db.execute(text(f"DELETE FROM organizations WHERE id = '{org_id}'"))
+    db.commit()
+    db.close()

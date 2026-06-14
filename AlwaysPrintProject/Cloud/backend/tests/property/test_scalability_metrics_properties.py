@@ -184,24 +184,26 @@ class TestMemoryPerWorkstationAverage:
         self, rss_mb: float, ws_count: int
     ):
         """
-        El campo avg_per_workstation_mb siempre es igual a round(rss_mb / ws_count, 2)
-        para cualquier rss_mb >= 0 y ws_count > 0.
+        El campo avg_per_workstation_mb se calcula como el overhead marginal
+        (rss_actual - baseline) dividido por ws_count. Si no hay baseline,
+        retorna 0.0. Si overhead <= 0, retorna 0.0.
 
-        Se verifica directamente el cálculo del promedio de memoria por workstation.
+        Se usa un baseline fijo de 0.0 para que el overhead sea igual a rss_mb,
+        verificando así que: avg = round(rss_mb / ws_count, 2).
 
         **Validates: Requirements 3.3**
         """
-        # Calcular el valor esperado según la propiedad definida
-        expected_avg = round(rss_mb / ws_count, 2)
-
         # Convertir rss_mb de vuelta a vmrss_kb para simular /proc/self/status
-        # Nota: se usa el valor redondeado que generaría el colector para evitar
-        # discrepancias de redondeo intermedio
         vmrss_kb = round(rss_mb * 1024)
         # El rss_mb real que calcula el colector es round(vmrss_kb / 1024, 2)
         actual_rss_mb = round(vmrss_kb / 1024, 2)
-        # Recalcular expected_avg con el rss_mb real del colector
-        expected_avg = round(actual_rss_mb / ws_count, 2)
+        # Con baseline = 0.0, el overhead es actual_rss_mb completo
+        # avg_per_workstation_mb = round(overhead / ws_count, 2)
+        overhead_mb = actual_rss_mb - 0.0  # baseline es 0.0
+        if overhead_mb > 0:
+            expected_avg = round(overhead_mb / ws_count, 2)
+        else:
+            expected_avg = 0.0
 
         # Construir contenido simulado de /proc/self/status
         proc_status_content = (
@@ -230,6 +232,8 @@ class TestMemoryPerWorkstationAverage:
                 {"app.services.websocket_manager": mock_ws_module},
             ):
                 collector = ScalabilityMetricsCollector()
+                # Establecer baseline en 0.0 para que el overhead = rss_mb completo
+                collector._baseline_rss_mb = 0.0
                 resultado = collector.collect_python_memory()
 
         # Verificar que el resultado no es None

@@ -12,15 +12,20 @@ from botocore.exceptions import ClientError
 from app.services.s3_update_service import S3UpdateService
 
 
+# Nombre del bucket configurado en settings (parametrizado por entorno)
+EXPECTED_BUCKET = "alwaysprint-prod-artifacts"
+EXPECTED_KEY = "latest/AlwaysPrint.msi"
+
+
 class TestS3UpdateServiceGetMsiMetadata:
     """Tests para el método get_msi_metadata()."""
 
-    @patch('app.services.s3_update_service.boto3.client')
-    def test_retorna_metadata_completa_cuando_s3_responde(self, mock_boto_client):
+    @patch('app.services.s3_update_service.boto3.Session')
+    def test_retorna_metadata_completa_cuando_s3_responde(self, mock_session_cls):
         """Verifica que se extraen correctamente todos los campos de metadata."""
-        # Configurar mock de S3
+        # Configurar mock de la sesión y el cliente S3
         mock_s3 = MagicMock()
-        mock_boto_client.return_value = mock_s3
+        mock_session_cls.return_value.client.return_value = mock_s3
         mock_s3.head_object.return_value = {
             'Metadata': {
                 'version': '2.1.0',
@@ -33,16 +38,21 @@ class TestS3UpdateServiceGetMsiMetadata:
         servicio = S3UpdateService()
         resultado = servicio.get_msi_metadata()
 
+        # Verificar que se llamó head_object con el bucket parametrizado
+        mock_s3.head_object.assert_called_once_with(
+            Bucket=EXPECTED_BUCKET,
+            Key=EXPECTED_KEY
+        )
         assert resultado['version'] == '2.1.0'
         assert resultado['build_date'] == '2026-06-01T10:30:00Z'
         assert resultado['commit_hash'] == 'abc1234'
         assert resultado['file_size'] == 15728640
 
-    @patch('app.services.s3_update_service.boto3.client')
-    def test_retorna_valores_por_defecto_cuando_metadata_vacia(self, mock_boto_client):
+    @patch('app.services.s3_update_service.boto3.Session')
+    def test_retorna_valores_por_defecto_cuando_metadata_vacia(self, mock_session_cls):
         """Verifica que se usan valores por defecto cuando la metadata no tiene campos."""
         mock_s3 = MagicMock()
-        mock_boto_client.return_value = mock_s3
+        mock_session_cls.return_value.client.return_value = mock_s3
         mock_s3.head_object.return_value = {
             'Metadata': {},
             'ContentLength': 0,
@@ -56,11 +66,11 @@ class TestS3UpdateServiceGetMsiMetadata:
         assert resultado['commit_hash'] == ''
         assert resultado['file_size'] == 0
 
-    @patch('app.services.s3_update_service.boto3.client')
-    def test_propaga_client_error_cuando_objeto_no_existe(self, mock_boto_client):
+    @patch('app.services.s3_update_service.boto3.Session')
+    def test_propaga_client_error_cuando_objeto_no_existe(self, mock_session_cls):
         """Verifica que se propaga ClientError cuando el objeto S3 no existe."""
         mock_s3 = MagicMock()
-        mock_boto_client.return_value = mock_s3
+        mock_session_cls.return_value.client.return_value = mock_s3
         mock_s3.head_object.side_effect = ClientError(
             {'Error': {'Code': '404', 'Message': 'Not Found'}},
             'HeadObject'
@@ -73,11 +83,11 @@ class TestS3UpdateServiceGetMsiMetadata:
 
         assert exc_info.value.response['Error']['Code'] == '404'
 
-    @patch('app.services.s3_update_service.boto3.client')
-    def test_propaga_client_error_cuando_s3_no_disponible(self, mock_boto_client):
+    @patch('app.services.s3_update_service.boto3.Session')
+    def test_propaga_client_error_cuando_s3_no_disponible(self, mock_session_cls):
         """Verifica que se propaga ClientError cuando S3 no está disponible."""
         mock_s3 = MagicMock()
-        mock_boto_client.return_value = mock_s3
+        mock_session_cls.return_value.client.return_value = mock_s3
         mock_s3.head_object.side_effect = ClientError(
             {'Error': {'Code': '503', 'Message': 'Service Unavailable'}},
             'HeadObject'
@@ -92,45 +102,47 @@ class TestS3UpdateServiceGetMsiMetadata:
 class TestS3UpdateServiceGenerateDownloadUrl:
     """Tests para el método generate_download_url()."""
 
-    @patch('app.services.s3_update_service.boto3.client')
-    def test_genera_url_con_expiracion_por_defecto(self, mock_boto_client):
+    @patch('app.services.s3_update_service.boto3.Session')
+    def test_genera_url_con_expiracion_por_defecto(self, mock_session_cls):
         """Verifica que se genera URL presigned con expiración de 1 hora."""
         mock_s3 = MagicMock()
-        mock_boto_client.return_value = mock_s3
+        mock_session_cls.return_value.client.return_value = mock_s3
         mock_s3.generate_presigned_url.return_value = 'https://s3.amazonaws.com/presigned-url'
 
         servicio = S3UpdateService()
         url = servicio.generate_download_url()
 
         assert url == 'https://s3.amazonaws.com/presigned-url'
+        # Verificar que se usa el bucket parametrizado por entorno
         mock_s3.generate_presigned_url.assert_called_once_with(
             'get_object',
-            Params={'Bucket': 'alwaysprint-prod-artifacts', 'Key': 'latest/AlwaysPrint.msi'},
+            Params={'Bucket': EXPECTED_BUCKET, 'Key': EXPECTED_KEY},
             ExpiresIn=3600
         )
 
-    @patch('app.services.s3_update_service.boto3.client')
-    def test_genera_url_con_expiracion_personalizada(self, mock_boto_client):
+    @patch('app.services.s3_update_service.boto3.Session')
+    def test_genera_url_con_expiracion_personalizada(self, mock_session_cls):
         """Verifica que se respeta el parámetro expires_in personalizado."""
         mock_s3 = MagicMock()
-        mock_boto_client.return_value = mock_s3
+        mock_session_cls.return_value.client.return_value = mock_s3
         mock_s3.generate_presigned_url.return_value = 'https://s3.amazonaws.com/custom-url'
 
         servicio = S3UpdateService()
         url = servicio.generate_download_url(expires_in=7200)
 
         assert url == 'https://s3.amazonaws.com/custom-url'
+        # Verificar que se respeta expiración personalizada con bucket correcto
         mock_s3.generate_presigned_url.assert_called_once_with(
             'get_object',
-            Params={'Bucket': 'alwaysprint-prod-artifacts', 'Key': 'latest/AlwaysPrint.msi'},
+            Params={'Bucket': EXPECTED_BUCKET, 'Key': EXPECTED_KEY},
             ExpiresIn=7200
         )
 
-    @patch('app.services.s3_update_service.boto3.client')
-    def test_propaga_client_error_al_generar_url(self, mock_boto_client):
+    @patch('app.services.s3_update_service.boto3.Session')
+    def test_propaga_client_error_al_generar_url(self, mock_session_cls):
         """Verifica que se propaga ClientError si falla la generación de URL."""
         mock_s3 = MagicMock()
-        mock_boto_client.return_value = mock_s3
+        mock_session_cls.return_value.client.return_value = mock_s3
         mock_s3.generate_presigned_url.side_effect = ClientError(
             {'Error': {'Code': 'AccessDenied', 'Message': 'Access Denied'}},
             'GeneratePresignedUrl'

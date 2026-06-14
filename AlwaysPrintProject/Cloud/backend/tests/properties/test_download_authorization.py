@@ -121,11 +121,18 @@ class TestDownloadEndpointAuthorization:
             # Crear cliente de test con allow_redirects=False para capturar el 302
             client = TestClient(app, raise_server_exceptions=False)
 
-            # Mock de S3UpdateService.generate_download_url para evitar llamadas reales a AWS
+            # Mock de S3UpdateService para evitar llamadas reales a AWS
             with patch(
                 "app.api.v1.endpoints.updates.S3UpdateService"
             ) as MockS3Service:
                 mock_s3_instance = MagicMock()
+                # El endpoint ahora usa get_object para streaming directo (200)
+                mock_body = MagicMock()
+                mock_body.iter_chunks.return_value = iter([b"fake-msi-content"])
+                mock_s3_instance.get_object.return_value = {
+                    'Body': mock_body,
+                    'ContentLength': 100,
+                }
                 mock_s3_instance.generate_download_url.return_value = DUMMY_PRESIGNED_URL
                 MockS3Service.return_value = mock_s3_instance
 
@@ -136,14 +143,12 @@ class TestDownloadEndpointAuthorization:
                     follow_redirects=False,
                 )
 
-            # Verificar la propiedad: 302 si y solo si auto_update_enabled es True
+            # Verificar la propiedad: 200 si y solo si auto_update_enabled es True
             if auto_update_enabled:
-                assert response.status_code == 302, (
-                    f"Con auto_update_enabled=True se esperaba 302, "
+                assert response.status_code == 200, (
+                    f"Con auto_update_enabled=True se esperaba 200, "
                     f"pero se obtuvo {response.status_code}"
                 )
-                # Verificar que el redirect apunta a la URL presigned
-                assert response.headers.get("location") == DUMMY_PRESIGNED_URL
             else:
                 assert response.status_code == 403, (
                     f"Con auto_update_enabled=False se esperaba 403, "

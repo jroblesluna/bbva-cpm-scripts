@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -297,6 +298,69 @@ async def admin_delete_versions(
     }
 
 
+def _register_pending_ip(db: Session, request: Request) -> None:
+    """
+    Registra una IP pública desconocida como pendiente de aprobación.
+
+    Usa upsert (INSERT ... ON CONFLICT) para idempotencia.
+    Solo actualiza metadata (last_hostname, last_user) si el registro
+    existente tiene is_authorized=False.
+
+    Errores de BD se capturan silenciosamente — no deben interrumpir
+    el flujo HTTP 401 al cliente.
+    """
+    try:
+        client_ip = get_client_ip(request)
+        now = datetime.utcnow()
+
+        # Extraer metadata de headers (solo valores no vacíos)
+        hostname_header = request.headers.get("X-Workstation-ID") or None
+        user_header = request.headers.get("X-Workstation-Local-IP") or None
+
+        # Valores para el INSERT inicial
+        insert_values = {
+            "ip_address": client_ip,
+            "is_authorized": False,
+            "organization_id": None,
+            "first_seen": now,
+            "last_hostname": hostname_header,
+            "last_user": user_header,
+        }
+
+        # Construir el SET para ON CONFLICT DO UPDATE
+        # Solo actualizar campos cuyo header está presente y no vacío
+        update_set = {}
+        if hostname_header:
+            update_set["last_hostname"] = hostname_header
+        if user_header:
+            update_set["last_user"] = user_header
+
+        stmt = pg_insert(PublicIP).values(**insert_values)
+
+        if update_set:
+            # Solo actualizar metadata si hay headers presentes Y el registro es pendiente
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["ip_address"],
+                set_=update_set,
+                where=(PublicIP.is_authorized == False),
+            )
+        else:
+            # Sin headers para actualizar: no modificar nada en conflicto
+            stmt = stmt.on_conflict_do_nothing(
+                index_elements=["ip_address"],
+            )
+
+        db.execute(stmt)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.warning(
+            "Error al registrar IP pendiente: ip=%s, error=%s",
+            get_client_ip(request),
+            str(e),
+        )
+
+
 def _identify_workstation(request: Request, db: Session) -> Workstation:
     """
     Identifica la workstation que realiza la solicitud.
@@ -492,6 +556,18 @@ def check_update(
             )
         else:
             # Tampoco se pudo identificar la organización
+            # → Registrar IP como pendiente antes de retornar 401
+            ip_publica = client_ip
+            x_workstation_id = request.headers.get("X-Workstation-ID", "no-presente")
+            x_workstation_local_ip = request.headers.get("X-Workstation-Local-IP", "no-presente")
+            logger.warning(
+                "IP no autorizada intentando verificar actualizaciones: "
+                "ip_publica=%s, x_workstation_id=%s, x_workstation_local_ip=%s",
+                ip_publica,
+                x_workstation_id,
+                x_workstation_local_ip,
+            )
+            _register_pending_ip(db, request)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Workstation no autenticada"

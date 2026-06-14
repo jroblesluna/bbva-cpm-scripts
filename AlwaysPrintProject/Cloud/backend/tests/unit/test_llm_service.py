@@ -118,7 +118,8 @@ class TestBedrockProviderRetry:
         with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             result = await provider.invoke("test payload", 4096)
 
-        assert result == "Análisis completado exitosamente."
+        # invoke() retorna tupla (texto, input_tokens, output_tokens)
+        assert result == ("Análisis completado exitosamente.", 100, 50)
         # Verificar que se esperó con backoff exponencial (1s, 2s)
         assert mock_sleep.call_count == 2
         mock_sleep.assert_any_call(1)
@@ -203,7 +204,8 @@ class TestBedrockProviderRetry:
         with caplog.at_level(logging.INFO, logger="app.services.llm_service"):
             result = await provider.invoke("test payload", 4096)
 
-        assert result == "Resultado del análisis."
+        # invoke() retorna tupla (texto, input_tokens, output_tokens)
+        assert result == ("Resultado del análisis.", 250, 120)
         # Verificar que se loggearon las métricas
         assert any("input_tokens: 250" in record.message for record in caplog.records)
         assert any("output_tokens: 120" in record.message for record in caplog.records)
@@ -239,7 +241,8 @@ class TestBedrockProviderRetry:
         with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             result = await provider.invoke("test", 4096)
 
-        assert result == "OK"
+        # invoke() retorna tupla (texto, input_tokens, output_tokens)
+        assert result == ("OK", 10, 5)
         mock_sleep.assert_called_once_with(1)
 
 
@@ -306,14 +309,16 @@ class TestLLMServiceInvoke:
         """
         service = LLMService()
         mock_provider = AsyncMock()
-        mock_provider.invoke = AsyncMock(return_value="Respuesta del LLM")
+        # invoke() ahora retorna tupla (texto, input_tokens, output_tokens)
+        mock_provider.invoke = AsyncMock(return_value=("Respuesta del LLM", 100, 50))
         mock_provider.get_provider_name = MagicMock(return_value="bedrock:test-model")
         service._provider = mock_provider
 
         with caplog.at_level(logging.INFO, logger="app.services.llm_service"):
             result = await service.invoke("payload de prueba")
 
-        assert result == "Respuesta del LLM"
+        # LLMService.invoke() retorna la tupla completa
+        assert result == ("Respuesta del LLM", 100, 50)
         # Verificar que se loggeó la duración
         assert any("duración" in record.message for record in caplog.records)
         assert any("invocación completada" in record.message for record in caplog.records)
@@ -370,7 +375,8 @@ class TestOpenAIProvider:
         with patch("httpx.AsyncClient", return_value=mock_client_instance):
             result = await provider.invoke("test payload", 4096)
 
-        assert result == "Análisis OpenAI completado."
+        # invoke() retorna tupla (texto, input_tokens, output_tokens)
+        assert result == ("Análisis OpenAI completado.", 200, 80)
         # Verificar que se llamó con los headers correctos
         mock_client_instance.post.assert_called_once()
         call_kwargs = mock_client_instance.post.call_args
@@ -407,7 +413,8 @@ class TestOpenAIProvider:
             with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
                 result = await provider.invoke("test", 4096)
 
-        assert result == "OK"
+        # invoke() retorna tupla (texto, input_tokens, output_tokens)
+        assert result == ("OK", 10, 5)
         mock_sleep.assert_called_once_with(1)
 
     @pytest.mark.asyncio
@@ -491,7 +498,8 @@ class TestAnthropicProvider:
         with patch("httpx.AsyncClient", return_value=mock_client_instance):
             result = await provider.invoke("test payload", 4096)
 
-        assert result == "Análisis Anthropic completado."
+        # invoke() retorna tupla (texto, input_tokens, output_tokens)
+        assert result == ("Análisis Anthropic completado.", 300, 150)
         # Verificar headers de Anthropic
         call_kwargs = mock_client_instance.post.call_args
         assert "x-api-key" in str(call_kwargs) or "sk-ant-test-key" in str(call_kwargs)
@@ -527,7 +535,8 @@ class TestAnthropicProvider:
             with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
                 result = await provider.invoke("test", 4096)
 
-        assert result == "OK"
+        # invoke() retorna tupla (texto, input_tokens, output_tokens)
+        assert result == ("OK", 10, 5)
         mock_sleep.assert_called_once_with(1)
 
     @pytest.mark.asyncio
@@ -606,4 +615,5 @@ class TestAnthropicProvider:
         with patch("httpx.AsyncClient", return_value=mock_client_instance):
             result = await provider.invoke("test", 4096)
 
-        assert result == "Primera parte. Segunda parte."
+        # invoke() retorna tupla (texto, input_tokens, output_tokens)
+        assert result == ("Primera parte. Segunda parte.", 50, 30)
