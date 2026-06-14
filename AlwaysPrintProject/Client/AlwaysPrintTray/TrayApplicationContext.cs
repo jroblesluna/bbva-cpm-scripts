@@ -210,7 +210,7 @@ namespace AlwaysPrintTray
                     try
                     {
                         var credentials = new CloudCredentialsManager();
-                        _cloudManager = new CloudManager(cfg, credentials, _pipe, _uiContext, _trayIcon);
+                        _cloudManager = new CloudManager(cfg, credentials, _registry, _pipe, _uiContext, _trayIcon);
                         // Capturar cfg para el callback
                         var cfgForCallback = cfg;
                         _cloudManager.Registered += () => OnCloudManagerRegistered(cfgForCallback);
@@ -755,7 +755,7 @@ namespace AlwaysPrintTray
                         
                         // 5. Iniciar CloudManager con la configuración actualizada
                         var credentials = new CloudCredentialsManager();
-                        _cloudManager = new CloudManager(cfg, credentials, _pipe, _uiContext, _trayIcon);
+                        _cloudManager = new CloudManager(cfg, credentials, _registry, _pipe, _uiContext, _trayIcon);
                         _cloudManager.Registered += () => OnCloudManagerRegistered(cfg);
                         _cloudManager.CheckUpdateRequested += OnCheckUpdateRequested;
                         _cloudManager.Start();

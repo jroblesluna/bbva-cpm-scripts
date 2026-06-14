@@ -327,6 +327,69 @@ class S3UpdateService:
             logger.error("Error al subir MSI a S3: %s", str(e))
             raise
 
+    def get_broadcast_update_info(self, target_version: str | None = None) -> dict | None:
+        """
+        Obtiene información completa para broadcast de actualización (zero-query).
+
+        Método de conveniencia que resuelve la clave S3 según target_version,
+        obtiene metadata del MSI y genera una presigned URL en una sola llamada.
+        Diseñado para enriquecer el mensaje WebSocket de check_update, permitiendo
+        a las workstations descargar directamente desde S3 sin queries al backend.
+
+        Args:
+            target_version: Versión objetivo de la organización. Si es None,
+                se usa el MSI más reciente (latest/AlwaysPrint.msi).
+                Si está definida, se usa versions/{target_version}/AlwaysPrint.msi.
+
+        Returns:
+            dict con claves: download_url, version, file_size
+            None si ocurre un error de S3 (permite fallback al flujo legacy)
+        """
+        try:
+            # Resolver la clave S3 según target_version de la organización
+            if target_version:
+                s3_key = f"versions/{target_version}/AlwaysPrint.msi"
+            else:
+                s3_key = self._key  # latest/AlwaysPrint.msi
+
+            logger.info(
+                "Obteniendo info de broadcast para actualización: "
+                "target_version=%s, s3_key=%s",
+                target_version or "latest",
+                s3_key
+            )
+
+            # Obtener metadata del MSI (versión y tamaño)
+            metadata = self.get_msi_metadata(key=s3_key)
+
+            # Generar presigned URL con expiración de 1 hora
+            download_url = self.generate_download_url(key=s3_key, expires_in=3600)
+
+            resultado = {
+                'download_url': download_url,
+                'version': metadata['version'],
+                'file_size': metadata['file_size'],
+            }
+
+            logger.info(
+                "Info de broadcast obtenida exitosamente: version=%s, "
+                "file_size=%d bytes, url_generada=True",
+                resultado['version'],
+                resultado['file_size']
+            )
+
+            return resultado
+
+        except ClientError as e:
+            # Si S3 falla, retornar None para permitir fallback al flujo legacy
+            logger.warning(
+                "Error de S3 al obtener info de broadcast (se usará fallback legacy): "
+                "target_version=%s, error=%s",
+                target_version or "latest",
+                str(e)
+            )
+            return None
+
     def generate_download_url(self, key: str = None, expires_in: int = 3600, filename: str = None) -> str:
         """
         Genera una URL presigned para descargar el MSI desde S3.
