@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient, organizationsApi, logAnalysisApi } from '@/lib/api'
@@ -71,6 +71,9 @@ export default function EditOrganizationPage() {
   const [openaiApiKey, setOpenaiApiKey] = useState<string | null>(null)
   const [jitterWindowSeconds, setJitterWindowSeconds] = useState(30)
   const [jitterWindowError, setJitterWindowError] = useState('')
+  const [activeWorkstationCount, setActiveWorkstationCount] = useState<number>(0)
+  const [debouncedJitterWindow, setDebouncedJitterWindow] = useState(30)
+  const jitterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [generalDirty, setGeneralDirty] = useState(false)
   const [savingGeneral, setSavingGeneral] = useState(false)
 
@@ -162,6 +165,35 @@ export default function EditOrganizationPage() {
     }
     loadVersions()
   }, [])
+
+  // === CARGAR WORKSTATIONS ACTIVAS DE LA ORG (para cálculo de jitter) ===
+  useEffect(() => {
+    if (!orgId) return
+    const loadActiveCount = async () => {
+      try {
+        const res = await apiClient.get(`/workstations/`, { params: { organization_id: orgId, is_online: true, page_size: 1 } })
+        setActiveWorkstationCount(res.data?.total ?? 0)
+      } catch {
+        setActiveWorkstationCount(0)
+      }
+    }
+    loadActiveCount()
+  }, [orgId])
+
+  // === DEBOUNCE PARA CÁLCULO DE TASA DE CONEXIONES (300ms) ===
+  useEffect(() => {
+    if (jitterDebounceRef.current) {
+      clearTimeout(jitterDebounceRef.current)
+    }
+    jitterDebounceRef.current = setTimeout(() => {
+      setDebouncedJitterWindow(jitterWindowSeconds)
+    }, 300)
+    return () => {
+      if (jitterDebounceRef.current) {
+        clearTimeout(jitterDebounceRef.current)
+      }
+    }
+  }, [jitterWindowSeconds])
 
   // === HANDLERS: GENERAL ===
   const handleSaveGeneral = async () => {
@@ -444,6 +476,20 @@ export default function EditOrganizationPage() {
                 <p className="text-xs text-red-600">{jitterWindowError}</p>
               )}
               <p className="text-xs text-gray-500">{t('jitterWindowHelper')}</p>
+              {/* Cálculo dinámico de tasa de conexiones */}
+              {activeWorkstationCount > 0 && debouncedJitterWindow >= 5 && debouncedJitterWindow <= 300 ? (
+                <p className="text-xs text-blue-600">
+                  {t('jitterWindowCalculation', {
+                    window: debouncedJitterWindow,
+                    count: activeWorkstationCount,
+                    rate: (activeWorkstationCount / debouncedJitterWindow).toFixed(1),
+                  })}
+                </p>
+              ) : (
+                <p className="text-xs text-amber-600">
+                  {t('jitterWindowNoWorkstations')}
+                </p>
+              )}
             </div>
 
             {/* Save button */}
