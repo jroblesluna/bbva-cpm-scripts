@@ -461,6 +461,7 @@ async def send_vlan_command(
                         "download_url": update_info["download_url"],
                         "version": update_info["version"],
                         "file_size": update_info["file_size"],
+                        "auto_update_enabled": True,
                     }
                 else:
                     vlans_logger.warning(
