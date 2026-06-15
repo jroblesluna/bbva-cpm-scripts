@@ -58,7 +58,7 @@ import { LogAnalysisHistory } from '@/components/workstations/LogAnalysisHistory
 import { LogAnalysisButton } from '@/components/workstations/LogAnalysisButton';
 
 type ViewMode = 'cards' | 'table';
-type SortField = 'ip_private' | 'hostname' | 'current_user' | 'organization' | 'tray_version' | 'last_connection' | 'is_online';
+type SortField = 'ip_private' | 'hostname' | 'current_user' | 'organization' | 'tray_version' | 'action_config' | 'last_connection' | 'is_online';
 type SortDirection = 'asc' | 'desc';
 
 export default function WorkstationsPage() {
@@ -300,6 +300,10 @@ export default function WorkstationsPage() {
         return dir * (a.organization?.name ?? '').localeCompare(b.organization?.name ?? '');
       case 'tray_version':
         return dir * (a.tray_version ?? '').localeCompare(b.tray_version ?? '');
+      case 'action_config':
+        const configA = a.action_config_name ? `${a.action_config_name} ${a.action_config_version ?? ''}` : '';
+        const configB = b.action_config_name ? `${b.action_config_name} ${b.action_config_version ?? ''}` : '';
+        return dir * configA.localeCompare(configB);
       case 'last_connection':
         return dir * (a.last_connection ?? '').localeCompare(b.last_connection ?? '');
       case 'is_online':
@@ -1676,7 +1680,7 @@ function WorkstationTable({
                 <SortHeader field="current_user">Usuario</SortHeader>
                 <SortHeader field="organization">Org</SortHeader>
                 <SortHeader field="tray_version">Versión</SortHeader>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Config</th>
+                <SortHeader field="action_config">Config</SortHeader>
                 <SortHeader field="last_connection">Última Conexión</SortHeader>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Acciones
