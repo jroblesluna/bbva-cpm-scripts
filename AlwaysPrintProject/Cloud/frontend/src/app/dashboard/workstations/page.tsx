@@ -2180,6 +2180,12 @@ function WorkstationDetailModal({
                   </dd>
                 </div>
               )}
+              {!workstation.action_config_name && (
+                <div>
+                  <dt className="text-gray-600">Action Config</dt>
+                  <dd className="font-medium text-gray-400">—</dd>
+                </div>
+              )}
             </dl>
           </div>
           {workstation.organization && (
