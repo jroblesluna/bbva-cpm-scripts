@@ -1670,15 +1670,11 @@ namespace AlwaysPrintTray.Cloud
                         AlwaysPrintLogger.WriteTrayInfo(
                             $"CloudManager: configuración de acciones actualizada. " +
                             $"Nombre: {localInfo.Name}, Hash: {localInfo.Hash}");
-                        
-                        // Notificar al backend el estado actual de la action config
-                        SendActionConfigStatus(localInfo.Name, localInfo.Hash, localInfo.Version);
                     }
                     else
                     {
                         AlwaysPrintLogger.WriteTrayInfo(
                             "CloudManager: no hay configuración de acciones activa en Cloud");
-                        SendActionConfigStatus(null, null, null);
                     }
                 }
                 else
@@ -1686,6 +1682,15 @@ namespace AlwaysPrintTray.Cloud
                     AlwaysPrintLogger.WriteTrayWarning(
                         "CloudManager: error verificando configuración de acciones");
                 }
+
+                // Siempre reportar el estado de la config local al backend
+                // (puede existir localmente aunque la Cloud no tenga config para esta org)
+                var currentConfig = _configManager.GetLocalConfigInfo();
+                SendActionConfigStatus(
+                    currentConfig?.Name,
+                    currentConfig?.Hash,
+                    currentConfig?.Version);
+
                 return success;
             }
             catch (Exception ex)

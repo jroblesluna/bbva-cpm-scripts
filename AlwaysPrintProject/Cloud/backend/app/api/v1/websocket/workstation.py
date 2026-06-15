@@ -387,17 +387,14 @@ async def workstation_websocket(
                 action_config_name = data.get("action_config_name")
                 action_config_hash = data.get("action_config_hash")
                 action_config_version = data.get("action_config_version")
-                if action_config_name is not None or action_config_hash is not None or action_config_version is not None:
+                if "action_config_name" in data or "action_config_hash" in data or "action_config_version" in data:
                     ws_record = db.query(Workstation).filter(
                         Workstation.id == workstation_id
                     ).first()
                     if ws_record:
-                        if action_config_name is not None:
-                            ws_record.action_config_name = action_config_name
-                        if action_config_hash is not None:
-                            ws_record.action_config_hash = action_config_hash
-                        if action_config_version is not None:
-                            ws_record.action_config_version = action_config_version
+                        ws_record.action_config_name = action_config_name
+                        ws_record.action_config_hash = action_config_hash
+                        ws_record.action_config_version = action_config_version
                         db.commit()
                 
                 # Notificar a operadores
