@@ -47,6 +47,7 @@ import {
   Sparkles,
   Settings,
   ListChecks,
+  Cog,
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
@@ -1453,6 +1454,14 @@ function WorkstationCard({
               {workstation.tray_version ? `v${workstation.tray_version}` : '—'}
             </span>
           </div>
+          {workstation.action_config_name && (
+            <div className="flex items-center">
+              <Cog className="w-3.5 h-3.5 mr-1 shrink-0" />
+              <span className="text-xs">
+                {workstation.action_config_name} v{workstation.action_config_version ?? '?'}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Fila 3: Timestamps */}
@@ -1667,6 +1676,7 @@ function WorkstationTable({
                 <SortHeader field="current_user">Usuario</SortHeader>
                 <SortHeader field="organization">Org</SortHeader>
                 <SortHeader field="tray_version">Versión</SortHeader>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Config</th>
                 <SortHeader field="last_connection">Última Conexión</SortHeader>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Acciones
@@ -1733,6 +1743,12 @@ function WorkstationTable({
                   {/* Versión */}
                   <td className="px-3 py-3 whitespace-nowrap font-mono text-xs text-gray-600">
                     {ws.tray_version ? `v${ws.tray_version}` : '—'}
+                  </td>
+                  {/* Config */}
+                  <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-600">
+                    {ws.action_config_name
+                      ? `${ws.action_config_name} v${ws.action_config_version ?? '?'}`
+                      : '—'}
                   </td>
                   {/* Última Conexión */}
                   <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-500">
