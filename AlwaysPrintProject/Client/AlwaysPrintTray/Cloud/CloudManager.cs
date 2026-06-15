@@ -1212,6 +1212,17 @@ namespace AlwaysPrintTray.Cloud
                 long fileSize = paramsObj?["file_size"]?.Value<long>() ?? 0;
                 string version = paramsObj?["version"]?.ToString() ?? "unknown";
 
+                // Verificar que la versión ofrecida sea diferente a la instalada antes de descargar
+                string currentVersion = System.Reflection.Assembly.GetExecutingAssembly()
+                    .GetName().Version?.ToString() ?? "0.0.0.0";
+                if (version == currentVersion)
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: check_update zero-query ignorado — versión ofrecida ({version}) es igual a la instalada.");
+                    SendCommandResult(commandId, true, $"Versión ya instalada ({currentVersion}). Sin descarga.");
+                    return;
+                }
+
                 HandleDirectDownload(downloadUrl, fileSize, version, commandId);
                 return;
             }
@@ -1659,11 +1670,15 @@ namespace AlwaysPrintTray.Cloud
                         AlwaysPrintLogger.WriteTrayInfo(
                             $"CloudManager: configuración de acciones actualizada. " +
                             $"Nombre: {localInfo.Name}, Hash: {localInfo.Hash}");
+                        
+                        // Notificar al backend el estado actual de la action config
+                        SendActionConfigStatus(localInfo.Name, localInfo.Hash);
                     }
                     else
                     {
                         AlwaysPrintLogger.WriteTrayInfo(
                             "CloudManager: no hay configuración de acciones activa en Cloud");
+                        SendActionConfigStatus(null, null);
                     }
                 }
                 else
@@ -1707,6 +1722,32 @@ namespace AlwaysPrintTray.Cloud
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteTrayError($"CloudManager: error en DownloadResources: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Envía status_update al servidor con la información de la action config activa.
+        /// Se invoca después de verificar/actualizar la configuración de acciones.
+        /// </summary>
+        /// <param name="configName">Nombre de la config activa (null si no hay).</param>
+        /// <param name="configHash">Hash de la config activa (null si no hay).</param>
+        private void SendActionConfigStatus(string? configName, string? configHash)
+        {
+            try
+            {
+                if (_wsClient == null || !_wsClient.IsConnected) return;
+
+                _wsClient.Send("status_update", new
+                {
+                    action_config_name = configName,
+                    action_config_hash = configHash,
+                    current_user = Environment.UserName
+                });
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"CloudManager: error enviando status_update de action_config. {ex.Message}");
             }
         }
     }

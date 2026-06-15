@@ -2166,6 +2166,17 @@ function WorkstationDetailModal({
                 <dt className="text-gray-600">Versión Tray</dt>
                 <dd className="font-medium">{workstation.tray_version ?? '—'}</dd>
               </div>
+              {workstation.action_config_name && (
+                <div>
+                  <dt className="text-gray-600">Action Config</dt>
+                  <dd className="font-medium">
+                    {workstation.action_config_name}
+                    {workstation.action_config_hash && (
+                      <span className="ml-1 text-xs text-gray-400 font-mono">({workstation.action_config_hash})</span>
+                    )}
+                  </dd>
+                </div>
+              )}
             </dl>
           </div>
           {workstation.organization && (

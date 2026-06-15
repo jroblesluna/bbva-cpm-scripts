@@ -41,6 +41,8 @@ const workstationArb: fc.Arbitrary<Workstation> = fc.record({
   updated_at: fc.constant('2024-01-01T00:00:00Z'),
   cidr: fc.option(fc.constant('192.168.1.0/24'), { nil: null }),
   tray_version: fc.option(fc.string({ minLength: 1, maxLength: 10 }), { nil: null }),
+  action_config_name: fc.constant(null as string | null),
+  action_config_hash: fc.constant(null as string | null),
   default_printer_id: fc.constant(null as string | null),
 });
 

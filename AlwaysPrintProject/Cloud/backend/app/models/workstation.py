@@ -41,6 +41,10 @@ class Workstation(Base):
     cidr = Column(String(45), nullable=True)  # CIDR reportado por la workstation (ej: "192.168.1.0/24")
     tray_version = Column(String(50), nullable=True)  # Versión del Tray instalado (ej: "2.1.0.0")
     
+    # Información de la action config activa
+    action_config_name = Column(String(100), nullable=True)  # Nombre de la config activa (ej: "CPM_Compliant")
+    action_config_hash = Column(String(16), nullable=True)  # Hash corto de la config activa (ej: "ea5c7184")
+    
     # Estado de la estación
     is_online = Column(Boolean, nullable=False, default=False)
     contingency_active = Column(Boolean, nullable=False, default=False)
