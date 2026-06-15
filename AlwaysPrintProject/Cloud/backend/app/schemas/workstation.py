@@ -106,6 +106,9 @@ class WorkstationResponse(BaseModel):
     updated_at: datetime
     cidr: Optional[str] = Field(None, description="CIDR de la subred reportado por la workstation")
     tray_version: Optional[str] = Field(None, description="Versión del AlwaysPrintTray instalado")
+    action_config_name: Optional[str] = Field(None, description="Nombre de la action config activa")
+    action_config_hash: Optional[str] = Field(None, description="Hash de la action config activa")
+    action_config_version: Optional[str] = Field(None, description="Versión de la action config activa")
     default_printer_id: Optional[UUID] = Field(None, description="ID del dispositivo (impresora) predeterminado")
     
     # Relación con organización (anidada)
