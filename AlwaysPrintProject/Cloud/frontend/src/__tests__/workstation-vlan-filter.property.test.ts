@@ -43,6 +43,7 @@ const workstationArb: fc.Arbitrary<Workstation> = fc.record({
   tray_version: fc.option(fc.string({ minLength: 1, maxLength: 10 }), { nil: null }),
   action_config_name: fc.constant(null as string | null),
   action_config_hash: fc.constant(null as string | null),
+  action_config_version: fc.constant(null as string | null),
   default_printer_id: fc.constant(null as string | null),
 });
 

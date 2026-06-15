@@ -386,7 +386,8 @@ async def workstation_websocket(
                 # Actualizar action_config info si viene en el mensaje
                 action_config_name = data.get("action_config_name")
                 action_config_hash = data.get("action_config_hash")
-                if action_config_name is not None or action_config_hash is not None:
+                action_config_version = data.get("action_config_version")
+                if action_config_name is not None or action_config_hash is not None or action_config_version is not None:
                     ws_record = db.query(Workstation).filter(
                         Workstation.id == workstation_id
                     ).first()
@@ -395,6 +396,8 @@ async def workstation_websocket(
                             ws_record.action_config_name = action_config_name
                         if action_config_hash is not None:
                             ws_record.action_config_hash = action_config_hash
+                        if action_config_version is not None:
+                            ws_record.action_config_version = action_config_version
                         db.commit()
                 
                 # Notificar a operadores

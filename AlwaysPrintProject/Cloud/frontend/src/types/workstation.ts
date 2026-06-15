@@ -23,6 +23,7 @@ export interface Workstation {
   tray_version: string | null
   action_config_name: string | null
   action_config_hash: string | null
+  action_config_version: string | null
   default_printer_id: string | null
   organization?: Organization
   vlan?: VLANBasic | null

@@ -1672,13 +1672,13 @@ namespace AlwaysPrintTray.Cloud
                             $"Nombre: {localInfo.Name}, Hash: {localInfo.Hash}");
                         
                         // Notificar al backend el estado actual de la action config
-                        SendActionConfigStatus(localInfo.Name, localInfo.Hash);
+                        SendActionConfigStatus(localInfo.Name, localInfo.Hash, localInfo.Version);
                     }
                     else
                     {
                         AlwaysPrintLogger.WriteTrayInfo(
                             "CloudManager: no hay configuración de acciones activa en Cloud");
-                        SendActionConfigStatus(null, null);
+                        SendActionConfigStatus(null, null, null);
                     }
                 }
                 else
@@ -1725,13 +1725,19 @@ namespace AlwaysPrintTray.Cloud
             }
         }
 
+        private void SendActionConfigStatus(string? configName, string? configHash)
+        {
+            SendActionConfigStatus(configName, configHash, null);
+        }
+
         /// <summary>
         /// Envía status_update al servidor con la información de la action config activa.
         /// Se invoca después de verificar/actualizar la configuración de acciones.
         /// </summary>
         /// <param name="configName">Nombre de la config activa (null si no hay).</param>
         /// <param name="configHash">Hash de la config activa (null si no hay).</param>
-        private void SendActionConfigStatus(string? configName, string? configHash)
+        /// <param name="configVersion">Versión de la config activa (null si no hay).</param>
+        private void SendActionConfigStatus(string? configName, string? configHash, string? configVersion)
         {
             try
             {
@@ -1741,6 +1747,7 @@ namespace AlwaysPrintTray.Cloud
                 {
                     action_config_name = configName,
                     action_config_hash = configHash,
+                    action_config_version = configVersion,
                     current_user = Environment.UserName
                 });
             }

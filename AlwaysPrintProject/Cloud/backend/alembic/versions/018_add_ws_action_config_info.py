@@ -26,8 +26,13 @@ def upgrade() -> None:
         'workstations',
         sa.Column('action_config_hash', sa.String(16), nullable=True)
     )
+    op.add_column(
+        'workstations',
+        sa.Column('action_config_version', sa.String(20), nullable=True)
+    )
 
 
 def downgrade() -> None:
+    op.drop_column('workstations', 'action_config_version')
     op.drop_column('workstations', 'action_config_hash')
     op.drop_column('workstations', 'action_config_name')

@@ -2171,6 +2171,9 @@ function WorkstationDetailModal({
                   <dt className="text-gray-600">Action Config</dt>
                   <dd className="font-medium">
                     {workstation.action_config_name}
+                    {workstation.action_config_version && (
+                      <span className="ml-1 text-xs text-gray-500">v{workstation.action_config_version}</span>
+                    )}
                     {workstation.action_config_hash && (
                       <span className="ml-1 text-xs text-gray-400 font-mono">({workstation.action_config_hash})</span>
                     )}

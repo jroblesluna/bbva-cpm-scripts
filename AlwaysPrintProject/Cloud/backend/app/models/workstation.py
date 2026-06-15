@@ -44,6 +44,7 @@ class Workstation(Base):
     # Información de la action config activa
     action_config_name = Column(String(100), nullable=True)  # Nombre de la config activa (ej: "CPM_Compliant")
     action_config_hash = Column(String(16), nullable=True)  # Hash corto de la config activa (ej: "ea5c7184")
+    action_config_version = Column(String(20), nullable=True)  # Versión de la config activa (ej: "5.1")
     
     # Estado de la estación
     is_online = Column(Boolean, nullable=False, default=False)
