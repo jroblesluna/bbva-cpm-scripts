@@ -1,5 +1,5 @@
 {
-  "version": "5.8",
+  "version": "5.9",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -305,6 +305,51 @@
             "value_name": "ContingencyPrinterIp",
             "value": "{{contingency_printer_ip}}",
             "value_type": "string"
+          }
+        },
+        {
+          "type": "StopService",
+          "description": "Detener LpdServiceMonitor",
+          "parameters": {
+            "service_name": "LpdServiceMonitor",
+            "graceful_timeout_seconds": 15,
+            "force_kill_on_timeout": true
+          }
+        },
+        {
+          "type": "StopService",
+          "description": "Detener LPDSVC",
+          "parameters": {
+            "service_name": "LPDSVC",
+            "graceful_timeout_seconds": 15,
+            "force_kill_on_timeout": true
+          }
+        },
+        {
+          "type": "StopService",
+          "description": "Detener Spooler",
+          "parameters": {
+            "service_name": "Spooler",
+            "graceful_timeout_seconds": 15,
+            "force_kill_on_timeout": true
+          }
+        },
+        {
+          "type": "DeleteFolderContents",
+          "description": "Eliminar spool pendiente",
+          "parameters": {
+            "path": "C:\\Windows\\System32\\Spool\\Printers",
+            "recursive": true,
+            "ignore_errors": true
+          }
+        },
+        {
+          "type": "StartService",
+          "description": "Iniciar Spooler",
+          "parameters": {
+            "service_name": "Spooler",
+            "wait_for_running": true,
+            "timeout_seconds": 30
           }
         }
       ]
