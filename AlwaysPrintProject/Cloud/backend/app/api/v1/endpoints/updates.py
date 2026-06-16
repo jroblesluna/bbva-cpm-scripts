@@ -303,12 +303,14 @@ def _register_pending_ip(db: Session, request: Request) -> None:
     Registra una IP pública desconocida como pendiente de aprobación.
 
     Usa upsert (INSERT ... ON CONFLICT) para idempotencia.
-    Solo actualiza metadata (last_hostname, last_user) si el registro
-    existente tiene is_authorized=False.
+    - Primera vez: guarda first_payload con info del request y request_count=1
+    - Repetidos: incrementa request_count y actualiza last_hostname/last_user
 
     Errores de BD se capturan silenciosamente — no deben interrumpir
     el flujo HTTP 401 al cliente.
     """
+    import json as json_module
+
     try:
         client_ip = get_client_ip(request)
         now = datetime.utcnow()
@@ -316,6 +318,21 @@ def _register_pending_ip(db: Session, request: Request) -> None:
         # Extraer metadata de headers (solo valores no vacíos)
         hostname_header = request.headers.get("X-Workstation-ID") or None
         user_header = request.headers.get("X-Workstation-Local-IP") or None
+
+        # Construir payload del primer request para diagnóstico
+        first_payload_dict = {
+            "endpoint": str(request.url.path),
+            "method": request.method,
+            "ip": client_ip,
+            "hostname": hostname_header,
+            "user": user_header,
+            "user_agent": request.headers.get("User-Agent"),
+            "timestamp": now.isoformat() + "Z",
+        }
+        try:
+            first_payload_json = json_module.dumps(first_payload_dict, ensure_ascii=False, default=str)
+        except (TypeError, ValueError):
+            first_payload_json = None
 
         # Valores para el INSERT inicial
         insert_values = {
@@ -325,30 +342,24 @@ def _register_pending_ip(db: Session, request: Request) -> None:
             "first_seen": now,
             "last_hostname": hostname_header,
             "last_user": user_header,
+            "request_count": 1,
+            "first_payload": first_payload_json,
         }
 
         # Construir el SET para ON CONFLICT DO UPDATE
-        # Solo actualizar campos cuyo header está presente y no vacío
-        update_set = {}
+        # Siempre incrementar request_count; actualizar metadata si headers presentes
+        update_set = {"request_count": PublicIP.request_count + 1}
         if hostname_header:
             update_set["last_hostname"] = hostname_header
         if user_header:
             update_set["last_user"] = user_header
 
         stmt = pg_insert(PublicIP).values(**insert_values)
-
-        if update_set:
-            # Solo actualizar metadata si hay headers presentes Y el registro es pendiente
-            stmt = stmt.on_conflict_do_update(
-                index_elements=["ip_address"],
-                set_=update_set,
-                where=(PublicIP.is_authorized == False),
-            )
-        else:
-            # Sin headers para actualizar: no modificar nada en conflicto
-            stmt = stmt.on_conflict_do_nothing(
-                index_elements=["ip_address"],
-            )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["ip_address"],
+            set_=update_set,
+            where=(PublicIP.is_authorized == False),
+        )
 
         db.execute(stmt)
         db.commit()
@@ -705,12 +716,26 @@ def download_update(
                 PublicIP.ip_address == client_ip
             ).first()
             if not existing_ip:
+                import json as json_module
                 from datetime import datetime, timezone
+                payload_dict = {
+                    "endpoint": "/updates/download",
+                    "method": "GET",
+                    "ip": client_ip,
+                    "user_agent": request.headers.get("User-Agent") if hasattr(request, 'headers') else None,
+                    "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+                }
+                try:
+                    payload_json = json_module.dumps(payload_dict, ensure_ascii=False, default=str)
+                except (TypeError, ValueError):
+                    payload_json = None
                 new_pending_ip = PublicIP(
                     ip_address=client_ip,
                     is_authorized=False,
                     organization_id=None,
                     description=f"Detectada en endpoint /updates/download el {datetime.now(timezone.utc).replace(tzinfo=None).strftime('%Y-%m-%d %H:%M:%S')}",
+                    request_count=1,
+                    first_payload=payload_json,
                 )
                 db.add(new_pending_ip)
                 db.commit()
@@ -718,6 +743,11 @@ def download_update(
                     "IP registrada como pendiente de aprobación (desde /updates/download): %s",
                     client_ip
                 )
+            else:
+                # IP ya existe como pendiente: incrementar contador
+                if not existing_ip.is_authorized:
+                    existing_ip.request_count = (existing_ip.request_count or 0) + 1
+                    db.commit()
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Workstation no autenticada"
