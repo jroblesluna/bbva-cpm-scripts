@@ -59,7 +59,6 @@ namespace AlwaysPrintTray.Forms
         {
             public MonitoredServiceConfig Config { get; set; } = null!;
             public Label StateLabel { get; set; } = null!;
-            public Button StartButton { get; set; } = null!;
         }
 
         public StatusForm(PipeClient pipe)
@@ -213,35 +212,20 @@ namespace AlwaysPrintTray.Forms
                 };
                 Controls.Add(lblName);
 
-                // Estado del servicio
+                // Estado del servicio (siempre gris, solo lectura)
                 var lblState = new Label
                 {
                     Text = "...",
                     Location = new Point(StateX, y + 4),
-                    AutoSize = true
+                    AutoSize = true,
+                    ForeColor = Color.FromArgb(0x66, 0x66, 0x66)
                 };
                 Controls.Add(lblState);
-
-                // Botón "Iniciar" (visible solo cuando está detenido)
-                var btnStart = new Button
-                {
-                    Text = LocalizationManager.Get("StatusButtonStartService"),
-                    Location = new Point(ButtonX, y),
-                    AutoSize = true,
-                    Padding = new Padding(12, 2, 12, 2),
-                    Tag = svc,
-                    Visible = false,
-                    FlatStyle = FlatStyle.Standard
-                };
-                btnStart.Click += OnServiceStartClick;
-                Controls.Add(btnStart);
-                _allActionButtons.Add(btnStart);
 
                 _serviceRows.Add(new ServiceRow
                 {
                     Config = svc,
-                    StateLabel = lblState,
-                    StartButton = btnStart
+                    StateLabel = lblState
                 });
 
                 y += 36;
@@ -257,7 +241,11 @@ namespace AlwaysPrintTray.Forms
             try
             {
                 // Información general
-                _valState.Text = StatusDisplayHelper.FormatEstadoSistema(IsContingencyEnabled());
+                bool contingency = IsContingencyEnabled();
+                _valState.Text = contingency ? "🛡️ En Contingencia" : "🛡️ Normal";
+                _valState.ForeColor = contingency
+                    ? Color.FromArgb(0xE6, 0x7E, 0x00)   // Naranja
+                    : Color.FromArgb(0x22, 0x8B, 0x22);   // Verde
                 _valVersion.Text = System.Reflection.Assembly.GetExecutingAssembly()
                     .GetName().Version?.ToString() ?? "0.0.0.0";
                 _valQueue.Text = LoadQueueName();
@@ -303,7 +291,7 @@ namespace AlwaysPrintTray.Forms
 
         /// <summary>
         /// Lee el estado de cada servicio con ServiceController y actualiza la UI.
-        /// Muestra botón "Iniciar" solo cuando el estado es Stopped.
+        /// Solo muestra el estado en gris (sin colores ni botones de inicio).
         /// </summary>
         private void RefreshServiceStates()
         {
@@ -324,15 +312,7 @@ namespace AlwaysPrintTray.Forms
                 }
 
                 row.StateLabel.Text = state;
-
-                // Color según estado
-                if (state == "Running")
-                    row.StateLabel.ForeColor = Color.FromArgb(0x22, 0x8B, 0x22);
-                else
-                    row.StateLabel.ForeColor = Color.FromArgb(0xCC, 0x00, 0x00);
-
-                // Botón "Iniciar" visible solo cuando está detenido y no estamos busy
-                row.StartButton.Visible = (state == "Stopped") && !_isBusy;
+                row.StateLabel.ForeColor = Color.FromArgb(0x66, 0x66, 0x66); // Siempre gris
             }
         }
 
@@ -402,84 +382,6 @@ namespace AlwaysPrintTray.Forms
                     var icon = opResult.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning;
                     var title = opResult.Success ? "OK" : "Error";
                     MessageBox.Show(this, opResult.Message, title, MessageBoxButtons.OK, icon);
-                }
-
-                worker.Dispose();
-            };
-            worker.RunWorkerAsync();
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // ── Inicio de servicio ──────────────────────────────────────────────────
-        // ═══════════════════════════════════════════════════════════════════════
-
-        private void OnServiceStartClick(object? sender, EventArgs e)
-        {
-            var btn = sender as Button;
-            if (btn == null) return;
-            var svc = btn.Tag as MonitoredServiceConfig;
-            if (svc == null) return;
-
-            // Activar estado busy global
-            SetBusyState(true);
-
-            // Ejecutar en BackgroundWorker
-            var worker = new BackgroundWorker();
-            worker.DoWork += (s, args) =>
-            {
-                if (!_pipe.IsConnected)
-                {
-                    args.Result = new OperationResult { Success = false, Message = "El servicio no está accesible." };
-                    return;
-                }
-
-                var payload = new ServiceActionPayload
-                {
-                    ServiceName = svc.ServiceName,
-                    Action = "Start"
-                };
-                var request = PipeMessage.Create(MessageType.ServiceAction, payload);
-                var response = _pipe.Send(request);
-
-                if (response?.Type == MessageType.Ack)
-                {
-                    var ack = response.GetPayload<AckPayload>();
-                    if (ack?.Success == true)
-                        args.Result = new OperationResult { Success = true, Message = $"✓ {svc.DisplayName} iniciado." };
-                    else
-                        args.Result = new OperationResult { Success = false, Message = $"Error: {ack?.Message ?? "desconocido"}" };
-                }
-                else if (response?.Type == MessageType.ServiceActionResponse)
-                {
-                    var resp = response.GetPayload<ServiceActionResponsePayload>();
-                    if (resp?.Success == true)
-                        args.Result = new OperationResult { Success = true, Message = $"✓ {svc.DisplayName} iniciado. Estado: {resp.NewState}" };
-                    else
-                        args.Result = new OperationResult { Success = false, Message = $"Error: {resp?.Message ?? "desconocido"}" };
-                }
-                else
-                {
-                    var error = response?.GetPayload<ErrorPayload>();
-                    args.Result = new OperationResult { Success = false, Message = $"Error: {error?.Message ?? "respuesta inesperada"}" };
-                }
-            };
-            worker.RunWorkerCompleted += (s, args) =>
-            {
-                SetBusyState(false);
-                RefreshServiceStates();
-
-                if (args.Error != null)
-                {
-                    MessageBox.Show(this, $"Error: {args.Error.Message}", "Error",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-                else if (args.Result is OperationResult opResult)
-                {
-                    if (!opResult.Success)
-                    {
-                        MessageBox.Show(this, opResult.Message, "Error",
-                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    }
                 }
 
                 worker.Dispose();
