@@ -46,5 +46,8 @@ namespace AlwaysPrint.Shared.Messages
         ExecuteOnDemandTrigger,      // Tray → Service: ejecutar trigger OnDemand por label
         ServiceAction,               // Tray → Service: iniciar o reiniciar un servicio
         ServiceActionResponse,       // Service → Tray: resultado de la acción sobre servicio
+
+        // Lifecycle del servicio
+        ServiceStopping,             // Service → Tray (push): servicio se está deteniendo, ocultar icono
     }
 }

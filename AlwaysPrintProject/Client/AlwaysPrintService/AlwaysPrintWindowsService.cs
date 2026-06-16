@@ -569,11 +569,32 @@ namespace AlwaysPrintService
             return false;
         }
 
-        private static int KillExistingTray()
+        private int KillExistingTray()
         {
             int count = 0;
+            var processes = Process.GetProcessesByName("AlwaysPrintTray");
+            if (processes.Length == 0) return 0;
+            
+            // Intentar cierre graceful: enviar señal vía pipe para que el Tray
+            // oculte su NotifyIcon antes de morir (evita iconos fantasma en el tray)
+            if (_pipeServer != null && _pipeServer.IsClientConnected)
+            {
+                try
+                {
+                    var shutdownMsg = PipeMessage.Create(MessageType.ServiceStopping);
+                    _pipeServer.SendToClient(shutdownMsg);
+                    // Dar 1.5 segundos para que el Tray procese y oculte el icono
+                    Thread.Sleep(1500);
+                }
+                catch { /* Si falla el envío, proceder con kill directo */ }
+            }
+            
+            // Forzar kill de los que no se cerraron voluntariamente
             foreach (var p in Process.GetProcessesByName("AlwaysPrintTray"))
+            {
                 try { p.Kill(); count++; } catch { /* already gone */ }
+            }
+            
             return count;
         }
 

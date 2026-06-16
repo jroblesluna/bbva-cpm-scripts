@@ -1054,6 +1054,14 @@ namespace AlwaysPrintTray
                     case MessageType.ActionConfigChanged:
                         HandleActionConfigChanged();
                         break;
+                    case MessageType.ServiceStopping:
+                        // Servicio se está deteniendo: ocultar icono inmediatamente para evitar fantasmas
+                        AlwaysPrintLogger.WriteTrayInfo("Tray: mensaje ServiceStopping recibido. Ocultando icono.");
+                        _uiContext.Post(_ =>
+                        {
+                            _trayIcon.Visible = false;
+                        }, null);
+                        break;
                     default:
                         // Otros mensajes push se ignoran aquí (CloudManager los maneja por separado)
                         break;
