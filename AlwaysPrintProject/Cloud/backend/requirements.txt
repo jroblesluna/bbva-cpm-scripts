@@ -27,6 +27,7 @@ email-validator>=2.2.0
 psutil>=6.1.0  # Métricas del sistema operativo (CPU, RAM, disco, swap)
 docker>=7.1.0  # Docker SDK para recolectar stats de contenedores
 apscheduler>=3.10.4  # Programación de tareas periódicas (recolección cada 6h)
+tzlocal>=5.0  # Requerido por APScheduler para detección de timezone local
 
 # === UTILITIES ===
 python-dotenv>=1.0.1
