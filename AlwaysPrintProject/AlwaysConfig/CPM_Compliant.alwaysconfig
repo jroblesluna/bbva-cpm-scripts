@@ -590,18 +590,7 @@
                 "timeout_seconds": 60,
                 "window_style": "Hidden"
               }
-            }
-          ]
-        },
-        {
-          "type": "Conditional",
-          "description": "Solo iniciar CPM si no hay contingencia activa",
-          "condition": {
-            "variable": "contingency_enabled",
-            "operator": "not_equals",
-            "value": "1"
-          },
-          "actions": [
+            },
             {
               "type": "StartService",
               "description": "Iniciar lpmc_universal_service",
