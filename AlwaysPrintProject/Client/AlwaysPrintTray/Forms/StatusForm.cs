@@ -273,7 +273,7 @@ namespace AlwaysPrintTray.Forms
         }
 
         /// <summary>
-        /// Timer callback: refresca estados de servicios directamente en el hilo UI.
+        /// Timer callback: refresca estados de servicios y estado de contingencia.
         /// ServiceController.Status es suficientemente rápido para esto.
         /// </summary>
         private void OnRefreshTimerTick(object? sender, EventArgs e)
@@ -281,12 +281,25 @@ namespace AlwaysPrintTray.Forms
             try
             {
                 RefreshServiceStates();
+                RefreshContingencyState();
             }
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteTrayError(
                     $"StatusForm.RefreshTimer: {ex.Message}", AlwaysPrintLogger.EvtGenericError);
             }
+        }
+
+        /// <summary>
+        /// Actualiza el estado de contingencia leyendo el semáforo del registro.
+        /// </summary>
+        private void RefreshContingencyState()
+        {
+            bool contingency = IsContingencyEnabled();
+            _valState.Text = contingency ? "🛡️ En Contingencia" : "🛡️ Normal";
+            _valState.ForeColor = contingency
+                ? Color.FromArgb(0xE6, 0x7E, 0x00)   // Naranja
+                : Color.FromArgb(0x22, 0x8B, 0x22);   // Verde
         }
 
         /// <summary>
