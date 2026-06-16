@@ -1,5 +1,5 @@
 {
-  "version": "5.6",
+  "version": "5.7",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -42,6 +42,15 @@
             "inherit": true,
             "replace_child_permissions": true
           }
+        },
+        {
+          "type": "ReadAppSetting",
+          "description": "Leer semáforo ContingencyEnabled (antes de limpieza)",
+          "parameters": {
+            "value_name": "ContingencyEnabled",
+            "default_value": "0"
+          },
+          "store_result_in": "contingency_enabled"
         },
         {
           "type": "GetLoggedInUsers",
@@ -107,13 +116,24 @@
               }
             },
             {
-              "type": "StartService",
-              "description": "Iniciar lpmc_universal_service",
-              "parameters": {
-                "service_name": "lpmc_universal_service",
-                "wait_for_running": true,
-                "timeout_seconds": 30
-              }
+              "type": "Conditional",
+              "description": "Solo reiniciar CPM si no hay contingencia activa",
+              "condition": {
+                "variable": "contingency_enabled",
+                "operator": "not_equals",
+                "value": "1"
+              },
+              "actions": [
+                {
+                  "type": "StartService",
+                  "description": "Iniciar lpmc_universal_service",
+                  "parameters": {
+                    "service_name": "lpmc_universal_service",
+                    "wait_for_running": true,
+                    "timeout_seconds": 30
+                  }
+                }
+              ]
             }
           ]
         },
@@ -127,15 +147,6 @@
             "window_style": "Hidden",
             "run_as_logged_in_user": true
           }
-        },
-        {
-          "type": "ReadAppSetting",
-          "description": "Leer semáforo ContingencyEnabled",
-          "parameters": {
-            "value_name": "ContingencyEnabled",
-            "default_value": "0"
-          },
-          "store_result_in": "contingency_enabled"
         },
         {
           "type": "Conditional",
@@ -583,13 +594,24 @@
           ]
         },
         {
-          "type": "StartService",
-          "description": "Iniciar lpmc_universal_service",
-          "parameters": {
-            "service_name": "lpmc_universal_service",
-            "wait_for_running": true,
-            "timeout_seconds": 30
-          }
+          "type": "Conditional",
+          "description": "Solo iniciar CPM si no hay contingencia activa",
+          "condition": {
+            "variable": "contingency_enabled",
+            "operator": "not_equals",
+            "value": "1"
+          },
+          "actions": [
+            {
+              "type": "StartService",
+              "description": "Iniciar lpmc_universal_service",
+              "parameters": {
+                "service_name": "lpmc_universal_service",
+                "wait_for_running": true,
+                "timeout_seconds": 30
+              }
+            }
+          ]
         }
       ]
     }
