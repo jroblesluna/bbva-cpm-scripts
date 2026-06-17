@@ -631,7 +631,13 @@
     "descriptionPlaceholder": "e.g. Lima Main Office",
     "lastUpdated": "Last updated: {time}",
     "pagination": "Showing {start} to {end} of {total} IPs",
-    "pageNumber": "Page {page}"
+    "pageNumber": "Page {page}",
+    "tableHeaderIp": "Public IP",
+    "tableHeaderHostname": "Hostname",
+    "tableHeaderUser": "User",
+    "tableHeaderRequests": "Requests",
+    "tableHeaderFirstSeen": "First Seen",
+    "tableHeaderActions": "Actions"
   },
   "language": {
     "label": "Language",

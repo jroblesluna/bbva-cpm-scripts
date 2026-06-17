@@ -339,8 +339,9 @@ namespace AlwaysPrint.Shared.Configuration
                     if (string.IsNullOrWhiteSpace(rawValue)) return null;
 
                     // Intentar parsear como ISO 8601 en UTC
+                    // Nota: solo usar RoundtripKind (AdjustToUniversal es incompatible en .NET 4.8)
                     if (!DateTime.TryParse(rawValue, CultureInfo.InvariantCulture,
-                            DateTimeStyles.RoundtripKind | DateTimeStyles.AdjustToUniversal, out DateTime parsed))
+                            DateTimeStyles.RoundtripKind, out DateTime parsed))
                     {
                         AlwaysPrintLogger.WriteWarning(
                             $"RegistryConfigManager.{valueName}: valor '{rawValue}' no es un ISO 8601 válido, tratando como ausente.",

@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
+using AlwaysPrint.Shared.Network;
 using Newtonsoft.Json;
 
 namespace AlwaysPrintTray.Cloud
@@ -124,6 +125,10 @@ namespace AlwaysPrintTray.Cloud
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 // Autenticación de workstation (se envía la versión actual como header informativo)
                 request.Headers.Add("X-Client-Version", _currentVersion);
+                // Headers de identificación para diagnóstico de IPs pendientes
+                request.Headers.Add("X-Workstation-Hostname", Environment.MachineName);
+                request.Headers.Add("X-Workstation-User", Environment.UserName);
+                request.Headers.Add("X-Workstation-IP-Private", NetworkHelper.GetOutboundLocalIP());
 
                 var response = await _httpClient.SendAsync(request);
 

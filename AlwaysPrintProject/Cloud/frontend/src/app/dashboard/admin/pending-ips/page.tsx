@@ -31,6 +31,8 @@ import {
   Monitor,
   User,
   Info,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
@@ -60,6 +62,7 @@ export default function PendingIPsPage() {
   const t = useTranslations('pendingIps');
   const tCommon = useTranslations('common');
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [authorizingIP, setAuthorizingIP] = useState<PendingIP | null>(null);
   const [selectedOrgId, setSelectedOrgId] = useState('');
   const [customDescription, setCustomDescription] = useState('');
@@ -284,11 +287,11 @@ export default function PendingIPsPage() {
         </Alert>
       )}
 
-      {/* Búsqueda */}
+      {/* Búsqueda y toggle de vista */}
       <Card className="mb-6">
         <CardContent className="p-4">
-          <div className="flex items-center">
-            <Search className="w-5 h-5 text-gray-400 mr-3" />
+          <div className="flex items-center gap-3">
+            <Search className="w-5 h-5 text-gray-400 shrink-0" />
             <Input
               type="text"
               placeholder={t('searchPlaceholder')}
@@ -296,109 +299,224 @@ export default function PendingIPsPage() {
               onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
               className="flex-1"
             />
+            <div className="flex items-center gap-1 border rounded-md p-0.5">
+              <Button variant={viewMode === 'cards' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('cards')} className="h-8 w-8 p-0">
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+              <Button variant={viewMode === 'table' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('table')} className="h-8 w-8 p-0">
+                <List className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Lista de IPs pendientes */}
-      <div className="space-y-4">
-        {filteredIPs.length > 0 ? (
-          paginatedIPs.map((ip) => (
-            <Card key={ip.id} className="hover:shadow-md transition">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                  <div className="flex items-start flex-1 min-w-0">
-                    <div className="rounded-full p-2 bg-amber-100 mr-3 shrink-0">
-                      <Globe className="w-5 h-5 text-amber-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <h3 className="text-base font-semibold text-gray-900">
-                          {ip.ip_address}
-                        </h3>
-                        <Badge variant="secondary" className="text-xs">
-                          <Clock className="w-3 h-3 mr-1" />
-                          {t('pending')}
-                        </Badge>
+      {viewMode === 'cards' ? (
+        <div className="space-y-4">
+          {filteredIPs.length > 0 ? (
+            paginatedIPs.map((ip) => (
+              <Card key={ip.id} className="hover:shadow-md transition">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div className="flex items-start flex-1 min-w-0">
+                      <div className="rounded-full p-2 bg-amber-100 mr-3 shrink-0">
+                        <Globe className="w-5 h-5 text-amber-600" />
                       </div>
-
-                      {ip.description && (
-                        <p className="text-sm text-gray-600 mb-1">{ip.description}</p>
-                      )}
-
-                      {(ip.last_hostname || ip.last_user) && (
-                        <div className="flex flex-wrap gap-3 mb-1">
-                          {ip.last_hostname && (
-                            <span className="flex items-center gap-1 text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
-                              <Monitor className="w-3 h-3 text-gray-500" />
-                              {ip.last_hostname}
-                            </span>
-                          )}
-                          {ip.last_user && (
-                            <span className="flex items-center gap-1 text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
-                              <User className="w-3 h-3 text-gray-500" />
-                              {ip.last_user}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1 text-xs text-gray-600 bg-blue-50 px-2 py-0.5 rounded">
-                            {t('requestCount', { count: ip.request_count })}
-                          </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <h3 className="text-base font-semibold text-gray-900">
+                            {ip.ip_address}
+                          </h3>
+                          <Badge variant="secondary" className="text-xs">
+                            <Clock className="w-3 h-3 mr-1" />
+                            {t('pending')}
+                          </Badge>
                         </div>
-                      )}
 
-                      {ip.first_payload && (
-                        <details className="mb-1">
-                          <summary className="text-xs text-blue-600 cursor-pointer hover:text-blue-800">
-                            {t('viewPayload')}
-                          </summary>
-                          <pre className="text-xs bg-gray-50 border rounded p-2 mt-1 overflow-x-auto max-w-lg whitespace-pre-wrap">
-                            {JSON.stringify(JSON.parse(ip.first_payload), null, 2)}
-                          </pre>
-                        </details>
-                      )}
+                        {ip.description && (
+                          <p className="text-sm text-gray-600 mb-1">{ip.description}</p>
+                        )}
 
-                      <div className="text-xs text-gray-500">
-                        <span>{t('firstSeen')} {formatDateWithTimezone(ip.first_seen, userTimezone)}</span>
+                        {(ip.last_hostname || ip.last_user) && (
+                          <div className="flex flex-wrap gap-3 mb-1">
+                            {ip.last_hostname && (
+                              <span className="flex items-center gap-1 text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                                <Monitor className="w-3 h-3 text-gray-500" />
+                                {ip.last_hostname}
+                              </span>
+                            )}
+                            {ip.last_user && (
+                              <span className="flex items-center gap-1 text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                                <User className="w-3 h-3 text-gray-500" />
+                                {ip.last_user}
+                              </span>
+                            )}
+                            <span className="flex items-center gap-1 text-xs text-gray-600 bg-blue-50 px-2 py-0.5 rounded">
+                              {t('requestCount', { count: ip.request_count })}
+                            </span>
+                          </div>
+                        )}
+
+                        {ip.first_payload && (
+                          <details className="mb-1">
+                            <summary className="text-xs text-blue-600 cursor-pointer hover:text-blue-800">
+                              {t('viewPayload')}
+                            </summary>
+                            <pre className="text-xs bg-gray-50 border rounded p-2 mt-1 overflow-x-auto max-w-lg whitespace-pre-wrap">
+                              {JSON.stringify(JSON.parse(ip.first_payload), null, 2)}
+                            </pre>
+                          </details>
+                        )}
+
+                        <div className="text-xs text-gray-500">
+                          <span>{t('firstSeen')} {formatDateWithTimezone(ip.first_seen, userTimezone)}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 sm:ml-4 sm:shrink-0">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => setAuthorizingIP(ip)}
-                      disabled={authorizeMutation.isPending || rejectMutation.isPending}
-                    >
-                      <CheckCircle className="w-4 h-4 mr-1" />
-                      {t('authorize')}
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleReject(ip)}
-                      disabled={authorizeMutation.isPending || rejectMutation.isPending}
-                    >
-                      <XCircle className="w-4 h-4 mr-1" />
-                      {t('reject')}
-                    </Button>
+                    <div className="flex items-center gap-2 sm:ml-4 sm:shrink-0">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => setAuthorizingIP(ip)}
+                        disabled={authorizeMutation.isPending || rejectMutation.isPending}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        {t('authorize')}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleReject(ip)}
+                        disabled={authorizeMutation.isPending || rejectMutation.isPending}
+                      >
+                        <XCircle className="w-4 h-4 mr-1" />
+                        {t('reject')}
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <Globe className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">{t('emptyTitle')}</h3>
+                <p className="text-gray-600 mb-4">
+                  {searchTerm ? t('emptyFilter') : t('emptyMessage')}
+                </p>
               </CardContent>
             </Card>
-          ))
-        ) : (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Globe className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">{t('emptyTitle')}</h3>
-              <p className="text-gray-600 mb-4">
-                {searchTerm ? t('emptyFilter') : t('emptyMessage')}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+          )}
+        </div>
+      ) : (
+        /* Vista de tabla */
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('tableHeaderIp')}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('tableHeaderHostname')}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('tableHeaderUser')}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('tableHeaderRequests')}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('tableHeaderFirstSeen')}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('tableHeaderActions')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {paginatedIPs.length > 0 ? (
+                  paginatedIPs.map((ip) => (
+                    <tr key={ip.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">{ip.ip_address}</span>
+                          {ip.first_payload && (
+                            <details className="inline">
+                              <summary className="text-xs text-blue-600 cursor-pointer hover:text-blue-800">
+                                <Info className="w-3 h-3 inline" />
+                              </summary>
+                              <pre className="absolute z-10 text-xs bg-white border rounded p-2 mt-1 shadow-lg max-w-md whitespace-pre-wrap">
+                                {JSON.stringify(JSON.parse(ip.first_payload), null, 2)}
+                              </pre>
+                            </details>
+                          )}
+                        </div>
+                        {ip.description && (
+                          <p className="text-xs text-gray-500 truncate max-w-[200px]">{ip.description}</p>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        {ip.last_hostname ? (
+                          <span className="flex items-center gap-1 text-xs text-gray-700">
+                            <Monitor className="w-3 h-3 text-gray-400" />
+                            {ip.last_hostname}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        {ip.last_user ? (
+                          <span className="flex items-center gap-1 text-xs text-gray-700">
+                            <User className="w-3 h-3 text-gray-400" />
+                            {ip.last_user}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <Badge variant="secondary" className="text-xs">
+                          {ip.request_count}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-600">
+                        {formatDateWithTimezone(ip.first_seen, userTimezone)}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            title={t('authorize')}
+                            onClick={() => setAuthorizingIP(ip)}
+                            disabled={authorizeMutation.isPending || rejectMutation.isPending}
+                          >
+                            <CheckCircle className="w-4 h-4 text-green-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            title={t('reject')}
+                            onClick={() => handleReject(ip)}
+                            disabled={authorizeMutation.isPending || rejectMutation.isPending}
+                          >
+                            <XCircle className="w-4 h-4 text-red-600" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-12 text-center">
+                      <Globe className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                      <p className="text-sm text-gray-600">
+                        {searchTerm ? t('emptyFilter') : t('emptyMessage')}
+                      </p>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       {/* Paginación */}
       {totalFiltered > 0 && totalPages > 1 && (

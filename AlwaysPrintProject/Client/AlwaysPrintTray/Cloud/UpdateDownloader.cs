@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
 using AlwaysPrint.Shared.Logging;
+using AlwaysPrint.Shared.Network;
 
 namespace AlwaysPrintTray.Cloud
 {
@@ -66,7 +67,13 @@ namespace AlwaysPrintTray.Cloud
                 // 2. Llamar al endpoint de descarga (sigue redirect a presigned URL automáticamente)
                 string downloadUrl = $"{_cloudApiUrl.TrimEnd('/')}/api/v1/updates/download";
 
-                using (var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
+                var request = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
+                // Headers de identificación para diagnóstico de IPs pendientes
+                request.Headers.Add("X-Workstation-Hostname", Environment.MachineName);
+                request.Headers.Add("X-Workstation-User", Environment.UserName);
+                request.Headers.Add("X-Workstation-IP-Private", NetworkHelper.GetOutboundLocalIP());
+
+                using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
                 {
                     response.EnsureSuccessStatusCode();
 

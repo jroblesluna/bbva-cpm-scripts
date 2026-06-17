@@ -631,7 +631,13 @@
     "descriptionPlaceholder": "Ej: Oficina Principal Lima",
     "lastUpdated": "Última actualización: {time}",
     "pagination": "Mostrando {start} a {end} de {total} IPs",
-    "pageNumber": "Página {page}"
+    "pageNumber": "Página {page}",
+    "tableHeaderIp": "IP Pública",
+    "tableHeaderHostname": "Hostname",
+    "tableHeaderUser": "Usuario",
+    "tableHeaderRequests": "Solicitudes",
+    "tableHeaderFirstSeen": "Primera vez",
+    "tableHeaderActions": "Acciones"
   },
   "language": {
     "label": "Idioma",

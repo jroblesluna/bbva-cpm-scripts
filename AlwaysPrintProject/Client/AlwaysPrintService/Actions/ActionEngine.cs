@@ -776,6 +776,22 @@ namespace AlwaysPrintService.Actions
                         }
                         break;
                     
+                    case "not_empty":
+                        // Evalúa si la variable no está vacía (listas con elementos o strings no vacíos)
+                        if (variableValue is List<string> notEmptyList)
+                            return notEmptyList.Count > 0;
+                        if (variableValue is string notEmptyStr)
+                            return !string.IsNullOrEmpty(notEmptyStr);
+                        return variableValue != null;
+                    
+                    case "empty":
+                        // Evalúa si la variable está vacía (lista sin elementos o string vacío)
+                        if (variableValue is List<string> emptyList)
+                            return emptyList.Count == 0;
+                        if (variableValue is string emptyStr)
+                            return string.IsNullOrEmpty(emptyStr);
+                        return variableValue == null;
+                    
                     default:
                         AlwaysPrintLogger.WriteWarning($"ActionEngine: operador desconocido: {condition.Operator}");
                         return false;

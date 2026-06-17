@@ -316,8 +316,9 @@ def _register_pending_ip(db: Session, request: Request) -> None:
         now = datetime.utcnow()
 
         # Extraer metadata de headers (solo valores no vacíos)
-        hostname_header = request.headers.get("X-Workstation-ID") or None
-        user_header = request.headers.get("X-Workstation-Local-IP") or None
+        hostname_header = request.headers.get("X-Workstation-Hostname") or request.headers.get("X-Workstation-ID") or None
+        user_header = request.headers.get("X-Workstation-User") or None
+        ip_private_header = request.headers.get("X-Workstation-IP-Private") or request.headers.get("X-Workstation-Local-IP") or None
 
         # Construir payload del primer request para diagnóstico
         first_payload_dict = {
@@ -326,6 +327,7 @@ def _register_pending_ip(db: Session, request: Request) -> None:
             "ip": client_ip,
             "hostname": hostname_header,
             "user": user_header,
+            "ip_private": ip_private_header,
             "user_agent": request.headers.get("User-Agent"),
             "timestamp": now.isoformat() + "Z",
         }
@@ -722,6 +724,9 @@ def download_update(
                     "endpoint": "/updates/download",
                     "method": "GET",
                     "ip": client_ip,
+                    "hostname": request.headers.get("X-Workstation-Hostname") if hasattr(request, 'headers') else None,
+                    "user": request.headers.get("X-Workstation-User") if hasattr(request, 'headers') else None,
+                    "ip_private": request.headers.get("X-Workstation-IP-Private") if hasattr(request, 'headers') else None,
                     "user_agent": request.headers.get("User-Agent") if hasattr(request, 'headers') else None,
                     "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                 }
