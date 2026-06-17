@@ -938,7 +938,7 @@ fi
 print_header "8. ERRORES RECIENTES"
 
 if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
-    LOGS=$(ssm_exec "$INSTANCE_ID" '["echo \"=== BACKEND ===\"; docker logs alwaysprint-backend-1 --tail 50 2>&1 | grep -i \"error\\|traceback\\|critical\" | grep -v \"favicon\\|_next/static\" | tail -5 || echo \"Sin errores\"; echo; echo \"=== FRONTEND ===\"; docker logs alwaysprint-frontend-1 --tail 50 2>&1 | grep -i \"error\" | grep -v \"favicon\\|_next/static\\|chunk\" | cut -c1-200 | tail -3 || echo \"Sin errores\""]' 8)
+    LOGS=$(ssm_exec "$INSTANCE_ID" '["echo \"=== BACKEND ===\"; docker logs alwaysprint-backend-1 --tail 50 2>&1 | grep -i \"error\\|traceback\\|critical\" | grep -v \"favicon\\|_next/static\" | tail -5 || echo \"Sin errores\"; echo; echo \"=== FRONTEND ===\"; docker logs alwaysprint-frontend-1 --tail 50 2>&1 | grep -i \"error\" | grep -v \"favicon\\|_next/static\\|chunk\\|Server Action\" | cut -c1-200 | tail -3 || echo \"Sin errores\""]' 8)
     
     if [ -n "$LOGS" ] && [ "$LOGS" != "None" ]; then
         echo ""
