@@ -86,11 +86,22 @@ namespace AlwaysPrintTray.Cloud
 
                 if (actualSize != expectedSize)
                 {
+                    // Diagnóstico: leer primeros bytes del archivo para identificar respuesta de proxy/error
+                    string snippet = "";
+                    try
+                    {
+                        byte[] head = new byte[Math.Min(200, (int)actualSize)];
+                        using (var fs = System.IO.File.OpenRead(filePath))
+                            fs.Read(head, 0, head.Length);
+                        snippet = System.Text.Encoding.UTF8.GetString(head).Replace("\r", "").Replace("\n", " ");
+                    }
+                    catch { snippet = "(no se pudo leer)"; }
+
                     // Verificación de integridad fallida: eliminar archivo parcial
                     AlwaysPrintLogger.WriteTrayError(
                         $"UpdateDownloader: integridad de MSI fallida. " +
                         $"Esperado: {expectedSize} bytes, actual: {actualSize} bytes. " +
-                        $"Archivo parcial eliminado.");
+                        $"Primeros bytes: [{snippet}]. Archivo parcial eliminado.");
 
                     DeleteFileSafe(filePath);
                     return null;
@@ -208,10 +219,21 @@ namespace AlwaysPrintTray.Cloud
 
                 if (expectedSize > 0 && actualSize != expectedSize)
                 {
+                    // Diagnóstico: leer primeros bytes para identificar respuesta de proxy/error
+                    string snippet = "";
+                    try
+                    {
+                        byte[] head = new byte[Math.Min(200, (int)actualSize)];
+                        using (var fs = System.IO.File.OpenRead(filePath))
+                            fs.Read(head, 0, head.Length);
+                        snippet = System.Text.Encoding.UTF8.GetString(head).Replace("\r", "").Replace("\n", " ");
+                    }
+                    catch { snippet = "(no se pudo leer)"; }
+
                     AlwaysPrintLogger.WriteTrayError(
                         $"UpdateDownloader: integridad de MSI fallida (zero-query). " +
                         $"Esperado: {expectedSize} bytes, actual: {actualSize} bytes. " +
-                        $"Versión: {version}. Archivo parcial eliminado.");
+                        $"Versión: {version}. Primeros bytes: [{snippet}]. Archivo parcial eliminado.");
                     DeleteFileSafe(filePath);
                     return null;
                 }
