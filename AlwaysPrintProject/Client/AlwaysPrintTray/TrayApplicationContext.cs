@@ -96,18 +96,6 @@ namespace AlwaysPrintTray
             menu.Items.Add(LocalizationManager.Get("MenuMyPrinters"),    null, (_, __) => ShowMyPrinters());
             menu.Items.Add(LocalizationManager.Get("MenuCheckUpdates"),  null, (_, __) => CheckForUpdatesManual());
 
-            // Agregar sección On-Demand Actions solo si hay triggers configurados
-            var onDemandTriggers = OnDemand.OnDemandConfigReader.GetOnDemandTriggers();
-            if (onDemandTriggers.Count > 0)
-            {
-                menu.Items.Add(new ToolStripSeparator());
-                foreach (var trigger in onDemandTriggers)
-                {
-                    var t = trigger; // captura para closure
-                    menu.Items.Add(t.Label, null, (_, __) => ExecuteOnDemandTrigger(t));
-                }
-            }
-
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(LocalizationManager.Get("MenuExit"),          null, (_, __) => ExitApplication());
 
