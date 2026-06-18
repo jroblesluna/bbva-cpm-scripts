@@ -351,6 +351,9 @@ class WorkstationService:
                 return None, False
 
         # IP nueva: registrar como pendiente con payload del primer request
+        # Usamos try/except para manejar race condition en multi-worker:
+        # si otro worker inserta la misma IP entre nuestro SELECT y el INSERT,
+        # capturamos el IntegrityError y reintentamos el SELECT.
         payload_json = None
         if registration_payload:
             try:
@@ -358,19 +361,36 @@ class WorkstationService:
             except (TypeError, ValueError):
                 payload_json = None
 
-        new_public_ip = PublicIP(
-            ip_address=public_ip,
-            is_authorized=False,
-            organization_id=None,
-            description=f"Detectada automáticamente el {datetime.now(timezone.utc).replace(tzinfo=None).strftime('%Y-%m-%d %H:%M:%S')}",
-            last_hostname=hostname,
-            last_user=current_user,
-            request_count=1,
-            first_payload=payload_json,
-        )
+        try:
+            new_public_ip = PublicIP(
+                ip_address=public_ip,
+                is_authorized=False,
+                organization_id=None,
+                description=f"Detectada automáticamente el {datetime.now(timezone.utc).replace(tzinfo=None).strftime('%Y-%m-%d %H:%M:%S')}",
+                last_hostname=hostname,
+                last_user=current_user,
+                request_count=1,
+                first_payload=payload_json,
+            )
 
-        db.add(new_public_ip)
-        db.commit()
+            db.add(new_public_ip)
+            db.commit()
+        except IntegrityError:
+            # Race condition: otro worker insertó la IP mientras procesábamos
+            db.rollback()
+            # Re-consultar: la IP ya existe, solo incrementar contador
+            public_ip_record = db.query(PublicIP).filter_by(
+                ip_address=public_ip
+            ).first()
+            if public_ip_record:
+                public_ip_record.request_count = (public_ip_record.request_count or 0) + 1
+                if hostname is not None:
+                    public_ip_record.last_hostname = hostname
+                if current_user is not None:
+                    public_ip_record.last_user = current_user
+                db.commit()
+                if public_ip_record.is_authorized and public_ip_record.organization_id:
+                    return public_ip_record.organization, True
 
         return None, False
     
