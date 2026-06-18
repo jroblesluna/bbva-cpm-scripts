@@ -12,7 +12,6 @@ Este módulo maneja la comunicación bidireccional con las workstations:
 
 import asyncio
 from datetime import datetime, timezone
-from functools import partial
 from typing import Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from pydantic import ValidationError
@@ -163,22 +162,17 @@ async def workstation_websocket(
             f"client_host={client_host}"
         )
         
-        # Registrar workstation (operación sync, ejecutada en executor para no bloquear event loop)
+        # Registrar workstation (sync directo — la sesión ya está en el request context)
         try:
-            loop = asyncio.get_event_loop()
-            workstation, is_new, status = await loop.run_in_executor(
-                None,
-                partial(
-                    workstation_service.register_workstation,
-                    db=db,
-                    ip_private=ip_private,
-                    public_ip=client_host or "unknown",
-                    hostname=hostname,
-                    os_serial=os_serial,
-                    current_user=current_user,
-                    cidr=cidr,
-                    tray_version=tray_version,
-                ),
+            workstation, is_new, status = workstation_service.register_workstation(
+                db=db,
+                ip_private=ip_private,
+                public_ip=client_host or "unknown",
+                hostname=hostname,
+                os_serial=os_serial,
+                current_user=current_user,
+                cidr=cidr,
+                tray_version=tray_version,
             )
             
             if status == "pending":
@@ -219,11 +213,7 @@ async def workstation_websocket(
         config = await registration_cache.get_effective_config(workstation_id, db)
         if config is None:
             # Fallback: si el cache no pudo resolver la config, usar ConfigService directo
-            loop = asyncio.get_event_loop()
-            config = await loop.run_in_executor(
-                None,
-                partial(config_service.get_effective_config, db, workstation_id),
-            )
+            config = config_service.get_effective_config(db, workstation_id)
         logger.debug("ws.config_obtenida", workstation_id=workstation_id)
         
         # Enviar confirmación de registro con workstation_id
