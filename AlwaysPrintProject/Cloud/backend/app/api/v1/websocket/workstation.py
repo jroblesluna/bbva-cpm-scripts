@@ -10,17 +10,18 @@ Este módulo maneja la comunicación bidireccional con las workstations:
 - Recepción de resultados de conectividad
 """
 
-import json
-import logging
+import asyncio
 from datetime import datetime, timezone
+from functools import partial
 from typing import Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db, SessionLocal
+from app.core.logging import get_logger
 from app.models.workstation import Workstation
-from app.models.organization import Organization, PublicIP
+from app.models.organization import Organization
 from app.schemas.websocket import RegisterMessage, TelemetryMessage, ConnectivityResultMessage
 from app.schemas.telemetry import TelemetryMessagePayload, ConnectivityResultPayload
 from app.services.websocket_manager import connection_manager
@@ -29,6 +30,7 @@ from app.services.config import ConfigService
 from app.services.message import MessageService
 from app.services.audit import AuditService
 from app.services.telemetry import TelemetryService
+from app.services.registration_cache import RegistrationCache
 
 
 async def _safe_close(websocket: WebSocket, code: int, reason: str) -> None:
@@ -50,7 +52,26 @@ async def _safe_close(websocket: WebSocket, code: int, reason: str) -> None:
 from app.services.connectivity import ConnectivityService
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+
+
+# Singleton de RegistrationCache, inicializado bajo demanda
+_registration_cache: Optional[RegistrationCache] = None
+
+
+def _get_registration_cache() -> RegistrationCache:
+    """
+    Obtiene o crea la instancia singleton de RegistrationCache.
+
+    Si el connection_manager es un RedisConnectionManager (tiene _redis),
+    usa su cliente Redis para el cache. Si no, opera en modo sin cache (fallback a BD).
+    """
+    global _registration_cache
+    if _registration_cache is None:
+        # Obtener cliente Redis del connection_manager si está disponible
+        redis_client = getattr(connection_manager, "_redis", None)
+        _registration_cache = RegistrationCache(redis=redis_client)
+    return _registration_cache
 
 
 router = APIRouter()
@@ -89,11 +110,11 @@ async def workstation_websocket(
     try:
         # Aceptar la conexión WebSocket antes de cualquier operación
         await websocket.accept()
-        print(f"[WS] Conexión aceptada", flush=True)
+        logger.info("ws.conexion_aceptada")
         
         # Esperar mensaje de registro
         data = await websocket.receive_json()
-        print(f"[WS] Mensaje recibido: type={data.get('type')}", flush=True)
+        logger.info("ws.mensaje_recibido", message_type=data.get("type"))
         
         if data.get("type") != "register":
             await _safe_close(websocket, 1008, "First message must be register")
@@ -142,17 +163,22 @@ async def workstation_websocket(
             f"client_host={client_host}"
         )
         
-        # Registrar workstation
+        # Registrar workstation (operación sync, ejecutada en executor para no bloquear event loop)
         try:
-            workstation, is_new, status = workstation_service.register_workstation(
-                db=db,
-                ip_private=ip_private,
-                public_ip=client_host or "unknown",
-                hostname=hostname,
-                os_serial=os_serial,
-                current_user=current_user,
-                cidr=cidr,
-                tray_version=tray_version
+            loop = asyncio.get_event_loop()
+            workstation, is_new, status = await loop.run_in_executor(
+                None,
+                partial(
+                    workstation_service.register_workstation,
+                    db=db,
+                    ip_private=ip_private,
+                    public_ip=client_host or "unknown",
+                    hostname=hostname,
+                    os_serial=os_serial,
+                    current_user=current_user,
+                    cidr=cidr,
+                    tray_version=tray_version,
+                ),
             )
             
             if status == "pending":
@@ -171,12 +197,11 @@ async def workstation_websocket(
                 return
             
             workstation_id = str(workstation.id)
-            print(f"[WS] Registro exitoso: id={workstation_id}, status={status}", flush=True)
+            logger.info("ws.registro_exitoso", workstation_id=workstation_id, status=status)
             
         except Exception as e:
             # Error en registro
-            print(f"[WS] ERROR en registro: {type(e).__name__}: {e}", flush=True)
-            logger.error(f"Error registrando workstation ip={ip_private}: {e}")
+            logger.error("ws.error_registro", error_type=type(e).__name__, error=str(e), ip_private=ip_private)
             await _safe_close(websocket, 1011, f"Error: {str(e)}")
             return
         
@@ -187,82 +212,56 @@ async def workstation_websocket(
             db=db,
             organization_id=str(workstation.organization_id)
         )
-        print(f"[WS] Conectado al manager", flush=True)
+        logger.info("ws.conectado_al_manager", workstation_id=workstation_id)
         
-        # Enviar configuración efectiva
-        config = config_service.get_effective_config(db, workstation_id)
-        print(f"[WS] Config obtenida, enviando...", flush=True)
+        # Obtener configuración efectiva desde cache (Redis) o BD
+        registration_cache = _get_registration_cache()
+        config = await registration_cache.get_effective_config(workstation_id, db)
+        if config is None:
+            # Fallback: si el cache no pudo resolver la config, usar ConfigService directo
+            loop = asyncio.get_event_loop()
+            config = await loop.run_in_executor(
+                None,
+                partial(config_service.get_effective_config, db, workstation_id),
+            )
+        logger.debug("ws.config_obtenida", workstation_id=workstation_id)
         
         # Enviar confirmación de registro con workstation_id
         await websocket.send_json({
             "type": "registered",
             "workstation_id": workstation_id
         })
-        print(f"[WS] Mensaje registered enviado: {workstation_id}", flush=True)
+        logger.info("ws.registered_enviado", workstation_id=workstation_id)
         
         await websocket.send_json({
             "type": "config_update",
             "config": config
         })
-        print(f"[WS] Config enviada", flush=True)
+        logger.debug("ws.config_enviada", workstation_id=workstation_id)
         
-        # Sincronizar estado de contingencia forzada (por si se activó mientras estaba offline)
-        # Prioridad: organización > VLAN > workstation individual
-        forced_contingency_enabled = False
-        forced_source = None
-        forced_source_name = None
+        # Sincronizar estado de contingencia forzada desde cache (Redis) o BD
+        # El cache resuelve la prioridad: organización > VLAN > workstation individual
+        contingency_state = await registration_cache.get_forced_contingency_state(
+            workstation_id=workstation_id,
+            organization_id=str(workstation.organization_id),
+            vlan_id=str(workstation.vlan_id) if workstation.vlan_id else None,
+            db=db,
+        )
 
-        org = db.query(Organization).filter(Organization.id == workstation.organization_id).first()
-        if org and org.forced_contingency:
-            forced_contingency_enabled = True
-            forced_source = "organization"
-            forced_source_name = org.name
-
-        if not forced_contingency_enabled and workstation.vlan_id:
-            from app.models.vlan import VLAN as VLANModel
-            ws_vlan = db.query(VLANModel).filter(VLANModel.id == workstation.vlan_id).first()
-            if ws_vlan and ws_vlan.forced_contingency:
-                forced_contingency_enabled = True
-                forced_source = "vlan"
-                forced_source_name = ws_vlan.name
-
-        if not forced_contingency_enabled and workstation.forced_contingency:
-            forced_contingency_enabled = True
-            forced_source = "workstation"
-            forced_source_name = workstation.hostname or str(workstation.ip_private)
-
-        if forced_contingency_enabled:
-            # Resolver printer_ip
-            from app.models.device import Device
-            printer_ip = None
-            if workstation.default_printer_id:
-                printer = db.query(Device).filter(Device.id == workstation.default_printer_id).first()
-                if printer:
-                    printer_ip = printer.ip_address
-            if not printer_ip and workstation.vlan_id:
-                from app.models.vlan import VLAN as VLANModel2
-                ws_vlan2 = db.query(VLANModel2).filter(VLANModel2.id == workstation.vlan_id).first()
-                if ws_vlan2 and ws_vlan2.default_device_id:
-                    default_dev = db.query(Device).filter(Device.id == ws_vlan2.default_device_id).first()
-                    if default_dev:
-                        printer_ip = default_dev.ip_address
-                if not printer_ip:
-                    first_device = db.query(Device).filter(
-                        Device.vlan_id == workstation.vlan_id,
-                        Device.organization_id == workstation.organization_id,
-                        Device.is_active == True
-                    ).order_by(Device.ip_address).first()
-                    if first_device:
-                        printer_ip = first_device.ip_address
-
+        if contingency_state and contingency_state.get("enabled"):
             await websocket.send_json({
                 "type": "forced_contingency",
                 "enabled": True,
-                "source": forced_source,
-                "source_name": forced_source_name,
-                "printer_ip": printer_ip,
+                "source": contingency_state["source"],
+                "source_name": contingency_state["source_name"],
+                "printer_ip": contingency_state["printer_ip"],
             })
-            print(f"[WS] Contingencia forzada sincronizada: source={forced_source}, printer_ip={printer_ip}", flush=True)
+            logger.info(
+                "ws.contingencia_forzada_sincronizada",
+                workstation_id=workstation_id,
+                source=contingency_state["source"],
+                printer_ip=contingency_state["printer_ip"],
+            )
 
         else:
             # No hay contingencia forzada activa. Enviar estado explícito para que
@@ -277,7 +276,7 @@ async def workstation_websocket(
                 "printer_ip": None,
             })
 
-        print(f"[WS] Entrando al loop", flush=True)
+        logger.debug("ws.entrando_al_loop", workstation_id=workstation_id)
         
         # Enviar mensajes pendientes (nuevo sistema de deliveries)
         pending_deliveries = message_service.get_pending_deliveries_for_workstation(
@@ -517,12 +516,17 @@ async def workstation_websocket(
     
     except WebSocketDisconnect:
         # Cliente desconectado
-        print(f"[WS] WebSocketDisconnect para {workstation_id}", flush=True)
+        logger.info("ws.desconexion", workstation_id=workstation_id)
     
     except Exception as e:
         # Error inesperado
-        print(f"[WS] EXCEPCION INESPERADA: {type(e).__name__}: {e}", flush=True)
-        logger.error(f"WebSocket error inesperado para workstation_id={workstation_id}: {e}", exc_info=True)
+        logger.error(
+            "ws.excepcion_inesperada",
+            workstation_id=workstation_id,
+            error_type=type(e).__name__,
+            error=str(e),
+            exc_info=True,
+        )
     
     finally:
         # Limpiar conexión

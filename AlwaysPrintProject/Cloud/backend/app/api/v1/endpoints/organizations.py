@@ -40,6 +40,7 @@ from app.schemas.organization import (
     TargetVersionResponse,
 )
 from app.services.audit import AuditService
+from app.services.cache_utils import get_registration_cache
 from app.services.config import ConfigService
 from app.services.s3_update_service import S3UpdateService
 
@@ -314,6 +315,10 @@ async def update_my_organization(
     db.commit()
     db.refresh(organization)
     
+    # Invalidar cache de registro tras modificación exitosa
+    cache = get_registration_cache()
+    await cache.invalidate_organization(str(organization.id))
+    
     # Registrar en auditoría
     audit_service = AuditService()
     audit_service.log_update(
@@ -363,6 +368,10 @@ async def toggle_my_auto_update(
     organization.auto_update_enabled = body.enabled
     db.commit()
     db.refresh(organization)
+    
+    # Invalidar cache de registro tras modificación exitosa
+    cache = get_registration_cache()
+    await cache.invalidate_organization(str(organization.id))
     
     logger.info(
         "Auto-update actualizado (operador): org_id=%s, enabled=%s, user_id=%s",
@@ -444,6 +453,10 @@ async def pin_my_version(
     db.commit()
     db.refresh(organization)
     
+    # Invalidar cache de registro tras modificación exitosa
+    cache = get_registration_cache()
+    await cache.invalidate_organization(str(organization.id))
+    
     logger.info(
         "Versión pineada (operador): org_id=%s, version=%s, user_id=%s",
         organization.id, version, current_user.id,
@@ -457,7 +470,7 @@ async def pin_my_version(
 
 
 @router.post("/me/public-ips", response_model=PublicIPResponse, status_code=status.HTTP_201_CREATED)
-def add_my_public_ip(
+async def add_my_public_ip(
     request: Request,
     ip_data: PublicIPCreate,
     current_user: User = Depends(get_current_user),
@@ -487,6 +500,9 @@ def add_my_public_ip(
         existing.authorized_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.commit()
         db.refresh(existing)
+        # Invalidar cache de registro tras modificación de IPs públicas
+        cache = get_registration_cache()
+        await cache.invalidate_organization(str(org_id))
         return existing
     
     from datetime import datetime, timezone
@@ -501,6 +517,10 @@ def add_my_public_ip(
     db.add(new_ip)
     db.commit()
     db.refresh(new_ip)
+    
+    # Invalidar cache de registro tras modificación de IPs públicas
+    cache = get_registration_cache()
+    await cache.invalidate_organization(str(org_id))
     
     audit_service = AuditService()
     audit_service.log_create(
@@ -517,7 +537,7 @@ def add_my_public_ip(
 
 
 @router.delete("/me/public-ips/{ip_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_my_public_ip(
+async def remove_my_public_ip(
     request: Request,
     ip_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -541,6 +561,10 @@ def remove_my_public_ip(
     
     db.delete(public_ip)
     db.commit()
+    
+    # Invalidar cache de registro tras eliminación de IP pública
+    cache = get_registration_cache()
+    await cache.invalidate_organization(str(org_id))
     
     audit_service = AuditService()
     audit_service.log_delete(
@@ -681,6 +705,10 @@ async def update_organization(
     db.commit()
     db.refresh(organization)
     
+    # Invalidar cache de registro tras modificación exitosa
+    cache = get_registration_cache()
+    await cache.invalidate_organization(str(organization.id))
+    
     # Registrar en auditoría
     audit_service = AuditService()
     audit_service.log_update(
@@ -702,7 +730,7 @@ async def update_organization(
 
 
 @router.delete("/{org_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_organization(
+async def delete_organization(
     request: Request,
     org_id: UUID,
     current_user: User = Depends(require_admin),
@@ -745,13 +773,17 @@ def delete_organization(
     db.delete(organization)
     db.commit()
     
+    # Invalidar cache de registro tras eliminación de organización
+    cache = get_registration_cache()
+    await cache.invalidate_organization(str(org_id))
+    
     return None
 
 
 # === ENDPOINTS DE IPS PÚBLICAS ===
 
 @router.post("/{org_id}/public-ips", response_model=PublicIPResponse, status_code=status.HTTP_201_CREATED)
-def add_public_ip(
+async def add_public_ip(
     request: Request,
     org_id: UUID,
     ip_data: PublicIPCreate,
@@ -787,6 +819,10 @@ def add_public_ip(
     db.commit()
     db.refresh(public_ip)
     
+    # Invalidar cache de registro tras modificación de IPs públicas
+    cache = get_registration_cache()
+    await cache.invalidate_organization(str(org_id))
+    
     # Registrar en auditoría
     audit_service = AuditService()
     audit_service.log_create(
@@ -806,7 +842,7 @@ def add_public_ip(
 
 
 @router.delete("/{org_id}/public-ips/{ip_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_public_ip(
+async def remove_public_ip(
     request: Request,
     org_id: UUID,
     ip_id: UUID,
@@ -846,6 +882,10 @@ def remove_public_ip(
     db.delete(public_ip)
     db.commit()
     
+    # Invalidar cache de registro tras eliminación de IP pública
+    cache = get_registration_cache()
+    await cache.invalidate_organization(str(org_id))
+    
     # Registrar en auditoría
     audit_service = AuditService()
     audit_service.log_delete(
@@ -879,7 +919,7 @@ def list_pending_public_ips(
 
 
 @router.post("/public-ips/{ip_id}/authorize", response_model=PublicIPResponse)
-def authorize_public_ip(
+async def authorize_public_ip(
     request: Request,
     ip_id: UUID,
     authorize_data: PublicIPAuthorizeRequest,
@@ -925,6 +965,10 @@ def authorize_public_ip(
     
     db.commit()
     db.refresh(public_ip)
+    
+    # Invalidar cache de registro tras autorización de IP pública
+    cache = get_registration_cache()
+    await cache.invalidate_organization(str(authorize_data.organization_id))
     
     # Registrar en auditoría
     audit_service = AuditService()
@@ -1023,6 +1067,10 @@ async def toggle_auto_update(
     organization.auto_update_enabled = body.enabled
     db.commit()
     db.refresh(organization)
+
+    # Invalidar cache de registro tras modificación de auto-update
+    cache = get_registration_cache()
+    await cache.invalidate_organization(str(org_id))
 
     logger.info(
         "Auto-update actualizado: org_id=%s, enabled=%s, admin_id=%s",
@@ -1211,6 +1259,10 @@ async def toggle_forced_contingency(
     db.commit()
     db.refresh(organization)
 
+    # Invalidar cache de registro tras modificación de contingencia organizacional
+    cache = get_registration_cache()
+    await cache.invalidate_organization(str(org_id))
+
     logger.info(
         "Contingencia org actualizada: org_id=%s, enabled=%s, force_all=%s, admin_id=%s",
         org_id, body.enabled, body.force_all, current_user.id,
@@ -1267,7 +1319,7 @@ async def toggle_forced_contingency(
         "Enviar null para volver a usar la última versión disponible (latest)."
     )
 )
-def set_target_version(
+async def set_target_version(
     org_id: UUID,
     body: TargetVersionRequest,
     current_user: User = Depends(require_admin),
@@ -1297,6 +1349,10 @@ def set_target_version(
     organization.target_version = body.version
     db.commit()
     db.refresh(organization)
+
+    # Invalidar cache de registro tras modificación de target_version
+    cache = get_registration_cache()
+    await cache.invalidate_organization(str(org_id))
 
     logger.info(
         "Target version actualizada: org_id=%s, target_version=%s, admin_id=%s",

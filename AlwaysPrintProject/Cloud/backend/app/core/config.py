@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./alwaysprint.db"
     
     # Pool de conexiones (solo para PostgreSQL/SQL Server)
-    DB_POOL_SIZE: int = 20
+    DB_POOL_SIZE: int = 30
     DB_MAX_OVERFLOW: int = 10
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800  # 30 minutos — evita conexiones stale por timeout de RDS
@@ -83,6 +83,13 @@ class Settings(BaseSettings):
     REDIS_URL: Optional[str] = None  # Ejemplo: redis://localhost:6379/0
     CACHE_TTL_SECONDS: int = 300  # 5 minutos
     
+    # === CONFIGURACIÓN MULTI-WORKER Y WEBSOCKET SCALING ===
+    UVICORN_WORKERS: int = 1  # Número de workers uvicorn (DEV: 2+)
+    WS_REDIS_RECONNECT_MAX_INTERVAL: int = 30  # Intervalo máximo de reconexión Redis (segundos)
+    WORKER_REGISTRY_TTL: int = 60  # TTL de registro de worker en Redis (segundos)
+    WS_DEBUG_LOGGING: bool = True  # Logging detallado temporal para validación multi-worker
+    WS_LOG_TIMING: bool = True  # Desglose de timing del hot path de registro
+
     # === CONFIGURACIÓN DE LOGGING ===
     LOG_LEVEL: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
     LOG_FILE: str = "logs/alwaysprint.log"
