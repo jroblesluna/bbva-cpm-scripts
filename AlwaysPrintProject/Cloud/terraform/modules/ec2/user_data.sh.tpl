@@ -11,6 +11,16 @@ dnf install -y docker nginx python3-pip certbot python3-certbot-nginx amazon-ssm
 systemctl enable docker
 systemctl start docker
 
+# Aumentar límites de file descriptors para soportar miles de WebSockets
+cat >> /etc/security/limits.conf <<'LIMITS'
+nginx soft nofile 16384
+nginx hard nofile 16384
+* soft nofile 16384
+* hard nofile 16384
+LIMITS
+echo "fs.file-max = 65535" >> /etc/sysctl.conf
+sysctl -p
+
 # Reiniciar SSM agent tras dnf update para asegurar registro con AWS
 systemctl enable amazon-ssm-agent
 systemctl restart amazon-ssm-agent
@@ -45,6 +55,10 @@ cat > $APP_DIR/.env <<'ENVFILE'
 ${backend_env_vars}
 ENVFILE
 
+# Variables de Redis y multi-worker para WebSocket scaling (entorno DEV)
+echo "REDIS_URL=redis://redis:6379/0" >> $APP_DIR/.env
+echo "UVICORN_WORKERS=2"              >> $APP_DIR/.env
+
 # Variables sensibles desde Secrets Manager
 DATABASE_URL=$(aws secretsmanager get-secret-value \
   --secret-id "${database_url_secret}" --region ${aws_region} \
@@ -78,7 +92,7 @@ services:
       - "host.docker.internal:host-gateway"
     command: >
       sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port ${backend_port} --workers 1 --ws-ping-interval 300 --ws-ping-timeout 300"
+             uvicorn app.main:app --host 0.0.0.0 --port ${backend_port} --workers $${UVICORN_WORKERS:-2} --ws-ping-interval 300 --ws-ping-timeout 300"
     healthcheck:
       test: ["CMD-SHELL", "python -c 'import urllib.request as u; u.urlopen(chr(104)+chr(116)+chr(116)+chr(112)+chr(58)+chr(47)+chr(47)+chr(108)+chr(111)+chr(99)+chr(97)+chr(108)+chr(104)+chr(111)+chr(115)+chr(116)+chr(58)+chr(56)+chr(48)+chr(48)+chr(48)+chr(47)+chr(97)+chr(112)+chr(105)+chr(47)+chr(118)+chr(49)+chr(47)+chr(104)+chr(101)+chr(97)+chr(108)+chr(116)+chr(104))'"]
       interval: 30s
@@ -100,7 +114,40 @@ networks:
     driver: bridge
 COMPOSE
 
-# ── Nginx config (HTTP primero, Certbot añade HTTPS) ─────────────────
+# ── Nginx global config (soporte para +8000 WebSockets simultáneos) ──
+cat > /etc/nginx/nginx.conf <<'NGINXGLOBAL'
+worker_processes auto;
+worker_rlimit_nofile 16384;
+
+error_log /var/log/nginx/error.log;
+pid /run/nginx.pid;
+
+events {
+    worker_connections 8192;
+    multi_accept on;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    types_hash_max_size 4096;
+    types_hash_bucket_size 128;
+
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log /var/log/nginx/access.log main;
+
+    sendfile on;
+    tcp_nopush on;
+    keepalive_timeout 65;
+
+    include /etc/nginx/conf.d/*.conf;
+}
+NGINXGLOBAL
+
+# ── Nginx virtualhost (HTTP primero, Certbot añade HTTPS) ────────────
 cat > /etc/nginx/conf.d/alwaysprint.conf <<NGINX
 server {
     listen 80;

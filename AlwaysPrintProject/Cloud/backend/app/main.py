@@ -4,11 +4,13 @@ Punto de entrada principal de la aplicación FastAPI
 
 import asyncio
 import os
+import signal
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.core.logging import configure_structlog, get_logger
 from app.core.database import SessionLocal
 from app.services.websocket_manager import connection_manager
 from app.services.status_scheduler import status_scheduler
@@ -17,6 +19,26 @@ from app.api.v1.router import api_router
 from app.api.v1.websocket import workstation, operator
 from app.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
 
+# Configurar structlog lo antes posible para que todos los logs usen formato estructurado
+configure_structlog()
+
+logger = get_logger(__name__)
+
+
+async def _handle_sigterm() -> None:
+    """
+    Handler asíncrono para SIGTERM.
+
+    Ejecuta el graceful shutdown del connection_manager: cierra WebSockets
+    con código 1001, limpia registros en Redis (WorkerRegistry) y cancela
+    tasks de background (listener, heartbeat).
+    """
+    logger.info("sigterm.received", msg="Señal SIGTERM recibida, iniciando graceful shutdown")
+    await connection_manager.graceful_shutdown_workstations(
+        reason="Servidor apagándose por SIGTERM"
+    )
+    logger.info("sigterm.shutdown_complete", msg="Graceful shutdown completado por SIGTERM")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,7 +46,9 @@ async def lifespan(app: FastAPI):
     Gestor de ciclo de vida de la aplicación.
     
     En desarrollo (SQLite): crea las tablas automáticamente si no existen.
-    Inicia el ping loop al arrancar y lo detiene al cerrar.
+    Inicializa el connection_manager (Redis pub/sub + suscripción global:broadcast),
+    inicia el ping loop (solo pings a workstations locales) y registra el handler
+    de SIGTERM para graceful shutdown.
     """
     # Startup: Crear tablas en SQLite si no existen (desarrollo)
     if settings.is_sqlite:
@@ -32,11 +56,29 @@ async def lifespan(app: FastAPI):
         from app.core.database import init_db
         init_db()
 
+    # Startup: Inicializar connection_manager (conectar Redis, suscribir
+    # global:broadcast, iniciar listener task). En modo in-memory es no-op.
+    await connection_manager.initialize()
+    logger.info(
+        "startup.connection_manager_initialized",
+        msg="ConnectionManager inicializado correctamente",
+    )
+
+    # Startup: Registrar handler de SIGTERM para graceful shutdown
+    # Usa asyncio add_signal_handler para invocar el shutdown asíncrono
+    loop = asyncio.get_running_loop()
+    loop.add_signal_handler(
+        signal.SIGTERM,
+        lambda: asyncio.ensure_future(_handle_sigterm()),
+    )
+    logger.info("startup.sigterm_handler_registered", msg="Handler SIGTERM registrado")
+
     # Startup: Capturar baseline de memoria RSS del proceso
     # (antes de iniciar ping loop y aceptar conexiones WS)
     scalability_collector.capture_baseline()
 
-    # Startup: Iniciar ping loop
+    # Startup: Iniciar ping loop (solo envía pings a workstations locales
+    # conectadas a este worker — no afecta otros workers)
     ping_task = asyncio.create_task(
         connection_manager.start_ping_loop(SessionLocal)
     )
