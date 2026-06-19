@@ -188,11 +188,11 @@ class RedisConnectionManager:
             db: Sesión de base de datos
             organization_id: UUID de la organización
         """
-        async with self._lock:
-            self.workstation_connections[workstation_id] = websocket
-            self.last_pong[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
-            self.last_activity[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
-            self.org_ids[workstation_id] = organization_id
+        # Registrar localmente (sin lock — asyncio single-threaded, safe entre awaits)
+        self.workstation_connections[workstation_id] = websocket
+        self.last_pong[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
+        self.last_activity[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
+        self.org_ids[workstation_id] = organization_id
 
         # Actualizar estado en base de datos
         from app.services.workstation import WorkstationService
@@ -203,34 +203,32 @@ class RedisConnectionManager:
             is_online=True,
         )
 
-        # Suscribir canal Redis para esta workstation
+        # Suscribir canal Redis para esta workstation (fire-and-forget para no bloquear)
         if self._redis_available and self._pubsub:
-            try:
-                await self._pubsub.subscribe(f"ws:{workstation_id}")
-                logger.debug(
-                    "redis.subscribe",
-                    channel=f"ws:{workstation_id}",
-                    workstation_id=workstation_id,
-                )
-            except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
-                logger.warning(
-                    "redis.subscribe_failed",
-                    channel=f"ws:{workstation_id}",
-                    error=str(e),
-                )
+            asyncio.ensure_future(self._subscribe_workstation_channel(workstation_id))
 
-        # Registrar en WorkerRegistry
+        # Registrar en WorkerRegistry (fire-and-forget)
         if self._worker_registry:
-            await self._worker_registry.register_workstation(workstation_id)
+            asyncio.ensure_future(self._worker_registry.register_workstation(workstation_id))
+
+    async def _subscribe_workstation_channel(self, workstation_id: str) -> None:
+        """Suscribe al canal Redis ws:{workstation_id} de forma no-bloqueante."""
+        try:
+            await self._pubsub.subscribe(f"ws:{workstation_id}")
+        except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
+            logger.warning(
+                "redis.subscribe_failed",
+                channel=f"ws:{workstation_id}",
+                error=str(e),
+            )
 
     async def update_last_activity(self, workstation_id: str) -> None:
         """
         Actualiza el timestamp de última actividad de una workstation.
         Se invoca al recibir cualquier mensaje válido.
         """
-        async with self._lock:
-            if workstation_id in self.workstation_connections:
-                self.last_activity[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
+        if workstation_id in self.workstation_connections:
+            self.last_activity[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
 
     async def disconnect_workstation(
         self,
@@ -255,20 +253,19 @@ class RedisConnectionManager:
         """
         should_mark_offline = False
 
-        async with self._lock:
-            if workstation_id in self.workstation_connections:
-                current_ws = self.workstation_connections[workstation_id]
-                if websocket is None or current_ws is websocket:
-                    del self.workstation_connections[workstation_id]
-                    should_mark_offline = True
+        if workstation_id in self.workstation_connections:
+            current_ws = self.workstation_connections[workstation_id]
+            if websocket is None or current_ws is websocket:
+                del self.workstation_connections[workstation_id]
+                should_mark_offline = True
 
-            if should_mark_offline and workstation_id in self.last_pong:
-                del self.last_pong[workstation_id]
+        if should_mark_offline and workstation_id in self.last_pong:
+            del self.last_pong[workstation_id]
 
-            if should_mark_offline:
-                self.last_activity.pop(workstation_id, None)
-                self.org_ids.pop(workstation_id, None)
-                self._pending_pongs.pop(workstation_id, None)
+        if should_mark_offline:
+            self.last_activity.pop(workstation_id, None)
+            self.org_ids.pop(workstation_id, None)
+            self._pending_pongs.pop(workstation_id, None)
 
         if not should_mark_offline:
             return
@@ -369,22 +366,21 @@ class RedisConnectionManager:
             True si se envió localmente, False si se publicó en Redis o no se pudo enviar
         """
         # Intentar entrega local primero
-        async with self._lock:
-            if workstation_id in self.workstation_connections:
-                ws = self.workstation_connections[workstation_id]
-                try:
-                    await ws.send_json(message)
-                    logger.debug(
-                        "delivery.local",
-                        workstation_id=workstation_id,
-                        message_type=message.get("type", "unknown"),
-                    )
-                    return True
-                except Exception:
-                    # Conexión muerta, limpiar
-                    del self.workstation_connections[workstation_id]
-                    self.last_pong.pop(workstation_id, None)
-                    return False
+        if workstation_id in self.workstation_connections:
+            ws = self.workstation_connections[workstation_id]
+            try:
+                await ws.send_json(message)
+                logger.debug(
+                    "delivery.local",
+                    workstation_id=workstation_id,
+                    message_type=message.get("type", "unknown"),
+                )
+                return True
+            except Exception:
+                # Conexión muerta, limpiar
+                del self.workstation_connections[workstation_id]
+                self.last_pong.pop(workstation_id, None)
+                return False
 
         # No está local — publicar en Redis para que otro worker lo entregue
         if self._redis_available and self._redis:
