@@ -200,11 +200,13 @@ async def workstation_websocket(
             return
         
         # Conectar WebSocket (incluye organization_id para rastreo de inactividad por org)
+        vlan_id = str(workstation.vlan_id) if workstation.vlan_id else None
         await connection_manager.connect_workstation(
             workstation_id=workstation_id,
             websocket=websocket,
             db=db,
-            organization_id=str(workstation.organization_id)
+            organization_id=str(workstation.organization_id),
+            vlan_id=vlan_id,
         )
         logger.info("ws.conectado_al_manager", workstation_id=workstation_id)
         

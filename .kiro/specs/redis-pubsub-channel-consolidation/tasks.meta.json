@@ -1,0 +1,577 @@
+{
+  "pbtResults": {
+    "2.2 Write property test for lazy org subscribe on connect (Property 8)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781848347377
+    },
+    "2.3 Write property test for fire-and-forget resilience (Property 15)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781849090716
+    },
+    "3.2 Write property test for subscription count invariant (Property 1)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781852240212
+    },
+    "4.2 Write property test for cross-worker message routing (Property 5)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781852599426
+    },
+    "5.3 Write property test for command response routing (Property 6)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781852759641
+    },
+    "5.2 Write property test for no per-command channel operations (Property 3)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781852887192
+    },
+    "7.4 Write property test for VLAN filtering (Property 9)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781879041840
+    },
+    "7.3 Write property test for worker channel dispatch correctness (Property 4)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781879147083
+    },
+    "7.5 Write property test for tenant isolation (Property 10)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781879304174
+    },
+    "7.6 Write property test for global broadcast delivery (Property 11)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781879427289
+    },
+    "8.2 Write property test for reconnect channel set (Property 12)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781882056845
+    },
+    "8.3 Write property test for reconnect re-registers workstations (Property 13)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781882062406
+    },
+    "12.2 Write property test for command response resolves waiter (Property 7)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781882254494
+    },
+    "9.2 Write property test for no per-workstation channel operations (Property 2)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781882801570
+    },
+    "12.1 Write property test for graceful fallback without Redis (Property 14)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781883101736
+    }
+  },
+  "executionHistory": {
+    "1.1 Añadir variables `_org_ws_count`, `_ws_vlan_ids` y modificar `_pending_command_responses`": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851998592
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852005158
+      }
+    ],
+    "2.1 Implementar hot path síncrono y fire-and-forget en `connect_workstation`": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851998620
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852006097
+      }
+    ],
+    "2.2 Write property test for lazy org subscribe on connect (Property 8)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851998670
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852007788
+      }
+    ],
+    "2.3 Write property test for fire-and-forget resilience (Property 15)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851998701
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852008504
+      }
+    ],
+    "3.1 Implementar decremento de contador org y conditional UNSUBSCRIBE en `disconnect_workstation`": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851998728
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852009380
+      }
+    ],
+    "3.2 Write property test for subscription count invariant (Property 1)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851998755
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852020154
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852255277
+      }
+    ],
+    "4.1 Implementar resolución de worker y publish a `worker:{target_worker_id}` en `send_to_workstation`": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851998782
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852010371
+      }
+    ],
+    "4.2 Write property test for cross-worker message routing (Property 5)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851998813
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852260008
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852612253
+      }
+    ],
+    "5.1 Refactorizar `register_command_waiter`, `publish_command_response` y `wait_for_command_response`": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851998871
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852260850
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852613342
+      }
+    ],
+    "5.2 Write property test for no per-command channel operations (Property 3)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851998900
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852618754
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781855046041
+      }
+    ],
+    "5.3 Write property test for command response routing (Property 6)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851998930
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852619562
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781855047004
+      }
+    ],
+    "6. Checkpoint - Verificar funcionalidad core": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851998971
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781883128630
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781885664877
+      }
+    ],
+    "7.1 Implementar `_redis_listener` con despacho por canal consolidado": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999002
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852620379
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781855053069
+      }
+    ],
+    "7.2 Implementar `_deliver_to_local_org_workstations` con filtrado VLAN": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999028
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781855059024
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781869541922
+      }
+    ],
+    "7.3 Write property test for worker channel dispatch correctness (Property 4)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999055
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781855059931
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781879160271
+      }
+    ],
+    "7.4 Write property test for VLAN filtering (Property 9)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999078
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781855060867
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781879053609
+      }
+    ],
+    "7.5 Write property test for tenant isolation (Property 10)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999105
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781855061388
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781879316414
+      }
+    ],
+    "7.6 Write property test for global broadcast delivery (Property 11)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999135
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781855062293
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781879439864
+      }
+    ],
+    "8.1 Implementar reconexión con exponential backoff y re-suscripción de canales consolidados": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999167
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781879444735
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781879553151
+      }
+    ],
+    "8.2 Write property test for reconnect channel set (Property 12)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999194
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781879557988
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781882084270
+      }
+    ],
+    "8.3 Write property test for reconnect re-registers workstations (Property 13)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999229
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781879558828
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781882085124
+      }
+    ],
+    "9.1 Modificar `initialize()` para suscribir `worker:{worker_id}` y `global:broadcast` únicamente": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999272
+      },
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852007007
+      }
+    ],
+    "9.2 Write property test for no per-workstation channel operations (Property 2)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999299
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781882089953
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781883119382
+      }
+    ],
+    "10.1 Modificar endpoint WebSocket para pasar `vlan_id` a `connect_workstation`": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999325
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781879559755
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781882083050
+      }
+    ],
+    "11. Checkpoint - Verificar integración completa": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999351
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781885668941
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781887049805
+      }
+    ],
+    "12.1 Write property test for graceful fallback without Redis (Property 14)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999378
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781882090888
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781883118515
+      }
+    ],
+    "12.2 Write property test for command response resolves waiter (Property 7)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999408
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781882091736
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781883117710
+      }
+    ],
+    "13. Final checkpoint - Verificar todos los tests": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781851999460
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781887053877
+      },
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781887507228
+      }
+    ],
+    "1. Agregar nuevo estado interno al RedisConnectionManager": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852005209
+      }
+    ],
+    "2. Refactorizar `connect_workstation` (zero Redis awaits, fire-and-forget org subscribe)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852008533
+      }
+    ],
+    "3. Refactorizar `disconnect_workstation` (org count decrement, conditional unsubscribe)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852255303
+      }
+    ],
+    "4. Refactorizar `send_to_workstation` (WorkerRegistry lookup + publish a worker channel)": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781852612292
+      }
+    ],
+    "5. Refactorizar command waiters (sin subscribe/unsubscribe, publish response a worker:{originator})": [
+      {
+        "executionId": "7ae345b1-15be-4e35-8901-5666d97bd34a",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781855047076
+      }
+    ],
+    "7. Refactorizar el listener Redis para despacho por nuevo esquema de canales": [
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781879439899
+      }
+    ],
+    "10. Propagar `vlan_id` desde WebSocket endpoint a `connect_workstation`": [
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781882083090
+      }
+    ],
+    "8. Refactorizar `_handle_redis_reconnect` con re-suscripción consolidada": [
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781882085166
+      }
+    ],
+    "12. Property tests de fallback graceful": [
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781883118547
+      }
+    ],
+    "9. Refactorizar `initialize()` para suscribir solo canales fijos": [
+      {
+        "executionId": "abbdab9f-0f9e-4a63-a551-e49fee9497c4",
+        "chatSessionId": "sess_13298632-e438-4de7-90bc-704db2c456d9",
+        "timestamp": 1781883119426
+      }
+    ]
+  }
+}
