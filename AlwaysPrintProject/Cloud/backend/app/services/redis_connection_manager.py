@@ -581,12 +581,17 @@ class RedisConnectionManager:
 
         while True:
             try:
+                # Usar get_message con timeout largo y sleep generoso para no saturar
+                # el event loop. El timeout de 5s permite que Redis acumule mensajes
+                # sin que el listener consuma CPU innecesariamente.
                 message = await self._pubsub.get_message(
                     ignore_subscribe_messages=True,
-                    timeout=1.0,
+                    timeout=5.0,
                 )
                 if message is None:
-                    await asyncio.sleep(0.01)
+                    # Sin mensajes: ceder el event loop con sleep largo
+                    # Esto es crítico — un sleep corto (0.01) causa starvation
+                    await asyncio.sleep(0.1)
                     continue
 
                 if message["type"] != "message":
@@ -601,12 +606,6 @@ class RedisConnectionManager:
                 except (json.JSONDecodeError, TypeError):
                     logger.warning("redis.invalid_payload", channel=channel)
                     continue
-
-                logger.debug(
-                    "redis.receive",
-                    channel=channel,
-                    message_type=payload.get("type", "unknown") if isinstance(payload, dict) else "unknown",
-                )
 
                 # Despachar según tipo de canal
                 if channel.startswith("ws:"):
