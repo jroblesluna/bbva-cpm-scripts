@@ -75,6 +75,7 @@ class RegistrationCache:
             fetch_fn=lambda: self._fetch_organization_data(organization_id, db),
             data_type="organization",
             identifier=organization_id,
+            db=db,
         )
 
     async def get_vlan_data(
@@ -98,6 +99,7 @@ class RegistrationCache:
             fetch_fn=lambda: self._fetch_vlan_data(vlan_id, db),
             data_type="vlan",
             identifier=vlan_id,
+            db=db,
         )
 
     async def get_effective_config(
@@ -121,6 +123,7 @@ class RegistrationCache:
             fetch_fn=lambda: self._fetch_effective_config(workstation_id, db),
             data_type="effective_config",
             identifier=workstation_id,
+            db=db,
         )
 
     async def get_forced_contingency_state(
@@ -154,6 +157,7 @@ class RegistrationCache:
             ),
             data_type="contingency_state",
             identifier=workstation_id,
+            db=db,
         )
 
     # =========================================================================
@@ -276,6 +280,7 @@ class RegistrationCache:
         fetch_fn,
         data_type: str,
         identifier: str,
+        db: Optional[Session] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Patrón genérico: intenta leer de Redis, si no existe consulta BD y cachea.
@@ -285,6 +290,10 @@ class RegistrationCache:
             fetch_fn: Función callable que consulta PostgreSQL (retorna dict o None).
             data_type: Tipo de dato para logging.
             identifier: ID del recurso para logging.
+            db: Sesión de BD opcional. Si se provee, se hace db.rollback() tras
+                fetch_fn() para cerrar la transacción implícita ANTES de cualquier
+                await externo (crítico para evitar idle-in-transaction durante el
+                setex de Redis y agotar el pool de PostgreSQL bajo concurrencia).
 
         Returns:
             Dict con datos o None si el recurso no existe en BD.
@@ -326,7 +335,29 @@ class RegistrationCache:
                 data_type=data_type,
                 identifier=identifier,
             )
+            # Cerrar transacción implícita incluso en caso de error para
+            # liberar la conexión del pool antes de retornar.
+            if db is not None:
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
             return None
+
+        # CRÍTICO: cerrar la transacción implícita ANTES de cualquier await externo.
+        # Si no se hace, la sesión queda 'idle in transaction' durante el setex de
+        # Redis, bloqueando el slot del pool de PostgreSQL. Bajo concurrencia alta
+        # (60+ registros simultáneos en cache-miss) esto agota el pool.
+        if db is not None:
+            try:
+                db.rollback()
+            except Exception as e:
+                logger.warning(
+                    "cache.rollback_after_fetch_error",
+                    error=str(e),
+                    data_type=data_type,
+                    identifier=identifier,
+                )
 
         if data is None:
             # Recurso no existe en BD: NO almacenar valor vacío en Redis
