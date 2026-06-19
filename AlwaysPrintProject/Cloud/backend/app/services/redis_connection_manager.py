@@ -4,16 +4,16 @@ Gestor de conexiones WebSocket con coordinación via Redis pub/sub.
 Este módulo implementa el RedisConnectionManager que extiende la funcionalidad
 del ConnectionManager original con comunicación inter-worker mediante Redis:
 - Pub/Sub para comandos cross-worker y broadcasts organizacionales
-- Suscripción por workstation (ws:{id}) y organización (org:{id})
+- Canal worker consolidado para mensajes dirigidos y respuestas de comandos
+- Suscripción lazy por organización (org:{id}) según workstations conectadas
 - Fallback graceful cuando Redis no está disponible
 - Exponential backoff para reconexión Redis (1s→2s→4s→8s→16s→30s max)
-- Command waiters con resolución via pub/sub (cmd_response:{id})
+- Command waiters con resolución via canal worker (sin suscripciones dinámicas)
 
-Canales Redis:
-- ws:{workstation_id} → Comandos dirigidos a una workstation específica
-- org:{organization_id} → Broadcasts organizacionales
+Canales Redis (esquema consolidado, máximo 2 + N_orgs_activas por worker):
+- worker:{worker_id} → Mensajes dirigidos a workstations del worker + respuestas de comandos
+- org:{organization_id} → Broadcasts organizacionales (lazy subscribe/unsubscribe)
 - global:broadcast → Broadcasts globales a todos los workers
-- cmd_response:{command_id} → Respuestas de comandos cross-worker
 
 Uso:
     from app.services.redis_connection_manager import RedisConnectionManager
@@ -85,8 +85,14 @@ class RedisConnectionManager:
         # Death pings pendientes de respuesta: {workstation_id: datetime_enviado}
         self._pending_pongs: Dict[str, datetime] = {}
 
-        # Respuestas pendientes de comandos: {command_id: (asyncio.Event, list)}
-        self._pending_command_responses: Dict[str, Tuple[asyncio.Event, List[Optional[dict]]]] = {}
+        # Respuestas pendientes de comandos: {command_id: (asyncio.Event, list, originator_worker_id)}
+        self._pending_command_responses: Dict[str, Tuple[asyncio.Event, List[Optional[dict]], str]] = {}
+
+        # Contador de workstations por organización (lazy subscribe/unsubscribe)
+        self._org_ws_count: Dict[str, int] = {}
+
+        # VLAN de cada workstation conectada (para filtrado local)
+        self._ws_vlan_ids: Dict[str, Optional[str]] = {}
 
         # Redis
         self._redis_url = redis_url
@@ -110,8 +116,10 @@ class RedisConnectionManager:
 
     async def initialize(self) -> None:
         """
-        Conectar a Redis, suscribir canal global:broadcast, iniciar listener task.
+        Conectar a Redis, suscribir canales fijos: worker:{worker_id} y global:broadcast.
+        Inicializar WorkerRegistry y arrancar listener task + heartbeat task.
 
+        NO suscribe canales per-workstation ni per-command.
         Si Redis no está disponible, el manager opera en modo local sin Redis.
         La conexión se reintenta con exponential backoff en background.
         """
@@ -139,9 +147,12 @@ class RedisConnectionManager:
                 ttl=settings.WORKER_REGISTRY_TTL,
             )
 
-            # Crear pub/sub y suscribir canal global
+            # Crear pub/sub y suscribir canales fijos (2 canales consolidados)
             self._pubsub = self._redis.pubsub()
-            await self._pubsub.subscribe("global:broadcast")
+            await self._pubsub.subscribe(
+                f"worker:{self._worker_id}",
+                "global:broadcast",
+            )
 
             # Iniciar listener task para procesar mensajes pub/sub
             self._listener_task = asyncio.create_task(self._redis_listener())
@@ -152,7 +163,9 @@ class RedisConnectionManager:
             logger.info(
                 "redis.initialized",
                 redis_url=self._redis_url,
-                channel="global:broadcast",
+                worker_channel=f"worker:{self._worker_id}",
+                global_channel="global:broadcast",
+                msg="Suscrito a canales fijos: worker:{worker_id} y global:broadcast",
             )
         except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
             logger.warning(
@@ -174,25 +187,37 @@ class RedisConnectionManager:
         websocket: WebSocket,
         db: Session,
         organization_id: str,
+        vlan_id: Optional[str] = None,
     ) -> None:
         """
-        Registra conexión de un Tray Client.
+        Registra workstation localmente. Zero Redis awaits en hot path.
 
-        1. Registra localmente (dict workstation_id → WebSocket)
-        2. Suscribe al canal Redis ws:{workstation_id}
-        3. Registra en WorkerRegistry
+        Hot path (síncrono):
+          1. workstation_connections[ws_id] = websocket
+          2. org_ids[ws_id] = organization_id
+          3. _ws_vlan_ids[ws_id] = vlan_id
+          4. last_pong[ws_id] = now
+          5. last_activity[ws_id] = now
+          6. _org_ws_count[org_id] += 1
+
+        Fire-and-forget (no bloquea respuesta):
+          7. WorkerRegistry.register_workstation(ws_id) — SADD
+          8. Si _org_ws_count[org_id] == 1 → SUBSCRIBE org:{org_id}
 
         Args:
             workstation_id: UUID de la workstation
             websocket: Conexión WebSocket (ya aceptada por el endpoint)
             db: Sesión de base de datos
             organization_id: UUID de la organización
+            vlan_id: VLAN de la workstation (para filtrado local de mensajes org)
         """
-        # Registrar localmente (sin lock — asyncio single-threaded, safe entre awaits)
+        # === Hot path síncrono (zero Redis awaits) ===
         self.workstation_connections[workstation_id] = websocket
+        self.org_ids[workstation_id] = organization_id
+        self._ws_vlan_ids[workstation_id] = vlan_id
         self.last_pong[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
         self.last_activity[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
-        self.org_ids[workstation_id] = organization_id
+        self._org_ws_count[organization_id] = self._org_ws_count.get(organization_id, 0) + 1
 
         # Actualizar estado en base de datos
         from app.services.workstation import WorkstationService
@@ -203,22 +228,54 @@ class RedisConnectionManager:
             is_online=True,
         )
 
-        # Suscribir canal Redis para esta workstation (fire-and-forget para no bloquear)
-        if self._redis_available and self._pubsub:
-            asyncio.ensure_future(self._subscribe_workstation_channel(workstation_id))
+        # === Fire-and-forget (no bloquea la conexión) ===
+        is_first_of_org = self._org_ws_count[organization_id] == 1
+        asyncio.create_task(
+            self._fire_and_forget_connect(workstation_id, organization_id, is_first_of_org)
+        )
 
-        # Registrar en WorkerRegistry (fire-and-forget)
-        if self._worker_registry:
-            asyncio.ensure_future(self._worker_registry.register_workstation(workstation_id))
+    async def _fire_and_forget_connect(
+        self,
+        workstation_id: str,
+        organization_id: str,
+        subscribe_org: bool,
+    ) -> None:
+        """
+        Operaciones Redis fire-and-forget tras connect_workstation.
 
-    async def _subscribe_workstation_channel(self, workstation_id: str) -> None:
-        """Suscribe al canal Redis ws:{workstation_id} de forma no-bloqueante."""
+        Registra workstation en WorkerRegistry (SADD) y, si es la primera
+        workstation de la organización en este worker, suscribe al canal org:{org_id}.
+
+        Args:
+            workstation_id: UUID de la workstation
+            organization_id: UUID de la organización
+            subscribe_org: True si debe suscribir canal org (primera WS de esa org)
+        """
         try:
-            await self._pubsub.subscribe(f"ws:{workstation_id}")
+            # Registrar en WorkerRegistry (SADD)
+            if self._worker_registry:
+                await self._worker_registry.register_workstation(workstation_id)
+
+            # Lazy subscribe: solo si es la primera workstation de esta org en el worker
+            if subscribe_org and self._redis_available and self._pubsub:
+                await self._pubsub.subscribe(f"org:{organization_id}")
+                logger.debug(
+                    "redis.lazy_org_subscribe",
+                    channel=f"org:{organization_id}",
+                    org_id=organization_id,
+                )
         except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
             logger.warning(
-                "redis.subscribe_failed",
-                channel=f"ws:{workstation_id}",
+                "redis.fire_and_forget_connect_failed",
+                workstation_id=workstation_id,
+                org_id=organization_id,
+                error=str(e),
+            )
+        except Exception as e:
+            logger.warning(
+                "redis.fire_and_forget_connect_error",
+                workstation_id=workstation_id,
+                org_id=organization_id,
                 error=str(e),
             )
 
@@ -237,11 +294,13 @@ class RedisConnectionManager:
         websocket: WebSocket = None,
     ) -> None:
         """
-        Desconecta un Tray Client y limpia recursos.
+        Desconecta workstation y limpia estado.
 
-        1. Elimina del estado local
-        2. Desuscribe del canal Redis ws:{workstation_id}
-        3. Elimina del WorkerRegistry
+        1. Elimina de workstation_connections, org_ids, _ws_vlan_ids, last_pong,
+           last_activity, _pending_pongs
+        2. _org_ws_count[org_id] -= 1
+        3. Si _org_ws_count[org_id] == 0 → UNSUBSCRIBE org:{org_id}, del counter
+        4. WorkerRegistry.unregister_workstation(ws_id) — SREM
 
         Solo marca offline si el WebSocket que se desconecta es el mismo que
         está actualmente registrado (evita race conditions en reconexiones).
@@ -259,34 +318,44 @@ class RedisConnectionManager:
                 del self.workstation_connections[workstation_id]
                 should_mark_offline = True
 
-        if should_mark_offline and workstation_id in self.last_pong:
-            del self.last_pong[workstation_id]
-
-        if should_mark_offline:
-            self.last_activity.pop(workstation_id, None)
-            self.org_ids.pop(workstation_id, None)
-            self._pending_pongs.pop(workstation_id, None)
-
         if not should_mark_offline:
             return
 
-        # Desuscribir canal Redis de esta workstation
-        if self._redis_available and self._pubsub:
-            try:
-                await self._pubsub.unsubscribe(f"ws:{workstation_id}")
-                logger.debug(
-                    "redis.unsubscribe",
-                    channel=f"ws:{workstation_id}",
-                    workstation_id=workstation_id,
-                )
-            except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
-                logger.warning(
-                    "redis.unsubscribe_failed",
-                    channel=f"ws:{workstation_id}",
-                    error=str(e),
-                )
+        # Obtener org_id ANTES de eliminar de org_ids (necesario para decremento)
+        org_id = self.org_ids.get(workstation_id)
 
-        # Eliminar del WorkerRegistry
+        # Limpiar estado local
+        if workstation_id in self.last_pong:
+            del self.last_pong[workstation_id]
+        self.last_activity.pop(workstation_id, None)
+        self.org_ids.pop(workstation_id, None)
+        self._ws_vlan_ids.pop(workstation_id, None)
+        self._pending_pongs.pop(workstation_id, None)
+
+        # Decrementar contador org y conditional UNSUBSCRIBE
+        if org_id and org_id in self._org_ws_count:
+            self._org_ws_count[org_id] -= 1
+            if self._org_ws_count[org_id] <= 0:
+                # Última workstation de esta org en este worker → UNSUBSCRIBE
+                del self._org_ws_count[org_id]
+                if self._redis_available and self._pubsub:
+                    try:
+                        await self._pubsub.unsubscribe(f"org:{org_id}")
+                        logger.debug(
+                            "redis.lazy_org_unsubscribe",
+                            channel=f"org:{org_id}",
+                            org_id=org_id,
+                            workstation_id=workstation_id,
+                        )
+                    except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
+                        logger.warning(
+                            "redis.lazy_org_unsubscribe_failed",
+                            channel=f"org:{org_id}",
+                            org_id=org_id,
+                            error=str(e),
+                        )
+
+        # Eliminar del WorkerRegistry (SREM)
         if self._worker_registry:
             await self._worker_registry.unregister_workstation(workstation_id)
 
@@ -353,10 +422,14 @@ class RedisConnectionManager:
         message: dict,
     ) -> bool:
         """
-        Envía mensaje a una workstation.
+        Envía mensaje a workstation.
 
-        Si la workstation está conectada localmente, envía directamente.
-        Si no está aquí y Redis está disponible, publica en ws:{workstation_id}.
+        1. Si está localmente → envío directo via WebSocket
+        2. Si no está local y Redis disponible:
+           a. Consultar WorkerRegistry.find_worker_for_workstation(ws_id)
+           b. Si encontrado → publish a worker:{target_worker_id}
+           c. Si no encontrado → log warning, return False
+        3. Si Redis no disponible → log, return False
 
         Args:
             workstation_id: UUID de la workstation
@@ -365,7 +438,7 @@ class RedisConnectionManager:
         Returns:
             True si se envió localmente, False si se publicó en Redis o no se pudo enviar
         """
-        # Intentar entrega local primero
+        # 1. Intentar entrega local primero
         if workstation_id in self.workstation_connections:
             ws = self.workstation_connections[workstation_id]
             try:
@@ -382,30 +455,71 @@ class RedisConnectionManager:
                 self.last_pong.pop(workstation_id, None)
                 return False
 
-        # No está local — publicar en Redis para que otro worker lo entregue
+        # 2. No está local — resolver worker via WorkerRegistry y publicar en su canal
         if self._redis_available and self._redis:
+            # Si WorkerRegistry no está disponible, no podemos resolver el worker destino
+            if not self._worker_registry:
+                logger.warning(
+                    "delivery.no_worker_registry",
+                    workstation_id=workstation_id,
+                    message_type=message.get("type", "unknown"),
+                    msg="WorkerRegistry no disponible, no se puede resolver worker destino",
+                )
+                return False
+
             try:
-                payload = json.dumps(message, default=str)
-                await self._redis.publish(f"ws:{workstation_id}", payload)
+                # 2a. Consultar en qué worker está la workstation
+                target_worker_id = await self._worker_registry.find_worker_for_workstation(
+                    workstation_id
+                )
+
+                # 2c. Si no se encontró el worker → log warning, return False
+                if not target_worker_id:
+                    logger.warning(
+                        "delivery.worker_not_found",
+                        workstation_id=workstation_id,
+                        message_type=message.get("type", "unknown"),
+                        msg="No se encontró worker para la workstation en WorkerRegistry",
+                    )
+                    return False
+
+                # 2b. Worker encontrado → publicar en worker:{target_worker_id}
+                # Enriquecer payload con target_workstation_id y organization_id
+                org_id = message.get("organization_id") or self.org_ids.get(workstation_id)
+                enriched_message = {
+                    **message,
+                    "target_workstation_id": workstation_id,
+                }
+                if org_id:
+                    enriched_message["organization_id"] = org_id
+
+                payload = json.dumps(enriched_message, default=str)
+                target_channel = f"worker:{target_worker_id}"
+                await self._redis.publish(target_channel, payload)
                 logger.debug(
                     "delivery.remote_publish",
                     workstation_id=workstation_id,
                     message_type=message.get("type", "unknown"),
-                    target_channel=f"ws:{workstation_id}",
+                    target_channel=target_channel,
+                    target_worker_id=target_worker_id,
                 )
                 return False
+
             except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
                 logger.warning(
                     "redis.publish_failed",
-                    channel=f"ws:{workstation_id}",
+                    workstation_id=workstation_id,
                     error=str(e),
+                    msg="Error al resolver worker o publicar mensaje",
                 )
+                return False
 
-        # Workstation no conectada localmente y Redis no disponible
+        # 3. Redis no disponible → log, return False
         logger.debug(
-            "delivery.not_found",
+            "delivery.redis_not_available",
             workstation_id=workstation_id,
             message_type=message.get("type", "unknown"),
+            msg="Redis no disponible, no se puede entregar mensaje remotamente",
         )
         return False
 
@@ -569,10 +683,10 @@ class RedisConnectionManager:
         Loop async que procesa mensajes pub/sub entrantes.
 
         Escucha continuamente en el PubSub y despacha mensajes según el canal:
-        - ws:{workstation_id} → entrega local al WebSocket
+        - worker:{worker_id} → si type == "cmd_response" resuelve waiter,
+                               sino entrega a workstation local via target_workstation_id
         - org:{organization_id} → entrega a todas las locales de esa org
         - global:broadcast → entrega a todas las locales
-        - cmd_response:{command_id} → resuelve command waiter
         """
         if not self._pubsub:
             return
@@ -581,6 +695,8 @@ class RedisConnectionManager:
 
         # Guardar referencia al event loop
         self._event_loop = asyncio.get_running_loop()
+
+        worker_channel = f"worker:{self._worker_id}"
 
         while True:
             try:
@@ -606,18 +722,31 @@ class RedisConnectionManager:
                     except (json.JSONDecodeError, TypeError):
                         continue
 
-                    # Despachar según tipo de canal
-                    if channel.startswith("ws:"):
-                        workstation_id = channel[3:]
-                        await self._deliver_to_local_workstation(workstation_id, payload)
+                    # Despachar según tipo de canal (esquema consolidado)
+                    # Solo se procesan: worker:{worker_id}, org:{org_id}, global:broadcast
+                    # Canales ws:{id} y cmd_response:{id} han sido eliminados del esquema
+                    if channel == worker_channel:
+                        # Canal worker consolidado: cmd_response o mensaje dirigido
+                        msg_type = payload.get("type") if isinstance(payload, dict) else None
+                        if msg_type == "cmd_response":
+                            command_id = payload.get("command_id")
+                            if command_id:
+                                self.resolve_command_response(command_id, payload)
+                        else:
+                            target_ws_id = payload.get("target_workstation_id") if isinstance(payload, dict) else None
+                            if target_ws_id:
+                                await self._deliver_to_local_workstation(target_ws_id, payload)
+                            else:
+                                logger.debug(
+                                    "redis.listener_no_target_ws",
+                                    channel=channel,
+                                    msg_type=msg_type,
+                                )
                     elif channel.startswith("org:"):
                         organization_id = channel[4:]
                         await self._deliver_to_local_org_workstations(organization_id, payload)
                     elif channel == "global:broadcast":
                         await self._deliver_global_broadcast(payload)
-                    elif channel.startswith("cmd_response:"):
-                        command_id = channel[13:]
-                        self.resolve_command_response(command_id, payload)
 
                     messages_processed += 1
                     if messages_processed >= 50:
@@ -746,25 +875,42 @@ class RedisConnectionManager:
         self, organization_id: str, payload: dict
     ) -> None:
         """
-        Entrega un mensaje a todas las workstations locales de una organización.
+        Entrega mensaje organizacional con filtrado opcional por VLAN.
 
-        Solo entrega a workstations cuyo org_id coincide con organization_id (Req 1.4).
-        Valida explícitamente tenant isolation por cada workstation (Req 5.3, 5.4).
+        1. Filtrar workstations locales donde org_ids[ws_id] == organization_id
+        2. Si payload contiene target_vlan_id:
+           Filtrar adicionalmente donde _ws_vlan_ids[ws_id] == target_vlan_id
+        3. Enviar payload a cada workstation que pase ambos filtros
+
+        Valida explícitamente tenant isolation por cada workstation (Req 8.3).
 
         Args:
             organization_id: UUID de la organización
             payload: Mensaje a entregar
         """
+        # Extraer target_vlan_id del payload (filtrado VLAN opcional)
+        target_vlan_id = payload.get("target_vlan_id") if isinstance(payload, dict) else None
+
         async with self._lock:
+            # 1. Filtrar por organización
             local_ws_ids = [
                 ws_id for ws_id, org_id in self.org_ids.items()
                 if org_id == organization_id
             ]
 
+        total_org_count = len(local_ws_ids)
+
+        # 2. Si hay target_vlan_id, filtrar adicionalmente por VLAN
+        if target_vlan_id is not None:
+            local_ws_ids = [
+                ws_id for ws_id in local_ws_ids
+                if self._ws_vlan_ids.get(ws_id) == target_vlan_id
+            ]
+
         delivered = 0
         skipped = 0
         for ws_id in local_ws_ids:
-            # Verificación explícita de tenant isolation por workstation
+            # Verificación explícita de tenant isolation por workstation (defense-in-depth)
             if not self._validate_tenant(ws_id, organization_id):
                 skipped += 1
                 continue
@@ -782,6 +928,9 @@ class RedisConnectionManager:
             "delivery.org_from_redis",
             org_id=organization_id,
             delivered=delivered,
+            total_org_workstations=total_org_count,
+            vlan_filtered=target_vlan_id is not None,
+            target_vlan_id=target_vlan_id,
             skipped_tenant_fail=skipped,
             message_type=payload.get("type", "unknown"),
         )
@@ -814,7 +963,9 @@ class RedisConnectionManager:
         Reconexión con exponential backoff: 1s → 2s → 4s → 8s → 16s → 30s max.
 
         Reintenta conectar a Redis indefinidamente. Una vez reconectado,
-        re-suscribe todos los canales activos y reinicia el listener task.
+        re-suscribe los canales consolidados (worker, global, orgs activas)
+        y reinicia el listener task. La re-suscripción es O(1 + N_orgs_activas),
+        independiente del número de workstations conectadas.
         """
         delay = 1
         max_delay = settings.WS_REDIS_RECONNECT_MAX_INTERVAL
@@ -841,19 +992,24 @@ class RedisConnectionManager:
                 await self._redis.ping()
                 self._redis_available = True
 
-                # Re-crear pub/sub y re-suscribir canales activos
+                # Re-crear pub/sub y re-suscribir canales fijos
                 self._pubsub = self._redis.pubsub()
-                await self._pubsub.subscribe("global:broadcast")
+                await self._pubsub.subscribe(
+                    f"worker:{self._worker_id}",
+                    "global:broadcast",
+                )
 
-                # Re-suscribir canales de workstations conectadas localmente
+                # Re-suscribir canales org para organizaciones con workstations conectadas
+                for org_id, count in self._org_ws_count.items():
+                    if count > 0:
+                        try:
+                            await self._pubsub.subscribe(f"org:{org_id}")
+                        except Exception:
+                            pass
+
+                # Obtener lista de workstations conectadas localmente
                 async with self._lock:
                     ws_ids = list(self.workstation_connections.keys())
-
-                for ws_id in ws_ids:
-                    try:
-                        await self._pubsub.subscribe(f"ws:{ws_id}")
-                    except Exception:
-                        pass
 
                 # Re-inicializar WorkerRegistry
                 self._worker_registry = WorkerRegistry(
@@ -872,7 +1028,9 @@ class RedisConnectionManager:
                 logger.info(
                     "redis.connection_restored",
                     attempts=attempt,
-                    resubscribed_channels=len(ws_ids) + 1,
+                    fixed_channels=2,
+                    org_channels=sum(1 for c in self._org_ws_count.values() if c > 0),
+                    workstations_reregistered=len(ws_ids),
                 )
                 return
 
@@ -912,10 +1070,8 @@ class RedisConnectionManager:
 
     def register_command_waiter(self, command_id: str) -> asyncio.Event:
         """
-        Registra un waiter para esperar la respuesta de un comando específico.
-
-        Suscribe al canal cmd_response:{command_id} en Redis para recibir
-        respuestas de otros workers.
+        Registra waiter para respuesta de comando.
+        Almacena self._worker_id como originator. NO hace SUBSCRIBE.
 
         Args:
             command_id: ID del comando cuya respuesta se espera
@@ -924,25 +1080,8 @@ class RedisConnectionManager:
             asyncio.Event que se señalará cuando llegue la respuesta
         """
         event = asyncio.Event()
-        self._pending_command_responses[command_id] = (event, [None])
-
-        # Suscribir canal de respuesta en Redis (fire-and-forget)
-        if self._redis_available and self._pubsub:
-            asyncio.create_task(self._subscribe_command_response(command_id))
-
+        self._pending_command_responses[command_id] = (event, [None], self._worker_id)
         return event
-
-    async def _subscribe_command_response(self, command_id: str) -> None:
-        """Suscribe al canal cmd_response:{command_id} para respuestas cross-worker."""
-        try:
-            if self._pubsub:
-                await self._pubsub.subscribe(f"cmd_response:{command_id}")
-        except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
-            logger.warning(
-                "redis.subscribe_cmd_response_failed",
-                command_id=command_id,
-                error=str(e),
-            )
 
     def resolve_command_response(self, command_id: str, response: dict) -> bool:
         """
@@ -956,7 +1095,7 @@ class RedisConnectionManager:
             True si había un waiter esperando, False si no
         """
         if command_id in self._pending_command_responses:
-            event, container = self._pending_command_responses[command_id]
+            event, container, _ = self._pending_command_responses[command_id]
             container[0] = response
             event.set()
             return True
@@ -966,10 +1105,8 @@ class RedisConnectionManager:
         self, command_id: str, timeout: float = 30.0
     ) -> Optional[dict]:
         """
-        Espera la respuesta de un comando con timeout.
-
-        Cuando la workstation responde en otro worker, la respuesta llega
-        via pub/sub en cmd_response:{command_id} y resuelve el event.
+        Espera respuesta con timeout. NO hace UNSUBSCRIBE al terminar.
+        Solo limpia el waiter del dict interno.
 
         Args:
             command_id: ID del comando
@@ -981,7 +1118,7 @@ class RedisConnectionManager:
         if command_id not in self._pending_command_responses:
             return None
 
-        event, container = self._pending_command_responses[command_id]
+        event, container, _ = self._pending_command_responses[command_id]
 
         try:
             await asyncio.wait_for(event.wait(), timeout=timeout)
@@ -989,37 +1126,39 @@ class RedisConnectionManager:
         except asyncio.TimeoutError:
             return None
         finally:
-            # Limpiar waiter y desuscribir canal
+            # Solo limpiar waiter del dict interno, NO hacer UNSUBSCRIBE
             self._pending_command_responses.pop(command_id, None)
-            if self._redis_available and self._pubsub:
-                try:
-                    await self._pubsub.unsubscribe(f"cmd_response:{command_id}")
-                except Exception:
-                    pass
 
     async def publish_command_response(
-        self, command_id: str, response: dict
+        self, command_id: str, response: dict, originator_worker_id: str
     ) -> None:
         """
-        Publica la respuesta de un comando en Redis para que el worker
-        originador la reciba.
+        Publica respuesta de comando al canal del worker originador.
+        Publica en worker:{originator_worker_id} con payload:
+          {"type": "cmd_response", "command_id": ..., ...response}
 
         Args:
             command_id: ID del comando
             response: Respuesta del comando
+            originator_worker_id: Worker ID del worker que originó el comando
         """
         if self._redis_available and self._redis:
             try:
-                payload = json.dumps(response, default=str)
-                await self._redis.publish(f"cmd_response:{command_id}", payload)
+                payload = json.dumps(
+                    {"type": "cmd_response", "command_id": command_id, **response},
+                    default=str,
+                )
+                await self._redis.publish(f"worker:{originator_worker_id}", payload)
                 logger.debug(
                     "redis.publish_cmd_response",
                     command_id=command_id,
+                    target_worker=originator_worker_id,
                 )
             except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
                 logger.warning(
                     "redis.publish_cmd_response_failed",
                     command_id=command_id,
+                    target_worker=originator_worker_id,
                     error=str(e),
                 )
 
@@ -1202,13 +1341,8 @@ class RedisConnectionManager:
                         self.org_ids.pop(ws_id, None)
                         self._pending_pongs.pop(ws_id, None)
 
-                # Desuscribir canales Redis y unregister de WorkerRegistry
+                # Unregister de WorkerRegistry (ya no se desuscriben canales ws:{id})
                 for ws_id in dead_workstations:
-                    if self._redis_available and self._pubsub:
-                        try:
-                            await self._pubsub.unsubscribe(f"ws:{ws_id}")
-                        except Exception:
-                            pass
                     if self._worker_registry:
                         await self._worker_registry.unregister_workstation(ws_id)
 

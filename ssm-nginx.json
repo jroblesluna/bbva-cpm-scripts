@@ -1,0 +1,5 @@
+{
+  "commands": [
+    "cat > /etc/nginx/nginx.conf <<'NGINXCONF'\nworker_processes auto;\nworker_rlimit_nofile 16384;\n\nerror_log /var/log/nginx/error.log;\npid /run/nginx.pid;\n\nevents {\n    worker_connections 8192;\n    multi_accept on;\n}\n\nhttp {\n    include /etc/nginx/mime.types;\n    default_type application/octet-stream;\n    types_hash_max_size 4096;\n    types_hash_bucket_size 128;\n\n    log_format main '$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\" \"$http_x_forwarded_for\"';\n    access_log /var/log/nginx/access.log main;\n\n    sendfile on;\n    tcp_nopush on;\n    keepalive_timeout 65;\n\n    include /etc/nginx/conf.d/*.conf;\n}\nNGINXCONF\nnginx -t && systemctl reload nginx && echo NGINX_OK || echo NGINX_FAILED"
+  ]
+}

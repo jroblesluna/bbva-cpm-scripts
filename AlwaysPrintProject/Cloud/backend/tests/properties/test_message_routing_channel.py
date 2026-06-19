@@ -1,19 +1,19 @@
-# Feature: websocket-scaling-redis, Property 1: Message Routing to Correct Channel
+# Feature: redis-pubsub-channel-consolidation, Property: Message Routing to Correct Channel
 """
-Property test: Message Routing to Correct Channel
+Property test: Message Routing to Correct Channel (Esquema Consolidado)
 
 Para cualquier tipo de mensaje (comando a workstation, broadcast organizacional,
 o respuesta de comando) y cualquier identificador target, el sistema DEBE publicar
 el mensaje en el canal Redis con formato correcto:
-- `ws:{workstation_id}` para comandos a workstation
+- `worker:{target_worker_id}` para comandos a workstation remota
 - `org:{organization_id}` para broadcasts organizacionales
-- `cmd_response:{command_id}` para respuestas de comando
+- `worker:{originator_worker_id}` con type=cmd_response para respuestas de comando
 
-Se generan UUIDs aleatorios para ws_id, org_id y cmd_id, y se verifica
+Se generan UUIDs aleatorios para worker_id, org_id y cmd_id, y se verifica
 que las llamadas a Redis.publish() usan los canales correctos.
 
-Feature: websocket-scaling-redis, Property 1: Message Routing to Correct Channel
-**Validates: Requirements 1.1, 1.3, 1.6**
+Feature: redis-pubsub-channel-consolidation
+**Validates: Requirements 1.4, 2.2, 3.2**
 """
 
 import asyncio
@@ -79,28 +79,17 @@ class MockRedisCapture:
         """Mock de desuscripción."""
         pass
 
-    def pipeline(self):
-        """Retorna un pipeline mock."""
-        return MockPipeline(self)
-
-
-class MockPipeline:
-    """Pipeline mock básico."""
-
-    def __init__(self, redis: MockRedisCapture):
-        self._redis = redis
-
-    async def execute(self):
-        return []
-
 
 # === HELPER PARA CREAR RedisConnectionManager CON MOCK ===
 
 
-async def create_manager_with_mock_redis():
+async def create_manager_with_mock_redis(resolved_worker_id: str = "worker_remote_99"):
     """
     Crea un RedisConnectionManager con Redis mockeado,
     marcado como disponible, sin intentar conexión real.
+
+    Args:
+        resolved_worker_id: El worker_id que WorkerRegistry resuelve
     """
     from app.services.redis_connection_manager import RedisConnectionManager
 
@@ -110,7 +99,20 @@ async def create_manager_with_mock_redis():
     # Inyectar el mock directamente
     manager._redis = mock_redis
     manager._redis_available = True
-    manager._lock = asyncio.Lock()
+    manager._worker_id = "worker_local_12345"
+
+    # Mock WorkerRegistry que resuelve al worker_id dado
+    mock_registry = AsyncMock()
+    mock_registry.register_workstation = AsyncMock()
+    mock_registry.unregister_workstation = AsyncMock()
+    mock_registry.find_worker_for_workstation = AsyncMock(return_value=resolved_worker_id)
+    manager._worker_registry = mock_registry
+
+    # Mock pubsub
+    mock_pubsub = AsyncMock()
+    mock_pubsub.subscribe = AsyncMock()
+    mock_pubsub.unsubscribe = AsyncMock()
+    manager._pubsub = mock_pubsub
 
     return manager, mock_redis
 
@@ -121,44 +123,60 @@ async def create_manager_with_mock_redis():
 @hypothesis_settings(max_examples=150, deadline=None)
 @given(
     workstation_id=uuid_strategy,
+    target_worker_id=st.from_regex(r"worker_[a-z0-9]{5,10}", fullmatch=True),
     message=message_strategy,
 )
-async def test_send_to_workstation_publishes_to_ws_channel(
+async def test_send_to_workstation_publishes_to_worker_channel(
     workstation_id: str,
+    target_worker_id: str,
     message: dict,
 ):
     """
     Propiedad: Cuando send_to_workstation() se llama con un workstation_id
     que NO está conectado localmente, el sistema DEBE publicar en el canal
-    Redis `ws:{workstation_id}`.
+    Redis `worker:{target_worker_id}` resuelto via WorkerRegistry.
 
-    Feature: websocket-scaling-redis, Property 1: Message Routing to Correct Channel
-    **Validates: Requirements 1.1, 1.3, 1.6**
+    NO se publica en `ws:{workstation_id}` (canal eliminado).
+
+    Feature: redis-pubsub-channel-consolidation
+    **Validates: Requirements 1.4, 2.2**
     """
-    manager, mock_redis = await create_manager_with_mock_redis()
+    manager, mock_redis = await create_manager_with_mock_redis(
+        resolved_worker_id=target_worker_id
+    )
 
     # No registrar la workstation localmente → forzar publicación via Redis
-    # (workstation_connections está vacío)
     result = await manager.send_to_workstation(workstation_id, message)
 
-    # Verificar que se publicó exactamente en ws:{workstation_id}
+    # Retorna False porque fue entrega remota
+    assert result is False, (
+        "send_to_workstation a workstation remota debe retornar False"
+    )
+
+    # Verificar que se publicó exactamente en worker:{target_worker_id}
     assert len(mock_redis.published) == 1, (
         f"Se esperaba exactamente 1 publicación Redis, "
         f"pero se hicieron {len(mock_redis.published)}"
     )
 
     channel, payload = mock_redis.published[0]
-    expected_channel = f"ws:{workstation_id}"
+    expected_channel = f"worker:{target_worker_id}"
     assert channel == expected_channel, (
         f"El canal de publicación debería ser '{expected_channel}' "
         f"pero fue '{channel}'"
     )
 
-    # Verificar que el payload es el mensaje serializado
+    # Verificar que NO se usó el canal ws:{workstation_id} (eliminado)
+    assert channel != f"ws:{workstation_id}", (
+        f"El canal ws:{workstation_id} está ELIMINADO. "
+        f"Los mensajes deben ir a worker:*"
+    )
+
+    # Verificar que el payload contiene target_workstation_id
     decoded = json.loads(payload)
-    assert decoded["type"] == message["type"], (
-        f"El tipo de mensaje publicado debería ser '{message['type']}' "
-        f"pero fue '{decoded['type']}'"
+    assert decoded.get("target_workstation_id") == workstation_id, (
+        f"El payload debe contener target_workstation_id='{workstation_id}' "
+        f"pero fue '{decoded.get('target_workstation_id')}'"
     )
 
 
@@ -175,12 +193,12 @@ async def test_broadcast_to_organization_publishes_to_org_channel(
     Propiedad: Cuando broadcast_to_organization() se llama con un organization_id,
     el sistema DEBE publicar en el canal Redis `org:{organization_id}`.
 
-    Feature: websocket-scaling-redis, Property 1: Message Routing to Correct Channel
-    **Validates: Requirements 1.1, 1.3, 1.6**
+    Feature: redis-pubsub-channel-consolidation
+    **Validates: Requirements 1.4**
     """
     manager, mock_redis = await create_manager_with_mock_redis()
 
-    # Crear un mock de db session (no se usa para publicación Redis)
+    # Crear un mock de db session
     mock_db = MagicMock()
 
     await manager.broadcast_to_organization(organization_id, message, mock_db)
@@ -209,45 +227,63 @@ async def test_broadcast_to_organization_publishes_to_org_channel(
 @hypothesis_settings(max_examples=150, deadline=None)
 @given(
     command_id=uuid_strategy,
+    originator_worker_id=st.from_regex(r"worker_[a-z0-9]{5,10}", fullmatch=True),
     response=st.fixed_dictionaries({
-        "command_id": uuid_strategy,
         "success": st.booleans(),
         "output": st.text(min_size=0, max_size=100),
     }),
 )
-async def test_publish_command_response_publishes_to_cmd_response_channel(
+async def test_publish_command_response_publishes_to_worker_channel(
     command_id: str,
+    originator_worker_id: str,
     response: dict,
 ):
     """
-    Propiedad: Cuando publish_command_response() se llama con un command_id,
-    el sistema DEBE publicar la respuesta en el canal Redis `cmd_response:{command_id}`.
+    Propiedad: Cuando publish_command_response() se llama con un command_id
+    y originator_worker_id, el sistema DEBE publicar la respuesta en el canal
+    Redis `worker:{originator_worker_id}` con type=cmd_response y command_id.
 
-    Feature: websocket-scaling-redis, Property 1: Message Routing to Correct Channel
-    **Validates: Requirements 1.1, 1.3, 1.6**
+    NO se publica en `cmd_response:{command_id}` (canal eliminado).
+
+    Feature: redis-pubsub-channel-consolidation
+    **Validates: Requirements 3.2**
     """
     manager, mock_redis = await create_manager_with_mock_redis()
 
-    await manager.publish_command_response(command_id, response)
+    await manager.publish_command_response(command_id, response, originator_worker_id)
 
-    # Verificar que se publicó en cmd_response:{command_id}
+    # Verificar que se publicó en worker:{originator_worker_id}
     assert len(mock_redis.published) == 1, (
         f"Se esperaba exactamente 1 publicación Redis para command response, "
         f"pero se hicieron {len(mock_redis.published)}"
     )
 
     channel, payload = mock_redis.published[0]
-    expected_channel = f"cmd_response:{command_id}"
+    expected_channel = f"worker:{originator_worker_id}"
     assert channel == expected_channel, (
         f"El canal de publicación debería ser '{expected_channel}' "
         f"pero fue '{channel}'"
     )
 
-    # Verificar que el payload es la respuesta serializada
+    # Verificar que NO se usó el canal cmd_response:{command_id} (eliminado)
+    assert channel != f"cmd_response:{command_id}", (
+        f"El canal cmd_response:{command_id} está ELIMINADO. "
+        f"Las respuestas van a worker:{originator_worker_id}"
+    )
+
+    # Verificar que el payload tiene type=cmd_response y command_id
     decoded = json.loads(payload)
-    assert decoded["success"] == response["success"], (
+    assert decoded.get("type") == "cmd_response", (
+        f"El campo 'type' debería ser 'cmd_response' "
+        f"pero fue '{decoded.get('type')}'"
+    )
+    assert decoded.get("command_id") == command_id, (
+        f"El campo 'command_id' debería ser '{command_id}' "
+        f"pero fue '{decoded.get('command_id')}'"
+    )
+    assert decoded.get("success") == response["success"], (
         f"El campo 'success' debería ser {response['success']} "
-        f"pero fue {decoded['success']}"
+        f"pero fue {decoded.get('success')}"
     )
 
 
@@ -256,32 +292,38 @@ async def test_publish_command_response_publishes_to_cmd_response_channel(
     workstation_id=uuid_strategy,
     organization_id=uuid_strategy,
     command_id=uuid_strategy,
+    originator_worker_id=st.from_regex(r"worker_[a-z0-9]{5,10}", fullmatch=True),
+    target_worker_id=st.from_regex(r"worker_[a-z0-9]{5,10}", fullmatch=True),
     message=message_strategy,
 )
 async def test_channel_format_consistency(
     workstation_id: str,
     organization_id: str,
     command_id: str,
+    originator_worker_id: str,
+    target_worker_id: str,
     message: dict,
 ):
     """
-    Propiedad: Los tres tipos de canal SIEMPRE siguen el formato correcto:
-    - ws:{id} contiene exactamente el prefijo "ws:" seguido del workstation_id
-    - org:{id} contiene exactamente el prefijo "org:" seguido del organization_id
-    - cmd_response:{id} contiene exactamente el prefijo "cmd_response:" seguido del command_id
+    Propiedad: Los tres tipos de canal consolidado SIEMPRE siguen el formato correcto:
+    - worker:{id} para mensajes dirigidos a workstations remotas
+    - org:{id} para broadcasts organizacionales
+    - worker:{originator} con type=cmd_response para respuestas de comandos
 
-    Ningún canal debe contener espacios adicionales, slashes, o caracteres inesperados.
+    Ningún canal debe ser ws:{id} ni cmd_response:{id} (eliminados).
 
-    Feature: websocket-scaling-redis, Property 1: Message Routing to Correct Channel
-    **Validates: Requirements 1.1, 1.3, 1.6**
+    Feature: redis-pubsub-channel-consolidation
+    **Validates: Requirements 1.4, 2.2, 3.2**
     """
-    manager, mock_redis = await create_manager_with_mock_redis()
+    manager, mock_redis = await create_manager_with_mock_redis(
+        resolved_worker_id=target_worker_id
+    )
     mock_db = MagicMock()
 
     # Ejecutar las tres operaciones
     await manager.send_to_workstation(workstation_id, message)
     await manager.broadcast_to_organization(organization_id, message, mock_db)
-    await manager.publish_command_response(command_id, {"success": True})
+    await manager.publish_command_response(command_id, {"success": True}, originator_worker_id)
 
     # Verificar que se publicaron 3 mensajes
     assert len(mock_redis.published) == 3, (
@@ -293,26 +335,23 @@ async def test_channel_format_consistency(
     org_channel = mock_redis.published[1][0]
     cmd_channel = mock_redis.published[2][0]
 
-    # Canal workstation: debe ser exactamente "ws:{workstation_id}"
-    assert ws_channel == f"ws:{workstation_id}", (
-        f"Canal workstation incorrecto: '{ws_channel}' != 'ws:{workstation_id}'"
+    # Canal para workstation: debe ser "worker:{target_worker_id}"
+    assert ws_channel == f"worker:{target_worker_id}", (
+        f"Canal workstation incorrecto: '{ws_channel}' != 'worker:{target_worker_id}'"
     )
-    assert ":" in ws_channel and ws_channel.split(":", 1)[0] == "ws", (
-        f"Formato de canal ws inválido: '{ws_channel}'"
+    assert not ws_channel.startswith("ws:"), (
+        f"Canal ws:* está ELIMINADO, pero se encontró: '{ws_channel}'"
     )
 
     # Canal organización: debe ser exactamente "org:{organization_id}"
     assert org_channel == f"org:{organization_id}", (
         f"Canal organización incorrecto: '{org_channel}' != 'org:{organization_id}'"
     )
-    assert ":" in org_channel and org_channel.split(":", 1)[0] == "org", (
-        f"Formato de canal org inválido: '{org_channel}'"
-    )
 
-    # Canal command response: debe ser exactamente "cmd_response:{command_id}"
-    assert cmd_channel == f"cmd_response:{command_id}", (
-        f"Canal cmd_response incorrecto: '{cmd_channel}' != 'cmd_response:{command_id}'"
+    # Canal command response: debe ser "worker:{originator_worker_id}"
+    assert cmd_channel == f"worker:{originator_worker_id}", (
+        f"Canal cmd_response incorrecto: '{cmd_channel}' != 'worker:{originator_worker_id}'"
     )
-    assert "cmd_response:" in cmd_channel, (
-        f"Formato de canal cmd_response inválido: '{cmd_channel}'"
+    assert not cmd_channel.startswith("cmd_response:"), (
+        f"Canal cmd_response:* está ELIMINADO, pero se encontró: '{cmd_channel}'"
     )
