@@ -579,49 +579,53 @@ class RedisConnectionManager:
 
         logger.info("redis.listener_started")
 
+        # Guardar referencia al event loop
+        self._event_loop = asyncio.get_running_loop()
+
         while True:
             try:
-                # Usar get_message con timeout largo y sleep generoso para no saturar
-                # el event loop. El timeout de 5s permite que Redis acumule mensajes
-                # sin que el listener consuma CPU innecesariamente.
-                message = await self._pubsub.get_message(
-                    ignore_subscribe_messages=True,
-                    timeout=5.0,
-                )
-                if message is None:
-                    # Sin mensajes: ceder el event loop con sleep largo
-                    # Esto es crítico — un sleep corto (0.01) causa starvation
-                    await asyncio.sleep(0.1)
-                    continue
+                # Procesar TODOS los mensajes disponibles en batch antes de ceder
+                # Esto evita que el listener solo procese 1 mensaje por iteración
+                messages_processed = 0
+                while True:
+                    message = await self._pubsub.get_message(
+                        ignore_subscribe_messages=True,
+                        timeout=0.001,  # Non-blocking: retorna inmediatamente si no hay mensajes
+                    )
+                    if message is None:
+                        break  # No hay más mensajes, salir del batch
 
-                if message["type"] != "message":
-                    continue
+                    if message["type"] != "message":
+                        continue
 
-                channel = message["channel"]
-                data = message["data"]
+                    channel = message["channel"]
+                    data = message["data"]
 
-                # Parsear payload JSON
-                try:
-                    payload = json.loads(data) if isinstance(data, str) else data
-                except (json.JSONDecodeError, TypeError):
-                    logger.warning("redis.invalid_payload", channel=channel)
-                    continue
+                    try:
+                        payload = json.loads(data) if isinstance(data, str) else data
+                    except (json.JSONDecodeError, TypeError):
+                        continue
 
-                # Despachar según tipo de canal
-                if channel.startswith("ws:"):
-                    workstation_id = channel[3:]  # Quitar "ws:"
-                    await self._deliver_to_local_workstation(workstation_id, payload)
+                    # Despachar según tipo de canal
+                    if channel.startswith("ws:"):
+                        workstation_id = channel[3:]
+                        await self._deliver_to_local_workstation(workstation_id, payload)
+                    elif channel.startswith("org:"):
+                        organization_id = channel[4:]
+                        await self._deliver_to_local_org_workstations(organization_id, payload)
+                    elif channel == "global:broadcast":
+                        await self._deliver_global_broadcast(payload)
+                    elif channel.startswith("cmd_response:"):
+                        command_id = channel[13:]
+                        self.resolve_command_response(command_id, payload)
 
-                elif channel.startswith("org:"):
-                    organization_id = channel[4:]  # Quitar "org:"
-                    await self._deliver_to_local_org_workstations(organization_id, payload)
+                    messages_processed += 1
+                    if messages_processed >= 50:
+                        break  # Procesar máx 50 por batch, luego ceder
 
-                elif channel == "global:broadcast":
-                    await self._deliver_global_broadcast(payload)
-
-                elif channel.startswith("cmd_response:"):
-                    command_id = channel[13:]  # Quitar "cmd_response:"
-                    self.resolve_command_response(command_id, payload)
+                # Ceder el event loop generosamente — 500ms cuando no hay mensajes
+                # Esto es el fix clave: el listener NO compite con los registros
+                await asyncio.sleep(0.5)
 
             except asyncio.CancelledError:
                 logger.info("redis.listener_cancelled")
