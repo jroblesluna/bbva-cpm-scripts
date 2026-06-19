@@ -13,11 +13,11 @@ Este módulo maneja la comunicación bidireccional con las workstations:
 import asyncio
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db, SessionLocal
+from app.core.database import SessionLocal
 from app.core.logging import get_logger
 from app.models.workstation import Workstation
 from app.models.organization import Organization
@@ -77,10 +77,7 @@ router = APIRouter()
 
 
 @router.websocket("/ws/workstation")
-async def workstation_websocket(
-    websocket: WebSocket,
-    db: Session = Depends(get_db)
-):
+async def workstation_websocket(websocket: WebSocket):
     """
     Endpoint WebSocket para Tray Clients.
     
@@ -101,6 +98,7 @@ async def workstation_websocket(
     """
     
     workstation_id: Optional[str] = None
+    db: Optional[Session] = None
     workstation_service = WorkstationService()
     config_service = ConfigService()
     message_service = MessageService()
@@ -162,83 +160,109 @@ async def workstation_websocket(
             f"client_host={client_host}"
         )
         
-        # Registrar workstation (sync directo — la sesión ya está en el request context)
+        # Registrar workstation con sesión corta (no retener entre awaits)
         try:
-            workstation, is_new, status = workstation_service.register_workstation(
-                db=db,
-                ip_private=ip_private,
-                public_ip=client_host or "unknown",
-                hostname=hostname,
-                os_serial=os_serial,
-                current_user=current_user,
-                cidr=cidr,
-                tray_version=tray_version,
-            )
-            
-            if status == "pending":
-                # IP pública no autorizada
-                await _safe_close(websocket, 1008, f"IP {client_host} no autorizada")
-                return
-            
-            elif status == "inactive_organization":
-                # Organización desactivada
-                await _safe_close(websocket, 1008, "Organizacion desactivada")
-                return
-            
-            elif status != "authorized" or not workstation:
-                # Error inesperado
-                await _safe_close(websocket, 1011, "Error al registrar")
-                return
-            
-            workstation_id = str(workstation.id)
-            logger.info("ws.registro_exitoso", workstation_id=workstation_id, status=status)
-            
+            db = SessionLocal()
+            try:
+                workstation, is_new, status = workstation_service.register_workstation(
+                    db=db,
+                    ip_private=ip_private,
+                    public_ip=client_host or "unknown",
+                    hostname=hostname,
+                    os_serial=os_serial,
+                    current_user=current_user,
+                    cidr=cidr,
+                    tray_version=tray_version,
+                )
+
+                if status == "pending":
+                    # IP pública no autorizada
+                    await _safe_close(websocket, 1008, f"IP {client_host} no autorizada")
+                    return
+
+                elif status == "inactive_organization":
+                    # Organización desactivada
+                    await _safe_close(websocket, 1008, "Organizacion desactivada")
+                    return
+
+                elif status != "authorized" or not workstation:
+                    # Error inesperado
+                    await _safe_close(websocket, 1011, "Error al registrar")
+                    return
+
+                # Materializar IDs como strings antes de cerrar la sesión:
+                # tras el close el objeto workstation queda detached.
+                workstation_id = str(workstation.id)
+                organization_id = str(workstation.organization_id)
+                vlan_id = str(workstation.vlan_id) if workstation.vlan_id else None
+                logger.info("ws.registro_exitoso", workstation_id=workstation_id, status=status)
+            finally:
+                db.close()
+                db = None
+
         except Exception as e:
             # Error en registro
             logger.error("ws.error_registro", error_type=type(e).__name__, error=str(e), ip_private=ip_private)
             await _safe_close(websocket, 1011, f"Error: {str(e)}")
             return
-        
-        # Conectar WebSocket (incluye organization_id para rastreo de inactividad por org)
-        vlan_id = str(workstation.vlan_id) if workstation.vlan_id else None
-        await connection_manager.connect_workstation(
-            workstation_id=workstation_id,
-            websocket=websocket,
-            db=db,
-            organization_id=str(workstation.organization_id),
-            vlan_id=vlan_id,
-        )
+
+        # Conectar WebSocket con sesión corta (incluye organization_id para rastreo de inactividad por org)
+        db = SessionLocal()
+        try:
+            await connection_manager.connect_workstation(
+                workstation_id=workstation_id,
+                websocket=websocket,
+                db=db,
+                organization_id=organization_id,
+                vlan_id=vlan_id,
+            )
+        finally:
+            db.close()
+            db = None
         logger.info("ws.conectado_al_manager", workstation_id=workstation_id)
-        
-        # Obtener configuración efectiva desde cache (Redis) o BD
+
+        # Obtener configuración efectiva desde cache (Redis) o BD con sesión corta
         registration_cache = _get_registration_cache()
-        config = await registration_cache.get_effective_config(workstation_id, db)
-        if config is None:
-            # Fallback: si el cache no pudo resolver la config, usar ConfigService directo
-            config = config_service.get_effective_config(db, workstation_id)
+        db = SessionLocal()
+        try:
+            config = await registration_cache.get_effective_config(workstation_id, db)
+            if config is None:
+                # Fallback: si el cache no pudo resolver la config, usar ConfigService directo
+                config = config_service.get_effective_config(db, workstation_id)
+            # Cerrar transacción explícitamente antes de awaits posteriores
+            db.commit()
+        finally:
+            db.close()
+            db = None
         logger.debug("ws.config_obtenida", workstation_id=workstation_id)
-        
-        # Enviar confirmación de registro con workstation_id
+
+        # Enviar confirmación de registro con workstation_id (sin sesión BD)
         await websocket.send_json({
             "type": "registered",
             "workstation_id": workstation_id
         })
         logger.info("ws.registered_enviado", workstation_id=workstation_id)
-        
+
         await websocket.send_json({
             "type": "config_update",
             "config": config
         })
         logger.debug("ws.config_enviada", workstation_id=workstation_id)
-        
-        # Sincronizar estado de contingencia forzada desde cache (Redis) o BD
+
+        # Sincronizar estado de contingencia forzada desde cache (Redis) o BD con sesión corta
         # El cache resuelve la prioridad: organización > VLAN > workstation individual
-        contingency_state = await registration_cache.get_forced_contingency_state(
-            workstation_id=workstation_id,
-            organization_id=str(workstation.organization_id),
-            vlan_id=str(workstation.vlan_id) if workstation.vlan_id else None,
-            db=db,
-        )
+        db = SessionLocal()
+        try:
+            contingency_state = await registration_cache.get_forced_contingency_state(
+                workstation_id=workstation_id,
+                organization_id=organization_id,
+                vlan_id=vlan_id,
+                db=db,
+            )
+            db.commit()  # cerrar transacción antes de awaits
+        finally:
+            db.close()
+            db = None
 
         if contingency_state and contingency_state.get("enabled"):
             await websocket.send_json({
@@ -269,31 +293,41 @@ async def workstation_websocket(
             })
 
         logger.debug("ws.entrando_al_loop", workstation_id=workstation_id)
-        
-        # Enviar mensajes pendientes (nuevo sistema de deliveries)
-        pending_deliveries = message_service.get_pending_deliveries_for_workstation(
-            db=db,
-            workstation_id=workstation_id
-        )
-        
-        for delivery in pending_deliveries:
-            msg = delivery.message
+
+        # Enviar mensajes pendientes (nuevo sistema de deliveries) con sesión corta.
+        # Materializar los datos antes de cerrar la sesión para que los objetos
+        # queden detached y los sends posteriores no abran transacciones.
+        db = SessionLocal()
+        try:
+            pending_deliveries = message_service.get_pending_deliveries_for_workstation(
+                db=db,
+                workstation_id=workstation_id
+            )
+            deliveries_data = [
+                {
+                    "message_id": str(d.message.id),
+                    "content": d.message.content,
+                    "sent_at": d.message.sent_at.isoformat(),
+                }
+                for d in pending_deliveries
+            ]
+            # Marcar todos los deliveries como enviados en la misma transacción
+            for d in pending_deliveries:
+                message_service.mark_delivery_as_sent(db, str(d.message.id), workstation_id)
+            db.commit()
+        finally:
+            db.close()
+            db = None
+
+        # Enviar mensajes al cliente sin retener sesión de BD
+        for delivery in deliveries_data:
             await websocket.send_json({
                 "type": "message",
-                "message_id": str(msg.id),
-                "content": msg.content,
-                "sent_at": msg.sent_at.isoformat()
+                "message_id": delivery["message_id"],
+                "content": delivery["content"],
+                "sent_at": delivery["sent_at"],
             })
-            
-            # Marcar delivery individual como enviado
-            message_service.mark_delivery_as_sent(db, str(msg.id), workstation_id)
-        
-        # Liberar sesión de BD después del setup completo.
-        # El registro, config, contingencia y mensajes pendientes ya se procesaron.
-        # La sesión se re-crea on-demand en el loop solo cuando llega un mensaje.
-        db.close()
-        db = None
-        
+
         # Loop de recepción de mensajes
         while True:
             data = await websocket.receive_json()
@@ -320,7 +354,7 @@ async def workstation_websocket(
                 if not ws_exists:
                     # Workstation eliminada: verificar si la organización permite re-registro
                     org = db.query(Organization).filter(
-                        Organization.id == workstation.organization_id
+                        Organization.id == organization_id
                     ).first()
                     
                     if org and org.auto_reregister_enabled:
@@ -360,7 +394,7 @@ async def workstation_websocket(
                     audit_service.log_contingency_toggle(
                         db=db,
                         workstation_id=workstation_id,
-                        organization_id=str(workstation.organization_id),
+                        organization_id=organization_id,
                         user_id=None,  # Cambio automático
                         activated=contingency_active,
                         ip_address=client_host
@@ -390,7 +424,7 @@ async def workstation_websocket(
                 
                 # Notificar a operadores
                 await connection_manager.broadcast_to_organization(
-                    organization_id=str(workstation.organization_id),
+                    organization_id=organization_id,
                     message={
                         "type": "workstation_status_change",
                         "workstation_id": workstation_id,
@@ -414,7 +448,7 @@ async def workstation_websocket(
                     entity_type="WorkstationConfig",
                     entity_id=workstation_id,
                     workstation_id=workstation_id,
-                    organization_id=str(workstation.organization_id),
+                    organization_id=organization_id,
                     old_values={field: old_value},
                     new_values={field: new_value},
                     ip_address=client_host
@@ -435,7 +469,7 @@ async def workstation_websocket(
                 
                 # Notificar a operadores
                 await connection_manager.broadcast_to_organization(
-                    organization_id=str(workstation.organization_id),
+                    organization_id=organization_id,
                     message={
                         "type": "command_result",
                         "workstation_id": workstation_id,
@@ -453,14 +487,14 @@ async def workstation_websocket(
                 result = await _handle_telemetry(
                     data=data,
                     workstation_id=workstation_id,
-                    organization_id=str(workstation.organization_id),
+                    organization_id=organization_id,
                     db=db
                 )
                 
                 # Si la workstation fue eliminada de la BD, verificar flag de re-registro
                 if result == "request_reregister":
                     org = db.query(Organization).filter(
-                        Organization.id == workstation.organization_id
+                        Organization.id == organization_id
                     ).first()
                     
                     if org and org.auto_reregister_enabled:
@@ -489,7 +523,7 @@ async def workstation_websocket(
                 await _handle_connectivity_result(
                     data=data,
                     workstation_id=workstation_id,
-                    organization_id=str(workstation.organization_id),
+                    organization_id=organization_id,
                     db=db
                 )
             

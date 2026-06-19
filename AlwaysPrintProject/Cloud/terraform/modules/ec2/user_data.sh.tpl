@@ -21,6 +21,17 @@ LIMITS
 echo "fs.file-max = 65535" >> /etc/sysctl.conf
 sysctl -p
 
+# Tuning TCP — permite mayor backlog de conexiones bajo carga (load tests +1000 ws/s)
+# tcp_max_syn_backlog: cola de conexiones SYN pendientes (default 128 satura rápido)
+# somaxconn: tamaño de la cola listen() del socket (default 4096 ya es alto)
+# netdev_max_backlog: paquetes pendientes en la NIC antes de procesarlos
+cat > /etc/sysctl.d/99-alwaysprint-tcp.conf <<'TCPCONF'
+net.ipv4.tcp_max_syn_backlog = 4096
+net.core.somaxconn = 4096
+net.core.netdev_max_backlog = 4096
+TCPCONF
+sysctl -p /etc/sysctl.d/99-alwaysprint-tcp.conf
+
 # Reiniciar SSM agent tras dnf update para asegurar registro con AWS
 systemctl enable amazon-ssm-agent
 systemctl restart amazon-ssm-agent
