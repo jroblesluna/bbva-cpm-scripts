@@ -575,36 +575,32 @@ class RedisConnectionManager:
         db: Session = None,
     ) -> None:
         """
-        Envía mensaje a todas las workstations de una organización.
+        Envía mensaje a todos los operadores conectados de una organización.
 
-        1. Envía a todas las workstations locales de la organización
-        2. Publica en org:{organization_id} para que otros workers entreguen a las suyas
+        1. Envía a operadores locales conectados (frontend dashboard)
+        2. Publica en org:{organization_id} para que otros workers entreguen a sus operadores
+
+        Los broadcasts son notificaciones para el frontend (telemetry_received,
+        workstation_status_change, etc.), NO se envían a workstations.
 
         Args:
             organization_id: UUID de la organización
             message: Mensaje a enviar
-            db: Sesión de base de datos
+            db: Sesión de base de datos (no utilizada)
         """
-        # Entregar a workstations locales de esta organización
-        local_count = 0
-        local_ws_ids = [
-            ws_id for ws_id, org_id in self.org_ids.items()
-            if org_id == organization_id
-        ]
+        # Entregar a operadores locales conectados
+        async with self._lock:
+            user_ids = list(self.operator_connections.keys())
 
-        for ws_id in local_ws_ids:
-            ws = self.workstation_connections.get(ws_id)
-            if ws:
-                try:
-                    await ws.send_json(message)
-                    local_count += 1
-                except Exception:
-                    pass  # Conexión muerta, será limpiada por Death Ping
+        for user_id in user_ids:
+            await self.send_to_operator(user_id, message)
 
-        # Publicar en Redis para que otros workers entreguen a sus locales
+        # Publicar en Redis para que otros workers entreguen a sus operadores
         if self._redis_available and self._redis:
             try:
-                payload = json.dumps(message, default=str)
+                # Incluir origin_worker_id para que el listener ignore mensajes propios
+                pub_message = {**message, "_origin_worker": self._worker_id}
+                payload = json.dumps(pub_message, default=str)
                 await self._redis.publish(f"org:{organization_id}", payload)
                 logger.debug(
                     "delivery.org_broadcast",
@@ -749,8 +745,15 @@ class RedisConnectionManager:
                         if target_ws_id:
                             await self._deliver_to_local_workstation(target_ws_id, payload)
                 elif channel.startswith("org:"):
-                    organization_id = channel[4:]
-                    await self._deliver_to_local_org_workstations(organization_id, payload)
+                    # Ignorar mensajes originados por este mismo worker (ya se entregaron localmente)
+                    origin = payload.pop("_origin_worker", None) if isinstance(payload, dict) else None
+                    if origin == self._worker_id:
+                        continue
+                    # Entregar a operadores locales (broadcasts son para frontend, no WS)
+                    async with self._lock:
+                        user_ids = list(self.operator_connections.keys())
+                    for user_id in user_ids:
+                        await self.send_to_operator(user_id, payload)
                 elif channel == "global:broadcast":
                     await self._deliver_global_broadcast(payload)
 
