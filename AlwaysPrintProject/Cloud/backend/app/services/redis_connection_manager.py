@@ -160,9 +160,10 @@ class RedisConnectionManager:
             )
 
             # Iniciar listener task para procesar mensajes pub/sub
+            # NOTA: Usa get_message blocking (timeout=None) para no competir con el event loop
             self._listener_task = asyncio.create_task(self._redis_listener())
 
-            # Iniciar heartbeat periódico para WorkerRegistry
+            # Iniciar heartbeat periódico para WorkerRegistry (cada TTL/2 segundos)
             self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
             logger.info(
@@ -715,61 +716,43 @@ class RedisConnectionManager:
 
         while True:
             try:
-                # Procesar TODOS los mensajes disponibles en batch antes de ceder
-                # Esto evita que el listener solo procese 1 mensaje por iteración
-                messages_processed = 0
-                while True:
-                    message = await self._pubsub.get_message(
-                        ignore_subscribe_messages=True,
-                        timeout=0.001,  # Non-blocking: retorna inmediatamente si no hay mensajes
-                    )
-                    if message is None:
-                        break  # No hay más mensajes, salir del batch
+                # Blocking get_message: suspende la coroutine hasta que llega un mensaje
+                # o expira el timeout. Esto NO consume CPU ni compite con el event loop.
+                # timeout=1.0 cede al event loop cada 1s como máximo si no hay mensajes.
+                message = await self._pubsub.get_message(
+                    ignore_subscribe_messages=True,
+                    timeout=1.0,
+                )
+                if message is None:
+                    continue  # Timeout sin mensaje — reintentar
 
-                    if message["type"] != "message":
-                        continue
+                if message["type"] != "message":
+                    continue
 
-                    channel = message["channel"]
-                    data = message["data"]
+                channel = message["channel"]
+                data = message["data"]
 
-                    try:
-                        payload = json.loads(data) if isinstance(data, str) else data
-                    except (json.JSONDecodeError, TypeError):
-                        continue
+                try:
+                    payload = json.loads(data) if isinstance(data, str) else data
+                except (json.JSONDecodeError, TypeError):
+                    continue
 
-                    # Despachar según tipo de canal (esquema consolidado)
-                    # Solo se procesan: worker:{worker_id}, org:{org_id}, global:broadcast
-                    # Canales ws:{id} y cmd_response:{id} han sido eliminados del esquema
-                    if channel == worker_channel:
-                        # Canal worker consolidado: cmd_response o mensaje dirigido
-                        msg_type = payload.get("type") if isinstance(payload, dict) else None
-                        if msg_type == "cmd_response":
-                            command_id = payload.get("command_id")
-                            if command_id:
-                                self.resolve_command_response(command_id, payload)
-                        else:
-                            target_ws_id = payload.get("target_workstation_id") if isinstance(payload, dict) else None
-                            if target_ws_id:
-                                await self._deliver_to_local_workstation(target_ws_id, payload)
-                            else:
-                                logger.debug(
-                                    "redis.listener_no_target_ws",
-                                    channel=channel,
-                                    msg_type=msg_type,
-                                )
-                    elif channel.startswith("org:"):
-                        organization_id = channel[4:]
-                        await self._deliver_to_local_org_workstations(organization_id, payload)
-                    elif channel == "global:broadcast":
-                        await self._deliver_global_broadcast(payload)
-
-                    messages_processed += 1
-                    if messages_processed >= 50:
-                        break  # Procesar máx 50 por batch, luego ceder
-
-                # Ceder el event loop generosamente — 500ms cuando no hay mensajes
-                # Esto es el fix clave: el listener NO compite con los registros
-                await asyncio.sleep(0.5)
+                # Despachar según tipo de canal (esquema consolidado)
+                if channel == worker_channel:
+                    msg_type = payload.get("type") if isinstance(payload, dict) else None
+                    if msg_type == "cmd_response":
+                        command_id = payload.get("command_id")
+                        if command_id:
+                            self.resolve_command_response(command_id, payload)
+                    else:
+                        target_ws_id = payload.get("target_workstation_id") if isinstance(payload, dict) else None
+                        if target_ws_id:
+                            await self._deliver_to_local_workstation(target_ws_id, payload)
+                elif channel.startswith("org:"):
+                    organization_id = channel[4:]
+                    await self._deliver_to_local_org_workstations(organization_id, payload)
+                elif channel == "global:broadcast":
+                    await self._deliver_global_broadcast(payload)
 
             except asyncio.CancelledError:
                 logger.info("redis.listener_cancelled")
