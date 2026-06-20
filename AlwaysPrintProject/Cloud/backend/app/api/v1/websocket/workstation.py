@@ -185,7 +185,8 @@ async def workstation_websocket(
             workstation_id=workstation_id,
             websocket=websocket,
             db=db,
-            organization_id=str(workstation.organization_id)
+            organization_id=str(workstation.organization_id),
+            vlan_id=str(workstation.vlan_id) if workstation.vlan_id else None
         )
         print(f"[WS] Conectado al manager", flush=True)
         

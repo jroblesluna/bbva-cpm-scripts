@@ -1,0 +1,333 @@
+{
+  "pbtResults": {
+    "4.2 Write property test para import ban (Property 2)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781926254129
+    },
+    "5.1 Write property test para interface compliance (Property 1)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781930071648
+    },
+    "5.3 Write property test para pool sizing constraint (Property 4)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781930102459
+    },
+    "5.4 Write property test para multi-worker requires Redis (Property 5)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781930119917
+    },
+    "5.2 Write property test para session lifecycle (Property 3)": {
+      "status": "passed",
+      "lastRunTimestamp": 1781930200001
+    }
+  },
+  "executionHistory": {
+    "1.1 Añadir UVICORN_WORKERS, WORKER_REGISTRY_TTL, WS_REDIS_RECONNECT_MAX_INTERVAL a Settings en config.py con validador multi-worker→Redis": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233415
+      },
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925251169
+      },
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925500958
+      }
+    ],
+    "1.2 Restaurar websocket_manager.py como factory condicional": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233450
+      },
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925505264
+      },
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925895937
+      }
+    ],
+    "1.3 Añadir inicialización de RedisConnectionManager en lifespan de main.py": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233484
+      },
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925506132
+      },
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925896745
+      }
+    ],
+    "2.1 Añadir vlan_id a la llamada connect_workstation en workstation.py": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233520
+      },
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925900640
+      },
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925952082
+      }
+    ],
+    "2.2 Verificar y eliminar cualquier importación de registration_cache en workstation.py": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233543
+      },
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925901449
+      },
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925952926
+      }
+    ],
+    "3. Checkpoint — Verificar que el backend arranca correctamente": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233567
+      },
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925966256
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781934629378
+      }
+    ],
+    "4.1 Crear tests/test_import_ban.py con test de importaciones prohibidas": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233591
+      },
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925967221
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781934615093
+      }
+    ],
+    "4.2 Write property test para import ban (Property 2)": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233617
+      },
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925967927
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781934615779
+      }
+    ],
+    "5.1 Write property test para interface compliance (Property 1)": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233642
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781929966082
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781930213639
+      }
+    ],
+    "5.2 Write property test para session lifecycle (Property 3)": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233666
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781929966750
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781930214369
+      }
+    ],
+    "5.3 Write property test para pool sizing constraint (Property 4)": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233691
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781929967514
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781930215194
+      }
+    ],
+    "5.4 Write property test para multi-worker requires Redis (Property 5)": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233716
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781929968404
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781930216017
+      }
+    ],
+    "6. Checkpoint — Ejecutar property tests existentes y nuevos": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233741
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781930231970
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781933340311
+      }
+    ],
+    "7.1 Verificar que el factory selecciona correctamente según REDIS_URL": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233784
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781930232772
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781933341289
+      }
+    ],
+    "7.2 Verificar shutdown graceful con cleanup de Redis en lifespan": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233821
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781930233547
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781933342175
+      }
+    ],
+    "8. Final checkpoint — Suite completa de tests": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925233844
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781933347028
+      },
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781934596716
+      }
+    ],
+    "1. Configuración de settings multi-worker y factory de connection_manager": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925896780
+      }
+    ],
+    "2. Adaptación del endpoint WebSocket": [
+      {
+        "executionId": "94ce2094-9d68-475f-a634-0ecbb53e9943",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781925952964
+      }
+    ],
+    "5. Property tests para correctness properties del diseño": [
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781930216043
+      }
+    ],
+    "7. Integración final y wiring": [
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781933342209
+      }
+    ],
+    "4. Tests de lint guard e import ban": [
+      {
+        "executionId": "d3f91e0d-323f-49c1-90f8-0013b76010f2",
+        "chatSessionId": "sess_2bde1809-3f19-493b-8db6-aea723628844",
+        "timestamp": 1781934615860
+      }
+    ]
+  }
+}
