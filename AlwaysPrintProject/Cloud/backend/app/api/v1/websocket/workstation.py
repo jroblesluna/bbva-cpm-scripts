@@ -398,18 +398,30 @@ async def workstation_websocket(
                         ws_record.action_config_version = action_config_version
                         db.commit()
                 
-                # Notificar a operadores
-                await connection_manager.broadcast_to_organization(
-                    organization_id=str(workstation.organization_id),
-                    message={
-                        "type": "workstation_status_change",
-                        "workstation_id": workstation_id,
-                        "contingency_active": contingency_active,
-                        "contingency_printer_ip": contingency_printer_ip,
-                        "current_user": current_user
-                    },
-                    db=db
-                )
+                # Preparar mensaje de broadcast ANTES de liberar la sesión de BD
+                status_broadcast_msg = {
+                    "type": "workstation_status_change",
+                    "workstation_id": workstation_id,
+                    "contingency_active": contingency_active,
+                    "contingency_printer_ip": contingency_printer_ip,
+                    "current_user": current_user
+                }
+                
+                # Liberar sesión de BD ANTES del broadcast (evita pool exhaustion).
+                # El broadcast puede awaitar Redis publish, reteniendo la coroutine.
+                db.close()
+                db = None
+                
+                # Notificar a operadores (sin retener conexión de BD)
+                broadcast_db = SessionLocal()
+                try:
+                    await connection_manager.broadcast_to_organization(
+                        organization_id=str(workstation.organization_id),
+                        message=status_broadcast_msg,
+                        db=broadcast_db
+                    )
+                finally:
+                    broadcast_db.close()
             
             elif message_type == "config_change_report":
                 # Workstation reporta cambio de configuración local
@@ -443,23 +455,34 @@ async def workstation_websocket(
                     "output": output
                 })
                 
-                # Notificar a operadores
-                await connection_manager.broadcast_to_organization(
-                    organization_id=str(workstation.organization_id),
-                    message={
-                        "type": "command_result",
-                        "workstation_id": workstation_id,
-                        "command_id": command_id,
-                        "success": success,
-                        "output": output
-                    },
-                    db=db
-                )
+                # Preparar mensaje de broadcast
+                cmd_broadcast_msg = {
+                    "type": "command_result",
+                    "workstation_id": workstation_id,
+                    "command_id": command_id,
+                    "success": success,
+                    "output": output
+                }
+                
+                # Liberar sesión de BD ANTES del broadcast (evita pool exhaustion)
+                db.close()
+                db = None
+                
+                # Notificar a operadores (sin retener conexión de BD)
+                broadcast_db = SessionLocal()
+                try:
+                    await connection_manager.broadcast_to_organization(
+                        organization_id=str(workstation.organization_id),
+                        message=cmd_broadcast_msg,
+                        db=broadcast_db
+                    )
+                finally:
+                    broadcast_db.close()
             
             elif message_type == "telemetry":
                 # Actualizar última actividad al recibir telemetría
                 await connection_manager.update_last_activity(workstation_id)
-                # Procesar mensaje de telemetría periódica
+                # Procesar mensaje de telemetría periódica (solo operaciones de BD)
                 result = await _handle_telemetry(
                     data=data,
                     workstation_id=workstation_id,
@@ -491,17 +514,50 @@ async def workstation_websocket(
                             "auto_reregister_enabled=False. Descartando sin re-registro.",
                             workstation_id
                         )
+                elif isinstance(result, dict):
+                    # Telemetría persistida exitosamente: hacer broadcast DESPUÉS de liberar BD.
+                    # Esto evita pool exhaustion cuando 66+ WS envían telemetría simultáneamente.
+                    telemetry_broadcast_msg = result
+                    db.close()
+                    db = None
+                    
+                    # Broadcast sin retener conexión de BD del pool principal
+                    broadcast_db = SessionLocal()
+                    try:
+                        await connection_manager.broadcast_to_organization(
+                            organization_id=str(workstation.organization_id),
+                            message=telemetry_broadcast_msg,
+                            db=broadcast_db
+                        )
+                    finally:
+                        broadcast_db.close()
             
             elif message_type == "connectivity_result":
                 # Actualizar última actividad al recibir resultado de conectividad
                 await connection_manager.update_last_activity(workstation_id)
-                # Procesar resultado de chequeo de conectividad
-                await _handle_connectivity_result(
+                # Procesar resultado de chequeo de conectividad (solo operaciones de BD)
+                connectivity_broadcast_msg = await _handle_connectivity_result(
                     data=data,
                     workstation_id=workstation_id,
                     organization_id=str(workstation.organization_id),
                     db=db
                 )
+                
+                if connectivity_broadcast_msg is not None:
+                    # Persistencia exitosa: hacer broadcast DESPUÉS de liberar BD
+                    db.close()
+                    db = None
+                    
+                    # Broadcast sin retener conexión de BD del pool principal
+                    broadcast_db = SessionLocal()
+                    try:
+                        await connection_manager.broadcast_to_organization(
+                            organization_id=str(workstation.organization_id),
+                            message=connectivity_broadcast_msg,
+                            db=broadcast_db
+                        )
+                    finally:
+                        broadcast_db.close()
             
             else:
                 # Tipo de mensaje desconocido
@@ -510,11 +566,12 @@ async def workstation_websocket(
                     "message": f"Unknown message type: {message_type}"
                 })
             
-            # Liberar sesión de BD después de cada mensaje.
+            # Liberar sesión de BD después de cada mensaje (si no fue liberada antes).
             # Sin esto, cada WebSocket retiene una conexión del pool permanentemente.
             # La sesión se re-crea al inicio del siguiente ciclo (receive_json bloquea sin retener pool).
-            db.close()
-            db = None
+            if db is not None:
+                db.close()
+                db = None
     
     except WebSocketDisconnect:
         # Cliente desconectado
@@ -545,17 +602,23 @@ async def _handle_telemetry(
     workstation_id: str,
     organization_id: str,
     db: Session
-) -> None:
+) -> Optional[dict | str]:
     """
     Procesa un mensaje de telemetría recibido de una workstation.
 
     Flujo:
     1. Valida el payload con TelemetryMessagePayload (Pydantic)
     2. Persiste en BD usando TelemetryService (verifica tenant isolation)
-    3. Si persist exitoso, broadcast 'telemetry_received' a operadores de la cuenta
+    3. Si persist exitoso, RETORNA datos de broadcast (el caller hace el broadcast
+       DESPUÉS de liberar la sesión de BD para evitar pool exhaustion)
     4. Si validación falla: log ERROR, descartar, NO cerrar conexión
-    5. Si workstation no existe para la cuenta: log WARNING, descartar, NO cerrar conexión
+    5. Si workstation no existe para la cuenta: retorna "request_reregister"
     6. Si escritura BD falla: log ERROR, omitir broadcast, NO cerrar conexión
+
+    Returns:
+        - None: sin broadcast necesario (error de validación o BD)
+        - "request_reregister": workstation eliminada, solicitar re-registro
+        - dict: datos del mensaje de broadcast para enviar a operadores
 
     Args:
         data: Datos crudos del mensaje WebSocket
@@ -574,7 +637,7 @@ async def _handle_telemetry(
             workstation_id,
             str(e)
         )
-        return
+        return None
 
     # Persistir telemetría usando TelemetryService (incluye verificación de tenant)
     telemetry_service = TelemetryService()
@@ -592,7 +655,7 @@ async def _handle_telemetry(
             workstation_id,
             str(e)
         )
-        return
+        return None
 
     if telemetry_log is None:
         # workstation_id no existe para esta cuenta: solicitar re-registro
@@ -617,23 +680,20 @@ async def _handle_telemetry(
         db.commit()
         logger.info("Telemetría restauró is_online=True para workstation_id=%s", workstation_id)
 
-    # Persistencia exitosa: broadcast 'telemetry_received' a operadores de la organización
-    await connection_manager.broadcast_to_organization(
-        organization_id=organization_id,
-        message={
-            "type": "telemetry_received",
-            "workstation_id": workstation_id,
-            "queue_status": payload.queue_status,
-            "contingency_active": payload.contingency_active,
-            "jobs_identified": payload.jobs_identified,
-            "avg_release_time_ms": payload.avg_release_time_ms,
-            "disconnection_count": len(payload.disconnection_log)
-        },
-        db=db
-    )
+    # Retornar datos de broadcast — el caller lo envía DESPUÉS de liberar la sesión de BD.
+    # Esto evita pool exhaustion: la sesión se cierra antes del await a Redis/broadcast.
+    broadcast_message = {
+        "type": "telemetry_received",
+        "workstation_id": workstation_id,
+        "queue_status": payload.queue_status,
+        "contingency_active": payload.contingency_active,
+        "jobs_identified": payload.jobs_identified,
+        "avg_release_time_ms": payload.avg_release_time_ms,
+        "disconnection_count": len(payload.disconnection_log)
+    }
 
     logger.info(
-        "Telemetría persistida y broadcast enviado - workstation_id=%s, "
+        "Telemetría persistida - workstation_id=%s, "
         "queue_status=%s, jobs_identified=%d, contingency_active=%s",
         workstation_id,
         payload.queue_status,
@@ -641,24 +701,31 @@ async def _handle_telemetry(
         payload.contingency_active
     )
 
+    return broadcast_message
+
 
 async def _handle_connectivity_result(
     data: dict,
     workstation_id: str,
     organization_id: str,
     db: Session
-) -> None:
+) -> Optional[dict]:
     """
     Procesa un resultado de chequeo de conectividad recibido de una workstation.
     
     Flujo:
     1. Validar payload con ConnectivityResultPayload (Pydantic)
     2. Persistir resultado usando ConnectivityService (incluye tenant isolation)
-    3. Si persist retorna None (workstation no encontrada para la cuenta), log WARNING y continuar
-    4. Si persist exitoso, broadcast connectivity_result a operadores de la misma cuenta
-    5. Si error de BD, log ERROR, omitir broadcast, continuar
+    3. Si persist retorna None (workstation no encontrada para la cuenta), log WARNING y retornar None
+    4. Si persist exitoso, RETORNA datos de broadcast (el caller lo envía DESPUÉS
+       de liberar la sesión de BD para evitar pool exhaustion)
+    5. Si error de BD, log ERROR, retornar None
     6. NUNCA cerrar la conexión WebSocket por errores
     
+    Returns:
+        - None: sin broadcast necesario (error de validación, BD, o workstation no encontrada)
+        - dict: datos del mensaje de broadcast para enviar a operadores
+
     Args:
         data: Datos crudos del mensaje WebSocket
         workstation_id: UUID de la workstation que envió el mensaje
@@ -682,7 +749,7 @@ async def _handle_connectivity_result(
             workstation_id,
             str(e)
         )
-        return
+        return None
 
     try:
         # Persistir resultado usando ConnectivityService (verifica tenant isolation internamente)
@@ -702,25 +769,22 @@ async def _handle_connectivity_result(
                 workstation_id,
                 organization_id
             )
-            return
+            return None
 
-        # Persistencia exitosa: broadcast a operadores de la misma organización
-        await connection_manager.broadcast_to_organization(
-            organization_id=organization_id,
-            message={
-                "type": "connectivity_result",
-                "workstation_id": str(workstation_id),
-                "check_id": payload.check_id,
-                "check_type": payload.check_type,
-                "success": payload.success,
-                "latency_ms": payload.latency_ms,
-                "error": payload.error
-            },
-            db=db
-        )
+        # Persistencia exitosa: retornar datos de broadcast.
+        # El caller lo envía DESPUÉS de liberar la sesión de BD para evitar pool exhaustion.
+        broadcast_message = {
+            "type": "connectivity_result",
+            "workstation_id": str(workstation_id),
+            "check_id": payload.check_id,
+            "check_type": payload.check_type,
+            "success": payload.success,
+            "latency_ms": payload.latency_ms,
+            "error": payload.error
+        }
 
         logger.info(
-            "[%s] Resultado de conectividad persistido y broadcast - workstation_id=%s, "
+            "[%s] Resultado de conectividad persistido - workstation_id=%s, "
             "check_id=%s, check_type=%s, success=%s, latency_ms=%s",
             datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             workstation_id,
@@ -729,6 +793,8 @@ async def _handle_connectivity_result(
             payload.success,
             payload.latency_ms
         )
+
+        return broadcast_message
 
     except Exception as e:
         # Error de BD u otro error inesperado: log ERROR, omitir broadcast, NO cerrar WebSocket
@@ -740,4 +806,4 @@ async def _handle_connectivity_result(
             data.get("check_id", "desconocido"),
             str(e)
         )
-
+        return None
