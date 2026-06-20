@@ -45,7 +45,7 @@ DEFAULT_URL = "wss://alwaysprint.dev.iol.pe/ws/workstation"
 DEFAULT_CONNECTIONS = 500
 DEFAULT_DURATION = 300  # 5 minutos
 TELEMETRY_INTERVAL = 30  # segundos entre envíos de telemetría
-CONNECT_RAMP_DELAY = 0.5  # segundos entre cada nueva conexión (evita pico simultáneo)
+CONNECT_RAMP_DELAY = 0.1  # segundos entre cada nueva conexión (evita pico simultáneo)
 RECONNECT_DELAY = 5  # segundos antes de reintentar conexión fallida
 MAX_RETRIES = 5  # máximo de reintentos por workstation
 

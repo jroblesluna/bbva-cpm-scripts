@@ -80,7 +80,8 @@ class ConnectionManager:
         workstation_id: str, 
         websocket: WebSocket,
         db: Session,
-        organization_id: str
+        organization_id: str,
+        vlan_id: str = None
     ):
         """
         Registra conexión de un Tray Client.
@@ -91,6 +92,7 @@ class ConnectionManager:
             websocket: Conexión WebSocket (ya aceptada por el endpoint)
             db: Sesión de base de datos
             organization_id: UUID de la organización a la que pertenece la workstation
+            vlan_id: ID de la VLAN (opcional, ignorado en modo single-worker)
         """
         async with self._lock:
             self.workstation_connections[workstation_id] = websocket
@@ -766,6 +768,15 @@ class ConnectionManager:
         )
 
 
-# Instancia global del ConnectionManager
-connection_manager = ConnectionManager()
+# === FACTORY CONDICIONAL ===
+# Selecciona el manager según la configuración de Redis.
+# Si REDIS_URL está configurado, usa RedisConnectionManager para coordinación
+# inter-worker via pub/sub. Si no, usa ConnectionManager (modo single-worker).
+from app.core.config import settings
+
+if settings.REDIS_URL:
+    from app.services.redis_connection_manager import RedisConnectionManager
+    connection_manager = RedisConnectionManager(redis_url=settings.REDIS_URL)
+else:
+    connection_manager = ConnectionManager()
 
