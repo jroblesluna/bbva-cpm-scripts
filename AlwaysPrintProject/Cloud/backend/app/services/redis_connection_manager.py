@@ -219,14 +219,8 @@ class RedisConnectionManager:
         self.last_activity[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
         self._org_ws_count[organization_id] = self._org_ws_count.get(organization_id, 0) + 1
 
-        # Actualizar estado en base de datos
-        from app.services.workstation import WorkstationService
-        workstation_service = WorkstationService()
-        workstation_service.update_workstation_status(
-            db=db,
-            workstation_id=workstation_id,
-            is_online=True,
-        )
+        # Nota: NO se actualiza is_online aquí porque register_workstation()
+        # (llamado antes en el endpoint) ya lo hace con db.commit().
 
         # === Fire-and-forget (no bloquea la conexión) ===
         is_first_of_org = self._org_ws_count[organization_id] == 1
