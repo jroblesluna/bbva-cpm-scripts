@@ -25,7 +25,6 @@ from app.models.workstation import Workstation
 from app.schemas import GlobalConfigUpdate, GlobalConfigResponse
 from app.services.config import ConfigService
 from app.services.audit import AuditService
-from app.services.cache_utils import get_registration_cache
 
 router = APIRouter()
 
@@ -311,7 +310,7 @@ def get_global_config(
 
 
 @router.put("/global", response_model=GlobalConfigResponse)
-async def update_global_config(
+def update_global_config(
     request: Request,
     config_data: GlobalConfigUpdate,
     organization_id: str = None,
@@ -393,9 +392,5 @@ async def update_global_config(
             new_config=config_data.model_dump(exclude_unset=True),
             ip_address=get_client_ip(request)
         )
-
-    # Invalidar cache de registro tras modificación de configuración global
-    cache = get_registration_cache()
-    await cache.invalidate_organization(str(target_organization_id))
 
     return config

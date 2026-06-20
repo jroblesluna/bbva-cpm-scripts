@@ -711,16 +711,6 @@ class ConnectionManager:
             # Limpiar el waiter
             self._pending_command_responses.pop(command_id, None)
 
-    async def initialize(self) -> None:
-        """
-        Inicialización del ConnectionManager in-memory.
-
-        No-op: el ConnectionManager in-memory no requiere inicialización asíncrona.
-        Existe para mantener la interfaz idéntica a RedisConnectionManager
-        y permitir que el startup llame initialize() de forma uniforme.
-        """
-        pass
-
     async def graceful_shutdown_workstations(self, reason: str = "Servidor reiniciando"):
         """
         Cierra todas las conexiones WebSocket de workstations de forma limpia
@@ -776,62 +766,6 @@ class ConnectionManager:
         )
 
 
-# =========================================================================
-# FACTORY PARA SELECCIÓN DE CONNECTION MANAGER
-# =========================================================================
-
-
-def create_connection_manager():
-    """
-    Factory que retorna la implementación apropiada de ConnectionManager.
-
-    Si REDIS_URL está configurado (no None y no vacío), retorna
-    RedisConnectionManager con coordinación inter-worker via Redis pub/sub.
-    Si no, retorna el ConnectionManager in-memory original (backward compatible).
-
-    La interfaz pública es idéntica en ambas implementaciones (duck typing):
-    - connect_workstation / disconnect_workstation
-    - send_to_workstation / send_direct_to_workstation
-    - broadcast_to_organization / broadcast_to_all_operators
-    - connect_operator / disconnect_operator / send_to_operator
-    - handle_pong / start_ping_loop / stop_ping_loop
-    - register_command_waiter / resolve_command_response / wait_for_command_response
-    - graceful_shutdown_workstations
-    - get_online_workstations / get_online_operators / is_workstation_online
-    - get_connection_count / update_last_activity
-
-    Returns:
-        RedisConnectionManager si REDIS_URL está configurado,
-        ConnectionManager (in-memory) en caso contrario.
-    """
-    from app.core.config import settings
-    from app.core.logging import get_logger
-
-    factory_logger = get_logger(__name__)
-
-    redis_url = settings.REDIS_URL
-
-    if redis_url and redis_url.strip():
-        # Redis disponible — usar RedisConnectionManager para multi-worker
-        from app.services.redis_connection_manager import RedisConnectionManager
-
-        factory_logger.info(
-            "connection_manager.factory",
-            mode="redis",
-            redis_url=redis_url,
-            msg="Usando RedisConnectionManager con coordinación inter-worker",
-        )
-        return RedisConnectionManager(redis_url=redis_url)
-    else:
-        # Sin Redis — usar ConnectionManager in-memory (backward compatible)
-        factory_logger.info(
-            "connection_manager.factory",
-            mode="in-memory",
-            msg="Usando ConnectionManager in-memory (REDIS_URL no configurado)",
-        )
-        return ConnectionManager()
-
-
-# Instancia global del ConnectionManager (seleccionada por la factory)
-connection_manager = create_connection_manager()
+# Instancia global del ConnectionManager
+connection_manager = ConnectionManager()
 

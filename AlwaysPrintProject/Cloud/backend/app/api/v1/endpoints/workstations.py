@@ -39,7 +39,6 @@ from app.schemas import (
 from app.services.workstation import WorkstationService
 from app.services.config import ConfigService
 from app.services.audit import AuditService
-from app.services.cache_utils import get_registration_cache
 from app.services.websocket_manager import connection_manager
 
 router = APIRouter()
@@ -986,7 +985,7 @@ def update_workstation(
 
 
 @router.put("/{workstation_id}/config", response_model=WorkstationConfigResponse)
-async def update_workstation_config(
+def update_workstation_config(
     request: Request,
     workstation_id: UUID,
     config_data: WorkstationConfigUpdate,
@@ -1037,10 +1036,6 @@ async def update_workstation_config(
         workstation_id=workstation_id,
         **config_data.model_dump(exclude_unset=True)
     )
-    
-    # Invalidar cache de configuración efectiva tras modificación
-    cache = get_registration_cache()
-    await cache.invalidate_organization(str(workstation.organization_id))
     
     # Registrar en auditoría
     audit_service = AuditService()
@@ -1124,10 +1119,6 @@ async def toggle_workstation_forced_contingency(
     db.commit()
     db.refresh(workstation)
 
-    # Invalidar cache de contingencia tras modificación individual
-    cache = get_registration_cache()
-    await cache.invalidate_organization(str(workstation.organization_id))
-
     logger.info(
         "Contingencia forzada workstation actualizada: workstation_id=%s, enabled=%s, user_id=%s",
         workstation_id, enabled, current_user.id,
@@ -1153,7 +1144,7 @@ async def toggle_workstation_forced_contingency(
 
 
 @router.delete("/{workstation_id}/config", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_workstation_config(
+def delete_workstation_config(
     request: Request,
     workstation_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -1194,10 +1185,6 @@ async def delete_workstation_config(
     
     # Eliminar configuración
     config_service.delete_workstation_config(db, workstation_id)
-    
-    # Invalidar cache de configuración efectiva tras eliminación
-    cache = get_registration_cache()
-    await cache.invalidate_organization(str(workstation.organization_id))
     
     # Registrar en auditoría
     audit_service = AuditService()
