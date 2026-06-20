@@ -30,7 +30,6 @@ from app.schemas import (
 from app.services.config import ConfigService
 from app.services.workstation import WorkstationService
 from app.services.audit import AuditService
-from app.services.cache_utils import get_registration_cache
 
 router = APIRouter()
 
@@ -198,7 +197,7 @@ def get_vlan(
 
 
 @router.put("/{vlan_id}", response_model=VLANResponse)
-async def update_vlan(
+def update_vlan(
     request: Request,
     vlan_id: UUID,
     vlan_data: VLANUpdate,
@@ -242,10 +241,6 @@ async def update_vlan(
     db.commit()
     db.refresh(vlan)
     
-    # Invalidar cache de VLAN tras modificación exitosa
-    cache = get_registration_cache()
-    await cache.invalidate_vlan(str(vlan_id), str(vlan.organization_id))
-    
     audit_service = AuditService()
     audit_service.log_update(
         db=db,
@@ -262,7 +257,7 @@ async def update_vlan(
 
 
 @router.delete("/{vlan_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_vlan(
+def delete_vlan(
     request: Request,
     vlan_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -278,10 +273,6 @@ async def delete_vlan(
     
     db.delete(vlan)
     db.commit()
-    
-    # Invalidar cache de VLAN tras eliminación
-    cache = get_registration_cache()
-    await cache.invalidate_vlan(str(vlan_id), str(vlan.organization_id))
     
     audit_service = AuditService()
     audit_service.log_delete(
@@ -361,10 +352,6 @@ async def toggle_vlan_forced_contingency(
         )
     db.commit()
     db.refresh(vlan)
-
-    # Invalidar cache de VLAN tras modificación de contingencia
-    cache = get_registration_cache()
-    await cache.invalidate_vlan(str(vlan_id), str(vlan.organization_id))
 
     log_module.getLogger(__name__).info(
         "Contingencia forzada VLAN actualizada: vlan_id=%s, enabled=%s, force_all=%s, user_id=%s",
@@ -555,10 +542,6 @@ async def set_vlan_default_device(
     db.commit()
     db.refresh(vlan)
 
-    # Invalidar cache de VLAN tras cambio de impresora predeterminada
-    cache = get_registration_cache()
-    await cache.invalidate_vlan(str(vlan_id), str(vlan.organization_id))
-
     log_module.getLogger(__name__).info(
         "Impresora predeterminada de VLAN actualizada: vlan_id=%s, device_id=%s, user_id=%s",
         vlan_id, device_id, current_user.id,
@@ -644,7 +627,7 @@ def get_vlan_config(
 
 
 @router.put("/{vlan_id}/config", response_model=VLANConfigResponse)
-async def update_vlan_config(
+def update_vlan_config(
     request: Request,
     vlan_id: UUID,
     config_data: VLANConfigUpdate,
@@ -664,10 +647,6 @@ async def update_vlan_config(
         db, vlan_id, **config_data.model_dump(exclude_unset=True)
     )
     
-    # Invalidar cache de VLAN tras actualización de configuración
-    cache = get_registration_cache()
-    await cache.invalidate_vlan(str(vlan_id), str(vlan.organization_id))
-    
     audit_service = AuditService()
     audit_service.log_config_change(
         db=db,
@@ -684,7 +663,7 @@ async def update_vlan_config(
 
 
 @router.delete("/{vlan_id}/config", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_vlan_config(
+def delete_vlan_config(
     request: Request,
     vlan_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -700,10 +679,6 @@ async def delete_vlan_config(
     
     config_service = ConfigService()
     config_service.delete_vlan_config(db, vlan_id)
-    
-    # Invalidar cache de VLAN tras eliminación de configuración
-    cache = get_registration_cache()
-    await cache.invalidate_vlan(str(vlan_id), str(vlan.organization_id))
     
     audit_service = AuditService()
     audit_service.log_config_change(

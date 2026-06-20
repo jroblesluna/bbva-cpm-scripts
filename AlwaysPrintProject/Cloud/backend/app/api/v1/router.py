@@ -26,7 +26,6 @@ from app.api.v1.endpoints import (
     log_analysis,
     system_status,
     system_metrics,
-    health,
 )
 
 # Router principal de la API v1
@@ -175,12 +174,6 @@ api_router.include_router(
     system_metrics.router,
     prefix="/system",
     tags=["system-metrics"]
-)
-
-# Health check detallado (Redis, conexiones, cache, latencia)
-api_router.include_router(
-    health.router,
-    tags=["Sistema"]
 )
 
 
