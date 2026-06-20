@@ -6,7 +6,7 @@
  * para descubrir todos los workers activos y mostrar sus métricas individuales.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/components/providers/AuthProvider';
 import { useTranslations } from 'next-intl';
 import {
   Server,
@@ -71,7 +71,7 @@ function formatUptime(seconds: number): string {
 // === COMPONENTE ===
 
 export default function WorkersTab() {
-  const { token } = useAuth();
+  const { getAuthHeaders } = useAuth();
   const t = useTranslations('systemStatus');
   const [workers, setWorkers] = useState<WorkerInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -79,20 +79,17 @@ export default function WorkersTab() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   const fetchWorkers = useCallback(async () => {
-    if (!token) return;
-
     setLoading(true);
     setError(null);
 
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const headers = getAuthHeaders();
       const discoveredWorkers = new Map<string, WorkerInfo>();
 
       // Hacer 10 requests para descubrir todos los workers vía round-robin
       const requests = Array.from({ length: 10 }, () =>
-        fetch(`${baseUrl}/api/v1/health/detailed`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        fetch(`${baseUrl}/api/v1/health/detailed`, { headers })
           .then((res) => (res.ok ? res.json() : null))
           .catch(() => null)
       );
@@ -116,7 +113,7 @@ export default function WorkersTab() {
     } finally {
       setLoading(false);
     }
-  }, [token, t]);
+  }, [getAuthHeaders, t]);
 
   // Auto-refresh al montar y cada 30s
   useEffect(() => {
