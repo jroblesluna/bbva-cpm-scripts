@@ -64,7 +64,7 @@ class RegistrationCache:
 
         Args:
             organization_id: UUID de la organización.
-            db: Sesión SQLAlchemy para fallback a PostgreSQL.
+            db: Sesión SQLAlchemy (mantenida por compatibilidad, no se usa internamente).
 
         Returns:
             Dict con datos de la organización o None si no existe.
@@ -72,10 +72,9 @@ class RegistrationCache:
         cache_key = f"cache:org:{organization_id}:data"
         return await self._get_or_fetch(
             cache_key=cache_key,
-            fetch_fn=lambda: self._fetch_organization_data(organization_id, db),
+            fetch_fn=lambda internal_db: self._fetch_organization_data(organization_id, internal_db),
             data_type="organization",
             identifier=organization_id,
-            db=db,
         )
 
     async def get_vlan_data(
@@ -88,7 +87,7 @@ class RegistrationCache:
 
         Args:
             vlan_id: UUID de la VLAN.
-            db: Sesión SQLAlchemy para fallback a PostgreSQL.
+            db: Sesión SQLAlchemy (mantenida por compatibilidad, no se usa internamente).
 
         Returns:
             Dict con datos de la VLAN o None si no existe.
@@ -96,10 +95,9 @@ class RegistrationCache:
         cache_key = f"cache:vlan:{vlan_id}:data"
         return await self._get_or_fetch(
             cache_key=cache_key,
-            fetch_fn=lambda: self._fetch_vlan_data(vlan_id, db),
+            fetch_fn=lambda internal_db: self._fetch_vlan_data(vlan_id, internal_db),
             data_type="vlan",
             identifier=vlan_id,
-            db=db,
         )
 
     async def get_effective_config(
@@ -112,7 +110,7 @@ class RegistrationCache:
 
         Args:
             workstation_id: UUID de la workstation.
-            db: Sesión SQLAlchemy para fallback a PostgreSQL.
+            db: Sesión SQLAlchemy (mantenida por compatibilidad, no se usa internamente).
 
         Returns:
             Dict con la configuración efectiva o None si la workstation no existe.
@@ -120,10 +118,9 @@ class RegistrationCache:
         cache_key = f"cache:config:{workstation_id}:effective"
         return await self._get_or_fetch(
             cache_key=cache_key,
-            fetch_fn=lambda: self._fetch_effective_config(workstation_id, db),
+            fetch_fn=lambda internal_db: self._fetch_effective_config(workstation_id, internal_db),
             data_type="effective_config",
             identifier=workstation_id,
-            db=db,
         )
 
     async def get_forced_contingency_state(
@@ -144,7 +141,7 @@ class RegistrationCache:
             workstation_id: UUID de la workstation.
             organization_id: UUID de la organización.
             vlan_id: UUID de la VLAN (puede ser None).
-            db: Sesión SQLAlchemy para fallback a PostgreSQL.
+            db: Sesión SQLAlchemy (mantenida por compatibilidad, no se usa internamente).
 
         Returns:
             Dict con estado de contingencia: {enabled, source, source_name, printer_ip}
@@ -152,12 +149,11 @@ class RegistrationCache:
         cache_key = f"cache:contingency:{workstation_id}:state"
         return await self._get_or_fetch(
             cache_key=cache_key,
-            fetch_fn=lambda: self._fetch_forced_contingency_state(
-                workstation_id, organization_id, vlan_id, db
+            fetch_fn=lambda internal_db: self._fetch_forced_contingency_state(
+                workstation_id, organization_id, vlan_id, internal_db
             ),
             data_type="contingency_state",
             identifier=workstation_id,
-            db=db,
         )
 
     # =========================================================================
@@ -280,20 +276,19 @@ class RegistrationCache:
         fetch_fn,
         data_type: str,
         identifier: str,
-        db: Optional[Session] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Patrón genérico: intenta leer de Redis, si no existe consulta BD y cachea.
 
+        La consulta a BD usa una sesión interna corta (SessionLocal) que se cierra
+        inmediatamente después de la query, garantizando que no quedan transacciones
+        idle-in-transaction mientras se espera el await de Redis setex.
+
         Args:
             cache_key: Key completa de Redis.
-            fetch_fn: Función callable que consulta PostgreSQL (retorna dict o None).
+            fetch_fn: Callable que recibe una Session y retorna dict o None.
             data_type: Tipo de dato para logging.
             identifier: ID del recurso para logging.
-            db: Sesión de BD opcional. Si se provee, se hace db.rollback() tras
-                fetch_fn() para cerrar la transacción implícita ANTES de cualquier
-                await externo (crítico para evitar idle-in-transaction durante el
-                setex de Redis y agotar el pool de PostgreSQL bajo concurrencia).
 
         Returns:
             Dict con datos o None si el recurso no existe en BD.
@@ -318,52 +313,38 @@ class RegistrationCache:
                     identifier=identifier,
                 )
 
-        # Cache miss o Redis no disponible: consultar PostgreSQL
+        # Cache miss o Redis no disponible: consultar PostgreSQL con sesión interna corta.
+        # Usar sesión propia para garantizar que la transacción se cierra inmediatamente
+        # después de la query, sin depender del lifecycle del caller. Esto elimina el
+        # problema de conexiones idle-in-transaction durante el await de Redis setex.
         logger.debug(
             "cache.miss",
             key=cache_key,
             data_type=data_type,
         )
 
+        from app.core.database import SessionLocal
+
+        internal_db = SessionLocal()
         try:
-            data = fetch_fn()
+            data = fetch_fn(internal_db)
         except Exception as e:
-            # PostgreSQL no disponible durante cache-miss
             logger.error(
                 "cache.db_fetch_error",
                 error=str(e),
                 data_type=data_type,
                 identifier=identifier,
             )
-            # Cerrar transacción implícita incluso en caso de error para
-            # liberar la conexión del pool antes de retornar.
-            if db is not None:
-                try:
-                    db.rollback()
-                except Exception:
-                    pass
             return None
-
-        # CRÍTICO: cerrar la transacción implícita ANTES de cualquier await externo.
-        # Si no se hace, la sesión queda 'idle in transaction' durante el setex de
-        # Redis, bloqueando el slot del pool de PostgreSQL. Bajo concurrencia alta
-        # (60+ registros simultáneos en cache-miss) esto agota el pool.
-        if db is not None:
-            try:
-                db.rollback()
-            except Exception as e:
-                logger.warning(
-                    "cache.rollback_after_fetch_error",
-                    error=str(e),
-                    data_type=data_type,
-                    identifier=identifier,
-                )
+        finally:
+            internal_db.close()
 
         if data is None:
             # Recurso no existe en BD: NO almacenar valor vacío en Redis
             return None
 
-        # Almacenar en Redis con TTL (solo si Redis está disponible)
+        # Almacenar en Redis con TTL (solo si Redis está disponible).
+        # La sesión de BD ya está cerrada — no hay transacción abierta durante este await.
         if self._redis:
             try:
                 await self._redis.setex(
