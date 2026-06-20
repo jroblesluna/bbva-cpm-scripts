@@ -93,12 +93,12 @@ class Settings(BaseSettings):
     UVICORN_WORKERS: int = 1
     WORKER_REGISTRY_TTL: int = 60  # segundos
     WS_REDIS_RECONNECT_MAX_INTERVAL: int = 30  # segundos (backoff cap)
-    WS_DEBUG_LOGGING: bool = True  # Logging estructurado detallado (dev)
 
     # === CONFIGURACIÓN DE WEBSOCKET ===
     WS_PING_INTERVAL: int = 30  # segundos
     WS_PING_TIMEOUT: int = 60  # segundos
     WS_MAX_CONNECTIONS: int = 5000
+    WS_DEBUG_LOGGING: bool = False  # True usa ConsoleRenderer (dev), False usa KeyValueRenderer (prod)
     
     # === CONFIGURACIÓN DE RATE LIMITING ===
     RATE_LIMIT_LOGIN: int = 5  # intentos por minuto

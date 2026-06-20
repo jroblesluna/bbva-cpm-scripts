@@ -29,6 +29,9 @@ docker>=7.1.0  # Docker SDK para recolectar stats de contenedores
 apscheduler>=3.10.4  # Programación de tareas periódicas (recolección cada 6h)
 tzlocal>=5.0  # Requerido por APScheduler para detección de timezone local
 
+# === LOGGING ESTRUCTURADO ===
+structlog>=24.1.0
+
 # === UTILITIES ===
 python-dotenv>=1.0.1
 python-dateutil>=2.9.0
