@@ -87,8 +87,8 @@ metrics = Metrics()
 # === GENERACIÓN DE DATOS SIMULADOS ===
 
 def _random_ip() -> str:
-    """Genera una IP privada aleatoria en rango 192.168.x.x."""
-    return f"192.168.{random.randint(1, 254)}.{random.randint(1, 254)}"
+    """Genera una IP privada aleatoria en rango 192.165.x.x."""
+    return f"192.165.{random.randint(1, 254)}.{random.randint(1, 254)}"
 
 
 def _random_hostname(idx: int) -> str:
@@ -113,7 +113,7 @@ def _make_register_msg(idx: int) -> dict:
     """Crea mensaje de registro para la workstation simulada."""
     return {
         "type": "register",
-        "ip_private": f"192.168.{idx // 254 + 1}.{idx % 254 + 1}",
+        "ip_private": f"192.165.{idx // 254 + 1}.{idx % 254 + 1}",
         "hostname": _random_hostname(idx),
         "os_serial": _random_serial(),
         "current_user": _random_user(),
