@@ -855,8 +855,7 @@ class RedisConnectionManager:
             workstation_id: UUID de la workstation target
             payload: Mensaje a entregar
         """
-        async with self._lock:
-            ws = self.workstation_connections.get(workstation_id)
+        ws = self.workstation_connections.get(workstation_id)
 
         if ws is None:
             logger.debug(
@@ -906,12 +905,11 @@ class RedisConnectionManager:
         # Extraer target_vlan_id del payload (filtrado VLAN opcional)
         target_vlan_id = payload.get("target_vlan_id") if isinstance(payload, dict) else None
 
-        async with self._lock:
-            # 1. Filtrar por organización
-            local_ws_ids = [
-                ws_id for ws_id, org_id in self.org_ids.items()
-                if org_id == organization_id
-            ]
+        # 1. Filtrar por organización (sin lock — dict read es safe en asyncio)
+        local_ws_ids = [
+            ws_id for ws_id, org_id in self.org_ids.items()
+            if org_id == organization_id
+        ]
 
         total_org_count = len(local_ws_ids)
 
@@ -930,8 +928,7 @@ class RedisConnectionManager:
                 skipped += 1
                 continue
 
-            async with self._lock:
-                ws = self.workstation_connections.get(ws_id)
+            ws = self.workstation_connections.get(ws_id)
             if ws:
                 try:
                     await ws.send_json(payload)
@@ -1261,13 +1258,12 @@ class RedisConnectionManager:
             dead_workstations: List[str] = []
 
             # === FASE 1: Verificar pending_pongs del ciclo anterior ===
-            async with self._lock:
-                for ws_id, ping_sent_at in list(self._pending_pongs.items()):
-                    if (current_time - ping_sent_at).total_seconds() > PONG_TIMEOUT_SECONDS:
-                        dead_workstations.append(ws_id)
+            for ws_id, ping_sent_at in list(self._pending_pongs.items()):
+                if (current_time - ping_sent_at).total_seconds() > PONG_TIMEOUT_SECONDS:
+                    dead_workstations.append(ws_id)
 
-                for ws_id in dead_workstations:
-                    self._pending_pongs.pop(ws_id, None)
+            for ws_id in dead_workstations:
+                self._pending_pongs.pop(ws_id, None)
 
             if dead_workstations:
                 logger.info(
@@ -1278,8 +1274,7 @@ class RedisConnectionManager:
 
             # === FASE 2: Consultar timeouts por organización ===
             org_timeouts: Dict[str, int] = {}
-            async with self._lock:
-                org_ids_unicos = set(self.org_ids.values())
+            org_ids_unicos = set(self.org_ids.values())
 
             if org_ids_unicos:
                 try:
@@ -1302,16 +1297,14 @@ class RedisConnectionManager:
                     )
 
             # === FASE 3: Identificar inactivas y enviar Death Ping ===
-            async with self._lock:
-                workstation_ids = list(self.workstation_connections.keys())
+            workstation_ids = list(self.workstation_connections.keys())
 
             pings_enviados = 0
             for ws_id in workstation_ids:
-                async with self._lock:
-                    if ws_id in self._pending_pongs:
-                        continue
-                    org_id = self.org_ids.get(ws_id)
-                    ws_last_activity = self.last_activity.get(ws_id)
+                if ws_id in self._pending_pongs:
+                    continue
+                org_id = self.org_ids.get(ws_id)
+                ws_last_activity = self.last_activity.get(ws_id)
 
                 if org_id is None or ws_last_activity is None:
                     continue
@@ -1323,8 +1316,7 @@ class RedisConnectionManager:
                     try:
                         sent = await self.send_to_workstation(ws_id, {"type": "ping"})
                         if sent:
-                            async with self._lock:
-                                self._pending_pongs[ws_id] = current_time
+                            self._pending_pongs[ws_id] = current_time
                             pings_enviados += 1
                         else:
                             dead_workstations.append(ws_id)
@@ -1347,13 +1339,12 @@ class RedisConnectionManager:
             if dead_workstations:
                 dead_workstations = list(set(dead_workstations))
 
-                async with self._lock:
-                    for ws_id in dead_workstations:
-                        self.workstation_connections.pop(ws_id, None)
-                        self.last_activity.pop(ws_id, None)
-                        self.last_pong.pop(ws_id, None)
-                        self.org_ids.pop(ws_id, None)
-                        self._pending_pongs.pop(ws_id, None)
+                for ws_id in dead_workstations:
+                    self.workstation_connections.pop(ws_id, None)
+                    self.last_activity.pop(ws_id, None)
+                    self.last_pong.pop(ws_id, None)
+                    self.org_ids.pop(ws_id, None)
+                    self._pending_pongs.pop(ws_id, None)
 
                 # Unregister de WorkerRegistry (ya no se desuscriben canales ws:{id})
                 for ws_id in dead_workstations:
