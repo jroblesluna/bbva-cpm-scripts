@@ -412,16 +412,12 @@ async def workstation_websocket(
                 db.close()
                 db = None
                 
-                # Notificar a operadores (sin retener conexión de BD)
-                broadcast_db = SessionLocal()
-                try:
-                    await connection_manager.broadcast_to_organization(
-                        organization_id=str(workstation.organization_id),
-                        message=status_broadcast_msg,
-                        db=broadcast_db
-                    )
-                finally:
-                    broadcast_db.close()
+                # Notificar a operadores (sin consulta a BD — envía a todos los conectados)
+                await connection_manager.broadcast_to_organization(
+                    organization_id=str(workstation.organization_id),
+                    message=status_broadcast_msg,
+                    db=None
+                )
             
             elif message_type == "config_change_report":
                 # Workstation reporta cambio de configuración local
@@ -468,16 +464,12 @@ async def workstation_websocket(
                 db.close()
                 db = None
                 
-                # Notificar a operadores (sin retener conexión de BD)
-                broadcast_db = SessionLocal()
-                try:
-                    await connection_manager.broadcast_to_organization(
-                        organization_id=str(workstation.organization_id),
-                        message=cmd_broadcast_msg,
-                        db=broadcast_db
-                    )
-                finally:
-                    broadcast_db.close()
+                # Notificar a operadores (sin consulta a BD — envía a todos los conectados)
+                await connection_manager.broadcast_to_organization(
+                    organization_id=str(workstation.organization_id),
+                    message=cmd_broadcast_msg,
+                    db=None
+                )
             
             elif message_type == "telemetry":
                 # Actualizar última actividad al recibir telemetría
@@ -522,15 +514,11 @@ async def workstation_websocket(
                     db = None
                     
                     # Broadcast sin retener conexión de BD del pool principal
-                    broadcast_db = SessionLocal()
-                    try:
-                        await connection_manager.broadcast_to_organization(
-                            organization_id=str(workstation.organization_id),
-                            message=telemetry_broadcast_msg,
-                            db=broadcast_db
-                        )
-                    finally:
-                        broadcast_db.close()
+                    await connection_manager.broadcast_to_organization(
+                        organization_id=str(workstation.organization_id),
+                        message=telemetry_broadcast_msg,
+                        db=None
+                    )
             
             elif message_type == "connectivity_result":
                 # Actualizar última actividad al recibir resultado de conectividad
@@ -549,15 +537,11 @@ async def workstation_websocket(
                     db = None
                     
                     # Broadcast sin retener conexión de BD del pool principal
-                    broadcast_db = SessionLocal()
-                    try:
-                        await connection_manager.broadcast_to_organization(
-                            organization_id=str(workstation.organization_id),
-                            message=connectivity_broadcast_msg,
-                            db=broadcast_db
-                        )
-                    finally:
-                        broadcast_db.close()
+                    await connection_manager.broadcast_to_organization(
+                        organization_id=str(workstation.organization_id),
+                        message=connectivity_broadcast_msg,
+                        db=None
+                    )
             
             else:
                 # Tipo de mensaje desconocido

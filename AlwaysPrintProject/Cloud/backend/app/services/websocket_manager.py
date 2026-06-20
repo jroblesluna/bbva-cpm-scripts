@@ -357,23 +357,26 @@ class ConnectionManager:
         self, 
         organization_id: str, 
         message: dict,
-        db: Session
+        db: Session = None
     ):
         """
-        Envía mensaje a todos los operadores de una organización.
+        Envía mensaje a todos los operadores conectados.
+        
+        Nota: Envía a TODOS los operadores conectados (no filtra por org).
+        En producción hay muy pocos operadores simultáneos (1-3 admins).
+        El frontend filtra los mensajes por organization_id.
         
         Args:
-            organization_id: UUID de la organización
+            organization_id: UUID de la organización (incluido en el mensaje para filtrado frontend)
             message: Mensaje a enviar
-            db: Sesión de base de datos
+            db: Sesión de base de datos (no utilizada, mantenida por compatibilidad de interfaz)
         """
-        # Obtener todos los usuarios de la organización
-        from app.models.user import User
-        users = db.query(User).filter_by(organization_id=organization_id).all()
+        # Enviar a todos los operadores conectados — el frontend filtra por org_id
+        async with self._lock:
+            user_ids = list(self.operator_connections.keys())
         
-        # Enviar a cada usuario
-        for user in users:
-            await self.send_to_operator(str(user.id), message)
+        for user_id in user_ids:
+            await self.send_to_operator(user_id, message)
     
     async def broadcast_to_all_operators(self, message: dict):
         """

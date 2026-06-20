@@ -548,7 +548,7 @@ class RedisConnectionManager:
         self,
         organization_id: str,
         message: dict,
-        db: Session,
+        db: Session = None,
     ) -> None:
         """
         Envía mensaje a todas las workstations de una organización.
