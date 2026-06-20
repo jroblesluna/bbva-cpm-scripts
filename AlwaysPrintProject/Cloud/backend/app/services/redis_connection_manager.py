@@ -605,7 +605,6 @@ class RedisConnectionManager:
                 logger.debug(
                     "delivery.org_broadcast",
                     org_id=organization_id,
-                    local_count=local_count,
                     message_type=message.get("type", "unknown"),
                 )
             except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
@@ -618,7 +617,6 @@ class RedisConnectionManager:
             logger.debug(
                 "delivery.org_broadcast_local_only",
                 org_id=organization_id,
-                local_count=local_count,
             )
 
     # =========================================================================
