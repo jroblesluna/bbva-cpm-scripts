@@ -54,6 +54,7 @@ import type {
 } from '@/types/system-status';
 import HistoryTab from './components/HistoryTab';
 import MetricsCard from './components/MetricsCard';
+import WorkersTab from './components/WorkersTab';
 
 // === CONSTANTES DE UMBRALES ===
 const THRESHOLD_MEMORY = 80;
@@ -432,6 +433,10 @@ export default function SystemStatusPage() {
             <Server className="mr-2 h-4 w-4" />
             {t('tabHistory')}
           </TabsTrigger>
+          <TabsTrigger value="workers">
+            <Cpu className="mr-2 h-4 w-4" />
+            {t('tabWorkers')}
+          </TabsTrigger>
         </TabsList>
 
         {/* Tab: Estado Actual */}
@@ -546,6 +551,11 @@ export default function SystemStatusPage() {
         {/* Tab: Histórico */}
         <TabsContent value="history">
           <HistoryTab />
+        </TabsContent>
+
+        {/* Tab: Workers */}
+        <TabsContent value="workers">
+          <WorkersTab />
         </TabsContent>
       </Tabs>
     </div>
