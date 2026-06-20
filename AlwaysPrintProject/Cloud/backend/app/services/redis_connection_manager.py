@@ -82,6 +82,11 @@ class RedisConnectionManager:
         self._disconnect_flush_task: Optional[asyncio.Task] = None
         self._db_session_factory = None
 
+        # Cola de registros Redis pendientes (batch SADD cada 1s en vez de 1 task por connect)
+        self._pending_registrations: List[str] = []
+        self._pending_org_subscribes: List[str] = []
+        self._registration_flush_task: Optional[asyncio.Task] = None
+
         # Death pings pendientes de respuesta: {workstation_id: datetime_enviado}
         self._pending_pongs: Dict[str, datetime] = {}
 
@@ -222,54 +227,72 @@ class RedisConnectionManager:
         # Nota: NO se actualiza is_online aquí porque register_workstation()
         # (llamado antes en el endpoint) ya lo hace con db.commit().
 
-        # === Fire-and-forget (no bloquea la conexión) ===
+        # === Encolar registro Redis en batch (no crear task individual) ===
+        # Esto evita crear 10+ asyncio.Tasks/s durante ramp-up rápido
+        # que saturan el event loop. El flush ocurre cada 1s.
+        self._pending_registrations.append(workstation_id)
         is_first_of_org = self._org_ws_count[organization_id] == 1
-        asyncio.create_task(
-            self._fire_and_forget_connect(workstation_id, organization_id, is_first_of_org)
-        )
+        if is_first_of_org:
+            self._pending_org_subscribes.append(organization_id)
 
-    async def _fire_and_forget_connect(
-        self,
-        workstation_id: str,
-        organization_id: str,
-        subscribe_org: bool,
-    ) -> None:
+        # Iniciar flush task si no existe
+        if self._registration_flush_task is None or self._registration_flush_task.done():
+            self._registration_flush_task = asyncio.create_task(
+                self._flush_pending_registrations()
+            )
+
+    async def _flush_pending_registrations(self) -> None:
         """
-        Operaciones Redis fire-and-forget tras connect_workstation.
+        Flush batch de registros Redis pendientes.
 
-        Registra workstation en WorkerRegistry (SADD) y, si es la primera
-        workstation de la organización en este worker, suscribe al canal org:{org_id}.
-
-        Args:
-            workstation_id: UUID de la workstation
-            organization_id: UUID de la organización
-            subscribe_org: True si debe suscribir canal org (primera WS de esa org)
+        Espera 1 segundo, luego hace SADD batch de todas las workstations
+        pendientes + SUBSCRIBE de organizaciones nuevas. Esto evita crear
+        un asyncio.Task individual por cada connect_workstation durante
+        ramp-up rápido (que saturaba el event loop con 100+ tasks).
         """
+        await asyncio.sleep(1)
+
+        # Copiar y limpiar colas
+        ws_ids = self._pending_registrations.copy()
+        org_ids = self._pending_org_subscribes.copy()
+        self._pending_registrations.clear()
+        self._pending_org_subscribes.clear()
+
+        if not ws_ids and not org_ids:
+            return
+
         try:
-            # Registrar en WorkerRegistry (SADD)
-            if self._worker_registry:
-                await self._worker_registry.register_workstation(workstation_id)
+            # Batch SADD de todas las workstations al WorkerRegistry
+            if self._worker_registry and ws_ids:
+                for ws_id in ws_ids:
+                    await self._worker_registry.register_workstation(ws_id)
 
-            # Lazy subscribe: solo si es la primera workstation de esta org en el worker
-            if subscribe_org and self._redis_available and self._pubsub:
-                await self._pubsub.subscribe(f"org:{organization_id}")
+            # Lazy subscribe de organizaciones nuevas
+            if org_ids and self._redis_available and self._pubsub:
+                for org_id in org_ids:
+                    await self._pubsub.subscribe(f"org:{org_id}")
+                    logger.debug(
+                        "redis.lazy_org_subscribe",
+                        channel=f"org:{org_id}",
+                        org_id=org_id,
+                    )
+
+            if ws_ids:
                 logger.debug(
-                    "redis.lazy_org_subscribe",
-                    channel=f"org:{organization_id}",
-                    org_id=organization_id,
+                    "redis.batch_register_flush",
+                    count=len(ws_ids),
+                    orgs_subscribed=len(org_ids),
                 )
         except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
             logger.warning(
-                "redis.fire_and_forget_connect_failed",
-                workstation_id=workstation_id,
-                org_id=organization_id,
+                "redis.batch_register_failed",
+                count=len(ws_ids),
                 error=str(e),
             )
         except Exception as e:
             logger.warning(
-                "redis.fire_and_forget_connect_error",
-                workstation_id=workstation_id,
-                org_id=organization_id,
+                "redis.batch_register_error",
+                count=len(ws_ids),
                 error=str(e),
             )
 
@@ -563,15 +586,13 @@ class RedisConnectionManager:
         """
         # Entregar a workstations locales de esta organización
         local_count = 0
-        async with self._lock:
-            local_ws_ids = [
-                ws_id for ws_id, org_id in self.org_ids.items()
-                if org_id == organization_id
-            ]
+        local_ws_ids = [
+            ws_id for ws_id, org_id in self.org_ids.items()
+            if org_id == organization_id
+        ]
 
         for ws_id in local_ws_ids:
-            async with self._lock:
-                ws = self.workstation_connections.get(ws_id)
+            ws = self.workstation_connections.get(ws_id)
             if ws:
                 try:
                     await ws.send_json(message)
@@ -1167,9 +1188,8 @@ class RedisConnectionManager:
         Args:
             workstation_id: UUID de la workstation
         """
-        async with self._lock:
-            self.last_pong[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
-            self._pending_pongs.pop(workstation_id, None)
+        self.last_pong[workstation_id] = datetime.now(timezone.utc).replace(tzinfo=None)
+        self._pending_pongs.pop(workstation_id, None)
 
     async def start_ping_loop(self, db_session_factory) -> None:
         """
