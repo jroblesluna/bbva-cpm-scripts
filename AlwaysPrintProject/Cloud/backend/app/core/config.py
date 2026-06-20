@@ -89,6 +89,12 @@ class Settings(BaseSettings):
     LOG_ROTATION: str = "1 day"
     LOG_RETENTION: str = "30 days"
     
+    # === CONFIGURACIÓN MULTI-WORKER ===
+    UVICORN_WORKERS: int = 1
+    WORKER_REGISTRY_TTL: int = 60  # segundos
+    WS_REDIS_RECONNECT_MAX_INTERVAL: int = 30  # segundos (backoff cap)
+    WS_DEBUG_LOGGING: bool = True  # Logging estructurado detallado (dev)
+
     # === CONFIGURACIÓN DE WEBSOCKET ===
     WS_PING_INTERVAL: int = 30  # segundos
     WS_PING_TIMEOUT: int = 60  # segundos
@@ -139,6 +145,21 @@ class Settings(BaseSettings):
     LOG_ANALYZER_ANTHROPIC_API_KEY: str = ""
     # Modelo de Anthropic
     LOG_ANALYZER_ANTHROPIC_MODEL: str = "claude-3-5-sonnet-20241022"
+
+    @model_validator(mode="after")
+    def _validate_multi_worker(self) -> "Settings":
+        """
+        Valida que REDIS_URL esté configurado cuando se usan múltiples workers.
+
+        Multi-worker necesita Redis para coordinación inter-worker (pub/sub,
+        WorkerRegistry). Sin Redis, los workers no pueden comunicarse entre sí.
+        """
+        if self.UVICORN_WORKERS > 1 and not self.REDIS_URL:
+            raise ValueError(
+                "REDIS_URL es requerido cuando UVICORN_WORKERS > 1. "
+                "Multi-worker necesita Redis para coordinación inter-worker."
+            )
+        return self
 
     @model_validator(mode="after")
     def _validate_log_analyzer_settings(self) -> "Settings":

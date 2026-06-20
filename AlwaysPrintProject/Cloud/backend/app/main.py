@@ -36,6 +36,10 @@ async def lifespan(app: FastAPI):
     # (antes de iniciar ping loop y aceptar conexiones WS)
     scalability_collector.capture_baseline()
 
+    # Startup: Inicializar Redis si el manager lo requiere
+    if hasattr(connection_manager, 'initialize'):
+        await connection_manager.initialize()
+
     # Startup: Iniciar ping loop
     ping_task = asyncio.create_task(
         connection_manager.start_ping_loop(SessionLocal)
