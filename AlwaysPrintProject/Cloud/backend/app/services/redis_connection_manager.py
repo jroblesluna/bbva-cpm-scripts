@@ -1055,6 +1055,13 @@ class RedisConnectionManager:
                 await asyncio.sleep(interval)
                 if self._worker_registry and self._redis_available:
                     await self._worker_registry.heartbeat()
+                    # Publicar conteo local de WS para que get_global_connection_count
+                    # tenga datos frescos sin importar qué worker responda la request
+                    await self._redis.set(
+                        f"workers:{self._worker_id}:ws_count",
+                        str(len(self.workstation_connections)),
+                        ex=90,
+                    )
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -1482,13 +1489,12 @@ class RedisConnectionManager:
 
     async def get_global_connection_count(self) -> dict:
         """
-        Obtiene conteo GLOBAL de conexiones WebSocket.
+        Obtiene conteo EXACTO de conexiones WebSocket de TODOS los workers.
 
-        Reporta SOLO las conexiones locales del worker que responde esta request.
-        Con round-robin, el frontend puede llamar múltiples veces y sumar/promediar.
-
-        El campo 'workers' indica cuántos workers hay activos (via heartbeat keys).
-        El frontend puede estimar el total como: workstations × workers (si distribución uniforme).
+        Cada worker escribe periódicamente su conteo en Redis:
+          workers:{worker_id}:ws_count → integer (actualizado cada heartbeat)
+        Este método suma los conteos de todos los workers activos.
+        Para el worker actual, usa el dict local (siempre fresco).
         """
         local_ws = len(self.workstation_connections)
         local_ops = len(self.operator_connections)
@@ -1498,32 +1504,56 @@ class RedisConnectionManager:
             return {
                 "workstations": local_ws,
                 "operators": local_ops,
-                "stale": 0,
                 "workers": 1,
                 "worker_id": worker_id,
+                "detail": {worker_id: local_ws},
             }
 
         try:
-            # Contar workers activos por heartbeat
+            # Actualizar nuestro conteo en Redis (para que otros lo lean)
+            await self._redis.set(
+                f"workers:{worker_id}:ws_count",
+                str(local_ws),
+                ex=90,  # Expira si el worker muere (TTL > heartbeat interval)
+            )
+
+            # Leer conteos de TODOS los workers activos
+            total_ws = 0
             worker_count = 0
-            async for _ in self._redis.scan_iter(match="workers:*:heartbeat"):
+            detail: dict = {}
+
+            async for key in self._redis.scan_iter(match="workers:*:heartbeat"):
+                wid = key.split(":")[1]
                 worker_count += 1
+
+                if wid == worker_id:
+                    # Para este worker, usar dict local (fuente de verdad)
+                    detail[wid] = local_ws
+                    total_ws += local_ws
+                else:
+                    # Para otros workers, leer su ws_count publicado
+                    count_str = await self._redis.get(f"workers:{wid}:ws_count")
+                    count = int(count_str) if count_str else 0
+                    detail[wid] = count
+                    total_ws += count
 
             if worker_count == 0:
                 worker_count = 1
+                total_ws = local_ws
+                detail = {worker_id: local_ws}
 
             return {
-                "workstations": local_ws,
+                "workstations": total_ws,
                 "operators": local_ops,
-                "stale": 0,
                 "workers": worker_count,
                 "worker_id": worker_id,
+                "detail": detail,
             }
         except Exception:
             return {
                 "workstations": local_ws,
                 "operators": local_ops,
-                "stale": 0,
                 "workers": 1,
                 "worker_id": worker_id,
+                "detail": {worker_id: local_ws},
             }

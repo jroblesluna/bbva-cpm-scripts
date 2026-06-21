@@ -249,14 +249,10 @@ class ScalabilityMetricsCollector:
             workstation_count = counts.get("workstations", 0)
             operator_count = counts.get("operators", 0)
             workers = counts.get("workers", 1)
-
-            # Con multi-worker, este endpoint solo ve las WS locales del worker que responde.
-            # Estimar total global = local × workers (distribución uniforme por round-robin)
-            estimated_total_ws = workstation_count * workers
-            total = estimated_total_ws + operator_count
+            total = workstation_count + operator_count
 
             return WebSocketMetricsResponse(
-                workstation_count=estimated_total_ws,
+                workstation_count=workstation_count,
                 operator_count=operator_count,
                 total=total,
                 stale=0,
