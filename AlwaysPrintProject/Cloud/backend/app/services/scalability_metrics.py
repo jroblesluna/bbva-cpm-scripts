@@ -355,16 +355,24 @@ class ScalabilityMetricsCollector:
                 ws_count = counts.get("workstations", 0)
 
                 if ws_count > 0:
-                    if self._baseline_rss_mb is not None:
-                        # Overhead marginal = memoria actual - memoria base
-                        overhead_mb = rss_mb - self._baseline_rss_mb
-                        if overhead_mb > 0:
-                            avg_per_workstation_mb = round(overhead_mb / ws_count, 2)
-                        else:
-                            # RSS no superó el baseline: overhead efectivo es 0
-                            avg_per_workstation_mb = 0.0
+                    # Calcular RSS total de todos los workers
+                    detail = counts.get("detail", {})
+                    if detail:
+                        total_rss = sum(
+                            w.get("rss_mb", 0) if isinstance(w, dict) else 0
+                            for w in detail.values()
+                        )
                     else:
-                        # Sin baseline (no se ejecutó capture_baseline): no calcular
+                        total_rss = rss_mb
+
+                    # Restar baselines (baseline × num_workers)
+                    num_workers = counts.get("workers", 1)
+                    baseline_total = (self._baseline_rss_mb or 0) * num_workers
+                    overhead_mb = total_rss - baseline_total
+
+                    if overhead_mb > 0:
+                        avg_per_workstation_mb = round(overhead_mb / ws_count, 2)
+                    else:
                         avg_per_workstation_mb = 0.0
                 else:
                     avg_per_workstation_mb = 0.0
