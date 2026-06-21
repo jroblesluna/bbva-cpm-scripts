@@ -49,6 +49,10 @@ CONNECT_RAMP_DELAY = 0.1  # segundos entre cada nueva conexión (evita pico simu
 RECONNECT_DELAY = 5  # segundos antes de reintentar conexión fallida
 MAX_RETRIES = 5  # máximo de reintentos por workstation
 
+# Identificador de sesión del load test (2 chars aleatorios)
+# Permite correr múltiples instancias sin colisión de hostnames/IPs
+RUN_ID = ''.join(random.choices(string.ascii_uppercase, k=2))
+
 
 # === MÉTRICAS ===
 
@@ -92,8 +96,8 @@ def _random_ip() -> str:
 
 
 def _random_hostname(idx: int) -> str:
-    """Genera un hostname único tipo workstation Windows basado en el índice."""
-    return f"W10-LT{idx:04d}"
+    """Genera un hostname único tipo workstation Windows con ID de sesión."""
+    return f"W10-LT-{RUN_ID}{idx:04d}"
 
 
 def _random_serial() -> str:
@@ -111,9 +115,16 @@ def _random_user() -> str:
 
 def _make_register_msg(idx: int) -> dict:
     """Crea mensaje de registro para la workstation simulada."""
+    # IP: 192.{segundo octeto fijo por sesión}.{tercer octeto}.{cuarto octeto}
+    # Segundo octeto: basado en RUN_ID (evita 168 para no colisionar con redes reales)
+    second_octet = (ord(RUN_ID[0]) + ord(RUN_ID[1])) % 155 + 2  # rango 2-156, nunca 168
+    if second_octet >= 168:
+        second_octet += 1  # saltar 168
+    third_octet = (idx // 254) % 256
+    fourth_octet = (idx % 254) + 1
     return {
         "type": "register",
-        "ip_private": f"192.165.{idx // 254 + 1}.{idx % 254 + 1}",
+        "ip_private": f"192.{second_octet}.{third_octet}.{fourth_octet}",
         "hostname": _random_hostname(idx),
         "os_serial": _random_serial(),
         "current_user": _random_user(),
