@@ -512,7 +512,7 @@ else
         echo -e "\n  ${BLUE}Workers Uvicorn:${NC}"
         if [ "$BACKEND_STATUS" = "running" ]; then
             # Consultar health/detailed múltiples veces para descubrir todos los workers
-            WORKER_INFO=$(ssm_exec "$INSTANCE_ID" '["WORKERS=\"\"; for i in $(seq 1 20); do W=$(curl -s http://localhost:8000/api/v1/health/detailed 2>/dev/null | python3 -c \"import sys,json; d=json.load(sys.stdin); print(d.get(\\\"worker_id\\\",\\\"\\\") + \\\"|\\\" + str(d.get(\\\"connections\\\",{}).get(\\\"workstations\\\",0)) + \\\"|\\\" + str(d.get(\\\"redis\\\",{}).get(\\\"connected\\\",False)) + \\\"|\\\" + str(d.get(\\\"memory_mb\\\",0)))\" 2>/dev/null); [ -n \"$W\" ] && WORKERS=\"$WORKERS\n$W\"; done; echo \"$WORKERS\" | sort | uniq -c | sort -rn | grep -v \"^$\""]' 8)
+            WORKER_INFO=$(ssm_exec "$INSTANCE_ID" '["WORKERS=\"\"; for i in $(seq 1 20); do W=$(curl -s http://localhost:8000/api/v1/health/detailed 2>/dev/null | python3 -c \"import sys,json; d=json.load(sys.stdin); print(d.get(\\\"worker_id\\\",\\\"\\\") + \\\"|\\\" + str(d.get(\\\"connections\\\",{}).get(\\\"workstations\\\",0)) + \\\"|\\\" + str(d.get(\\\"redis\\\",{}).get(\\\"connected\\\",False)) + \\\"|\\\" + str(d.get(\\\"memory_mb\\\",0)))\" 2>/dev/null); [ -n \"$W\" ] && WORKERS=\"$WORKERS\\n$W\"; done; echo -e \"$WORKERS\" | grep \"|\" | sort -t\"|\" -k1,1 -u"]' 8)
             
             if [ -n "$WORKER_INFO" ] && ! echo "$WORKER_INFO" | grep -q "FAIL\|Traceback"; then
                 # Contar workers únicos
@@ -526,12 +526,12 @@ else
                     check_warn "No se pudieron detectar workers"
                 fi
                 
-                # Mostrar detalle por worker
-                echo "$WORKER_INFO" | grep "|" | while IFS= read -r line; do
-                    HITS=$(echo "$line" | awk '{print $1}')
-                    WDATA=$(echo "$line" | awk '{print $2}')
-                    WID=$(echo "$WDATA" | cut -d'|' -f1)
-                    WS_COUNT=$(echo "$WDATA" | cut -d'|' -f2)
+
+
+
+
+
+
                     REDIS_CONN=$(echo "$WDATA" | cut -d'|' -f3)
                     MEM_MB=$(echo "$WDATA" | cut -d'|' -f4)
                     
