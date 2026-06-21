@@ -26,7 +26,7 @@ class WebSocketMetricsResponse(BaseModel):
     stale (registradas en Redis pero sin conexión real) y workers activos.
     """
     workstation_count: int = Field(
-        ..., ge=0, le=10000,
+        ..., ge=0, le=100000,
         description="Conteo de conexiones WebSocket de workstations activas (real, todos los workers)"
     )
     operator_count: int = Field(
