@@ -118,17 +118,39 @@ export default function MetricsCard() {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Métrica 1: Conexiones WebSocket */}
-          <MetricItem
-            label={t('websocket.label')}
-            value={metrics?.websocket?.total ?? null}
-            unit=""
-            thresholdColor={evaluateThreshold(
-              metrics?.websocket?.total ?? null,
-              WS_TOTAL_THRESHOLD
+          {/* Métrica 1: Conexiones WebSocket (consolidado + detalle por worker) */}
+          <div className="rounded-lg border p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`h-2 w-2 rounded-full ${
+                evaluateThreshold(metrics?.websocket?.total ?? null, WS_TOTAL_THRESHOLD) === 'red'
+                  ? 'bg-red-500'
+                  : evaluateThreshold(metrics?.websocket?.total ?? null, WS_TOTAL_THRESHOLD) === 'yellow'
+                  ? 'bg-yellow-500'
+                  : 'bg-green-500'
+              }`} />
+              <span className="text-sm text-muted-foreground">{t('websocket.label')}</span>
+            </div>
+            <p className="text-2xl font-bold">
+              {metrics?.websocket?.total ?? '-'}
+            </p>
+            {/* Desglose por worker */}
+            {metrics?.websocket?.detail && Object.keys(metrics.websocket.detail).length > 0 && (
+              <div className="mt-2 pt-2 border-t border-gray-100 space-y-0.5">
+                {Object.entries(metrics.websocket.detail).map(([wid, count]) => (
+                  <div key={wid} className="flex justify-between text-xs text-muted-foreground">
+                    <span className="font-mono">{wid}</span>
+                    <span className="font-mono">{count}</span>
+                  </div>
+                ))}
+                {(metrics.websocket.workers ?? 0) > 1 && (
+                  <div className="flex justify-between text-xs font-medium pt-1 border-t border-gray-50">
+                    <span>{t('websocket.total')}</span>
+                    <span>{metrics.websocket.total}</span>
+                  </div>
+                )}
+              </div>
             )}
-            t={t}
-          />
+          </div>
 
           {/* Métrica 2: Memoria Python por workstation */}
           <MetricItem

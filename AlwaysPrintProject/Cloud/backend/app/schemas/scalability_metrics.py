@@ -45,6 +45,10 @@ class WebSocketMetricsResponse(BaseModel):
         default=1, ge=1,
         description="Cantidad de workers uvicorn activos"
     )
+    detail: dict = Field(
+        default_factory=dict,
+        description="Desglose por worker: {worker_id: ws_count}"
+    )
     data_available: bool = Field(
         default=True,
         description="Indica si los datos pudieron ser obtenidos del ConnectionManager"

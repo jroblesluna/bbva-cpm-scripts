@@ -15,6 +15,8 @@ export interface WebSocketMetrics {
   workstation_count: number
   operator_count: number
   total: number
+  workers: number
+  detail: Record<string, number>
   data_available: boolean
 }
 

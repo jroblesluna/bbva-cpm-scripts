@@ -250,6 +250,7 @@ class ScalabilityMetricsCollector:
             operator_count = counts.get("operators", 0)
             workers = counts.get("workers", 1)
             total = workstation_count + operator_count
+            detail = counts.get("detail", {})
 
             return WebSocketMetricsResponse(
                 workstation_count=workstation_count,
@@ -257,6 +258,7 @@ class ScalabilityMetricsCollector:
                 total=total,
                 stale=0,
                 workers=workers,
+                detail=detail,
                 data_available=True,
             )
 
