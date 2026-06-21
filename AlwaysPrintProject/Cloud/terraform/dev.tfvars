@@ -25,8 +25,8 @@ ses_from_email = "noreply@dev.iol.pe"
 backend_port  = 8000
 frontend_port = 3000
 
-# c7i-flex.large (4 GB RAM — testing de carga con ~6000+ ws)
-ec2_instance_type = "c7i-flex.large"
+# En Free Tier: t3.small (2GB) / c7i-flex.large (4GB) / m7i-flex.large (8GB)
+ec2_instance_type = "m7i-flex.large"
 
 backend_env_vars = {
   LOG_LEVEL                   = "DEBUG"
