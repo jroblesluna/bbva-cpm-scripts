@@ -46,8 +46,9 @@ DEFAULT_CONNECTIONS = 500
 DEFAULT_DURATION = 300  # 5 minutos
 TELEMETRY_INTERVAL = 300  # segundos entre envíos de telemetría
 CONNECT_RAMP_DELAY = 0.35  # segundos entre cada nueva conexión (evita pico simultáneo)
-RECONNECT_DELAY = 5  # segundos antes de reintentar conexión fallida
-MAX_RETRIES = 5  # máximo de reintentos por workstation
+RECONNECT_DELAY_BASE = 1  # segundos base para exponential backoff
+RECONNECT_DELAY_MAX = 60  # máximo delay entre reintentos (cap del backoff)
+MAX_RETRIES = 0  # 0 = infinito (reconecta hasta que termine la duración)
 
 # Identificador de sesión del load test (2 chars aleatorios)
 # Permite correr múltiples instancias sin colisión de hostnames/IPs
@@ -169,13 +170,13 @@ def _get_rss_mb() -> float:
 async def simulate_workstation(idx: int, url: str, duration: float):
     """
     Simula una workstation: conecta, registra, envía telemetría periódica.
-    Se mantiene viva durante 'duration' segundos respondiendo a pings.
-    Reintenta conexión si falla al conectar o si se desconecta a mitad de sesión.
+    Reconexión infinita con exponential backoff + jitter (como el Tray real).
+    Solo se detiene cuando expira la duración del test.
     """
     end_time = time.time() + duration
     retries = 0
 
-    while time.time() < end_time and retries <= MAX_RETRIES:
+    while time.time() < end_time:
         ws: Optional[websockets.WebSocketClientProtocol] = None
         was_connected = False
 
@@ -202,7 +203,7 @@ async def simulate_workstation(idx: int, url: str, duration: float):
             metrics.register_latencies.append(latency)
             metrics.connected += 1
             was_connected = True
-            retries = 0  # Reset reintentos tras conexión exitosa
+            retries = 0  # Reset backoff tras conexión exitosa
 
             # Parsear respuesta para obtener workstation_id
             resp_data = json.loads(response)
@@ -233,19 +234,14 @@ async def simulate_workstation(idx: int, url: str, duration: float):
                     await ws.send(json.dumps(telemetry))
                     metrics.messages_sent += 1
 
-            # Terminó la duración normalmente — salir del while de reintentos
+            # Terminó la duración normalmente
             break
 
         except asyncio.TimeoutError:
             metrics.pending = max(0, metrics.pending - 1)
             retries += 1
-            if retries > MAX_RETRIES:
-                metrics.failed += 1
-                metrics.errors.append(f"WS-{idx}: timeout de conexión (max reintentos alcanzado)")
-            else:
-                metrics.errors.append(f"WS-{idx}: timeout, reintentando ({retries}/{MAX_RETRIES})...")
-                metrics.reconnections += 1
-                await asyncio.sleep(RECONNECT_DELAY)
+            metrics.errors.append(f"WS-{idx}: timeout, reintentando ({retries})...")
+            metrics.reconnections += 1
 
         except websockets.exceptions.ConnectionClosed as e:
             if was_connected:
@@ -253,15 +249,10 @@ async def simulate_workstation(idx: int, url: str, duration: float):
             else:
                 metrics.pending = max(0, metrics.pending - 1)
             retries += 1
-            if retries > MAX_RETRIES or time.time() >= end_time:
-                metrics.failed += 1
-                metrics.errors.append(f"WS-{idx}: conexión cerrada ({e.code}: {e.reason})")
-            else:
-                metrics.errors.append(
-                    f"WS-{idx}: desconectada ({e.code}), reconectando ({retries}/{MAX_RETRIES})..."
-                )
-                metrics.reconnections += 1
-                await asyncio.sleep(RECONNECT_DELAY)
+            metrics.errors.append(
+                f"WS-{idx}: desconectada ({e.code}), reconectando ({retries})..."
+            )
+            metrics.reconnections += 1
 
         except Exception as e:
             if was_connected:
@@ -269,13 +260,8 @@ async def simulate_workstation(idx: int, url: str, duration: float):
             else:
                 metrics.pending = max(0, metrics.pending - 1)
             retries += 1
-            if retries > MAX_RETRIES:
-                metrics.failed += 1
-                metrics.errors.append(f"WS-{idx}: {type(e).__name__}: {e}")
-            else:
-                metrics.errors.append(f"WS-{idx}: {type(e).__name__}, reintentando ({retries}/{MAX_RETRIES})...")
-                metrics.reconnections += 1
-                await asyncio.sleep(RECONNECT_DELAY)
+            metrics.errors.append(f"WS-{idx}: {type(e).__name__}, reintentando ({retries})...")
+            metrics.reconnections += 1
 
         finally:
             if ws:
@@ -283,6 +269,12 @@ async def simulate_workstation(idx: int, url: str, duration: float):
                     await ws.close()
                 except Exception:
                     pass
+
+        # Exponential backoff con jitter (1s, 2s, 4s, 8s, ... cap 60s)
+        if time.time() < end_time:
+            delay = min(RECONNECT_DELAY_BASE * (2 ** min(retries - 1, 6)), RECONNECT_DELAY_MAX)
+            jitter = random.uniform(0, delay * 0.3)  # 30% jitter
+            await asyncio.sleep(delay + jitter)
 
     # Al salir del loop, si estaba conectada, decrementar
     metrics.connected = max(0, metrics.connected - 1)
