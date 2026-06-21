@@ -227,6 +227,41 @@ class ScalabilityMetricsCollector:
             collected_at=datetime.utcnow(),
         )
 
+    def _calculate_ws_capacity(self, detail: dict, workers: int) -> int:
+        """
+        Calcula capacidad máxima de WS basada en RAM disponible.
+
+        Fórmula:
+            RAM_disponible = RAM_total - baseline_total_workers - overhead_sistema
+            capacidad = RAM_disponible / MB_per_WS
+
+        Parámetros empíricos (basados en load testing):
+            - MB_per_WS = 0.5 (conservador: incluye buffers WS, BD queries, Redis keys)
+            - SYSTEM_OVERHEAD = 600 MB (OS + Redis + Frontend + kernel buffers)
+        """
+        MB_PER_WS = 0.5
+        SYSTEM_OVERHEAD_MB = 600
+
+        try:
+            import psutil
+            ram_total_mb = psutil.virtual_memory().total / (1024 * 1024)
+        except Exception:
+            ram_total_mb = 7600  # Fallback m7i-flex.large
+
+        # Baseline total de todos los workers
+        if detail:
+            baseline_total = sum(
+                w.get("baseline_mb", 120) if isinstance(w, dict) else 120
+                for w in detail.values()
+            )
+        else:
+            baseline_total = 120 * workers
+
+        ram_available = ram_total_mb - baseline_total - SYSTEM_OVERHEAD_MB
+        capacity = int(max(ram_available / MB_PER_WS, 1000))
+
+        return capacity
+
     async def collect_websocket_metrics(self) -> WebSocketMetricsResponse:
         """
         Recolecta métricas de conexiones WebSocket del ConnectionManager singleton.
@@ -252,6 +287,11 @@ class ScalabilityMetricsCollector:
             total = workstation_count + operator_count
             detail = counts.get("detail", {})
 
+            # Calcular capacidad dinámica basada en RAM disponible
+            capacity = self._calculate_ws_capacity(detail, workers)
+            threshold_warning = int(capacity * 0.7)
+            threshold_critical = int(capacity * 0.9)
+
             return WebSocketMetricsResponse(
                 workstation_count=workstation_count,
                 operator_count=operator_count,
@@ -259,6 +299,9 @@ class ScalabilityMetricsCollector:
                 stale=0,
                 workers=workers,
                 detail=detail,
+                capacity=capacity,
+                threshold_warning=threshold_warning,
+                threshold_critical=threshold_critical,
                 data_available=True,
             )
 

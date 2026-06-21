@@ -47,7 +47,19 @@ class WebSocketMetricsResponse(BaseModel):
     )
     detail: dict = Field(
         default_factory=dict,
-        description="Desglose por worker: {worker_id: ws_count}"
+        description="Desglose por worker: {worker_id: {ws, rss_mb, baseline_mb, fd, pool_out}}"
+    )
+    capacity: int = Field(
+        default=0, ge=0,
+        description="Capacidad máxima estimada de WS (basada en RAM, workers, overhead)"
+    )
+    threshold_warning: int = Field(
+        default=0, ge=0,
+        description="Umbral de warning (70% de capacidad)"
+    )
+    threshold_critical: int = Field(
+        default=0, ge=0,
+        description="Umbral de critical (90% de capacidad)"
     )
     data_available: bool = Field(
         default=True,

@@ -17,6 +17,9 @@ export interface WebSocketMetrics {
   total: number
   workers: number
   detail: Record<string, WorkerDetail>
+  capacity: number
+  threshold_warning: number
+  threshold_critical: number
   data_available: boolean
 }
 

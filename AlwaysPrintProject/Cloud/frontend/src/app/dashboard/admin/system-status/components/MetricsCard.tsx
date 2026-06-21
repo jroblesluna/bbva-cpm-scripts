@@ -24,7 +24,6 @@ import { apiClient } from '@/lib/api'
 import type { ScalabilityMetrics } from '@/types/scalability-metrics'
 import {
   evaluateThreshold,
-  WS_TOTAL_THRESHOLD,
   MEMORY_PER_WS_THRESHOLD,
   FD_USAGE_THRESHOLD,
   DB_POOL_USAGE_THRESHOLD,
@@ -122,16 +121,24 @@ export default function MetricsCard() {
           <div className="rounded-lg border p-4">
             <div className="flex items-center gap-2 mb-1">
               <span className={`h-2 w-2 rounded-full ${
-                evaluateThreshold(metrics?.websocket?.total ?? null, WS_TOTAL_THRESHOLD) === 'red'
-                  ? 'bg-red-500'
-                  : evaluateThreshold(metrics?.websocket?.total ?? null, WS_TOTAL_THRESHOLD) === 'yellow'
-                  ? 'bg-yellow-500'
-                  : 'bg-green-500'
+                (() => {
+                  const total = metrics?.websocket?.total ?? 0;
+                  const crit = metrics?.websocket?.threshold_critical ?? 12000;
+                  const warn = metrics?.websocket?.threshold_warning ?? 8000;
+                  if (total > crit) return 'bg-red-500';
+                  if (total > warn) return 'bg-yellow-500';
+                  return 'bg-green-500';
+                })()
               }`} />
               <span className="text-sm text-muted-foreground">{t('websocket.label')}</span>
             </div>
             <p className="text-2xl font-bold">
               {metrics?.websocket?.total ?? '-'}
+              {metrics?.websocket?.capacity ? (
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  / {metrics.websocket.capacity.toLocaleString()} max
+                </span>
+              ) : null}
             </p>
             {/* Desglose por worker */}
             {metrics?.websocket?.detail && Object.keys(metrics.websocket.detail).length > 0 && (
@@ -146,6 +153,14 @@ export default function MetricsCard() {
                   <div className="flex justify-between text-xs font-medium pt-1 border-t border-gray-50">
                     <span>{t('websocket.total')}</span>
                     <span>{metrics.websocket.total}</span>
+                  </div>
+                )}
+                {metrics.websocket.capacity > 0 && (
+                  <div className="flex justify-between text-xs text-muted-foreground pt-1">
+                    <span>Capacity (warn / crit)</span>
+                    <span className="font-mono">
+                      {metrics.websocket.threshold_warning.toLocaleString()} / {metrics.websocket.threshold_critical.toLocaleString()}
+                    </span>
                   </div>
                 )}
               </div>

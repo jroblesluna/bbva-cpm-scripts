@@ -708,6 +708,51 @@ class SystemStatusCollector:
     # ESTADO GENERAL Y ALERTAS — Cálculo de umbrales y generación de alertas
     # =========================================================================
 
+    def _calculate_ws_capacity(self, scalability_metrics) -> int:
+        """
+        Calcula la capacidad máxima de WebSocket connections basado en:
+        - RAM total del sistema
+        - Baseline de memoria por worker (capturada al inicio)
+        - Overhead de OS, Redis, Frontend (~600 MB)
+        - MB por WebSocket empírico (0.5 MB conservador con telemetría)
+
+        Fórmula:
+            RAM_disponible = RAM_total - (baseline × workers) - overhead_sistema
+            capacidad = RAM_disponible / MB_per_WS
+
+        Returns:
+            Capacidad máxima estimada de WS (int)
+        """
+        MB_PER_WS = 0.5  # Conservador: incluye buffers WS + overhead BD + Redis keys
+        SYSTEM_OVERHEAD_MB = 600  # OS + Redis + Frontend + buffers kernel
+
+        try:
+            import psutil
+            ram_total_mb = psutil.virtual_memory().total / (1024 * 1024)
+        except Exception:
+            ram_total_mb = 7600  # Fallback: m7i-flex.large
+
+        # Obtener baseline y workers del detail
+        detail = {}
+        workers = 1
+        if scalability_metrics.websocket is not None:
+            detail = getattr(scalability_metrics.websocket, 'detail', {}) or {}
+            workers = getattr(scalability_metrics.websocket, 'workers', 1) or 1
+
+        # Calcular baseline total de todos los workers
+        if detail:
+            baseline_total = sum(
+                w.get("baseline_mb", 120) if isinstance(w, dict) else 120
+                for w in detail.values()
+            )
+        else:
+            baseline_total = 120 * workers  # Fallback: ~120 MB por worker
+
+        ram_available = ram_total_mb - baseline_total - SYSTEM_OVERHEAD_MB
+        capacity = int(max(ram_available / MB_PER_WS, 1000))  # Mínimo 1000
+
+        return capacity
+
     def calculate_overall_status(
         self,
         os_metrics: OsMetricsResponse,
@@ -814,21 +859,25 @@ class SystemStatusCollector:
         # === MÉTRICAS DE ESCALABILIDAD ===
         # Verificar umbrales de las métricas de escalabilidad si están disponibles
         if scalability_metrics is not None:
-            # WebSocket total: > 12000 critical, > 8000 warning
+            # WebSocket total: umbrales dinámicos basados en RAM disponible
             if scalability_metrics.websocket is not None:
                 ws_total = scalability_metrics.websocket.total
-                if ws_total > 12000:
+                ws_capacity = self._calculate_ws_capacity(scalability_metrics)
+                ws_warn = int(ws_capacity * 0.7)
+                ws_crit = int(ws_capacity * 0.9)
+
+                if ws_total > ws_crit:
                     alerts.append(AlertResponse(
                         metric_name="ws_connections",
                         current_value=float(ws_total),
-                        threshold=12000.0,
+                        threshold=float(ws_crit),
                         severity="critical",
                     ))
-                elif ws_total > 8000:
+                elif ws_total > ws_warn:
                     alerts.append(AlertResponse(
                         metric_name="ws_connections",
                         current_value=float(ws_total),
-                        threshold=8000.0,
+                        threshold=float(ws_warn),
                         severity="warning",
                     ))
 
