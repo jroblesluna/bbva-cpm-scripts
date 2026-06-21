@@ -525,19 +525,14 @@ else
                 else
                     check_warn "No se pudieron detectar workers"
                 fi
-                
-
-
-
-
-
-
-                    REDIS_CONN=$(echo "$WDATA" | cut -d'|' -f3)
-                    MEM_MB=$(echo "$WDATA" | cut -d'|' -f4)
-                    
+                # Mostrar detalle por worker (deduplicado por worker_id)
+                echo "$WORKER_INFO" | grep "|" | while IFS= read -r line; do
+                    WID=$(echo "$line" | cut -d'|' -f1)
+                    WS_COUNT=$(echo "$line" | cut -d'|' -f2)
+                    REDIS_CONN=$(echo "$line" | cut -d'|' -f3)
+                    MEM_MB=$(echo "$line" | cut -d'|' -f4)
                     REDIS_ICON="🟢"
                     [ "$REDIS_CONN" = "False" ] && REDIS_ICON="🔴"
-                    
                     echo -e "  ${NC}    ${WID}: ${WS_COUNT} workstations | Redis: ${REDIS_ICON} | Mem: ${MEM_MB} MB"
                 done
             else
