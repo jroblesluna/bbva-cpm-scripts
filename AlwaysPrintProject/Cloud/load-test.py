@@ -44,7 +44,7 @@ except ImportError:
 DEFAULT_URL = "wss://alwaysprint.dev.iol.pe/ws/workstation"
 DEFAULT_CONNECTIONS = 500
 DEFAULT_DURATION = 300  # 5 minutos
-TELEMETRY_INTERVAL = 30  # segundos entre envíos de telemetría
+TELEMETRY_INTERVAL = 300  # segundos entre envíos de telemetría
 CONNECT_RAMP_DELAY = 0.35  # segundos entre cada nueva conexión (evita pico simultáneo)
 RECONNECT_DELAY = 5  # segundos antes de reintentar conexión fallida
 MAX_RETRIES = 5  # máximo de reintentos por workstation
@@ -319,6 +319,12 @@ async def main():
     print(f"  Duración:     {duration}s")
     print(f"  Telemetría:   cada {TELEMETRY_INTERVAL}s por ws")
     print(f"  Ramp-up:      {CONNECT_RAMP_DELAY}s entre conexiones ({n_connections * CONNECT_RAMP_DELAY:.0f}s total)")
+    # Mostrar prefijos de sesión
+    _second = (ord(RUN_ID[0]) + ord(RUN_ID[1])) % 155 + 2
+    if _second >= 168:
+        _second += 1
+    print(f"  Hostnames:    W10-LT-{RUN_ID}*")
+    print(f"  IPs:          192.{_second}.*.*")
     print("=" * 70)
     print()
 
