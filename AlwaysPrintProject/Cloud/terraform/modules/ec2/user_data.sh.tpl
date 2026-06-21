@@ -225,6 +225,13 @@ aws ecr get-login-password --region \$AWS_REGION \\
 
 cd /opt/alwaysprint
 
+# Asegurar configuración de Redis y multi-worker en cada deploy
+# (previene drift si el .env fue modificado manualmente)
+sed -i 's|^REDIS_URL=.*|REDIS_URL=redis://redis:6379/0|' .env
+sed -i 's|^UVICORN_WORKERS=.*|UVICORN_WORKERS=2|' .env
+grep -q '^REDIS_URL=' .env || echo 'REDIS_URL=redis://redis:6379/0' >> .env
+grep -q '^UVICORN_WORKERS=' .env || echo 'UVICORN_WORKERS=2' >> .env
+
 if [ "\$SERVICE" = "backend" ] || [ "\$SERVICE" = "all" ]; then
   docker compose pull backend
   docker compose up -d backend
