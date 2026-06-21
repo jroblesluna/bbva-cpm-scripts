@@ -90,9 +90,14 @@ metrics = Metrics()
 
 # === GENERACIÓN DE DATOS SIMULADOS ===
 
-def _random_ip() -> str:
-    """Genera una IP privada aleatoria en rango 192.165.x.x."""
-    return f"192.165.{random.randint(1, 254)}.{random.randint(1, 254)}"
+def _random_ip(idx: int) -> str:
+    """Genera una IP privada basada en RUN_ID (nunca 192.168.* para evitar colisión)."""
+    second_octet = (ord(RUN_ID[0]) + ord(RUN_ID[1])) % 155 + 2
+    if second_octet >= 168:
+        second_octet += 1
+    third_octet = (idx // 254) % 256
+    fourth_octet = (idx % 254) + 1
+    return f"192.{second_octet}.{third_octet}.{fourth_octet}"
 
 
 def _random_hostname(idx: int) -> str:
