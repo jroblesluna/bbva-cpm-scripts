@@ -726,7 +726,7 @@ class SystemStatusCollector:
         - Contenedor no running → alerta severity "warning"
 
         Umbrales de escalabilidad:
-        - WebSocket total > 4500 → alerta severity "critical"
+        - WebSocket total > 12000 → alerta severity "critical"
         - WebSocket total > 3000 → alerta severity "warning"
         - Memoria Python por workstation > 4 MB/ws → alerta severity "critical"
         - Memoria Python por workstation > 2 MB/ws → alerta severity "warning"
@@ -814,21 +814,21 @@ class SystemStatusCollector:
         # === MÉTRICAS DE ESCALABILIDAD ===
         # Verificar umbrales de las métricas de escalabilidad si están disponibles
         if scalability_metrics is not None:
-            # WebSocket total: > 4500 critical, > 3000 warning
+            # WebSocket total: > 12000 critical, > 8000 warning
             if scalability_metrics.websocket is not None:
                 ws_total = scalability_metrics.websocket.total
-                if ws_total > 4500:
+                if ws_total > 12000:
                     alerts.append(AlertResponse(
                         metric_name="ws_connections",
                         current_value=float(ws_total),
-                        threshold=4500.0,
+                        threshold=12000.0,
                         severity="critical",
                     ))
-                elif ws_total > 3000:
+                elif ws_total > 8000:
                     alerts.append(AlertResponse(
                         metric_name="ws_connections",
                         current_value=float(ws_total),
-                        threshold=3000.0,
+                        threshold=8000.0,
                         severity="warning",
                     ))
 

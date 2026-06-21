@@ -41,8 +41,8 @@ export function evaluateThreshold(
 
 /** Umbral para total de conexiones WebSocket (workstations + operadores) */
 export const WS_TOTAL_THRESHOLD: ThresholdConfig = {
-  greenMax: 3000,
-  yellowMax: 4500,
+  greenMax: 8000,
+  yellowMax: 12000,
 }
 
 /** Umbral para memoria Python promedio por workstation (MB/ws) */
