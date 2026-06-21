@@ -299,6 +299,64 @@ Estos archivos **no están en el repositorio**, existen solo en el servidor Linu
 - **Frontend**: TypeScript, Next.js 15, React 18, Tailwind CSS
 - **Protocolos**: HTTPS/TLS 1.3, REST API, WebSocket (opcional)
 
+## Arquitectura Multi-Worker del Backend (WebSocket Scaling)
+
+**Estado**: ✅ Implementado (Junio 2026)
+
+### Configuración de Despliegue
+
+El backend se ejecuta con **2 uvicorn workers** coordinados vía **Redis pub/sub**:
+
+| Variable | Valor | Propósito |
+|----------|-------|-----------|
+| `UVICORN_WORKERS` | `2` | Distribuye carga de WS entre 2 event loops |
+| `REDIS_URL` | `redis://redis:6379/0` | Coordinación inter-worker (pub/sub + WorkerRegistry) |
+
+Estos valores se fuerzan automáticamente en cada deploy vía `deploy.sh` (no dependen de configuración manual).
+
+### Componentes
+
+| Archivo | Rol |
+|---------|-----|
+| `app/services/websocket_manager.py` | Factory condicional: si REDIS_URL → RedisConnectionManager, else → ConnectionManager |
+| `app/services/redis_connection_manager.py` | Gestión WS multi-worker con pub/sub, WorkerRegistry, fallback graceful |
+| `app/services/worker_registry.py` | Registra qué workstations están en qué worker (Redis SETs con TTL) |
+| `app/core/logging.py` | Structured logging con structlog (worker_id binding) |
+| `app/api/v1/endpoints/health.py` | `/health/detailed` — métricas por worker individual |
+
+### Arquitectura de Canales Redis
+
+```
+worker:{worker_id}     → Mensajes dirigidos a WS del worker + cmd_response
+org:{organization_id}  → Broadcasts a operadores de la org (lazy subscribe)
+global:broadcast       → Broadcasts globales a todos los workers
+```
+
+### Reglas Críticas de Rendimiento
+
+1. **`broadcast_to_organization` solo envía a operadores**, NO a workstations. Las WS no necesitan recibir broadcasts de telemetría/status — esos son para el frontend.
+2. **El listener Redis usa `get_message(timeout=1.0)` blocking**, no polling con sleep. Polling con `timeout=0.001` + sleep saturaba el event loop.
+3. **Registros de WS en WorkerRegistry se batchean** (flush cada 1s), no 1 asyncio.Task por connect.
+4. **Locks (`async with self._lock`) NO se usan en hot paths** — dict reads/writes son atómicas en asyncio (single-threaded per worker). Solo proteger operaciones multi-step con await intermedio.
+5. **`is_workstation_online` retorna True si Redis está activo** — deja que `send_to_workstation` resuelva cross-worker routing.
+
+### Capacidad Probada (Load Test)
+
+| Instancia | Workers | Redis | WS Máximas | Latencia P95 |
+|-----------|---------|-------|-----------|--------------|
+| t3.small (2 GB) | 2 | Sí | ~3,475 | <200ms |
+| t3.small (2 GB) | 1 | No | ~2,000 | Event loop starvation a 2K |
+| c7i-flex.large (4 GB) | 2 | Sí | ~6,000+ (estimado) | <200ms |
+
+### Qué NO Hacer
+
+- **No enviar broadcasts a workstations** desde `broadcast_to_organization` — causa O(n²) con N workstations
+- **No crear un asyncio.Task por cada `connect_workstation`** — batchear operaciones Redis
+- **No usar polling agresivo en el listener** (`timeout=0.001` + sleep) — bloquea registros
+- **No poner locks en lectura de dicts** del hot path (ping loop, broadcast, deliver)
+- **No remover `RegistrationCache`** de los lint guards — fue eliminado por causar pool exhaustion
+- **No cambiar REDIS_URL o UVICORN_WORKERS manualmente** — deploy.sh los restaura
+
 ## Comandos Útiles
 
 ### Sistema de Producción (Lexmark CPM)
