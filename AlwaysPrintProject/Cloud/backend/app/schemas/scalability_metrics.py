@@ -22,11 +22,12 @@ class WebSocketMetricsResponse(BaseModel):
     """
     Métricas de conexiones WebSocket activas.
 
-    Incluye conteo de workstations, operadores y total combinado.
+    Incluye conteo de workstations, operadores, total combinado,
+    stale (registradas en Redis pero sin conexión real) y workers activos.
     """
     workstation_count: int = Field(
         ..., ge=0, le=10000,
-        description="Conteo de conexiones WebSocket de workstations activas"
+        description="Conteo de conexiones WebSocket de workstations activas (real, todos los workers)"
     )
     operator_count: int = Field(
         ..., ge=0, le=1000,
@@ -35,6 +36,14 @@ class WebSocketMetricsResponse(BaseModel):
     total: int = Field(
         ..., ge=0,
         description="Total combinado de conexiones (workstations + operadores)"
+    )
+    stale: int = Field(
+        default=0, ge=0,
+        description="Conexiones registradas en Redis pero sin conexión real (stale)"
+    )
+    workers: int = Field(
+        default=1, ge=1,
+        description="Cantidad de workers uvicorn activos"
     )
     data_available: bool = Field(
         default=True,

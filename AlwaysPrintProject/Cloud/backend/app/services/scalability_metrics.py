@@ -162,7 +162,7 @@ class ScalabilityMetricsCollector:
 
         # Colector de memoria del proceso Python
         try:
-            memory_result = self.collect_python_memory()
+            memory_result = await self.collect_python_memory()
         except Exception as e:
             logger.warning(
                 "Fallo en recolección de métrica de escalabilidad",
@@ -249,11 +249,15 @@ class ScalabilityMetricsCollector:
             workstation_count = counts.get("workstations", 0)
             operator_count = counts.get("operators", 0)
             total = workstation_count + operator_count
+            stale = counts.get("stale", 0)
+            workers = counts.get("workers", 1)
 
             return WebSocketMetricsResponse(
                 workstation_count=workstation_count,
                 operator_count=operator_count,
                 total=total,
+                stale=stale,
+                workers=workers,
                 data_available=True,
             )
 
@@ -273,7 +277,7 @@ class ScalabilityMetricsCollector:
                 data_available=False,
             )
 
-    def collect_python_memory(self) -> Optional[PythonMemoryResponse]:
+    async def collect_python_memory(self) -> Optional[PythonMemoryResponse]:
         """
         Recolecta métricas de memoria del proceso Python.
 
@@ -342,7 +346,11 @@ class ScalabilityMetricsCollector:
             try:
                 from app.services.websocket_manager import connection_manager
 
-                counts = connection_manager.get_connection_count()
+                # Usar conteo global (todos los workers) si está disponible
+                if hasattr(connection_manager, 'get_global_connection_count'):
+                    counts = await connection_manager.get_global_connection_count()
+                else:
+                    counts = connection_manager.get_connection_count()
                 ws_count = counts.get("workstations", 0)
 
                 if ws_count > 0:

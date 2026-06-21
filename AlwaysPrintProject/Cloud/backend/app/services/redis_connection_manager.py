@@ -1484,9 +1484,12 @@ class RedisConnectionManager:
         """
         Obtiene conteo GLOBAL de conexiones (todos los workers combinados).
 
-        Para el worker actual, usa el dict local (fuente de verdad).
-        Para otros workers, consulta WorkerRegistry en Redis (SCARD).
-        Si Redis no está disponible, retorna solo las locales.
+        Reporta:
+        - workstations: conexiones reales (dict local de este worker + SCARD de otros)
+        - workstations_redis: total registrado en Redis (puede incluir stale)
+        - stale: diferencia entre Redis y conexiones reales
+        - operators: conexiones de operadores (solo locales)
+        - workers: cantidad de workers activos
         """
         local_ws = len(self.workstation_connections)
         local_ops = len(self.operator_connections)
@@ -1494,36 +1497,46 @@ class RedisConnectionManager:
         if not self._redis_available or not self._redis:
             return {
                 "workstations": local_ws,
+                "workstations_redis": local_ws,
+                "stale": 0,
                 "operators": local_ops,
                 "workers": 1,
             }
 
         try:
-            # Sumar WS de OTROS workers via Redis
-            total_ws = local_ws  # Empezar con las locales (fuente de verdad)
-            worker_count = 1  # Contar este worker
+            total_ws_real = local_ws  # Este worker: dict local = fuente de verdad
+            total_ws_redis = 0  # Total registrado en Redis (incluye stale)
+            worker_count = 1
 
             async for key in self._redis.scan_iter(match="workers:*:heartbeat"):
-                # Extraer worker_id de "workers:{worker_id}:heartbeat"
                 worker_id = key.split(":")[1]
+                ws_key = f"workers:{worker_id}:workstations"
+                redis_count = await self._redis.scard(ws_key)
+                total_ws_redis += redis_count
 
-                # Saltar nuestro propio worker (ya contamos las locales)
                 if worker_id == self._worker_id:
+                    # Para este worker, usamos dict local (fuente de verdad)
                     continue
 
+                # Para otros workers, asumimos que Redis refleja su estado real
+                # (si su heartbeat está activo, el worker vive y su SET es correcto)
                 worker_count += 1
-                ws_key = f"workers:{worker_id}:workstations"
-                count = await self._redis.scard(ws_key)
-                total_ws += count
+                total_ws_real += redis_count
+
+            stale = max(0, total_ws_redis - total_ws_real)
 
             return {
-                "workstations": total_ws,
+                "workstations": total_ws_real,
+                "workstations_redis": total_ws_redis,
+                "stale": stale,
                 "operators": local_ops,
                 "workers": worker_count,
             }
         except Exception:
             return {
                 "workstations": local_ws,
+                "workstations_redis": local_ws,
+                "stale": 0,
                 "operators": local_ops,
                 "workers": 1,
             }
