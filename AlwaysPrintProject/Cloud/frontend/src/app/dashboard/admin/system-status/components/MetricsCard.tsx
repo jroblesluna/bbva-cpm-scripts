@@ -199,8 +199,6 @@ export default function MetricsCard() {
               </div>
             )}
           </div>
-            t={t}
-          />
 
           {/* Métrica 4: Pool de BD (%) */}
           <div className="rounded-lg border p-4">
