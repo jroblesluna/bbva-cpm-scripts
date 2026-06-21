@@ -1474,8 +1474,54 @@ class RedisConnectionManager:
         return False
 
     def get_connection_count(self) -> dict:
-        """Obtiene conteo de conexiones locales."""
+        """Obtiene conteo de conexiones locales de este worker."""
         return {
             "workstations": len(self.workstation_connections),
             "operators": len(self.operator_connections),
         }
+
+    async def get_global_connection_count(self) -> dict:
+        """
+        Obtiene conteo GLOBAL de conexiones (todos los workers combinados).
+
+        Consulta WorkerRegistry en Redis para sumar las workstations de todos los
+        workers activos. Si Redis no está disponible, retorna solo las locales.
+        """
+        local_ws = len(self.workstation_connections)
+        local_ops = len(self.operator_connections)
+
+        if not self._redis_available or not self._redis:
+            return {
+                "workstations": local_ws,
+                "operators": local_ops,
+                "workers": 1,
+            }
+
+        try:
+            # Buscar todos los heartbeat keys para descubrir workers activos
+            total_ws = 0
+            worker_count = 0
+            async for key in self._redis.scan_iter(match="workers:*:heartbeat"):
+                worker_count += 1
+                # Extraer worker_id de "workers:{worker_id}:heartbeat"
+                worker_id = key.split(":")[1]
+                ws_key = f"workers:{worker_id}:workstations"
+                count = await self._redis.scard(ws_key)
+                total_ws += count
+
+            # Si no encontramos workers en Redis, usar local
+            if worker_count == 0:
+                total_ws = local_ws
+                worker_count = 1
+
+            return {
+                "workstations": total_ws,
+                "operators": local_ops,  # operadores no se trackean en Redis
+                "workers": worker_count,
+            }
+        except Exception:
+            return {
+                "workstations": local_ws,
+                "operators": local_ops,
+                "workers": 1,
+            }

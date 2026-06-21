@@ -148,7 +148,7 @@ class ScalabilityMetricsCollector:
 
         # Colector de conexiones WebSocket
         try:
-            websocket_result = self.collect_websocket_metrics()
+            websocket_result = await self.collect_websocket_metrics()
         except Exception as e:
             logger.warning(
                 "Fallo en recolección de métrica de escalabilidad",
@@ -227,15 +227,12 @@ class ScalabilityMetricsCollector:
             collected_at=datetime.utcnow(),
         )
 
-    def collect_websocket_metrics(self) -> WebSocketMetricsResponse:
+    async def collect_websocket_metrics(self) -> WebSocketMetricsResponse:
         """
         Recolecta métricas de conexiones WebSocket del ConnectionManager singleton.
 
-        Obtiene el conteo de workstations y operadores conectados,
-        calcula el total combinado (workstation_count + operator_count).
-
-        Si el ConnectionManager no está disponible o produce un error,
-        retorna 0 para todos los campos y data_available=False.
+        Con multi-worker + Redis, consulta el conteo GLOBAL (todos los workers)
+        via WorkerRegistry. Sin Redis, retorna solo las conexiones locales.
 
         Returns:
             WebSocketMetricsResponse con conteos de conexiones.
@@ -243,7 +240,12 @@ class ScalabilityMetricsCollector:
         try:
             from app.services.websocket_manager import connection_manager
 
-            counts = connection_manager.get_connection_count()
+            # Usar conteo global si el manager soporta get_global_connection_count (Redis)
+            if hasattr(connection_manager, 'get_global_connection_count'):
+                counts = await connection_manager.get_global_connection_count()
+            else:
+                counts = connection_manager.get_connection_count()
+
             workstation_count = counts.get("workstations", 0)
             operator_count = counts.get("operators", 0)
             total = workstation_count + operator_count
