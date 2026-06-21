@@ -355,23 +355,23 @@ class ScalabilityMetricsCollector:
                 ws_count = counts.get("workstations", 0)
 
                 if ws_count > 0:
-                    # Calcular RSS total de todos los workers
+                    # Sumar overhead solo de workers que tienen WS conectadas
                     detail = counts.get("detail", {})
+                    total_overhead = 0.0
                     if detail:
-                        total_rss = sum(
-                            w.get("rss_mb", 0) if isinstance(w, dict) else 0
-                            for w in detail.values()
-                        )
+                        for wdata in detail.values():
+                            if isinstance(wdata, dict) and wdata.get("ws", 0) > 0:
+                                w_rss = wdata.get("rss_mb", 0)
+                                w_baseline = wdata.get("baseline_mb", 0)
+                                w_overhead = max(0, w_rss - w_baseline)
+                                total_overhead += w_overhead
                     else:
-                        total_rss = rss_mb
+                        # Fallback: usar RSS local del worker
+                        if self._baseline_rss_mb is not None:
+                            total_overhead = max(0, rss_mb - self._baseline_rss_mb)
 
-                    # Restar baselines (baseline × num_workers)
-                    num_workers = counts.get("workers", 1)
-                    baseline_total = (self._baseline_rss_mb or 0) * num_workers
-                    overhead_mb = total_rss - baseline_total
-
-                    if overhead_mb > 0:
-                        avg_per_workstation_mb = round(overhead_mb / ws_count, 2)
+                    if total_overhead > 0:
+                        avg_per_workstation_mb = round(total_overhead / ws_count, 2)
                     else:
                         avg_per_workstation_mb = 0.0
                 else:

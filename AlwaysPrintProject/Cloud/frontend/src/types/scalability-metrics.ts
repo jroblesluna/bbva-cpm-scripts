@@ -24,6 +24,7 @@ export interface WebSocketMetrics {
 export interface WorkerDetail {
   ws: number
   rss_mb: number
+  baseline_mb: number
   fd: number
   pool_out: number
 }

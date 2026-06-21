@@ -161,14 +161,27 @@ export default function MetricsCard() {
             <p className="text-2xl font-bold">
               {metrics?.python_memory?.avg_per_workstation_mb ?? '-'} <span className="text-sm font-normal">{t('memory.unit')}</span>
             </p>
-            {metrics?.websocket?.detail && Object.keys(metrics.websocket.detail).length > 1 && (
+            {metrics?.websocket?.detail && Object.keys(metrics.websocket.detail).length > 0 && (
               <div className="mt-2 pt-2 border-t border-gray-100 space-y-0.5">
                 {Object.entries(metrics.websocket.detail).map(([wid, wdata]) => (
                   <div key={wid} className="flex justify-between text-xs text-muted-foreground">
                     <span className="font-mono">{wid}</span>
-                    <span className="font-mono">{typeof wdata === 'object' ? `${wdata.rss_mb} MB` : '-'}</span>
+                    <span className="font-mono">
+                      {typeof wdata === 'object' ? `${wdata.rss_mb} / ${wdata.baseline_mb}` : '-'} MB
+                    </span>
                   </div>
                 ))}
+                {Object.keys(metrics.websocket.detail).length > 1 && (() => {
+                  const entries = Object.values(metrics.websocket.detail);
+                  const totalRss = entries.reduce((s, w) => s + (typeof w === 'object' ? w.rss_mb : 0), 0);
+                  const totalBaseline = entries.reduce((s, w) => s + (typeof w === 'object' ? w.baseline_mb : 0), 0);
+                  return (
+                    <div className="flex justify-between text-xs font-medium pt-1 border-t border-gray-50">
+                      <span>Memory / Baseline</span>
+                      <span className="font-mono">{totalRss.toFixed(1)} / {totalBaseline.toFixed(1)} MB</span>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>

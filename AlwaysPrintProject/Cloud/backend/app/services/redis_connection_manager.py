@@ -1060,10 +1060,12 @@ class RedisConnectionManager:
                     rss_mb = self._get_rss_mb()
                     fd_count = self._get_fd_count()
                     pool_checked_out = self._get_pool_checked_out()
+                    baseline_mb = self._get_baseline_mb()
 
                     metrics_json = json.dumps({
                         "ws": ws_count,
                         "rss_mb": rss_mb,
+                        "baseline_mb": baseline_mb,
                         "fd": fd_count,
                         "pool_out": pool_checked_out,
                     })
@@ -1114,6 +1116,14 @@ class RedisConnectionManager:
             return engine.pool.checkedout()
         except Exception:
             return 0
+
+    def _get_baseline_mb(self) -> float:
+        """Obtiene el baseline RSS capturado al inicio por scalability_collector."""
+        try:
+            from app.services.scalability_metrics import scalability_collector
+            return scalability_collector._baseline_rss_mb or 0.0
+        except Exception:
+            return 0.0
 
     # =========================================================================
     # COMMAND WAITERS (request-response sobre WebSocket + Redis)
@@ -1550,7 +1560,7 @@ class RedisConnectionManager:
         local_fd = self._get_fd_count()
         local_pool = self._get_pool_checked_out()
 
-        local_metrics = {"ws": local_ws, "rss_mb": local_rss, "fd": local_fd, "pool_out": local_pool}
+        local_metrics = {"ws": local_ws, "rss_mb": local_rss, "baseline_mb": self._get_baseline_mb(), "fd": local_fd, "pool_out": local_pool}
 
         if not self._redis_available or not self._redis:
             return {
