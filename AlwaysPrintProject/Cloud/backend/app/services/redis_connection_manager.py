@@ -1484,8 +1484,9 @@ class RedisConnectionManager:
         """
         Obtiene conteo GLOBAL de conexiones (todos los workers combinados).
 
-        Consulta WorkerRegistry en Redis para sumar las workstations de todos los
-        workers activos. Si Redis no está disponible, retorna solo las locales.
+        Para el worker actual, usa el dict local (fuente de verdad).
+        Para otros workers, consulta WorkerRegistry en Redis (SCARD).
+        Si Redis no está disponible, retorna solo las locales.
         """
         local_ws = len(self.workstation_connections)
         local_ops = len(self.operator_connections)
@@ -1498,25 +1499,26 @@ class RedisConnectionManager:
             }
 
         try:
-            # Buscar todos los heartbeat keys para descubrir workers activos
-            total_ws = 0
-            worker_count = 0
+            # Sumar WS de OTROS workers via Redis
+            total_ws = local_ws  # Empezar con las locales (fuente de verdad)
+            worker_count = 1  # Contar este worker
+
             async for key in self._redis.scan_iter(match="workers:*:heartbeat"):
-                worker_count += 1
                 # Extraer worker_id de "workers:{worker_id}:heartbeat"
                 worker_id = key.split(":")[1]
+
+                # Saltar nuestro propio worker (ya contamos las locales)
+                if worker_id == self._worker_id:
+                    continue
+
+                worker_count += 1
                 ws_key = f"workers:{worker_id}:workstations"
                 count = await self._redis.scard(ws_key)
                 total_ws += count
 
-            # Si no encontramos workers en Redis, usar local
-            if worker_count == 0:
-                total_ws = local_ws
-                worker_count = 1
-
             return {
                 "workstations": total_ws,
-                "operators": local_ops,  # operadores no se trackean en Redis
+                "operators": local_ops,
                 "workers": worker_count,
             }
         except Exception:
