@@ -1055,17 +1055,65 @@ class RedisConnectionManager:
                 await asyncio.sleep(interval)
                 if self._worker_registry and self._redis_available:
                     await self._worker_registry.heartbeat()
-                    # Publicar conteo local de WS para que get_global_connection_count
-                    # tenga datos frescos sin importar qué worker responda la request
+                    # Publicar métricas del worker para consolidación global
+                    ws_count = len(self.workstation_connections)
+                    rss_mb = self._get_rss_mb()
+                    fd_count = self._get_fd_count()
+                    pool_checked_out = self._get_pool_checked_out()
+
+                    metrics_json = json.dumps({
+                        "ws": ws_count,
+                        "rss_mb": rss_mb,
+                        "fd": fd_count,
+                        "pool_out": pool_checked_out,
+                    })
                     await self._redis.set(
-                        f"workers:{self._worker_id}:ws_count",
-                        str(len(self.workstation_connections)),
+                        f"workers:{self._worker_id}:metrics",
+                        metrics_json,
                         ex=90,
                     )
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.warning("worker.heartbeat_error", error=str(e))
+
+    def _get_rss_mb(self) -> float:
+        """Obtiene RSS del proceso actual en MB."""
+        try:
+            import resource
+            import platform
+            usage = resource.getrusage(resource.RUSAGE_SELF)
+            if platform.system() == "Darwin":
+                return round(usage.ru_maxrss / (1024 * 1024), 1)
+            return round(usage.ru_maxrss / 1024, 1)
+        except Exception:
+            try:
+                with open("/proc/self/status", "r") as f:
+                    for line in f:
+                        if line.startswith("VmRSS:"):
+                            return round(int(line.split()[1]) / 1024, 1)
+            except Exception:
+                pass
+        return 0.0
+
+    def _get_fd_count(self) -> int:
+        """Obtiene número de file descriptors abiertos."""
+        try:
+            import os
+            return len(os.listdir(f"/proc/{os.getpid()}/fd"))
+        except Exception:
+            return 0
+
+    def _get_pool_checked_out(self) -> int:
+        """Obtiene conexiones de BD checked out del pool."""
+        try:
+            from app.core.database import engine
+            from app.core.config import settings as cfg
+            if cfg.is_sqlite:
+                return 0
+            return engine.pool.checkedout()
+        except Exception:
+            return 0
 
     # =========================================================================
     # COMMAND WAITERS (request-response sobre WebSocket + Redis)
@@ -1489,16 +1537,20 @@ class RedisConnectionManager:
 
     async def get_global_connection_count(self) -> dict:
         """
-        Obtiene conteo EXACTO de conexiones WebSocket de TODOS los workers.
+        Obtiene métricas EXACTAS de TODOS los workers para consolidación.
 
-        Cada worker escribe periódicamente su conteo en Redis:
-          workers:{worker_id}:ws_count → integer (actualizado cada heartbeat)
-        Este método suma los conteos de todos los workers activos.
-        Para el worker actual, usa el dict local (siempre fresco).
+        Cada worker publica sus métricas en workers:{id}:metrics (JSON con ws, rss_mb, fd, pool_out).
+        Este método lee las métricas de todos los workers activos y las consolida.
+        Para el worker actual, usa valores en vivo (dict local + process info).
         """
         local_ws = len(self.workstation_connections)
         local_ops = len(self.operator_connections)
         worker_id = self._worker_id
+        local_rss = self._get_rss_mb()
+        local_fd = self._get_fd_count()
+        local_pool = self._get_pool_checked_out()
+
+        local_metrics = {"ws": local_ws, "rss_mb": local_rss, "fd": local_fd, "pool_out": local_pool}
 
         if not self._redis_available or not self._redis:
             return {
@@ -1506,18 +1558,18 @@ class RedisConnectionManager:
                 "operators": local_ops,
                 "workers": 1,
                 "worker_id": worker_id,
-                "detail": {worker_id: local_ws},
+                "detail": {worker_id: local_metrics},
             }
 
         try:
-            # Actualizar nuestro conteo en Redis (para que otros lo lean)
+            # Actualizar nuestras métricas en Redis
             await self._redis.set(
-                f"workers:{worker_id}:ws_count",
-                str(local_ws),
-                ex=90,  # Expira si el worker muere (TTL > heartbeat interval)
+                f"workers:{worker_id}:metrics",
+                json.dumps(local_metrics),
+                ex=90,
             )
 
-            # Leer conteos de TODOS los workers activos
+            # Leer métricas de TODOS los workers activos
             total_ws = 0
             worker_count = 0
             detail: dict = {}
@@ -1527,20 +1579,21 @@ class RedisConnectionManager:
                 worker_count += 1
 
                 if wid == worker_id:
-                    # Para este worker, usar dict local (fuente de verdad)
-                    detail[wid] = local_ws
+                    detail[wid] = local_metrics
                     total_ws += local_ws
                 else:
-                    # Para otros workers, leer su ws_count publicado
-                    count_str = await self._redis.get(f"workers:{wid}:ws_count")
-                    count = int(count_str) if count_str else 0
-                    detail[wid] = count
-                    total_ws += count
+                    metrics_str = await self._redis.get(f"workers:{wid}:metrics")
+                    if metrics_str:
+                        wmetrics = json.loads(metrics_str)
+                        detail[wid] = wmetrics
+                        total_ws += wmetrics.get("ws", 0)
+                    else:
+                        detail[wid] = {"ws": 0, "rss_mb": 0, "fd": 0, "pool_out": 0}
 
             if worker_count == 0:
                 worker_count = 1
                 total_ws = local_ws
-                detail = {worker_id: local_ws}
+                detail = {worker_id: local_metrics}
 
             return {
                 "workstations": total_ws,
@@ -1555,5 +1608,5 @@ class RedisConnectionManager:
                 "operators": local_ops,
                 "workers": 1,
                 "worker_id": worker_id,
-                "detail": {worker_id: local_ws},
+                "detail": {worker_id: local_metrics},
             }

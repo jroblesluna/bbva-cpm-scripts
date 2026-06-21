@@ -136,10 +136,10 @@ export default function MetricsCard() {
             {/* Desglose por worker */}
             {metrics?.websocket?.detail && Object.keys(metrics.websocket.detail).length > 0 && (
               <div className="mt-2 pt-2 border-t border-gray-100 space-y-0.5">
-                {Object.entries(metrics.websocket.detail).map(([wid, count]) => (
+                {Object.entries(metrics.websocket.detail).map(([wid, wdata]) => (
                   <div key={wid} className="flex justify-between text-xs text-muted-foreground">
                     <span className="font-mono">{wid}</span>
-                    <span className="font-mono">{count}</span>
+                    <span className="font-mono">{typeof wdata === 'object' ? wdata.ws : wdata}</span>
                   </div>
                 ))}
                 {(metrics.websocket.workers ?? 0) > 1 && (
@@ -152,46 +152,82 @@ export default function MetricsCard() {
             )}
           </div>
 
-          {/* Métrica 2: Memoria Python por workstation */}
-          <MetricItem
-            label={t('memory.perWorkstation')}
-            value={metrics?.python_memory?.avg_per_workstation_mb ?? null}
-            unit={t('memory.unit')}
-            thresholdColor={
-              // Solo aplicar umbral si hay al menos 10 ws (con pocas, el promedio no es representativo)
-              (metrics?.websocket?.total ?? 0) >= 10
-                ? evaluateThreshold(
-                    metrics?.python_memory?.avg_per_workstation_mb ?? null,
-                    MEMORY_PER_WS_THRESHOLD
-                  )
-                : null
-            }
-            t={t}
-          />
+          {/* Métrica 2: Memoria RSS por worker */}
+          <div className="rounded-lg border p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="h-2 w-2 rounded-full bg-green-500" />
+              <span className="text-sm text-muted-foreground">{t('memory.perWorkstation')}</span>
+            </div>
+            <p className="text-2xl font-bold">
+              {metrics?.python_memory?.avg_per_workstation_mb ?? '-'} <span className="text-sm font-normal">{t('memory.unit')}</span>
+            </p>
+            {metrics?.websocket?.detail && Object.keys(metrics.websocket.detail).length > 1 && (
+              <div className="mt-2 pt-2 border-t border-gray-100 space-y-0.5">
+                {Object.entries(metrics.websocket.detail).map(([wid, wdata]) => (
+                  <div key={wid} className="flex justify-between text-xs text-muted-foreground">
+                    <span className="font-mono">{wid}</span>
+                    <span className="font-mono">{typeof wdata === 'object' ? `${wdata.rss_mb} MB` : '-'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Métrica 3: File Descriptors (%) */}
-          <MetricItem
-            label={t('fileDescriptors.usage')}
-            value={metrics?.file_descriptors?.usage_percent ?? null}
-            unit="%"
-            thresholdColor={evaluateThreshold(
-              metrics?.file_descriptors?.usage_percent ?? null,
-              FD_USAGE_THRESHOLD
+          <div className="rounded-lg border p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`h-2 w-2 rounded-full ${
+                evaluateThreshold(metrics?.file_descriptors?.usage_percent ?? null, FD_USAGE_THRESHOLD) === 'red'
+                  ? 'bg-red-500'
+                  : evaluateThreshold(metrics?.file_descriptors?.usage_percent ?? null, FD_USAGE_THRESHOLD) === 'yellow'
+                  ? 'bg-yellow-500'
+                  : 'bg-green-500'
+              }`} />
+              <span className="text-sm text-muted-foreground">{t('fileDescriptors.usage')}</span>
+            </div>
+            <p className="text-2xl font-bold">
+              {metrics?.file_descriptors?.usage_percent ?? '-'} <span className="text-sm font-normal">%</span>
+            </p>
+            {metrics?.websocket?.detail && Object.keys(metrics.websocket.detail).length > 1 && (
+              <div className="mt-2 pt-2 border-t border-gray-100 space-y-0.5">
+                {Object.entries(metrics.websocket.detail).map(([wid, wdata]) => (
+                  <div key={wid} className="flex justify-between text-xs text-muted-foreground">
+                    <span className="font-mono">{wid}</span>
+                    <span className="font-mono">{typeof wdata === 'object' ? wdata.fd : '-'} FDs</span>
+                  </div>
+                ))}
+              </div>
             )}
+          </div>
             t={t}
           />
 
           {/* Métrica 4: Pool de BD (%) */}
-          <MetricItem
-            label={t('dbPool.usage')}
-            value={metrics?.db_pool?.usage_percent ?? null}
-            unit="%"
-            thresholdColor={evaluateThreshold(
-              metrics?.db_pool?.usage_percent ?? null,
-              DB_POOL_USAGE_THRESHOLD
+          <div className="rounded-lg border p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`h-2 w-2 rounded-full ${
+                evaluateThreshold(metrics?.db_pool?.usage_percent ?? null, DB_POOL_USAGE_THRESHOLD) === 'red'
+                  ? 'bg-red-500'
+                  : evaluateThreshold(metrics?.db_pool?.usage_percent ?? null, DB_POOL_USAGE_THRESHOLD) === 'yellow'
+                  ? 'bg-yellow-500'
+                  : 'bg-green-500'
+              }`} />
+              <span className="text-sm text-muted-foreground">{t('dbPool.usage')}</span>
+            </div>
+            <p className="text-2xl font-bold">
+              {metrics?.db_pool?.usage_percent ?? '-'} <span className="text-sm font-normal">%</span>
+            </p>
+            {metrics?.websocket?.detail && Object.keys(metrics.websocket.detail).length > 1 && (
+              <div className="mt-2 pt-2 border-t border-gray-100 space-y-0.5">
+                {Object.entries(metrics.websocket.detail).map(([wid, wdata]) => (
+                  <div key={wid} className="flex justify-between text-xs text-muted-foreground">
+                    <span className="font-mono">{wid}</span>
+                    <span className="font-mono">{typeof wdata === 'object' ? wdata.pool_out : '-'} out</span>
+                  </div>
+                ))}
+              </div>
             )}
-            t={t}
-          />
+          </div>
 
           {/* Métrica 5: Tasa de transmisión de red (MB/s) */}
           <MetricItem

@@ -16,8 +16,16 @@ export interface WebSocketMetrics {
   operator_count: number
   total: number
   workers: number
-  detail: Record<string, number>
+  detail: Record<string, WorkerDetail>
   data_available: boolean
+}
+
+/** Detalle de métricas de un worker individual */
+export interface WorkerDetail {
+  ws: number
+  rss_mb: number
+  fd: number
+  pool_out: number
 }
 
 // === MÉTRICAS DE MEMORIA DEL PROCESO PYTHON ===
