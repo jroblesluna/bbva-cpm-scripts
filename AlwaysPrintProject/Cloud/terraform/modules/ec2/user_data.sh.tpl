@@ -22,13 +22,13 @@ echo "fs.file-max = 65535" >> /etc/sysctl.conf
 sysctl -p
 
 # Tuning TCP — permite mayor backlog de conexiones bajo carga (load tests +1000 ws/s)
-# tcp_max_syn_backlog: cola de conexiones SYN pendientes (default 128 satura rápido)
-# somaxconn: tamaño de la cola listen() del socket (default 4096 ya es alto)
+# tcp_max_syn_backlog: cola de conexiones SYN pendientes (65535 para 8000+ WS)
+# somaxconn: tamaño de la cola listen() del socket (65535 para alto throughput)
 # netdev_max_backlog: paquetes pendientes en la NIC antes de procesarlos
 cat > /etc/sysctl.d/99-alwaysprint-tcp.conf <<'TCPCONF'
-net.ipv4.tcp_max_syn_backlog = 4096
-net.core.somaxconn = 4096
-net.core.netdev_max_backlog = 4096
+net.ipv4.tcp_max_syn_backlog = 65535
+net.core.somaxconn = 65535
+net.core.netdev_max_backlog = 65535
 TCPCONF
 sysctl -p /etc/sysctl.d/99-alwaysprint-tcp.conf
 
@@ -128,13 +128,13 @@ COMPOSE
 # ── Nginx global config (soporte para +8000 WebSockets simultáneos) ──
 cat > /etc/nginx/nginx.conf <<'NGINXGLOBAL'
 worker_processes auto;
-worker_rlimit_nofile 16384;
+worker_rlimit_nofile 65536;
 
 error_log /var/log/nginx/error.log;
 pid /run/nginx.pid;
 
 events {
-    worker_connections 8192;
+    worker_connections 32768;
     multi_accept on;
 }
 
