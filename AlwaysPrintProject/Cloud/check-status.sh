@@ -909,7 +909,68 @@ else
 fi
 
 # =============================================================================
-# 7. ESTADÍSTICAS DE LA INSTANCIA
+# 7. VALIDACIÓN DE TUNING (Nginx + Kernel + Workers)
+# =============================================================================
+print_header "7. VALIDACIÓN DE TUNING INFRA"
+
+if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
+    echo -e "  ${CYAN}Verificando configuración de Nginx y Kernel...${NC}"
+    
+    TUNING=$(ssm_exec "$INSTANCE_ID" '["echo WORKER_CONN=$(grep worker_connections /etc/nginx/nginx.conf | tr -d \" ;\"); echo RLIMIT=$(grep worker_rlimit_nofile /etc/nginx/nginx.conf | tr -d \";\"); echo SOMAXCONN=$(cat /proc/sys/net/core/somaxconn); echo TCP_BACKLOG=$(cat /proc/sys/net/ipv4/tcp_max_syn_backlog); echo NETDEV_BACKLOG=$(cat /proc/sys/net/core/netdev_max_backlog)"]' 10)
+    
+    if [ -n "$TUNING" ]; then
+        # Valores esperados (deben coincidir con user_data.sh.tpl)
+        EXPECTED_WORKER_CONN="32768"
+        EXPECTED_RLIMIT="65536"
+        EXPECTED_SOMAXCONN="65535"
+        EXPECTED_TCP_BACKLOG="65535"
+        EXPECTED_NETDEV="65535"
+        
+        # Parsear valores actuales
+        ACTUAL_WORKER_CONN=$(echo "$TUNING" | grep "^WORKER_CONN=" | sed 's/.*worker_connections//' | tr -d ' ')
+        ACTUAL_RLIMIT=$(echo "$TUNING" | grep "^RLIMIT=" | sed 's/.*worker_rlimit_nofile//' | tr -d ' ')
+        ACTUAL_SOMAXCONN=$(echo "$TUNING" | grep "^SOMAXCONN=" | cut -d= -f2)
+        ACTUAL_TCP_BACKLOG=$(echo "$TUNING" | grep "^TCP_BACKLOG=" | cut -d= -f2)
+        ACTUAL_NETDEV=$(echo "$TUNING" | grep "^NETDEV_BACKLOG=" | cut -d= -f2)
+        
+        echo -e "\n  ${BLUE}Nginx:${NC}"
+        if [ "$ACTUAL_WORKER_CONN" = "$EXPECTED_WORKER_CONN" ]; then
+            check_ok "worker_connections = $ACTUAL_WORKER_CONN"
+        else
+            check_fail "worker_connections = $ACTUAL_WORKER_CONN (esperado: $EXPECTED_WORKER_CONN)"
+        fi
+        
+        if [ "$ACTUAL_RLIMIT" = "$EXPECTED_RLIMIT" ]; then
+            check_ok "worker_rlimit_nofile = $ACTUAL_RLIMIT"
+        else
+            check_fail "worker_rlimit_nofile = $ACTUAL_RLIMIT (esperado: $EXPECTED_RLIMIT)"
+        fi
+        
+        echo -e "\n  ${BLUE}Kernel TCP:${NC}"
+        if [ "$ACTUAL_SOMAXCONN" = "$EXPECTED_SOMAXCONN" ]; then
+            check_ok "net.core.somaxconn = $ACTUAL_SOMAXCONN"
+        else
+            check_fail "net.core.somaxconn = $ACTUAL_SOMAXCONN (esperado: $EXPECTED_SOMAXCONN)"
+        fi
+        
+        if [ "$ACTUAL_TCP_BACKLOG" = "$EXPECTED_TCP_BACKLOG" ]; then
+            check_ok "net.ipv4.tcp_max_syn_backlog = $ACTUAL_TCP_BACKLOG"
+        else
+            check_fail "net.ipv4.tcp_max_syn_backlog = $ACTUAL_TCP_BACKLOG (esperado: $EXPECTED_TCP_BACKLOG)"
+        fi
+        
+        if [ "$ACTUAL_NETDEV" = "$EXPECTED_NETDEV" ]; then
+            check_ok "net.core.netdev_max_backlog = $ACTUAL_NETDEV"
+        else
+            check_fail "net.core.netdev_max_backlog = $ACTUAL_NETDEV (esperado: $EXPECTED_NETDEV)"
+        fi
+    else
+        check_warn "No se pudo obtener configuración de tuning"
+    fi
+fi
+
+# =============================================================================
+# 8. ESTADÍSTICAS DE LA INSTANCIA
 # =============================================================================
 print_header "7. ESTADÍSTICAS DE LA INSTANCIA"
 
@@ -966,9 +1027,9 @@ else
 fi
 
 # =============================================================================
-# 8. ERRORES RECIENTES
+# 9. ERRORES RECIENTES
 # =============================================================================
-print_header "8. ERRORES RECIENTES"
+print_header "9. ERRORES RECIENTES"
 
 if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
     LOGS=$(ssm_exec "$INSTANCE_ID" '["echo \"=== BACKEND ===\"; docker logs alwaysprint-backend-1 --tail 50 2>&1 | grep -i \"error\\|traceback\\|critical\" | grep -v \"favicon\\|_next/static\" | tail -5 || echo \"Sin errores\"; echo; echo \"=== FRONTEND ===\"; docker logs alwaysprint-frontend-1 --tail 50 2>&1 | grep -i \"error\" | grep -v \"favicon\\|_next/static\\|chunk\" | cut -c1-200 | tail -3 || echo \"Sin errores\""]' 8)
