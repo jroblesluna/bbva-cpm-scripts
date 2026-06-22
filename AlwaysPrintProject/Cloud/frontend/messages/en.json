@@ -853,7 +853,9 @@
     "createdAt": "Created At",
     "updatedAt": "Last Updated",
     "pagination": "Showing {start} to {end} of {total} devices",
-    "pageNumber": "Page {page}"
+    "pageNumber": "Page {page}",
+    "searchVlanPlaceholder": "Search VLANs...",
+    "searchVlanBtn": "Search VLAN"
   },
   "orgEdit": {
     "title": "Edit: {name}",

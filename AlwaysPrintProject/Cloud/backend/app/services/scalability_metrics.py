@@ -17,8 +17,14 @@ comportamiento aceptable — retorna null la primera vez).
 import asyncio
 import logging
 import os
-import resource
+import platform
 import time
+
+# 'resource' solo está disponible en Linux/Unix
+if platform.system() != "Windows":
+    import resource
+else:
+    resource = None  # type: ignore
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
@@ -467,9 +473,13 @@ class ScalabilityMetricsCollector:
 
         Returns:
             FileDescriptorResponse con open_count, limit y usage_percent,
-            o None si /proc/self/fd no es accesible.
+            o None si /proc/self/fd no es accesible (Windows, etc.).
         """
         try:
+            # En Windows /proc no existe y resource no está disponible
+            if resource is None:
+                return None
+
             # Contar entradas en /proc/self/fd para obtener open_count
             open_count = len(os.listdir("/proc/self/fd"))
 

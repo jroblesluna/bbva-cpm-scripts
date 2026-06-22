@@ -4,7 +4,7 @@
 
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -31,6 +31,7 @@ import type { Device, DeviceCreate, DeviceUpdate } from '@/types/device'
 import type { VLAN } from '@/types/vlan'
 import { formatDateWithTimezone } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select'
 
 export default function DevicesPage() {
   const { user } = useAuth()
@@ -39,7 +40,6 @@ export default function DevicesPage() {
   const tCommon = useTranslations('common')
   const [devices, setDevices] = useState<Device[]>([])
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
-  const [vlans, setVlans] = useState<VLAN[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterOrgId, setFilterOrgId] = useState<string | undefined>(undefined)
@@ -65,11 +65,6 @@ export default function DevicesPage() {
     loadDevices(silent)
   }, [user, filterOrgId, filterVlanId, filterActive])
 
-  useEffect(() => {
-    if (!user) return
-    loadVlans()
-  }, [user, filterOrgId])
-
   const loadAccounts = async () => {
     try {
       const response = await apiClient.get('/organizations/?skip=0&limit=1000')
@@ -79,15 +74,29 @@ export default function DevicesPage() {
     }
   }
 
-  const loadVlans = async () => {
+  const loadVlanOptions = useCallback(async (params: { search: string; skip: number; limit: number }): Promise<{ options: SearchableSelectOption[]; total: number }> => {
     try {
-      const params = filterOrgId ? `?organization_id=${filterOrgId}` : ''
-      const response = await apiClient.get(`/vlans/${params}`)
-      setVlans(response.data.vlans || [])
+      const queryParams: Record<string, string> = {}
+      if (filterOrgId) queryParams.organization_id = filterOrgId
+      if (params.search) queryParams.search = params.search
+      if (params.limit > 0) {
+        queryParams.skip = String(params.skip)
+        queryParams.limit = String(params.limit)
+      }
+      const queryString = new URLSearchParams(queryParams).toString()
+      const url = queryString ? `/vlans/?${queryString}` : '/vlans/'
+      const response = await apiClient.get(url)
+      const vlans: VLAN[] = response.data.vlans || []
+      const total: number = response.data.total || 0
+      return {
+        options: vlans.map((v) => ({ value: v.id, label: v.name })),
+        total,
+      }
     } catch (error) {
       console.error('Error cargando VLANs:', error)
+      return { options: [], total: 0 }
     }
-  }
+  }, [filterOrgId])
 
   const loadDevices = async (silent = false) => {
     try {
@@ -257,16 +266,18 @@ export default function DevicesPage() {
               ))}
             </select>
           )}
-          <select
-            value={filterVlanId || 'all'}
-            onChange={(e) => setFilterVlanId(e.target.value === 'all' ? undefined : e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">{t('allVlans')}</option>
-            {vlans.map((vlan) => (
-              <option key={vlan.id} value={vlan.id}>{vlan.name}</option>
-            ))}
-          </select>
+          <SearchableSelect
+            value={filterVlanId}
+            onChange={(val) => setFilterVlanId(val)}
+            placeholder={t('allVlans')}
+            loadOptions={loadVlanOptions}
+            searchPlaceholder={t('searchVlanPlaceholder')}
+            searchButtonTitle={t('searchVlanBtn')}
+            prevLabel={tCommon('previous')}
+            nextLabel={tCommon('next')}
+            pageSize={5}
+            className="w-full"
+          />
           <select
             value={filterActive}
             onChange={(e) => setFilterActive(e.target.value)}

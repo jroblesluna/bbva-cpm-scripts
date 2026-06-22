@@ -40,17 +40,23 @@ router = APIRouter()
 @router.get("/", response_model=VLANListResponse)
 def list_vlans(
     organization_id: Optional[str] = Query(None, description="Filtrar por ID de organización (solo Admin)"),
+    search: Optional[str] = Query(None, description="Buscar por nombre de VLAN"),
+    skip: int = Query(0, ge=0, description="Número de registros a saltar (paginación)"),
+    limit: int = Query(0, ge=0, description="Número máximo de registros a retornar (0 = sin límite)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Listar VLANs.
+    Listar VLANs con soporte de paginación y búsqueda.
     
     - Admin: puede ver todas las VLANs o filtrar por organization_id
     - Operador: solo puede ver VLANs de su cuenta
     
     Args:
         organization_id: ID de organización para filtrar (opcional, solo Admin)
+        search: Término de búsqueda por nombre (opcional)
+        skip: Offset para paginación (default: 0)
+        limit: Límite de resultados (default: 0 = sin límite, para compatibilidad)
         current_user: Usuario autenticado
         db: Sesión de base de datos
     
@@ -71,7 +77,21 @@ def list_vlans(
         query = query.filter(VLAN.organization_id == organization_id)
     # Si es Admin sin filtro, ve todas las VLANs
     
-    vlans = query.order_by(VLAN.name).all()
+    # Filtro de búsqueda por nombre
+    if search:
+        query = query.filter(VLAN.name.ilike(f"%{search}%"))
+    
+    # Contar total antes de paginar
+    total_count = query.count()
+    
+    # Ordenar
+    query = query.order_by(VLAN.name)
+    
+    # Aplicar paginación solo si limit > 0
+    if limit > 0:
+        query = query.offset(skip).limit(limit)
+    
+    vlans = query.all()
     
     # Calcular estadísticas
     from app.models.device import Device
@@ -104,7 +124,7 @@ def list_vlans(
         in_contingency=in_contingency,
     )
     
-    return VLANListResponse(total=len(vlans), vlans=vlans, stats=stats)
+    return VLANListResponse(total=total_count, vlans=vlans, stats=stats)
 
 
 @router.post("/", response_model=VLANResponse, status_code=status.HTTP_201_CREATED)
