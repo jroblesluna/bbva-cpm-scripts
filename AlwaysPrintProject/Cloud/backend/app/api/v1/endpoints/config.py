@@ -425,10 +425,17 @@ def get_maps_key(
     # Determinar la organización a consultar
     if current_user.role == UserRole.ADMIN:
         if not organization_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="organization_id requerido para administradores"
-            )
+            # Sin organization_id: buscar la primera org con API key configurada
+            org_with_key = db.query(Organization).filter(
+                Organization.google_maps_api_key.isnot(None),
+                Organization.google_maps_api_key != '',
+            ).first()
+            if not org_with_key:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="API Key de Google Maps no configurada en ninguna organización"
+                )
+            return {"api_key": org_with_key.google_maps_api_key}
         target_organization_id = organization_id
     else:
         # Operador: usar su organización asignada
