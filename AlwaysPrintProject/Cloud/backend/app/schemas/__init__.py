@@ -54,6 +54,7 @@ from app.schemas.vlan import (
     VLANResponse,
     VLANDetailResponse,
     VLANListResponse,
+    VLANGeoResponse,
 )
 
 # === CONFIG SCHEMAS ===
@@ -231,6 +232,7 @@ __all__ = [
     "VLANResponse",
     "VLANDetailResponse",
     "VLANListResponse",
+    "VLANGeoResponse",
     # Config
     "ConnectivityCheckItem",
     "GlobalConfigUpdate",

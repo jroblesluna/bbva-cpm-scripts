@@ -18,6 +18,7 @@ export interface Organization {
   jitter_window_seconds: number
   llm_model_id?: string | null
   openai_api_key?: string | null
+  google_maps_api_key?: string | null
   created_at: string
   updated_at: string
   public_ips?: PublicIP[]
@@ -50,6 +51,7 @@ export interface OrganizationUpdate {
   jitter_window_seconds?: number
   llm_model_id?: string | null
   openai_api_key?: string | null
+  google_maps_api_key?: string | null
 }
 
 export interface PublicIPCreate {

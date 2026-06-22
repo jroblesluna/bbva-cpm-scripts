@@ -73,7 +73,8 @@
     "subResources": "Recursos",
     "groupMonitoring": "Monitoreo / Operaciones",
     "groupSystem": "Sistema",
-    "documentation": "Documentación"
+    "documentation": "Documentación",
+    "map": "Mapa"
   },
   "login": {
     "title": "AlwaysPrint Cloud Manager",
@@ -321,6 +322,8 @@
     "defaultDeviceNoDevices": "No hay dispositivos activos en esta VLAN",
     "actionConfigTitle": "Acciones Administrativas",
     "actionConfigDesc": "Configuración de acciones específica para esta VLAN",
+    "geoSectionTitle": "Ubicación geográfica",
+    "geoSectionDesc": "Dirección y coordenadas de la agencia asociada a esta VLAN",
     "metadataLabel": "Metadatos de la VLAN",
     "metadataHelper": "Pares clave-valor disponibles para las workstations (ej: remote_queue_path)",
     "metadataKeyPlaceholder": "Clave (ej: remote_queue_path)",
@@ -901,7 +904,9 @@
     "jitterWindowSaveSuccess": "Ventana de jitter actualizada correctamente",
     "jitterWindowSaveError": "Error al actualizar la ventana de jitter",
     "jitterWindowCalculation": "Con {window} segundos de ventana y {count} workstations activas, aproximadamente {rate} conexiones por segundo durante eventos masivos",
-    "jitterWindowNoWorkstations": "No hay workstations activas para calcular la tasa de conexiones"
+    "jitterWindowNoWorkstations": "No hay workstations activas para calcular la tasa de conexiones",
+    "googleMapsApiKey": "API Key de Google Maps",
+    "googleMapsApiKeyHelper": "Requerida para geolocalización de VLANs. Obtenga su key en"
   },
   "systemStatus": {
     "title": "Estado del Sistema",
@@ -1116,5 +1121,27 @@
       "error": "Error al cargar las métricas",
       "unavailable": "No disponible"
     }
+  },
+  "map": {
+    "loading": "Cargando Google Maps...",
+    "loadError": "Error al cargar Google Maps",
+    "title": "Mapa de VLANs",
+    "subtitle": "Distribución geográfica de agencias",
+    "filterAll": "Todas las organizaciones",
+    "filterOrg": "Filtrar por organización",
+    "noApiKey": "API Key no configurada",
+    "noApiKeyDesc": "Configure su API Key de Google Maps en la configuración de la organización para habilitar el mapa.",
+    "noLocations": "Sin ubicaciones",
+    "noLocationsDesc": "No hay VLANs con ubicación configurada. Edite una VLAN para agregar su dirección.",
+    "wsTotal": "Total",
+    "wsOnline": "En línea",
+    "wsOffline": "Fuera de línea",
+    "wsContingency": "Contingencia",
+    "addressLabel": "Dirección",
+    "addressPlaceholder": "Buscar dirección...",
+    "imageLabel": "URL de imagen",
+    "imagePlaceholder": "https://ejemplo.com/foto-agencia.jpg",
+    "miniMapToggle": "Mostrar mapa",
+    "configureKey": "Configurar API Key"
   }
 }

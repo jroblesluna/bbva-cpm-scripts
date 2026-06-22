@@ -12,6 +12,11 @@ export interface VLAN {
   contingency_inherited: boolean | null
   default_device_id: string | null
   metadata: Record<string, string> | null
+  address: string | null
+  latitude: number | null
+  longitude: number | null
+  place_id: string | null
+  location_image_url: string | null
   created_at: string
   updated_at: string
 }
@@ -32,6 +37,11 @@ export interface VLANUpdate {
   description?: string | null
   cidr_ranges?: string[]
   metadata?: Record<string, string> | null
+  address?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  place_id?: string | null
+  location_image_url?: string | null
 }
 
 export interface VLANListResponse {

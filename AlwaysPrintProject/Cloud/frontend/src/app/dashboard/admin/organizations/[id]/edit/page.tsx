@@ -69,6 +69,7 @@ export default function EditOrganizationPage() {
   const [isActive, setIsActive] = useState(true)
   const [llmModelId, setLlmModelId] = useState<string | null>(null)
   const [openaiApiKey, setOpenaiApiKey] = useState<string | null>(null)
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null)
   const [jitterWindowSeconds, setJitterWindowSeconds] = useState(30)
   const [jitterWindowError, setJitterWindowError] = useState('')
   const [activeWorkstationCount, setActiveWorkstationCount] = useState<number>(0)
@@ -125,6 +126,7 @@ export default function EditOrganizationPage() {
       setIsActive(org.is_active)
       setLlmModelId(org.llm_model_id || null)
       setOpenaiApiKey(org.openai_api_key || null)
+      setGoogleMapsApiKey(org.google_maps_api_key ?? null)
       setJitterWindowSeconds(org.jitter_window_seconds ?? 30)
       setAutoUpdateEnabled(org.auto_update_enabled)
       setTargetVersion(org.target_version)
@@ -199,7 +201,7 @@ export default function EditOrganizationPage() {
   const handleSaveGeneral = async () => {
     setSavingGeneral(true)
     try {
-      const data: OrganizationUpdate = { name, description, is_active: isActive, timezone, language, llm_model_id: llmModelId, openai_api_key: openaiApiKey, jitter_window_seconds: jitterWindowSeconds }
+      const data: OrganizationUpdate = { name, description, is_active: isActive, timezone, language, llm_model_id: llmModelId, openai_api_key: openaiApiKey, google_maps_api_key: googleMapsApiKey, jitter_window_seconds: jitterWindowSeconds }
       await organizationsApi.update(orgId, data)
       setGeneralDirty(false)
       refetchOrg()
@@ -453,6 +455,29 @@ export default function EditOrganizationPage() {
               <Label>{tAccounts('openaiKeyLabel')}</Label>
               <Input type="password" placeholder={tAccounts('openaiKeyPlaceholder')} value={openaiApiKey || ''} onChange={(e) => { setOpenaiApiKey(e.target.value || null); setGeneralDirty(true) }} />
               <p className="text-xs text-gray-500">{tAccounts('openaiKeyHelper')}</p>
+            </div>
+
+            {/* Google Maps API Key */}
+            <div className="space-y-2">
+              <Label htmlFor="google-maps-api-key">{t('googleMapsApiKey')}</Label>
+              <Input
+                id="google-maps-api-key"
+                type="password"
+                value={googleMapsApiKey ?? ''}
+                onChange={(e) => { setGoogleMapsApiKey(e.target.value || null); setGeneralDirty(true) }}
+                placeholder="AIza..."
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {t('googleMapsApiKeyHelper')}{' '}
+                <a
+                  href="https://console.cloud.google.com/google/maps-apis/credentials"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  Google Cloud Console
+                </a>
+              </p>
             </div>
 
             {/* Jitter Window */}

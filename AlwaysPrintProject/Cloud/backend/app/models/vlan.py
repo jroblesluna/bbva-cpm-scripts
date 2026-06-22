@@ -7,7 +7,7 @@ dentro de una cuenta, identificados por rangos CIDR.
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, String, Boolean, DateTime, Float, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -53,7 +53,18 @@ class VLAN(Base):
     # Flag que indica si la action config de la VLAN es obligatoria para todas sus workstations
     # Si es True, las workstations de esta VLAN NO pueden tener su propia action config
     action_config_mandatory = Column(Boolean, nullable=False, default=False, server_default='false')
-    
+
+    # === CAMPOS DE GEOLOCALIZACIÓN ===
+    # Dirección formateada de la ubicación física (agencia/sucursal)
+    address = Column(String(500), nullable=True)
+    # Coordenadas geográficas para renderizar marcadores en el mapa
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    # Identificador único de Google Places para la ubicación verificada
+    place_id = Column(String(100), nullable=True)
+    # URL de imagen/foto de la ubicación física
+    location_image_url = Column(String(500), nullable=True)
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

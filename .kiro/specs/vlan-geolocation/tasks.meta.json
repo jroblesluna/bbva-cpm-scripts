@@ -1,0 +1,268 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Crear migración Alembic 020_add_vlan_geolocation": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315287
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109320318
+      }
+    ],
+    "1.2 Actualizar modelo VLAN con campos de geolocalización": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315324
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109321152
+      }
+    ],
+    "1.3 Actualizar modelo Organization con google_maps_api_key": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315351
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109321868
+      }
+    ],
+    "1.4 Actualizar schemas Pydantic (VLANUpdate, VLANResponse, OrganizationUpdate, OrganizationResponse)": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315385
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109322810
+      }
+    ],
+    "2.1 Crear endpoint GET /api/v1/vlans/geo": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315415
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109323659
+      }
+    ],
+    "2.2 Crear endpoint GET /api/v1/config/maps-key": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315442
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109324478
+      }
+    ],
+    "2.3 Extender PATCH /api/v1/vlans/{id} para aceptar campos geo": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315465
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109325422
+      }
+    ],
+    "2.4 Extender PATCH /api/v1/organizations/{id} para google_maps_api_key": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315490
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109326153
+      }
+    ],
+    "3.1 Instalar dependencias de Google Maps": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315517
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109326923
+      }
+    ],
+    "3.2 Crear GoogleMapsProvider component": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315541
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109327664
+      }
+    ],
+    "3.3 Añadir traducciones i18n (namespace map) en es.json y en.json": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315572
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109328521
+      }
+    ],
+    "4.1 Crear AddressAutocomplete component": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315599
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109329366
+      }
+    ],
+    "4.2 Crear MarkerInfoWindow component": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315630
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109330072
+      }
+    ],
+    "4.3 Crear VlanMiniMap component": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315657
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109330830
+      }
+    ],
+    "5.1 Crear página /dashboard/map": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315697
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109331530
+      }
+    ],
+    "5.2 Extender modal de editar VLAN con campos de geolocalización": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315723
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109332363
+      }
+    ],
+    "5.3 Integrar VlanMiniMap en la página de VLANs": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315748
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109333283
+      }
+    ],
+    "5.4 Extender Organization Edit con campo Google Maps API Key": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315773
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109334093
+      }
+    ],
+    "6. Checkpoint — Verificación completa": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109315798
+      },
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109334857
+      }
+    ],
+    "1. Backend: Migración y modelos": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109322862
+      }
+    ],
+    "2. Backend: Endpoints": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109326195
+      }
+    ],
+    "3. Frontend: Dependencias e infraestructura": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109328545
+      }
+    ],
+    "4. Frontend: Componentes de mapa": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109330856
+      }
+    ],
+    "5. Frontend: Páginas": [
+      {
+        "executionId": "437b68d7-b638-4aba-a5ca-42e99b5a8a2c",
+        "chatSessionId": "sess_244bdfdf-fee4-4c22-8d2a-51f784594bca",
+        "timestamp": 1782109334124
+      }
+    ]
+  }
+}
