@@ -62,9 +62,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       router.push('/dashboard')
     } catch (error: any) {
       let errorMessage = 'Error al iniciar sesión'
-      if (error?.detail) errorMessage = error.detail
-      else if (error?.message) errorMessage = error.message
-      else if (typeof error === 'string') errorMessage = error
+      if (error?.detail && typeof error.detail === 'string') {
+        errorMessage = error.detail
+      } else if (error?.detail && Array.isArray(error.detail)) {
+        // 422 de FastAPI: array de errores de validación
+        errorMessage = error.detail.map((e: { msg?: string }) => e.msg || '').filter(Boolean).join(', ') || 'Datos inválidos'
+      } else if (error?.message) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      }
       setState({ user: null, isAuthenticated: false, isLoading: false, error: errorMessage })
       throw error
     }

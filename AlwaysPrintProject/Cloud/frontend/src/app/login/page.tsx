@@ -67,7 +67,7 @@ export default function LoginPage() {
     try {
       await login({ email, password })
     } catch (error: any) {
-      if (process.env.NODE_ENV === 'development' && error?.status !== 401) {
+      if (process.env.NODE_ENV === 'development' && error?.status !== 401 && error?.status !== 422) {
         console.error('Error inesperado en login:', error)
       }
     }
@@ -135,6 +135,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={8}
                 disabled={isLoading}
               />
             </div>
