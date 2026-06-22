@@ -384,7 +384,7 @@ export default function SystemStatusPage() {
   return (
     <div className="container mx-auto py-6 space-y-6">
       {/* Banner crítico fijo */}
-      {snapshot.overall_status === 'critical' && (
+      {snapshot.overall_status === 'critical' && snapshot.alerts.length > 0 && (
         <div className="sticky top-0 z-50 bg-red-600 text-white px-4 py-3 rounded-lg flex items-center gap-3 shadow-lg">
           <AlertTriangle className="h-5 w-5 shrink-0" />
           <span className="font-medium">
