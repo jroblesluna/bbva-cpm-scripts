@@ -29,6 +29,8 @@ interface WorkstationStats {
   contingency_active: number
   total_vlans: number
   vlans_in_contingency?: number
+  vlans_without_devices?: number
+  vlans_with_config?: number
   by_account?: Record<string, {
     name: string
     total: number
@@ -332,7 +334,70 @@ export default function DashboardPage() {
         <OrganizationSection orgInfo={stats.organization_info} t={t} />
       )}
 
-      {/* === SECCIÓN 2: VLANs === */}
+      {/* === SECCIÓN 2: VLANs (admin sin vlan_summary) === */}
+      {isAdmin() && stats && !stats.vlan_summary && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Network className="w-5 h-5 text-purple-600" />
+              {t('sectionVlans')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 border border-gray-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500">{t('vlanCardTotal')}</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.total_vlans || 0}</p>
+                  </div>
+                  <div className="bg-purple-100 rounded-full p-2">
+                    <Network className="w-5 h-5 text-purple-600" />
+                  </div>
+                </div>
+              </div>
+
+              <div className={`p-4 border rounded-lg ${(stats.vlans_without_devices || 0) > 0 ? 'border-orange-200 bg-orange-50' : 'border-gray-200'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500">{t('vlanCardNoDevices')}</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.vlans_without_devices || 0}</p>
+                  </div>
+                  <div className={`rounded-full p-2 ${(stats.vlans_without_devices || 0) > 0 ? 'bg-orange-100' : 'bg-gray-100'}`}>
+                    <AlertTriangle className={`w-5 h-5 ${(stats.vlans_without_devices || 0) > 0 ? 'text-orange-600' : 'text-gray-400'}`} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border border-gray-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500">{t('vlanCardWithConfig')}</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.vlans_with_config || 0}</p>
+                  </div>
+                  <div className="bg-green-100 rounded-full p-2">
+                    <Settings className="w-5 h-5 text-green-600" />
+                  </div>
+                </div>
+              </div>
+
+              <div className={`p-4 border rounded-lg ${(stats.vlans_in_contingency || 0) > 0 ? 'border-orange-200 bg-orange-50' : 'border-gray-200'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500">{t('vlanCardContingency')}</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.vlans_in_contingency || 0}</p>
+                  </div>
+                  <div className={`rounded-full p-2 ${(stats.vlans_in_contingency || 0) > 0 ? 'bg-orange-100' : 'bg-orange-50'}`}>
+                    <ShieldAlert className={`w-5 h-5 ${(stats.vlans_in_contingency || 0) > 0 ? 'text-orange-600' : 'text-orange-400'}`} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* === SECCIÓN 2: VLANs (operador con vlan_summary) === */}
       {stats?.vlan_summary && stats.vlan_summary.length > 0 && (
         <VLANStatusSection stats={stats} t={t} />
       )}
@@ -343,6 +408,11 @@ export default function DashboardPage() {
       {/* Donuts de contingencia — solo admin */}
       {isAdmin() && stats && orgStats && (
         <ContingencyDonuts stats={stats} orgStats={orgStats} t={t} />
+      )}
+
+      {/* Donuts de contingencia — operador (solo VLANs y Estaciones) */}
+      {!isAdmin() && stats && (
+        <OperatorContingencyDonuts stats={stats} t={t} />
       )}
 
       {/* Distribución por Cuenta (solo admin) */}
@@ -801,6 +871,43 @@ function DonutChart({ active, total, label }: { active: number; total: number; l
         </span>
       </div>
     </div>
+  )
+}
+
+function OperatorContingencyDonuts({
+  stats,
+}: {
+  stats: WorkstationStats
+  t: ReturnType<typeof useTranslations>
+}) {
+  const vlansInContingency = stats.vlan_summary
+    ? stats.vlan_summary.filter(v => v.forced_contingency).length
+    : (stats.vlans_in_contingency ?? 0)
+  const totalVlans = stats.vlan_summary?.length ?? stats.total_vlans
+
+  return (
+    <Card className="mb-8">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <AlertTriangle className="w-4 h-4 text-orange-500" />
+          Contingencia activa
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 justify-items-center">
+          <DonutChart
+            active={stats.contingency_active}
+            total={stats.total}
+            label="Estaciones"
+          />
+          <DonutChart
+            active={vlansInContingency}
+            total={totalVlans}
+            label="VLANs"
+          />
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

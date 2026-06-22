@@ -681,6 +681,29 @@ def get_workstation_stats(
             total_vlans = db.query(VLAN).count()
             vlans_in_contingency = db.query(VLAN).filter(VLAN.forced_contingency == True).count()
 
+        # Calcular VLANs sin dispositivos y con config
+        from app.models.device import Device
+        from sqlalchemy import func
+
+        if org_id:
+            all_vlans_query = db.query(VLAN).filter(VLAN.organization_id == org_id)
+        else:
+            all_vlans_query = db.query(VLAN)
+        
+        all_vlans_for_stats = all_vlans_query.all()
+        vlans_without_devices = 0
+        vlans_with_config = 0
+        
+        for v in all_vlans_for_stats:
+            device_count = db.query(Device).filter(
+                Device.vlan_id == v.id,
+                Device.is_active == True
+            ).count()
+            if device_count == 0:
+                vlans_without_devices += 1
+            if v.vlan_metadata and len(v.vlan_metadata) > 0:
+                vlans_with_config += 1
+
         # Preparar respuesta base
         response = WorkstationStatsResponse(
             total=total,
@@ -689,6 +712,8 @@ def get_workstation_stats(
             contingency_active=contingency,
             total_vlans=total_vlans,
             vlans_in_contingency=vlans_in_contingency,
+            vlans_without_devices=vlans_without_devices,
+            vlans_with_config=vlans_with_config,
         )
         
         # Si es admin, agregar estadísticas por cuenta
