@@ -23,10 +23,13 @@ from app.schemas import (
     VLANResponse,
     VLANDetailResponse,
     VLANListResponse,
+    VLANGeoResponse,
     VLANConfigUpdate,
     VLANConfigResponse,
     WorkstationListResponse,
 )
+from app.models.organization import Organization
+from app.models.workstation import Workstation
 from app.services.config import ConfigService
 from app.services.workstation import WorkstationService
 from app.services.audit import AuditService
@@ -161,6 +164,91 @@ def create_vlan(
     )
     
     return vlan
+
+
+@router.get("/geo", response_model=list[VLANGeoResponse])
+def list_vlans_geo(
+    organization_id: Optional[str] = Query(None, description="Filtrar por ID de organización (solo Admin)"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Listar VLANs geolocalizadas con estadísticas de workstations.
+    
+    Retorna solo VLANs con latitude y longitude no-null, junto con
+    el conteo de workstations (total, online, offline, contingencia)
+    para renderizar marcadores en el mapa.
+    
+    - Admin: puede ver todas o filtrar por organization_id
+    - Operador: solo ve VLANs de su organización (tenant isolation)
+    
+    Args:
+        organization_id: ID de organización para filtrar (opcional, solo Admin)
+        current_user: Usuario autenticado
+        db: Sesión de base de datos
+    
+    Returns:
+        Lista de VLANGeoResponse con coordenadas y stats de WS
+    """
+    # Validar que operador tenga organización asignada
+    if current_user.role == UserRole.OPERATOR and not current_user.organization_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
+    
+    # Query base: VLANs con coordenadas no-null, join con Organization para obtener nombre
+    query = db.query(VLAN, Organization.name.label("organization_name")).join(
+        Organization, VLAN.organization_id == Organization.id
+    ).filter(
+        VLAN.latitude.isnot(None),
+        VLAN.longitude.isnot(None)
+    )
+    
+    # Aplicar tenant isolation según rol
+    if current_user.role == UserRole.OPERATOR:
+        # Operadores solo ven su organización
+        query = query.filter(VLAN.organization_id == current_user.organization_id)
+    elif current_user.role == UserRole.ADMIN and organization_id:
+        # Admins pueden filtrar por organización específica
+        query = query.filter(VLAN.organization_id == organization_id)
+    # Si es Admin sin filtro, ve todas las VLANs geolocalizadas
+    
+    results = query.order_by(VLAN.name).all()
+    
+    # Construir respuesta con estadísticas de workstations por VLAN
+    geo_responses = []
+    for vlan, org_name in results:
+        # Contar workstations de esta VLAN
+        ws_total = db.query(Workstation).filter(Workstation.vlan_id == vlan.id).count()
+        ws_online = db.query(Workstation).filter(
+            Workstation.vlan_id == vlan.id,
+            Workstation.is_online == True
+        ).count()
+        ws_contingency = db.query(Workstation).filter(
+            Workstation.vlan_id == vlan.id,
+            Workstation.forced_contingency == True
+        ).count()
+        # Offline = no online y no en contingencia forzada
+        ws_offline = db.query(Workstation).filter(
+            Workstation.vlan_id == vlan.id,
+            Workstation.is_online == False,
+            Workstation.forced_contingency == False
+        ).count()
+        
+        geo_responses.append(VLANGeoResponse(
+            id=str(vlan.id),
+            name=vlan.name,
+            organization_id=str(vlan.organization_id),
+            organization_name=org_name,
+            address=vlan.address or "",
+            latitude=vlan.latitude,
+            longitude=vlan.longitude,
+            location_image_url=vlan.location_image_url,
+            ws_total=ws_total,
+            ws_online=ws_online,
+            ws_offline=ws_offline,
+            ws_contingency=ws_contingency,
+        ))
+    
+    return geo_responses
 
 
 @router.get("/{vlan_id}", response_model=VLANDetailResponse)

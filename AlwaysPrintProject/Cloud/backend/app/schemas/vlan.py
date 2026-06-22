@@ -8,7 +8,7 @@ import re
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 import ipaddress
 
 
@@ -95,7 +95,23 @@ class VLANUpdate(BaseModel):
     cidr_ranges: Optional[list[str]] = Field(None, min_length=1)
     metadata: Optional[dict] = Field(None, description="Metadatos arbitrarios (ej: remote_queue_path)")
     action_config_mandatory: Optional[bool] = Field(None, description="Si la action config de VLAN es obligatoria para sus workstations")
-    
+    # Campos de geolocalización
+    address: Optional[str] = Field(None, max_length=500, description="Dirección formateada de Google Places")
+    latitude: Optional[float] = Field(None, ge=-90, le=90, description="Latitud (-90 a 90)")
+    longitude: Optional[float] = Field(None, ge=-180, le=180, description="Longitud (-180 a 180)")
+    place_id: Optional[str] = Field(None, max_length=100, description="Google Place ID")
+    location_image_url: Optional[str] = Field(None, max_length=500, description="URL de imagen de la ubicación física")
+
+    @model_validator(mode="after")
+    def validate_lat_lng_together(self):
+        """Valida que latitude y longitude vengan juntos o ninguno."""
+        lat = self.latitude
+        lng = self.longitude
+        # Si uno viene y el otro no, es inválido
+        if (lat is not None) != (lng is not None):
+            raise ValueError("latitude y longitude deben proporcionarse juntos o ninguno")
+        return self
+
     @field_validator("cidr_ranges")
     @classmethod
     def validate_cidr_ranges(cls, v: Optional[list[str]]) -> Optional[list[str]]:
@@ -130,6 +146,12 @@ class VLANResponse(BaseModel):
     default_device_id: Optional[UUID] = None
     vlan_metadata: Optional[dict] = Field(None, serialization_alias="metadata")
     action_config_mandatory: bool = False
+    # Campos de geolocalización
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    place_id: Optional[str] = None
+    location_image_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     
@@ -155,3 +177,27 @@ class VLANListResponse(BaseModel):
     total: int
     vlans: list[VLANResponse]
     stats: Optional[VLANListStats] = None
+
+
+# === SCHEMA PARA ENDPOINT /vlans/geo ===
+
+class VLANGeoResponse(BaseModel):
+    """Schema de respuesta para el endpoint GET /vlans/geo.
+    
+    Retorna VLANs con coordenadas + estadísticas de workstations
+    para renderizar marcadores en el mapa.
+    """
+    id: str
+    name: str
+    organization_id: str
+    organization_name: str
+    address: str
+    latitude: float
+    longitude: float
+    location_image_url: Optional[str] = None
+    ws_total: int = Field(description="Total de workstations en la VLAN")
+    ws_online: int = Field(description="Workstations online")
+    ws_offline: int = Field(description="Workstations offline")
+    ws_contingency: int = Field(description="Workstations en contingencia")
+
+    model_config = {"from_attributes": True}

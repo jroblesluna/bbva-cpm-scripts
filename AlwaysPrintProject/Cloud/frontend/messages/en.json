@@ -73,7 +73,8 @@
     "subResources": "Resources",
     "groupMonitoring": "Monitoring / Operations",
     "groupSystem": "System",
-    "documentation": "Documentation"
+    "documentation": "Documentation",
+    "map": "Map"
   },
   "login": {
     "title": "AlwaysPrint Cloud Manager",
@@ -321,6 +322,8 @@
     "defaultDeviceNoDevices": "No active devices in this VLAN",
     "actionConfigTitle": "Administrative Actions",
     "actionConfigDesc": "Action configuration specific to this VLAN",
+    "geoSectionTitle": "Geographic Location",
+    "geoSectionDesc": "Address and coordinates of the branch associated with this VLAN",
     "metadataLabel": "VLAN Metadata",
     "metadataHelper": "Key-value pairs available to workstations (e.g. remote_queue_path)",
     "metadataKeyPlaceholder": "Key (e.g. remote_queue_path)",
@@ -901,7 +904,9 @@
     "jitterWindowSaveSuccess": "Jitter window updated successfully",
     "jitterWindowSaveError": "Failed to update jitter window",
     "jitterWindowCalculation": "With {window} seconds window and {count} active workstations, approximately {rate} connections per second during mass events",
-    "jitterWindowNoWorkstations": "No active workstations to compute connection rate estimate"
+    "jitterWindowNoWorkstations": "No active workstations to compute connection rate estimate",
+    "googleMapsApiKey": "Google Maps API Key",
+    "googleMapsApiKeyHelper": "Required for VLAN geolocation. Get your key from"
   },
   "systemStatus": {
     "title": "System Status",
@@ -1116,5 +1121,27 @@
       "error": "Error loading metrics",
       "unavailable": "Unavailable"
     }
+  },
+  "map": {
+    "loading": "Loading Google Maps...",
+    "loadError": "Error loading Google Maps",
+    "title": "VLAN Map",
+    "subtitle": "Geographic distribution of branches",
+    "filterAll": "All organizations",
+    "filterOrg": "Filter by organization",
+    "noApiKey": "API Key not configured",
+    "noApiKeyDesc": "Configure your Google Maps API Key in the organization settings to enable the map.",
+    "noLocations": "No locations",
+    "noLocationsDesc": "No VLANs have a configured location. Edit a VLAN to add its address.",
+    "wsTotal": "Total",
+    "wsOnline": "Online",
+    "wsOffline": "Offline",
+    "wsContingency": "Contingency",
+    "addressLabel": "Address",
+    "addressPlaceholder": "Search address...",
+    "imageLabel": "Image URL",
+    "imagePlaceholder": "https://example.com/branch-photo.jpg",
+    "miniMapToggle": "Show map",
+    "configureKey": "Configure API Key"
   }
 }

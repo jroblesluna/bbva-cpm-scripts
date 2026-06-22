@@ -110,6 +110,10 @@ class Organization(Base):
     # Si está configurada, se usa OpenAI en vez de AWS Bedrock para el análisis de logs
     openai_api_key = Column(String(200), nullable=True)
 
+    # API Key de Google Maps para esta organización (opcional)
+    # Se usa para geolocalización de VLANs: autocompletado de direcciones y renderizado de mapas
+    google_maps_api_key = Column(String(200), nullable=True)
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -12,6 +12,8 @@ import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ActionConfigSection } from '@/components/config/ActionConfigSection'
+import { GoogleMapsProvider } from '@/components/maps/GoogleMapsProvider'
+import { AddressAutocomplete, type AddressSelection } from '@/components/maps/AddressAutocomplete'
 import { Badge } from '@/components/ui/badge'
 import {
   Network,
@@ -45,6 +47,7 @@ import { formatDateWithTimezone } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 import { useToast } from '@/hooks/use-toast'
 import { CidrHealthBadge } from '@/components/vlans/CidrHealthBadge'
+import { VlanMiniMap, type VlanMarkerData } from '@/components/maps/VlanMiniMap'
 import {
   Tooltip,
   TooltipContent,
@@ -121,6 +124,10 @@ export default function VLANsPage() {
   const [selectedVlanIds, setSelectedVlanIds] = useState<Set<string>>(new Set())
   const [vlanBulkAction, setVlanBulkAction] = useState<'contingency_on' | 'contingency_off' | 'restart_service' | 'restart_tray' | null>(null)
   const [vlanBulkPending, setVlanBulkPending] = useState(false)
+
+  // Estado para mini-mapa de geolocalización
+  const [miniMapCollapsed, setMiniMapCollapsed] = useState(true)
+  const [highlightedVlanId, setHighlightedVlanId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -225,6 +232,16 @@ export default function VLANsPage() {
   const paginatedVlans = filteredVlans.slice((page - 1) * pageSize, page * pageSize)
   const paginationStart = (page - 1) * pageSize + 1
   const paginationEnd = Math.min(page * pageSize, totalFiltered)
+
+  // VLANs con coordenadas para el mini-mapa
+  const geoVlans: VlanMarkerData[] = vlans
+    .filter(v => v.latitude != null && v.longitude != null)
+    .map(v => ({
+      id: v.id,
+      name: v.name,
+      latitude: v.latitude!,
+      longitude: v.longitude!,
+    }))
 
   const handleEdit = async (vlan: VLAN) => {
     try {
@@ -604,6 +621,25 @@ export default function VLANsPage() {
         </div>
       )}
 
+      {/* Mini-mapa de VLANs geolocalizadas */}
+      {geoVlans.length > 0 && (
+        <GoogleMapsProvider>
+          <VlanMiniMap
+            vlans={geoVlans}
+            collapsed={miniMapCollapsed}
+            onToggleCollapse={() => setMiniMapCollapsed(!miniMapCollapsed)}
+            onMarkerClick={(vlanId) => {
+              setHighlightedVlanId(vlanId)
+              // Scroll al card/fila de la VLAN
+              const element = document.getElementById(`vlan-${vlanId}`)
+              element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              // Limpiar highlight después de 3 segundos
+              setTimeout(() => setHighlightedVlanId(null), 3000)
+            }}
+          />
+        </GoogleMapsProvider>
+      )}
+
       {/* Contenido principal: vista de tarjetas o tabla */}
       {filteredVlans.length === 0 ? (
         <div className="bg-white rounded-lg shadow">
@@ -627,7 +663,7 @@ export default function VLANsPage() {
         /* Vista de tarjetas (responsive) */
         <div className="space-y-4">
           {paginatedVlans.map((vlan) => (
-            <div key={vlan.id} className={`bg-white rounded-lg shadow p-4 md:p-6 ${selectedVlanIds.has(vlan.id) ? 'ring-2 ring-blue-500' : ''}`}>
+            <div key={vlan.id} id={`vlan-${vlan.id}`} className={`bg-white rounded-lg shadow p-4 md:p-6 transition-all ${selectedVlanIds.has(vlan.id) ? 'ring-2 ring-blue-500' : ''} ${highlightedVlanId === vlan.id ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}>
               {/* Fila 1: Nombre + CidrHealthBadge + niveles de contingencia */}
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2 min-w-0 flex-wrap">
@@ -805,7 +841,7 @@ export default function VLANsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {paginatedVlans.map((vlan) => (
-                  <tr key={vlan.id} className={`hover:bg-gray-50 ${selectedVlanIds.has(vlan.id) ? 'bg-blue-50' : ''}`}>
+                  <tr key={vlan.id} id={`vlan-${vlan.id}`} className={`hover:bg-gray-50 transition-all ${selectedVlanIds.has(vlan.id) ? 'bg-blue-50' : ''} ${highlightedVlanId === vlan.id ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}>
                     {selectionMode && (
                       <td className="px-3 py-4 w-8">
                         <input
@@ -1438,10 +1474,17 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
   const { getAuthHeaders } = useAuth()
   const t = useTranslations('vlans')
   const tCommon = useTranslations('common')
+  const tMap = useTranslations('map')
   const [loading, setLoading] = useState(false)
   const [devices, setDevices] = useState<Device[]>([])
   const [devicesLoading, setDevicesLoading] = useState(true)
   const [selectedDefaultDevice, setSelectedDefaultDevice] = useState<string | null>(vlan.default_device_id)
+  // Estado de geolocalización
+  const [editAddress, setEditAddress] = useState<string | null>(vlan.address ?? null)
+  const [editLatitude, setEditLatitude] = useState<number | null>(vlan.latitude ?? null)
+  const [editLongitude, setEditLongitude] = useState<number | null>(vlan.longitude ?? null)
+  const [editPlaceId, setEditPlaceId] = useState<string | null>(vlan.place_id ?? null)
+  const [editLocationImageUrl, setEditLocationImageUrl] = useState(vlan.location_image_url ?? '')
   const [formData, setFormData] = useState<VLANUpdate>({
     name: vlan.name,
     description: vlan.description,
@@ -1501,7 +1544,16 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
       const metadata = metadataEntries.length > 0
         ? Object.fromEntries(metadataEntries.filter(e => e.key.trim()).map(e => [e.key.trim(), e.value]))
         : null
-      await apiClient.put(`/vlans/${vlan.id}`, { ...formData, cidr_ranges: validCidrs, metadata: metadata })
+      await apiClient.put(`/vlans/${vlan.id}`, {
+        ...formData,
+        cidr_ranges: validCidrs,
+        metadata: metadata,
+        address: editAddress,
+        latitude: editLatitude,
+        longitude: editLongitude,
+        place_id: editPlaceId,
+        location_image_url: editLocationImageUrl || null,
+      })
       // Actualizar impresora predeterminada si cambió
       if (selectedDefaultDevice !== vlan.default_device_id) {
         const params = selectedDefaultDevice ? { device_id: selectedDefaultDevice } : {}
@@ -1659,6 +1711,35 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
               </Button>
             </div>
           </form>
+          {/* Sección de geolocalización */}
+          <div className="border-t border-gray-200 pt-4 mt-4">
+            <h4 className="text-sm font-semibold text-gray-900 mb-1">{t('geoSectionTitle')}</h4>
+            <p className="text-xs text-gray-500 mb-3">{t('geoSectionDesc')}</p>
+            <GoogleMapsProvider>
+              <AddressAutocomplete
+                onSelect={(sel: AddressSelection) => {
+                  setEditAddress(sel.address)
+                  setEditLatitude(sel.latitude)
+                  setEditLongitude(sel.longitude)
+                  setEditPlaceId(sel.place_id)
+                }}
+                defaultValue={editAddress ?? ''}
+                defaultLatitude={editLatitude ?? undefined}
+                defaultLongitude={editLongitude ?? undefined}
+              />
+            </GoogleMapsProvider>
+            {/* URL de imagen de la ubicación */}
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">{tMap('imageLabel')}</label>
+              <input
+                type="text"
+                value={editLocationImageUrl}
+                onChange={(e) => setEditLocationImageUrl(e.target.value)}
+                placeholder={tMap('imagePlaceholder')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+            </div>
+          </div>
           {/* Sección de Action Config para esta VLAN (colapsable) */}
           <details className="mt-6 pt-6 border-t border-gray-200 group">
             <summary className="flex items-center justify-between cursor-pointer list-none p-3 rounded-lg hover:bg-gray-50 transition-colors [&::-webkit-details-marker]:hidden">
