@@ -68,7 +68,7 @@ def org_with_key():
     org = MagicMock(spec=Organization)
     org.id = uuid.uuid4()
     org.name = "BBVA"
-    org.google_maps_api_key = "test-fake-google-maps-api-key-not-real"
+    org.google_maps_api_key = f"fake_maps_key_{uuid.uuid4().hex}"
     return org
 
 
