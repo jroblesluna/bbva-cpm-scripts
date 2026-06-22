@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.utils import get_client_ip
-from app.models.organization import PublicIP
+from app.models.organization import Organization, PublicIP
 from app.models.config import GlobalConfig, VLANConfig, WorkstationConfig
 from app.models.user import User, UserRole
 from app.models.workstation import Workstation
@@ -394,3 +394,67 @@ def update_global_config(
         )
 
     return config
+
+
+# === ENDPOINT DE API KEY DE GOOGLE MAPS ===
+
+
+@router.get("/maps-key")
+def get_maps_key(
+    organization_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Obtener la API Key de Google Maps para cargar el SDK en el frontend.
+
+    Este es el ÚNICO endpoint que retorna la key completa (sin enmascarar),
+    ya que es necesaria para inicializar Google Maps JS SDK en el navegador.
+
+    - Admin: debe pasar ?organization_id=UUID para indicar qué organización consultar
+    - Operador: usa su organización asignada (ignora organization_id)
+
+    Returns:
+        {"api_key": "AIzaSy...full_key"}
+
+    Raises:
+        HTTPException 400: organization_id requerido para Admin
+        HTTPException 403: Usuario sin organización asignada
+        HTTPException 404: No hay API Key configurada para la organización
+    """
+    # Determinar la organización a consultar
+    if current_user.role == UserRole.ADMIN:
+        if not organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="organization_id requerido para administradores"
+            )
+        target_organization_id = organization_id
+    else:
+        # Operador: usar su organización asignada
+        if not current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuario sin cuenta asignada"
+            )
+        target_organization_id = str(current_user.organization_id)
+
+    # Buscar la organización en la base de datos
+    org = db.query(Organization).filter(
+        Organization.id == target_organization_id
+    ).first()
+
+    if not org:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organización no encontrada"
+        )
+
+    # Verificar que la organización tenga una API Key configurada
+    if not org.google_maps_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="API Key de Google Maps no configurada para esta organización"
+        )
+
+    return {"api_key": org.google_maps_api_key}

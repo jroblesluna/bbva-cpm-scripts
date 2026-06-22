@@ -972,7 +972,7 @@ fi
 # =============================================================================
 # 8. ESTADÍSTICAS DE LA INSTANCIA
 # =============================================================================
-print_header "7. ESTADÍSTICAS DE LA INSTANCIA"
+print_header "8. ESTADÍSTICAS DE LA INSTANCIA"
 
 if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
     echo -e "  ${CYAN}Consultando recursos...${NC}"

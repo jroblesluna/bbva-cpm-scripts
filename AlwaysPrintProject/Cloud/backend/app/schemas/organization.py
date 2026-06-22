@@ -89,6 +89,7 @@ class OrganizationUpdate(BaseModel):
     action_config_mandatory: Optional[bool] = Field(None, description="Si la action config de org es obligatoria para VLANs/workstations")
     llm_model_id: Optional[str] = Field(None, max_length=100, description="Modelo LLM para análisis de logs (NULL = usar default global)")
     openai_api_key: Optional[str] = Field(None, max_length=200, description="API Key de OpenAI (si se configura, se usa OpenAI en vez de Bedrock)")
+    google_maps_api_key: Optional[str] = Field(None, max_length=200, description="API Key de Google Maps para geolocalización de VLANs")
     offline_timeout_minutes: Optional[int] = Field(None, ge=1, description="Minutos de inactividad antes de enviar Death Ping")
     jitter_window_seconds: Optional[int] = Field(None, ge=5, le=300, description="Ventana de jitter en segundos para reconexiones (5-300)")
 
@@ -106,11 +107,21 @@ class OrganizationResponse(OrganizationBase):
     action_config_mandatory: bool = False
     llm_model_id: Optional[str] = None
     openai_api_key: Optional[str] = None
+    google_maps_api_key: Optional[str] = None
     offline_timeout_minutes: int = 10
     jitter_window_seconds: int = 30
     public_ips: list[PublicIPResponse] = []
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("google_maps_api_key", mode="before")
+    @classmethod
+    def mask_google_maps_api_key(cls, v: Optional[str]) -> Optional[str]:
+        """Enmascara la API Key de Google Maps mostrando solo los últimos 4 caracteres."""
+        if v is None or len(v) == 0:
+            return None
+        # Formato: AIza...xxxx (últimos 4 chars)
+        return f"AIza...{v[-4:]}"
 
     model_config = {"from_attributes": True}
 

@@ -36,6 +36,7 @@ import {
   ChevronRight,
   Server,
   BookOpen,
+  MapPin,
 } from 'lucide-react'
 
 // Definición de items de navegación
@@ -92,6 +93,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       items: [
         { key: 'systemStatus', href: '/dashboard/admin/system-status', icon: Server, adminOnly: true },
         { key: 'telemetry', href: '/dashboard/telemetry', icon: Activity },
+        { key: 'map', href: '/dashboard/map', icon: MapPin },
         { key: 'connectivity', href: '/dashboard/connectivity', icon: Wifi },
         { key: 'audit', href: '/dashboard/audit', icon: FileText },
         { key: 'messages', href: '/dashboard/messages', icon: MessageSquare },
