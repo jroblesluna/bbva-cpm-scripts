@@ -521,7 +521,7 @@ class RedisConnectionManager:
                     target_channel=target_channel,
                     target_worker_id=target_worker_id,
                 )
-                return False
+                return True  # Mensaje publicado exitosamente — otro worker lo entregará
 
             except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
                 logger.warning(
