@@ -2,7 +2,8 @@
 Tests unitarios del endpoint GET /api/v1/config/maps-key.
 
 Verifica:
-- Admin sin organization_id → HTTP 400
+- Admin sin organization_id y sin org con key → HTTP 404
+- Admin sin organization_id pero con org con key → HTTP 200
 - Operador sin organización asignada → HTTP 403
 - Organización no encontrada → HTTP 404
 - Organización sin API Key → HTTP 404
@@ -102,31 +103,56 @@ def _mock_db_no_org():
     return db
 
 
-# === TEST: ADMIN SIN ORGANIZATION_ID → HTTP 400 ===
+# === TEST: ADMIN SIN ORGANIZATION_ID → HTTP 404 (NINGUNA ORG CON KEY) ===
 
 
 class TestAdminSinOrganizationId:
-    """Tests para admin que no pasa organization_id."""
+    """Tests para admin que no pasa organization_id y no hay org con key."""
 
     @pytest.mark.asyncio
-    async def test_admin_sin_org_id_retorna_400(self, admin_user):
+    async def test_admin_sin_org_id_sin_orgs_con_key_retorna_404(self, admin_user):
         """
         WHEN un admin hace GET /config/maps-key sin ?organization_id,
-        THEN se retorna HTTP 400 indicando que es requerido.
+        AND no hay ninguna organización con google_maps_api_key configurada,
+        THEN se retorna HTTP 404 indicando que no hay key configurada.
         Validates: Requirement 7.3
         """
         app = FastAPI()
         app.include_router(router, prefix="/config")
         app.dependency_overrides[get_current_user] = lambda: admin_user
-        app.dependency_overrides[get_db] = lambda: MagicMock()
+        app.dependency_overrides[get_db] = lambda: _mock_db_no_org()
 
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
             response = await client.get("/config/maps-key")
 
-        assert response.status_code == 400
-        assert "organization_id" in response.json()["detail"]
+        assert response.status_code == 404
+        assert "no configurada" in response.json()["detail"].lower()
+
+        app.dependency_overrides.clear()
+
+    @pytest.mark.asyncio
+    async def test_admin_sin_org_id_con_org_con_key_retorna_200(self, admin_user, org_with_key):
+        """
+        WHEN un admin hace GET /config/maps-key sin ?organization_id,
+        AND existe una organización con google_maps_api_key configurada,
+        THEN se retorna HTTP 200 con la key de esa organización.
+        Validates: Requirement 7.3
+        """
+        app = FastAPI()
+        app.include_router(router, prefix="/config")
+        app.dependency_overrides[get_current_user] = lambda: admin_user
+        app.dependency_overrides[get_db] = lambda: _mock_db_with_org(org_with_key)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/config/maps-key")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["api_key"] == org_with_key.google_maps_api_key
 
         app.dependency_overrides.clear()
 

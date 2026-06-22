@@ -16,6 +16,7 @@ const GOOGLE_MAPS_LIBRARIES: ('places')[] = ['places']
 interface GoogleMapsProviderProps {
   children: ReactNode
   fallback?: ReactNode
+  organizationId?: string  // Requerido para admins, opcional para operadores
 }
 
 interface MapsKeyState {
@@ -28,7 +29,7 @@ interface MapsKeyState {
  * Componente que carga el SDK de Google Maps usando la API Key
  * de la organización del usuario autenticado.
  */
-export function GoogleMapsProvider({ children, fallback }: GoogleMapsProviderProps) {
+export function GoogleMapsProvider({ children, fallback, organizationId }: GoogleMapsProviderProps) {
   const t = useTranslations('map')
   const [keyState, setKeyState] = useState<MapsKeyState>({
     apiKey: null,
@@ -42,7 +43,11 @@ export function GoogleMapsProvider({ children, fallback }: GoogleMapsProviderPro
 
     async function fetchMapsKey() {
       try {
-        const response = await apiClient.get<{ api_key: string }>('/config/maps-key')
+        const params: Record<string, string> = {}
+        if (organizationId) {
+          params.organization_id = organizationId
+        }
+        const response = await apiClient.get<{ api_key: string }>('/config/maps-key', { params })
         if (!cancelled) {
           setKeyState({
             apiKey: response.data.api_key,
@@ -64,7 +69,7 @@ export function GoogleMapsProvider({ children, fallback }: GoogleMapsProviderPro
 
     fetchMapsKey()
     return () => { cancelled = true }
-  }, [])
+  }, [organizationId])
 
   // Estado: cargando la API key
   if (keyState.isLoading) {
