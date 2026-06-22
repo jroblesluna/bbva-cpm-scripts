@@ -10,6 +10,7 @@ import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { workstationsApi, organizationsApi, vlansApi, devicesApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,6 +72,7 @@ export default function WorkstationsPage() {
   const tCommon = useTranslations('common');
   const tActions = useTranslations('actionConfigs');
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 400);
   const [filterOnline, setFilterOnline] = useState<boolean | undefined>(undefined);
   const [filterContingency, setFilterContingency] = useState<boolean | undefined>(undefined);
   const [filterWithConfig, setFilterWithConfig] = useState<boolean | undefined>(undefined);
@@ -100,8 +102,11 @@ export default function WorkstationsPage() {
     setPage(1);
   };
 
+  // Resetear página cuando el término de búsqueda con debounce cambia
+  useEffect(() => { setPage(1) }, [debouncedSearch]);
+
   const filters = {
-    search: searchTerm || undefined,
+    search: debouncedSearch || undefined,
     is_online: filterOnline,
     contingency_active: filterContingency,
     organization_id: isAdmin ? filterOrgId : undefined,
@@ -116,7 +121,7 @@ export default function WorkstationsPage() {
     isFetching,
     error,
   } = useQuery({
-    queryKey: ['workstations', searchTerm, filterOnline, filterContingency, filterOrgId, filterVlanId, page, pageSize],
+    queryKey: ['workstations', debouncedSearch, filterOnline, filterContingency, filterOrgId, filterVlanId, page, pageSize],
     queryFn: () => workstationsApi.list(filters),
     placeholderData: (prev) => prev,
   });
@@ -521,7 +526,7 @@ export default function WorkstationsPage() {
                   type="text"
                   placeholder={t('searchPlaceholder')}
                   value={searchTerm}
-                  onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+                  onChange={(e) => { setSearchTerm(e.target.value); }}
                   className="flex-1"
                 />
               </div>
