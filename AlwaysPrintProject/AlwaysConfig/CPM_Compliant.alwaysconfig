@@ -139,6 +139,16 @@
         },
         {
           "type": "RunProcess",
+          "description": "Habilitar feature LPD Print Service (si no está habilitado)",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\dism.exe",
+            "arguments": "/online /enable-feature /featurename:Printing-Foundation-LPDPrintService /all",
+            "timeout_seconds": 120,
+            "window_style": "Hidden"
+          }
+        },
+        {
+          "type": "RunProcess",
           "description": "Ejecutar update_winhostuser.bat (mapeado hostname→IP)",
           "parameters": {
             "file_path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\update_winhostuser.bat",
@@ -700,6 +710,16 @@
             "value": "1"
           },
           "actions": [
+            {
+              "type": "RunProcess",
+              "description": "Habilitar feature LPD Print Service (si no está habilitado)",
+              "parameters": {
+                "file_path": "C:\\Windows\\System32\\dism.exe",
+                "arguments": "/online /enable-feature /featurename:Printing-Foundation-LPDPrintService /all",
+                "timeout_seconds": 120,
+                "window_style": "Hidden"
+              }
+            },
             {
               "type": "RunProcess",
               "description": "Ejecutar update_winhostuser.bat (mapeado hostname→IP)",
