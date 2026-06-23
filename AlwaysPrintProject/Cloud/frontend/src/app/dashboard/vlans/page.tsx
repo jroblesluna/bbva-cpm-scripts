@@ -666,6 +666,25 @@ export default function VLANsPage() {
         <div className="space-y-4">
           {paginatedVlans.map((vlan) => (
             <div key={vlan.id} id={`vlan-${vlan.id}`} className={`bg-white rounded-lg shadow p-4 md:p-6 transition-all ${selectedVlanIds.has(vlan.id) ? 'ring-2 ring-blue-500' : ''} ${highlightedVlanId === vlan.id ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}>
+              {/* Layout: en desktop imagen a la izquierda + contenido a la derecha */}
+              <div className="flex flex-col md:flex-row md:gap-4">
+                {/* Thumbnail de imagen (solo desktop) */}
+                <div className="hidden md:block flex-shrink-0 w-32 h-24 rounded-md overflow-hidden border border-gray-200 bg-gray-100">
+                  {vlan.location_image_url ? (
+                    <img
+                      src={vlan.location_image_url}
+                      alt={vlan.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-300">
+                      <Network className="h-8 w-8" />
+                    </div>
+                  )}
+                </div>
+                {/* Contenido principal */}
+                <div className="flex-1 min-w-0">
               {/* Fila 1: Nombre + CidrHealthBadge + niveles de contingencia */}
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2 min-w-0 flex-wrap">
@@ -723,10 +742,12 @@ export default function VLANsPage() {
                   <span>{formatDateWithTimezone(vlan.created_at, timezone)}</span>
                 </div>
               </div>
+                </div>{/* cierre flex-1 min-w-0 (contenido principal) */}
+              </div>{/* cierre flex container desktop */}
 
-              {/* Imagen de ubicación (Street View desde S3) */}
+              {/* Imagen de ubicación (solo mobile — full width) */}
               {vlan.location_image_url && (
-                <div className="mb-3">
+                <div className="mb-3 md:hidden">
                   <img
                     src={vlan.location_image_url}
                     alt={vlan.name}
