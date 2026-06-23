@@ -57,6 +57,11 @@ function createCompleteMetrics(
       workstation_count: 1500,
       operator_count: 50,
       total: 1550,
+      workers: 2,
+      detail: {},
+      capacity: 5000,
+      threshold_warning: 3000,
+      threshold_critical: 4500,
       data_available: true,
     },
     python_memory: {
@@ -125,6 +130,11 @@ describe('MetricsCard', () => {
           workstation_count: 3400,
           operator_count: 100,
           total: 3500,
+          workers: 2,
+          detail: {},
+          capacity: 5000,
+          threshold_warning: 3000,
+          threshold_critical: 4500,
           data_available: true,
         },
       })
