@@ -185,12 +185,13 @@ class S3ImagesService:
     async def _try_street_view(
         self, client: httpx.AsyncClient, latitude: float, longitude: float, api_key: str, vlan_id: str
     ) -> Optional[bytes]:
-        """Intenta obtener imagen de Street View Static API."""
+        """Intenta obtener imagen de Street View Static API (solo exteriores)."""
         try:
-            # Verificar primero si hay cobertura con metadata endpoint
+            # Verificar primero si hay cobertura outdoor con metadata endpoint
             metadata_url = (
                 f"https://maps.googleapis.com/maps/api/streetview/metadata"
                 f"?location={latitude},{longitude}"
+                f"&source=outdoor"
                 f"&key={api_key}"
             )
             meta_resp = await client.get(metadata_url)
@@ -198,21 +199,22 @@ class S3ImagesService:
                 meta_data = meta_resp.json()
                 if meta_data.get("status") != "OK":
                     logger.info(
-                        "Street View sin cobertura (status=%s): vlan_id=%s",
+                        "Street View sin cobertura outdoor (status=%s): vlan_id=%s",
                         meta_data.get("status"), vlan_id
                     )
                     return None
 
-            # Descargar la imagen
+            # Descargar la imagen (solo fuentes outdoor — excluye photospheres de interior)
             url = (
                 f"https://maps.googleapis.com/maps/api/streetview"
                 f"?size=600x400"
                 f"&location={latitude},{longitude}"
+                f"&source=outdoor"
                 f"&key={api_key}"
             )
             resp = await client.get(url)
             if resp.status_code == 200 and "image" in resp.headers.get("content-type", ""):
-                logger.info("Street View obtenida: vlan_id=%s, size=%d", vlan_id, len(resp.content))
+                logger.info("Street View outdoor obtenida: vlan_id=%s, size=%d", vlan_id, len(resp.content))
                 return resp.content
             logger.info(
                 "Street View no disponible (status=%d): vlan_id=%s",
