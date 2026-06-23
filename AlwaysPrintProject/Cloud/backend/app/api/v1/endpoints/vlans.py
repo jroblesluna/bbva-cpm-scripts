@@ -854,6 +854,7 @@ async def upload_location_image(
         latitude=vlan.latitude,
         longitude=vlan.longitude,
         api_key=org.google_maps_api_key,
+        place_id=vlan.place_id,
     )
 
     if not image_url:
