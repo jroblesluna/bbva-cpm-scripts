@@ -444,12 +444,21 @@ async def workstation_websocket(
                 success = data.get("success")
                 output = data.get("output")
                 
-                # Resolver waiter si hay alguno esperando esta respuesta
-                connection_manager.resolve_command_response(command_id, {
+                response_data = {
                     "command_id": command_id,
                     "success": success,
                     "output": output
-                })
+                }
+                
+                # Resolver waiter local o publicar cross-worker
+                resolved_locally = connection_manager.resolve_command_response(command_id, response_data)
+                if not resolved_locally and command_id:
+                    # Buscar si este comando vino de otro worker
+                    origin_worker = connection_manager._command_origins.pop(command_id, None)
+                    if origin_worker:
+                        await connection_manager.publish_command_response(
+                            command_id, response_data, origin_worker
+                        )
                 
                 # Preparar mensaje de broadcast
                 cmd_broadcast_msg = {

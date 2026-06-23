@@ -93,6 +93,9 @@ class RedisConnectionManager:
         # Respuestas pendientes de comandos: {command_id: (asyncio.Event, list, originator_worker_id)}
         self._pending_command_responses: Dict[str, Tuple[asyncio.Event, List[Optional[dict]], str]] = {}
 
+        # Mapping de command_id → origin_worker_id para routing cross-worker de respuestas
+        self._command_origins: Dict[str, str] = {}
+
         # Contador de workstations por organización (lazy subscribe/unsubscribe)
         self._org_ws_count: Dict[str, int] = {}
 
@@ -502,11 +505,12 @@ class RedisConnectionManager:
                     return False
 
                 # 2b. Worker encontrado → publicar en worker:{target_worker_id}
-                # Enriquecer payload con target_workstation_id y organization_id
+                # Enriquecer payload con target_workstation_id, organization_id y origin_worker_id
                 org_id = message.get("organization_id") or self.org_ids.get(workstation_id)
                 enriched_message = {
                     **message,
                     "target_workstation_id": workstation_id,
+                    "_origin_worker_id": self._worker_id,
                 }
                 if org_id:
                     enriched_message["organization_id"] = org_id
@@ -741,7 +745,19 @@ class RedisConnectionManager:
                     else:
                         target_ws_id = payload.get("target_workstation_id") if isinstance(payload, dict) else None
                         if target_ws_id:
-                            await self._deliver_to_local_workstation(target_ws_id, payload)
+                            # Guardar origin worker para routing de cmd_response
+                            origin_worker = payload.get("_origin_worker_id")
+                            command_id = payload.get("command_id")
+                            if origin_worker and command_id and origin_worker != self._worker_id:
+                                # Limitar tamaño del mapping (evitar memory leak)
+                                if len(self._command_origins) > 10000:
+                                    keys_to_remove = list(self._command_origins.keys())[:5000]
+                                    for k in keys_to_remove:
+                                        del self._command_origins[k]
+                                self._command_origins[command_id] = origin_worker
+                            # Entregar al WS local (sin campos internos de routing)
+                            clean_payload = {k: v for k, v in payload.items() if not k.startswith("_") and k != "target_workstation_id"}
+                            await self._deliver_to_local_workstation(target_ws_id, clean_payload)
                 elif channel.startswith("org:"):
                     # Ignorar mensajes originados por este mismo worker (ya se entregaron localmente)
                     origin = payload.pop("_origin_worker", None) if isinstance(payload, dict) else None
