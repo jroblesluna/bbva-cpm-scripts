@@ -10,6 +10,7 @@ Este módulo define los endpoints para:
 - Envío de comandos remotos a workstations
 """
 
+import asyncio
 import logging
 import uuid
 from typing import Optional
@@ -287,10 +288,33 @@ async def download_latest_log(
     sent = await connection_manager.send_to_workstation(workstation_id_str, message)
     
     if not sent:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="La workstation se desconectó antes de recibir el comando."
+        # Retry una vez: el primer fallo puede ser por registro stale en WorkerRegistry
+        # que ya fue invalidado por send_to_workstation. El segundo intento resuelve
+        # el worker correcto.
+        logger.info(
+            f"[LOGS] Primer intento falló (registro stale probable), reintentando: "
+            f"workstation_id={workstation_id}, command_id={command_id}"
         )
+        # Limpiar waiter del primer intento
+        connection_manager._pending_command_responses.pop(command_id, None)
+        
+        # Pequeña espera para que la invalidación del registry se propague
+        await asyncio.sleep(0.1)
+        
+        # Generar nuevo command_id para el retry
+        command_id = str(uuid.uuid4())
+        connection_manager.register_command_waiter(command_id)
+        message["command_id"] = command_id
+        
+        sent = await connection_manager.send_to_workstation(workstation_id_str, message)
+        if not sent:
+            logger.warning(
+                f"[LOGS] Segundo intento también falló: workstation_id={workstation_id}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="La workstation se desconectó antes de recibir el comando."
+            )
     
     logger.info(
         f"[LOGS] Comando enviado (sent=True), esperando respuesta: command_id={command_id}"
@@ -311,9 +335,16 @@ async def download_latest_log(
         )
     
     if not response_data.get("success"):
+        # Si es error de workstation no alcanzable (routing stale), dar mensaje claro
+        error_type = response_data.get("error", "")
+        if error_type == "workstation_not_reachable":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="La workstation no está accesible en este momento. Intente nuevamente."
+            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error en la workstation: {response_data.get('output', 'Error desconocido')}"
+            detail=f"Error en la workstation: {response_data.get('output', response_data.get('message', 'Error desconocido'))}"
         )
     
     # Decodificar contenido base64

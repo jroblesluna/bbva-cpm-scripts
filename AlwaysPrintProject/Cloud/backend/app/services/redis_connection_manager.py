@@ -505,6 +505,22 @@ class RedisConnectionManager:
                     )
                     return False
 
+                # 2d. Si el target es este mismo worker, el registro es stale
+                # (paso 1 ya confirmó que la WS no está en conexiones locales).
+                # Invalidar registro y retornar False para fail-fast.
+                if target_worker_id == self._worker_id:
+                    logger.warning(
+                        "delivery.stale_self_reference",
+                        workstation_id=workstation_id,
+                        message_type=message.get("type", "unknown"),
+                        msg="WorkerRegistry apunta a este worker pero WS no está local — registro stale, invalidando",
+                    )
+                    # Limpiar registro stale en background (no bloquear respuesta)
+                    asyncio.ensure_future(
+                        self._worker_registry.unregister_workstation(workstation_id)
+                    )
+                    return False
+
                 # 2b. Worker encontrado → publicar en worker:{target_worker_id}
                 # Enriquecer payload con target_workstation_id, organization_id y origin_worker_id
                 org_id = message.get("organization_id") or self.org_ids.get(workstation_id)
@@ -763,9 +779,40 @@ class RedisConnectionManager:
                                 origin_worker=origin_worker,
                                 target_ws_id=target_ws_id,
                             )
-                            # Entregar al WS local (sin campos internos de routing)
-                            clean_payload = {k: v for k, v in payload.items() if not k.startswith("_") and k != "target_workstation_id"}
-                            await self._deliver_to_local_workstation(target_ws_id, clean_payload)
+                            # Verificar si la WS está local antes de intentar entregar
+                            if target_ws_id not in self.workstation_connections:
+                                # WS no está en este worker — registro stale
+                                logger.warning(
+                                    "delivery.cross_worker_ws_not_found",
+                                    command_id=command_id,
+                                    target_ws_id=target_ws_id,
+                                    origin_worker=origin_worker,
+                                    msg="WS no encontrada localmente tras cross-worker delivery — resolviendo con error",
+                                )
+                                # Resolver waiter con error para evitar timeout de 30s
+                                if command_id:
+                                    error_response = {
+                                        "success": False,
+                                        "error": "workstation_not_reachable",
+                                        "message": "La workstation no está conectada en el worker esperado",
+                                    }
+                                    # Si el originador es este mismo worker, resolver localmente
+                                    if origin_worker == self._worker_id:
+                                        self.resolve_command_response(command_id, error_response)
+                                    elif origin_worker:
+                                        # Publicar error al worker originador
+                                        await self.publish_command_response(
+                                            command_id, error_response, origin_worker
+                                        )
+                                # Invalidar registro stale
+                                if self._worker_registry:
+                                    asyncio.ensure_future(
+                                        self._worker_registry.unregister_workstation(target_ws_id)
+                                    )
+                            else:
+                                # Entregar al WS local (sin campos internos de routing)
+                                clean_payload = {k: v for k, v in payload.items() if not k.startswith("_") and k != "target_workstation_id"}
+                                await self._deliver_to_local_workstation(target_ws_id, clean_payload)
                 elif channel.startswith("org:"):
                     # Ignorar mensajes originados por este mismo worker (ya se entregaron localmente)
                     origin = payload.pop("_origin_worker", None) if isinstance(payload, dict) else None

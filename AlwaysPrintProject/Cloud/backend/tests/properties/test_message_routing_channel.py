@@ -148,9 +148,9 @@ async def test_send_to_workstation_publishes_to_worker_channel(
     # No registrar la workstation localmente → forzar publicación via Redis
     result = await manager.send_to_workstation(workstation_id, message)
 
-    # Retorna False porque fue entrega remota
-    assert result is False, (
-        "send_to_workstation a workstation remota debe retornar False"
+    # Retorna True porque se publicó exitosamente via Redis
+    assert result is True, (
+        "send_to_workstation con publicación Redis exitosa debe retornar True"
     )
 
     # Verificar que se publicó exactamente en worker:{target_worker_id}
