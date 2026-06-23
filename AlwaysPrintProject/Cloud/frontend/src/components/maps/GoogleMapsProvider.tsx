@@ -5,13 +5,24 @@
  * Obtiene la key vía GET /config/maps-key y envuelve a los hijos con el contexto de Google Maps.
  */
 
-import { useState, useEffect, ReactNode } from 'react'
+import { useState, useEffect, createContext, useContext, ReactNode } from 'react'
 import { useJsApiLoader } from '@react-google-maps/api'
 import { useTranslations } from 'next-intl'
 import { apiClient } from '@/lib/api'
 
 // Librerías requeridas para autocompletado de direcciones
 const GOOGLE_MAPS_LIBRARIES: ('places')[] = ['places']
+
+// Contexto para exponer la API Key a componentes hijos
+const MapsApiKeyContext = createContext<string | null>(null)
+
+/**
+ * Hook para obtener la API Key de Google Maps desde el contexto.
+ * Retorna null si no se está dentro de un GoogleMapsProvider.
+ */
+export function useMapsApiKey(): string | null {
+  return useContext(MapsApiKeyContext)
+}
 
 interface GoogleMapsProviderProps {
   children: ReactNode
@@ -120,7 +131,11 @@ function GoogleMapsLoader({ apiKey, children, fallback }: GoogleMapsLoaderProps)
     return fallback ?? <MapSkeleton message={t('loading')} />
   }
 
-  return <>{children}</>
+  return (
+    <MapsApiKeyContext.Provider value={apiKey}>
+      {children}
+    </MapsApiKeyContext.Provider>
+  )
 }
 
 // ============================================================================

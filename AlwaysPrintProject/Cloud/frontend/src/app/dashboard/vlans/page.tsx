@@ -1722,6 +1722,10 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                   setEditLatitude(sel.latitude)
                   setEditLongitude(sel.longitude)
                   setEditPlaceId(sel.place_id)
+                  // Auto-llenar URL de imagen con Street View si disponible
+                  if (sel.streetViewUrl) {
+                    setEditLocationImageUrl(sel.streetViewUrl)
+                  }
                 }}
                 defaultValue={editAddress ?? ''}
                 defaultLatitude={editLatitude ?? undefined}
@@ -1738,6 +1742,18 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                 placeholder={tMap('imagePlaceholder')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
+              {/* Vista previa de la imagen */}
+              {editLocationImageUrl && (
+                <div className="mt-2">
+                  <img
+                    src={editLocationImageUrl}
+                    alt={tMap('imagePreview')}
+                    className="w-full h-40 object-cover rounded-md border"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    onLoad={(e) => { (e.target as HTMLImageElement).style.display = 'block' }}
+                  />
+                </div>
+              )}
             </div>
           </div>
           {/* Sección de Action Config para esta VLAN (colapsable) */}

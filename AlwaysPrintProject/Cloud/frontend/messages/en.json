@@ -1143,6 +1143,8 @@
     "addressPlaceholder": "Search address...",
     "imageLabel": "Image URL",
     "imagePlaceholder": "https://example.com/branch-photo.jpg",
+    "imagePreview": "Location preview",
+    "streetViewAuto": "Image auto-generated from Street View",
     "miniMapToggle": "Show map",
     "configureKey": "Configure API Key"
   }

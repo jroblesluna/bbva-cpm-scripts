@@ -9,6 +9,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { Autocomplete, GoogleMap, Marker } from '@react-google-maps/api'
 import { useTranslations } from 'next-intl'
+import { useMapsApiKey } from './GoogleMapsProvider'
 
 // ============================================================================
 // Interfaces
@@ -19,6 +20,7 @@ export interface AddressSelection {
   latitude: number
   longitude: number
   place_id: string
+  streetViewUrl?: string  // URL auto-generada de Street View Static API
 }
 
 export interface AddressAutocompleteProps {
@@ -27,6 +29,7 @@ export interface AddressAutocompleteProps {
   defaultLatitude?: number       // Latitud para preview map inicial
   defaultLongitude?: number      // Longitud para preview map inicial
   disabled?: boolean
+  apiKey?: string                // API Key para generar URL de Street View (fallback a contexto)
 }
 
 // ============================================================================
@@ -58,10 +61,15 @@ export function AddressAutocomplete({
   defaultLatitude,
   defaultLongitude,
   disabled = false,
+  apiKey,
 }: AddressAutocompleteProps) {
   const t = useTranslations('map')
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
+
+  // Obtener API Key del contexto (fallback al prop)
+  const contextApiKey = useMapsApiKey()
+  const effectiveApiKey = apiKey ?? contextApiKey
 
   // Estado para las coordenadas del marker/mapa
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(
@@ -91,13 +99,19 @@ export function AddressAutocomplete({
 
     setCoordinates({ lat, lng })
 
+    // Generar URL de Street View Static si hay API Key disponible
+    const streetViewUrl = effectiveApiKey
+      ? `https://maps.googleapis.com/maps/api/streetview?size=600x400&location=${lat},${lng}&key=${effectiveApiKey}`
+      : undefined
+
     onSelect({
       address,
       latitude: lat,
       longitude: lng,
       place_id,
+      streetViewUrl,
     })
-  }, [onSelect])
+  }, [onSelect, effectiveApiKey])
 
   // Determinar si hay coordenadas para mostrar el mapa
   const showMap = !disabled && coordinates !== null
