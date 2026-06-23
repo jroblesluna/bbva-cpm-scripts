@@ -69,15 +69,10 @@ class S3ImagesService:
             async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
                 image_data = None
 
-                # Intento 1: Google Places Photo (la foto real del lugar)
-                if place_id:
-                    image_data = await self._try_places_photo(client, place_id, api_key, vlan_id)
+                # Intento 1: Street View Static API (vista exterior del edificio)
+                image_data = await self._try_street_view(client, latitude, longitude, api_key, vlan_id)
 
-                # Intento 2: Street View Static API
-                if not image_data:
-                    image_data = await self._try_street_view(client, latitude, longitude, api_key, vlan_id)
-
-                # Intento 3: Maps Static API (fallback seguro)
+                # Intento 2: Maps Static API (mapa satélite con marcador)
                 if not image_data:
                     image_data = await self._try_static_map(client, latitude, longitude, api_key, vlan_id)
 

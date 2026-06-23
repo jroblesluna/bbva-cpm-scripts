@@ -1771,9 +1771,16 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                       title={tMap('imageRegenerate')}
                       onClick={async () => {
                         try {
+                          // Guardar coordenadas actuales antes de regenerar
+                          await apiClient.put(`/vlans/${vlan.id}`, {
+                            address: editAddress,
+                            latitude: editLatitude,
+                            longitude: editLongitude,
+                            place_id: editPlaceId,
+                          })
                           const result = await vlansApi.uploadLocationImage(vlan.id)
                           if (result.location_image_url) {
-                            setEditLocationImageUrl(result.location_image_url + '?t=' + Date.now())
+                            setEditLocationImageUrl(result.location_image_url)
                           }
                         } catch { /* silencioso */ }
                       }}
