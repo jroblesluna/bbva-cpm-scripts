@@ -187,6 +187,23 @@ class S3ImagesService:
     ) -> Optional[bytes]:
         """Intenta obtener imagen de Street View Static API."""
         try:
+            # Verificar primero si hay cobertura con metadata endpoint
+            metadata_url = (
+                f"https://maps.googleapis.com/maps/api/streetview/metadata"
+                f"?location={latitude},{longitude}"
+                f"&key={api_key}"
+            )
+            meta_resp = await client.get(metadata_url)
+            if meta_resp.status_code == 200:
+                meta_data = meta_resp.json()
+                if meta_data.get("status") != "OK":
+                    logger.info(
+                        "Street View sin cobertura (status=%s): vlan_id=%s",
+                        meta_data.get("status"), vlan_id
+                    )
+                    return None
+
+            # Descargar la imagen
             url = (
                 f"https://maps.googleapis.com/maps/api/streetview"
                 f"?size=600x400"
@@ -195,7 +212,7 @@ class S3ImagesService:
             )
             resp = await client.get(url)
             if resp.status_code == 200 and "image" in resp.headers.get("content-type", ""):
-                logger.info("Street View obtenida: vlan_id=%s", vlan_id)
+                logger.info("Street View obtenida: vlan_id=%s, size=%d", vlan_id, len(resp.content))
                 return resp.content
             logger.info(
                 "Street View no disponible (status=%d): vlan_id=%s",
