@@ -1151,6 +1151,7 @@
     "imageNoCoords": "Select an address to generate the image",
     "imageSelectOne": "Select the most representative image:",
     "imageOption": "Option",
+    "imageRecommended": "Recommended",
     "streetViewInteractive": "Interactive view",
     "streetViewDrag": "Drag to rotate, scroll to zoom",
     "streetViewCapture": "Capture this view",

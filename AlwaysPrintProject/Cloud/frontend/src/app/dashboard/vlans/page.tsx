@@ -1502,6 +1502,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
   const [imageOptions, setImageOptions] = useState<string[]>([])
   const [imageLoading, setImageLoading] = useState(false)
   const [showStreetViewCapture, setShowStreetViewCapture] = useState(false)
+  const [recommendedIndex, setRecommendedIndex] = useState(0)
   const [formData, setFormData] = useState<VLANUpdate>({
     name: vlan.name,
     description: vlan.description,
@@ -1785,6 +1786,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                           const result = await vlansApi.uploadLocationImage(vlan.id)
                           if (result.options.length > 0) {
                             setImageOptions(result.options)
+                            setRecommendedIndex(result.recommended_index)
                           }
                         } catch { /* silencioso */ }
                         setImageLoading(false)
@@ -1822,7 +1824,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                       <button
                         key={idx}
                         type="button"
-                        className="relative rounded-md border-2 border-gray-200 hover:border-blue-500 overflow-hidden transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={`relative rounded-md border-2 overflow-hidden transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${idx === recommendedIndex ? 'border-blue-500' : 'border-gray-200 hover:border-blue-400'}`}
                         onClick={async () => {
                           try {
                             const result = await vlansApi.selectLocationImage(vlan.id, url)
@@ -1838,6 +1840,11 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                           alt={`${tMap('imageOption')} ${idx + 1}`}
                           className="w-full h-24 object-cover"
                         />
+                        {idx === recommendedIndex && (
+                          <span className="absolute top-1 left-1 inline-flex items-center rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-medium text-white">
+                            {tMap('imageRecommended')}
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -1874,6 +1881,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                         const result = await vlansApi.uploadLocationImage(vlan.id)
                         if (result.options.length > 0) {
                           setImageOptions(result.options)
+                          setRecommendedIndex(result.recommended_index)
                         }
                       } catch { /* silencioso */ }
                       setImageLoading(false)

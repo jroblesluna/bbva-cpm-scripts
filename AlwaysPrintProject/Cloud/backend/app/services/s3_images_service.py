@@ -48,22 +48,42 @@ class S3ImagesService:
         latitude: float,
         longitude: float,
         api_key: str,
-    ) -> list[str]:
+        place_id: Optional[str] = None,
+    ) -> dict:
         """
         Genera múltiples opciones de imagen para que el usuario elija.
 
-        Opciones:
-        - Street View desde 4 ángulos (heading 0°, 90°, 180°, 270°) con source=outdoor
-        - Mapa satélite con marcador (siempre disponible)
+        Opciones (en orden):
+        1. Google Places Photo (la misma que muestra Google Maps) — si disponible, marcada como recomendada
+        2. Street View desde 4 ángulos (heading 0°, 90°, 180°, 270°) con source=outdoor
+        3. Mapa satélite con marcador (siempre disponible)
 
-        Retorna lista de URLs públicas de S3.
+        Retorna dict con:
+        - options: lista de URLs públicas de S3
+        - recommended_index: índice de la opción recomendada (0 si hay Places Photo)
         """
         options: list[str] = []
+        recommended_index: int = 0
         cache_buster = int(time.time())
 
         try:
             async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
-                # Verificar cobertura outdoor de Street View
+                # 1. Google Places Photo (primera opción, recomendada)
+                if place_id:
+                    places_photo = await self._try_places_photo(client, place_id, api_key, vlan_id)
+                    if places_photo:
+                        s3_key = f"vlan-images/{vlan_id}_opt_places.jpg"
+                        self._client.put_object(
+                            Bucket=self._bucket,
+                            Key=s3_key,
+                            Body=places_photo,
+                            ContentType="image/jpeg",
+                            CacheControl="no-cache",
+                        )
+                        options.append(f"{self._get_public_url(s3_key)}?v={cache_buster}")
+                        recommended_index = 0
+
+                # 2. Verificar cobertura outdoor de Street View
                 has_outdoor = await self._check_sv_coverage(client, latitude, longitude, api_key)
 
                 # Street View desde distintos ángulos
@@ -111,11 +131,11 @@ class S3ImagesService:
                     options.append(f"{self._get_public_url(s3_key)}?v={cache_buster}")
 
             logger.info("Opciones generadas: vlan_id=%s, count=%d", vlan_id, len(options))
-            return options
+            return {"options": options, "recommended_index": recommended_index}
 
         except Exception as e:
             logger.error("Error generando opciones: vlan_id=%s, error=%s", vlan_id, str(e))
-            return options
+            return {"options": options, "recommended_index": recommended_index}
 
     # =========================================================================
     # SELECCIONAR OPCIÓN
@@ -264,11 +284,57 @@ class S3ImagesService:
     def _cleanup_options(self, vlan_id: str) -> None:
         """Elimina las imágenes de opciones temporales de S3."""
         try:
-            for suffix in ["_opt0", "_opt1", "_opt2", "_opt3", "_opt_map"]:
+            for suffix in ["_opt0", "_opt1", "_opt2", "_opt3", "_opt_map", "_opt_places"]:
                 key = f"vlan-images/{vlan_id}{suffix}.jpg"
                 self._client.delete_object(Bucket=self._bucket, Key=key)
         except Exception:
             pass
+
+    async def _try_places_photo(
+        self, client: httpx.AsyncClient, place_id: str, api_key: str, vlan_id: str
+    ) -> Optional[bytes]:
+        """
+        Obtiene la foto principal del lugar desde Google Places API.
+        Es la misma foto que muestra Google Maps en el panel izquierdo.
+        """
+        try:
+            # Obtener photo_reference del place
+            details_url = (
+                f"https://maps.googleapis.com/maps/api/place/details/json"
+                f"?place_id={place_id}"
+                f"&fields=photos"
+                f"&key={api_key}"
+            )
+            details_resp = await client.get(details_url)
+            if details_resp.status_code != 200:
+                return None
+
+            details_data = details_resp.json()
+            photos = details_data.get("result", {}).get("photos", [])
+            if not photos:
+                return None
+
+            # Primera foto = la principal (misma que Google Maps)
+            photo_reference = photos[0].get("photo_reference")
+            if not photo_reference:
+                return None
+
+            # Descargar la foto
+            photo_url = (
+                f"https://maps.googleapis.com/maps/api/place/photo"
+                f"?maxwidth=600"
+                f"&photo_reference={photo_reference}"
+                f"&key={api_key}"
+            )
+            photo_resp = await client.get(photo_url)
+            if photo_resp.status_code == 200 and "image" in photo_resp.headers.get("content-type", ""):
+                logger.info("Places Photo obtenida: vlan_id=%s, size=%d", vlan_id, len(photo_resp.content))
+                return photo_resp.content
+
+            return None
+        except Exception as e:
+            logger.info("Error en Places Photo: vlan_id=%s, error=%s", vlan_id, str(e))
+            return None
 
     def _get_public_url(self, s3_key: str) -> str:
         """Construye la URL pública del objeto en S3."""

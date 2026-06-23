@@ -849,20 +849,21 @@ async def upload_location_image(
     from app.services.s3_images_service import S3ImagesService
     s3_service = S3ImagesService()
 
-    options = await s3_service.generate_image_options(
+    result = await s3_service.generate_image_options(
         vlan_id=str(vlan.id),
         latitude=vlan.latitude,
         longitude=vlan.longitude,
         api_key=org.google_maps_api_key,
+        place_id=vlan.place_id,
     )
 
-    if not options:
+    if not result["options"]:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="No se pudo generar opciones de imagen desde Google"
         )
 
-    return {"options": options}
+    return result
 
 
 @router.post("/{vlan_id}/location-image/select")

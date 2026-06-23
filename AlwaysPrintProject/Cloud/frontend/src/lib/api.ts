@@ -684,10 +684,10 @@ export const vlansApi = {
 
   /**
    * Generar opciones de imagen de ubicación para una VLAN.
-   * Retorna múltiples URLs (Street View desde distintos ángulos + mapa satélite).
+   * Retorna múltiples URLs (Places Photo + Street View + mapa satélite).
    */
-  uploadLocationImage: async (id: string): Promise<{ options: string[] }> => {
-    const response = await apiClient.post<{ options: string[] }>(
+  uploadLocationImage: async (id: string): Promise<{ options: string[]; recommended_index: number }> => {
+    const response = await apiClient.post<{ options: string[]; recommended_index: number }>(
       `/vlans/${id}/location-image`
     )
     return response.data
