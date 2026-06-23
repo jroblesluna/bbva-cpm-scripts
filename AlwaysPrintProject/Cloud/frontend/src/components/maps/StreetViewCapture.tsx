@@ -75,9 +75,11 @@ export function StreetViewCapture({ latitude, longitude, onCapture, onClose }: S
     const pov = panoramaRef.current.getPov()
     const zoom = panoramaRef.current.getZoom()
     const pano = panoramaRef.current.getPano()
-    // Convertir zoom de Street View a FOV (field of view)
-    // zoom 0 = 180°, zoom 1 = 90°, zoom 2 = 45°, etc.
-    const fov = 180 / Math.pow(2, zoom)
+    // FOV para Street View Static API:
+    // El JS viewer con zoom=1 muestra ~90° horizontal en un contenedor 3:2
+    // zoom=0 → 180°, zoom=1 → 90°, zoom=2 → 45°, zoom=3 → 22.5°
+    // Fórmula estándar de Google: fov = 180 / 2^zoom
+    const fov = Math.min(120, Math.max(10, 180 / Math.pow(2, zoom)))
     onCapture(pov.heading, pov.pitch, fov, pano)
   }, [onCapture])
 
@@ -95,8 +97,8 @@ export function StreetViewCapture({ latitude, longitude, onCapture, onClose }: S
 
   return (
     <div className="border rounded-lg overflow-hidden">
-      {/* Visor interactivo de Street View */}
-      <div ref={containerRef} className="w-full h-64 bg-gray-100">
+      {/* Visor interactivo de Street View — aspect ratio 3:2 (igual que imagen guardada 600x400) */}
+      <div ref={containerRef} className="w-full bg-gray-100" style={{ aspectRatio: '3/2' }}>
         {status === 'loading' && (
           <div className="w-full h-full flex items-center justify-center">
             <p className="text-sm text-gray-400">{t('streetViewLoading')}</p>
