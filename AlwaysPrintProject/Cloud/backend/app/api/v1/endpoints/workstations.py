@@ -280,6 +280,10 @@ async def download_latest_log(
         "params": {}
     }
     
+    logger.info(
+        f"[LOGS] Enviando get_latest_log: workstation_id={workstation_id}, command_id={command_id}"
+    )
+    
     sent = await connection_manager.send_to_workstation(workstation_id_str, message)
     
     if not sent:
@@ -288,12 +292,19 @@ async def download_latest_log(
             detail="La workstation se desconectó antes de recibir el comando."
         )
     
+    logger.info(
+        f"[LOGS] Comando enviado (sent=True), esperando respuesta: command_id={command_id}"
+    )
+    
     # Esperar respuesta con timeout de 30 segundos
     response_data = await connection_manager.wait_for_command_response(
         command_id, timeout=30.0
     )
     
     if response_data is None:
+        logger.warning(
+            f"[LOGS] TIMEOUT esperando respuesta: workstation_id={workstation_id}, command_id={command_id}"
+        )
         raise HTTPException(
             status_code=status.HTTP_408_REQUEST_TIMEOUT,
             detail="Timeout esperando respuesta de la workstation. Intente nuevamente."

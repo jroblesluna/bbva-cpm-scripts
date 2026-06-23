@@ -464,10 +464,11 @@ class RedisConnectionManager:
             ws = self.workstation_connections[workstation_id]
             try:
                 await ws.send_json(message)
-                logger.debug(
+                logger.info(
                     "delivery.local",
                     workstation_id=workstation_id,
                     message_type=message.get("type", "unknown"),
+                    command_id=message.get("command_id"),
                 )
                 return True
             except Exception:
@@ -518,10 +519,11 @@ class RedisConnectionManager:
                 payload = json.dumps(enriched_message, default=str)
                 target_channel = f"worker:{target_worker_id}"
                 await self._redis.publish(target_channel, payload)
-                logger.debug(
+                logger.info(
                     "delivery.remote_publish",
                     workstation_id=workstation_id,
                     message_type=message.get("type", "unknown"),
+                    command_id=message.get("command_id"),
                     target_channel=target_channel,
                     target_worker_id=target_worker_id,
                 )
@@ -755,6 +757,12 @@ class RedisConnectionManager:
                                     for k in keys_to_remove:
                                         del self._command_origins[k]
                                 self._command_origins[command_id] = origin_worker
+                            logger.info(
+                                "delivery.cross_worker_received",
+                                command_id=command_id,
+                                origin_worker=origin_worker,
+                                target_ws_id=target_ws_id,
+                            )
                             # Entregar al WS local (sin campos internos de routing)
                             clean_payload = {k: v for k, v in payload.items() if not k.startswith("_") and k != "target_workstation_id"}
                             await self._deliver_to_local_workstation(target_ws_id, clean_payload)
@@ -1175,7 +1183,16 @@ class RedisConnectionManager:
             event, container, _ = self._pending_command_responses[command_id]
             container[0] = response
             event.set()
+            logger.info(
+                "cmd_response.resolved_locally",
+                command_id=command_id,
+                success=response.get("success"),
+            )
             return True
+        logger.info(
+            "cmd_response.no_local_waiter",
+            command_id=command_id,
+        )
         return False
 
     async def wait_for_command_response(
@@ -1226,7 +1243,7 @@ class RedisConnectionManager:
                     default=str,
                 )
                 await self._redis.publish(f"worker:{originator_worker_id}", payload)
-                logger.debug(
+                logger.info(
                     "redis.publish_cmd_response",
                     command_id=command_id,
                     target_worker=originator_worker_id,

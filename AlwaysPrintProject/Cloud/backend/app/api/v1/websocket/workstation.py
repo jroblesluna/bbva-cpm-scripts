@@ -456,8 +456,19 @@ async def workstation_websocket(
                     # Buscar si este comando vino de otro worker
                     origin_worker = connection_manager._command_origins.pop(command_id, None)
                     if origin_worker:
+                        logger.info(
+                            "[WS] command_result routing cross-worker: "
+                            "command_id=%s → origin_worker=%s",
+                            command_id, origin_worker,
+                        )
                         await connection_manager.publish_command_response(
                             command_id, response_data, origin_worker
+                        )
+                    else:
+                        logger.warning(
+                            "[WS] command_result sin waiter local ni origin_worker: "
+                            "command_id=%s, workstation_id=%s",
+                            command_id, workstation_id,
                         )
                 
                 # Preparar mensaje de broadcast
