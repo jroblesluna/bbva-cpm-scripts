@@ -2,7 +2,8 @@
 
 /**
  * Componente de captura interactiva de Street View.
- * El usuario navega el panorama y puede capturar la vista actual como imagen.
+ * El usuario navega el panorama outdoor y puede capturar la vista actual.
+ * Filtra photospheres de interior usando source=OUTDOOR.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -21,33 +22,52 @@ export function StreetViewCapture({ latitude, longitude, onCapture, onClose }: S
   const t = useTranslations('map')
   const containerRef = useRef<HTMLDivElement>(null)
   const panoramaRef = useRef<google.maps.StreetViewPanorama | null>(null)
-  const [hasStreetView, setHasStreetView] = useState(true)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'no-coverage'>('loading')
 
   useEffect(() => {
     if (!containerRef.current || !window.google?.maps) return
 
-    const panorama = new google.maps.StreetViewPanorama(containerRef.current, {
-      position: { lat: latitude, lng: longitude },
-      pov: { heading: 0, pitch: 0 },
-      zoom: 1,
-      addressControl: false,
-      fullscreenControl: false,
-      motionTracking: false,
-      motionTrackingControl: false,
-    })
-
-    // Verificar si hay cobertura
+    // Buscar panorama OUTDOOR más cercano a las coordenadas
     const sv = new google.maps.StreetViewService()
     sv.getPanorama(
-      { location: { lat: latitude, lng: longitude }, radius: 50, source: google.maps.StreetViewSource.OUTDOOR },
-      (data, status) => {
-        if (status !== google.maps.StreetViewStatus.OK) {
-          setHasStreetView(false)
+      {
+        location: { lat: latitude, lng: longitude },
+        radius: 100,
+        source: google.maps.StreetViewSource.OUTDOOR,
+        preference: google.maps.StreetViewPreference.NEAREST,
+      },
+      (data, svStatus) => {
+        if (svStatus !== google.maps.StreetViewStatus.OK || !data?.location?.latLng) {
+          setStatus('no-coverage')
+          return
         }
+
+        // Calcular heading inicial mirando hacia las coordenadas del edificio
+        const svLat = data.location.latLng.lat()
+        const svLng = data.location.latLng.lng()
+        const heading = google.maps.geometry?.spherical?.computeHeading(
+          new google.maps.LatLng(svLat, svLng),
+          new google.maps.LatLng(latitude, longitude)
+        ) ?? 0
+
+        // Crear panorama con el pano_id outdoor encontrado
+        const panorama = new google.maps.StreetViewPanorama(containerRef.current!, {
+          pano: data.location.pano,
+          pov: { heading, pitch: 5 },
+          zoom: 1,
+          addressControl: false,
+          fullscreenControl: false,
+          motionTracking: false,
+          motionTrackingControl: false,
+          linksControl: true, // Permitir navegación por la calle
+          panControl: true,
+          zoomControl: true,
+        })
+
+        panoramaRef.current = panorama
+        setStatus('ready')
       }
     )
-
-    panoramaRef.current = panorama
   }, [latitude, longitude])
 
   const handleCapture = useCallback(() => {
@@ -60,11 +80,12 @@ export function StreetViewCapture({ latitude, longitude, onCapture, onClose }: S
     onCapture(pov.heading, pov.pitch, fov)
   }, [onCapture])
 
-  if (!hasStreetView) {
+  if (status === 'no-coverage') {
     return (
       <div className="border rounded-lg p-6 text-center bg-gray-50">
         <p className="text-sm text-gray-500">{t('streetViewNoAvailable')}</p>
         <Button variant="ghost" size="sm" onClick={onClose} className="mt-2">
+          <X className="h-4 w-4 mr-1" />
           {t('close')}
         </Button>
       </div>
@@ -74,7 +95,13 @@ export function StreetViewCapture({ latitude, longitude, onCapture, onClose }: S
   return (
     <div className="border rounded-lg overflow-hidden">
       {/* Visor interactivo de Street View */}
-      <div ref={containerRef} className="w-full h-64" />
+      <div ref={containerRef} className="w-full h-64 bg-gray-100">
+        {status === 'loading' && (
+          <div className="w-full h-full flex items-center justify-center">
+            <p className="text-sm text-gray-400">{t('streetViewLoading')}</p>
+          </div>
+        )}
+      </div>
 
       {/* Controles */}
       <div className="flex items-center justify-between p-2 bg-gray-50 border-t">
@@ -84,7 +111,13 @@ export function StreetViewCapture({ latitude, longitude, onCapture, onClose }: S
             <X className="h-4 w-4 mr-1" />
             {t('close')}
           </Button>
-          <Button variant="default" size="sm" onClick={handleCapture} className="h-8">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleCapture}
+            className="h-8"
+            disabled={status !== 'ready'}
+          >
             <Camera className="h-4 w-4 mr-1" />
             {t('streetViewCapture')}
           </Button>

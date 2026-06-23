@@ -1155,6 +1155,7 @@
     "streetViewDrag": "Drag to rotate, scroll to zoom",
     "streetViewCapture": "Capture this view",
     "streetViewNoAvailable": "No street view available for this location",
+    "streetViewLoading": "Finding street view...",
     "close": "Close",
     "streetViewAuto": "Image auto-generated from Street View",
     "miniMapToggle": "Show map",

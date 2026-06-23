@@ -1155,6 +1155,7 @@
     "streetViewDrag": "Arrastre para girar, zoom con scroll",
     "streetViewCapture": "Capturar esta vista",
     "streetViewNoAvailable": "No hay vista de calle disponible para esta ubicación",
+    "streetViewLoading": "Buscando vista de calle...",
     "close": "Cerrar",
     "streetViewAuto": "Imagen generada automáticamente desde Street View",
     "miniMapToggle": "Mostrar mapa",
