@@ -126,17 +126,22 @@ class S3ImagesService:
                 Key=s3_key,
                 Body=image_data,
                 ContentType="image/jpeg",
-                CacheControl="public, max-age=86400",  # Cache 24h
+                CacheControl="no-cache",  # Evitar cache stale al regenerar
             )
 
             public_url = self._get_public_url(s3_key)
 
+            # Agregar cache-buster para forzar recarga en el navegador
+            import time
+            cache_buster = int(time.time())
+            public_url_with_cb = f"{public_url}?v={cache_buster}"
+
             logger.info(
                 "Imagen de Street View subida a S3: vlan_id=%s, size=%d bytes, url=%s",
-                vlan_id, len(image_data), public_url
+                vlan_id, len(image_data), public_url_with_cb
             )
 
-            return public_url
+            return public_url_with_cb
 
         except httpx.TimeoutException:
             logger.warning(
