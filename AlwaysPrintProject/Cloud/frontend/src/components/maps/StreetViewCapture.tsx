@@ -14,7 +14,7 @@ import { Camera, X } from 'lucide-react'
 interface StreetViewCaptureProps {
   latitude: number
   longitude: number
-  onCapture: (heading: number, pitch: number, fov: number) => void
+  onCapture: (heading: number, pitch: number, fov: number, panoId: string) => void
   onClose: () => void
 }
 
@@ -74,10 +74,11 @@ export function StreetViewCapture({ latitude, longitude, onCapture, onClose }: S
     if (!panoramaRef.current) return
     const pov = panoramaRef.current.getPov()
     const zoom = panoramaRef.current.getZoom()
+    const pano = panoramaRef.current.getPano()
     // Convertir zoom de Street View a FOV (field of view)
     // zoom 0 = 180°, zoom 1 = 90°, zoom 2 = 45°, etc.
     const fov = 180 / Math.pow(2, zoom)
-    onCapture(pov.heading, pov.pitch, fov)
+    onCapture(pov.heading, pov.pitch, fov, pano)
   }, [onCapture])
 
   if (status === 'no-coverage') {

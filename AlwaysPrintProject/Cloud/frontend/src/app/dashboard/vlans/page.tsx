@@ -1913,9 +1913,9 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                   <StreetViewCapture
                     latitude={editLatitude}
                     longitude={editLongitude}
-                    onCapture={async (heading, pitch, fov) => {
+                    onCapture={async (heading, pitch, fov, panoId) => {
                       try {
-                        const result = await vlansApi.captureStreetView(vlan.id, heading, pitch, fov)
+                        const result = await vlansApi.captureStreetView(vlan.id, heading, pitch, fov, panoId)
                         if (result.location_image_url) {
                           setEditLocationImageUrl(result.location_image_url)
                           setShowStreetViewCapture(false)

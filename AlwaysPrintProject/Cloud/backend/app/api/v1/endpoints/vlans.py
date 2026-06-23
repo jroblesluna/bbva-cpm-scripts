@@ -939,6 +939,7 @@ async def capture_street_view(
     heading = body.get("heading", 0)
     pitch = body.get("pitch", 0)
     fov = body.get("fov", 90)
+    pano_id = body.get("pano_id")
 
     org = db.query(Organization).filter(Organization.id == vlan.organization_id).first()
     if not org or not org.google_maps_api_key:
@@ -958,6 +959,7 @@ async def capture_street_view(
         pitch=pitch,
         fov=fov,
         api_key=org.google_maps_api_key,
+        pano_id=pano_id,
     )
 
     if not image_url:

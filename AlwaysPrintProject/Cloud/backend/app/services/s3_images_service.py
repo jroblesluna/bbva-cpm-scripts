@@ -166,24 +166,37 @@ class S3ImagesService:
         pitch: float,
         fov: float,
         api_key: str,
+        pano_id: Optional[str] = None,
     ) -> Optional[str]:
         """
         Captura una imagen de Street View con parámetros exactos del usuario.
 
-        El usuario navega el panorama interactivo en el frontend y envía
-        heading/pitch/fov de la vista que quiere capturar.
+        Si pano_id está disponible, usa ese panorama exacto (garantiza que la
+        imagen capturada sea la misma que el usuario estaba viendo).
         """
         try:
-            url = (
-                f"https://maps.googleapis.com/maps/api/streetview"
-                f"?size=600x400"
-                f"&location={latitude},{longitude}"
-                f"&heading={heading}"
-                f"&pitch={pitch}"
-                f"&fov={fov}"
-                f"&source=outdoor"
-                f"&key={api_key}"
-            )
+            # Usar pano_id si disponible (garantiza panorama exacto)
+            if pano_id:
+                url = (
+                    f"https://maps.googleapis.com/maps/api/streetview"
+                    f"?size=600x400"
+                    f"&pano={pano_id}"
+                    f"&heading={heading}"
+                    f"&pitch={pitch}"
+                    f"&fov={fov}"
+                    f"&key={api_key}"
+                )
+            else:
+                url = (
+                    f"https://maps.googleapis.com/maps/api/streetview"
+                    f"?size=600x400"
+                    f"&location={latitude},{longitude}"
+                    f"&heading={heading}"
+                    f"&pitch={pitch}"
+                    f"&fov={fov}"
+                    f"&source=outdoor"
+                    f"&key={api_key}"
+                )
 
             async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
                 resp = await client.get(url)
