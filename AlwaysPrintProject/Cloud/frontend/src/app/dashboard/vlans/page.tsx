@@ -1497,6 +1497,8 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
   const [editLongitude, setEditLongitude] = useState<number | null>(vlan.longitude ?? null)
   const [editPlaceId, setEditPlaceId] = useState<string | null>(vlan.place_id ?? null)
   const [editLocationImageUrl, setEditLocationImageUrl] = useState(vlan.location_image_url ?? '')
+  const [imageOptions, setImageOptions] = useState<string[]>([])
+  const [imageLoading, setImageLoading] = useState(false)
   const [formData, setFormData] = useState<VLANUpdate>({
     name: vlan.name,
     description: vlan.description,
@@ -1566,15 +1568,12 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
         place_id: editPlaceId,
         // No enviar location_image_url directamente — se genera server-side
       })
-      // Si las coordenadas cambiaron, regenerar imagen automáticamente
+      // Si las coordenadas cambiaron y hay imagen, limpiar la imagen vieja
+      // (el usuario deberá regenerar manualmente con el picker)
       const coordsChanged = editLatitude !== vlan.latitude || editLongitude !== vlan.longitude
-      if (editLatitude != null && editLongitude != null && coordsChanged) {
-        try {
-          await vlansApi.uploadLocationImage(vlan.id)
-        } catch {
-          // No bloquear el guardado si la imagen falla
-          console.warn('No se pudo generar imagen de Street View')
-        }
+      if (coordsChanged && editLocationImageUrl) {
+        await apiClient.put(`/vlans/${vlan.id}`, { location_image_url: null })
+        setEditLocationImageUrl('')
       }
       // Actualizar impresora predeterminada si cambió
       if (selectedDefaultDevice !== vlan.default_device_id) {
@@ -1750,17 +1749,18 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                 defaultLongitude={editLongitude ?? undefined}
               />
             </GoogleMapsProvider>
-            {/* Vista previa de la imagen de ubicación con controles */}
+            {/* Imagen de ubicación con picker de opciones */}
             <div className="mt-3">
               <label className="block text-sm font-medium text-gray-700 mb-1">{tMap('imageLabel')}</label>
-              {editLocationImageUrl ? (
+
+              {/* Imagen seleccionada actual */}
+              {editLocationImageUrl && imageOptions.length === 0 && (
                 <div className="relative">
                   <img
                     src={editLocationImageUrl}
                     alt={tMap('imagePreview')}
                     className="w-full h-40 object-cover rounded-md border"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                    onLoad={(e) => { (e.target as HTMLImageElement).style.display = 'block' }}
                   />
                   <div className="absolute top-2 right-2 flex gap-1">
                     <Button
@@ -1769,9 +1769,10 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                       size="sm"
                       className="h-7 w-7 p-0 bg-white/90 hover:bg-white"
                       title={tMap('imageRegenerate')}
+                      disabled={imageLoading}
                       onClick={async () => {
+                        setImageLoading(true)
                         try {
-                          // Guardar coordenadas actuales antes de regenerar
                           await apiClient.put(`/vlans/${vlan.id}`, {
                             address: editAddress,
                             latitude: editLatitude,
@@ -1779,13 +1780,14 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                             place_id: editPlaceId,
                           })
                           const result = await vlansApi.uploadLocationImage(vlan.id)
-                          if (result.location_image_url) {
-                            setEditLocationImageUrl(result.location_image_url)
+                          if (result.options.length > 0) {
+                            setImageOptions(result.options)
                           }
                         } catch { /* silencioso */ }
+                        setImageLoading(false)
                       }}
                     >
-                      <RefreshCw className="h-3.5 w-3.5" />
+                      <RefreshCw className={`h-3.5 w-3.5 ${imageLoading ? 'animate-spin' : ''}`} />
                     </Button>
                     <Button
                       type="button"
@@ -1797,6 +1799,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                         try {
                           await apiClient.put(`/vlans/${vlan.id}`, { location_image_url: null })
                           setEditLocationImageUrl('')
+                          setImageOptions([])
                         } catch { /* silencioso */ }
                       }}
                     >
@@ -1805,15 +1808,59 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                   </div>
                   <p className="text-xs text-gray-400 mt-1">{tMap('imageAutoGenerated')}</p>
                 </div>
-              ) : editLatitude != null && editLongitude != null ? (
+              )}
+
+              {/* Grid de opciones para seleccionar */}
+              {imageOptions.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-600 mb-2">{tMap('imageSelectOne')}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {imageOptions.map((url, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        className="relative rounded-md border-2 border-gray-200 hover:border-blue-500 overflow-hidden transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        onClick={async () => {
+                          try {
+                            const result = await vlansApi.selectLocationImage(vlan.id, url)
+                            if (result.location_image_url) {
+                              setEditLocationImageUrl(result.location_image_url)
+                              setImageOptions([])
+                            }
+                          } catch { /* silencioso */ }
+                        }}
+                      >
+                        <img
+                          src={url}
+                          alt={`${tMap('imageOption')} ${idx + 1}`}
+                          className="w-full h-24 object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 text-xs"
+                    onClick={() => setImageOptions([])}
+                  >
+                    {tCommon('cancel')}
+                  </Button>
+                </div>
+              )}
+
+              {/* Botón para generar cuando no hay imagen ni opciones */}
+              {!editLocationImageUrl && imageOptions.length === 0 && editLatitude != null && editLongitude != null && (
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   className="w-full h-20 border-dashed text-gray-500"
+                  disabled={imageLoading}
                   onClick={async () => {
+                    setImageLoading(true)
                     try {
-                      // Guardar coordenadas primero si son nuevas
                       await apiClient.put(`/vlans/${vlan.id}`, {
                         address: editAddress,
                         latitude: editLatitude,
@@ -1821,16 +1868,24 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                         place_id: editPlaceId,
                       })
                       const result = await vlansApi.uploadLocationImage(vlan.id)
-                      if (result.location_image_url) {
-                        setEditLocationImageUrl(result.location_image_url)
+                      if (result.options.length > 0) {
+                        setImageOptions(result.options)
                       }
                     } catch { /* silencioso */ }
+                    setImageLoading(false)
                   }}
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                  {imageLoading ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                  )}
                   {tMap('imageGenerate')}
                 </Button>
-              ) : (
+              )}
+
+              {/* Sin coordenadas */}
+              {!editLocationImageUrl && imageOptions.length === 0 && (editLatitude == null || editLongitude == null) && (
                 <p className="text-xs text-gray-400">{tMap('imageNoCoords')}</p>
               )}
             </div>

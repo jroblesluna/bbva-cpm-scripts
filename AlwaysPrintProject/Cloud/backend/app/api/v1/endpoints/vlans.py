@@ -845,27 +845,63 @@ async def upload_location_image(
             detail="La organización no tiene API Key de Google Maps configurada"
         )
 
-    # Descargar y subir imagen a S3
+    # Generar opciones de imagen
     from app.services.s3_images_service import S3ImagesService
     s3_service = S3ImagesService()
 
-    image_url = await s3_service.upload_street_view_image(
+    options = await s3_service.generate_image_options(
         vlan_id=str(vlan.id),
         latitude=vlan.latitude,
         longitude=vlan.longitude,
         api_key=org.google_maps_api_key,
-        place_id=vlan.place_id,
     )
 
-    if not image_url:
+    if not options:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="No se pudo obtener la imagen de Street View de Google"
+            detail="No se pudo generar opciones de imagen desde Google"
+        )
+
+    return {"options": options}
+
+
+@router.post("/{vlan_id}/location-image/select")
+async def select_location_image(
+    vlan_id: UUID,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Seleccionar una de las opciones de imagen generadas como la imagen principal.
+
+    Body:
+        {"selected_url": "https://...s3.../vlan-images/{id}_optN.jpg?v=..."}
+    """
+    vlan = db.query(VLAN).filter(VLAN.id == vlan_id).first()
+    if not vlan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
+
+    if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
+
+    selected_url = body.get("selected_url")
+    if not selected_url:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="selected_url es requerido")
+
+    from app.services.s3_images_service import S3ImagesService
+    s3_service = S3ImagesService()
+
+    final_url = await s3_service.select_image_option(str(vlan.id), selected_url)
+    if not final_url:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al seleccionar la imagen"
         )
 
     # Actualizar la URL en la BD
-    vlan.location_image_url = image_url
+    vlan.location_image_url = final_url
     db.commit()
     db.refresh(vlan)
 
-    return {"location_image_url": image_url}
+    return {"location_image_url": final_url}

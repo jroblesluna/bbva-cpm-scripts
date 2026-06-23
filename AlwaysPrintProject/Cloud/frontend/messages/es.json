@@ -1149,6 +1149,8 @@
     "imageRemove": "Eliminar imagen",
     "imageGenerate": "Generar imagen de ubicación",
     "imageNoCoords": "Seleccione una dirección para generar la imagen",
+    "imageSelectOne": "Seleccione la imagen más representativa:",
+    "imageOption": "Opción",
     "streetViewAuto": "Imagen generada automáticamente desde Street View",
     "miniMapToggle": "Mostrar mapa",
     "configureKey": "Configurar API Key"

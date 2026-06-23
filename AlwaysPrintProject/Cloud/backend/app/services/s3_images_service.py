@@ -48,19 +48,15 @@ class S3ImagesService:
         place_id: Optional[str] = None,
     ) -> Optional[str]:
         """
-        Descarga la imagen de ubicación y la sube a S3.
-
-        Orden de prioridad:
-        1. Google Places Photo (la misma foto que muestra Google Maps)
-        2. Street View Static API (panorámica más cercana)
-        3. Maps Static API (mapa satélite con marcador)
+        Genera UNA imagen de ubicación (la mejor disponible) y la sube a S3.
+        Usado internamente cuando se selecciona una opción del picker.
 
         Args:
-            vlan_id: UUID de la VLAN (se usa como nombre de archivo)
-            latitude: Latitud de la ubicación
-            longitude: Longitud de la ubicación
-            api_key: Google Maps API key de la organización
-            place_id: Google Place ID (opcional, mejora la calidad de la foto)
+            vlan_id: UUID de la VLAN
+            latitude: Latitud
+            longitude: Longitud
+            api_key: Google Maps API key
+            place_id: Google Place ID (no usado actualmente)
 
         Returns:
             URL pública de la imagen en S3, o None si falla
@@ -69,12 +65,187 @@ class S3ImagesService:
             async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
                 image_data = None
 
-                # Intento 1: Street View Static API (vista exterior del edificio)
+                # Intento 1: Street View Static API (solo exteriores)
                 image_data = await self._try_street_view(client, latitude, longitude, api_key, vlan_id)
 
                 # Intento 2: Maps Static API (mapa satélite con marcador)
                 if not image_data:
                     image_data = await self._try_static_map(client, latitude, longitude, api_key, vlan_id)
+
+            if not image_data:
+                logger.warning(
+                    "No se pudo obtener ninguna imagen para vlan_id=%s", vlan_id
+                )
+                return None
+
+            # Subir a S3
+            s3_key = f"vlan-images/{vlan_id}.jpg"
+            self._client.put_object(
+                Bucket=self._bucket,
+                Key=s3_key,
+                Body=image_data,
+                ContentType="image/jpeg",
+                CacheControl="no-cache",
+            )
+
+            public_url = self._get_public_url(s3_key)
+
+            import time
+            cache_buster = int(time.time())
+            public_url_with_cb = f"{public_url}?v={cache_buster}"
+
+            logger.info(
+                "Imagen subida a S3: vlan_id=%s, size=%d bytes",
+                vlan_id, len(image_data)
+            )
+
+            return public_url_with_cb
+
+        except httpx.TimeoutException:
+            logger.warning("Timeout descargando imagen: vlan_id=%s", vlan_id)
+            return None
+        except ClientError as e:
+            logger.error("Error al subir imagen a S3: vlan_id=%s, error=%s", vlan_id, str(e))
+            return None
+        except Exception as e:
+            logger.error("Error inesperado: vlan_id=%s, error=%s", vlan_id, str(e))
+            return None
+
+    async def generate_image_options(
+        self,
+        vlan_id: str,
+        latitude: float,
+        longitude: float,
+        api_key: str,
+    ) -> list[str]:
+        """
+        Genera múltiples opciones de imagen para que el usuario elija.
+
+        Opciones generadas:
+        - Street View desde 4 ángulos (heading 0°, 90°, 180°, 270°) si hay cobertura outdoor
+        - Mapa satélite con marcador (siempre disponible)
+
+        Sube cada opción a S3 como vlan-images/{vlan_id}_opt{N}.jpg
+        Retorna lista de URLs públicas.
+        """
+        import time
+        options: list[str] = []
+        cache_buster = int(time.time())
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+                # Verificar cobertura outdoor de Street View
+                has_outdoor = False
+                metadata_url = (
+                    f"https://maps.googleapis.com/maps/api/streetview/metadata"
+                    f"?location={latitude},{longitude}"
+                    f"&source=outdoor"
+                    f"&key={api_key}"
+                )
+                meta_resp = await client.get(metadata_url)
+                if meta_resp.status_code == 200:
+                    meta_data = meta_resp.json()
+                    has_outdoor = meta_data.get("status") == "OK"
+
+                # Generar opciones de Street View desde distintos ángulos
+                if has_outdoor:
+                    headings = [0, 90, 180, 270]
+                    for idx, heading in enumerate(headings):
+                        url = (
+                            f"https://maps.googleapis.com/maps/api/streetview"
+                            f"?size=600x400"
+                            f"&location={latitude},{longitude}"
+                            f"&heading={heading}"
+                            f"&source=outdoor"
+                            f"&key={api_key}"
+                        )
+                        resp = await client.get(url)
+                        if resp.status_code == 200 and "image" in resp.headers.get("content-type", ""):
+                            s3_key = f"vlan-images/{vlan_id}_opt{idx}.jpg"
+                            self._client.put_object(
+                                Bucket=self._bucket,
+                                Key=s3_key,
+                                Body=resp.content,
+                                ContentType="image/jpeg",
+                                CacheControl="no-cache",
+                            )
+                            options.append(f"{self._get_public_url(s3_key)}?v={cache_buster}")
+
+                # Siempre agregar mapa satélite como última opción
+                static_data = await self._try_static_map(client, latitude, longitude, api_key, vlan_id)
+                if static_data:
+                    s3_key = f"vlan-images/{vlan_id}_opt_map.jpg"
+                    self._client.put_object(
+                        Bucket=self._bucket,
+                        Key=s3_key,
+                        Body=static_data,
+                        ContentType="image/jpeg",
+                        CacheControl="no-cache",
+                    )
+                    options.append(f"{self._get_public_url(s3_key)}?v={cache_buster}")
+
+            logger.info(
+                "Opciones de imagen generadas: vlan_id=%s, count=%d",
+                vlan_id, len(options)
+            )
+            return options
+
+        except Exception as e:
+            logger.error("Error generando opciones: vlan_id=%s, error=%s", vlan_id, str(e))
+            return options
+
+    async def select_image_option(self, vlan_id: str, selected_url: str) -> Optional[str]:
+        """
+        Copia la opción seleccionada como imagen principal y limpia las opciones.
+
+        Args:
+            vlan_id: UUID de la VLAN
+            selected_url: URL de la opción seleccionada
+
+        Returns:
+            URL final de la imagen principal
+        """
+        import time
+
+        try:
+            # Determinar el s3_key de la opción seleccionada desde la URL
+            # URL format: https://bucket.s3.region.amazonaws.com/vlan-images/{vlan_id}_optN.jpg?v=xxx
+            base_url = self._get_public_url("")
+            relative_key = selected_url.split("?")[0].replace(base_url, "")
+
+            # Copiar la opción seleccionada como imagen principal
+            main_key = f"vlan-images/{vlan_id}.jpg"
+            self._client.copy_object(
+                Bucket=self._bucket,
+                Key=main_key,
+                CopySource={"Bucket": self._bucket, "Key": relative_key},
+                ContentType="image/jpeg",
+                CacheControl="no-cache",
+                MetadataDirective="REPLACE",
+            )
+
+            # Limpiar opciones temporales
+            self._cleanup_options(vlan_id)
+
+            cache_buster = int(time.time())
+            final_url = f"{self._get_public_url(main_key)}?v={cache_buster}"
+
+            logger.info("Imagen seleccionada: vlan_id=%s, source=%s", vlan_id, relative_key)
+            return final_url
+
+        except Exception as e:
+            logger.error("Error seleccionando imagen: vlan_id=%s, error=%s", vlan_id, str(e))
+            return None
+
+    def _cleanup_options(self, vlan_id: str) -> None:
+        """Elimina las imágenes de opciones temporales de S3."""
+        try:
+            # Listar y eliminar opciones (opt0, opt1, opt2, opt3, opt_map)
+            for suffix in ["_opt0", "_opt1", "_opt2", "_opt3", "_opt_map"]:
+                key = f"vlan-images/{vlan_id}{suffix}.jpg"
+                self._client.delete_object(Bucket=self._bucket, Key=key)
+        except Exception:
+            pass  # Best effort cleanup
 
             if not image_data:
                 logger.warning(
