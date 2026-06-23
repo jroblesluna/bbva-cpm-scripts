@@ -64,24 +64,28 @@ class S3ImagesService:
         """
         options: list[str] = []
         recommended_index: int = 0
+        places_count: int = 0
         cache_buster = int(time.time())
 
         try:
             async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
-                # 1. Google Places Photo (primera opción, recomendada)
+                # 1. Google Places Photos (las fotos del lugar en Google Maps)
                 if place_id:
-                    places_photo = await self._try_places_photo(client, place_id, api_key, vlan_id)
-                    if places_photo:
-                        s3_key = f"vlan-images/{vlan_id}_opt_places.jpg"
+                    places_photos = await self._get_places_photos(client, place_id, api_key, vlan_id, max_photos=3)
+                    for idx, photo_data in enumerate(places_photos):
+                        s3_key = f"vlan-images/{vlan_id}_opt_places{idx}.jpg"
                         self._client.put_object(
                             Bucket=self._bucket,
                             Key=s3_key,
-                            Body=places_photo,
+                            Body=photo_data,
                             ContentType="image/jpeg",
                             CacheControl="no-cache",
                         )
                         options.append(f"{self._get_public_url(s3_key)}?v={cache_buster}")
+                    # La recomendada es la primera Places Photo (si existe)
+                    if places_photos:
                         recommended_index = 0
+                        places_count = len(places_photos)
 
                 # 2. Verificar cobertura outdoor de Street View
                 has_outdoor = await self._check_sv_coverage(client, latitude, longitude, api_key)
@@ -131,11 +135,11 @@ class S3ImagesService:
                     options.append(f"{self._get_public_url(s3_key)}?v={cache_buster}")
 
             logger.info("Opciones generadas: vlan_id=%s, count=%d", vlan_id, len(options))
-            return {"options": options, "recommended_index": recommended_index}
+            return {"options": options, "recommended_index": recommended_index, "places_count": places_count}
 
         except Exception as e:
             logger.error("Error generando opciones: vlan_id=%s, error=%s", vlan_id, str(e))
-            return {"options": options, "recommended_index": recommended_index}
+            return {"options": options, "recommended_index": recommended_index, "places_count": places_count}
 
     # =========================================================================
     # SELECCIONAR OPCIÓN
@@ -284,21 +288,21 @@ class S3ImagesService:
     def _cleanup_options(self, vlan_id: str) -> None:
         """Elimina las imágenes de opciones temporales de S3."""
         try:
-            for suffix in ["_opt0", "_opt1", "_opt2", "_opt3", "_opt_map", "_opt_places"]:
+            for suffix in ["_opt0", "_opt1", "_opt2", "_opt3", "_opt_map", "_opt_places", "_opt_places0", "_opt_places1", "_opt_places2"]:
                 key = f"vlan-images/{vlan_id}{suffix}.jpg"
                 self._client.delete_object(Bucket=self._bucket, Key=key)
         except Exception:
             pass
 
-    async def _try_places_photo(
-        self, client: httpx.AsyncClient, place_id: str, api_key: str, vlan_id: str
-    ) -> Optional[bytes]:
+    async def _get_places_photos(
+        self, client: httpx.AsyncClient, place_id: str, api_key: str, vlan_id: str, max_photos: int = 3
+    ) -> list[bytes]:
         """
-        Obtiene la foto principal del lugar desde Google Places API.
-        Es la misma foto que muestra Google Maps en el panel izquierdo.
+        Obtiene las primeras N fotos del lugar desde Google Places API.
+        La portada de Google Maps puede ser cualquiera de estas fotos.
         """
+        results: list[bytes] = []
         try:
-            # Obtener photo_reference del place
             details_url = (
                 f"https://maps.googleapis.com/maps/api/place/details/json"
                 f"?place_id={place_id}"
@@ -307,34 +311,32 @@ class S3ImagesService:
             )
             details_resp = await client.get(details_url)
             if details_resp.status_code != 200:
-                return None
+                return results
 
             details_data = details_resp.json()
             photos = details_data.get("result", {}).get("photos", [])
             if not photos:
-                return None
+                return results
 
-            # Primera foto = la principal (misma que Google Maps)
-            photo_reference = photos[0].get("photo_reference")
-            if not photo_reference:
-                return None
+            for photo in photos[:max_photos]:
+                photo_reference = photo.get("photo_reference")
+                if not photo_reference:
+                    continue
+                photo_url = (
+                    f"https://maps.googleapis.com/maps/api/place/photo"
+                    f"?maxwidth=600"
+                    f"&photo_reference={photo_reference}"
+                    f"&key={api_key}"
+                )
+                photo_resp = await client.get(photo_url)
+                if photo_resp.status_code == 200 and "image" in photo_resp.headers.get("content-type", ""):
+                    results.append(photo_resp.content)
 
-            # Descargar la foto
-            photo_url = (
-                f"https://maps.googleapis.com/maps/api/place/photo"
-                f"?maxwidth=600"
-                f"&photo_reference={photo_reference}"
-                f"&key={api_key}"
-            )
-            photo_resp = await client.get(photo_url)
-            if photo_resp.status_code == 200 and "image" in photo_resp.headers.get("content-type", ""):
-                logger.info("Places Photo obtenida: vlan_id=%s, size=%d", vlan_id, len(photo_resp.content))
-                return photo_resp.content
-
-            return None
+            logger.info("Places Photos obtenidas: vlan_id=%s, count=%d", vlan_id, len(results))
+            return results
         except Exception as e:
-            logger.info("Error en Places Photo: vlan_id=%s, error=%s", vlan_id, str(e))
-            return None
+            logger.info("Error en Places Photos: vlan_id=%s, error=%s", vlan_id, str(e))
+            return results
 
     def _get_public_url(self, s3_key: str) -> str:
         """Construye la URL pública del objeto en S3."""

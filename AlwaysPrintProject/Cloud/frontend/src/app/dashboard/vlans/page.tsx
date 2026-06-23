@@ -1503,6 +1503,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
   const [imageLoading, setImageLoading] = useState(false)
   const [showStreetViewCapture, setShowStreetViewCapture] = useState(false)
   const [recommendedIndex, setRecommendedIndex] = useState(0)
+  const [placesCount, setPlacesCount] = useState(0)
   const [formData, setFormData] = useState<VLANUpdate>({
     name: vlan.name,
     description: vlan.description,
@@ -1787,6 +1788,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                           if (result.options.length > 0) {
                             setImageOptions(result.options)
                             setRecommendedIndex(result.recommended_index)
+                            setPlacesCount(result.places_count)
                           }
                         } catch { /* silencioso */ }
                         setImageLoading(false)
@@ -1845,6 +1847,21 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                             {tMap('imageRecommended')}
                           </span>
                         )}
+                        {idx < placesCount && idx !== recommendedIndex && (
+                          <span className="absolute top-1 left-1 inline-flex items-center rounded-full bg-green-600 px-2 py-0.5 text-[10px] font-medium text-white">
+                            Google Maps
+                          </span>
+                        )}
+                        {idx >= placesCount && idx < (imageOptions.length - 1) && (
+                          <span className="absolute top-1 left-1 inline-flex items-center rounded-full bg-gray-700 px-2 py-0.5 text-[10px] font-medium text-white">
+                            Street View
+                          </span>
+                        )}
+                        {idx === (imageOptions.length - 1) && idx >= placesCount && (
+                          <span className="absolute top-1 left-1 inline-flex items-center rounded-full bg-gray-500 px-2 py-0.5 text-[10px] font-medium text-white">
+                            {tMap('imageSatellite')}
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -1882,6 +1899,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                         if (result.options.length > 0) {
                           setImageOptions(result.options)
                           setRecommendedIndex(result.recommended_index)
+                          setPlacesCount(result.places_count)
                         }
                       } catch { /* silencioso */ }
                       setImageLoading(false)
