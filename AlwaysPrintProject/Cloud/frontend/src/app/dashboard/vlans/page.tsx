@@ -1842,23 +1842,23 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                           alt={`${tMap('imageOption')} ${idx + 1}`}
                           className="w-full h-24 object-cover"
                         />
-                        {idx === recommendedIndex && (
-                          <span className="absolute top-1 left-1 inline-flex items-center rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-medium text-white">
+                        {idx === recommendedIndex && placesCount > 0 && (
+                          <span className="absolute top-1 right-1 inline-flex items-center rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-medium text-white">
                             {tMap('imageRecommended')}
                           </span>
                         )}
                         {idx < placesCount && idx !== recommendedIndex && (
-                          <span className="absolute top-1 left-1 inline-flex items-center rounded-full bg-green-600 px-2 py-0.5 text-[10px] font-medium text-white">
+                          <span className="absolute top-1 right-1 inline-flex items-center rounded-full bg-green-600 px-2 py-0.5 text-[10px] font-medium text-white">
                             Google Maps
                           </span>
                         )}
                         {idx >= placesCount && idx < (imageOptions.length - 1) && (
-                          <span className="absolute top-1 left-1 inline-flex items-center rounded-full bg-gray-700 px-2 py-0.5 text-[10px] font-medium text-white">
+                          <span className="absolute top-1 left-1 inline-flex items-center rounded-full bg-gray-700/80 px-2 py-0.5 text-[10px] font-medium text-white">
                             Street View
                           </span>
                         )}
                         {idx === (imageOptions.length - 1) && idx >= placesCount && (
-                          <span className="absolute top-1 left-1 inline-flex items-center rounded-full bg-gray-500 px-2 py-0.5 text-[10px] font-medium text-white">
+                          <span className="absolute top-1 left-1 inline-flex items-center rounded-full bg-gray-500/80 px-2 py-0.5 text-[10px] font-medium text-white">
                             {tMap('imageSatellite')}
                           </span>
                         )}

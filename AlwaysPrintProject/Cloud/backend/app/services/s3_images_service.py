@@ -92,7 +92,34 @@ class S3ImagesService:
 
                 # Street View desde distintos ángulos
                 if has_outdoor:
-                    headings = [0, 90, 180, 270]
+                    # Obtener la posición real del panorama para calcular heading hacia el edificio
+                    sv_lat, sv_lng = latitude, longitude
+                    metadata_url = (
+                        f"https://maps.googleapis.com/maps/api/streetview/metadata"
+                        f"?location={latitude},{longitude}"
+                        f"&source=outdoor"
+                        f"&key={api_key}"
+                    )
+                    meta_resp = await client.get(metadata_url)
+                    if meta_resp.status_code == 200:
+                        meta_data = meta_resp.json()
+                        loc = meta_data.get("location", {})
+                        sv_lat = loc.get("lat", latitude)
+                        sv_lng = loc.get("lng", longitude)
+
+                    # Calcular heading desde la posición del panorama hacia el edificio
+                    import math
+                    dy = latitude - sv_lat
+                    dx = longitude - sv_lng
+                    base_heading = math.degrees(math.atan2(dx, dy)) % 360
+
+                    # Generar: heading hacia edificio + 3 offsets (90°, 180°, 270°)
+                    headings = [
+                        base_heading,
+                        (base_heading + 90) % 360,
+                        (base_heading + 180) % 360,
+                        (base_heading + 270) % 360,
+                    ]
                     for idx, heading in enumerate(headings):
                         url = (
                             f"https://maps.googleapis.com/maps/api/streetview"
