@@ -801,3 +801,70 @@ def delete_vlan_config(
     )
     
     return None
+
+
+@router.post("/{vlan_id}/location-image")
+async def upload_location_image(
+    vlan_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Genera y almacena la imagen de Street View de la VLAN en S3.
+
+    Usa las coordenadas ya guardadas en la VLAN (latitude, longitude) para
+    descargar la imagen de Google Street View server-side (sin exponer la API key),
+    la sube a S3 y actualiza location_image_url con la URL pública de S3.
+
+    Requisitos:
+    - La VLAN debe tener latitude y longitude previamente guardadas
+    - La organización debe tener google_maps_api_key configurada
+
+    Returns:
+        {"location_image_url": "https://...s3...amazonaws.com/vlan-images/{id}.jpg"}
+    """
+    vlan = db.query(VLAN).filter(VLAN.id == vlan_id).first()
+    if not vlan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
+
+    if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
+
+    # Verificar que la VLAN tenga coordenadas
+    if vlan.latitude is None or vlan.longitude is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La VLAN no tiene coordenadas de geolocalización configuradas"
+        )
+
+    # Obtener API key de la organización
+    org = db.query(Organization).filter(Organization.id == vlan.organization_id).first()
+    if not org or not org.google_maps_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La organización no tiene API Key de Google Maps configurada"
+        )
+
+    # Descargar y subir imagen a S3
+    from app.services.s3_images_service import S3ImagesService
+    s3_service = S3ImagesService()
+
+    image_url = await s3_service.upload_street_view_image(
+        vlan_id=str(vlan.id),
+        latitude=vlan.latitude,
+        longitude=vlan.longitude,
+        api_key=org.google_maps_api_key,
+    )
+
+    if not image_url:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="No se pudo obtener la imagen de Street View de Google"
+        )
+
+    # Actualizar la URL en la BD
+    vlan.location_image_url = image_url
+    db.commit()
+    db.refresh(vlan)
+
+    return {"location_image_url": image_url}

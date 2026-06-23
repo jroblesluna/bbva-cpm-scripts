@@ -681,6 +681,17 @@ export const vlansApi = {
     )
     return response.data
   },
+
+  /**
+   * Generar y almacenar imagen de Street View en S3 para una VLAN.
+   * Requiere que la VLAN ya tenga lat/lng guardadas.
+   */
+  uploadLocationImage: async (id: string): Promise<{ location_image_url: string }> => {
+    const response = await apiClient.post<{ location_image_url: string }>(
+      `/vlans/${id}/location-image`
+    )
+    return response.data
+  },
 }
 
 // ============================================================================
