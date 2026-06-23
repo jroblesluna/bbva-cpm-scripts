@@ -905,3 +905,69 @@ async def select_location_image(
     db.refresh(vlan)
 
     return {"location_image_url": final_url}
+
+
+@router.post("/{vlan_id}/location-image/capture")
+async def capture_street_view(
+    vlan_id: UUID,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Captura una imagen de Street View con heading/pitch/fov personalizados.
+
+    El usuario navega el panorama interactivo y captura la vista exacta que quiere.
+    El backend descarga esa vista específica de la Street View Static API.
+
+    Body:
+        {"heading": 45.0, "pitch": -10.0, "fov": 90.0}
+    """
+    vlan = db.query(VLAN).filter(VLAN.id == vlan_id).first()
+    if not vlan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VLAN no encontrada")
+
+    if current_user.role == UserRole.OPERATOR and vlan.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
+
+    if vlan.latitude is None or vlan.longitude is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La VLAN no tiene coordenadas configuradas"
+        )
+
+    heading = body.get("heading", 0)
+    pitch = body.get("pitch", 0)
+    fov = body.get("fov", 90)
+
+    org = db.query(Organization).filter(Organization.id == vlan.organization_id).first()
+    if not org or not org.google_maps_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La organización no tiene API Key de Google Maps configurada"
+        )
+
+    from app.services.s3_images_service import S3ImagesService
+    s3_service = S3ImagesService()
+
+    image_url = await s3_service.capture_custom_street_view(
+        vlan_id=str(vlan.id),
+        latitude=vlan.latitude,
+        longitude=vlan.longitude,
+        heading=heading,
+        pitch=pitch,
+        fov=fov,
+        api_key=org.google_maps_api_key,
+    )
+
+    if not image_url:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="No se pudo capturar la imagen de Street View"
+        )
+
+    vlan.location_image_url = image_url
+    db.commit()
+    db.refresh(vlan)
+
+    return {"location_image_url": image_url}

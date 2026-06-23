@@ -703,6 +703,17 @@ export const vlansApi = {
     )
     return response.data
   },
+
+  /**
+   * Capturar imagen de Street View con heading/pitch/fov personalizados.
+   */
+  captureStreetView: async (id: string, heading: number, pitch: number, fov: number): Promise<{ location_image_url: string }> => {
+    const response = await apiClient.post<{ location_image_url: string }>(
+      `/vlans/${id}/location-image/capture`,
+      { heading, pitch, fov }
+    )
+    return response.data
+  },
 }
 
 // ============================================================================

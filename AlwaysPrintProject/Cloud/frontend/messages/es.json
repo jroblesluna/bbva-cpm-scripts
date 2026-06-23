@@ -1151,6 +1151,11 @@
     "imageNoCoords": "Seleccione una dirección para generar la imagen",
     "imageSelectOne": "Seleccione la imagen más representativa:",
     "imageOption": "Opción",
+    "streetViewInteractive": "Vista interactiva",
+    "streetViewDrag": "Arrastre para girar, zoom con scroll",
+    "streetViewCapture": "Capturar esta vista",
+    "streetViewNoAvailable": "No hay vista de calle disponible para esta ubicación",
+    "close": "Cerrar",
     "streetViewAuto": "Imagen generada automáticamente desde Street View",
     "miniMapToggle": "Mostrar mapa",
     "configureKey": "Configurar API Key"

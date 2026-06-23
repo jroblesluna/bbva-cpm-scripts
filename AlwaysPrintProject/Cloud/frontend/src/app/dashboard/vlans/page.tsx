@@ -39,6 +39,7 @@ import {
   AlertTriangle,
   Settings,
   ListChecks,
+  Camera,
 } from 'lucide-react'
 import { apiClient, vlansApi } from '@/lib/api'
 import type { VLAN, VLANCreate, VLANUpdate, VLANDetail } from '@/types/vlan'
@@ -48,6 +49,7 @@ import { useUserTimezone } from '@/hooks/useUserTimezone'
 import { useToast } from '@/hooks/use-toast'
 import { CidrHealthBadge } from '@/components/vlans/CidrHealthBadge'
 import { VlanMiniMap, type VlanMarkerData } from '@/components/maps/VlanMiniMap'
+import { StreetViewCapture } from '@/components/maps/StreetViewCapture'
 import {
   Tooltip,
   TooltipContent,
@@ -1499,6 +1501,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
   const [editLocationImageUrl, setEditLocationImageUrl] = useState(vlan.location_image_url ?? '')
   const [imageOptions, setImageOptions] = useState<string[]>([])
   const [imageLoading, setImageLoading] = useState(false)
+  const [showStreetViewCapture, setShowStreetViewCapture] = useState(false)
   const [formData, setFormData] = useState<VLANUpdate>({
     name: vlan.name,
     description: vlan.description,
@@ -1851,41 +1854,81 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
               )}
 
               {/* Botón para generar cuando no hay imagen ni opciones */}
-              {!editLocationImageUrl && imageOptions.length === 0 && editLatitude != null && editLongitude != null && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-20 border-dashed text-gray-500"
-                  disabled={imageLoading}
-                  onClick={async () => {
-                    setImageLoading(true)
-                    try {
+              {!editLocationImageUrl && imageOptions.length === 0 && !showStreetViewCapture && editLatitude != null && editLongitude != null && (
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-16 border-dashed text-gray-500"
+                    disabled={imageLoading}
+                    onClick={async () => {
+                      setImageLoading(true)
+                      try {
+                        await apiClient.put(`/vlans/${vlan.id}`, {
+                          address: editAddress,
+                          latitude: editLatitude,
+                          longitude: editLongitude,
+                          place_id: editPlaceId,
+                        })
+                        const result = await vlansApi.uploadLocationImage(vlan.id)
+                        if (result.options.length > 0) {
+                          setImageOptions(result.options)
+                        }
+                      } catch { /* silencioso */ }
+                      setImageLoading(false)
+                    }}
+                  >
+                    {imageLoading ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    {tMap('imageGenerate')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-16 border-dashed text-gray-500"
+                    onClick={async () => {
                       await apiClient.put(`/vlans/${vlan.id}`, {
                         address: editAddress,
                         latitude: editLatitude,
                         longitude: editLongitude,
                         place_id: editPlaceId,
                       })
-                      const result = await vlansApi.uploadLocationImage(vlan.id)
-                      if (result.options.length > 0) {
-                        setImageOptions(result.options)
-                      }
-                    } catch { /* silencioso */ }
-                    setImageLoading(false)
-                  }}
-                >
-                  {imageLoading ? (
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                  )}
-                  {tMap('imageGenerate')}
-                </Button>
+                      setShowStreetViewCapture(true)
+                    }}
+                  >
+                    <Camera className="h-4 w-4 mr-2" />
+                    {tMap('streetViewInteractive')}
+                  </Button>
+                </div>
+              )}
+
+              {/* Street View interactivo (captura) */}
+              {showStreetViewCapture && editLatitude != null && editLongitude != null && (
+                <GoogleMapsProvider>
+                  <StreetViewCapture
+                    latitude={editLatitude}
+                    longitude={editLongitude}
+                    onCapture={async (heading, pitch, fov) => {
+                      try {
+                        const result = await vlansApi.captureStreetView(vlan.id, heading, pitch, fov)
+                        if (result.location_image_url) {
+                          setEditLocationImageUrl(result.location_image_url)
+                          setShowStreetViewCapture(false)
+                        }
+                      } catch { /* silencioso */ }
+                    }}
+                    onClose={() => setShowStreetViewCapture(false)}
+                  />
+                </GoogleMapsProvider>
               )}
 
               {/* Sin coordenadas */}
-              {!editLocationImageUrl && imageOptions.length === 0 && (editLatitude == null || editLongitude == null) && (
+              {!editLocationImageUrl && imageOptions.length === 0 && !showStreetViewCapture && (editLatitude == null || editLongitude == null) && (
                 <p className="text-xs text-gray-400">{tMap('imageNoCoords')}</p>
               )}
             </div>
