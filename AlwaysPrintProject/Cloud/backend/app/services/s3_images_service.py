@@ -63,7 +63,7 @@ class S3ImagesService:
         Returns:
             URL pública de la imagen en S3, o None si falla
         """
-        # Construir URL de Street View (server-side, key nunca llega al frontend)
+        # Intentar primero Street View, si falla (403/etc), usar Maps Static como fallback
         street_view_url = (
             f"https://maps.googleapis.com/maps/api/streetview"
             f"?size=600x400"
@@ -72,22 +72,39 @@ class S3ImagesService:
         )
 
         try:
-            # Descargar imagen desde Google
             async with httpx.AsyncClient(timeout=15.0) as client:
+                # Intento 1: Street View Static API
                 response = await client.get(street_view_url)
+
+                if response.status_code != 200 or "image" not in response.headers.get("content-type", ""):
+                    # Fallback: Maps Static API (mapa satélite con marcador)
+                    logger.info(
+                        "Street View no disponible (status=%d), usando Maps Static: vlan_id=%s",
+                        response.status_code, vlan_id
+                    )
+                    static_map_url = (
+                        f"https://maps.googleapis.com/maps/api/staticmap"
+                        f"?center={latitude},{longitude}"
+                        f"&zoom=17"
+                        f"&size=600x400"
+                        f"&maptype=hybrid"
+                        f"&markers=color:red%7C{latitude},{longitude}"
+                        f"&key={api_key}"
+                    )
+                    response = await client.get(static_map_url)
 
             if response.status_code != 200:
                 logger.warning(
-                    "No se pudo descargar imagen de Street View: status=%d, vlan_id=%s",
+                    "No se pudo descargar imagen (Street View ni Static Map): status=%d, vlan_id=%s",
                     response.status_code, vlan_id
                 )
                 return None
 
-            # Verificar que es una imagen real (no un placeholder de error de Google)
+            # Verificar que es una imagen real
             content_type = response.headers.get("content-type", "")
             if "image" not in content_type:
                 logger.warning(
-                    "Respuesta de Street View no es imagen: content_type=%s, vlan_id=%s",
+                    "Respuesta no es imagen: content_type=%s, vlan_id=%s",
                     content_type, vlan_id
                 )
                 return None
