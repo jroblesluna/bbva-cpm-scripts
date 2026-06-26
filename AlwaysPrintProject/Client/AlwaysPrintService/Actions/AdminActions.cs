@@ -688,35 +688,65 @@ namespace AlwaysPrintService.Actions
                 AlwaysPrintLogger.WriteInfo(
                     $"ReadPrintDriverVersion: cola '{queueName}' usa driver '{driverName}'");
 
-                // 2. Buscar la versión del driver en Win32_PrinterDriver
+                // 2. Buscar versión en el registro de drivers de impresión (más confiable que WMI)
+                string[] envPaths = new[]
+                {
+                    $@"SYSTEM\CurrentControlSet\Control\Print\Environments\Windows x64\Drivers\Version-3\{driverName}",
+                    $@"SYSTEM\CurrentControlSet\Control\Print\Environments\Windows NT x86\Drivers\Version-3\{driverName}"
+                };
+
+                foreach (var regPath in envPaths)
+                {
+                    using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(regPath);
+                    if (key == null) continue;
+
+                    // Leer archivos del driver para obtener ProductVersion
+                    string? configFile = key.GetValue("Configuration File")?.ToString();
+                    string? driverFile = key.GetValue("Driver")?.ToString();
+
+                    foreach (var file in new[] { driverFile, configFile })
+                    {
+                        if (string.IsNullOrEmpty(file)) continue;
+
+                        string fullPath = file;
+                        if (!System.IO.Path.IsPathRooted(file))
+                            fullPath = System.IO.Path.Combine(
+                                Environment.GetFolderPath(Environment.SpecialFolder.System),
+                                "spool", "drivers", "x64", "3", file);
+
+                        if (!System.IO.File.Exists(fullPath)) continue;
+
+                        var fi = System.Diagnostics.FileVersionInfo.GetVersionInfo(fullPath);
+                        // ProductVersion tiene la versión real del driver (ej: 3.0.8.0)
+                        string? version = fi.ProductVersion?.Trim();
+                        if (!string.IsNullOrEmpty(version) && version != "0.0.0.0" && !version.StartsWith("10.0."))
+                        {
+                            AlwaysPrintLogger.WriteInfo(
+                                $"ReadPrintDriverVersion: driver '{driverName}' versión = {version}");
+                            return version;
+                        }
+                    }
+                }
+
+                // 3. Fallback: intentar via Win32_PrinterDriver
                 string safeDriver = driverName.Replace("'", "''").Replace("\\", "\\\\");
                 using var driverSearch = new ManagementObjectSearcher(
                     @"\\.\root\cimv2",
-                    $"SELECT DriverPath, Version FROM Win32_PrinterDriver WHERE Name LIKE '{safeDriver}%'");
+                    $"SELECT DriverPath FROM Win32_PrinterDriver WHERE Name LIKE '{safeDriver}%'");
 
                 foreach (ManagementObject drv in driverSearch.Get())
                 {
-                    // Version puede estar directamente disponible
-                    string? version = drv["Version"]?.ToString();
                     string? driverPath = drv["DriverPath"]?.ToString();
-
-                    // Si no hay Version en WMI, intentar leerla del archivo del driver
-                    if (string.IsNullOrEmpty(version) && !string.IsNullOrEmpty(driverPath)
-                        && System.IO.File.Exists(driverPath))
+                    if (!string.IsNullOrEmpty(driverPath) && System.IO.File.Exists(driverPath))
                     {
-                        try
+                        var fi = System.Diagnostics.FileVersionInfo.GetVersionInfo(driverPath);
+                        string? version = fi.ProductVersion?.Trim() ?? fi.FileVersion;
+                        if (!string.IsNullOrEmpty(version) && !version.StartsWith("10.0."))
                         {
-                            var fileInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(driverPath);
-                            version = fileInfo.FileVersion;
+                            AlwaysPrintLogger.WriteInfo(
+                                $"ReadPrintDriverVersion: driver '{driverName}' versión = {version}");
+                            return version;
                         }
-                        catch { /* Ignorar error al leer versión de archivo */ }
-                    }
-
-                    if (!string.IsNullOrEmpty(version))
-                    {
-                        AlwaysPrintLogger.WriteInfo(
-                            $"ReadPrintDriverVersion: driver '{driverName}' versión = {version}");
-                        return version;
                     }
                 }
 

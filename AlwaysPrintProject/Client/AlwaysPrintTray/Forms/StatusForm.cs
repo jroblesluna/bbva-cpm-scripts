@@ -739,7 +739,8 @@ namespace AlwaysPrintTray.Forms
 
         /// <summary>
         /// Lee la versión del driver de la cola corporativa.
-        /// Usa WMI Win32_Printer para obtener el nombre del driver.
+        /// Busca la versión real del driver (ProductVersion) en el registro de drivers
+        /// de impresión o en el archivo .dll del driver.
         /// </summary>
         private string LoadDriverVersion()
         {
@@ -748,37 +749,94 @@ namespace AlwaysPrintTray.Forms
                 string queueName = LoadQueueName();
                 if (queueName == "N/A") return "N/A";
 
+                // 1. Obtener nombre del driver desde Win32_Printer
+                string driverName;
                 using (var searcher = new System.Management.ManagementObjectSearcher(
                     @"\\.\root\cimv2",
                     $"SELECT DriverName FROM Win32_Printer WHERE Name = '{queueName.Replace("'", "''")}'"))
                 {
+                    driverName = null;
                     foreach (System.Management.ManagementObject obj in searcher.Get())
                     {
-                        string driverName = obj["DriverName"]?.ToString() ?? "Desconocido";
-
-                        // Intentar obtener versión desde Win32_PrinterDriver
-                        string safeDriver = driverName.Replace("'", "''").Replace("\\", "\\\\");
-                        using (var drvSearch = new System.Management.ManagementObjectSearcher(
-                            @"\\.\root\cimv2",
-                            $"SELECT DriverPath FROM Win32_PrinterDriver WHERE Name LIKE '{safeDriver}%'"))
-                        {
-                            foreach (System.Management.ManagementObject drv in drvSearch.Get())
-                            {
-                                string driverPath = drv["DriverPath"]?.ToString() ?? "";
-                                if (!string.IsNullOrEmpty(driverPath) && System.IO.File.Exists(driverPath))
-                                {
-                                    var fi = System.Diagnostics.FileVersionInfo.GetVersionInfo(driverPath);
-                                    if (!string.IsNullOrEmpty(fi.FileVersion))
-                                        return $"{driverName} ({fi.FileVersion})";
-                                }
-                            }
-                        }
-
-                        return driverName;
+                        driverName = obj["DriverName"]?.ToString();
+                        break;
                     }
                 }
 
-                return "N/A";
+                if (string.IsNullOrEmpty(driverName)) return "N/A";
+
+                // 2. Buscar versión en el registro de drivers de impresión
+                //    HKLM\SYSTEM\CurrentControlSet\Control\Print\Environments\Windows x64\Drivers\Version-3\{DriverName}
+                string[] envPaths = new[]
+                {
+                    $@"SYSTEM\CurrentControlSet\Control\Print\Environments\Windows x64\Drivers\Version-3\{driverName}",
+                    $@"SYSTEM\CurrentControlSet\Control\Print\Environments\Windows NT x86\Drivers\Version-3\{driverName}"
+                };
+
+                foreach (var regPath in envPaths)
+                {
+                    using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(regPath))
+                    {
+                        if (key == null) continue;
+
+                        // Buscar el archivo de configuración del driver para obtener ProductVersion
+                        string configFile = key.GetValue("Configuration File")?.ToString() ?? "";
+                        string driverDir = key.GetValue("Driver")?.ToString() ?? "";
+
+                        // Intentar con el archivo principal del driver
+                        string[] filesToCheck = new[] { driverDir, configFile };
+                        foreach (var file in filesToCheck)
+                        {
+                            if (string.IsNullOrEmpty(file)) continue;
+
+                            // El path puede ser relativo al directorio de drivers del spooler
+                            string fullPath = file;
+                            if (!System.IO.Path.IsPathRooted(file))
+                                fullPath = System.IO.Path.Combine(
+                                    Environment.GetFolderPath(Environment.SpecialFolder.System),
+                                    "spool", "drivers", "x64", "3", file);
+
+                            if (!System.IO.File.Exists(fullPath)) continue;
+
+                            var fi = System.Diagnostics.FileVersionInfo.GetVersionInfo(fullPath);
+                            // Usar ProductVersion (versión del producto, ej: 3.0.8.0)
+                            // en vez de FileVersion (versión del archivo OS)
+                            string version = fi.ProductVersion?.Trim() ?? "";
+                            if (!string.IsNullOrEmpty(version) && version != "0.0.0.0")
+                                return $"{driverName} ({version})";
+
+                            // Fallback a FileVersion si ProductVersion no está
+                            if (!string.IsNullOrEmpty(fi.FileVersion))
+                            {
+                                // Verificar que no sea una versión de Windows genérica
+                                if (!fi.FileVersion.StartsWith("10.0."))
+                                    return $"{driverName} ({fi.FileVersion})";
+                            }
+                        }
+                    }
+                }
+
+                // 3. Fallback: intentar via Win32_PrinterDriver
+                string safeDriver = driverName.Replace("'", "''").Replace("\\", "\\\\");
+                using (var drvSearch = new System.Management.ManagementObjectSearcher(
+                    @"\\.\root\cimv2",
+                    $"SELECT DriverPath FROM Win32_PrinterDriver WHERE Name LIKE '{safeDriver}%'"))
+                {
+                    foreach (System.Management.ManagementObject drv in drvSearch.Get())
+                    {
+                        string driverPath = drv["DriverPath"]?.ToString() ?? "";
+                        if (!string.IsNullOrEmpty(driverPath) && System.IO.File.Exists(driverPath))
+                        {
+                            var fi = System.Diagnostics.FileVersionInfo.GetVersionInfo(driverPath);
+                            string version = fi.ProductVersion?.Trim() ?? fi.FileVersion ?? "";
+                            if (!string.IsNullOrEmpty(version) && !version.StartsWith("10.0."))
+                                return $"{driverName} ({version})";
+                        }
+                    }
+                }
+
+                // Sin versión detectada, retornar solo el nombre
+                return driverName;
             }
             catch { return "Error"; }
         }
