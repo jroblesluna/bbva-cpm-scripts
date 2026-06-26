@@ -653,6 +653,87 @@ namespace AlwaysPrintService.Actions
         }
 
         /// <summary>
+        /// Lee la versión del driver de impresora asociado a una cola.
+        /// Usa Win32_Printer para obtener el nombre del driver, luego Win32_PrinterDriver
+        /// para obtener la versión del archivo .dll del driver.
+        /// Parámetros: queue_name (nombre de la cola)
+        /// Retorna: string con la versión del driver, o null si no se pudo obtener.
+        /// </summary>
+        public static string? ReadPrintDriverVersion(string queueName)
+        {
+            try
+            {
+                AlwaysPrintLogger.WriteInfo($"ReadPrintDriverVersion: leyendo driver de cola '{queueName}'...");
+
+                // 1. Obtener el nombre del driver desde Win32_Printer
+                string safeQueue = queueName.Replace("'", "''");
+                using var printerSearch = new ManagementObjectSearcher(
+                    @"\\.\root\cimv2",
+                    $"SELECT DriverName FROM Win32_Printer WHERE Name = '{safeQueue}'");
+
+                string? driverName = null;
+                foreach (ManagementObject obj in printerSearch.Get())
+                {
+                    driverName = obj["DriverName"]?.ToString();
+                    break;
+                }
+
+                if (string.IsNullOrEmpty(driverName))
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        $"ReadPrintDriverVersion: cola '{queueName}' no encontrada o sin driver asignado");
+                    return null;
+                }
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"ReadPrintDriverVersion: cola '{queueName}' usa driver '{driverName}'");
+
+                // 2. Buscar la versión del driver en Win32_PrinterDriver
+                string safeDriver = driverName.Replace("'", "''").Replace("\\", "\\\\");
+                using var driverSearch = new ManagementObjectSearcher(
+                    @"\\.\root\cimv2",
+                    $"SELECT DriverPath, Version FROM Win32_PrinterDriver WHERE Name LIKE '{safeDriver}%'");
+
+                foreach (ManagementObject drv in driverSearch.Get())
+                {
+                    // Version puede estar directamente disponible
+                    string? version = drv["Version"]?.ToString();
+                    string? driverPath = drv["DriverPath"]?.ToString();
+
+                    // Si no hay Version en WMI, intentar leerla del archivo del driver
+                    if (string.IsNullOrEmpty(version) && !string.IsNullOrEmpty(driverPath)
+                        && System.IO.File.Exists(driverPath))
+                    {
+                        try
+                        {
+                            var fileInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(driverPath);
+                            version = fileInfo.FileVersion;
+                        }
+                        catch { /* Ignorar error al leer versión de archivo */ }
+                    }
+
+                    if (!string.IsNullOrEmpty(version))
+                    {
+                        AlwaysPrintLogger.WriteInfo(
+                            $"ReadPrintDriverVersion: driver '{driverName}' versión = {version}");
+                        return version;
+                    }
+                }
+
+                // Fallback: no se encontró versión
+                AlwaysPrintLogger.WriteWarning(
+                    $"ReadPrintDriverVersion: no se pudo obtener versión del driver '{driverName}'");
+                return driverName; // Retornar al menos el nombre del driver
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"ReadPrintDriverVersion: error leyendo driver de cola '{queueName}': {ex.Message}", ex);
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Establece una impresora como predeterminada para el usuario logueado.
         /// Como el Service corre como SYSTEM, esta acción se delega al Tray via Named Pipe.
         /// El Tray detecta el cambio de contingencia y establece la impresora predeterminada

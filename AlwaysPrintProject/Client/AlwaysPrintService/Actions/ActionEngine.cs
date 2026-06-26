@@ -322,6 +322,9 @@ namespace AlwaysPrintService.Actions
 
                 case ActionTypes.WriteAppSetting:
                     return ExecuteWriteAppSetting(action);
+
+                case ActionTypes.ReadPrintDriverVersion:
+                    return ExecuteReadPrintDriverVersion(action);
                 
                 default:
                     AlwaysPrintLogger.WriteWarning($"ActionEngine: tipo de acción desconocido: {action.Type}");
@@ -952,6 +955,41 @@ namespace AlwaysPrintService.Actions
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteError($"ReadPrintQueuePort: error: {ex.Message}", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Lee la versión del driver de una cola de impresión.
+        /// Parámetros: queue_name (nombre de la cola).
+        /// Si se especifica store_result_in, almacena la versión en la variable indicada.
+        /// </summary>
+        private bool ExecuteReadPrintDriverVersion(ActionConfig action)
+        {
+            try
+            {
+                string queueName = GetParameter<string>(action, "queue_name") ?? "";
+                queueName = ReplaceTemplates(queueName);
+
+                if (string.IsNullOrEmpty(queueName))
+                {
+                    AlwaysPrintLogger.WriteWarning("ReadPrintDriverVersion: queue_name vacío");
+                    return false;
+                }
+
+                string? version = AdminActions.ReadPrintDriverVersion(queueName);
+
+                if (!string.IsNullOrEmpty(action.StoreResultIn) && version != null)
+                {
+                    _variables[action.StoreResultIn] = version;
+                    _configVariables[action.StoreResultIn] = version;
+                }
+
+                return version != null;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"ReadPrintDriverVersion: error: {ex.Message}", ex);
                 return false;
             }
         }

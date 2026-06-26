@@ -24,6 +24,14 @@
           }
         },
         {
+          "type": "ReadPrintDriverVersion",
+          "description": "Registrar versión del driver de la cola corporativa",
+          "parameters": {
+            "queue_name": "{{corporate_queue_name}}"
+          },
+          "store_result_in": "driver_version"
+        },
+        {
           "type": "RunProcess",
           "description": "Otorgar Lectura/Escritura a Everyone en C:\\ProgramData\\LPMC\\",
           "parameters": {
