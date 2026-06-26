@@ -136,7 +136,28 @@ namespace AlwaysPrintTray.Forms
             // ── Sección A2: Conectividad Cloud ──────────────────────────────────
             AddSectionHeader(LocalizationManager.Get("StatusSectionCloudConnectivity"), ref y);
             _valCloudStatus = AddFieldRow(LocalizationManager.Get("StatusLabelCloudStatus"), "...", ref y);
-            _valCloudDetails = AddFieldRow(LocalizationManager.Get("StatusLabelCloudDetails"), "", ref y);
+            // Detalles con word-wrap (ancho fijo para que no se salga del formulario)
+            {
+                var lblDetails = new Label
+                {
+                    Text = LocalizationManager.Get("StatusLabelCloudDetails"),
+                    Location = new Point(LabelX, y),
+                    AutoSize = true,
+                    ForeColor = Color.FromArgb(0x55, 0x55, 0x55)
+                };
+                _valCloudDetails = new Label
+                {
+                    Text = "",
+                    Location = new Point(ValueX, y),
+                    Size = new Size(FormWidth - ValueX - 20, 36),
+                    AutoSize = false,
+                    AutoEllipsis = false,
+                    ForeColor = Color.FromArgb(0x66, 0x66, 0x66)
+                };
+                Controls.Add(lblDetails);
+                Controls.Add(_valCloudDetails);
+                y += 40; // Espacio extra para 2 líneas de texto
+            }
 
             y += SectionSpacing;
             AddSeparator(ref y);
