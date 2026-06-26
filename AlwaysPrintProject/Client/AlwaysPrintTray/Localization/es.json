@@ -39,5 +39,13 @@
   "StatusButtonExecute": "Ejecutar",
   "StatusSectionServices": "Servicios",
   "StatusButtonStartService": "Iniciar servicio",
-  "StatusButtonClose": "Cerrar"
+  "StatusButtonClose": "Cerrar",
+  "StatusSectionCloudConnectivity": "Conectividad Cloud",
+  "StatusLabelCloudStatus": "Estado:",
+  "StatusLabelCloudDetails": "Detalles:",
+  "StatusCloudConnected": "Conectado",
+  "StatusCloudConnecting": "Conectando...",
+  "StatusCloudDisconnected": "⚠ Desconectado",
+  "StatusCloudAttempts": "{0} intentos",
+  "StatusCloudNextRetry": "Próximo reintento en {0}s"
 }

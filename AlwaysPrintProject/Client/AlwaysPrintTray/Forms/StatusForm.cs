@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
+using AlwaysPrintTray.Cloud;
 using AlwaysPrintTray.Localization;
 using AlwaysPrintTray.OnDemand;
 using AlwaysPrintTray.Pipe;
@@ -14,9 +15,9 @@ namespace AlwaysPrintTray.Forms
 {
     /// <summary>
     /// Formulario de estado del sistema (WinForms, UI programática sin diseñador).
-    /// Muestra información general, triggers OnDemand y servicios monitoreados.
+    /// Muestra información general, conectividad Cloud, triggers OnDemand y servicios monitoreados.
     /// Usa posicionamiento absoluto con Y calculado dinámicamente.
-    /// Timer de 5 segundos para refrescar estados de servicios.
+    /// Timer de 5 segundos para refrescar estados de servicios y conectividad.
     /// BackgroundWorker para operaciones de pipe (sin async/await).
     /// </summary>
     public sealed class StatusForm : Form
@@ -33,12 +34,17 @@ namespace AlwaysPrintTray.Forms
 
         // ── Dependencias ────────────────────────────────────────────────────────
         private readonly PipeClient _pipe;
+        private readonly Func<CloudConnectivityState?>? _connectivityStateProvider;
 
         // ── Controles de información general ────────────────────────────────────
         private Label _valState = null!;
         private Label _valVersion = null!;
         private Label _valQueue = null!;
         private Label _valConfig = null!;
+
+        // ── Controles de conectividad Cloud ─────────────────────────────────────
+        private Label _valCloudStatus = null!;
+        private Label _valCloudDetails = null!;
 
         // ── Controles de servicios (para refresh con timer) ─────────────────────
         private readonly List<ServiceRow> _serviceRows = new List<ServiceRow>();
@@ -61,12 +67,39 @@ namespace AlwaysPrintTray.Forms
             public Label StateLabel { get; set; } = null!;
         }
 
-        public StatusForm(PipeClient pipe)
+        /// <summary>
+        /// Constructor del StatusForm.
+        /// </summary>
+        /// <param name="pipe">Cliente Named Pipe para comunicación con el Service.</param>
+        /// <param name="connectivityStateProvider">
+        /// Función que retorna el estado actual de conectividad Cloud (null si no aplica).
+        /// Permite al formulario consultar el estado sin acoplarse directamente a CloudRegistration.
+        /// </param>
+        public StatusForm(PipeClient pipe, Func<CloudConnectivityState?>? connectivityStateProvider = null)
         {
             _pipe = pipe ?? throw new ArgumentNullException(nameof(pipe));
+            _connectivityStateProvider = connectivityStateProvider;
             BuildUI();
             LoadData();
             SetupRefreshTimer();
+        }
+
+        /// <summary>
+        /// Actualiza la sección de conectividad Cloud desde fuera del formulario
+        /// (ej: cuando CloudRegistration emite ConnectivityStateChanged).
+        /// Thread-safe: usa Invoke si se llama desde otro hilo.
+        /// </summary>
+        public void UpdateCloudConnectivity(CloudConnectivityState state)
+        {
+            if (IsDisposed) return;
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => UpdateCloudConnectivity(state)));
+                return;
+            }
+
+            ApplyCloudConnectivityState(state);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -96,6 +129,14 @@ namespace AlwaysPrintTray.Forms
             _valVersion = AddFieldRow(LocalizationManager.Get("StatusLabelVersion"), "...", ref y);
             _valQueue = AddFieldRow(LocalizationManager.Get("StatusLabelActiveQueue"), "...", ref y);
             _valConfig = AddFieldRow(LocalizationManager.Get("StatusLabelConfig"), "...", ref y);
+
+            y += SectionSpacing;
+            AddSeparator(ref y);
+
+            // ── Sección A2: Conectividad Cloud ──────────────────────────────────
+            AddSectionHeader(LocalizationManager.Get("StatusSectionCloudConnectivity"), ref y);
+            _valCloudStatus = AddFieldRow(LocalizationManager.Get("StatusLabelCloudStatus"), "...", ref y);
+            _valCloudDetails = AddFieldRow(LocalizationManager.Get("StatusLabelCloudDetails"), "", ref y);
 
             y += SectionSpacing;
             AddSeparator(ref y);
@@ -251,6 +292,9 @@ namespace AlwaysPrintTray.Forms
                 _valQueue.Text = LoadQueueName();
                 _valConfig.Text = LoadConfigName();
 
+                // Conectividad Cloud (lectura inicial)
+                RefreshCloudConnectivity();
+
                 // Estados de servicios (lectura inicial)
                 RefreshServiceStates();
             }
@@ -282,6 +326,7 @@ namespace AlwaysPrintTray.Forms
             {
                 RefreshServiceStates();
                 RefreshContingencyState();
+                RefreshCloudConnectivity();
             }
             catch (Exception ex)
             {
@@ -327,6 +372,129 @@ namespace AlwaysPrintTray.Forms
                 row.StateLabel.Text = state;
                 row.StateLabel.ForeColor = Color.FromArgb(0x66, 0x66, 0x66); // Siempre gris
             }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ── Conectividad Cloud ──────────────────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Refresca la sección de conectividad Cloud consultando al provider.
+        /// </summary>
+        private void RefreshCloudConnectivity()
+        {
+            if (_connectivityStateProvider == null)
+            {
+                // Si Cloud ya está conectado (CloudEnabled=1), mostrar como conectado
+                ApplyCloudConnectedViaManager();
+                return;
+            }
+
+            var state = _connectivityStateProvider();
+            if (state != null)
+            {
+                ApplyCloudConnectivityState(state);
+            }
+        }
+
+        /// <summary>
+        /// Muestra estado "Conectado" cuando CloudManager ya está activo
+        /// (no hay CloudRegistration porque CloudEnabled=1).
+        /// </summary>
+        private void ApplyCloudConnectedViaManager()
+        {
+            _valCloudStatus.Text = LocalizationManager.Get("StatusCloudConnected");
+            _valCloudStatus.ForeColor = Color.FromArgb(0x22, 0x8B, 0x22); // Verde
+            _valCloudDetails.Text = "";
+            _valCloudDetails.Visible = false;
+        }
+
+        /// <summary>
+        /// Aplica un CloudConnectivityState a los controles de la sección Cloud.
+        /// </summary>
+        private void ApplyCloudConnectivityState(CloudConnectivityState state)
+        {
+            switch (state.Status)
+            {
+                case "Connected":
+                    _valCloudStatus.Text = LocalizationManager.Get("StatusCloudConnected");
+                    _valCloudStatus.ForeColor = Color.FromArgb(0x22, 0x8B, 0x22); // Verde
+                    _valCloudDetails.Text = "";
+                    _valCloudDetails.Visible = false;
+                    break;
+
+                case "Connecting":
+                    _valCloudStatus.Text = LocalizationManager.Get("StatusCloudConnecting");
+                    _valCloudStatus.ForeColor = Color.FromArgb(0x00, 0x66, 0xCC); // Azul
+                    _valCloudDetails.Text = "";
+                    _valCloudDetails.Visible = false;
+                    break;
+
+                case "Disconnected":
+                    _valCloudStatus.Text = FormatDisconnectedStatus(state);
+                    _valCloudStatus.ForeColor = Color.FromArgb(0xCC, 0x33, 0x00); // Rojo
+                    _valCloudDetails.Text = FormatDisconnectedDetails(state);
+                    _valCloudDetails.ForeColor = Color.FromArgb(0x66, 0x66, 0x66);
+                    _valCloudDetails.Visible = true;
+                    break;
+
+                default:
+                    _valCloudStatus.Text = state.Status;
+                    _valCloudStatus.ForeColor = Color.FromArgb(0x66, 0x66, 0x66);
+                    _valCloudDetails.Text = "";
+                    _valCloudDetails.Visible = false;
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Formatea el texto principal de estado cuando está desconectado.
+        /// Ejemplo: "⚠ Desconectado (3 intentos, 1m 30s)"
+        /// </summary>
+        private static string FormatDisconnectedStatus(CloudConnectivityState state)
+        {
+            var parts = new List<string>();
+            parts.Add(string.Format(
+                LocalizationManager.Get("StatusCloudAttempts"),
+                state.FailedAttempts));
+
+            if (state.DisconnectedDuration.HasValue)
+            {
+                var dur = state.DisconnectedDuration.Value;
+                if (dur.TotalHours >= 1)
+                    parts.Add($"{(int)dur.TotalHours}h {dur.Minutes}m");
+                else if (dur.TotalMinutes >= 1)
+                    parts.Add($"{(int)dur.TotalMinutes}m {dur.Seconds}s");
+                else
+                    parts.Add($"{dur.Seconds}s");
+            }
+
+            return $"{LocalizationManager.Get("StatusCloudDisconnected")} ({string.Join(", ", parts)})";
+        }
+
+        /// <summary>
+        /// Formatea los detalles del error de conectividad.
+        /// Ejemplo: "Próximo reintento en 30s — timeout (10 s)"
+        /// </summary>
+        private static string FormatDisconnectedDetails(CloudConnectivityState state)
+        {
+            var parts = new List<string>();
+
+            parts.Add(string.Format(
+                LocalizationManager.Get("StatusCloudNextRetry"),
+                state.CurrentRetryIntervalSeconds));
+
+            // Extraer solo la parte relevante del error (sin la URL completa)
+            if (!string.IsNullOrWhiteSpace(state.LastError))
+            {
+                string shortError = state.LastError;
+                // Truncar si es muy largo para la UI
+                if (shortError.Length > 80)
+                    shortError = shortError.Substring(0, 77) + "...";
+                parts.Add(shortError);
+            }
+
+            return string.Join(" — ", parts);
         }
 
         // ═══════════════════════════════════════════════════════════════════════

@@ -14,6 +14,34 @@ using Newtonsoft.Json.Linq;
 namespace AlwaysPrintTray.Cloud
 {
     /// <summary>
+    /// Estado de conectividad del registro Cloud, expuesto para consumo del StatusForm.
+    /// </summary>
+    public sealed class CloudConnectivityState
+    {
+        /// <summary>Estado actual: Connecting, Connected, Disconnected.</summary>
+        public string Status { get; set; } = "Connecting";
+
+        /// <summary>Cantidad de intentos fallidos consecutivos desde la última conexión exitosa.</summary>
+        public int FailedAttempts { get; set; }
+
+        /// <summary>Timestamp UTC del primer fallo consecutivo (null si conectado).</summary>
+        public DateTime? DisconnectedSince { get; set; }
+
+        /// <summary>Último error reportado (timeout, error de red, etc.).</summary>
+        public string? LastError { get; set; }
+
+        /// <summary>Intervalo actual de reintento en segundos.</summary>
+        public int CurrentRetryIntervalSeconds { get; set; }
+
+        /// <summary>Timestamp UTC del último intento realizado.</summary>
+        public DateTime? LastAttemptAt { get; set; }
+
+        /// <summary>Duración de la desconexión actual, o null si está conectado.</summary>
+        public TimeSpan? DisconnectedDuration =>
+            DisconnectedSince.HasValue ? DateTime.UtcNow - DisconnectedSince.Value : null;
+    }
+
+    /// <summary>
     /// Gestiona el ciclo de registro automático de la workstation con el Cloud Manager.
     /// 
     /// Flujo:
@@ -23,10 +51,16 @@ namespace AlwaysPrintTray.Cloud
     /// 4. Intenta registrarse cada X minutos
     /// 5. Si registro exitoso: activa CloudEnabled y guarda CloudApiUrl
     /// 6. Si registro rechazado (IP pendiente): espera y reintenta
+    /// 
+    /// Retry agresivo: los primeros intentos fallidos usan intervalo corto (30s)
+    /// para recuperarse rápidamente cuando el proxy corporativo aún no está listo
+    /// tras un logon. Después de N intentos rápidos, escala al intervalo normal (300s).
     /// </summary>
     public sealed class CloudRegistration : IDisposable
     {
-        private const int RetryIntervalSeconds = 300; // 5 minutos
+        private const int RetryIntervalSeconds = 300; // 5 minutos (intervalo normal)
+        private const int AggressiveRetryIntervalSeconds = 30; // 30 segundos (retry agresivo post-logon)
+        private const int MaxAggressiveRetries = 6; // Máximo de reintentos rápidos antes de escalar
         private const int CidrRetryIntervalSeconds = 30; // 30 segundos para reintentar detección de CIDR
         private const string RegisterPath = "/api/v1/workstations/register";
         
@@ -39,6 +73,12 @@ namespace AlwaysPrintTray.Cloud
         // Estado de detección de CIDR
         private string? _detectedCidr;
         private bool _cidrErrorNotified;
+
+        // === Estado de conectividad y retry agresivo ===
+        private int _consecutiveHealthCheckFailures;
+        private DateTime? _firstFailureAt;
+        private string? _lastHealthCheckError;
+        private readonly object _stateLock = new object();
         
         /// <summary>
         /// Evento que se dispara cuando el registro es exitoso.
@@ -63,6 +103,12 @@ namespace AlwaysPrintTray.Cloud
         /// </summary>
         public event Action? CidrDetectionRecovered;
 
+        /// <summary>
+        /// Evento que se dispara cuando cambia el estado de conectividad Cloud.
+        /// Permite al StatusForm actualizar la sección de conectividad en tiempo real.
+        /// </summary>
+        public event Action<CloudConnectivityState>? ConnectivityStateChanged;
+
         private bool _pendingNotified;
         
         public CloudRegistration(AppConfiguration config)
@@ -80,6 +126,41 @@ namespace AlwaysPrintTray.Cloud
             
             AlwaysPrintLogger.WriteTrayInfo(
                 $"CloudRegistration: iniciado. Intervalo de reintento: {RetryIntervalSeconds}s");
+
+            // Notificar estado inicial: conectando
+            NotifyConnectivityState("Connecting", null);
+        }
+
+        /// <summary>
+        /// Obtiene una copia del estado actual de conectividad (thread-safe).
+        /// Útil para que el StatusForm lea el estado al abrirse.
+        /// </summary>
+        public CloudConnectivityState GetConnectivityState()
+        {
+            lock (_stateLock)
+            {
+                return new CloudConnectivityState
+                {
+                    Status = _firstFailureAt.HasValue ? "Disconnected" : "Connecting",
+                    FailedAttempts = _consecutiveHealthCheckFailures,
+                    DisconnectedSince = _firstFailureAt,
+                    LastError = _lastHealthCheckError,
+                    CurrentRetryIntervalSeconds = GetCurrentRetryInterval(),
+                    LastAttemptAt = DateTime.UtcNow
+                };
+            }
+        }
+
+        /// <summary>
+        /// Determina el intervalo de retry actual basado en la cantidad de fallos consecutivos.
+        /// Los primeros MaxAggressiveRetries intentos usan intervalo corto (30s),
+        /// luego escala al intervalo normal (300s).
+        /// </summary>
+        private int GetCurrentRetryInterval()
+        {
+            if (_consecutiveHealthCheckFailures < MaxAggressiveRetries)
+                return AggressiveRetryIntervalSeconds;
+            return RetryIntervalSeconds;
         }
         
         private void OnRegistrationTimerTick(object? state)
@@ -186,10 +267,13 @@ namespace AlwaysPrintTray.Cloud
             
             if (!success || string.IsNullOrEmpty(respondingDomain))
             {
-                AlwaysPrintLogger.WriteTrayInfo(
-                    $"CloudRegistration: no se encontró servidor cloud. {details}");
+                // Health check falló: registrar fallo y aplicar retry agresivo si corresponde
+                OnHealthCheckFailed(details ?? "Sin detalles");
                 return;
             }
+            
+            // Health check exitoso: resetear contador de fallos
+            OnHealthCheckSucceeded();
             
             AlwaysPrintLogger.WriteTrayInfo(
                 $"CloudRegistration: servidor cloud encontrado: {respondingDomain}");
@@ -325,6 +409,89 @@ namespace AlwaysPrintTray.Cloud
             }
         }
         
+        /// <summary>
+        /// Maneja un fallo en el health check: incrementa contador, registra timestamp,
+        /// ajusta el intervalo de retry (agresivo si estamos en los primeros intentos),
+        /// y notifica el cambio de estado.
+        /// </summary>
+        private void OnHealthCheckFailed(string errorDetails)
+        {
+            lock (_stateLock)
+            {
+                _consecutiveHealthCheckFailures++;
+                _lastHealthCheckError = errorDetails;
+
+                if (!_firstFailureAt.HasValue)
+                    _firstFailureAt = DateTime.UtcNow;
+            }
+
+            int currentInterval = GetCurrentRetryInterval();
+            bool isAggressive = _consecutiveHealthCheckFailures <= MaxAggressiveRetries;
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"CloudRegistration: no se encontró servidor cloud (intento #{_consecutiveHealthCheckFailures}). " +
+                $"Próximo reintento en {currentInterval}s{(isAggressive ? " (modo agresivo)" : "")}. {errorDetails}");
+
+            // Ajustar timer al intervalo correspondiente
+            _registrationTimer.Change(
+                TimeSpan.FromSeconds(currentInterval),
+                TimeSpan.FromSeconds(currentInterval));
+
+            // Notificar cambio de estado al UI
+            NotifyConnectivityState("Disconnected", errorDetails);
+        }
+
+        /// <summary>
+        /// Maneja un health check exitoso: resetea contadores de fallo,
+        /// restaura el intervalo normal y notifica estado conectado.
+        /// </summary>
+        private void OnHealthCheckSucceeded()
+        {
+            bool wasDisconnected;
+            int previousFailures;
+
+            lock (_stateLock)
+            {
+                wasDisconnected = _firstFailureAt.HasValue;
+                previousFailures = _consecutiveHealthCheckFailures;
+                _consecutiveHealthCheckFailures = 0;
+                _firstFailureAt = null;
+                _lastHealthCheckError = null;
+            }
+
+            if (wasDisconnected)
+            {
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudRegistration: conectividad restaurada después de {previousFailures} intentos fallidos.");
+
+                // Restaurar intervalo normal
+                _registrationTimer.Change(
+                    Timeout.Infinite,
+                    Timeout.Infinite);
+            }
+
+            // Notificar estado conectado al UI
+            NotifyConnectivityState("Connected", null);
+        }
+
+        /// <summary>
+        /// Construye y emite el evento de cambio de estado de conectividad.
+        /// </summary>
+        private void NotifyConnectivityState(string status, string? lastError)
+        {
+            var state = new CloudConnectivityState
+            {
+                Status = status,
+                FailedAttempts = _consecutiveHealthCheckFailures,
+                DisconnectedSince = _firstFailureAt,
+                LastError = lastError,
+                CurrentRetryIntervalSeconds = GetCurrentRetryInterval(),
+                LastAttemptAt = DateTime.UtcNow
+            };
+
+            ConnectivityStateChanged?.Invoke(state);
+        }
+
         /// <summary>
         /// Obtiene la versión del Tray desde el Assembly ejecutable.
         /// Retorna la versión en formato "Major.Minor.Build.Revision" (ej: "2.1.0.0").

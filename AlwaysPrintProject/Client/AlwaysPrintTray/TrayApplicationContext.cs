@@ -266,6 +266,7 @@ namespace AlwaysPrintTray
                         _cloudRegistration.RegistrationPending += OnCloudRegistrationPending;
                         _cloudRegistration.CidrDetectionFailed += OnCidrDetectionFailed;
                         _cloudRegistration.CidrDetectionRecovered += OnCidrDetectionRecovered;
+                        _cloudRegistration.ConnectivityStateChanged += OnCloudConnectivityStateChanged;
                         AlwaysPrintLogger.WriteTrayInfo("CloudRegistration iniciado correctamente.");
                     }
                     catch (Exception exReg)
@@ -387,6 +388,20 @@ namespace AlwaysPrintTray
                     LocalizationManager.Get("BalloonCidrDetected"),
                     ToolTipIcon.Info);
             }, null);
+        }
+
+        /// <summary>
+        /// Callback de cambio de estado de conectividad Cloud.
+        /// Actualiza el StatusForm si está abierto (push en tiempo real).
+        /// </summary>
+        private void OnCloudConnectivityStateChanged(CloudConnectivityState state)
+        {
+            // Si el StatusForm está abierto, enviar la actualización en tiempo real
+            var form = _statusForm;
+            if (form != null && !form.IsDisposed)
+            {
+                form.UpdateCloudConnectivity(state);
+            }
         }
 
         /// <summary>
@@ -1121,7 +1136,18 @@ namespace AlwaysPrintTray
                 return;
             }
 
-            var form = new StatusForm(_pipe);
+            // Proveer estado de conectividad Cloud al StatusForm
+            Func<CloudConnectivityState?> connectivityProvider = () =>
+            {
+                // Si CloudRegistration está activo, obtener su estado
+                if (_cloudRegistration != null)
+                    return _cloudRegistration.GetConnectivityState();
+
+                // Si CloudManager está activo (ya registrado), reportar como conectado
+                return null;
+            };
+
+            var form = new StatusForm(_pipe, connectivityProvider);
             _activeForm = form;
             _statusForm = form;
             form.FormClosed += (_, __) => { _activeForm = null; _statusForm = null; };
