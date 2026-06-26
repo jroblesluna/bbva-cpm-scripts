@@ -385,7 +385,7 @@ namespace AlwaysPrintTray.Forms
         {
             if (_connectivityStateProvider == null)
             {
-                // Si Cloud ya está conectado (CloudEnabled=1), mostrar como conectado
+                // Sin provider: mostrar como conectado (CloudManager activo directamente)
                 ApplyCloudConnectedViaManager();
                 return;
             }
@@ -394,6 +394,12 @@ namespace AlwaysPrintTray.Forms
             if (state != null)
             {
                 ApplyCloudConnectivityState(state);
+            }
+            else
+            {
+                // Provider retornó null: CloudRegistration ya no existe (registro completado),
+                // CloudManager tomó el control → mostrar como conectado
+                ApplyCloudConnectedViaManager();
             }
         }
 
