@@ -148,9 +148,8 @@ namespace AlwaysPrint.Shared.Logging
                     }
                     else
                     {
-                        // Si el archivo ya existe, insertar el root log al inicio
-                        string existing = File.ReadAllText(logFile);
-                        File.WriteAllText(logFile, lines.ToString() + existing);
+                        // Si el archivo ya existe, agregar el root log en posición cronológica (append)
+                        File.AppendAllText(logFile, lines.ToString());
                     }
                 }
             }
