@@ -52,6 +52,64 @@ namespace AlwaysPrintTray.Bootstrap
         internal static HttpClient Http => _http;
 
         /// <summary>
+        /// Contador de timeouts consecutivos para decidir cuándo reciclar el pool.
+        /// </summary>
+        private static int _consecutiveTimeouts;
+
+        /// <summary>
+        /// Umbral de timeouts consecutivos antes de reciclar las conexiones del pool.
+        /// Después de 2 timeouts seguidos, se purgan las conexiones al proxy para
+        /// recuperarse de un reinicio de Zscaler que dejó sockets muertos en el pool.
+        /// </summary>
+        private const int RecycleAfterTimeouts = 2;
+
+        /// <summary>
+        /// Recicla el pool de conexiones HTTP purgando los ServicePoints.
+        /// Útil cuando el proxy corporativo (Zscaler) se reinicia y las conexiones
+        /// existentes quedan en estado muerto, causando timeouts indefinidos.
+        /// 
+        /// En .NET Framework 4.8, HttpClient cachea conexiones TCP en ServicePointManager.
+        /// Al cerrar los connection groups, fuerza que el siguiente request abra una nueva conexión.
+        /// </summary>
+        public static void RecycleConnectionPool()
+        {
+            try
+            {
+                // Purgar conexiones al proxy local (Zscaler)
+                var proxyUri = WebRequest.GetSystemWebProxy().GetProxy(
+                    new Uri("https://alwaysprint.apps.iol.pe"));
+                if (proxyUri != null)
+                {
+                    var sp = ServicePointManager.FindServicePoint(proxyUri);
+                    sp.CloseConnectionGroup("");
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"DomainHealthChecker: pool de conexiones reciclado para proxy {proxyUri.Host}:{proxyUri.Port}");
+                }
+
+                // También purgar conexiones directas a los dominios bootstrap
+                foreach (var domain in new[] { "alwaysprint.apps.iol.pe", "alwaysprint.sistemas.com.pe" })
+                {
+                    try
+                    {
+                        var sp = ServicePointManager.FindServicePoint(new Uri($"https://{domain}"));
+                        sp.CloseConnectionGroup("");
+                    }
+                    catch { /* Ignorar si el ServicePoint no existe */ }
+                }
+
+                _consecutiveTimeouts = 0;
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "DomainHealthChecker: reciclaje de pool completado. Próximos requests usarán conexiones frescas.");
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"DomainHealthChecker: error al reciclar pool de conexiones: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Configura los headers del HttpClient con la información de la workstation.
         /// Debe llamarse una vez al inicio del Tray.
         /// </summary>
@@ -151,6 +209,7 @@ namespace AlwaysPrintTray.Bootstrap
                             AlwaysPrintLogger.EvtServiceStarted);
                         
                         // Retornar el dominio completo (con prefijo) para uso posterior
+                        _consecutiveTimeouts = 0; // Reset en éxito
                         return (true, fullDomain, url);
                     }
                     catch (Newtonsoft.Json.JsonException ex)
@@ -184,6 +243,17 @@ namespace AlwaysPrintTray.Bootstrap
             string detalle = intentos.Count > 0
                 ? $"Ningún dominio bootstrap respondió correctamente. Intentos: [{string.Join("; ", intentos)}]"
                 : "Ningún dominio bootstrap respondió correctamente.";
+
+            // Incrementar contador de timeouts y reciclar pool si supera el umbral.
+            // Esto resuelve el caso donde Zscaler se reinició y el pool tiene sockets muertos.
+            _consecutiveTimeouts++;
+            if (_consecutiveTimeouts >= RecycleAfterTimeouts)
+            {
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"DomainHealthChecker: {_consecutiveTimeouts} timeouts consecutivos detectados. Reciclando pool de conexiones...");
+                RecycleConnectionPool();
+            }
+
             return (false, null, detalle);
         }
     }
