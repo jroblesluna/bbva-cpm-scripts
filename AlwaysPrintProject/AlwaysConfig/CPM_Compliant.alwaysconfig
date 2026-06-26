@@ -1,5 +1,5 @@
 {
-  "version": "6.4",
+  "version": "6.6",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -30,6 +30,16 @@
             "queue_name": "{{corporate_queue_name}}"
           },
           "store_result_in": "driver_version"
+        },
+        {
+          "type": "RunProcess",
+          "description": "Asegurar que la cola espere spool completo antes de imprimir (fix Snipping Tool 0-bytes)",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+            "arguments": "-NoProfile -NonInteractive -Command \"$p='HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\{{corporate_queue_name}}'; $a=(Get-ItemProperty $p -Name Attributes -EA SilentlyContinue).Attributes; if($a -band 0x100){Write-Host 'Ya configurado (DO_COMPLETE_FIRST activo)'}else{Set-ItemProperty $p -Name Attributes -Value ($a -bor 0x100); Write-Host 'Attributes actualizado: DO_COMPLETE_FIRST activado'}\"",
+            "timeout_seconds": 15,
+            "window_style": "Hidden"
+          }
         },
         {
           "type": "RunProcess",
