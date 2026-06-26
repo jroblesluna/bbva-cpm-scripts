@@ -444,7 +444,7 @@ namespace AlwaysPrintTray.Forms
             switch (state.Status)
             {
                 case "Connected":
-                    _valCloudStatus.Text = LocalizationManager.Get("StatusCloudConnected");
+                    _valCloudStatus.Text = FormatConnectedStatus(state);
                     _valCloudStatus.ForeColor = Color.FromArgb(0x22, 0x8B, 0x22); // Verde
                     _valCloudDetails.Text = "";
                     _valCloudDetails.Visible = false;
@@ -475,6 +475,35 @@ namespace AlwaysPrintTray.Forms
         }
 
         /// <summary>
+        /// <summary>
+        /// Formatea una duración en formato compacto: "Xd Xh Xm Xs" (omitiendo componentes en cero).
+        /// </summary>
+        private static string FormatDuration(TimeSpan dur)
+        {
+            if (dur.TotalDays >= 1)
+                return $"{(int)dur.TotalDays}d {dur.Hours}h {dur.Minutes}m";
+            if (dur.TotalHours >= 1)
+                return $"{(int)dur.TotalHours}h {dur.Minutes}m {dur.Seconds}s";
+            if (dur.TotalMinutes >= 1)
+                return $"{(int)dur.TotalMinutes}m {dur.Seconds}s";
+            return $"{dur.Seconds}s";
+        }
+
+        /// <summary>
+        /// Formatea el texto principal de estado cuando está conectado.
+        /// Ejemplo: "✓ Conectado (2h 15m 3s)"
+        /// </summary>
+        private static string FormatConnectedStatus(CloudConnectivityState state)
+        {
+            string text = LocalizationManager.Get("StatusCloudConnected");
+            if (state.ConnectedDuration.HasValue)
+            {
+                text += $" ({FormatDuration(state.ConnectedDuration.Value)})";
+            }
+            return text;
+        }
+
+        /// <summary>
         /// Formatea el texto principal de estado cuando está desconectado.
         /// Ejemplo: "⚠ Desconectado (3 intentos, 1m 30s)"
         /// </summary>
@@ -487,13 +516,7 @@ namespace AlwaysPrintTray.Forms
 
             if (state.DisconnectedDuration.HasValue)
             {
-                var dur = state.DisconnectedDuration.Value;
-                if (dur.TotalHours >= 1)
-                    parts.Add($"{(int)dur.TotalHours}h {dur.Minutes}m");
-                else if (dur.TotalMinutes >= 1)
-                    parts.Add($"{(int)dur.TotalMinutes}m {dur.Seconds}s");
-                else
-                    parts.Add($"{dur.Seconds}s");
+                parts.Add(FormatDuration(state.DisconnectedDuration.Value));
             }
 
             return $"{LocalizationManager.Get("StatusCloudDisconnected")} ({string.Join(", ", parts)})";

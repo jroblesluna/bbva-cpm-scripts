@@ -37,6 +37,7 @@ namespace AlwaysPrintTray
         // Integración Cloud (null si CloudEnabled=0 o CloudApiUrl vacía)
         private CloudManager? _cloudManager;
         private CloudRegistration? _cloudRegistration;
+        private DateTime? _cloudConnectedAt;
 
         // Integración de auto-actualización
         private UpdateChecker? _updateChecker;
@@ -244,6 +245,7 @@ namespace AlwaysPrintTray
                         _cloudManager.CheckUpdateRequested += OnCheckUpdateRequested;
                         _cloudManager.Start();
                         SubscribeOfflineStateManager(_cloudManager);
+                        _cloudConnectedAt = DateTime.UtcNow;
                         AlwaysPrintLogger.WriteTrayInfo("CloudManager iniciado correctamente.");
                     }
                     catch (Exception exCloud)
@@ -424,11 +426,16 @@ namespace AlwaysPrintTray
         /// </summary>
         private void OnOfflineStateChanged(bool isOffline, DateTime? disconnectedSince)
         {
+            // Al reconectar, actualizar timestamp de conexión
+            if (!isOffline)
+                _cloudConnectedAt = DateTime.UtcNow;
+
             var state = new CloudConnectivityState
             {
                 Status = isOffline ? "Disconnected" : "Connected",
                 FailedAttempts = 0,
                 DisconnectedSince = disconnectedSince,
+                ConnectedSince = isOffline ? null : _cloudConnectedAt,
                 LastError = isOffline ? "WebSocket desconectado" : null,
                 CurrentRetryIntervalSeconds = 0
             };
@@ -882,6 +889,7 @@ namespace AlwaysPrintTray
                         _cloudManager.CheckUpdateRequested += OnCheckUpdateRequested;
                         _cloudManager.Start();
                         SubscribeOfflineStateManager(_cloudManager);
+                        _cloudConnectedAt = DateTime.UtcNow;
                         
                         AlwaysPrintLogger.WriteTrayInfo(
                             "OnCloudRegistrationSuccessful: CloudManager iniciado correctamente");
@@ -1193,6 +1201,7 @@ namespace AlwaysPrintTray
                             DisconnectedSince = offlineMgr.OfflineDuration.HasValue
                                 ? DateTime.UtcNow - offlineMgr.OfflineDuration.Value
                                 : null,
+                            ConnectedSince = null,
                             LastError = "WebSocket desconectado",
                             CurrentRetryIntervalSeconds = 0
                         };
@@ -1204,6 +1213,7 @@ namespace AlwaysPrintTray
                         Status = "Connected",
                         FailedAttempts = 0,
                         DisconnectedSince = null,
+                        ConnectedSince = _cloudConnectedAt,
                         LastError = null,
                         CurrentRetryIntervalSeconds = 0
                     };

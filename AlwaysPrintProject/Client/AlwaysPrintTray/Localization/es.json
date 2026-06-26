@@ -43,7 +43,7 @@
   "StatusSectionCloudConnectivity": "Conectividad Cloud",
   "StatusLabelCloudStatus": "Estado:",
   "StatusLabelCloudDetails": "Detalles:",
-  "StatusCloudConnected": "Conectado",
+  "StatusCloudConnected": "✓ Conectado",
   "StatusCloudConnecting": "Conectando...",
   "StatusCloudDisconnected": "⚠ Desconectado",
   "StatusCloudAttempts": "{0} intentos",

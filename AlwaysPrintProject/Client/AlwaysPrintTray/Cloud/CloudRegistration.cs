@@ -27,6 +27,9 @@ namespace AlwaysPrintTray.Cloud
         /// <summary>Timestamp UTC del primer fallo consecutivo (null si conectado).</summary>
         public DateTime? DisconnectedSince { get; set; }
 
+        /// <summary>Timestamp UTC desde que está conectado (null si no conectado).</summary>
+        public DateTime? ConnectedSince { get; set; }
+
         /// <summary>Último error reportado (timeout, error de red, etc.).</summary>
         public string? LastError { get; set; }
 
@@ -39,6 +42,10 @@ namespace AlwaysPrintTray.Cloud
         /// <summary>Duración de la desconexión actual, o null si está conectado.</summary>
         public TimeSpan? DisconnectedDuration =>
             DisconnectedSince.HasValue ? DateTime.UtcNow - DisconnectedSince.Value : null;
+
+        /// <summary>Duración de la conexión actual, o null si no está conectado.</summary>
+        public TimeSpan? ConnectedDuration =>
+            ConnectedSince.HasValue ? DateTime.UtcNow - ConnectedSince.Value : null;
     }
 
     /// <summary>
@@ -77,6 +84,7 @@ namespace AlwaysPrintTray.Cloud
         // === Estado de conectividad y retry agresivo ===
         private int _consecutiveHealthCheckFailures;
         private DateTime? _firstFailureAt;
+        private DateTime? _connectedSince;
         private string? _lastHealthCheckError;
         private readonly object _stateLock = new object();
         
@@ -139,11 +147,16 @@ namespace AlwaysPrintTray.Cloud
         {
             lock (_stateLock)
             {
+                string status = _connectedSince.HasValue ? "Connected"
+                    : _firstFailureAt.HasValue ? "Disconnected"
+                    : "Connecting";
+
                 return new CloudConnectivityState
                 {
-                    Status = _firstFailureAt.HasValue ? "Disconnected" : "Connecting",
+                    Status = status,
                     FailedAttempts = _consecutiveHealthCheckFailures,
                     DisconnectedSince = _firstFailureAt,
+                    ConnectedSince = _connectedSince,
                     LastError = _lastHealthCheckError,
                     CurrentRetryIntervalSeconds = GetCurrentRetryInterval(),
                     LastAttemptAt = DateTime.UtcNow
@@ -420,6 +433,7 @@ namespace AlwaysPrintTray.Cloud
             {
                 _consecutiveHealthCheckFailures++;
                 _lastHealthCheckError = errorDetails;
+                _connectedSince = null;
 
                 if (!_firstFailureAt.HasValue)
                     _firstFailureAt = DateTime.UtcNow;
@@ -457,6 +471,8 @@ namespace AlwaysPrintTray.Cloud
                 _consecutiveHealthCheckFailures = 0;
                 _firstFailureAt = null;
                 _lastHealthCheckError = null;
+                if (!_connectedSince.HasValue)
+                    _connectedSince = DateTime.UtcNow;
             }
 
             if (wasDisconnected)
@@ -484,6 +500,7 @@ namespace AlwaysPrintTray.Cloud
                 Status = status,
                 FailedAttempts = _consecutiveHealthCheckFailures,
                 DisconnectedSince = _firstFailureAt,
+                ConnectedSince = _connectedSince,
                 LastError = lastError,
                 CurrentRetryIntervalSeconds = GetCurrentRetryInterval(),
                 LastAttemptAt = DateTime.UtcNow
