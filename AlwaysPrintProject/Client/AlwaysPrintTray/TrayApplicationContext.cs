@@ -243,6 +243,7 @@ namespace AlwaysPrintTray
                         _cloudManager.Registered += () => OnCloudManagerRegistered(cfgForCallback);
                         _cloudManager.CheckUpdateRequested += OnCheckUpdateRequested;
                         _cloudManager.Start();
+                        SubscribeOfflineStateManager(_cloudManager);
                         AlwaysPrintLogger.WriteTrayInfo("CloudManager iniciado correctamente.");
                     }
                     catch (Exception exCloud)
@@ -397,6 +398,41 @@ namespace AlwaysPrintTray
         private void OnCloudConnectivityStateChanged(CloudConnectivityState state)
         {
             // Si el StatusForm está abierto, enviar la actualización en tiempo real
+            var form = _statusForm;
+            if (form != null && !form.IsDisposed)
+            {
+                form.UpdateCloudConnectivity(state);
+            }
+        }
+
+        /// <summary>
+        /// Suscribe al evento StateChanged del OfflineStateManager de un CloudManager
+        /// para push de estado al StatusForm cuando el WebSocket se desconecta/reconecta.
+        /// </summary>
+        private void SubscribeOfflineStateManager(CloudManager manager)
+        {
+            var offlineMgr = manager.GetOfflineStateManager();
+            if (offlineMgr == null) return;
+
+            offlineMgr.StateChanged += OnOfflineStateChanged;
+        }
+
+        /// <summary>
+        /// Callback de cambio de estado online/offline del WebSocket (post-registro).
+        /// Traduce el estado del OfflineStateManager a CloudConnectivityState y
+        /// actualiza el StatusForm si está abierto.
+        /// </summary>
+        private void OnOfflineStateChanged(bool isOffline, DateTime? disconnectedSince)
+        {
+            var state = new CloudConnectivityState
+            {
+                Status = isOffline ? "Disconnected" : "Connected",
+                FailedAttempts = 0,
+                DisconnectedSince = disconnectedSince,
+                LastError = isOffline ? "WebSocket desconectado" : null,
+                CurrentRetryIntervalSeconds = 0
+            };
+
             var form = _statusForm;
             if (form != null && !form.IsDisposed)
             {
@@ -845,6 +881,7 @@ namespace AlwaysPrintTray
                         _cloudManager.Registered += () => OnCloudManagerRegistered(cfg);
                         _cloudManager.CheckUpdateRequested += OnCheckUpdateRequested;
                         _cloudManager.Start();
+                        SubscribeOfflineStateManager(_cloudManager);
                         
                         AlwaysPrintLogger.WriteTrayInfo(
                             "OnCloudRegistrationSuccessful: CloudManager iniciado correctamente");
@@ -1143,7 +1180,36 @@ namespace AlwaysPrintTray
                 if (_cloudRegistration != null)
                     return _cloudRegistration.GetConnectivityState();
 
-                // Si CloudManager está activo (ya registrado), reportar como conectado
+                // Si CloudManager está activo, verificar estado del WebSocket vía OfflineStateManager
+                if (_cloudManager != null)
+                {
+                    var offlineMgr = _cloudManager.GetOfflineStateManager();
+                    if (offlineMgr != null && offlineMgr.IsOffline)
+                    {
+                        return new CloudConnectivityState
+                        {
+                            Status = "Disconnected",
+                            FailedAttempts = 0,
+                            DisconnectedSince = offlineMgr.OfflineDuration.HasValue
+                                ? DateTime.UtcNow - offlineMgr.OfflineDuration.Value
+                                : null,
+                            LastError = "WebSocket desconectado",
+                            CurrentRetryIntervalSeconds = 0
+                        };
+                    }
+
+                    // CloudManager activo y online
+                    return new CloudConnectivityState
+                    {
+                        Status = "Connected",
+                        FailedAttempts = 0,
+                        DisconnectedSince = null,
+                        LastError = null,
+                        CurrentRetryIntervalSeconds = 0
+                    };
+                }
+
+                // Ni CloudRegistration ni CloudManager activos
                 return null;
             };
 

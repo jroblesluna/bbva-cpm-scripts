@@ -53,6 +53,12 @@ namespace AlwaysPrintTray.Cloud
         /// </summary>
         public event Action? CheckUpdateRequested;
 
+        /// <summary>
+        /// Expone el OfflineStateManager interno para que el StatusForm pueda consultar
+        /// el estado de conectividad del WebSocket post-registro.
+        /// </summary>
+        public OfflineStateManager? GetOfflineStateManager() => _offlineState;
+
         private readonly AppConfiguration _config;
         private readonly CloudCredentialsManager _credentials;
         private readonly RegistryConfigManager _registry;

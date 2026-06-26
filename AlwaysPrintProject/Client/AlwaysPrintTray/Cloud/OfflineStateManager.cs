@@ -36,6 +36,14 @@ namespace AlwaysPrintTray.Cloud
         private bool _disposed;
 
         /// <summary>
+        /// Evento que se dispara cuando cambia el estado online/offline del WebSocket.
+        /// Parámetros: (isOffline, disconnectedSince). 
+        /// Se emite en OnDisconnected y OnReconnected para que el StatusForm
+        /// pueda actualizar la sección de conectividad en tiempo real.
+        /// </summary>
+        public event Action<bool, DateTime?>? StateChanged;
+
+        /// <summary>
         /// Crea una nueva instancia de OfflineStateManager.
         /// </summary>
         /// <param name="uiContext">Contexto de sincronización del hilo UI para despachar operaciones visuales.</param>
@@ -114,6 +122,9 @@ namespace AlwaysPrintTray.Cloud
                     $"OfflineStateManager: desconexión registrada a las {_disconnectedAt.Value:O}. " +
                     "Timer de verificación iniciado (intervalo: 5 min).");
             }
+
+            // Notificar cambio de estado fuera del lock
+            StateChanged?.Invoke(true, _disconnectedAt);
         }
 
         /// <summary>
@@ -157,6 +168,9 @@ namespace AlwaysPrintTray.Cloud
                     ShowReconnectedNotification();
                 }
             }
+
+            // Notificar cambio de estado fuera del lock
+            StateChanged?.Invoke(false, null);
         }
 
         /// <summary>
