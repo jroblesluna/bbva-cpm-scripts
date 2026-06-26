@@ -396,6 +396,9 @@ namespace AlwaysPrintService.Actions
 
         /// <summary>
         /// Crea o actualiza un puerto TCP/IP de impresora via WMI.
+        /// Si el puerto ya existe con la misma configuración (host y port), retorna éxito
+        /// sin intentar escribir — evita el "Error genérico" de WMI en ciertos entornos
+        /// donde el puerto fue creado por GPO u otro mecanismo que bloquea escritura.
         /// </summary>
         public static bool CreateOrUpdateTcpPort(string portName, string hostAddress, int portNumber)
         {
@@ -415,13 +418,56 @@ namespace AlwaysPrintService.Actions
 
                 if (existingPort != null)
                 {
-                    existingPort["HostAddress"] = hostAddress;
-                    existingPort["PortNumber"] = portNumber;
-                    existingPort.Put();
-                    AlwaysPrintLogger.WriteInfo($"CreateOrUpdateTcpPort: puerto '{portName}' actualizado a {hostAddress}:{portNumber}");
-                    return true;
+                    // Verificar si ya tiene la configuración deseada antes de intentar escribir
+                    string currentHost = existingPort["HostAddress"]?.ToString() ?? "";
+                    int currentPort = 0;
+                    if (existingPort["PortNumber"] != null)
+                        int.TryParse(existingPort["PortNumber"].ToString(), out currentPort);
+
+                    if (string.Equals(currentHost, hostAddress, StringComparison.OrdinalIgnoreCase)
+                        && currentPort == portNumber)
+                    {
+                        AlwaysPrintLogger.WriteInfo(
+                            $"CreateOrUpdateTcpPort: puerto '{portName}' ya configurado correctamente ({hostAddress}:{portNumber}). Sin cambios.");
+                        return true;
+                    }
+
+                    // Configuración diferente: intentar actualizar
+                    try
+                    {
+                        existingPort["HostAddress"] = hostAddress;
+                        existingPort["PortNumber"] = portNumber;
+                        existingPort.Put();
+                        AlwaysPrintLogger.WriteInfo($"CreateOrUpdateTcpPort: puerto '{portName}' actualizado a {hostAddress}:{portNumber}");
+                        return true;
+                    }
+                    catch (ManagementException ex)
+                    {
+                        // Si falla la escritura pero el puerto ya existe, intentar recrear
+                        AlwaysPrintLogger.WriteWarning(
+                            $"CreateOrUpdateTcpPort: no se pudo actualizar puerto '{portName}' ({ex.Message}). " +
+                            "Intentando eliminar y recrear...");
+
+                        try
+                        {
+                            existingPort.Delete();
+                            AlwaysPrintLogger.WriteInfo(
+                                $"CreateOrUpdateTcpPort: puerto '{portName}' eliminado para recreación.");
+                        }
+                        catch (Exception delEx)
+                        {
+                            // No se pudo eliminar (puede estar en uso por una cola)
+                            AlwaysPrintLogger.WriteError(
+                                $"CreateOrUpdateTcpPort: no se pudo eliminar puerto '{portName}': {delEx.Message}. " +
+                                "Puede estar asignado a una cola de impresión.", delEx);
+                            return false;
+                        }
+
+                        // Caer al bloque de creación abajo
+                    }
                 }
 
+                // Crear puerto nuevo
                 var portClass = new ManagementClass("Win32_TCPIPPrinterPort");
                 var newPort = portClass.CreateInstance();
                 if (newPort == null) return false;
