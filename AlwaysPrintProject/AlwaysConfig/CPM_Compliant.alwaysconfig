@@ -771,6 +771,34 @@
           ]
         }
       ]
+    },
+    {
+      "event": "OnDemand",
+      "label": "Pausar Cola Corporativa",
+      "description": "Pausa la cola de impresión corporativa (LexmarkBBVA). Los trabajos se encolan pero no se envían a la impresora hasta que se reanude.",
+      "actions": [
+        {
+          "type": "PausePrintQueue",
+          "description": "Pausar cola corporativa",
+          "parameters": {
+            "queue_name": "{{corporate_queue_name}}"
+          }
+        }
+      ]
+    },
+    {
+      "event": "OnDemand",
+      "label": "Reanudar Cola Corporativa",
+      "description": "Reanuda la cola de impresión corporativa (LexmarkBBVA). Los trabajos encolados comenzarán a enviarse a la impresora.",
+      "actions": [
+        {
+          "type": "UnpausePrintQueue",
+          "description": "Reanudar cola corporativa",
+          "parameters": {
+            "queue_name": "{{corporate_queue_name}}"
+          }
+        }
+      ]
     }
   ]
 }

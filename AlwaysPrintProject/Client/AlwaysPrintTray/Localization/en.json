@@ -32,6 +32,8 @@
   "StatusLabelVersion": "Version:",
   "StatusLabelActiveQueue": "Active queue:",
   "StatusLabelConfig": "Configuration:",
+  "StatusLabelQueueStatus": "Queue status:",
+  "StatusLabelDriver": "Driver:",
   "StatusStateNormal": "Normal",
   "StatusStateContingency": "In Contingency",
   "StatusSectionOnDemand": "On-Demand Actions",

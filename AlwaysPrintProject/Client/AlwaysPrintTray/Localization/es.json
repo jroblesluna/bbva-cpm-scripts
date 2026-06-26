@@ -32,6 +32,8 @@
   "StatusLabelVersion": "Versión:",
   "StatusLabelActiveQueue": "Cola activa:",
   "StatusLabelConfig": "Configuración:",
+  "StatusLabelQueueStatus": "Estado cola:",
+  "StatusLabelDriver": "Driver:",
   "StatusStateNormal": "Normal",
   "StatusStateContingency": "En Contingencia",
   "StatusSectionOnDemand": "Acciones A Demanda",

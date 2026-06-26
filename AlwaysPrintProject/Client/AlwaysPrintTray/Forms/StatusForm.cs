@@ -40,6 +40,8 @@ namespace AlwaysPrintTray.Forms
         private Label _valState = null!;
         private Label _valVersion = null!;
         private Label _valQueue = null!;
+        private Label _valQueueStatus = null!;
+        private Label _valDriver = null!;
         private Label _valConfig = null!;
 
         // ── Controles de conectividad Cloud ─────────────────────────────────────
@@ -128,6 +130,8 @@ namespace AlwaysPrintTray.Forms
             _valState = AddFieldRow(LocalizationManager.Get("StatusLabelState"), "...", ref y);
             _valVersion = AddFieldRow(LocalizationManager.Get("StatusLabelVersion"), "...", ref y);
             _valQueue = AddFieldRow(LocalizationManager.Get("StatusLabelActiveQueue"), "...", ref y);
+            _valQueueStatus = AddFieldRow(LocalizationManager.Get("StatusLabelQueueStatus"), "...", ref y);
+            _valDriver = AddFieldRow(LocalizationManager.Get("StatusLabelDriver"), "...", ref y);
             _valConfig = AddFieldRow(LocalizationManager.Get("StatusLabelConfig"), "...", ref y);
 
             y += SectionSpacing;
@@ -311,6 +315,8 @@ namespace AlwaysPrintTray.Forms
                 _valVersion.Text = System.Reflection.Assembly.GetExecutingAssembly()
                     .GetName().Version?.ToString() ?? "0.0.0.0";
                 _valQueue.Text = LoadQueueName();
+                RefreshQueueStatus();
+                _valDriver.Text = LoadDriverVersion();
                 _valConfig.Text = LoadConfigName();
 
                 // Conectividad Cloud (lectura inicial)
@@ -347,6 +353,7 @@ namespace AlwaysPrintTray.Forms
             {
                 RefreshServiceStates();
                 RefreshContingencyState();
+                RefreshQueueStatus();
                 RefreshCloudConnectivity();
             }
             catch (Exception ex)
@@ -670,6 +677,110 @@ namespace AlwaysPrintTray.Forms
                 }
             }
             catch { return "N/A"; }
+        }
+
+        /// <summary>
+        /// Refresca el estado de la cola corporativa (Activa/Pausada/Offline) con color.
+        /// Usa WMI Win32_Printer.PrinterState para detectar pausa (bit 0x1 = Paused).
+        /// </summary>
+        private void RefreshQueueStatus()
+        {
+            try
+            {
+                string queueName = LoadQueueName();
+                if (queueName == "N/A")
+                {
+                    _valQueueStatus.Text = "N/A";
+                    _valQueueStatus.ForeColor = Color.FromArgb(0x66, 0x66, 0x66);
+                    return;
+                }
+
+                using (var searcher = new System.Management.ManagementObjectSearcher(
+                    @"\\.\root\cimv2",
+                    $"SELECT PrinterState, WorkOffline FROM Win32_Printer WHERE Name = '{queueName.Replace("'", "''")}'"))
+                {
+                    foreach (System.Management.ManagementObject obj in searcher.Get())
+                    {
+                        uint printerState = Convert.ToUInt32(obj["PrinterState"] ?? 0);
+                        bool offline = Convert.ToBoolean(obj["WorkOffline"] ?? false);
+
+                        // PrinterState bit flags: 0x1 = Paused, 0x2 = Error, 0x8 = Offline
+                        bool paused = (printerState & 0x1) != 0;
+
+                        if (paused)
+                        {
+                            _valQueueStatus.Text = "\u23F8 Pausada";
+                            _valQueueStatus.ForeColor = Color.FromArgb(0xE6, 0x7E, 0x00); // Naranja
+                        }
+                        else if (offline)
+                        {
+                            _valQueueStatus.Text = "\u26A0 Offline";
+                            _valQueueStatus.ForeColor = Color.FromArgb(0xCC, 0x33, 0x00); // Rojo
+                        }
+                        else
+                        {
+                            _valQueueStatus.Text = "\u2713 Activa";
+                            _valQueueStatus.ForeColor = Color.FromArgb(0x22, 0x8B, 0x22); // Verde
+                        }
+                        return;
+                    }
+                }
+
+                // Cola no encontrada en WMI
+                _valQueueStatus.Text = "No encontrada";
+                _valQueueStatus.ForeColor = Color.FromArgb(0xCC, 0x33, 0x00);
+            }
+            catch
+            {
+                _valQueueStatus.Text = "Error";
+                _valQueueStatus.ForeColor = Color.FromArgb(0x66, 0x66, 0x66);
+            }
+        }
+
+        /// <summary>
+        /// Lee la versión del driver de la cola corporativa.
+        /// Usa WMI Win32_Printer para obtener el nombre del driver.
+        /// </summary>
+        private string LoadDriverVersion()
+        {
+            try
+            {
+                string queueName = LoadQueueName();
+                if (queueName == "N/A") return "N/A";
+
+                using (var searcher = new System.Management.ManagementObjectSearcher(
+                    @"\\.\root\cimv2",
+                    $"SELECT DriverName FROM Win32_Printer WHERE Name = '{queueName.Replace("'", "''")}'"))
+                {
+                    foreach (System.Management.ManagementObject obj in searcher.Get())
+                    {
+                        string driverName = obj["DriverName"]?.ToString() ?? "Desconocido";
+
+                        // Intentar obtener versión desde Win32_PrinterDriver
+                        string safeDriver = driverName.Replace("'", "''").Replace("\\", "\\\\");
+                        using (var drvSearch = new System.Management.ManagementObjectSearcher(
+                            @"\\.\root\cimv2",
+                            $"SELECT DriverPath FROM Win32_PrinterDriver WHERE Name LIKE '{safeDriver}%'"))
+                        {
+                            foreach (System.Management.ManagementObject drv in drvSearch.Get())
+                            {
+                                string driverPath = drv["DriverPath"]?.ToString() ?? "";
+                                if (!string.IsNullOrEmpty(driverPath) && System.IO.File.Exists(driverPath))
+                                {
+                                    var fi = System.Diagnostics.FileVersionInfo.GetVersionInfo(driverPath);
+                                    if (!string.IsNullOrEmpty(fi.FileVersion))
+                                        return $"{driverName} ({fi.FileVersion})";
+                                }
+                            }
+                        }
+
+                        return driverName;
+                    }
+                }
+
+                return "N/A";
+            }
+            catch { return "Error"; }
         }
 
         private string LoadConfigName()
