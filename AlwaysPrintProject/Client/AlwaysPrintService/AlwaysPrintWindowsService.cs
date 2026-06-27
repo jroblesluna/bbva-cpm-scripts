@@ -257,6 +257,20 @@ namespace AlwaysPrintService
                 _pipeServer = new PipeServer(_dispatcher);
                 _pipeServer.Start();
 
+                // Establecer callback de cierre suave para StopTray (evita iconos fantasma)
+                _actionEngine.SetGracefulStopTrayCallback(() =>
+                {
+                    if (_pipeServer != null && _pipeServer.IsClientConnected)
+                    {
+                        var shutdownMsg = PipeMessage.Create(MessageType.ServiceStopping);
+                        _pipeServer.SendToClient(shutdownMsg);
+                        // Esperar para que el Tray procese y oculte el NotifyIcon
+                        Thread.Sleep(1500);
+                        return true;
+                    }
+                    return false;
+                });
+
                 // 6. Bucle principal: esperar usuario → lanzar Tray → monitorear.
                 RunSessionLoop();
             }

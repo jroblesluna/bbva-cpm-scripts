@@ -26,6 +26,16 @@ namespace AlwaysPrintService.Actions
         private readonly Dictionary<string, object> _variables = new Dictionary<string, object>();
         private readonly Dictionary<string, string> _configVariables = new Dictionary<string, string>();
         private ActionConfiguration? _config;
+        private Func<bool>? _gracefulStopTrayCallback;
+
+        /// <summary>
+        /// Establece un callback para cierre suave del Tray (envía señal vía pipe para
+        /// que el Tray oculte su NotifyIcon antes del kill, evitando iconos fantasma).
+        /// </summary>
+        public void SetGracefulStopTrayCallback(Func<bool> callback)
+        {
+            _gracefulStopTrayCallback = callback;
+        }
         
         // ═══════════════════════════════════════════════════════════════════════
         // VARIABLES DE CONFIGURACIÓN
@@ -583,7 +593,23 @@ namespace AlwaysPrintService.Actions
                     $"ActionEngine: no se pudo escribir LastRestartTimestamp en registro: {ex.Message}");
             }
 
-            AlwaysPrintLogger.WriteInfo("ActionEngine: StopTray - matando procesos AlwaysPrintTray");
+            // Intentar cierre suave primero (envía señal al Tray para que oculte NotifyIcon)
+            if (_gracefulStopTrayCallback != null)
+            {
+                AlwaysPrintLogger.WriteInfo("ActionEngine: StopTray - intentando cierre suave vía pipe");
+                try
+                {
+                    _gracefulStopTrayCallback();
+                }
+                catch (Exception ex)
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        $"ActionEngine: StopTray - cierre suave falló, procediendo con kill: {ex.Message}");
+                }
+            }
+
+            // Force kill de cualquier proceso que quede (graceful puede no haber cerrado todo)
+            AlwaysPrintLogger.WriteInfo("ActionEngine: StopTray - matando procesos AlwaysPrintTray restantes");
             int killed = AdminActions.KillProcessesByName("AlwaysPrintTray", null, true);
             return killed >= 0;
         }
