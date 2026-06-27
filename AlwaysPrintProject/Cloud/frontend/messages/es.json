@@ -246,7 +246,18 @@
     "bulkCommandSentDesc": "\"{action}\" enviado exitosamente.",
     "commandRestartService": "Reiniciar Servicio",
     "commandRestartTray": "Reiniciar Tray",
-    "commandCheckUpdate": "Verificar Actualización"
+    "commandCheckUpdate": "Verificar Actualización",
+    "onDemandSection": "Acciones A Demanda",
+    "executeAction": "Ejecutar",
+    "executing": "Ejecutando…",
+    "actionExecuted": "Acción ejecutada exitosamente",
+    "actionExecutedDesc": "Duración: {duration}ms",
+    "actionFailed": "Error al ejecutar acción",
+    "actionTimeout": "Timeout — la acción puede seguir ejecutándose en la workstation",
+    "actionConfirm": "¿Ejecutar esta acción?",
+    "actionConfirmDesc": "Se ejecutará \"{label}\" en la workstation. {description}",
+    "wsOfflineTooltip": "La workstation está desconectada",
+    "noActionsAvailable": "No hay acciones OnDemand disponibles en la configuración actual"
   },
   "vlans": {
     "title": "VLANs",
@@ -910,7 +921,22 @@
     "jitterWindowCalculation": "Con {window} segundos de ventana y {count} workstations activas, aproximadamente {rate} conexiones por segundo durante eventos masivos",
     "jitterWindowNoWorkstations": "No hay workstations activas para calcular la tasa de conexiones",
     "googleMapsApiKey": "API Key de Google Maps",
-    "googleMapsApiKeyHelper": "Requerida para geolocalización de VLANs. Obtenga su key en"
+    "googleMapsApiKeyHelper": "Requerida para geolocalización de VLANs. Obtenga su key en",
+    "tabCertificate": "Certificado",
+    "certificateTitle": "Certificado Digital",
+    "certificateStatus": "Estado",
+    "certificateGenerated": "Generado",
+    "certificateNotGenerated": "No generado",
+    "certificateVersion": "Versión",
+    "certificateExpiresAt": "Expira",
+    "certificateUrl": "Certificado (.cer)",
+    "certificateGenerate": "Generar Certificado",
+    "certificateRotate": "Renovar Certificado",
+    "certificateRotateConfirm": "¿Renovar certificado?",
+    "certificateRotateDescription": "Se generará un nuevo par de claves ECDSA. Todas las configuraciones activas se re-firmarán con la nueva clave y las workstations en línea recibirán una notificación para actualizar su certificado local.",
+    "certificateGenerateSuccess": "Certificado generado exitosamente",
+    "certificateRotateSuccess": "Certificado renovado exitosamente",
+    "certificateRotateSuccessDesc": "{count} configuración(es) re-firmada(s)"
   },
   "systemStatus": {
     "title": "Estado del Sistema",

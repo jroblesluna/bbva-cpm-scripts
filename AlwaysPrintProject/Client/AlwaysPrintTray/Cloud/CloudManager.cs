@@ -15,6 +15,7 @@ using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
 using AlwaysPrint.Shared.Network;
+using AlwaysPrint.Shared.Security;
 using AlwaysPrintTray.Localization;
 using AlwaysPrintTray.Pipe;
 using Newtonsoft.Json;
@@ -304,6 +305,9 @@ namespace AlwaysPrintTray.Cloud
                 case "message":
                     HandleCloudMessage(json);
                     break;
+                case "cert_rotated":
+                    HandleCertRotated(json);
+                    break;
                 default:
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"CloudManager: mensaje recibido tipo='{type}' (sin handler).");
@@ -354,6 +358,57 @@ namespace AlwaysPrintTray.Cloud
             {
                 AlwaysPrintLogger.WriteTrayError(
                     $"CloudManager: error procesando mensaje Cloud. {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Maneja el mensaje WebSocket de rotación de certificado.
+        /// Descarga el nuevo .cer desde S3 y actualiza la versión local en registro.
+        /// </summary>
+        private async void HandleCertRotated(string json)
+        {
+            try
+            {
+                var data = JObject.Parse(json);
+                string? certUrl = data["cert_url"]?.ToString();
+                int? certVersion = data["cert_version"]?.ToObject<int?>();
+
+                if (string.IsNullOrEmpty(certUrl) || !certVersion.HasValue)
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        "CloudManager: mensaje cert_rotated inválido — faltan campos cert_url o cert_version.",
+                        AlwaysPrintLogger.EvtGenericWarning);
+                    return;
+                }
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: rotación de certificado recibida. Nueva versión: {certVersion.Value}, URL: {certUrl}");
+
+                string certPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "AlwaysPrint", "config", "org.cer");
+
+                bool downloaded = await SignatureVerifier.DownloadCertAsync(certUrl, certPath);
+
+                if (downloaded)
+                {
+                    SignatureVerifier.SetLocalCertVersion(certVersion.Value);
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: certificado ECDSA rotado exitosamente a versión {certVersion.Value}");
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteError(
+                        $"CloudManager: error descargando nuevo certificado desde {certUrl}. " +
+                        "La verificación de firma puede fallar hasta la próxima actualización.",
+                        AlwaysPrintLogger.EvtGenericError);
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"CloudManager: error procesando cert_rotated: {ex.Message}", ex,
+                    AlwaysPrintLogger.EvtGenericError);
             }
         }
 
@@ -1128,6 +1183,11 @@ namespace AlwaysPrintTray.Cloud
                         HandleAnalyzeLogCommand(commandId);
                         break;
 
+                    case "execute_on_demand":
+                        var execParams = obj["params"] as JObject;
+                        HandleExecuteOnDemandCommand(commandId, execParams);
+                        break;
+
                     default:
                         // Comando desconocido
                         AlwaysPrintLogger.WriteTrayWarning(
@@ -1509,9 +1569,70 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
+        /// Ejecuta una acción OnDemand desde un comando remoto del servidor.
+        /// Envía la solicitud al Service vía Named Pipe y espera el resultado.
+        /// Incluye duration_ms en la respuesta para que el frontend muestre el tiempo de ejecución.
+        /// </summary>
+        private void HandleExecuteOnDemandCommand(string commandId, JObject? paramsObj)
+        {
+            string? label = paramsObj?["label"]?.ToString();
+
+            if (string.IsNullOrEmpty(label))
+            {
+                SendCommandResult(commandId, false, "Parámetro 'label' no proporcionado");
+                return;
+            }
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"CloudManager: ejecutando acción OnDemand remota. command_id={commandId}, label={label}");
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            try
+            {
+                // Enviar al Service via Pipe
+                var payload = new ExecuteOnDemandTriggerPayload { Label = label };
+                var pipeMessage = PipeMessage.Create(MessageType.ExecuteOnDemandTrigger, payload);
+                var response = _pipe.Send(pipeMessage);
+
+                stopwatch.Stop();
+                long durationMs = stopwatch.ElapsedMilliseconds;
+
+                if (response == null)
+                {
+                    SendCommandResult(commandId, false, "No se recibió respuesta del Service (timeout)", durationMs);
+                    return;
+                }
+
+                if (response.Type == MessageType.Error)
+                {
+                    var error = response.GetPayload<ErrorPayload>();
+                    SendCommandResult(commandId, false, $"Error del Service: {error?.Message}", durationMs);
+                    return;
+                }
+
+                var ack = response.GetPayload<AckPayload>();
+                bool success = ack?.Success == true;
+                string message = ack?.Message ?? (success ? "Acción ejecutada correctamente" : "Error al ejecutar acción");
+
+                SendCommandResult(commandId, success, message, durationMs);
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: acción OnDemand completada. label={label}, success={success}, duration_ms={durationMs}");
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error ejecutando acción OnDemand '{label}': {ex.Message}");
+                SendCommandResult(commandId, false, $"Error: {ex.Message}", stopwatch.ElapsedMilliseconds);
+            }
+        }
+
+        /// <summary>
         /// Envía el resultado de un comando remoto al servidor vía WebSocket.
         /// </summary>
-        private void SendCommandResult(string commandId, bool success, string output)
+        private void SendCommandResult(string commandId, bool success, string output, long? durationMs = null)
         {
             try
             {
@@ -1521,6 +1642,11 @@ namespace AlwaysPrintTray.Cloud
                     ["success"] = success,
                     ["output"] = output
                 };
+
+                if (durationMs.HasValue)
+                {
+                    payload["duration_ms"] = durationMs.Value;
+                }
 
                 _wsClient!.Send("command_result", payload);
             }

@@ -57,6 +57,7 @@ import type { Workstation, WorkstationUpdate, Organization, Device } from '@/typ
 import { ActionConfigSection } from '@/components/config/ActionConfigSection';
 import { LogAnalysisHistory } from '@/components/workstations/LogAnalysisHistory';
 import { LogAnalysisButton } from '@/components/workstations/LogAnalysisButton';
+import { OnDemandActionsSection } from '@/components/workstations/OnDemandActionsSection';
 
 type ViewMode = 'cards' | 'table';
 type SortField = 'ip_private' | 'hostname' | 'current_user' | 'organization' | 'tray_version' | 'action_config' | 'last_connection' | 'is_online';
@@ -2261,6 +2262,12 @@ function WorkstationDetailModal({
 
           {/* Historial de análisis de logs */}
           <LogAnalysisHistory workstationId={workstation.id} />
+
+          {/* Sección de acciones OnDemand */}
+          <OnDemandActionsSection
+            workstationId={workstation.id}
+            isOnline={workstation.is_online}
+          />
         </CardContent>
       </Card>
     </div>

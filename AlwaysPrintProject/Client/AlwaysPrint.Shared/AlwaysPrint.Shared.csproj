@@ -11,6 +11,10 @@
     <DefineConstants>$(DefineConstants);ENV_DEV</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Referencias de ensamblado de .NET Framework 4.8 no incluidas por defecto en SDK-style -->
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 </Project>

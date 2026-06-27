@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.IO;
 using System.ServiceProcess;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,6 +8,7 @@ using System.Windows.Forms;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
+using AlwaysPrint.Shared.Security;
 using AlwaysPrintTray.Bootstrap;
 using AlwaysPrintTray.Cloud;
 using AlwaysPrintTray.Forms;
@@ -835,15 +837,17 @@ namespace AlwaysPrintTray
         /// Callback que se ejecuta cuando el registro en la cloud es exitoso.
         /// Envía actualización de configuración al Service vía Named Pipe para activar CloudEnabled y CloudApiUrl.
         /// El Service es quien escribe en HKLM (tiene permisos administrativos).
+        /// Si la respuesta de registro incluye cert_url/cert_version, descarga el certificado ECDSA.
         /// </summary>
-        private void OnCloudRegistrationSuccessful(string workstationId, string accountId, string accountName, string cloudApiUrl)
+        private async void OnCloudRegistrationSuccessful(string workstationId, string accountId, string accountName, string cloudApiUrl, string? certUrl, int? certVersion)
         {
             AlwaysPrintLogger.WriteTrayInfo(
                 $"OnCloudRegistrationSuccessful: " +
                 $"workstation_id={workstationId}, " +
                 $"organization_id={accountId}, " +
                 $"organization_name={accountName}, " +
-                $"cloud_api_url={cloudApiUrl}");
+                $"cloud_api_url={cloudApiUrl}" +
+                (certUrl != null ? $", cert_url={certUrl}, cert_version={certVersion}" : ""));
             
             try
             {
@@ -872,7 +876,30 @@ namespace AlwaysPrintTray
                         AlwaysPrintLogger.WriteTrayInfo(
                             "OnCloudRegistrationSuccessful: configuración actualizada por el Service en HKLM");
                         
-                        // 4. Detener CloudRegistration
+                        // 4. Descargar certificado ECDSA si está disponible en la respuesta de registro
+                        if (!string.IsNullOrEmpty(certUrl) && certVersion.HasValue && certVersion.Value > 0)
+                        {
+                            string certPath = Path.Combine(
+                                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                                "AlwaysPrint", "config", "org.cer");
+                            
+                            bool downloaded = await SignatureVerifier.DownloadCertAsync(certUrl!, certPath);
+                            if (downloaded)
+                            {
+                                SignatureVerifier.SetLocalCertVersion(certVersion.Value);
+                                AlwaysPrintLogger.WriteTrayInfo(
+                                    $"OnCloudRegistrationSuccessful: certificado ECDSA descargado (versión {certVersion.Value})");
+                            }
+                            else
+                            {
+                                AlwaysPrintLogger.WriteWarning(
+                                    $"OnCloudRegistrationSuccessful: no se pudo descargar certificado ECDSA desde {certUrl}. " +
+                                    "Se descargará en la próxima verificación de configuración.",
+                                    AlwaysPrintLogger.EvtGenericWarning);
+                            }
+                        }
+                        
+                        // 5. Detener CloudRegistration
                         if (_cloudRegistration != null)
                         {
                             _cloudRegistration.RegistrationSuccessful -= OnCloudRegistrationSuccessful;
@@ -882,7 +909,7 @@ namespace AlwaysPrintTray
                                 "OnCloudRegistrationSuccessful: CloudRegistration detenido");
                         }
                         
-                        // 5. Iniciar CloudManager con la configuración actualizada
+                        // 6. Iniciar CloudManager con la configuración actualizada
                         var credentials = new CloudCredentialsManager();
                         _cloudManager = new CloudManager(cfg, credentials, _registry, _pipe, _uiContext, _trayIcon);
                         _cloudManager.Registered += () => OnCloudManagerRegistered(cfg);
@@ -894,7 +921,7 @@ namespace AlwaysPrintTray
                         AlwaysPrintLogger.WriteTrayInfo(
                             "OnCloudRegistrationSuccessful: CloudManager iniciado correctamente");
                         
-                        // 6. Mostrar notificación al usuario
+                        // 7. Mostrar notificación al usuario
                         ShowBalloon(
                             "AlwaysPrint",
                             $"¡Registro exitoso! Conectado a {accountName}",

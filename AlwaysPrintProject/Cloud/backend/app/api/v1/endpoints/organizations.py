@@ -39,8 +39,11 @@ from app.schemas.organization import (
     TargetVersionRequest,
     TargetVersionResponse,
 )
+from app.core.config import settings
 from app.services.audit import AuditService
 from app.services.config import ConfigService
+from app.services.crypto_service import CryptoService
+from app.services.s3_config_service import S3ConfigService
 from app.services.s3_update_service import S3UpdateService
 
 logger = logging.getLogger(__name__)
@@ -1383,3 +1386,260 @@ async def send_org_command(
     )
 
     return {"command_type": command_type, "organization_id": str(org_id), "dispatched": dispatched}
+
+
+
+# === ENDPOINTS DE CERTIFICADO ECDSA ===
+
+@router.post("/{org_id}/certificate/generate", status_code=status.HTTP_201_CREATED)
+def generate_certificate(
+    request: Request,
+    org_id: UUID,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Generar un certificado ECDSA para una organización (solo Admin).
+
+    Genera un par de claves ECDSA P-256, cifra la clave privada con AES-256-GCM,
+    sube el certificado público a S3 y almacena los metadatos en la organización.
+
+    Solo se permite generar si la organización no tiene certificado previo.
+    Para renovar un certificado existente, usar el endpoint de rotación.
+    """
+    # 1. Buscar la organización
+    organization = db.query(Organization).filter(Organization.id == org_id).first()
+
+    if not organization:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Organización con ID {org_id} no encontrada"
+        )
+
+    # 2. Verificar que no tenga certificado previo
+    if organization.ecdsa_cert_version and organization.ecdsa_cert_version > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La organización ya tiene un certificado. Use el endpoint de rotación."
+        )
+
+    # 3. Generar par de claves ECDSA
+    encrypted_private_key, cert_pem, expires_at = CryptoService.generate_key_pair(
+        str(org_id), settings.SECRET_KEY
+    )
+
+    # 4. Subir certificado público a S3
+    cert_url = S3ConfigService().upload_cert(str(org_id), 1, cert_pem)
+
+    # 5. Actualizar campos de la organización
+    organization.ecdsa_private_key_encrypted = encrypted_private_key
+    organization.ecdsa_cert_s3_key = f"certs/{org_id}/v1.cer"
+    organization.ecdsa_cert_version = 1
+    organization.ecdsa_cert_expires_at = expires_at
+
+    # 6. Commit a base de datos
+    db.commit()
+    db.refresh(organization)
+
+    # 7. Registrar en auditoría
+    audit_service = AuditService()
+    audit_service.log_action(
+        db=db,
+        action_type="config_change",
+        entity_type="organization",
+        entity_id=str(org_id),
+        user_id=str(current_user.id),
+        organization_id=str(org_id),
+        old_values={},
+        new_values={
+            "cert_version": 1,
+            "expires_at": expires_at.isoformat(),
+        },
+        ip_address=get_client_ip(request)
+    )
+
+    logger.info(
+        "Certificado ECDSA generado: org_id=%s, cert_version=1, expires_at=%s, admin_id=%s",
+        org_id, expires_at.isoformat(), current_user.id,
+    )
+
+    # 8. Retornar respuesta
+    return {
+        "cert_version": 1,
+        "cert_url": cert_url,
+        "expires_at": expires_at.isoformat(),
+        "message": "Certificado generado exitosamente",
+    }
+
+
+@router.post("/{org_id}/certificate/rotate", status_code=status.HTTP_200_OK)
+async def rotate_certificate(
+    request: Request,
+    org_id: UUID,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Rotar el certificado ECDSA de una organización (solo Admin).
+
+    Genera un nuevo par de claves ECDSA P-256, re-firma todos los ActionConfigs
+    activos de la organización con la nueva clave, sube el nuevo certificado a S3
+    y notifica a las workstations online via WebSocket.
+
+    El certificado anterior se mantiene en S3 (no se elimina) para permitir
+    que workstations offline validen configs firmados con la versión previa
+    durante un período de transición.
+    """
+    # 1. Buscar la organización
+    organization = db.query(Organization).filter(Organization.id == org_id).first()
+
+    if not organization:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Organización con ID {org_id} no encontrada"
+        )
+
+    # 2. Verificar que la organización TIENE un certificado previo
+    if not organization.ecdsa_cert_version or organization.ecdsa_cert_version == 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La organización no tiene certificado. Genere uno primero."
+        )
+
+    old_cert_version = organization.ecdsa_cert_version
+
+    # 3. Generar nuevo par de claves ECDSA
+    encrypted_private_key, cert_pem, expires_at = CryptoService.generate_key_pair(
+        str(org_id), settings.SECRET_KEY
+    )
+
+    # 4. Nueva versión del certificado
+    new_version = old_cert_version + 1
+
+    # 5. Subir nuevo certificado público a S3
+    cert_url = S3ConfigService().upload_cert(str(org_id), new_version, cert_pem)
+
+    # 6. Actualizar campos de la organización en BD
+    organization.ecdsa_private_key_encrypted = encrypted_private_key
+    organization.ecdsa_cert_s3_key = f"certs/{org_id}/v{new_version}.cer"
+    organization.ecdsa_cert_version = new_version
+    organization.ecdsa_cert_expires_at = expires_at
+
+    # 7. Re-firmar TODOS los ActionConfigs activos de la organización
+    active_configs = db.query(ActionConfig).filter(
+        ActionConfig.organization_id == org_id,
+        ActionConfig.is_active == True
+    ).all()
+
+    configs_re_signed = 0
+    s3_service = S3ConfigService()
+
+    for config in active_configs:
+        # Firmar con la nueva clave privada
+        hash_full, signature_b64 = CryptoService.sign_config(
+            encrypted_private_key, config.config_json, settings.SECRET_KEY, str(org_id)
+        )
+
+        # Construir JSON envolvente firmado
+        signed_json = CryptoService.build_signed_config(
+            config.config_json, hash_full, signature_b64, new_version
+        )
+
+        # Subir config re-firmado a S3
+        new_s3_key = s3_service.upload_signed_config(str(org_id), hash_full[:8], signed_json)
+
+        # Actualizar storage_path del config
+        config.storage_path = new_s3_key
+        configs_re_signed += 1
+
+    # 8. Commit a base de datos
+    db.commit()
+    db.refresh(organization)
+
+    # 9. WebSocket broadcast a workstations online de la organización
+    workstations = db.query(Workstation).filter(
+        Workstation.organization_id == org_id
+    ).all()
+
+    cert_rotated_message = {
+        "type": "cert_rotated",
+        "cert_url": cert_url,
+        "cert_version": new_version,
+    }
+
+    for ws in workstations:
+        ws_id = str(ws.id)
+        if connection_manager.is_workstation_online(ws_id):
+            await connection_manager.send_to_workstation(ws_id, cert_rotated_message)
+
+    # 10. Registrar en auditoría
+    audit_service = AuditService()
+    audit_service.log_action(
+        db=db,
+        action_type="config_change",
+        entity_type="organization",
+        entity_id=str(org_id),
+        user_id=str(current_user.id),
+        organization_id=str(org_id),
+        old_values={
+            "cert_version": old_cert_version,
+        },
+        new_values={
+            "cert_version": new_version,
+            "expires_at": expires_at.isoformat(),
+            "configs_re_signed": configs_re_signed,
+        },
+        ip_address=get_client_ip(request)
+    )
+
+    logger.info(
+        "Certificado ECDSA rotado: org_id=%s, v%d→v%d, configs_re_signed=%d, admin_id=%s",
+        org_id, old_cert_version, new_version, configs_re_signed, current_user.id,
+    )
+
+    # 11. Retornar respuesta
+    return {
+        "cert_version": new_version,
+        "cert_url": cert_url,
+        "expires_at": expires_at.isoformat(),
+        "configs_re_signed": configs_re_signed,
+        "message": "Certificado rotado exitosamente",
+    }
+
+
+@router.get("/{org_id}/certificate/info")
+def get_certificate_info(
+    org_id: UUID,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtener información del certificado ECDSA de una organización (solo Admin).
+    """
+    # 1. Buscar la organización
+    organization = db.query(Organization).filter(Organization.id == org_id).first()
+
+    if not organization:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Organización con ID {org_id} no encontrada"
+        )
+
+    # 2. Si no tiene certificado generado
+    if not organization.ecdsa_cert_version or organization.ecdsa_cert_version == 0:
+        return {
+            "has_certificate": False,
+            "cert_version": 0,
+            "cert_url": None,
+            "expires_at": None,
+        }
+
+    # 3. Construir URL pública del certificado
+    cert_url = S3ConfigService().get_public_url(organization.ecdsa_cert_s3_key)
+
+    return {
+        "has_certificate": True,
+        "cert_version": organization.ecdsa_cert_version,
+        "cert_url": cert_url,
+        "expires_at": organization.ecdsa_cert_expires_at.isoformat() if organization.ecdsa_cert_expires_at else None,
+    }

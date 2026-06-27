@@ -90,9 +90,9 @@ namespace AlwaysPrintTray.Cloud
         
         /// <summary>
         /// Evento que se dispara cuando el registro es exitoso.
-        /// Parámetros: (workstationId, accountId, accountName, cloudApiUrl)
+        /// Parámetros: (workstationId, accountId, accountName, cloudApiUrl, certUrl, certVersion)
         /// </summary>
-        public event Action<string, string, string, string>? RegistrationSuccessful;
+        public event Action<string, string, string, string, string?, int?>? RegistrationSuccessful;
 
         /// <summary>
         /// Evento que se dispara cuando la IP pública está pendiente de aprobación.
@@ -340,16 +340,21 @@ namespace AlwaysPrintTray.Cloud
                     string accountName = result["organization_name"]?.ToString() ?? "";
                     string message = result["message"]?.ToString() ?? "";
                     
+                    // Leer campos opcionales de certificado ECDSA
+                    string? certUrl = result["cert_url"]?.ToString();
+                    int? certVersion = result["cert_version"]?.ToObject<int?>();
+                    
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"CloudRegistration: ¡Registro exitoso! " +
                         $"workstation_id={workstationId}, " +
                         $"organization_id={accountId}, " +
                         $"organization_name={accountName}, " +
-                        $"message={message}",
+                        $"message={message}" +
+                        (certUrl != null ? $", cert_url={certUrl}, cert_version={certVersion}" : ""),
                         AlwaysPrintLogger.EvtServiceStarted);
                     
                     // Disparar evento de registro exitoso
-                    RegistrationSuccessful?.Invoke(workstationId, accountId, accountName, cloudApiUrl);
+                    RegistrationSuccessful?.Invoke(workstationId, accountId, accountName, cloudApiUrl, certUrl, certVersion);
                 }
                 else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
                 {

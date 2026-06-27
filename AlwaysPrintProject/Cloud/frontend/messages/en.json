@@ -246,7 +246,18 @@
     "bulkCommandSentDesc": "\"{action}\" sent successfully.",
     "commandRestartService": "Restart Service",
     "commandRestartTray": "Restart Tray",
-    "commandCheckUpdate": "Check Update"
+    "commandCheckUpdate": "Check Update",
+    "onDemandSection": "On-Demand Actions",
+    "executeAction": "Execute",
+    "executing": "Executing…",
+    "actionExecuted": "Action executed successfully",
+    "actionExecutedDesc": "Duration: {duration}ms",
+    "actionFailed": "Failed to execute action",
+    "actionTimeout": "Timeout — the action may still be running on the workstation",
+    "actionConfirm": "Execute this action?",
+    "actionConfirmDesc": "Will execute \"{label}\" on the workstation. {description}",
+    "wsOfflineTooltip": "Workstation is offline",
+    "noActionsAvailable": "No on-demand actions available in current configuration"
   },
   "vlans": {
     "title": "VLANs",
@@ -910,7 +921,22 @@
     "jitterWindowCalculation": "With {window} seconds window and {count} active workstations, approximately {rate} connections per second during mass events",
     "jitterWindowNoWorkstations": "No active workstations to compute connection rate estimate",
     "googleMapsApiKey": "Google Maps API Key",
-    "googleMapsApiKeyHelper": "Required for VLAN geolocation. Get your key from"
+    "googleMapsApiKeyHelper": "Required for VLAN geolocation. Get your key from",
+    "tabCertificate": "Certificate",
+    "certificateTitle": "Digital Certificate",
+    "certificateStatus": "Status",
+    "certificateGenerated": "Generated",
+    "certificateNotGenerated": "Not generated",
+    "certificateVersion": "Version",
+    "certificateExpiresAt": "Expires",
+    "certificateUrl": "Certificate (.cer)",
+    "certificateGenerate": "Generate Certificate",
+    "certificateRotate": "Rotate Certificate",
+    "certificateRotateConfirm": "Rotate certificate?",
+    "certificateRotateDescription": "A new ECDSA key pair will be generated. All active configurations will be re-signed with the new key and online workstations will be notified to update their local certificate.",
+    "certificateGenerateSuccess": "Certificate generated successfully",
+    "certificateRotateSuccess": "Certificate rotated successfully",
+    "certificateRotateSuccessDesc": "{count} configuration(s) re-signed"
   },
   "systemStatus": {
     "title": "System Status",
