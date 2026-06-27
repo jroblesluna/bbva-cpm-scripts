@@ -744,9 +744,24 @@ namespace AlwaysPrintService
             try
             {
                 AlwaysPrintLogger.WriteInfo("Recargando configuración de acciones");
+                
+                // Guardar hash anterior para detectar si hubo cambio real
+                string? previousHash = _actionEngine.LoadedConfigHash;
+                
                 LoadActionConfiguration();
                 
-                // Ejecutar trigger OnConfigChange si existe
+                // Solo ejecutar OnConfigChange si la config realmente cambió
+                string? newHash = _actionEngine.LoadedConfigHash;
+                
+                if (previousHash != null && previousHash == newHash)
+                {
+                    AlwaysPrintLogger.WriteInfo(
+                        $"ReloadActionConfiguration: config sin cambios (hash={newHash?.Substring(0, 8)}). " +
+                        "Omitiendo trigger OnConfigChange.");
+                    return;
+                }
+                
+                // Ejecutar trigger OnConfigChange (config nueva o primera carga)
                 ExecuteActionTrigger(TriggerEvents.OnConfigChange);
             }
             catch (Exception ex)

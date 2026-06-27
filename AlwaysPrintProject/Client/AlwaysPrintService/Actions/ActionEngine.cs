@@ -27,6 +27,13 @@ namespace AlwaysPrintService.Actions
         private readonly Dictionary<string, string> _configVariables = new Dictionary<string, string>();
         private ActionConfiguration? _config;
         private Func<bool>? _gracefulStopTrayCallback;
+        private string? _loadedConfigHash;
+
+        /// <summary>
+        /// Hash de la configuración actualmente cargada en memoria.
+        /// Se usa para detectar si un reload trae la misma config (evita triggers innecesarios).
+        /// </summary>
+        public string? LoadedConfigHash => _loadedConfigHash;
 
         /// <summary>
         /// Establece un callback para cierre suave del Tray (envía señal vía pipe para
@@ -65,6 +72,9 @@ namespace AlwaysPrintService.Actions
         {
             try
             {
+                // Reset hash al inicio (se establecerá si la carga es exitosa)
+                _loadedConfigHash = null;
+                
                 AlwaysPrintLogger.WriteInfo($"ActionEngine: cargando configuración desde {configFilePath}");
                 
                 if (!File.Exists(configFilePath))
@@ -151,6 +161,9 @@ namespace AlwaysPrintService.Actions
                     return false;
                 }
                 
+                // Almacenar hash del config cargado (para detectar recargas sin cambio)
+                _loadedConfigHash = parsed["hash"]?.ToString();
+                
                 AlwaysPrintLogger.WriteInfo(
                     $"ActionEngine: configuración firmada verificada y cargada. " +
                     $"Nombre: {_config.Name}, Versión: {_config.Version}, " +
@@ -191,6 +204,9 @@ namespace AlwaysPrintService.Actions
             try
             {
                 AlwaysPrintLogger.WriteInfo("ActionEngine: cargando configuración desde string JSON");
+                
+                // No hay envelope firmado → no hay hash disponible
+                _loadedConfigHash = null;
                 
                 _config = JsonConvert.DeserializeObject<ActionConfiguration>(json);
                 
