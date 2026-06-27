@@ -444,7 +444,6 @@ namespace AlwaysPrintService.Actions
                 case ActionTypes.ReadPrintDriverVersion:
                     return ExecuteReadPrintDriverVersion(action);
 
-                case ActionTypes.CheckWindowsFeature:
                 case ActionTypes.EnableWindowsFeature:
                     return ExecuteEnableWindowsFeature(action);
                 
