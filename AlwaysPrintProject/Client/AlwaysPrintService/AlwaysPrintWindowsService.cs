@@ -738,6 +738,9 @@ namespace AlwaysPrintService
 
         /// <summary>
         /// Recarga la configuración de acciones desde el archivo.
+        /// Solo ejecuta OnConfigChange cuando hay un config previo cargado que cambió
+        /// a una versión diferente. La primera carga no dispara OnConfigChange porque
+        /// el Tray ya se actualizó sin necesidad de restart.
         /// </summary>
         public void ReloadActionConfiguration()
         {
@@ -750,18 +753,32 @@ namespace AlwaysPrintService
                 
                 LoadActionConfiguration();
                 
-                // Solo ejecutar OnConfigChange si la config realmente cambió
+                // Evaluar si corresponde ejecutar OnConfigChange
                 string? newHash = _actionEngine.LoadedConfigHash;
                 
-                if (previousHash != null && previousHash == newHash)
+                if (previousHash == null)
                 {
+                    // Primera carga — config cargada en memoria por primera vez.
+                    // No ejecutar OnConfigChange (el Tray ya se actualizó sin necesidad de restart).
+                    AlwaysPrintLogger.WriteInfo(
+                        $"ReloadActionConfiguration: primera carga de config (hash={newHash?.Substring(0, 8)}). " +
+                        "Omitiendo trigger OnConfigChange (no hay config previo que reemplazar).");
+                    return;
+                }
+                
+                if (previousHash == newHash)
+                {
+                    // Misma config recargada — no hay cambio real.
                     AlwaysPrintLogger.WriteInfo(
                         $"ReloadActionConfiguration: config sin cambios (hash={newHash?.Substring(0, 8)}). " +
                         "Omitiendo trigger OnConfigChange.");
                     return;
                 }
                 
-                // Ejecutar trigger OnConfigChange (config nueva o primera carga)
+                // Config cambió (previousHash != newHash, y previousHash no es null) — ejecutar OnConfigChange
+                AlwaysPrintLogger.WriteInfo(
+                    $"ReloadActionConfiguration: config cambió (previo={previousHash?.Substring(0, 8)}, nuevo={newHash?.Substring(0, 8)}). " +
+                    "Ejecutando trigger OnConfigChange.");
                 ExecuteActionTrigger(TriggerEvents.OnConfigChange);
             }
             catch (Exception ex)
