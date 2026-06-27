@@ -74,7 +74,9 @@
     "groupMonitoring": "Monitoreo / Operaciones",
     "groupSystem": "Sistema",
     "documentation": "Documentación",
-    "map": "Mapa"
+    "map": "Mapa",
+    "collapseSidebar": "Contraer menú",
+    "expandSidebar": "Expandir menú"
   },
   "login": {
     "title": "AlwaysPrint Cloud Manager",
