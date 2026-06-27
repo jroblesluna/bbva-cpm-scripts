@@ -743,6 +743,68 @@ namespace AlwaysPrintService.Actions
         }
 
         // ═══════════════════════════════════════════════════════════════════════
+        // VERIFICACIÓN DE WINDOWS FEATURES
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Verifica si un Windows Optional Feature está habilitado.
+        /// Usa DISM /online /get-featureinfo para consultar el estado.
+        /// </summary>
+        /// <param name="featureName">Nombre del feature (ej: Printing-Foundation-LPDPrintService)</param>
+        /// <returns>"enabled" si está habilitado, "disabled" si no, "unknown" si no se pudo determinar</returns>
+        public static string CheckWindowsFeature(string featureName)
+        {
+            try
+            {
+                AlwaysPrintLogger.WriteInfo($"CheckWindowsFeature: verificando estado de '{featureName}'");
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "C:\\Windows\\System32\\dism.exe",
+                    Arguments = $"/online /get-featureinfo /featurename:{featureName}",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using (var process = new Process { StartInfo = startInfo })
+                {
+                    var stdout = new System.Text.StringBuilder();
+                    process.OutputDataReceived += (s, e) => { if (e.Data != null) stdout.AppendLine(e.Data); };
+
+                    process.Start();
+                    process.BeginOutputReadLine();
+                    process.WaitForExit(30000);
+
+                    string output = stdout.ToString();
+
+                    // DISM output contiene "State : Enabled" (inglés) o "Estado : Habilitada" (español)
+                    if (output.Contains("State : Enabled") || output.Contains("Estado : Habilitad"))
+                    {
+                        AlwaysPrintLogger.WriteInfo($"CheckWindowsFeature: '{featureName}' está habilitado");
+                        return "enabled";
+                    }
+                    else if (output.Contains("State : Disabled") || output.Contains("Estado : Deshabilitad"))
+                    {
+                        AlwaysPrintLogger.WriteInfo($"CheckWindowsFeature: '{featureName}' está deshabilitado");
+                        return "disabled";
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteWarning($"CheckWindowsFeature: no se pudo determinar estado de '{featureName}'");
+                        return "unknown";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"CheckWindowsFeature: error verificando '{featureName}': {ex.Message}");
+                return "unknown";
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // GESTIÓN DE SERVICIOS
         // ═══════════════════════════════════════════════════════════════════════
         
