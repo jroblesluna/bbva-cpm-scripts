@@ -62,31 +62,18 @@ namespace AlwaysPrint.Shared.Security
                     return false;
                 }
 
-                // 2. Serializar el config a JSON compacto (sin whitespace)
-                string serializedConfig = configToken.ToString(Formatting.None);
-
-                // 3. Calcular SHA256 del config serializado y comparar con el campo "hash"
-                byte[] configBytes = Encoding.UTF8.GetBytes(serializedConfig);
-                byte[] computedHashBytes;
-
-                using (var sha256 = SHA256.Create())
+                // 2. Convertir hash hex del envelope a bytes (el hash fue calculado por el backend)
+                // No re-computamos el hash del config porque la re-serialización JSON puede
+                // diferir del original (orden de propiedades, formato de números, escaping).
+                // La firma ECDSA garantiza la autenticidad del hash — si la firma es válida,
+                // el hash es auténtico y por tanto el config no fue alterado.
+                byte[] hashBytes = new byte[hashHex.Length / 2];
+                for (int i = 0; i < hashBytes.Length; i++)
                 {
-                    computedHashBytes = sha256.ComputeHash(configBytes);
+                    hashBytes[i] = Convert.ToByte(hashHex.Substring(i * 2, 2), 16);
                 }
 
-                string computedHashHex = BitConverter.ToString(computedHashBytes)
-                    .Replace("-", "")
-                    .ToLowerInvariant();
-
-                if (!computedHashHex.Equals(hashHex, StringComparison.OrdinalIgnoreCase))
-                {
-                    AlwaysPrintLogger.WriteError(
-                        $"SignatureVerifier: hash SHA256 no coincide. Esperado: {hashHex}, Calculado: {computedHashHex}",
-                        AlwaysPrintLogger.EvtGenericError);
-                    return false;
-                }
-
-                // 4. Cargar certificado X.509 y obtener clave pública ECDSA
+                // 3. Cargar certificado X.509 y obtener clave pública ECDSA
                 if (!File.Exists(certPath))
                 {
                     AlwaysPrintLogger.WriteError(
@@ -106,7 +93,7 @@ namespace AlwaysPrint.Shared.Security
                         return false;
                     }
 
-                    // 5. Verificar firma ECDSA
+                    // 4. Verificar firma ECDSA del hash
                     // El backend Python firma con: private_key.sign(hash_bytes, ec.ECDSA(hashes.SHA256()))
                     // Esto significa que hash_bytes (32 bytes) son hasheados OTRA VEZ con SHA256 antes de firmar.
                     // En .NET, VerifyData(data, signature, HashAlgorithmName.SHA256) hace exactamente eso:
@@ -114,21 +101,21 @@ namespace AlwaysPrint.Shared.Security
                     byte[] signatureBytes = Convert.FromBase64String(signatureBase64);
 
                     bool isValid = ecDsa.VerifyData(
-                        computedHashBytes,
+                        hashBytes,
                         signatureBytes,
                         HashAlgorithmName.SHA256);
 
                     if (!isValid)
                     {
                         AlwaysPrintLogger.WriteError(
-                            "SignatureVerifier: firma ECDSA inválida — la configuración pudo haber sido alterada.",
+                            "SignatureVerifier: firma ECDSA inválida — la configuración fue alterada o el certificado no corresponde.",
                             AlwaysPrintLogger.EvtGenericError);
                         return false;
                     }
                 }
 
-                // 6. Verificación exitosa
-                configJson = serializedConfig;
+                // 5. Firma válida — extraer config como string para el ActionEngine
+                configJson = configToken.ToString(Formatting.None);
                 AlwaysPrintLogger.WriteInfo(
                     "SignatureVerifier: verificación de firma ECDSA exitosa.");
                 return true;

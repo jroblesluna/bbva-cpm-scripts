@@ -194,7 +194,8 @@ namespace AlwaysPrintTray.Cloud
                                 bool certDownloaded = await SignatureVerifier.DownloadCertAsync(certUrl, certPath);
                                 if (certDownloaded)
                                 {
-                                    SignatureVerifier.SetLocalCertVersion(envelopeCertVersion);
+                                    // No escribir CertVersion en registro desde el Tray (requiere HKLM/admin).
+                                    // El Service lo actualizará al cargar y verificar la configuración firmada.
                                     AlwaysPrintLogger.WriteInfo(
                                         $"ConfigManager: certificado actualizado a versión {envelopeCertVersion}");
                                 }

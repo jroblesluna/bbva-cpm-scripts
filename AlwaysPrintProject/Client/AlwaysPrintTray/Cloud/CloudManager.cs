@@ -392,7 +392,8 @@ namespace AlwaysPrintTray.Cloud
 
                 if (downloaded)
                 {
-                    SignatureVerifier.SetLocalCertVersion(certVersion.Value);
+                    // No escribir CertVersion en registro desde el Tray (requiere HKLM/admin).
+                    // El Service lo actualizará al cargar y verificar la configuración firmada.
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"CloudManager: certificado ECDSA rotado exitosamente a versión {certVersion.Value}");
                 }

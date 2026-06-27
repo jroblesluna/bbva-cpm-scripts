@@ -886,7 +886,8 @@ namespace AlwaysPrintTray
                             bool downloaded = await SignatureVerifier.DownloadCertAsync(certUrl!, certPath);
                             if (downloaded)
                             {
-                                SignatureVerifier.SetLocalCertVersion(certVersion.Value);
+                                // No escribir CertVersion en registro desde el Tray (requiere HKLM/admin).
+                                // El Service lo actualizará al cargar y verificar la configuración firmada.
                                 AlwaysPrintLogger.WriteTrayInfo(
                                     $"OnCloudRegistrationSuccessful: certificado ECDSA descargado (versión {certVersion.Value})");
                             }

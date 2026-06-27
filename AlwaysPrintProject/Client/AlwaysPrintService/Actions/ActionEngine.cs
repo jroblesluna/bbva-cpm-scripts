@@ -125,6 +125,10 @@ namespace AlwaysPrintService.Actions
                     return false;
                 }
                 
+                // Actualizar CertVersion en registro (el Service tiene permisos HKLM)
+                int certVersion = parsed["cert_version"]!.Value<int>();
+                SignatureVerifier.SetLocalCertVersion(certVersion);
+                
                 // Firma válida — deserializar solo el config interno
                 _config = JsonConvert.DeserializeObject<ActionConfiguration>(verifiedConfigJson);
                 
