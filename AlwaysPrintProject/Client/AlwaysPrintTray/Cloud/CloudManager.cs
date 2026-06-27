@@ -315,6 +315,9 @@ namespace AlwaysPrintTray.Cloud
                 case "cert_rotated":
                     HandleCertRotated(json);
                     break;
+                case "action_config_changed":
+                    HandleActionConfigChanged();
+                    break;
                 default:
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"CloudManager: mensaje recibido tipo='{type}' (sin handler).");
@@ -1768,7 +1771,19 @@ namespace AlwaysPrintTray.Cloud
         }
         
         // === Gestión de Configuración de Acciones ===
-        
+
+        /// <summary>
+        /// Maneja la notificación del servidor de que la configuración de acciones cambió.
+        /// Re-verifica la configuración descargando desde Cloud si hay una nueva versión.
+        /// </summary>
+        private async void HandleActionConfigChanged()
+        {
+            AlwaysPrintLogger.WriteTrayInfo(
+                "CloudManager: notificación action_config_changed recibida. Re-verificando configuración...");
+
+            await CheckActionConfigurationAsync();
+        }
+
         /// <summary>
         /// Verifica y descarga la configuración de acciones desde la Cloud si es necesaria.
         /// Se ejecuta automáticamente al conectarse a la Cloud.

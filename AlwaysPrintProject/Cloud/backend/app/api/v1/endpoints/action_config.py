@@ -29,6 +29,36 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+async def _notify_workstations_config_changed(db: Session, organization_id) -> int:
+    """
+    Envía mensaje 'action_config_changed' a todas las workstations online de una organización.
+    Las workstations al recibir este mensaje re-verifican su configuración de acciones.
+    """
+    from app.services.websocket_manager import connection_manager
+    from app.models.workstation import Workstation
+
+    workstations = db.query(Workstation).filter(
+        Workstation.organization_id == organization_id
+    ).all()
+
+    message = {"type": "action_config_changed"}
+    dispatched = 0
+
+    for ws in workstations:
+        ws_id = str(ws.id)
+        if connection_manager.is_workstation_online(ws_id):
+            await connection_manager.send_to_workstation(ws_id, message)
+            dispatched += 1
+
+    if dispatched > 0:
+        logger.info(
+            "ActionConfig changed: notificadas %d workstations de org %s",
+            dispatched, organization_id
+        )
+
+    return dispatched
+
+
 # Caché en memoria de configs firmadas por worker.
 # Key: (config_id, config_hash, cert_version) → signed_json string.
 # Se invalida naturalmente cuando config cambia (nuevo hash) o cert rota (nueva version).
@@ -79,7 +109,7 @@ def _get_or_build_signed_config(config: ActionConfig, org: Organization) -> str:
     summary="Subir configuración de acciones",
     description="Sube un nuevo archivo de configuración de acciones para una organización, VLAN o workstation"
 )
-def upload_action_config(
+async def upload_action_config(
     organization_id: UUID,
     data: ActionConfigUpload,
     scope: str = "org",
@@ -119,6 +149,11 @@ def upload_action_config(
             vlan_id=str(vlan_id) if vlan_id else None,
             workstation_id=str(workstation_id) if workstation_id else None
         )
+        
+        # Si se creó activa, notificar a las workstations para que re-descarguen
+        if config.is_active:
+            await _notify_workstations_config_changed(db, organization_id)
+        
         return config
     except DuplicateConfigError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
@@ -239,7 +274,7 @@ def get_action_config_detail(
     summary="Actualizar configuración",
     description="Actualiza una configuración existente (activar/desactivar)"
 )
-def update_action_config(
+async def update_action_config(
     organization_id: UUID,
     config_id: UUID,
     data: ActionConfigUpdate,
@@ -277,6 +312,11 @@ def update_action_config(
             )
     
     updated_config = ActionConfigService.update_config(db, config, data)
+    
+    # Si se activó una config, notificar a las workstations de la org para que re-descarguen
+    if data.is_active and updated_config.is_active:
+        await _notify_workstations_config_changed(db, organization_id)
+    
     return updated_config
 
 
