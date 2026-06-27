@@ -99,18 +99,36 @@ namespace AlwaysPrint.Shared.Security
                     return false;
                 }
 
-                // 2. Convertir hash hex del envelope a bytes (el hash fue calculado por el backend)
-                // No re-computamos el hash del config porque la re-serialización JSON puede
-                // diferir del original (orden de propiedades, formato de números, escaping).
-                // La firma ECDSA garantiza la autenticidad del hash — si la firma es válida,
-                // el hash es auténtico y por tanto el config no fue alterado.
-                byte[] hashBytes = new byte[hashHex.Length / 2];
-                for (int i = 0; i < hashBytes.Length; i++)
+                // 2. Verificar integridad: SHA256 del config serializado debe coincidir con hash declarado.
+                // El backend normaliza el config con json.dumps(separators=(',',':')) antes de hashear,
+                // que produce output idéntico a Newtonsoft configToken.ToString(Formatting.None).
+                string serializedConfig = configToken.ToString(Formatting.None);
+                byte[] configBytes = Encoding.UTF8.GetBytes(serializedConfig);
+                byte[] computedHashBytes;
+
+                using (var sha256 = SHA256.Create())
                 {
-                    hashBytes[i] = Convert.ToByte(hashHex.Substring(i * 2, 2), 16);
+                    computedHashBytes = sha256.ComputeHash(configBytes);
                 }
 
+                string computedHashHex = BitConverter.ToString(computedHashBytes).Replace("-", "").ToLowerInvariant();
+
+                if (!computedHashHex.Equals(hashHex, StringComparison.OrdinalIgnoreCase))
+                {
+                    LogError(
+                        $"SignatureVerifier: hash SHA256 del config no coincide. " +
+                        $"Declarado: {hashHex.Substring(0, Math.Min(16, hashHex.Length))}..., " +
+                        $"Calculado: {computedHashHex.Substring(0, 16)}... " +
+                        "El contenido fue modificado en disco.",
+                        traySource, AlwaysPrintLogger.EvtGenericError);
+                    return false;
+                }
+
+                // hashBytes para verificación de firma (ya tenemos computedHashBytes que coincide)
+                byte[] hashBytes = computedHashBytes;
+
                 // 3. Cargar certificado X.509 y obtener clave pública ECDSA
+                // (sabemos que hash corresponde al config — ahora verificamos autenticidad)
                 if (!File.Exists(certPath))
                 {
                     LogError(
@@ -130,7 +148,7 @@ namespace AlwaysPrint.Shared.Security
                         return false;
                     }
 
-                    // 4. Verificar firma ECDSA del hash
+                    // 4. Verificar firma ECDSA del hash (integridad ya confirmada en paso 2)
                     // El backend Python firma con: private_key.sign(hash_bytes, ec.ECDSA(hashes.SHA256()))
                     // Esto significa que hash_bytes (32 bytes) son hasheados OTRA VEZ con SHA256 antes de firmar.
                     // En .NET, VerifyData(data, signature, HashAlgorithmName.SHA256) hace exactamente eso:

@@ -190,8 +190,11 @@ class CryptoService:
 
         Proceso:
         1. Descifra la clave privada
-        2. Calcula SHA256 del config_json (string UTF-8) → hash hex de 64 chars
-        3. Firma los 32 bytes raw del hash (no el hex string) con ECDSA
+        2. Normaliza config_json (parse + re-serialize con separadores compactos)
+           para garantizar que el hash coincida con lo que el cliente C# computa
+           al re-serializar con Newtonsoft Formatting.None
+        3. Calcula SHA256 del config normalizado → hash hex de 64 chars
+        4. Firma los 32 bytes raw del hash (no el hex string) con ECDSA
 
         Args:
             encrypted_private_key: Clave privada cifrada (base64)
@@ -209,8 +212,14 @@ class CryptoService:
             encrypted_private_key, secret_key, org_id
         )
 
-        # Calcular SHA256 del config_json como bytes UTF-8
-        config_bytes = config_json.encode("utf-8")
+        # Normalizar: parsear y re-serializar con formato compacto idéntico al del envelope.
+        # Esto garantiza que el hash corresponde al config tal como aparece en el JSON final
+        # y coincide con lo que C# computa con configToken.ToString(Formatting.None).
+        config_obj = json.loads(config_json)
+        normalized_config = json.dumps(config_obj, ensure_ascii=False, separators=(",", ":"))
+
+        # Calcular SHA256 del config NORMALIZADO como bytes UTF-8
+        config_bytes = normalized_config.encode("utf-8")
         hash_bytes = hashlib.sha256(config_bytes).digest()  # 32 bytes raw
         hash_full = hash_bytes.hex()  # 64 caracteres hex
 

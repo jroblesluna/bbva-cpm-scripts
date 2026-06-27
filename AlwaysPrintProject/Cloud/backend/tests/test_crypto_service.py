@@ -178,6 +178,62 @@ class TestCryptoService:
 
         assert hash_1 == hash_2
 
-        # Verificar que coincide con hashlib directamente
-        expected_hash = hashlib.sha256(_TEST_CONFIG.encode("utf-8")).hexdigest()
+        # Verificar que coincide con hashlib del config NORMALIZADO
+        # (sign_config normaliza: parse + re-serialize con separators compactos)
+        config_obj = json.loads(_TEST_CONFIG)
+        normalized = json.dumps(config_obj, ensure_ascii=False, separators=(",", ":"))
+        expected_hash = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
         assert hash_1 == expected_hash
+
+    def test_hash_matches_config_in_envelope(self):
+        """El hash en el envelope corresponde al SHA256 del config tal como aparece serializado en el envelope."""
+        encrypted_key, _cert_pem, _expires_at = CryptoService.generate_key_pair(
+            _TEST_ORG_ID, _TEST_SECRET_KEY
+        )
+
+        hash_full, signature_b64 = CryptoService.sign_config(
+            encrypted_key, _TEST_CONFIG, _TEST_SECRET_KEY, _TEST_ORG_ID
+        )
+
+        signed_json = CryptoService.build_signed_config(
+            _TEST_CONFIG, hash_full, signature_b64, cert_version=1
+        )
+
+        # Parsear el envelope y extraer config serializado (simula lo que hace C#)
+        envelope = json.loads(signed_json)
+        config_from_envelope = json.dumps(
+            envelope["config"], ensure_ascii=False, separators=(",", ":")
+        )
+
+        # Verificar que el hash declarado coincide con SHA256 del config del envelope
+        computed_hash = hashlib.sha256(config_from_envelope.encode("utf-8")).hexdigest()
+        assert computed_hash == envelope["hash"], (
+            f"Hash mismatch: el hash declarado en el envelope ({envelope['hash'][:16]}...) "
+            f"no coincide con SHA256 del config extraído ({computed_hash[:16]}...)"
+        )
+
+    def test_normalized_hash_differs_from_raw_when_format_differs(self):
+        """Si config_json tiene formato diferente (spaces), el hash se calcula del normalizado."""
+        encrypted_key, _cert_pem, _expires_at = CryptoService.generate_key_pair(
+            _TEST_ORG_ID, _TEST_SECRET_KEY
+        )
+
+        # Config con espacios (formato "pretty")
+        pretty_config = json.dumps(
+            {"printers": [{"name": "HP01", "ip": "10.0.1.50"}], "version": 3},
+            indent=2
+        )
+
+        hash_full, _sig = CryptoService.sign_config(
+            encrypted_key, pretty_config, _TEST_SECRET_KEY, _TEST_ORG_ID
+        )
+
+        # El hash NO debe ser del pretty_config directamente
+        raw_hash = hashlib.sha256(pretty_config.encode("utf-8")).hexdigest()
+        assert hash_full != raw_hash, "El hash debe ser del config normalizado, no del raw"
+
+        # Debe coincidir con el normalizado
+        config_obj = json.loads(pretty_config)
+        normalized = json.dumps(config_obj, ensure_ascii=False, separators=(",", ":"))
+        expected_hash = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+        assert hash_full == expected_hash
