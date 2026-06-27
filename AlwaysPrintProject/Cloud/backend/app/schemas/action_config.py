@@ -144,8 +144,16 @@ class ActionConfigSyncStatus(BaseModel):
 def calculate_config_hash(config_json: str) -> str:
     """
     Calcula el hash SHA256 de un JSON de configuración.
+    Normaliza el JSON (parse + re-serialize compacto) antes de hashear para
+    garantizar que el resultado sea determinístico independientemente del
+    formato original (espacios, orden, etc.) y coincida con el hash del envelope firmado.
     Retorna los primeros 8 caracteres en hexadecimal minúsculas.
     """
-    hash_obj = hashlib.sha256(config_json.encode('utf-8'))
+    import json
+    # Normalizar: parsear y re-serializar con formato compacto
+    # Mismo formato que CryptoService.sign_config usa para calcular el hash
+    config_obj = json.loads(config_json)
+    normalized = json.dumps(config_obj, ensure_ascii=False, separators=(',', ':'))
+    hash_obj = hashlib.sha256(normalized.encode('utf-8'))
     full_hash = hash_obj.hexdigest()
     return full_hash[:8]

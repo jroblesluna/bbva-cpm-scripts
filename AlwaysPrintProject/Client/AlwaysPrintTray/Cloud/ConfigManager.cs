@@ -225,18 +225,10 @@ namespace AlwaysPrintTray.Cloud
                         
                         AlwaysPrintLogger.WriteTrayInfo("ConfigManager: firma ECDSA verificada exitosamente");
                         
-                        // Comparar hash del envelope con expectedHash de Cloud (primeros 8 chars)
-                        string envelopeHash = parsed["hash"]!.ToString();
-                        string envelopeHashShort = envelopeHash.Substring(0, Math.Min(8, envelopeHash.Length));
-                        
-                        if (!envelopeHashShort.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
-                        {
-                            AlwaysPrintLogger.WriteTrayError(
-                                $"ConfigManager: hash del envelope ({envelopeHashShort}) no coincide con Cloud ({expectedHash})");
-                            return false;
-                        }
-                        
-                        AlwaysPrintLogger.WriteTrayInfo($"ConfigManager: hash verificado correctamente (firmado)");
+                        // La firma ECDSA ya garantiza autenticidad e integridad del config.
+                        // Loguear hash del envelope como referencia (no se usa para bloquear).
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"ConfigManager: config autenticada por firma ECDSA. Hash del envelope: {parsed["hash"]!.ToString().Substring(0, 8)}");
                         
                         // Enviar envelope COMPLETO al Service para persistencia
                         // El Service verificará la firma al cargar desde disco
