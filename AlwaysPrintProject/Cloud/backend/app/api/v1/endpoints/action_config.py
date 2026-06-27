@@ -3,6 +3,7 @@ Endpoints para gestión de configuraciones de acciones administrativas.
 """
 
 import logging
+import threading
 from typing import List
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Response
@@ -64,40 +65,82 @@ async def _notify_workstations_config_changed(db: Session, organization_id) -> i
 # Se invalida naturalmente cuando config cambia (nuevo hash) o cert rota (nueva version).
 _signed_config_cache: dict[tuple, str] = {}
 
+# Locks por cache_key para evitar thundering herd (múltiples threads computando lo mismo).
+# Solo 1 thread computa la firma; los demás esperan el resultado del caché.
+_signed_config_locks: dict[tuple, threading.Lock] = {}
+_locks_mutex = threading.Lock()  # Protege acceso al dict de locks
+
+_CACHE_LOCK_TIMEOUT = 10.0  # Segundos máximos de espera por el lock
+
+
+def _get_lock_for_key(cache_key: tuple) -> threading.Lock:
+    """Obtiene o crea un lock específico para una cache_key."""
+    with _locks_mutex:
+        if cache_key not in _signed_config_locks:
+            _signed_config_locks[cache_key] = threading.Lock()
+        return _signed_config_locks[cache_key]
+
 
 def _get_or_build_signed_config(config: ActionConfig, org: Organization) -> str:
     """
     Retorna el JSON firmado para un config, usando caché en memoria del worker.
     Evita re-firmar en cada request (PBKDF2 100K iter + ECDSA es costoso).
-    La caché se invalida automáticamente cuando cambia config_hash o cert_version.
+
+    Usa lock por cache_key para evitar thundering herd: si N requests llegan
+    simultáneamente para el mismo config, solo 1 computa la firma y las demás
+    esperan el resultado del caché (max 10s de espera).
     """
     cache_key = (str(config.id), config.config_hash, org.ecdsa_cert_version)
 
+    # Fast path: cache hit (sin lock)
     cached = _signed_config_cache.get(cache_key)
     if cached:
         return cached
 
-    # No está en caché — firmar y cachear
-    hash_full, signature_b64 = CryptoService.sign_config(
-        org.ecdsa_private_key_encrypted, config.config_json,
-        settings.SECRET_KEY, str(org.id)
-    )
-    signed_json = CryptoService.build_signed_config(
-        config.config_json, hash_full, signature_b64, org.ecdsa_cert_version
-    )
+    # Slow path: cache miss — adquirir lock para esta key
+    lock = _get_lock_for_key(cache_key)
+    acquired = lock.acquire(timeout=_CACHE_LOCK_TIMEOUT)
 
-    # Guardar en caché (bounded: limpiar si crece demasiado)
-    if len(_signed_config_cache) > 1000:
-        _signed_config_cache.clear()
+    try:
+        # Double-check: otro thread pudo haber llenado el caché mientras esperábamos
+        cached = _signed_config_cache.get(cache_key)
+        if cached:
+            return cached
 
-    _signed_config_cache[cache_key] = signed_json
+        if not acquired:
+            # Timeout esperando el lock — computar de todas formas (fallback)
+            logger.warning(
+                "Cache lock timeout para config_id=%s. Computando firma sin lock (fallback).",
+                config.id
+            )
 
-    logger.debug(
-        "Config firmada y cacheada: config_id=%s, hash=%s, cert_version=%d",
-        config.id, config.config_hash, org.ecdsa_cert_version
-    )
+        # Computar firma (PBKDF2 + ECDSA ~50ms)
+        hash_full, signature_b64 = CryptoService.sign_config(
+            org.ecdsa_private_key_encrypted, config.config_json,
+            settings.SECRET_KEY, str(org.id)
+        )
+        signed_json = CryptoService.build_signed_config(
+            config.config_json, hash_full, signature_b64, org.ecdsa_cert_version
+        )
 
-    return signed_json
+        # Guardar en caché (bounded: limpiar si crece demasiado)
+        if len(_signed_config_cache) > 1000:
+            _signed_config_cache.clear()
+            # También limpiar locks obsoletos
+            with _locks_mutex:
+                _signed_config_locks.clear()
+
+        _signed_config_cache[cache_key] = signed_json
+
+        logger.debug(
+            "Config firmada y cacheada: config_id=%s, hash=%s, cert_version=%d",
+            config.id, config.config_hash, org.ecdsa_cert_version
+        )
+
+        return signed_json
+    finally:
+        if acquired:
+            lock.release()
 
 
 # === ENDPOINTS PARA ADMINISTRADORES ===
