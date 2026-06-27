@@ -752,7 +752,7 @@ namespace AlwaysPrintService.Actions
         /// </summary>
         /// <param name="featureName">Nombre del feature (ej: Printing-Foundation-LPDPrintService)</param>
         /// <returns>"enabled" si está habilitado, "disabled" si no, "unknown" si no se pudo determinar</returns>
-        public static string CheckWindowsFeature(string featureName)
+        private static string CheckWindowsFeature(string featureName)
         {
             try
             {
@@ -801,6 +801,78 @@ namespace AlwaysPrintService.Actions
             {
                 AlwaysPrintLogger.WriteError($"CheckWindowsFeature: error verificando '{featureName}': {ex.Message}");
                 return "unknown";
+            }
+        }
+
+        /// <summary>
+        /// Habilita un Windows Optional Feature si no está ya habilitado.
+        /// Verifica primero con dism /get-featureinfo; si ya está habilitado, no hace nada.
+        /// Si está deshabilitado, ejecuta dism /enable-feature.
+        /// </summary>
+        /// <param name="featureName">Nombre del feature (ej: Printing-Foundation-LPDPrintService)</param>
+        /// <returns>true si el feature está habilitado (ya estaba o se habilitó), false si falló</returns>
+        public static bool EnableWindowsFeature(string featureName)
+        {
+            try
+            {
+                // 1. Verificar estado actual
+                string state = CheckWindowsFeature(featureName);
+                
+                if (state == "enabled")
+                {
+                    AlwaysPrintLogger.WriteInfo($"EnableWindowsFeature: '{featureName}' ya está habilitado. No se requiere acción.");
+                    return true;
+                }
+                
+                // 2. Habilitar si está deshabilitado o desconocido
+                AlwaysPrintLogger.WriteInfo($"EnableWindowsFeature: habilitando '{featureName}'...");
+                
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "C:\\Windows\\System32\\dism.exe",
+                    Arguments = $"/online /enable-feature /featurename:{featureName} /all /norestart",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+                
+                using (var process = new Process { StartInfo = startInfo })
+                {
+                    var stdout = new System.Text.StringBuilder();
+                    process.OutputDataReceived += (s, e) => { if (e.Data != null) stdout.AppendLine(e.Data); };
+                    
+                    process.Start();
+                    process.BeginOutputReadLine();
+                    bool exited = process.WaitForExit(120000); // 2 minutos timeout
+                    
+                    if (!exited)
+                    {
+                        AlwaysPrintLogger.WriteWarning($"EnableWindowsFeature: timeout habilitando '{featureName}'. Terminando proceso.");
+                        process.Kill();
+                        return false;
+                    }
+                    
+                    // Exit codes: 0 = éxito, 3010 = éxito + reboot pendiente
+                    int exitCode = process.ExitCode;
+                    bool success = (exitCode == 0 || exitCode == 3010);
+                    
+                    if (success)
+                    {
+                        AlwaysPrintLogger.WriteInfo($"EnableWindowsFeature: '{featureName}' habilitado exitosamente (exit code {exitCode})");
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteError($"EnableWindowsFeature: error habilitando '{featureName}' (exit code {exitCode})");
+                    }
+                    
+                    return success;
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"EnableWindowsFeature: error habilitando '{featureName}': {ex.Message}");
+                return false;
             }
         }
 

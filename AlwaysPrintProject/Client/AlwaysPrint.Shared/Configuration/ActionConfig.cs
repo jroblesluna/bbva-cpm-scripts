@@ -165,5 +165,6 @@ namespace AlwaysPrint.Shared.Configuration
         public const string WriteAppSetting = "WriteAppSetting";
         public const string ReadPrintDriverVersion = "ReadPrintDriverVersion";
         public const string CheckWindowsFeature = "CheckWindowsFeature";
+        public const string EnableWindowsFeature = "EnableWindowsFeature";
     }
 }

@@ -445,7 +445,8 @@ namespace AlwaysPrintService.Actions
                     return ExecuteReadPrintDriverVersion(action);
 
                 case ActionTypes.CheckWindowsFeature:
-                    return ExecuteCheckWindowsFeature(action);
+                case ActionTypes.EnableWindowsFeature:
+                    return ExecuteEnableWindowsFeature(action);
                 
                 default:
                     AlwaysPrintLogger.WriteWarning($"ActionEngine: tipo de acción desconocido: {action.Type}");
@@ -873,30 +874,21 @@ namespace AlwaysPrintService.Actions
         }
         
         /// <summary>
-        /// Verifica si un Windows Optional Feature está habilitado.
-        /// Almacena el resultado ("enabled", "disabled", "unknown") en la variable indicada por store_result_in.
+        /// Habilita un Windows Optional Feature si no está ya habilitado.
+        /// Encapsula la verificación + habilitación en una sola acción.
         /// Parámetros: feature_name (string, nombre del feature de Windows).
         /// </summary>
-        private bool ExecuteCheckWindowsFeature(ActionConfig action)
+        private bool ExecuteEnableWindowsFeature(ActionConfig action)
         {
             string featureName = GetParameter<string>(action, "feature_name") ?? "";
-
+            
             if (string.IsNullOrWhiteSpace(featureName))
             {
-                AlwaysPrintLogger.WriteWarning("ActionEngine: CheckWindowsFeature requiere 'feature_name'");
+                AlwaysPrintLogger.WriteWarning("ActionEngine: EnableWindowsFeature requiere 'feature_name'");
                 return false;
             }
-
-            string result = AdminActions.CheckWindowsFeature(featureName);
-
-            // Almacenar resultado en variable si se especificó store_result_in
-            if (!string.IsNullOrEmpty(action.StoreResultIn))
-            {
-                _variables[action.StoreResultIn] = result;
-                AlwaysPrintLogger.WriteInfo($"ActionEngine: resultado almacenado en variable '{action.StoreResultIn}': {result}");
-            }
-
-            return true; // La acción siempre "éxito" (el resultado está en la variable)
+            
+            return AdminActions.EnableWindowsFeature(featureName);
         }
 
         // ═══════════════════════════════════════════════════════════════════════

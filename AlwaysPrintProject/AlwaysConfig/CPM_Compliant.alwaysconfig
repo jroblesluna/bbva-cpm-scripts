@@ -1,5 +1,5 @@
 {
-  "version": "6.7",
+  "version": "6.8",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -146,52 +146,14 @@
           ]
         },
         {
-          "type": "CheckWindowsFeature",
-          "description": "Verificar si LPD Print Service está habilitado",
-          "parameters": { "feature_name": "Printing-Foundation-LPDPrintService" },
-          "store_result_in": "lpd_feature_state"
+          "type": "EnableWindowsFeature",
+          "description": "Habilitar LPD Print Service",
+          "parameters": { "feature_name": "Printing-Foundation-LPDPrintService" }
         },
         {
-          "type": "Conditional",
-          "description": "Si LPD Print Service no está habilitado: habilitarlo",
-          "condition": { "variable": "lpd_feature_state", "operator": "equals", "value": "disabled" },
-          "actions": [
-            {
-              "type": "RunProcess",
-              "description": "Habilitar feature LPD Print Service",
-              "parameters": {
-                "file_path": "C:\\Windows\\System32\\dism.exe",
-                "arguments": "/online /enable-feature /featurename:Printing-Foundation-LPDPrintService /all /norestart",
-                "timeout_seconds": 120,
-                "window_style": "Hidden",
-                "success_exit_codes": [0, 3010]
-              }
-            }
-          ]
-        },
-        {
-          "type": "CheckWindowsFeature",
-          "description": "Verificar si LPR Port Monitor está habilitado",
-          "parameters": { "feature_name": "Printing-Foundation-LPRPortMonitor" },
-          "store_result_in": "lpr_feature_state"
-        },
-        {
-          "type": "Conditional",
-          "description": "Si LPR Port Monitor no está habilitado: habilitarlo",
-          "condition": { "variable": "lpr_feature_state", "operator": "equals", "value": "disabled" },
-          "actions": [
-            {
-              "type": "RunProcess",
-              "description": "Habilitar feature LPR Port Monitor",
-              "parameters": {
-                "file_path": "C:\\Windows\\System32\\dism.exe",
-                "arguments": "/online /enable-feature /featurename:Printing-Foundation-LPRPortMonitor /all /norestart",
-                "timeout_seconds": 120,
-                "window_style": "Hidden",
-                "success_exit_codes": [0, 3010]
-              }
-            }
-          ]
+          "type": "EnableWindowsFeature",
+          "description": "Habilitar LPR Port Monitor",
+          "parameters": { "feature_name": "Printing-Foundation-LPRPortMonitor" }
         },
         {
           "type": "RunProcess",
@@ -757,52 +719,14 @@
           },
           "actions": [
             {
-              "type": "CheckWindowsFeature",
-              "description": "Verificar si LPD Print Service está habilitado",
-              "parameters": { "feature_name": "Printing-Foundation-LPDPrintService" },
-              "store_result_in": "lpd_feature_state"
+              "type": "EnableWindowsFeature",
+              "description": "Habilitar LPD Print Service",
+              "parameters": { "feature_name": "Printing-Foundation-LPDPrintService" }
             },
             {
-              "type": "Conditional",
-              "description": "Si LPD Print Service no está habilitado: habilitarlo",
-              "condition": { "variable": "lpd_feature_state", "operator": "equals", "value": "disabled" },
-              "actions": [
-                {
-                  "type": "RunProcess",
-                  "description": "Habilitar feature LPD Print Service",
-                  "parameters": {
-                    "file_path": "C:\\Windows\\System32\\dism.exe",
-                    "arguments": "/online /enable-feature /featurename:Printing-Foundation-LPDPrintService /all /norestart",
-                    "timeout_seconds": 120,
-                    "window_style": "Hidden",
-                    "success_exit_codes": [0, 3010]
-                  }
-                }
-              ]
-            },
-            {
-              "type": "CheckWindowsFeature",
-              "description": "Verificar si LPR Port Monitor está habilitado",
-              "parameters": { "feature_name": "Printing-Foundation-LPRPortMonitor" },
-              "store_result_in": "lpr_feature_state"
-            },
-            {
-              "type": "Conditional",
-              "description": "Si LPR Port Monitor no está habilitado: habilitarlo",
-              "condition": { "variable": "lpr_feature_state", "operator": "equals", "value": "disabled" },
-              "actions": [
-                {
-                  "type": "RunProcess",
-                  "description": "Habilitar feature LPR Port Monitor",
-                  "parameters": {
-                    "file_path": "C:\\Windows\\System32\\dism.exe",
-                    "arguments": "/online /enable-feature /featurename:Printing-Foundation-LPRPortMonitor /all /norestart",
-                    "timeout_seconds": 120,
-                    "window_style": "Hidden",
-                    "success_exit_codes": [0, 3010]
-                  }
-                }
-              ]
+              "type": "EnableWindowsFeature",
+              "description": "Habilitar LPR Port Monitor",
+              "parameters": { "feature_name": "Printing-Foundation-LPRPortMonitor" }
             },
             {
               "type": "RunProcess",
