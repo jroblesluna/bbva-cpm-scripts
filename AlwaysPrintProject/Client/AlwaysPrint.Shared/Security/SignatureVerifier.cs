@@ -137,9 +137,12 @@ namespace AlwaysPrint.Shared.Security
                     // hashea 'data' con SHA256 y luego verifica la firma ECDSA.
                     byte[] signatureBytes = Convert.FromBase64String(signatureBase64);
 
+                    // Convertir de formato DER (Python cryptography) a IEEE P1363 (.NET Framework 4.8)
+                    byte[] p1363Signature = ConvertDerToIeeeP1363(signatureBytes);
+
                     bool isValid = ecDsa.VerifyData(
                         hashBytes,
-                        signatureBytes,
+                        p1363Signature,
                         HashAlgorithmName.SHA256);
 
                     if (!isValid)
@@ -316,6 +319,67 @@ namespace AlwaysPrint.Shared.Security
                     $"SignatureVerifier: error escribiendo CertVersion en registro: {ex.Message}", ex,
                     AlwaysPrintLogger.EvtGenericError);
             }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // CONVERSIÓN DE FORMATO DE FIRMA DER → IEEE P1363
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Convierte una firma ECDSA de formato DER (ASN.1) a formato IEEE P1363 (r || s).
+        /// Python cryptography produce firmas en DER; .NET Framework 4.8 espera IEEE P1363.
+        /// Para P-256, el resultado es siempre 64 bytes (32 bytes r + 32 bytes s).
+        /// </summary>
+        /// <param name="derSignature">Firma en formato DER/ASN.1 (variable length, ~70-72 bytes para P-256).</param>
+        /// <param name="keySize">Tamaño del componente en bytes (32 para P-256).</param>
+        /// <returns>Firma en formato IEEE P1363 (64 bytes fijos para P-256).</returns>
+        private static byte[] ConvertDerToIeeeP1363(byte[] derSignature, int keySize = 32)
+        {
+            // DER format: SEQUENCE { INTEGER r, INTEGER s }
+            // 30 <len> 02 <rLen> <r> 02 <sLen> <s>
+
+            int offset = 0;
+
+            // Verificar SEQUENCE tag (0x30)
+            if (derSignature[offset++] != 0x30)
+                throw new CryptographicException("Firma DER inválida: falta tag SEQUENCE");
+
+            // Skip sequence length (puede ser 1 o 2 bytes en long form)
+            int seqLen = derSignature[offset++];
+            if (seqLen > 0x80)
+                offset += (seqLen - 0x80); // Long form length
+
+            // Parse INTEGER r
+            if (derSignature[offset++] != 0x02)
+                throw new CryptographicException("Firma DER inválida: falta tag INTEGER para r");
+            int rLen = derSignature[offset++];
+            byte[] rBytes = new byte[rLen];
+            Array.Copy(derSignature, offset, rBytes, 0, rLen);
+            offset += rLen;
+
+            // Parse INTEGER s
+            if (derSignature[offset++] != 0x02)
+                throw new CryptographicException("Firma DER inválida: falta tag INTEGER para s");
+            int sLen = derSignature[offset++];
+            byte[] sBytes = new byte[sLen];
+            Array.Copy(derSignature, offset, sBytes, 0, sLen);
+
+            // Convertir a formato P1363 de tamaño fijo (strip leading zeros, pad a keySize)
+            byte[] result = new byte[keySize * 2];
+
+            // Copiar r (alineado a la derecha, strip leading zero de ASN.1 integer positivo)
+            int rStart = (rBytes.Length > keySize) ? rBytes.Length - keySize : 0;
+            int rCopyLen = Math.Min(rBytes.Length, keySize);
+            int rDestOffset = keySize - rCopyLen;
+            Array.Copy(rBytes, rStart, result, rDestOffset, rCopyLen);
+
+            // Copiar s (alineado a la derecha, strip leading zero de ASN.1 integer positivo)
+            int sStart = (sBytes.Length > keySize) ? sBytes.Length - keySize : 0;
+            int sCopyLen = Math.Min(sBytes.Length, keySize);
+            int sDestOffset = keySize + (keySize - sCopyLen);
+            Array.Copy(sBytes, sStart, result, sDestOffset, sCopyLen);
+
+            return result;
         }
     }
 }
