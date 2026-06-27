@@ -100,6 +100,8 @@ class ActionConfigDownloadInfo(BaseModel):
     download_url: str = Field(..., description="URL relativa para descargar")
     name: str
     version: str
+    cert_version: Optional[int] = Field(None, description="Versión del certificado ECDSA de la org (null si no tiene)")
+    cert_url: Optional[str] = Field(None, description="URL pública del certificado .cer en S3 (null si no tiene)")
     
     model_config = {
         "json_schema_extra": {
@@ -107,7 +109,9 @@ class ActionConfigDownloadInfo(BaseModel):
                 "hash": "a3f5c8d2",
                 "download_url": "/api/v1/workstations/ws-123/config/download",
                 "name": "CPM_Compliant",
-                "version": "1.0"
+                "version": "1.0",
+                "cert_version": 1,
+                "cert_url": "https://s3.amazonaws.com/bucket/certs/org-id/v1.cer"
             }]
         }
     }

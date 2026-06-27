@@ -23,14 +23,15 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConnectivityCheckEditor } from '@/components/ConnectivityCheckEditor'
 import { LocaleSelector } from '@/components/LocaleSelector'
 import { ActionConfigSection } from '@/components/config/ActionConfigSection'
+import { CertificateSection } from '@/components/config/CertificateSection'
 import {
   ArrowLeft, Save, RotateCcw, Building2, Printer, Network, Wifi,
-  Download, Cog, Globe, Plus, X, Trash2, Info, AlertCircle, Pin,
+  Download, Cog, Globe, Plus, X, Trash2, Info, AlertCircle, Pin, ShieldCheck,
 } from 'lucide-react'
 import type { Organization, OrganizationUpdate, PublicIPCreate } from '@/types'
 import type { GlobalConfig, GlobalConfigUpdate, SearchTargets, ConnectivityCheck } from '@/types/config'
 
-type TabKey = 'general' | 'printing' | 'network' | 'connectivity' | 'updates' | 'actions' | 'ips'
+type TabKey = 'general' | 'printing' | 'network' | 'connectivity' | 'updates' | 'actions' | 'ips' | 'certificate'
 
 interface TabDef {
   key: TabKey
@@ -46,6 +47,7 @@ const TABS: TabDef[] = [
   { key: 'updates', labelKey: 'tabUpdates', icon: Download },
   { key: 'actions', labelKey: 'tabActions', icon: Cog },
   { key: 'ips', labelKey: 'tabIps', icon: Globe },
+  { key: 'certificate', labelKey: 'tabCertificate', icon: ShieldCheck },
 ]
 
 export default function EditOrganizationPage() {
@@ -645,6 +647,11 @@ export default function EditOrganizationPage() {
         {/* === TAB: ACTIONS === */}
         {activeTab === 'actions' && (
           <ActionConfigSection organizationId={orgId} hideHeader />
+        )}
+
+        {/* === TAB: CERTIFICATE === */}
+        {activeTab === 'certificate' && (
+          <CertificateSection organizationId={orgId} />
         )}
 
         {/* === TAB: IPS === */}

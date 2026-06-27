@@ -25,6 +25,9 @@ from app.schemas.action_config import (
     ActionConfigUpdate,
     calculate_config_hash,
 )
+from app.services.crypto_service import CryptoService
+from app.services.s3_config_service import S3ConfigService
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -236,6 +239,62 @@ class ActionConfigService:
             f"org={organization_id}, name={name}, hash={config_hash}, active={data.is_active}"
         )
         
+        # === FIRMA DIGITAL ECDSA Y SUBIDA A S3 ===
+        # Solo firmar si la organización tiene certificado generado.
+        # La firma NO es bloqueante: si falla, la config ya está guardada en BD.
+        try:
+            org = db.query(Organization).filter(
+                Organization.id == organization_id
+            ).first()
+            
+            if (
+                org
+                and org.ecdsa_cert_version > 0
+                and org.ecdsa_private_key_encrypted is not None
+            ):
+                # Firmar la configuración con la clave privada de la org
+                hash_full, signature_b64 = CryptoService.sign_config(
+                    org.ecdsa_private_key_encrypted,
+                    data.config_json,
+                    settings.SECRET_KEY,
+                    str(organization_id),
+                )
+                
+                # Construir JSON envolvente firmado
+                signed_json = CryptoService.build_signed_config(
+                    data.config_json,
+                    hash_full,
+                    signature_b64,
+                    org.ecdsa_cert_version,
+                )
+                
+                # Subir a S3
+                s3_key = S3ConfigService().upload_signed_config(
+                    str(organization_id),
+                    hash_full[:8],
+                    signed_json,
+                )
+                
+                # Actualizar storage_path en la config recién creada
+                new_config.storage_path = s3_key
+                db.commit()
+                
+                logger.info(
+                    f"Config firmada y subida a S3: id={new_config.id}, "
+                    f"s3_key={s3_key}, cert_version={org.ecdsa_cert_version}"
+                )
+            else:
+                logger.debug(
+                    f"Org {organization_id} no tiene certificado ECDSA, "
+                    f"config creada sin firma digital"
+                )
+        except Exception as e:
+            # La firma no debe impedir la creación de la config
+            logger.error(
+                f"Error al firmar/subir config a S3: id={new_config.id}, "
+                f"org={organization_id}, error={e}"
+            )
+        
         return new_config
     
     @staticmethod
@@ -264,6 +323,37 @@ class ActionConfigService:
             f"org={config.organization_id}, scope={config.scope}, active={config.is_active}"
         )
         
+        # Firmar y subir a S3 si se está activando y la org tiene certificado
+        if data.is_active and config.is_active:
+            try:
+                org = db.query(Organization).filter(
+                    Organization.id == config.organization_id
+                ).first()
+                
+                if org and org.ecdsa_cert_version and org.ecdsa_cert_version > 0 and org.ecdsa_private_key_encrypted:
+                    hash_full, signature_b64 = CryptoService.sign_config(
+                        org.ecdsa_private_key_encrypted, config.config_json,
+                        settings.SECRET_KEY, str(config.organization_id)
+                    )
+                    signed_json = CryptoService.build_signed_config(
+                        config.config_json, hash_full, signature_b64, org.ecdsa_cert_version
+                    )
+                    s3_key = S3ConfigService().upload_signed_config(
+                        str(config.organization_id), hash_full[:8], signed_json
+                    )
+                    config.storage_path = s3_key
+                    db.commit()
+                    db.refresh(config)
+                    logger.info(
+                        "Config firmada y subida a S3 al activar: config_id=%s, s3_key=%s",
+                        config.id, s3_key
+                    )
+            except Exception as e:
+                logger.error(
+                    "Error al firmar/subir config activada: config_id=%s, error=%s",
+                    config.id, str(e)
+                )
+        
         return config
     
     @staticmethod
@@ -271,6 +361,20 @@ class ActionConfigService:
         """Elimina una configuración."""
         config_id = config.id
         org_id = config.organization_id
+        
+        # Eliminar config firmada de S3 si existe
+        if config.storage_path:
+            try:
+                S3ConfigService().delete_signed_config(config.storage_path)
+                logger.info(
+                    "Config firmada eliminada de S3: config_id=%s, s3_key=%s",
+                    config_id, config.storage_path
+                )
+            except Exception as e:
+                logger.error(
+                    "Error al eliminar config firmada de S3: config_id=%s, s3_key=%s, error=%s",
+                    config_id, config.storage_path, str(e)
+                )
         
         db.delete(config)
         db.commit()

@@ -77,6 +77,8 @@ class WorkstationRegisterResponse(BaseModel):
     organization_name: str = Field(..., description="Nombre de la organización")
     message: str = Field(..., description="Mensaje de confirmación")
     cloud_api_url: str = Field(..., description="URL del servidor cloud para uso futuro")
+    cert_url: Optional[str] = Field(None, description="URL pública del certificado ECDSA (.cer)")
+    cert_version: Optional[int] = Field(None, description="Versión del certificado ECDSA")
 
 
 class WorkstationRegisterPendingResponse(BaseModel):

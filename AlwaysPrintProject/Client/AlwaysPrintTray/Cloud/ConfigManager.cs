@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
+using AlwaysPrint.Shared.Security;
 using AlwaysPrintTray.Pipe;
 using Newtonsoft.Json.Linq;
 
@@ -80,7 +81,7 @@ namespace AlwaysPrintTray.Cloud
                 // 3. Descargar nueva configuración
                 AlwaysPrintLogger.WriteInfo($"ConfigManager: descargando nueva configuración (hash: {cloudConfigInfo.Hash})");
                 
-                bool downloaded = await DownloadConfigAsync(cloudApiUrl, workstationId, apiKey, cloudConfigInfo.DownloadUrl, cloudConfigInfo.Hash);
+                bool downloaded = await DownloadConfigAsync(cloudApiUrl, workstationId, apiKey, cloudConfigInfo.DownloadUrl, cloudConfigInfo.Hash, cloudConfigInfo.CertVersion, cloudConfigInfo.CertUrl);
                 
                 if (downloaded)
                 {
@@ -134,7 +135,9 @@ namespace AlwaysPrintTray.Cloud
                     Hash = data["hash"]?.ToString() ?? "",
                     DownloadUrl = data["download_url"]?.ToString() ?? "",
                     Name = data["name"]?.ToString() ?? "",
-                    Version = data["version"]?.ToString() ?? ""
+                    Version = data["version"]?.ToString() ?? "",
+                    CertVersion = data["cert_version"]?.ToObject<int?>(),
+                    CertUrl = data["cert_url"]?.ToString()
                 };
             }
             catch (HttpRequestException ex)
@@ -150,6 +153,11 @@ namespace AlwaysPrintTray.Cloud
         
         private async Task<bool> DownloadConfigAsync(string cloudApiUrl, string workstationId, string apiKey, string downloadUrl, string expectedHash)
         {
+            return await DownloadConfigAsync(cloudApiUrl, workstationId, apiKey, downloadUrl, expectedHash, null, null);
+        }
+
+        private async Task<bool> DownloadConfigAsync(string cloudApiUrl, string workstationId, string apiKey, string downloadUrl, string expectedHash, int? remoteCertVersion, string? certUrl)
+        {
             try
             {
                 string url = $"{cloudApiUrl.TrimEnd('/')}{downloadUrl}";
@@ -160,9 +168,85 @@ namespace AlwaysPrintTray.Cloud
                 var response = await _httpClient.SendAsync(request);
                 response.EnsureSuccessStatusCode();
                 
-                string configJson = await response.Content.ReadAsStringAsync();
+                string downloadedContent = await response.Content.ReadAsStringAsync();
                 
-                // Verificar hash del contenido descargado antes de enviar al Service
+                // Determinar si es un JSON firmado (signed envelope) o config raw (legacy)
+                string configJson;
+                bool isSigned = false;
+                
+                try
+                {
+                    var parsed = JObject.Parse(downloadedContent);
+                    if (parsed["config"] != null && parsed["hash"] != null && 
+                        parsed["signature"] != null && parsed["cert_version"] != null)
+                    {
+                        isSigned = true;
+                        
+                        // Es un JSON firmado — verificar firma ECDSA
+                        int envelopeCertVersion = parsed["cert_version"]!.Value<int>();
+                        int localCertVersion = SignatureVerifier.GetLocalCertVersion();
+                        
+                        string certPath = Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                            "AlwaysPrint", "config", "org.cer");
+                        
+                        // Si cert_version remoto > local, intentar descargar nuevo certificado
+                        if (envelopeCertVersion > localCertVersion)
+                        {
+                            AlwaysPrintLogger.WriteWarning(
+                                $"ConfigManager: cert_version remoto ({envelopeCertVersion}) > local ({localCertVersion}). " +
+                                "Intentando actualizar certificado.");
+                            
+                            if (!string.IsNullOrEmpty(certUrl))
+                            {
+                                bool certDownloaded = await SignatureVerifier.DownloadCertAsync(certUrl, certPath);
+                                if (certDownloaded)
+                                {
+                                    SignatureVerifier.SetLocalCertVersion(envelopeCertVersion);
+                                    AlwaysPrintLogger.WriteInfo(
+                                        $"ConfigManager: certificado actualizado a versión {envelopeCertVersion}");
+                                }
+                                else
+                                {
+                                    AlwaysPrintLogger.WriteWarning(
+                                        "ConfigManager: no se pudo descargar el nuevo certificado. " +
+                                        "Se intentará verificar con el certificado actual.");
+                                }
+                            }
+                            else
+                            {
+                                AlwaysPrintLogger.WriteWarning(
+                                    "ConfigManager: cert_url no disponible para actualizar certificado. " +
+                                    "Se intentará verificar con el certificado actual (puede fallar). " +
+                                    "Se actualizará con el próximo cert_rotated.");
+                            }
+                        }
+                        
+                        // Verificar firma usando SignatureVerifier
+                        if (!SignatureVerifier.VerifyConfig(downloadedContent, certPath, out string verifiedConfig))
+                        {
+                            AlwaysPrintLogger.WriteError(
+                                "ConfigManager: verificación de firma ECDSA fallida — rechazando configuración.");
+                            return false;
+                        }
+                        
+                        // Firma válida — usar el config extraído
+                        configJson = verifiedConfig;
+                        AlwaysPrintLogger.WriteInfo("ConfigManager: firma ECDSA verificada exitosamente");
+                    }
+                    else
+                    {
+                        // No es un envelope firmado — config sin firmar (legacy / org sin certificado)
+                        configJson = downloadedContent;
+                    }
+                }
+                catch (Newtonsoft.Json.JsonException)
+                {
+                    // No es JSON válido como envelope — tratar como config raw
+                    configJson = downloadedContent;
+                }
+                
+                // Verificar hash del config extraído (8 primeros chars del SHA256)
                 string downloadedHash = CalculateHash(configJson);
                 
                 if (!downloadedHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
@@ -172,7 +256,7 @@ namespace AlwaysPrintTray.Cloud
                     return false;
                 }
                 
-                AlwaysPrintLogger.WriteInfo("ConfigManager: hash verificado correctamente");
+                AlwaysPrintLogger.WriteInfo($"ConfigManager: hash verificado correctamente{(isSigned ? " (firmado)" : "")}");
                 
                 // Enviar contenido al Service para que lo persista en disco
                 bool saved = SendSaveActionConfigToService(configJson, downloadedHash);
@@ -435,6 +519,8 @@ namespace AlwaysPrintTray.Cloud
         public string DownloadUrl { get; set; } = "";
         public string Name { get; set; } = "";
         public string Version { get; set; } = "";
+        public int? CertVersion { get; set; }
+        public string? CertUrl { get; set; }
     }
     
     public class LocalConfigInfo

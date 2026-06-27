@@ -66,6 +66,79 @@ class CommandResponse(BaseModel):
     status: str = Field(..., description="Estado del envío: sent")
 
 
+class OnDemandActionInfo(BaseModel):
+    """Schema de información de una acción OnDemand disponible."""
+    label: str = Field(..., description="Etiqueta de la acción (se usa como identificador)")
+    description: str = Field("", description="Descripción de lo que hace la acción")
+
+
+# === ENDPOINT DE ACCIONES ONDEMAND ===
+
+@router.get("/{workstation_id}/ondemand-actions", response_model=list[OnDemandActionInfo])
+def get_ondemand_actions(
+    workstation_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtener las acciones OnDemand disponibles para una workstation.
+    
+    Resuelve la configuración efectiva (con herencia) y extrae triggers OnDemand.
+    
+    - Admin: puede ver acciones de cualquier workstation
+    - Operador: solo puede ver acciones de workstations de su organización
+    
+    Args:
+        workstation_id: ID de la workstation
+        current_user: Usuario autenticado
+        db: Sesión de base de datos
+    
+    Returns:
+        Lista de OnDemandActionInfo con label y description de cada acción
+    """
+    import json
+
+    # Verificar que la workstation existe
+    workstation = db.query(Workstation).filter(Workstation.id == workstation_id).first()
+    if not workstation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workstation no encontrada"
+        )
+
+    # Tenant isolation: operadores solo su org, admins todo
+    if current_user.role != UserRole.ADMIN:
+        if current_user.organization_id != workstation.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Sin permiso para ver esta workstation"
+            )
+
+    # Resolver config efectivo
+    from app.services.action_config import ActionConfigService
+    config = ActionConfigService.resolve_effective_config(db, workstation.id)
+
+    if not config:
+        return []
+
+    # Parsear config_json y extraer triggers OnDemand
+    try:
+        config_data = json.loads(config.config_json)
+    except json.JSONDecodeError:
+        return []
+
+    actions: list[OnDemandActionInfo] = []
+    triggers = config_data.get("triggers", [])
+    for trigger in triggers:
+        if trigger.get("event") == "OnDemand":
+            label = trigger.get("label", "")
+            description = trigger.get("description", "")
+            if label:
+                actions.append(OnDemandActionInfo(label=label, description=description))
+
+    return actions
+
+
 # === ENDPOINT DE COMANDOS REMOTOS ===
 
 @router.post("/{workstation_id}/command",
@@ -132,13 +205,53 @@ async def send_command(
         )
     
     # Validar tipo de comando
-    valid_commands = ["restart_service", "restart_tray", "check_update"]
+    valid_commands = ["restart_service", "restart_tray", "check_update", "execute_on_demand"]
     if command_data.command_type not in valid_commands:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Tipo de comando inválido: {command_data.command_type}. "
                    f"Comandos válidos: {', '.join(valid_commands)}"
         )
+    
+    # Validación específica para execute_on_demand: verificar que el label existe en config efectivo
+    if command_data.command_type == "execute_on_demand":
+        import json
+        label = command_data.params.get("label")
+        if not label:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="El parámetro 'label' es requerido para execute_on_demand"
+            )
+        
+        from app.services.action_config import ActionConfigService
+        config = ActionConfigService.resolve_effective_config(db, workstation.id)
+        
+        if not config:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"La workstation no tiene configuración de acciones activa"
+            )
+        
+        # Verificar que el label existe entre los triggers OnDemand
+        try:
+            config_data = json.loads(config.config_json)
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="La configuración de acciones tiene un formato JSON inválido"
+            )
+        
+        triggers = config_data.get("triggers", [])
+        valid_labels = [
+            t.get("label") for t in triggers
+            if t.get("event") == "OnDemand" and t.get("label")
+        ]
+        
+        if label not in valid_labels:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"La acción OnDemand '{label}' no existe en la configuración efectiva de esta workstation"
+            )
     
     # Generar ID único para el comando
     command_id = str(uuid.uuid4())
@@ -150,6 +263,10 @@ async def send_command(
         "command_type": command_data.command_type,
         "params": command_data.params
     }
+    
+    # Para execute_on_demand: registrar waiter antes de enviar para esperar respuesta
+    if command_data.command_type == "execute_on_demand":
+        connection_manager.register_command_waiter(command_id)
     
     sent = await connection_manager.send_to_workstation(workstation_id_str, message)
     
@@ -166,6 +283,50 @@ async def send_command(
         f"workstation_id={workstation_id}, "
         f"enviado_por={current_user.email}"
     )
+    
+    # Para execute_on_demand: esperar respuesta con timeout de 120s y registrar auditoría
+    if command_data.command_type == "execute_on_demand":
+        response_data = await connection_manager.wait_for_command_response(
+            command_id, timeout=120.0
+        )
+        
+        # Registrar AuditLog con resultado (éxito o timeout)
+        from app.models.audit import ActionType
+        audit_service = AuditService()
+        
+        success = response_data.get("success", False) if response_data else False
+        duration_ms = response_data.get("duration_ms") if response_data else None
+        result_message = response_data.get("message", "") if response_data else "Timeout"
+        
+        audit_service.log_action(
+            db=db,
+            action_type=ActionType.ONDEMAND_EXECUTED,
+            entity_type="workstation",
+            entity_id=str(workstation_id),
+            user_id=str(current_user.id),
+            organization_id=str(workstation.organization_id),
+            new_values={
+                "label": command_data.params.get("label"),
+                "command_id": command_id,
+                "success": success,
+                "duration_ms": duration_ms,
+                "message": result_message,
+            }
+        )
+        
+        if response_data is None:
+            raise HTTPException(
+                status_code=status.HTTP_408_REQUEST_TIMEOUT,
+                detail="Timeout esperando respuesta de la workstation (120s). La acción puede seguir ejecutándose."
+            )
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"La acción OnDemand falló: {result_message}"
+            )
+        
+        return CommandResponse(command_id=command_id, status="completed")
     
     return CommandResponse(command_id=command_id, status="sent")
 
@@ -532,12 +693,22 @@ def register_workstation(
                 f"cloud_api_url={cloud_api_url}"
             )
             
+            # Obtener cert_url si la org tiene certificado ECDSA
+            cert_url = None
+            cert_version = None
+            if org.ecdsa_cert_version and org.ecdsa_cert_version > 0 and org.ecdsa_cert_s3_key:
+                from app.services.s3_config_service import S3ConfigService
+                cert_url = S3ConfigService().get_public_url(org.ecdsa_cert_s3_key)
+                cert_version = org.ecdsa_cert_version
+            
             return WorkstationRegisterResponse(
                 workstation_id=workstation.id,
                 organization_id=org.id,
                 organization_name=org.name,
                 message="Workstation registrada exitosamente" if is_new else "Workstation actualizada exitosamente",
-                cloud_api_url=cloud_api_url
+                cloud_api_url=cloud_api_url,
+                cert_url=cert_url,
+                cert_version=cert_version
             )
         
         else:

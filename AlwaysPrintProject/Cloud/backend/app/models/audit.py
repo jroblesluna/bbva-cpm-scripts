@@ -62,6 +62,9 @@ class ActionType(str, enum.Enum):
     CONTINGENCY_TOGGLE = "contingency_toggle"
     MESSAGE_SENT = "message_sent"
     COMMAND_SENT = "command_sent"
+    CERT_GENERATED = "cert_generated"
+    CERT_ROTATED = "cert_rotated"
+    ONDEMAND_EXECUTED = "ondemand_executed"
 
 
 class AuditLog(Base):

@@ -511,7 +511,7 @@ export const workstationsApi = {
    */
   sendCommand: async (
     id: string,
-    commandType: 'restart_service' | 'restart_tray' | 'check_update',
+    commandType: 'restart_service' | 'restart_tray' | 'check_update' | 'execute_on_demand',
     params?: Record<string, unknown>
   ): Promise<{ command_id: string; status: string }> => {
     const response = await apiClient.post<{ command_id: string; status: string }>(
@@ -573,6 +573,17 @@ export const workstationsApi = {
       `/workstations/${id}/forced-contingency`,
       null,
       { params: { enabled } }
+    )
+    return response.data
+  },
+
+  /**
+   * Obtener acciones OnDemand disponibles para una workstation.
+   * Se extraen del config efectivo (triggers con event="OnDemand").
+   */
+  getOnDemandActions: async (id: string): Promise<Array<{ label: string; description: string }>> => {
+    const response = await apiClient.get<Array<{ label: string; description: string }>>(
+      `/workstations/${id}/ondemand-actions`
     )
     return response.data
   },

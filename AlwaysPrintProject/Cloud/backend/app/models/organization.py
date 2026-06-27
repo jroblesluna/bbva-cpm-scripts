@@ -114,6 +114,16 @@ class Organization(Base):
     # Se usa para geolocalización de VLANs: autocompletado de direcciones y renderizado de mapas
     google_maps_api_key = Column(String(200), nullable=True)
 
+    # === CAMPOS ECDSA (Firma Digital de Configuraciones) ===
+    # Base64 de la clave privada ECDSA cifrada con AES-256-GCM (nonce || ciphertext || tag)
+    ecdsa_private_key_encrypted = Column(Text, nullable=True)
+    # S3 key del certificado .cer activo (ej: certs/{org_id}/v{version}.cer)
+    ecdsa_cert_s3_key = Column(String(500), nullable=True)
+    # Versión del certificado actual (incrementa en cada rotación)
+    ecdsa_cert_version = Column(Integer, nullable=False, default=0, server_default='0')
+    # Fecha de expiración del certificado activo
+    ecdsa_cert_expires_at = Column(DateTime, nullable=True)
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
