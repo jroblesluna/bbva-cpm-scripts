@@ -168,6 +168,14 @@ namespace AlwaysPrintService.Pipe
 
             try
             {
+                // Preservar campos locales que no son gestionados por la Cloud.
+                // Estos campos se establecen localmente por CloudRegistration y no deben
+                // ser sobrescritos por el config_update del servidor.
+                var currentConfig = _registry.Load();
+                payload.Configuration.CloudEnabled = currentConfig.CloudEnabled;
+                payload.Configuration.CloudApiUrl  = currentConfig.CloudApiUrl;
+                payload.Configuration.CloudLocale  = currentConfig.CloudLocale;
+
                 // Save() llama cfg.Validate() internamente; si lanza, no escribe nada.
                 _registry.Save(payload.Configuration);
 
