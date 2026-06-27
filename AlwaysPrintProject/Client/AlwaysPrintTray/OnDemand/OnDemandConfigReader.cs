@@ -6,6 +6,7 @@ using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace AlwaysPrintTray.OnDemand
 {
@@ -68,7 +69,8 @@ namespace AlwaysPrintTray.OnDemand
             try
             {
                 string json = File.ReadAllText(filePath);
-                var config = JsonConvert.DeserializeObject<ActionConfiguration>(json);
+                string configJson = ExtractConfigJson(json);
+                var config = JsonConvert.DeserializeObject<ActionConfiguration>(configJson);
 
                 if (config?.MonitoredServices == null)
                     return new List<MonitoredServiceConfig>();
@@ -100,7 +102,8 @@ namespace AlwaysPrintTray.OnDemand
             try
             {
                 string json = File.ReadAllText(filePath);
-                var config = JsonConvert.DeserializeObject<ActionConfiguration>(json);
+                string configJson = ExtractConfigJson(json);
+                var config = JsonConvert.DeserializeObject<ActionConfiguration>(configJson);
 
                 if (config?.Triggers == null)
                     return new List<OnDemandTriggerInfo>();
@@ -134,6 +137,35 @@ namespace AlwaysPrintTray.OnDemand
                     $"OnDemandConfigReader: error inesperado al cargar configuración: {ex.Message}");
                 return new List<OnDemandTriggerInfo>();
             }
+        }
+
+        /// <summary>
+        /// Extrae el JSON del config interno de un archivo.
+        /// Si es un envelope firmado (tiene campos config/hash/signature/cert_version),
+        /// retorna solo la porción "config" serializada.
+        /// Si es formato legacy, retorna el contenido tal cual.
+        /// </summary>
+        private static string ExtractConfigJson(string fileContent)
+        {
+            try
+            {
+                var parsed = JObject.Parse(fileContent);
+
+                // Detectar si es envelope firmado
+                if (parsed["config"] != null && parsed["hash"] != null &&
+                    parsed["signature"] != null && parsed["cert_version"] != null)
+                {
+                    // Es envelope — extraer config interno
+                    return parsed["config"]!.ToString(Formatting.None);
+                }
+            }
+            catch (JsonException)
+            {
+                // No es JSON válido — retornar tal cual (fallará en deserialización)
+            }
+
+            // No es envelope — retornar contenido original
+            return fileContent;
         }
     }
 }
