@@ -960,8 +960,9 @@ namespace AlwaysPrintService.Actions
         /// <param name="timeoutSeconds">Timeout máximo de ejecución</param>
         /// <param name="windowStyle">Estilo de ventana: Hidden, Minimized, Normal</param>
         /// <param name="runAsLoggedInUser">Si true, ejecuta como el usuario de consola activo</param>
-        /// <returns>true si el proceso terminó con exit code 0</returns>
-        public static bool RunProcess(string filePath, string arguments = "", int timeoutSeconds = 120, string windowStyle = "Hidden", bool runAsLoggedInUser = false)
+        /// <param name="successExitCodes">Códigos de salida considerados exitosos (default: solo 0). Ej: DISM retorna 3010 (reboot required) como éxito.</param>
+        /// <returns>true si el proceso terminó con un exit code considerado exitoso</returns>
+        public static bool RunProcess(string filePath, string arguments = "", int timeoutSeconds = 120, string windowStyle = "Hidden", bool runAsLoggedInUser = false, int[]? successExitCodes = null)
         {
             try
             {
@@ -973,7 +974,7 @@ namespace AlwaysPrintService.Actions
 
                 if (runAsLoggedInUser)
                 {
-                    return RunProcessAsLoggedInUser(filePath, arguments, timeoutSeconds, windowStyle);
+                    return RunProcessAsLoggedInUser(filePath, arguments, timeoutSeconds, windowStyle, successExitCodes);
                 }
 
                 AlwaysPrintLogger.WriteInfo($"RunProcess: ejecutando '{filePath}' con argumentos '{arguments}', ventana={windowStyle}, timeout={timeoutSeconds}s");
@@ -1023,7 +1024,8 @@ namespace AlwaysPrintService.Actions
                     }
 
                     AlwaysPrintLogger.WriteInfo($"RunProcess: '{filePath}' terminó con exit code {process.ExitCode}");
-                    return process.ExitCode == 0;
+                    int[] validCodes = successExitCodes ?? new[] { 0 };
+                    return validCodes.Contains(process.ExitCode);
                 }
             }
             catch (Exception ex)
@@ -1038,7 +1040,7 @@ namespace AlwaysPrintService.Actions
         /// Usa WTSQueryUserToken + CreateProcessAsUser para impersonar al usuario logueado.
         /// Redirige stdout/stderr a un archivo temporal para capturar el output.
         /// </summary>
-        private static bool RunProcessAsLoggedInUser(string filePath, string arguments, int timeoutSeconds, string windowStyle)
+        private static bool RunProcessAsLoggedInUser(string filePath, string arguments, int timeoutSeconds, string windowStyle, int[]? successExitCodes = null)
         {
             IntPtr userToken = IntPtr.Zero;
             IntPtr duplicateToken = IntPtr.Zero;
@@ -1203,7 +1205,8 @@ namespace AlwaysPrintService.Actions
                 }
 
                 AlwaysPrintLogger.WriteInfo($"RunProcess (como usuario): '{filePath}' terminó con exit code {exitCode}");
-                return exitCode == 0;
+                int[] validCodes = successExitCodes ?? new[] { 0 };
+                return validCodes.Contains((int)exitCode);
             }
             catch (Exception ex)
             {

@@ -152,7 +152,8 @@
             "file_path": "C:\\Windows\\System32\\dism.exe",
             "arguments": "/online /enable-feature /featurename:Printing-Foundation-LPDPrintService /all /norestart",
             "timeout_seconds": 120,
-            "window_style": "Hidden"
+            "window_style": "Hidden",
+            "success_exit_codes": [0, 3010]
           }
         },
         {
@@ -162,7 +163,8 @@
             "file_path": "C:\\Windows\\System32\\dism.exe",
             "arguments": "/online /enable-feature /featurename:Printing-Foundation-LPRPortMonitor /all /norestart",
             "timeout_seconds": 120,
-            "window_style": "Hidden"
+            "window_style": "Hidden",
+            "success_exit_codes": [0, 3010]
           }
         },
         {
@@ -735,7 +737,8 @@
                 "file_path": "C:\\Windows\\System32\\dism.exe",
                 "arguments": "/online /enable-feature /featurename:Printing-Foundation-LPDPrintService /all /norestart",
                 "timeout_seconds": 120,
-                "window_style": "Hidden"
+                "window_style": "Hidden",
+                "success_exit_codes": [0, 3010]
               }
             },
             {
@@ -745,7 +748,8 @@
                 "file_path": "C:\\Windows\\System32\\dism.exe",
                 "arguments": "/online /enable-feature /featurename:Printing-Foundation-LPRPortMonitor /all /norestart",
                 "timeout_seconds": 120,
-                "window_style": "Hidden"
+                "window_style": "Hidden",
+                "success_exit_codes": [0, 3010]
               }
             },
             {

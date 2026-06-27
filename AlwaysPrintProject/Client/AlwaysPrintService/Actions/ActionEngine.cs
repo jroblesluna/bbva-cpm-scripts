@@ -846,6 +846,9 @@ namespace AlwaysPrintService.Actions
             string windowStyle = GetParameter<string>(action, "window_style") ?? "Hidden";
             bool runAsLoggedInUser = GetParameter<bool>(action, "run_as_logged_in_user", false);
 
+            // Códigos de salida considerados exitosos (default: solo 0)
+            int[]? successExitCodes = GetParameterArray<int>(action, "success_exit_codes");
+
             if (string.IsNullOrWhiteSpace(filePath))
             {
                 AlwaysPrintLogger.WriteWarning("ActionEngine: RunProcess requiere 'file_path'");
@@ -855,7 +858,7 @@ namespace AlwaysPrintService.Actions
             filePath = ReplaceTemplates(filePath);
             arguments = ReplaceTemplates(arguments);
 
-            bool result = AdminActions.RunProcess(filePath, arguments, timeoutSeconds, windowStyle, runAsLoggedInUser);
+            bool result = AdminActions.RunProcess(filePath, arguments, timeoutSeconds, windowStyle, runAsLoggedInUser, successExitCodes);
 
             // Si se especificó store_result_in, guardar el resultado
             if (!string.IsNullOrEmpty(action.StoreResultIn))
@@ -1333,6 +1336,32 @@ namespace AlwaysPrintService.Actions
             {
                 AlwaysPrintLogger.WriteWarning($"ActionEngine: error obteniendo parámetro '{paramName}': {ex.Message}");
                 return defaultValue;
+            }
+        }
+
+        /// <summary>
+        /// Lee un parámetro de tipo array desde la configuración de acción.
+        /// Retorna null si el parámetro no existe o no es un array válido.
+        /// </summary>
+        private T[]? GetParameterArray<T>(ActionConfig action, string paramName)
+        {
+            try
+            {
+                if (action.Parameters == null)
+                    return null;
+
+                if (!action.Parameters.TryGetValue(paramName, out JToken? token))
+                    return null;
+
+                if (token == null || token.Type != JTokenType.Array)
+                    return null;
+
+                return ((JArray)token).ToObject<T[]>();
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning($"ActionEngine: error obteniendo parámetro array '{paramName}': {ex.Message}");
+                return null;
             }
         }
         
