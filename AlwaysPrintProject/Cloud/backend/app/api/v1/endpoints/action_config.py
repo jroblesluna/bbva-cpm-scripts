@@ -3,6 +3,7 @@ Endpoints para gestión de configuraciones de acciones administrativas.
 """
 
 import logging
+import time
 import threading
 from typing import List
 from uuid import UUID
@@ -29,11 +30,18 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Caché de config_info por workstation_id con TTL de 30 segundos.
+# Evita queries repetitivas cuando 66+ workstations pollen cada 30s.
+# Key: workstation_id → (timestamp, response_dict)
+_config_info_cache: dict[str, tuple[float, dict]] = {}
+_CONFIG_INFO_TTL = 30.0  # segundos
+
 
 async def _notify_workstations_config_changed(db: Session, organization_id) -> int:
     """
     Envía mensaje 'action_config_changed' a todas las workstations online de una organización.
     Las workstations al recibir este mensaje re-verifican su configuración de acciones.
+    También invalida el caché de config_info para las workstations de la organización.
     """
     from app.services.websocket_manager import connection_manager
     from app.models.workstation import Workstation
@@ -41,6 +49,10 @@ async def _notify_workstations_config_changed(db: Session, organization_id) -> i
     workstations = db.query(Workstation).filter(
         Workstation.organization_id == organization_id
     ).all()
+
+    # Invalidar caché de config_info para todas las workstations de esta org
+    for ws in workstations:
+        _config_info_cache.pop(str(ws.id), None)
 
     message = {"type": "action_config_changed"}
     dispatched = 0
@@ -416,10 +428,20 @@ def get_workstation_config_info(
     
     Aplica resolución jerárquica: Org (mandatory) > Workstation > VLAN > Org (default).
     Este endpoint NO requiere autenticación (usa workstation_id como identificación).
-    """
-    from app.models.workstation import Workstation
     
-    logger.info(f"[ACTION_CONFIG] Buscando workstation con id={workstation_id}")
+    Usa caché en memoria con TTL de 30s para evitar saturar el pool de conexiones
+    cuando 66+ workstations pollen simultáneamente.
+    """
+    # Check cache first
+    cached = _config_info_cache.get(workstation_id)
+    if cached:
+        cache_time, cache_data = cached
+        if time.time() - cache_time < _CONFIG_INFO_TTL:
+            # Cache hit — retornar sin tocar BD
+            return ActionConfigDownloadInfo(**cache_data)
+    
+    # Cache miss — proceed with DB queries
+    from app.models.workstation import Workstation
     
     workstation = db.query(Workstation).filter(
         Workstation.id == workstation_id
@@ -431,11 +453,6 @@ def get_workstation_config_info(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Workstation no encontrada"
         )
-    
-    logger.info(
-        f"[ACTION_CONFIG] Workstation encontrada: id={workstation.id}, "
-        f"organization_id={workstation.organization_id}, vlan_id={workstation.vlan_id}"
-    )
     
     # Resolver configuración efectiva con herencia jerárquica
     config = ActionConfigService.resolve_effective_config(db, workstation.id)
@@ -455,11 +472,6 @@ def get_workstation_config_info(
             detail=f"No hay configuración activa. org_id={workstation.organization_id}"
         )
     
-    logger.info(
-        f"[ACTION_CONFIG] Configuración efectiva: id={config.id}, scope={config.scope}, "
-        f"name={config.name}, hash={config.config_hash}"
-    )
-    
     # Obtener cert_version y cert_url de la organización (si tiene certificado)
     org = db.query(Organization).filter(Organization.id == workstation.organization_id).first()
     cert_version = org.ecdsa_cert_version if org and org.ecdsa_cert_version else None
@@ -468,7 +480,7 @@ def get_workstation_config_info(
         from app.services.s3_config_service import S3ConfigService
         cert_url = S3ConfigService().get_public_url(org.ecdsa_cert_s3_key)
     
-    return ActionConfigDownloadInfo(
+    result = ActionConfigDownloadInfo(
         hash=config.config_hash,
         download_url=f"/api/v1/workstations/{workstation_id}/config/download",
         name=config.name,
@@ -476,6 +488,18 @@ def get_workstation_config_info(
         cert_version=cert_version,
         cert_url=cert_url
     )
+    
+    # Store in cache
+    _config_info_cache[workstation_id] = (time.time(), result.model_dump())
+    
+    # Cleanup old entries periódicamente (cada 200 entradas)
+    if len(_config_info_cache) > 200:
+        now = time.time()
+        expired = [k for k, (t, _) in _config_info_cache.items() if now - t > _CONFIG_INFO_TTL * 2]
+        for k in expired:
+            del _config_info_cache[k]
+    
+    return result
 
 
 @router.get(
