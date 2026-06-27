@@ -29,6 +29,47 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# Caché en memoria de configs firmadas por worker.
+# Key: (config_id, config_hash, cert_version) → signed_json string.
+# Se invalida naturalmente cuando config cambia (nuevo hash) o cert rota (nueva version).
+_signed_config_cache: dict[tuple, str] = {}
+
+
+def _get_or_build_signed_config(config: ActionConfig, org: Organization) -> str:
+    """
+    Retorna el JSON firmado para un config, usando caché en memoria del worker.
+    Evita re-firmar en cada request (PBKDF2 100K iter + ECDSA es costoso).
+    La caché se invalida automáticamente cuando cambia config_hash o cert_version.
+    """
+    cache_key = (str(config.id), config.config_hash, org.ecdsa_cert_version)
+
+    cached = _signed_config_cache.get(cache_key)
+    if cached:
+        return cached
+
+    # No está en caché — firmar y cachear
+    hash_full, signature_b64 = CryptoService.sign_config(
+        org.ecdsa_private_key_encrypted, config.config_json,
+        settings.SECRET_KEY, str(org.id)
+    )
+    signed_json = CryptoService.build_signed_config(
+        config.config_json, hash_full, signature_b64, org.ecdsa_cert_version
+    )
+
+    # Guardar en caché (bounded: limpiar si crece demasiado)
+    if len(_signed_config_cache) > 1000:
+        _signed_config_cache.clear()
+
+    _signed_config_cache[cache_key] = signed_json
+
+    logger.debug(
+        "Config firmada y cacheada: config_id=%s, hash=%s, cert_version=%d",
+        config.id, config.config_hash, org.ecdsa_cert_version
+    )
+
+    return signed_json
+
+
 # === ENDPOINTS PARA ADMINISTRADORES ===
 
 @router.post(
@@ -74,7 +115,6 @@ def upload_action_config(
             organization_id=organization_id,
             data=data,
             created_by_id=current_user.id,
-            storage_path=None,
             scope=scope,
             vlan_id=str(vlan_id) if vlan_id else None,
             workstation_id=str(workstation_id) if workstation_id else None
@@ -388,19 +428,13 @@ def download_workstation_config(
             detail="No hay configuración activa"
         )
     
-    # Si la org tiene certificado ECDSA, retornar JSON firmado on-the-fly
+    # Si la org tiene certificado ECDSA, retornar JSON firmado (con caché en memoria)
     org = db.query(Organization).filter(Organization.id == workstation.organization_id).first()
 
     if org and org.ecdsa_cert_version and org.ecdsa_cert_version > 0 and org.ecdsa_private_key_encrypted:
-        # Construir on-the-fly (evita round-trip a S3)
         try:
-            hash_full, signature_b64 = CryptoService.sign_config(
-                org.ecdsa_private_key_encrypted, config.config_json,
-                settings.SECRET_KEY, str(org.id)
-            )
-            signed_json = CryptoService.build_signed_config(
-                config.config_json, hash_full, signature_b64, org.ecdsa_cert_version
-            )
+            # Usar config firmada pre-calculada si existe en caché
+            signed_json = _get_or_build_signed_config(config, org)
             return Response(
                 content=signed_json,
                 media_type="application/json",
@@ -413,8 +447,8 @@ def download_workstation_config(
                 }
             )
         except Exception as e:
-            # Si falla la firma, retornar sin firmar como fallback
-            logger.error("Error al firmar config on-the-fly: %s", str(e))
+            # Si falla, retornar sin firmar como fallback
+            logger.error("Error al obtener config firmada: %s", str(e))
 
     # Fallback: retornar config sin firmar (org sin certificado o error de firma)
     return Response(
