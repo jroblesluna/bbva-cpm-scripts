@@ -115,7 +115,6 @@ def upload_action_config(
             organization_id=organization_id,
             data=data,
             created_by_id=current_user.id,
-            storage_path=None,
             scope=scope,
             vlan_id=str(vlan_id) if vlan_id else None,
             workstation_id=str(workstation_id) if workstation_id else None

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
+using AlwaysPrint.Shared.Security;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -46,6 +47,9 @@ namespace AlwaysPrintService.Actions
         
         /// <summary>
         /// Carga la configuración desde un archivo JSON.
+        /// Si el archivo contiene un envelope firmado (config + hash + signature + cert_version),
+        /// verifica la firma ECDSA ANTES de cargar en memoria.
+        /// Si la verificación falla por cualquier motivo, ELIMINA el archivo y retorna false.
         /// </summary>
         public bool LoadConfiguration(string configFilePath)
         {
@@ -59,18 +63,84 @@ namespace AlwaysPrintService.Actions
                     return false;
                 }
                 
-                string json = File.ReadAllText(configFilePath);
-                _config = JsonConvert.DeserializeObject<ActionConfiguration>(json);
+                string fileContent = File.ReadAllText(configFilePath);
+                
+                // Intentar parsear como JSON
+                JObject? parsed;
+                try
+                {
+                    parsed = JObject.Parse(fileContent);
+                }
+                catch (JsonException ex)
+                {
+                    // JSON corrupto — invalidar y eliminar
+                    AlwaysPrintLogger.WriteError(
+                        $"ActionEngine: archivo de configuración corrupto (JSON inválido): {ex.Message}. Eliminando.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    DeleteConfigFile(configFilePath);
+                    return false;
+                }
+                
+                // Verificar si es envelope firmado (tiene los 4 campos requeridos)
+                bool isSignedEnvelope = parsed["config"] != null 
+                    && parsed["hash"] != null 
+                    && parsed["signature"] != null 
+                    && parsed["cert_version"] != null;
+                
+                if (!isSignedEnvelope)
+                {
+                    // Formato legacy sin firma — invalidar y eliminar
+                    AlwaysPrintLogger.WriteError(
+                        "ActionEngine: configuración sin firma digital (formato legacy). " +
+                        "Solo se aceptan configuraciones firmadas. Eliminando archivo.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    DeleteConfigFile(configFilePath);
+                    return false;
+                }
+                
+                // Verificar firma ECDSA
+                string certPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "AlwaysPrint", "config", "org.cer");
+                
+                if (!File.Exists(certPath))
+                {
+                    // No hay certificado local — no se puede verificar
+                    AlwaysPrintLogger.WriteError(
+                        $"ActionEngine: no se encontró certificado local en {certPath}. " +
+                        "No se puede verificar la firma. Eliminando configuración.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    DeleteConfigFile(configFilePath);
+                    return false;
+                }
+                
+                if (!SignatureVerifier.VerifyConfig(fileContent, certPath, out string verifiedConfigJson))
+                {
+                    // Firma inválida (hash mismatch o signature no corresponde)
+                    AlwaysPrintLogger.WriteError(
+                        "ActionEngine: firma digital inválida — la configuración fue modificada o es inauténtica. " +
+                        "Eliminando archivo.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    DeleteConfigFile(configFilePath);
+                    return false;
+                }
+                
+                // Firma válida — deserializar solo el config interno
+                _config = JsonConvert.DeserializeObject<ActionConfiguration>(verifiedConfigJson);
                 
                 if (_config == null)
                 {
-                    AlwaysPrintLogger.WriteError("ActionEngine: error deserializando configuración (resultado null)");
+                    AlwaysPrintLogger.WriteError(
+                        "ActionEngine: error deserializando el config interno del envelope (resultado null). Eliminando.",
+                        AlwaysPrintLogger.EvtGenericError);
+                    DeleteConfigFile(configFilePath);
                     return false;
                 }
                 
                 AlwaysPrintLogger.WriteInfo(
-                    $"ActionEngine: configuración cargada. " +
-                    $"Nombre: {_config.Name}, Versión: {_config.Version}, Triggers: {_config.Triggers.Count}");
+                    $"ActionEngine: configuración firmada verificada y cargada. " +
+                    $"Nombre: {_config.Name}, Versión: {_config.Version}, " +
+                    $"Triggers: {_config.Triggers.Count}, CertVersion: {parsed["cert_version"]}");
                 
                 return true;
             }
@@ -78,6 +148,24 @@ namespace AlwaysPrintService.Actions
             {
                 AlwaysPrintLogger.WriteError($"ActionEngine: error cargando configuración: {ex.Message}", ex);
                 return false;
+            }
+        }
+        
+        /// <summary>
+        /// Elimina el archivo de configuración inválido/corrupto del disco.
+        /// </summary>
+        private void DeleteConfigFile(string configFilePath)
+        {
+            try
+            {
+                File.Delete(configFilePath);
+                AlwaysPrintLogger.WriteInfo($"ActionEngine: archivo eliminado: {configFilePath}");
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"ActionEngine: no se pudo eliminar el archivo: {ex.Message}", ex,
+                    AlwaysPrintLogger.EvtGenericError);
             }
         }
         

@@ -151,7 +151,6 @@ class ActionConfigService:
         organization_id,
         data: ActionConfigUpload,
         created_by_id,
-        storage_path: Optional[str] = None,
         scope: str = "org",
         vlan_id=None,
         workstation_id=None
@@ -226,7 +225,7 @@ class ActionConfigService:
             config_json=data.config_json,
             config_hash=config_hash,
             is_active=data.is_active,
-            storage_path=storage_path,
+            storage_path=None,
             created_by_id=created_by_id
         )
         

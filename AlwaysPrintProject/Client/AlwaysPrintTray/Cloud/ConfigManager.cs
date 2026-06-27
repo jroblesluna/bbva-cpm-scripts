@@ -151,11 +151,6 @@ namespace AlwaysPrintTray.Cloud
         // DESCARGA
         // ═══════════════════════════════════════════════════════════════════════
         
-        private async Task<bool> DownloadConfigAsync(string cloudApiUrl, string workstationId, string apiKey, string downloadUrl, string expectedHash)
-        {
-            return await DownloadConfigAsync(cloudApiUrl, workstationId, apiKey, downloadUrl, expectedHash, null, null);
-        }
-
         private async Task<bool> DownloadConfigAsync(string cloudApiUrl, string workstationId, string apiKey, string downloadUrl, string expectedHash, int? remoteCertVersion, string? certUrl)
         {
             try
@@ -171,8 +166,6 @@ namespace AlwaysPrintTray.Cloud
                 string downloadedContent = await response.Content.ReadAsStringAsync();
                 
                 // Determinar si es un JSON firmado (signed envelope) o config raw (legacy)
-                string configJson;
-                bool isSigned = false;
                 
                 try
                 {
@@ -180,7 +173,6 @@ namespace AlwaysPrintTray.Cloud
                     if (parsed["config"] != null && parsed["hash"] != null && 
                         parsed["signature"] != null && parsed["cert_version"] != null)
                     {
-                        isSigned = true;
                         
                         // Es un JSON firmado — verificar firma ECDSA
                         int envelopeCertVersion = parsed["cert_version"]!.Value<int>();
@@ -222,7 +214,7 @@ namespace AlwaysPrintTray.Cloud
                             }
                         }
                         
-                        // Verificar firma usando SignatureVerifier
+                        // Verificar firma usando SignatureVerifier (fail-fast antes de persistir)
                         if (!SignatureVerifier.VerifyConfig(downloadedContent, certPath, out string verifiedConfig))
                         {
                             AlwaysPrintLogger.WriteError(
@@ -230,45 +222,49 @@ namespace AlwaysPrintTray.Cloud
                             return false;
                         }
                         
-                        // Firma válida — usar el config extraído
-                        configJson = verifiedConfig;
                         AlwaysPrintLogger.WriteInfo("ConfigManager: firma ECDSA verificada exitosamente");
+                        
+                        // Comparar hash del envelope con expectedHash de Cloud (primeros 8 chars)
+                        string envelopeHash = parsed["hash"]!.ToString();
+                        string envelopeHashShort = envelopeHash.Substring(0, Math.Min(8, envelopeHash.Length));
+                        
+                        if (!envelopeHashShort.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
+                        {
+                            AlwaysPrintLogger.WriteError(
+                                $"ConfigManager: hash del envelope ({envelopeHashShort}) no coincide con Cloud ({expectedHash})");
+                            return false;
+                        }
+                        
+                        AlwaysPrintLogger.WriteInfo($"ConfigManager: hash verificado correctamente (firmado)");
+                        
+                        // Enviar envelope COMPLETO al Service para persistencia
+                        // El Service verificará la firma al cargar desde disco
+                        bool saved = SendSaveActionConfigToService(downloadedContent, expectedHash);
+                        
+                        if (!saved)
+                        {
+                            AlwaysPrintLogger.WriteError("ConfigManager: el Service no pudo guardar la configuración");
+                            return false;
+                        }
+                        
+                        AlwaysPrintLogger.WriteInfo($"ConfigManager: configuración firmada guardada por el Service en {_configFilePath}");
+                        return true;
                     }
                     else
                     {
-                        // No es un envelope firmado — config sin firmar (legacy / org sin certificado)
-                        configJson = downloadedContent;
+                        // Formato legacy sin firma — NO guardar, rechazar
+                        AlwaysPrintLogger.WriteError(
+                            "ConfigManager: configuración recibida sin firma digital. Rechazando (formato legacy no aceptado).");
+                        return false;
                     }
                 }
                 catch (Newtonsoft.Json.JsonException)
                 {
-                    // No es JSON válido como envelope — tratar como config raw
-                    configJson = downloadedContent;
-                }
-                
-                // Verificar hash del config extraído (8 primeros chars del SHA256)
-                string downloadedHash = CalculateHash(configJson);
-                
-                if (!downloadedHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
-                {
+                    // No es JSON válido — rechazar
                     AlwaysPrintLogger.WriteError(
-                        $"ConfigManager: hash no coincide. Esperado: {expectedHash}, Obtenido: {downloadedHash}");
+                        "ConfigManager: contenido descargado no es JSON válido. Rechazando.");
                     return false;
                 }
-                
-                AlwaysPrintLogger.WriteInfo($"ConfigManager: hash verificado correctamente{(isSigned ? " (firmado)" : "")}");
-                
-                // Enviar contenido al Service para que lo persista en disco
-                bool saved = SendSaveActionConfigToService(configJson, downloadedHash);
-                
-                if (!saved)
-                {
-                    AlwaysPrintLogger.WriteError("ConfigManager: el Service no pudo guardar la configuración");
-                    return false;
-                }
-                
-                AlwaysPrintLogger.WriteInfo($"ConfigManager: configuración guardada por el Service en {_configFilePath}");
-                return true;
             }
             catch (Exception ex)
             {
@@ -347,8 +343,8 @@ namespace AlwaysPrintTray.Cloud
         // ═══════════════════════════════════════════════════════════════════════
         
         /// <summary>
-        /// Calcula el hash SHA256 del archivo de configuración local.
-        /// Retorna los primeros 8 caracteres del hash en hexadecimal.
+        /// Obtiene el hash de la configuración local.
+        /// Si el archivo es un envelope firmado, extrae el campo "hash" (primeros 8 chars).
         /// </summary>
         private string? GetLocalConfigHash()
         {
@@ -358,6 +354,21 @@ namespace AlwaysPrintTray.Cloud
                     return null;
                 
                 string content = File.ReadAllText(_configFilePath, Encoding.UTF8);
+                
+                // Si es un envelope firmado, extraer hash del campo "hash"
+                try
+                {
+                    var parsed = JObject.Parse(content);
+                    if (parsed["config"] != null && parsed["hash"] != null)
+                    {
+                        // Es envelope — el hash está en el campo "hash" (64 chars), tomar primeros 8
+                        string fullHash = parsed["hash"]!.ToString();
+                        return fullHash.Substring(0, Math.Min(8, fullHash.Length));
+                    }
+                }
+                catch (Newtonsoft.Json.JsonException) { }
+                
+                // Fallback: hashear contenido completo (no debería llegar aquí con el nuevo formato)
                 return CalculateHash(content);
             }
             catch (Exception ex)
@@ -370,7 +381,7 @@ namespace AlwaysPrintTray.Cloud
         /// <summary>
         /// Calcula el hash SHA256 de un string y retorna los primeros 8 caracteres.
         /// </summary>
-        public static string CalculateHash(string content)
+        private static string CalculateHash(string content)
         {
             using (var sha256 = SHA256.Create())
             {
@@ -389,6 +400,7 @@ namespace AlwaysPrintTray.Cloud
         
         /// <summary>
         /// Obtiene información sobre la configuración local activa.
+        /// Si el archivo es un envelope firmado, lee name/version del config interno.
         /// </summary>
         public LocalConfigInfo? GetLocalConfigInfo()
         {
@@ -398,13 +410,16 @@ namespace AlwaysPrintTray.Cloud
                     return null;
                 
                 string json = File.ReadAllText(_configFilePath, Encoding.UTF8);
-                var config = JObject.Parse(json);
+                var obj = JObject.Parse(json);
+                
+                // Si es envelope firmado, leer del config interno
+                JToken configToken = obj["config"] ?? obj;
                 
                 return new LocalConfigInfo
                 {
                     Hash = GetLocalConfigHash() ?? "",
-                    Name = config["name"]?.ToString() ?? "",
-                    Version = config["version"]?.ToString() ?? "",
+                    Name = configToken["name"]?.ToString() ?? "",
+                    Version = configToken["version"]?.ToString() ?? "",
                     FilePath = _configFilePath
                 };
             }
