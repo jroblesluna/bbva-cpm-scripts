@@ -353,6 +353,12 @@ namespace AlwaysPrintTray
                 {
                     RebuildOnDemandSubmenu();
 
+                    // Refrescar StatusForm si está abierto
+                    if (_statusForm != null && !_statusForm.IsDisposed)
+                    {
+                        _statusForm.RefreshActionConfigInfo();
+                    }
+
                     if (_firstConfigUpdateReceived)
                     {
                         // Solo notificar en actualizaciones posteriores (no en primera carga)
@@ -1215,7 +1221,12 @@ namespace AlwaysPrintTray
                     // Reconstruir submenú OnDemand del menú contextual
                     RebuildOnDemandSubmenu();
 
-                    // El StatusForm de WinForms se recarga al reabrir (no tiene refresh dinámico)
+                    // Refrescar StatusForm si está abierto
+                    if (_statusForm != null && !_statusForm.IsDisposed)
+                    {
+                        _statusForm.RefreshActionConfigInfo();
+                    }
+
                     AlwaysPrintLogger.WriteTrayInfo(
                         "HandleActionConfigChanged: submenú OnDemand reconstruido.");
                 }

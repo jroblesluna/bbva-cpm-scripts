@@ -104,6 +104,32 @@ namespace AlwaysPrintTray.Forms
             ApplyCloudConnectivityState(state);
         }
 
+        /// <summary>
+        /// Refresca la información de configuración de acciones y triggers OnDemand.
+        /// Se llama externamente cuando la config se actualiza desde Cloud.
+        /// Thread-safe: usa Invoke si se llama desde otro hilo.
+        /// </summary>
+        public void RefreshActionConfigInfo()
+        {
+            if (IsDisposed) return;
+
+            if (InvokeRequired)
+            {
+                Invoke(new Action(RefreshActionConfigInfo));
+                return;
+            }
+
+            try
+            {
+                _valConfig.Text = LoadConfigName();
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"StatusForm.RefreshActionConfigInfo: error refrescando config: {ex.Message}");
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // ── Construcción de la UI ───────────────────────────────────────────────
         // ═══════════════════════════════════════════════════════════════════════
