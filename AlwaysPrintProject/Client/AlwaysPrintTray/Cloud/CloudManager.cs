@@ -1774,13 +1774,18 @@ namespace AlwaysPrintTray.Cloud
 
         /// <summary>
         /// Maneja la notificación del servidor de que la configuración de acciones cambió.
-        /// Re-verifica la configuración descargando desde Cloud si hay una nueva versión.
+        /// Re-verifica la configuración con un jitter aleatorio para evitar thundering herd
+        /// (todas las workstations descargando al mismo tiempo).
         /// </summary>
         private async void HandleActionConfigChanged()
         {
+            // Jitter aleatorio de 1-10 segundos para evitar thundering herd
+            int jitterMs = new Random().Next(1000, 10000);
             AlwaysPrintLogger.WriteTrayInfo(
-                "CloudManager: notificación action_config_changed recibida. Re-verificando configuración...");
+                $"CloudManager: notificación action_config_changed recibida. " +
+                $"Re-verificando configuración en {jitterMs}ms...");
 
+            await Task.Delay(jitterMs);
             await CheckActionConfigurationAsync();
         }
 
