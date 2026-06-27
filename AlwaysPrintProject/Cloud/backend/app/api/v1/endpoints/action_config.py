@@ -81,16 +81,19 @@ def _get_lock_for_key(cache_key: tuple) -> threading.Lock:
         return _signed_config_locks[cache_key]
 
 
-def _get_or_build_signed_config(config: ActionConfig, org: Organization) -> str:
+def _get_or_build_signed_config_from_data(
+    config_id: str, config_hash: str, config_json: str,
+    cert_version: int, encrypted_key: str, org_id: str
+) -> str:
     """
-    Retorna el JSON firmado para un config, usando caché en memoria del worker.
-    Evita re-firmar en cada request (PBKDF2 100K iter + ECDSA es costoso).
+    Retorna el JSON firmado, usando caché en memoria del worker.
+    Acepta datos planos (no objetos ORM) para poder ejecutarse sin sesión de BD activa.
 
     Usa lock por cache_key para evitar thundering herd: si N requests llegan
     simultáneamente para el mismo config, solo 1 computa la firma y las demás
     esperan el resultado del caché (max 10s de espera).
     """
-    cache_key = (str(config.id), config.config_hash, org.ecdsa_cert_version)
+    cache_key = (config_id, config_hash, cert_version)
 
     # Fast path: cache hit (sin lock)
     cached = _signed_config_cache.get(cache_key)
@@ -102,31 +105,28 @@ def _get_or_build_signed_config(config: ActionConfig, org: Organization) -> str:
     acquired = lock.acquire(timeout=_CACHE_LOCK_TIMEOUT)
 
     try:
-        # Double-check: otro thread pudo haber llenado el caché mientras esperábamos
+        # Double-check: otro thread pudo haber llenado el caché
         cached = _signed_config_cache.get(cache_key)
         if cached:
             return cached
 
         if not acquired:
-            # Timeout esperando el lock — computar de todas formas (fallback)
             logger.warning(
                 "Cache lock timeout para config_id=%s. Computando firma sin lock (fallback).",
-                config.id
+                config_id
             )
 
         # Computar firma (PBKDF2 + ECDSA ~50ms)
         hash_full, signature_b64 = CryptoService.sign_config(
-            org.ecdsa_private_key_encrypted, config.config_json,
-            settings.SECRET_KEY, str(org.id)
+            encrypted_key, config_json, settings.SECRET_KEY, org_id
         )
         signed_json = CryptoService.build_signed_config(
-            config.config_json, hash_full, signature_b64, org.ecdsa_cert_version
+            config_json, hash_full, signature_b64, cert_version
         )
 
         # Guardar en caché (bounded: limpiar si crece demasiado)
         if len(_signed_config_cache) > 1000:
             _signed_config_cache.clear()
-            # También limpiar locks obsoletos
             with _locks_mutex:
                 _signed_config_locks.clear()
 
@@ -134,7 +134,7 @@ def _get_or_build_signed_config(config: ActionConfig, org: Organization) -> str:
 
         logger.debug(
             "Config firmada y cacheada: config_id=%s, hash=%s, cert_version=%d",
-            config.id, config.config_hash, org.ecdsa_cert_version
+            config_id, config_hash, cert_version
         )
 
         return signed_json
@@ -490,6 +490,9 @@ def download_workstation_config(
     """
     Descarga el JSON de la configuración efectiva para una workstation.
     Aplica resolución jerárquica: Org (mandatory) > Workstation > VLAN > Org (default).
+    
+    La sesión de BD se cierra ANTES del cómputo criptográfico para no retener
+    conexiones del pool durante PBKDF2/ECDSA (~50ms).
     """
     from app.models.workstation import Workstation
     workstation = db.query(Workstation).filter(
@@ -511,36 +514,60 @@ def download_workstation_config(
             detail="No hay configuración activa"
         )
     
-    # Si la org tiene certificado ECDSA, retornar JSON firmado (con caché en memoria)
+    # Extraer todos los datos necesarios ANTES de cerrar la sesión
+    config_id = str(config.id)
+    config_json = config.config_json
+    config_hash = config.config_hash
+    config_name = config.name
+    config_version = config.version
+    config_scope = config.scope if isinstance(config.scope, str) else config.scope.value
+    
     org = db.query(Organization).filter(Organization.id == workstation.organization_id).first()
-
-    if org and org.ecdsa_cert_version and org.ecdsa_cert_version > 0 and org.ecdsa_private_key_encrypted:
+    
+    org_has_cert = (
+        org is not None
+        and org.ecdsa_cert_version is not None
+        and org.ecdsa_cert_version > 0
+        and org.ecdsa_private_key_encrypted is not None
+    )
+    
+    # Extraer datos de org necesarios para firma (si tiene cert)
+    org_id = str(org.id) if org else None
+    org_encrypted_key = org.ecdsa_private_key_encrypted if org_has_cert else None
+    org_cert_version = org.ecdsa_cert_version if org_has_cert else None
+    
+    # === CERRAR SESIÓN DE BD — liberar conexión al pool ===
+    db.close()
+    
+    # === A partir de aquí, NO se usa 'db' ni objetos SQLAlchemy ===
+    
+    if org_has_cert:
         try:
-            # Usar config firmada pre-calculada si existe en caché
-            signed_json = _get_or_build_signed_config(config, org)
+            signed_json = _get_or_build_signed_config_from_data(
+                config_id, config_hash, config_json, org_cert_version, org_encrypted_key, org_id
+            )
             return Response(
                 content=signed_json,
                 media_type="application/json",
                 headers={
-                    "Content-Disposition": f'attachment; filename="{config.name}.alwaysconfig"',
-                    "X-Config-Hash": config.config_hash,
-                    "X-Config-Version": config.version,
-                    "X-Config-Scope": config.scope if isinstance(config.scope, str) else config.scope.value,
-                    "X-Cert-Version": str(org.ecdsa_cert_version),
+                    "Content-Disposition": f'attachment; filename="{config_name}.alwaysconfig"',
+                    "X-Config-Hash": config_hash,
+                    "X-Config-Version": config_version,
+                    "X-Config-Scope": config_scope,
+                    "X-Cert-Version": str(org_cert_version),
                 }
             )
         except Exception as e:
-            # Si falla, retornar sin firmar como fallback
             logger.error("Error al obtener config firmada: %s", str(e))
 
     # Fallback: retornar config sin firmar (org sin certificado o error de firma)
     return Response(
-        content=config.config_json,
+        content=config_json,
         media_type="application/json",
         headers={
-            "Content-Disposition": f'attachment; filename="{config.name}.alwaysconfig"',
-            "X-Config-Hash": config.config_hash,
-            "X-Config-Version": config.version,
-            "X-Config-Scope": config.scope if isinstance(config.scope, str) else config.scope.value
+            "Content-Disposition": f'attachment; filename="{config_name}.alwaysconfig"',
+            "X-Config-Hash": config_hash,
+            "X-Config-Version": config_version,
+            "X-Config-Scope": config_scope
         }
     )
