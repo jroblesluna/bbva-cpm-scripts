@@ -63,6 +63,9 @@ namespace AlwaysPrintTray
         private ToolStripMenuItem? _onDemandSubmenu;
         private ToolStripSeparator? _onDemandSeparator;
 
+        // Flag para distinguir la primera carga de config (no notificar) de actualizaciones reales
+        private bool _firstConfigUpdateReceived;
+
         public TrayApplicationContext(uint showStatusMsgId)
         {
             _showStatusMsgId = showStatusMsgId;
@@ -337,8 +340,9 @@ namespace AlwaysPrintTray
         /// <summary>
         /// Callback que se ejecuta cuando CloudManager descarga/actualiza la configuración de acciones.
         /// Reconstruye el submenú OnDemand para reflejar los nuevos triggers disponibles.
+        /// Muestra notificación balloon en actualizaciones posteriores a la primera carga.
         /// </summary>
-        private void OnActionConfigUpdated()
+        private void OnActionConfigUpdated(string configName, string configHash)
         {
             AlwaysPrintLogger.WriteTrayInfo(
                 "OnActionConfigUpdated: configuración de acciones actualizada desde Cloud. Reconstruyendo submenú OnDemand.");
@@ -348,6 +352,15 @@ namespace AlwaysPrintTray
                 try
                 {
                     RebuildOnDemandSubmenu();
+
+                    if (_firstConfigUpdateReceived)
+                    {
+                        // Solo notificar en actualizaciones posteriores (no en primera carga)
+                        ShowBalloon(AppTitle,
+                            $"Configuración actualizada: {configName}",
+                            ToolTipIcon.Info);
+                    }
+                    _firstConfigUpdateReceived = true;
                 }
                 catch (Exception ex)
                 {

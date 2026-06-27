@@ -57,8 +57,9 @@ namespace AlwaysPrintTray.Cloud
         /// <summary>
         /// Se dispara cuando la configuración de acciones ha sido descargada/actualizada exitosamente.
         /// El suscriptor (TrayApplicationContext) debe reconstruir el submenú OnDemand.
+        /// Parámetros: (configName, configHash).
         /// </summary>
-        public event Action? ActionConfigUpdated;
+        public event Action<string, string>? ActionConfigUpdated;
 
         /// <summary>
         /// Expone el OfflineStateManager interno para que el StatusForm pueda consultar
@@ -1811,7 +1812,7 @@ namespace AlwaysPrintTray.Cloud
                             $"Nombre: {localInfo.Name}, Hash: {localInfo.Hash}");
 
                         // Notificar para reconstruir submenú OnDemand
-                        ActionConfigUpdated?.Invoke();
+                        ActionConfigUpdated?.Invoke(localInfo.Name, localInfo.Hash);
                     }
                     else
                     {
