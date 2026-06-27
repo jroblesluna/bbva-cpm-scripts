@@ -388,7 +388,7 @@ namespace AlwaysPrintTray.Cloud
                     Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                     "AlwaysPrint", "config", "org.cer");
 
-                bool downloaded = await SignatureVerifier.DownloadCertAsync(certUrl, certPath);
+                bool downloaded = await SignatureVerifier.DownloadCertAsync(certUrl, certPath, traySource: true);
 
                 if (downloaded)
                 {

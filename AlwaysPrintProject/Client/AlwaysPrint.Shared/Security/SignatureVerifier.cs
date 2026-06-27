@@ -29,6 +29,42 @@ namespace AlwaysPrint.Shared.Security
         private const string CertVersionValueName = "CertVersion";
 
         // ═══════════════════════════════════════════════════════════════════════
+        // HELPERS DE LOGGING CON SOURCE CONFIGURABLE
+        // ═══════════════════════════════════════════════════════════════════════
+
+        private static void LogInfo(string message, bool traySource)
+        {
+            if (traySource)
+                AlwaysPrintLogger.WriteTrayInfo(message);
+            else
+                AlwaysPrintLogger.WriteInfo(message);
+        }
+
+        private static void LogWarning(string message, bool traySource, int eventId = AlwaysPrintLogger.EvtGenericWarning)
+        {
+            if (traySource)
+                AlwaysPrintLogger.WriteTrayWarning(message, eventId);
+            else
+                AlwaysPrintLogger.WriteWarning(message, eventId);
+        }
+
+        private static void LogError(string message, bool traySource, int eventId = AlwaysPrintLogger.EvtGenericError)
+        {
+            if (traySource)
+                AlwaysPrintLogger.WriteTrayError(message, eventId);
+            else
+                AlwaysPrintLogger.WriteError(message, eventId);
+        }
+
+        private static void LogError(string message, Exception ex, bool traySource, int eventId = AlwaysPrintLogger.EvtGenericError)
+        {
+            if (traySource)
+                AlwaysPrintLogger.WriteTrayError(message, ex, eventId);
+            else
+                AlwaysPrintLogger.WriteError(message, ex, eventId);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // VERIFICACIÓN DE CONFIGURACIÓN FIRMADA
         // ═══════════════════════════════════════════════════════════════════════
 
@@ -40,8 +76,9 @@ namespace AlwaysPrint.Shared.Security
         /// <param name="signedJson">JSON envolvente con estructura: {"config":{...},"hash":"...","signature":"...","cert_version":N}</param>
         /// <param name="certPath">Ruta al archivo .cer del certificado público.</param>
         /// <param name="configJson">Si la verificación es exitosa, contiene el JSON serializado del config.</param>
+        /// <param name="traySource">Si true, los logs se atribuyen al proceso Tray [APP]; si false, al Service [SVC].</param>
         /// <returns>true si hash y firma son válidos, false en caso contrario.</returns>
-        public static bool VerifyConfig(string signedJson, string certPath, out string configJson)
+        public static bool VerifyConfig(string signedJson, string certPath, out string configJson, bool traySource = false)
         {
             configJson = null!;
 
@@ -56,9 +93,9 @@ namespace AlwaysPrint.Shared.Security
 
                 if (configToken == null || string.IsNullOrEmpty(hashHex) || string.IsNullOrEmpty(signatureBase64))
                 {
-                    AlwaysPrintLogger.WriteError(
+                    LogError(
                         "SignatureVerifier: JSON envolvente inválido — faltan campos requeridos (config, hash, signature).",
-                        AlwaysPrintLogger.EvtGenericError);
+                        traySource, AlwaysPrintLogger.EvtGenericError);
                     return false;
                 }
 
@@ -76,9 +113,9 @@ namespace AlwaysPrint.Shared.Security
                 // 3. Cargar certificado X.509 y obtener clave pública ECDSA
                 if (!File.Exists(certPath))
                 {
-                    AlwaysPrintLogger.WriteError(
+                    LogError(
                         $"SignatureVerifier: certificado no encontrado en {certPath}",
-                        AlwaysPrintLogger.EvtGenericError);
+                        traySource, AlwaysPrintLogger.EvtGenericError);
                     return false;
                 }
 
@@ -87,9 +124,9 @@ namespace AlwaysPrint.Shared.Security
                 {
                     if (ecDsa == null)
                     {
-                        AlwaysPrintLogger.WriteError(
+                        LogError(
                             "SignatureVerifier: el certificado no contiene una clave pública ECDSA.",
-                            AlwaysPrintLogger.EvtGenericError);
+                            traySource, AlwaysPrintLogger.EvtGenericError);
                         return false;
                     }
 
@@ -107,38 +144,38 @@ namespace AlwaysPrint.Shared.Security
 
                     if (!isValid)
                     {
-                        AlwaysPrintLogger.WriteError(
+                        LogError(
                             "SignatureVerifier: firma ECDSA inválida — la configuración fue alterada o el certificado no corresponde.",
-                            AlwaysPrintLogger.EvtGenericError);
+                            traySource, AlwaysPrintLogger.EvtGenericError);
                         return false;
                     }
                 }
 
                 // 5. Firma válida — extraer config como string para el ActionEngine
                 configJson = configToken.ToString(Formatting.None);
-                AlwaysPrintLogger.WriteInfo(
-                    "SignatureVerifier: verificación de firma ECDSA exitosa.");
+                LogInfo(
+                    "SignatureVerifier: verificación de firma ECDSA exitosa.", traySource);
                 return true;
             }
             catch (JsonException ex)
             {
-                AlwaysPrintLogger.WriteError(
+                LogError(
                     $"SignatureVerifier: error parseando JSON envolvente: {ex.Message}", ex,
-                    AlwaysPrintLogger.EvtGenericError);
+                    traySource, AlwaysPrintLogger.EvtGenericError);
                 return false;
             }
             catch (CryptographicException ex)
             {
-                AlwaysPrintLogger.WriteError(
+                LogError(
                     $"SignatureVerifier: error criptográfico durante verificación: {ex.Message}", ex,
-                    AlwaysPrintLogger.EvtGenericError);
+                    traySource, AlwaysPrintLogger.EvtGenericError);
                 return false;
             }
             catch (Exception ex)
             {
-                AlwaysPrintLogger.WriteError(
+                LogError(
                     $"SignatureVerifier: error inesperado durante verificación: {ex.Message}", ex,
-                    AlwaysPrintLogger.EvtGenericError);
+                    traySource, AlwaysPrintLogger.EvtGenericError);
                 return false;
             }
         }
@@ -153,13 +190,14 @@ namespace AlwaysPrint.Shared.Security
         /// </summary>
         /// <param name="certUrl">URL pública del certificado .cer en S3.</param>
         /// <param name="localPath">Ruta local donde guardar el certificado (ej: C:\ProgramData\AlwaysPrint\config\org.cer).</param>
+        /// <param name="traySource">Si true, los logs se atribuyen al proceso Tray [APP]; si false, al Service [SVC].</param>
         /// <returns>true si la descarga y escritura fueron exitosas, false en caso contrario.</returns>
-        public static async Task<bool> DownloadCertAsync(string certUrl, string localPath)
+        public static async Task<bool> DownloadCertAsync(string certUrl, string localPath, bool traySource = false)
         {
             try
             {
-                AlwaysPrintLogger.WriteInfo(
-                    $"SignatureVerifier: descargando certificado desde {certUrl}");
+                LogInfo(
+                    $"SignatureVerifier: descargando certificado desde {certUrl}", traySource);
 
                 using (var httpClient = new HttpClient())
                 {
@@ -169,9 +207,9 @@ namespace AlwaysPrint.Shared.Security
 
                     if (certBytes == null || certBytes.Length == 0)
                     {
-                        AlwaysPrintLogger.WriteError(
+                        LogError(
                             "SignatureVerifier: certificado descargado está vacío.",
-                            AlwaysPrintLogger.EvtGenericError);
+                            traySource, AlwaysPrintLogger.EvtGenericError);
                         return false;
                     }
 
@@ -185,30 +223,30 @@ namespace AlwaysPrint.Shared.Security
                     // Guardar certificado en disco
                     File.WriteAllBytes(localPath, certBytes);
 
-                    AlwaysPrintLogger.WriteInfo(
-                        $"SignatureVerifier: certificado guardado exitosamente en {localPath} ({certBytes.Length} bytes)");
+                    LogInfo(
+                        $"SignatureVerifier: certificado guardado exitosamente en {localPath} ({certBytes.Length} bytes)", traySource);
                     return true;
                 }
             }
             catch (HttpRequestException ex)
             {
-                AlwaysPrintLogger.WriteError(
+                LogError(
                     $"SignatureVerifier: error HTTP descargando certificado: {ex.Message}", ex,
-                    AlwaysPrintLogger.EvtGenericError);
+                    traySource, AlwaysPrintLogger.EvtGenericError);
                 return false;
             }
             catch (IOException ex)
             {
-                AlwaysPrintLogger.WriteError(
+                LogError(
                     $"SignatureVerifier: error de I/O guardando certificado: {ex.Message}", ex,
-                    AlwaysPrintLogger.EvtGenericError);
+                    traySource, AlwaysPrintLogger.EvtGenericError);
                 return false;
             }
             catch (Exception ex)
             {
-                AlwaysPrintLogger.WriteError(
+                LogError(
                     $"SignatureVerifier: error inesperado descargando certificado: {ex.Message}", ex,
-                    AlwaysPrintLogger.EvtGenericError);
+                    traySource, AlwaysPrintLogger.EvtGenericError);
                 return false;
             }
         }
@@ -221,8 +259,9 @@ namespace AlwaysPrint.Shared.Security
         /// Lee la versión del certificado almacenada localmente en el registro de Windows.
         /// Retorna 0 si el valor no existe o no se puede leer.
         /// </summary>
+        /// <param name="traySource">Si true, los logs se atribuyen al proceso Tray [APP]; si false, al Service [SVC].</param>
         /// <returns>Versión del certificado local (0 si no se encuentra).</returns>
-        public static int GetLocalCertVersion()
+        public static int GetLocalCertVersion(bool traySource = false)
         {
             try
             {
@@ -238,9 +277,9 @@ namespace AlwaysPrint.Shared.Security
             }
             catch (Exception ex)
             {
-                AlwaysPrintLogger.WriteWarning(
+                LogWarning(
                     $"SignatureVerifier: error leyendo CertVersion del registro, retornando 0. {ex.Message}",
-                    AlwaysPrintLogger.EvtGenericWarning);
+                    traySource, AlwaysPrintLogger.EvtGenericWarning);
                 return 0;
             }
         }

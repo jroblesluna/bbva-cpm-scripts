@@ -50,19 +50,19 @@ namespace AlwaysPrintTray.Cloud
         {
             try
             {
-                AlwaysPrintLogger.WriteInfo("ConfigManager: verificando configuración en Cloud");
+                AlwaysPrintLogger.WriteTrayInfo("ConfigManager: verificando configuración en Cloud");
                 
                 // 1. Consultar si hay configuración activa en la Cloud
                 var cloudConfigInfo = await GetCloudConfigInfoAsync(cloudApiUrl, workstationId, apiKey);
                 
                 if (cloudConfigInfo == null)
                 {
-                    AlwaysPrintLogger.WriteInfo("ConfigManager: no hay configuración activa en Cloud");
+                    AlwaysPrintLogger.WriteTrayInfo("ConfigManager: no hay configuración activa en Cloud");
                     
                     // Si no hay config en Cloud pero existe local, eliminarla vía Service
                     if (File.Exists(_configFilePath))
                     {
-                        AlwaysPrintLogger.WriteInfo("ConfigManager: eliminando configuración local obsoleta vía Service");
+                        AlwaysPrintLogger.WriteTrayInfo("ConfigManager: eliminando configuración local obsoleta vía Service");
                         SendSaveActionConfigToService("", "");
                     }
                     
@@ -74,29 +74,29 @@ namespace AlwaysPrintTray.Cloud
                 
                 if (localHash != null && localHash.Equals(cloudConfigInfo.Hash, StringComparison.OrdinalIgnoreCase))
                 {
-                    AlwaysPrintLogger.WriteInfo($"ConfigManager: configuración local actualizada (hash: {localHash})");
+                    AlwaysPrintLogger.WriteTrayInfo($"ConfigManager: configuración local actualizada (hash: {localHash})");
                     return true;
                 }
                 
                 // 3. Descargar nueva configuración
-                AlwaysPrintLogger.WriteInfo($"ConfigManager: descargando nueva configuración (hash: {cloudConfigInfo.Hash})");
+                AlwaysPrintLogger.WriteTrayInfo($"ConfigManager: descargando nueva configuración (hash: {cloudConfigInfo.Hash})");
                 
                 bool downloaded = await DownloadConfigAsync(cloudApiUrl, workstationId, apiKey, cloudConfigInfo.DownloadUrl, cloudConfigInfo.Hash, cloudConfigInfo.CertVersion, cloudConfigInfo.CertUrl);
                 
                 if (downloaded)
                 {
-                    AlwaysPrintLogger.WriteInfo("ConfigManager: configuración descargada y guardada exitosamente");
+                    AlwaysPrintLogger.WriteTrayInfo("ConfigManager: configuración descargada y guardada exitosamente");
                     return true;
                 }
                 else
                 {
-                    AlwaysPrintLogger.WriteError("ConfigManager: error descargando/guardando configuración");
+                    AlwaysPrintLogger.WriteTrayError("ConfigManager: error descargando/guardando configuración");
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                AlwaysPrintLogger.WriteError($"ConfigManager: error verificando configuración: {ex.Message}", ex);
+                AlwaysPrintLogger.WriteTrayError($"ConfigManager: error verificando configuración: {ex.Message}", ex);
                 return false;
             }
         }
@@ -121,7 +121,7 @@ namespace AlwaysPrintTray.Cloud
                     // Leer detalle del 404 para diagnóstico
                     string detail = "";
                     try { detail = await response.Content.ReadAsStringAsync(); } catch { }
-                    AlwaysPrintLogger.WriteInfo($"ConfigManager: endpoint retornó 404. Detalle: {detail}");
+                    AlwaysPrintLogger.WriteTrayInfo($"ConfigManager: endpoint retornó 404. Detalle: {detail}");
                     return null;
                 }
                 
@@ -142,7 +142,7 @@ namespace AlwaysPrintTray.Cloud
             }
             catch (HttpRequestException ex)
             {
-                AlwaysPrintLogger.WriteWarning($"ConfigManager: error consultando info de configuración: {ex.Message}");
+                AlwaysPrintLogger.WriteTrayWarning($"ConfigManager: error consultando info de configuración: {ex.Message}");
                 return null;
             }
         }
@@ -176,7 +176,7 @@ namespace AlwaysPrintTray.Cloud
                         
                         // Es un JSON firmado — verificar firma ECDSA
                         int envelopeCertVersion = parsed["cert_version"]!.Value<int>();
-                        int localCertVersion = SignatureVerifier.GetLocalCertVersion();
+                        int localCertVersion = SignatureVerifier.GetLocalCertVersion(traySource: true);
                         
                         string certPath = Path.Combine(
                             Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
@@ -185,30 +185,30 @@ namespace AlwaysPrintTray.Cloud
                         // Si cert_version remoto > local, intentar descargar nuevo certificado
                         if (envelopeCertVersion > localCertVersion)
                         {
-                            AlwaysPrintLogger.WriteWarning(
+                            AlwaysPrintLogger.WriteTrayWarning(
                                 $"ConfigManager: cert_version remoto ({envelopeCertVersion}) > local ({localCertVersion}). " +
                                 "Intentando actualizar certificado.");
                             
                             if (!string.IsNullOrEmpty(certUrl))
                             {
-                                bool certDownloaded = await SignatureVerifier.DownloadCertAsync(certUrl, certPath);
+                                bool certDownloaded = await SignatureVerifier.DownloadCertAsync(certUrl, certPath, traySource: true);
                                 if (certDownloaded)
                                 {
                                     // No escribir CertVersion en registro desde el Tray (requiere HKLM/admin).
                                     // El Service lo actualizará al cargar y verificar la configuración firmada.
-                                    AlwaysPrintLogger.WriteInfo(
+                                    AlwaysPrintLogger.WriteTrayInfo(
                                         $"ConfigManager: certificado actualizado a versión {envelopeCertVersion}");
                                 }
                                 else
                                 {
-                                    AlwaysPrintLogger.WriteWarning(
+                                    AlwaysPrintLogger.WriteTrayWarning(
                                         "ConfigManager: no se pudo descargar el nuevo certificado. " +
                                         "Se intentará verificar con el certificado actual.");
                                 }
                             }
                             else
                             {
-                                AlwaysPrintLogger.WriteWarning(
+                                AlwaysPrintLogger.WriteTrayWarning(
                                     "ConfigManager: cert_url no disponible para actualizar certificado. " +
                                     "Se intentará verificar con el certificado actual (puede fallar). " +
                                     "Se actualizará con el próximo cert_rotated.");
@@ -216,14 +216,14 @@ namespace AlwaysPrintTray.Cloud
                         }
                         
                         // Verificar firma usando SignatureVerifier (fail-fast antes de persistir)
-                        if (!SignatureVerifier.VerifyConfig(downloadedContent, certPath, out string verifiedConfig))
+                        if (!SignatureVerifier.VerifyConfig(downloadedContent, certPath, out string verifiedConfig, traySource: true))
                         {
-                            AlwaysPrintLogger.WriteError(
+                            AlwaysPrintLogger.WriteTrayError(
                                 "ConfigManager: verificación de firma ECDSA fallida — rechazando configuración.");
                             return false;
                         }
                         
-                        AlwaysPrintLogger.WriteInfo("ConfigManager: firma ECDSA verificada exitosamente");
+                        AlwaysPrintLogger.WriteTrayInfo("ConfigManager: firma ECDSA verificada exitosamente");
                         
                         // Comparar hash del envelope con expectedHash de Cloud (primeros 8 chars)
                         string envelopeHash = parsed["hash"]!.ToString();
@@ -231,12 +231,12 @@ namespace AlwaysPrintTray.Cloud
                         
                         if (!envelopeHashShort.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
                         {
-                            AlwaysPrintLogger.WriteError(
+                            AlwaysPrintLogger.WriteTrayError(
                                 $"ConfigManager: hash del envelope ({envelopeHashShort}) no coincide con Cloud ({expectedHash})");
                             return false;
                         }
                         
-                        AlwaysPrintLogger.WriteInfo($"ConfigManager: hash verificado correctamente (firmado)");
+                        AlwaysPrintLogger.WriteTrayInfo($"ConfigManager: hash verificado correctamente (firmado)");
                         
                         // Enviar envelope COMPLETO al Service para persistencia
                         // El Service verificará la firma al cargar desde disco
@@ -244,17 +244,17 @@ namespace AlwaysPrintTray.Cloud
                         
                         if (!saved)
                         {
-                            AlwaysPrintLogger.WriteError("ConfigManager: el Service no pudo guardar la configuración");
+                            AlwaysPrintLogger.WriteTrayError("ConfigManager: el Service no pudo guardar la configuración");
                             return false;
                         }
                         
-                        AlwaysPrintLogger.WriteInfo($"ConfigManager: configuración firmada guardada por el Service en {_configFilePath}");
+                        AlwaysPrintLogger.WriteTrayInfo($"ConfigManager: configuración firmada guardada por el Service en {_configFilePath}");
                         return true;
                     }
                     else
                     {
                         // Formato legacy sin firma — NO guardar, rechazar
-                        AlwaysPrintLogger.WriteError(
+                        AlwaysPrintLogger.WriteTrayError(
                             "ConfigManager: configuración recibida sin firma digital. Rechazando (formato legacy no aceptado).");
                         return false;
                     }
@@ -262,14 +262,14 @@ namespace AlwaysPrintTray.Cloud
                 catch (Newtonsoft.Json.JsonException)
                 {
                     // No es JSON válido — rechazar
-                    AlwaysPrintLogger.WriteError(
+                    AlwaysPrintLogger.WriteTrayError(
                         "ConfigManager: contenido descargado no es JSON válido. Rechazando.");
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                AlwaysPrintLogger.WriteError($"ConfigManager: error descargando configuración: {ex.Message}", ex);
+                AlwaysPrintLogger.WriteTrayError($"ConfigManager: error descargando configuración: {ex.Message}", ex);
                 return false;
             }
         }
@@ -291,7 +291,7 @@ namespace AlwaysPrintTray.Cloud
             {
                 if (!_pipeClient.IsConnected)
                 {
-                    AlwaysPrintLogger.WriteWarning(
+                    AlwaysPrintLogger.WriteTrayWarning(
                         "ConfigManager: pipe no conectado, no se puede enviar configuración al Service");
                     return false;
                 }
@@ -307,14 +307,14 @@ namespace AlwaysPrintTray.Cloud
                 
                 if (response == null)
                 {
-                    AlwaysPrintLogger.WriteError("ConfigManager: no se recibió respuesta del Service (timeout o desconexión)");
+                    AlwaysPrintLogger.WriteTrayError("ConfigManager: no se recibió respuesta del Service (timeout o desconexión)");
                     return false;
                 }
                 
                 if (response.Type == MessageType.Error)
                 {
                     var error = response.GetPayload<ErrorPayload>();
-                    AlwaysPrintLogger.WriteError(
+                    AlwaysPrintLogger.WriteTrayError(
                         $"ConfigManager: Service retornó error al guardar config: [{error?.Code}] {error?.Message}");
                     return false;
                 }
@@ -322,19 +322,19 @@ namespace AlwaysPrintTray.Cloud
                 var ack = response.GetPayload<AckPayload>();
                 if (ack?.Success == true)
                 {
-                    AlwaysPrintLogger.WriteInfo($"ConfigManager: Service confirmó escritura exitosa. {ack.Message}");
+                    AlwaysPrintLogger.WriteTrayInfo($"ConfigManager: Service confirmó escritura exitosa. {ack.Message}");
                     return true;
                 }
                 else
                 {
-                    AlwaysPrintLogger.WriteWarning(
+                    AlwaysPrintLogger.WriteTrayWarning(
                         $"ConfigManager: Service reportó fallo al guardar: {ack?.Message}");
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                AlwaysPrintLogger.WriteError($"ConfigManager: error enviando config al Service: {ex.Message}", ex);
+                AlwaysPrintLogger.WriteTrayError($"ConfigManager: error enviando config al Service: {ex.Message}", ex);
                 return false;
             }
         }
@@ -374,7 +374,7 @@ namespace AlwaysPrintTray.Cloud
             }
             catch (Exception ex)
             {
-                AlwaysPrintLogger.WriteWarning($"ConfigManager: error calculando hash local: {ex.Message}");
+                AlwaysPrintLogger.WriteTrayWarning($"ConfigManager: error calculando hash local: {ex.Message}");
                 return null;
             }
         }
@@ -426,7 +426,7 @@ namespace AlwaysPrintTray.Cloud
             }
             catch (Exception ex)
             {
-                AlwaysPrintLogger.WriteWarning($"ConfigManager: error obteniendo info local: {ex.Message}");
+                AlwaysPrintLogger.WriteTrayWarning($"ConfigManager: error obteniendo info local: {ex.Message}");
                 return null;
             }
         }
@@ -444,7 +444,7 @@ namespace AlwaysPrintTray.Cloud
         {
             try
             {
-                AlwaysPrintLogger.WriteInfo("ConfigManager: descargando recursos de VLAN");
+                AlwaysPrintLogger.WriteTrayInfo("ConfigManager: descargando recursos de VLAN");
 
                 string url = $"{cloudApiUrl.TrimEnd('/')}/api/v1/workstations/{workstationId}/resources";
 
@@ -455,13 +455,13 @@ namespace AlwaysPrintTray.Cloud
 
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    AlwaysPrintLogger.WriteInfo("ConfigManager: endpoint /resources retornó 404 (workstation sin VLAN)");
+                    AlwaysPrintLogger.WriteTrayInfo("ConfigManager: endpoint /resources retornó 404 (workstation sin VLAN)");
                     return true;
                 }
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
                 {
-                    AlwaysPrintLogger.WriteWarning("ConfigManager: sin permisos para obtener recursos");
+                    AlwaysPrintLogger.WriteTrayWarning("ConfigManager: sin permisos para obtener recursos");
                     return false;
                 }
 
@@ -473,20 +473,20 @@ namespace AlwaysPrintTray.Cloud
                 bool saved = SendSaveResourcesToService(resourcesJson);
 
                 if (saved)
-                    AlwaysPrintLogger.WriteInfo("ConfigManager: recursos guardados exitosamente en resources.json");
+                    AlwaysPrintLogger.WriteTrayInfo("ConfigManager: recursos guardados exitosamente en resources.json");
                 else
-                    AlwaysPrintLogger.WriteWarning("ConfigManager: no se pudieron guardar los recursos");
+                    AlwaysPrintLogger.WriteTrayWarning("ConfigManager: no se pudieron guardar los recursos");
 
                 return saved;
             }
             catch (HttpRequestException ex)
             {
-                AlwaysPrintLogger.WriteWarning($"ConfigManager: error descargando recursos: {ex.Message}");
+                AlwaysPrintLogger.WriteTrayWarning($"ConfigManager: error descargando recursos: {ex.Message}");
                 return false;
             }
             catch (Exception ex)
             {
-                AlwaysPrintLogger.WriteError($"ConfigManager: error inesperado descargando recursos: {ex.Message}", ex);
+                AlwaysPrintLogger.WriteTrayError($"ConfigManager: error inesperado descargando recursos: {ex.Message}", ex);
                 return false;
             }
         }
@@ -500,7 +500,7 @@ namespace AlwaysPrintTray.Cloud
             {
                 if (!_pipeClient.IsConnected)
                 {
-                    AlwaysPrintLogger.WriteWarning("ConfigManager: pipe no conectado, no se pueden guardar recursos");
+                    AlwaysPrintLogger.WriteTrayWarning("ConfigManager: pipe no conectado, no se pueden guardar recursos");
                     return false;
                 }
 
@@ -519,7 +519,7 @@ namespace AlwaysPrintTray.Cloud
             }
             catch (Exception ex)
             {
-                AlwaysPrintLogger.WriteError($"ConfigManager: error enviando recursos al Service: {ex.Message}", ex);
+                AlwaysPrintLogger.WriteTrayError($"ConfigManager: error enviando recursos al Service: {ex.Message}", ex);
                 return false;
             }
         }
