@@ -2,9 +2,7 @@
 Endpoints para gestión de configuraciones de acciones administrativas.
 """
 
-import asyncio
 import logging
-import random
 import time
 import threading
 from typing import List
@@ -42,11 +40,9 @@ _CONFIG_INFO_TTL = 30.0  # segundos
 async def _notify_workstations_config_changed(db: Session, organization_id) -> int:
     """
     Envía mensaje 'action_config_changed' a todas las workstations online de una organización.
-    Las workstations al recibir este mensaje re-verifican su configuración de acciones.
+    Las workstations al recibir este mensaje re-verifican su configuración de acciones
+    con jitter aleatorio del lado cliente (1-10s) para evitar thundering herd.
     También invalida el caché de config_info para las workstations de la organización.
-    
-    Los mensajes se envían con un delay aleatorio entre 0-150ms entre cada uno
-    para evitar thundering herd (todas las WS re-verificando al mismo instante).
     """
     from app.services.websocket_manager import connection_manager
     from app.models.workstation import Workstation
@@ -62,25 +58,15 @@ async def _notify_workstations_config_changed(db: Session, organization_id) -> i
     message = {"type": "action_config_changed"}
     dispatched = 0
 
-    # Recopilar IDs de workstations online
-    online_ws_ids = [
-        str(ws.id) for ws in workstations
-        if connection_manager.is_workstation_online(str(ws.id))
-    ]
-
-    # Shuffle para distribuir aleatoriamente el orden de envío
-    random.shuffle(online_ws_ids)
-
-    for ws_id in online_ws_ids:
-        await connection_manager.send_to_workstation(ws_id, message)
-        dispatched += 1
-        # Delay de 50-150ms entre cada envío (distribuye ~66 WS en ~6-10 segundos)
-        if dispatched < len(online_ws_ids):
-            await asyncio.sleep(random.uniform(0.05, 0.15))
+    for ws in workstations:
+        ws_id = str(ws.id)
+        if connection_manager.is_workstation_online(ws_id):
+            await connection_manager.send_to_workstation(ws_id, message)
+            dispatched += 1
 
     if dispatched > 0:
         logger.info(
-            "ActionConfig changed: notificadas %d workstations de org %s (staggered)",
+            "ActionConfig changed: notificadas %d workstations de org %s",
             dispatched, organization_id
         )
 
