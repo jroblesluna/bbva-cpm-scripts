@@ -245,6 +245,7 @@ namespace AlwaysPrintTray
                         var cfgForCallback = cfg;
                         _cloudManager.Registered += () => OnCloudManagerRegistered(cfgForCallback);
                         _cloudManager.CheckUpdateRequested += OnCheckUpdateRequested;
+                        _cloudManager.ActionConfigUpdated += OnActionConfigUpdated;
                         _cloudManager.Start();
                         SubscribeOfflineStateManager(_cloudManager);
                         _cloudConnectedAt = DateTime.UtcNow;
@@ -331,6 +332,30 @@ namespace AlwaysPrintTray
                 AlwaysPrintLogger.WriteTrayError(
                     $"OnCheckUpdateRequested: error al verificar actualización: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Callback que se ejecuta cuando CloudManager descarga/actualiza la configuración de acciones.
+        /// Reconstruye el submenú OnDemand para reflejar los nuevos triggers disponibles.
+        /// </summary>
+        private void OnActionConfigUpdated()
+        {
+            AlwaysPrintLogger.WriteTrayInfo(
+                "OnActionConfigUpdated: configuración de acciones actualizada desde Cloud. Reconstruyendo submenú OnDemand.");
+
+            _uiContext.Post(_ =>
+            {
+                try
+                {
+                    RebuildOnDemandSubmenu();
+                }
+                catch (Exception ex)
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        $"OnActionConfigUpdated: error reconstruyendo submenú OnDemand. {ex.Message}",
+                        AlwaysPrintLogger.EvtGenericError);
+                }
+            }, null);
         }
 
         /// <summary>

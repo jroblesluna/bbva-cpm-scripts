@@ -55,6 +55,12 @@ namespace AlwaysPrintTray.Cloud
         public event Action? CheckUpdateRequested;
 
         /// <summary>
+        /// Se dispara cuando la configuración de acciones ha sido descargada/actualizada exitosamente.
+        /// El suscriptor (TrayApplicationContext) debe reconstruir el submenú OnDemand.
+        /// </summary>
+        public event Action? ActionConfigUpdated;
+
+        /// <summary>
         /// Expone el OfflineStateManager interno para que el StatusForm pueda consultar
         /// el estado de conectividad del WebSocket post-registro.
         /// </summary>
@@ -1803,6 +1809,9 @@ namespace AlwaysPrintTray.Cloud
                         AlwaysPrintLogger.WriteTrayInfo(
                             $"CloudManager: configuración de acciones actualizada. " +
                             $"Nombre: {localInfo.Name}, Hash: {localInfo.Hash}");
+
+                        // Notificar para reconstruir submenú OnDemand
+                        ActionConfigUpdated?.Invoke();
                     }
                     else
                     {

@@ -798,7 +798,21 @@ namespace AlwaysPrintTray.Forms
                 string filePath = PipeConstants.ActionConfigFilePath;
                 if (!System.IO.File.Exists(filePath)) return "Sin configuración";
                 var json = System.IO.File.ReadAllText(filePath);
-                var config = Newtonsoft.Json.JsonConvert.DeserializeObject<ActionConfiguration>(json);
+
+                // Si es envelope firmado, extraer config interno
+                string configJson = json;
+                try
+                {
+                    var parsed = Newtonsoft.Json.Linq.JObject.Parse(json);
+                    if (parsed["config"] != null && parsed["hash"] != null &&
+                        parsed["signature"] != null && parsed["cert_version"] != null)
+                    {
+                        configJson = parsed["config"]!.ToString(Newtonsoft.Json.Formatting.None);
+                    }
+                }
+                catch (Newtonsoft.Json.JsonException) { }
+
+                var config = Newtonsoft.Json.JsonConvert.DeserializeObject<ActionConfiguration>(configJson);
                 if (config == null) return "Sin configuración";
                 return StatusDisplayHelper.FormatConfigDisplay(
                     string.IsNullOrWhiteSpace(config.Name) ? "Desconocida" : config.Name,
