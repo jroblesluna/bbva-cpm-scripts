@@ -157,6 +157,47 @@ async def pin_version(
     action = "asignada" if version else "desasignada"
     logger.info("Versión %s para organización %s: %s", action, org.name, version or "latest")
 
+    # Push-based distribution: actualizar state map → Redis → push a workstations
+    if version:
+        try:
+            from app.services.push_services import get_state_map_service, get_push_distribution_service
+
+            state_map = get_state_map_service()
+            push_service = get_push_distribution_service()
+
+            update_info = S3UpdateService().get_broadcast_update_info(
+                target_version=version
+            )
+
+            if update_info:
+                await state_map.update_msi(
+                    org_id=str(organization_id),
+                    msi_version=update_info["version"],
+                    msi_url=update_info["download_url"],
+                )
+
+                enviados = await push_service.push_msi_update(
+                    org_id=str(organization_id),
+                    msi_version=update_info["version"],
+                    download_url=update_info["download_url"],
+                    file_size=update_info["file_size"],
+                )
+
+                logger.info(
+                    "push.msi_pin_version_admin: org_id=%s, version=%s, ws_notificadas=%d",
+                    organization_id, version, enviados,
+                )
+            else:
+                logger.warning(
+                    "push.msi_pin_version_sin_s3: org_id=%s, version=%s",
+                    organization_id, version,
+                )
+        except Exception as e:
+            logger.error(
+                "push.msi_pin_version_error: org_id=%s, version=%s, error=%s",
+                organization_id, version, str(e),
+            )
+
     return {"message": f"Versión {action} exitosamente", "target_version": org.target_version}
 
 

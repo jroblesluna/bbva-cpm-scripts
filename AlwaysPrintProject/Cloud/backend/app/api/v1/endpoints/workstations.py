@@ -1639,3 +1639,171 @@ def get_workstation_resources(
         vlan_metadata=vlan_metadata,
         contingency_printers=contingency_printers
     )
+
+
+# === ENDPOINT DE ESTADO DE DISTRIBUCIÓN (PUSH-BASED) ===
+
+
+class DistributionStateResponse(BaseModel):
+    """
+    Estado de distribución completo para una workstation.
+    Usado como fallback HTTP cuando la workstation no tiene estado cacheado
+    (primer inicio o reconexión pendiente).
+    """
+    config_hash: Optional[str] = Field(None, description="Hash SHA256 corto (8 chars) de la config activa")
+    config_s3_url: Optional[str] = Field(None, description="URL pública S3 del archivo .signed")
+    cert_version: int = Field(0, description="Versión del certificado ECDSA (0 = sin cert)")
+    cert_url: Optional[str] = Field(None, description="URL pública S3 del certificado .cer")
+    msi_version: Optional[str] = Field(None, description="Versión target del MSI")
+    msi_url: Optional[str] = Field(None, description="Presigned URL S3 del MSI")
+
+
+@router.get(
+    "/{workstation_id}/distribution-state",
+    response_model=DistributionStateResponse,
+    summary="Estado de distribución para verificación manual",
+    description=(
+        "Retorna el estado de distribución (config, cert, MSI) para una workstation. "
+        "Usado como fallback HTTP cuando el cliente no tiene estado cacheado del WebSocket."
+    ),
+    responses={
+        200: {"description": "Estado de distribución obtenido exitosamente"},
+        404: {"description": "Workstation no encontrada"},
+    }
+)
+async def get_distribution_state(
+    workstation_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene el estado de distribución completo para una workstation.
+
+    Flujo:
+    1. Consulta el StateMapService (zero queries a BD si ya está cargado).
+    2. Si el state map no tiene datos de la org, carga desde BD una sola vez.
+    3. Resuelve por scope (org > vlan > workstation) y retorna.
+
+    Este endpoint NO requiere autenticación (usa workstation_id como identificación).
+    Se usa como un solo request HTTP de fallback cuando la workstation no tiene
+    estado cacheado del registro enriquecido (primer inicio, reconexión pendiente).
+    """
+    # Buscar workstation en BD para obtener org_id y vlan_id
+    workstation = db.query(Workstation).filter(
+        Workstation.id == workstation_id
+    ).first()
+
+    if not workstation:
+        logger.warning(
+            f"[DISTRIBUTION_STATE] Workstation no encontrada: id={workstation_id}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workstation no encontrada"
+        )
+
+    org_id_str = str(workstation.organization_id)
+    vlan_id_str = str(workstation.vlan_id) if workstation.vlan_id else None
+
+    # Intentar resolver desde StateMapService (zero queries adicionales si ya cargado)
+    try:
+        from app.services.push_services import get_state_map_service
+        state_map = get_state_map_service()
+
+        if state_map is not None:
+            ws_state = await state_map.resolve_workstation_state(
+                org_id=org_id_str,
+                vlan_id=vlan_id_str,
+                ws_id=workstation_id
+            )
+
+            # Si no hay datos en el state map, cargar desde BD
+            if ws_state is None or not any([
+                ws_state.get("config_hash"),
+                ws_state.get("cert_version"),
+                ws_state.get("msi_version"),
+            ]):
+                await state_map._load_org_state(org_id=org_id_str)
+                ws_state = await state_map.resolve_workstation_state(
+                    org_id=org_id_str,
+                    vlan_id=vlan_id_str,
+                    ws_id=workstation_id
+                )
+
+            if ws_state is not None:
+                logger.info(
+                    f"[DISTRIBUTION_STATE] Estado resuelto desde StateMapService para ws={workstation_id}"
+                )
+                return DistributionStateResponse(
+                    config_hash=ws_state.get("config_hash"),
+                    config_s3_url=ws_state.get("config_s3_url"),
+                    cert_version=ws_state.get("cert_version", 0),
+                    cert_url=ws_state.get("cert_url"),
+                    msi_version=ws_state.get("msi_version"),
+                    msi_url=ws_state.get("msi_url"),
+                )
+    except Exception as e:
+        logger.warning(
+            f"[DISTRIBUTION_STATE] Error consultando StateMapService para ws={workstation_id}: {e}. "
+            "Fallback a consulta directa de BD."
+        )
+
+    # Fallback: consultar BD directamente si StateMapService no está disponible
+    from app.models.organization import Organization
+    from app.models.action_config import ActionConfig
+    from app.services.action_config import ActionConfigService
+
+    org = db.query(Organization).filter(
+        Organization.id == workstation.organization_id
+    ).first()
+
+    if not org:
+        logger.warning(
+            f"[DISTRIBUTION_STATE] Organización no encontrada para ws={workstation_id}"
+        )
+        return DistributionStateResponse()
+
+    # Resolver configuración efectiva (con herencia de scope)
+    config = ActionConfigService.resolve_effective_config(db, workstation.id)
+
+    config_hash = None
+    config_s3_url = None
+    if config and config.config_hash and config.storage_path:
+        config_hash = config.config_hash
+        from app.services.s3_config_service import S3ConfigService
+        config_s3_url = S3ConfigService().get_public_url(config.storage_path)
+
+    # Certificado
+    cert_version = org.ecdsa_cert_version or 0
+    cert_url = None
+    if cert_version > 0 and org.ecdsa_cert_s3_key:
+        from app.services.s3_config_service import S3ConfigService
+        cert_url = S3ConfigService().get_public_url(org.ecdsa_cert_s3_key)
+
+    # MSI
+    msi_version = org.target_version if hasattr(org, 'target_version') else None
+    msi_url = None
+    if msi_version and hasattr(org, 'auto_update_enabled') and org.auto_update_enabled:
+        try:
+            from app.services.s3_update_service import S3UpdateService
+            s3_service = S3UpdateService()
+            # Resolver clave S3 según target_version
+            s3_key = f"versions/{msi_version}/AlwaysPrint.msi"
+            msi_url = s3_service.generate_download_url(key=s3_key, expires_in=3600)
+        except Exception as e:
+            logger.warning(
+                f"[DISTRIBUTION_STATE] Error generando presigned URL de MSI: {e}"
+            )
+
+    logger.info(
+        f"[DISTRIBUTION_STATE] Estado resuelto desde BD para ws={workstation_id}. "
+        f"config_hash={config_hash}, cert_version={cert_version}, msi_version={msi_version}"
+    )
+
+    return DistributionStateResponse(
+        config_hash=config_hash,
+        config_s3_url=config_s3_url,
+        cert_version=cert_version,
+        cert_url=cert_url,
+        msi_version=msi_version,
+        msi_url=msi_url,
+    )

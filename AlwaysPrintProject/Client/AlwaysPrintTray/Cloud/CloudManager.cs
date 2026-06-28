@@ -49,9 +49,13 @@ namespace AlwaysPrintTray.Cloud
         public event Action? Registered;
 
         /// <summary>
-        /// Se dispara cuando se recibe un comando remoto "check_update" desde la Cloud.
-        /// El suscriptor (TrayApplicationContext) debe invocar UpdateChecker.CheckNowAsync().
+        /// [LEGACY FALLBACK] Se dispara cuando se recibe un comando remoto "check_update" sin download_url.
+        /// El suscriptor (TrayApplicationContext) invoca UpdateChecker.CheckNowAsync() para hacer
+        /// un único request HTTP al backend como fallback. En operación normal, las actualizaciones
+        /// de MSI llegan vía push message con presigned URL y se descargan directamente desde S3.
         /// </summary>
+        [Obsolete("Evento legacy para comandos check_update sin download_url. " +
+                   "En operación normal, MSI_Push_Message incluye download_url para descarga directa S3.")]
         public event Action? CheckUpdateRequested;
 
         /// <summary>
@@ -67,6 +71,32 @@ namespace AlwaysPrintTray.Cloud
         /// </summary>
         public OfflineStateManager? GetOfflineStateManager() => _offlineState;
 
+        /// <summary>
+        /// Retorna el último estado de distribución conocido (del registro enriquecido o push messages).
+        /// Delega al PushMessageHandler para verificación manual desde el Tray.
+        /// Puede ser null si no se ha recibido aún ningún estado del servidor.
+        /// </summary>
+        public DistributionState? GetCachedState() => _pushMessageHandler?.GetCachedState();
+
+        /// <summary>
+        /// Compara un estado de distribución contra el estado local y descarga desde S3
+        /// los recursos que difieran. Usado por la verificación manual desde el Tray.
+        /// Delega al PushMessageHandler para la lógica de comparación y descarga.
+        /// Retorna el número de componentes actualizados (0 = todo al día).
+        /// </summary>
+        /// <param name="state">Estado de distribución a comparar.</param>
+        public async Task<int> SyncFromCachedStateAsync(DistributionState state)
+        {
+            if (_pushMessageHandler == null)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    "CloudManager: SyncFromCachedStateAsync invocado pero PushMessageHandler no inicializado.");
+                return 0;
+            }
+
+            return await _pushMessageHandler.SyncFromStateAsync(state);
+        }
+
         private readonly AppConfiguration _config;
         private readonly CloudCredentialsManager _credentials;
         private readonly RegistryConfigManager _registry;
@@ -78,6 +108,7 @@ namespace AlwaysPrintTray.Cloud
         private CloudWebSocketClient? _wsClient;
         private ConfigurationSync? _configSync;
         private ConfigManager? _configManager;
+        private PushMessageHandler? _pushMessageHandler;
         private TelemetryReporter? _telemetryReporter;
         private ConnectivityMonitor? _connectivityMonitor;
         private OfflineStateManager? _offlineState;
@@ -135,6 +166,11 @@ namespace AlwaysPrintTray.Cloud
             // Inicializar ConfigManager para gestión de archivos de configuración de acciones
             _configManager = new ConfigManager(_wsClient.HttpClient, _pipe);
             AlwaysPrintLogger.WriteTrayInfo("CloudManager: ConfigManager inicializado.");
+
+            // Inicializar PushMessageHandler para procesar mensajes push de distribución
+            _pushMessageHandler = new PushMessageHandler(
+                _configManager, _updateDownloader, _pipe, _config.CloudApiUrl, _wsClient.HttpClient);
+            AlwaysPrintLogger.WriteTrayInfo("CloudManager: PushMessageHandler inicializado.");
 
             // Detectar condición sin configuración cacheada + offline al inicio
             var cachedConfig = _configSync.LoadFromCache();
@@ -266,11 +302,15 @@ namespace AlwaysPrintTray.Cloud
             SendRegistration();
             NotifyServiceCloudStatus(connected: true);
             
-            // Nota: CheckActionConfiguration() y el evento Registered se disparan
-            // en HandleRegistered() después de recibir confirmación del servidor.
-            // Si la workstation ya estaba registrada y el servidor no envía "registered"
-            // explícitamente, HandleRegistered no se ejecutará — pero eso es correcto:
-            // el UpdateChecker solo debe iniciar cuando el servidor confirma el registro.
+            // Nota: El evento Registered se dispara en HandleRegistered() después de
+            // recibir confirmación del servidor. La distribución de configs, certificados
+            // y MSI es ahora 100% push-based:
+            // - ProcessRegistrationState() recibe el estado enriquecido completo
+            // - PushMessageHandler gestiona las descargas directas desde S3
+            // - UpdateChecker polling periódico DESHABILITADO (MSI llega vía push)
+            // - HandleCertRotated ya no descarga (delegado a PushMessageHandler)
+            // Ya no se hace polling HTTP a /config/info, /config/download,
+            // /updates/check (periódico) ni descarga directa de certificados.
         }
 
         private void OnDisconnected()
@@ -314,9 +354,17 @@ namespace AlwaysPrintTray.Cloud
                     break;
                 case "cert_rotated":
                     HandleCertRotated(json);
+                    // Enrutar al PushMessageHandler para actualizar estado cacheado
+                    RouteToPushHandler("cert_rotated", json);
                     break;
                 case "action_config_changed":
                     HandleActionConfigChanged(json);
+                    // Enrutar al PushMessageHandler para actualizar estado cacheado y descarga directa S3
+                    RouteToPushHandler("action_config_changed", json);
+                    break;
+                case "check_update":
+                    // Mensaje push directo de actualización de MSI — enrutar al PushMessageHandler
+                    RouteToPushHandler("check_update", json);
                     break;
                 default:
                     AlwaysPrintLogger.WriteTrayInfo(
@@ -372,10 +420,20 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
-        /// Maneja el mensaje WebSocket de rotación de certificado.
-        /// Descarga el nuevo .cer desde S3 y actualiza la versión local en registro.
+        /// [DEPRECADO] Anteriormente descargaba el certificado directamente al recibir cert_rotated.
+        /// 
+        /// Con push-based distribution, la descarga de certificados se gestiona
+        /// exclusivamente por PushMessageHandler.HandleCertPush() que incluye:
+        /// - Comparación de cert_version vs local
+        /// - Retry con backoff exponencial [1s, 2s, 4s]
+        /// - Actualización del estado cacheado (DistributionState)
+        /// 
+        /// El routing al PushMessageHandler se realiza en OnMessageReceived vía RouteToPushHandler.
+        /// Este método se mantiene solo para loguear la recepción del mensaje con fines de diagnóstico.
         /// </summary>
-        private async void HandleCertRotated(string json)
+        [Obsolete("La descarga de certificados se gestiona por PushMessageHandler.HandleCertPush() con retry. " +
+                   "Este handler solo loguea. Será eliminado cuando se complete la migración.")]
+        private void HandleCertRotated(string json)
         {
             try
             {
@@ -383,43 +441,14 @@ namespace AlwaysPrintTray.Cloud
                 string? certUrl = data["cert_url"]?.ToString();
                 int? certVersion = data["cert_version"]?.ToObject<int?>();
 
-                if (string.IsNullOrEmpty(certUrl) || !certVersion.HasValue)
-                {
-                    AlwaysPrintLogger.WriteWarning(
-                        "CloudManager: mensaje cert_rotated inválido — faltan campos cert_url o cert_version.",
-                        AlwaysPrintLogger.EvtGenericWarning);
-                    return;
-                }
-
                 AlwaysPrintLogger.WriteTrayInfo(
-                    $"CloudManager: rotación de certificado recibida. Nueva versión: {certVersion.Value}, URL: {certUrl}");
-
-                string certPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                    "AlwaysPrint", "config", "org.cer");
-
-                bool downloaded = await SignatureVerifier.DownloadCertAsync(certUrl, certPath, traySource: true);
-
-                if (downloaded)
-                {
-                    // No escribir CertVersion en registro desde el Tray (requiere HKLM/admin).
-                    // El Service lo actualizará al cargar y verificar la configuración firmada.
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        $"CloudManager: certificado ECDSA rotado exitosamente a versión {certVersion.Value}");
-                }
-                else
-                {
-                    AlwaysPrintLogger.WriteError(
-                        $"CloudManager: error descargando nuevo certificado desde {certUrl}. " +
-                        "La verificación de firma puede fallar hasta la próxima actualización.",
-                        AlwaysPrintLogger.EvtGenericError);
-                }
+                    $"CloudManager: cert_rotated recibido (versión={certVersion?.ToString() ?? "?"}, url={(certUrl != null ? "presente" : "null")}). " +
+                    "Descarga delegada a PushMessageHandler con retry S3.");
             }
             catch (Exception ex)
             {
-                AlwaysPrintLogger.WriteError(
-                    $"CloudManager: error procesando cert_rotated: {ex.Message}", ex,
-                    AlwaysPrintLogger.EvtGenericError);
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"CloudManager: error parseando mensaje cert_rotated para diagnóstico: {ex.Message}");
             }
         }
 
@@ -754,12 +783,19 @@ namespace AlwaysPrintTray.Cloud
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"CloudManager: WorkstationId registrado = {workstationId}");
                     
-                    // Verificar configuración de acciones ahora que tenemos WorkstationId
-                    CheckActionConfiguration();
+                    // NOTA: La verificación de configuración de acciones ahora se gestiona
+                    // vía Registration_Enrichment (ProcessRegistrationState) que recibe el estado
+                    // completo desde el In_Memory_State_Map del servidor. Ya no se hace polling
+                    // HTTP a /workstations/{id}/config/info ni /config/download.
+                    // Si el estado incluye config_hash + config_s3_url, PushMessageHandler
+                    // descarga directamente desde S3.
 
                     // Descargar recursos de VLAN (metadata, impresoras de contingencia)
                     DownloadResources();
                 }
+
+                // Procesar estado de distribución enriquecido (Registration_Enrichment)
+                ProcessRegistrationState(obj);
 
                 _credentials.SaveLastConnected(DateTime.UtcNow);
 
@@ -789,6 +825,82 @@ namespace AlwaysPrintTray.Cloud
             {
                 AlwaysPrintLogger.WriteTrayError(
                     $"CloudManager: error procesando respuesta de registro. {ex.Message}");
+            }
+        }
+
+        // === Registration Enrichment y routing de push messages ===
+
+        /// <summary>
+        /// Procesa el campo "state" del mensaje "registered" (Registration_Enrichment).
+        /// Si el servidor incluye datos de distribución, crea un DistributionState
+        /// y lo pasa al PushMessageHandler para que mantenga el caché actualizado.
+        /// </summary>
+        /// <param name="registeredObj">JObject del mensaje "registered" completo.</param>
+        private void ProcessRegistrationState(JObject registeredObj)
+        {
+            try
+            {
+                var stateObj = registeredObj["state"] as JObject;
+                if (stateObj == null)
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "CloudManager: mensaje registered sin campo 'state'. " +
+                        "El servidor no incluyó estado de distribución enriquecido.");
+                    return;
+                }
+
+                // Construir DistributionState desde el JSON del registro enriquecido
+                var distributionState = new DistributionState
+                {
+                    ConfigHash = stateObj["config_hash"]?.ToString(),
+                    ConfigS3Url = stateObj["config_s3_url"]?.ToString(),
+                    CertVersion = stateObj["cert_version"]?.ToObject<int>() ?? 0,
+                    CertUrl = stateObj["cert_url"]?.ToString(),
+                    MsiVersion = stateObj["msi_version"]?.ToString(),
+                    MsiUrl = stateObj["msi_url"]?.ToString(),
+                    LastUpdated = DateTime.UtcNow
+                };
+
+                // Pasar al PushMessageHandler para cacheo y posible sincronización
+                _pushMessageHandler?.UpdateState(distributionState);
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: estado de distribución recibido en registro enriquecido. " +
+                    $"ConfigHash={distributionState.ConfigHash ?? "null"}, " +
+                    $"CertVersion={distributionState.CertVersion}, " +
+                    $"MsiVersion={distributionState.MsiVersion ?? "null"}");
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"CloudManager: error procesando estado de distribución del registro enriquecido. {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Enruta un mensaje push recibido vía WebSocket al PushMessageHandler.
+        /// Fire-and-forget: no bloquea el hilo de procesamiento de mensajes WebSocket.
+        /// </summary>
+        /// <param name="messageType">Tipo del mensaje (action_config_changed, check_update, cert_rotated).</param>
+        /// <param name="json">JSON completo del mensaje.</param>
+        private async void RouteToPushHandler(string messageType, string json)
+        {
+            try
+            {
+                if (_pushMessageHandler == null)
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"CloudManager: PushMessageHandler no inicializado. " +
+                        $"No se puede procesar mensaje push tipo='{messageType}'.");
+                    return;
+                }
+
+                await _pushMessageHandler.HandlePushMessage(messageType, json);
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error enrutando mensaje push tipo='{messageType}' al PushMessageHandler. {ex.Message}");
             }
         }
 
@@ -1251,8 +1363,10 @@ namespace AlwaysPrintTray.Cloud
 
         /// <summary>
         /// Ejecuta el comando check_update: soporta dos flujos:
-        /// 1. Zero-query: si params contiene download_url válida, descarga directa desde S3
-        /// 2. Legacy: si download_url ausente/vacío, dispara CheckUpdateRequested para flujo HTTP
+        /// 1. Push-based (normal): si params contiene download_url válida, descarga directa desde S3
+        /// 2. Legacy fallback: si download_url ausente/vacío, dispara CheckUpdateRequested 
+        ///    para que UpdateChecker.CheckNowAsync() haga un solo request HTTP al backend
+        ///    (NO activa polling periódico, solo una verificación puntual).
         /// </summary>
         /// <param name="commandId">ID del comando para reportar resultado.</param>
         /// <param name="paramsObj">Params del comando WebSocket (puede contener download_url, version, file_size).</param>
@@ -1773,10 +1887,15 @@ namespace AlwaysPrintTray.Cloud
         // === Gestión de Configuración de Acciones ===
 
         /// <summary>
-        /// Maneja la notificación del servidor de que la configuración de acciones cambió.
-        /// Compara el hash remoto con el local para evitar descargas innecesarias.
-        /// Si el hash difiere (o no viene), re-verifica con jitter aleatorio para evitar thundering herd.
+        /// [DEPRECADO] Manejaba la notificación del servidor de que la configuración cambió
+        /// descargando vía HTTP. Ahora la descarga directa desde S3 la gestiona el
+        /// PushMessageHandler a través de RouteToPushHandler.
+        /// 
+        /// Se mantiene solo para actualizar el estado del UI (submenú OnDemand) cuando
+        /// PushMessageHandler aplica exitosamente una config.
         /// </summary>
+        [Obsolete("La descarga se gestiona vía PushMessageHandler.HandlePushMessage. " +
+                   "Este método solo actualiza UI como efecto secundario.")]
         private async void HandleActionConfigChanged(string json)
         {
             try
@@ -1790,7 +1909,7 @@ namespace AlwaysPrintTray.Cloud
                 }
                 catch { }
 
-                // Si el hash remoto coincide con el local, no hay cambio real → evitar descarga HTTP
+                // Si el hash remoto coincide con el local, no hay cambio real → no hacer nada
                 if (!string.IsNullOrEmpty(remoteHash))
                 {
                     var localInfo = _configManager?.GetLocalConfigInfo();
@@ -1798,19 +1917,26 @@ namespace AlwaysPrintTray.Cloud
                     {
                         AlwaysPrintLogger.WriteTrayInfo(
                             $"CloudManager: action_config_changed recibido pero hash local ({localInfo.Hash}) " +
-                            $"coincide con remoto ({remoteHash}). Sin cambios, descarga evitada.");
+                            $"coincide con remoto ({remoteHash}). Sin cambios.");
                         return;
                     }
                 }
 
-                // Jitter aleatorio de 1-10 segundos para distribuir descargas
-                int jitterMs = new Random().Next(1000, 10000);
+                // NOTA: La descarga se gestiona vía PushMessageHandler (RouteToPushHandler)
+                // que descarga directamente desde S3. NO hacemos polling HTTP al backend.
                 AlwaysPrintLogger.WriteTrayInfo(
-                    $"CloudManager: notificación action_config_changed recibida (hash={remoteHash ?? "?"}). " +
-                    $"Re-verificando configuración en {jitterMs}ms...");
+                    $"CloudManager: action_config_changed recibido (hash={remoteHash ?? "?"}). " +
+                    "Descarga delegada a PushMessageHandler vía S3 directo.");
 
-                await Task.Delay(jitterMs);
-                await CheckActionConfigurationAsync();
+                // Esperar un momento para que PushMessageHandler complete la descarga
+                // y luego actualizar UI con la info local
+                await Task.Delay(3000);
+
+                var updatedInfo = _configManager?.GetLocalConfigInfo();
+                if (updatedInfo != null)
+                {
+                    ActionConfigUpdated?.Invoke(updatedInfo.Name, updatedInfo.Hash);
+                }
             }
             catch (Exception ex)
             {
@@ -1820,19 +1946,26 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
-        /// Verifica y descarga la configuración de acciones desde la Cloud si es necesaria.
-        /// Se ejecuta automáticamente al conectarse a la Cloud.
+        /// [DEPRECADO] Wrapper síncrono para CheckActionConfigurationAsync.
+        /// Ya no se invoca automáticamente al conectarse — la distribución es push-based.
+        /// Se mantiene para compatibilidad durante la transición.
         /// </summary>
+        [Obsolete("La distribución de configs es push-based. Usar GetCachedState() para verificación manual.")]
         private async void CheckActionConfiguration()
         {
             await CheckActionConfigurationAsync();
         }
 
         /// <summary>
-        /// Verifica y descarga la configuración de acciones desde la Cloud.
-        /// Método público para permitir invocación manual desde "Buscar Actualizaciones".
-        /// Retorna true si la configuración se actualizó o ya está al día.
+        /// [DEPRECADO] Verifica y descarga la configuración de acciones desde la Cloud vía HTTP.
+        /// Anteriormente era el flujo principal. Ahora la distribución es push-based:
+        /// - Push messages → PushMessageHandler → descarga directa desde S3
+        /// - Registration_Enrichment → ProcessRegistrationState → PushMessageHandler
+        /// 
+        /// Se mantiene como fallback para "Buscar Actualizaciones" durante el período de transición.
+        /// Task 7.3 implementará la verificación manual usando GetCachedState() como fuente primaria.
         /// </summary>
+        [Obsolete("Será reemplazado por verificación manual basada en GetCachedState() (Task 7.3).")]
         public async Task<bool> CheckActionConfigurationAsync()
         {
             try

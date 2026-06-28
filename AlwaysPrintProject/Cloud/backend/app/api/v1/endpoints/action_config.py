@@ -26,6 +26,8 @@ from app.schemas.action_config import (
 )
 from app.services.action_config import ActionConfigService, DuplicateConfigError
 from app.services.crypto_service import CryptoService
+from app.services.push_services import get_state_map_service, get_push_distribution_service
+from app.services.s3_config_service import S3ConfigService
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +96,75 @@ async def _send_config_changed_notifications(ws_ids: list[str], config_hash: str
         "ActionConfig changed: %d/%d notificaciones enviadas (background, hash=%s)",
         sent, len(ws_ids), config_hash or "vacío"
     )
+
+
+async def _push_config_activation(
+    org_id: str,
+    config_hash: str,
+    storage_path: str | None,
+    scope: str,
+    scope_id: str | None,
+) -> None:
+    """
+    Integración push-based: actualizar state map → publicar Redis → push a workstations.
+
+    Se invoca DESPUÉS del commit a BD exitoso para garantizar persistencia.
+    Si falla algún paso (Redis no disponible, etc.), se loguea warning y
+    no bloquea el flujo del endpoint — eventual consistency vía re-registro WS.
+
+    Args:
+        org_id: UUID de la organización como string.
+        config_hash: Hash SHA256 corto (8 chars) de la config activada.
+        storage_path: Clave S3 del archivo .signed (ej: "configs/org_id/hash.signed").
+        scope: Scope del cambio ("org", "vlan", "workstation").
+        scope_id: ID del scope (vlan_id o workstation_id). None para scope "org".
+    """
+    try:
+        state_map = get_state_map_service()
+        push_service = get_push_distribution_service()
+
+        # Construir URL pública S3 a partir del storage_path
+        config_s3_url = None
+        if storage_path:
+            s3_service = S3ConfigService()
+            config_s3_url = s3_service.get_public_url(storage_path)
+
+        if not config_s3_url:
+            logger.warning(
+                "push.config_sin_s3_url: org_id=%s, config_hash=%s, storage_path=%s",
+                org_id, config_hash, storage_path,
+            )
+            return
+
+        # 1. Actualizar state map local (publica automáticamente a Redis vía update_config)
+        await state_map.update_config(
+            org_id=org_id,
+            config_hash=config_hash,
+            config_s3_url=config_s3_url,
+            scope=scope,
+            scope_id=scope_id,
+        )
+
+        # 2. Push a workstations online
+        enviados = await push_service.push_config_change(
+            org_id=org_id,
+            config_hash=config_hash,
+            download_url=config_s3_url,
+            scope=scope,
+            scope_id=scope_id,
+        )
+
+        logger.info(
+            "push.config_activacion_completa: org_id=%s, scope=%s, scope_id=%s, "
+            "config_hash=%s, ws_notificadas=%d",
+            org_id, scope, scope_id, config_hash, enviados,
+        )
+    except Exception as e:
+        # No bloquear el endpoint — el push es best-effort
+        logger.error(
+            "push.config_activacion_error: org_id=%s, config_hash=%s, error=%s",
+            org_id, config_hash, str(e),
+        )
 
 
 # Caché en memoria de configs firmadas por worker.
@@ -232,6 +303,15 @@ async def upload_action_config(
         # Si se creó activa, notificar a las workstations para que re-descarguen
         if config.is_active:
             await _notify_workstations_config_changed(db, organization_id, config.config_hash)
+            
+            # Push-based distribution: actualizar state map → Redis → push a workstations
+            await _push_config_activation(
+                org_id=str(organization_id),
+                config_hash=config.config_hash,
+                storage_path=config.storage_path,
+                scope=scope,
+                scope_id=str(vlan_id) if vlan_id else (str(workstation_id) if workstation_id else None),
+            )
         
         return config
     except DuplicateConfigError as e:
@@ -395,6 +475,27 @@ async def update_action_config(
     # Si se activó una config, notificar a las workstations de la org para que re-descarguen
     if data.is_active and updated_config.is_active:
         await _notify_workstations_config_changed(db, organization_id, updated_config.config_hash)
+        
+        # Push-based distribution: actualizar state map → Redis → push a workstations
+        # Determinar scope_id del config activado
+        scope_id = None
+        if updated_config.scope and updated_config.scope != "org":
+            if updated_config.scope == "vlan" and hasattr(updated_config, 'vlan_id'):
+                scope_id = str(updated_config.vlan_id) if updated_config.vlan_id else None
+            elif updated_config.scope == "workstation" and hasattr(updated_config, 'workstation_id'):
+                scope_id = str(updated_config.workstation_id) if updated_config.workstation_id else None
+        
+        config_scope = updated_config.scope if isinstance(updated_config.scope, str) else (
+            updated_config.scope.value if hasattr(updated_config.scope, 'value') else "org"
+        )
+        
+        await _push_config_activation(
+            org_id=str(organization_id),
+            config_hash=updated_config.config_hash,
+            storage_path=updated_config.storage_path,
+            scope=config_scope,
+            scope_id=scope_id,
+        )
     
     return updated_config
 

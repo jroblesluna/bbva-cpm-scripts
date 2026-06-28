@@ -14,6 +14,7 @@ from app.services.websocket_manager import connection_manager
 from app.services.status_scheduler import status_scheduler
 from app.services.scalability_metrics import scalability_collector
 from app.services.status_batch_writer import status_batch_writer
+from app.services.push_services import get_state_map_service
 from app.api.v1.router import api_router
 from app.api.v1.websocket import workstation, operator
 from app.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
@@ -41,6 +42,10 @@ async def lifespan(app: FastAPI):
     if hasattr(connection_manager, 'initialize'):
         await connection_manager.initialize()
 
+    # Startup: Inicializar StateMapService (carga estado desde BD + suscripción Redis)
+    state_map = get_state_map_service()
+    await state_map.initialize(SessionLocal)
+
     # Startup: Iniciar ping loop
     ping_task = asyncio.create_task(
         connection_manager.start_ping_loop(SessionLocal)
@@ -54,6 +59,9 @@ async def lifespan(app: FastAPI):
     
     yield
     
+    # Shutdown: Detener StateMapService (listener Redis + conexión)
+    await state_map.shutdown()
+
     # Shutdown: Detener batch writer de status_update
     status_batch_writer.stop()
 
