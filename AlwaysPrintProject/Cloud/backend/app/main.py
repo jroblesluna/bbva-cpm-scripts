@@ -13,6 +13,7 @@ from app.core.database import SessionLocal
 from app.services.websocket_manager import connection_manager
 from app.services.status_scheduler import status_scheduler
 from app.services.scalability_metrics import scalability_collector
+from app.services.status_batch_writer import status_batch_writer
 from app.api.v1.router import api_router
 from app.api.v1.websocket import workstation, operator
 from app.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
@@ -47,9 +48,15 @@ async def lifespan(app: FastAPI):
 
     # Startup: Iniciar scheduler de recolección de métricas
     status_scheduler.start()
+
+    # Startup: Iniciar batch writer de status_update (flush cada 5s)
+    status_batch_writer.start()
     
     yield
     
+    # Shutdown: Detener batch writer de status_update
+    status_batch_writer.stop()
+
     # Shutdown: Detener scheduler de recolección de métricas
     status_scheduler.stop()
 

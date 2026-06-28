@@ -377,55 +377,44 @@ async def workstation_websocket(
                 action_config_hash = data.get("action_config_hash")
                 action_config_version = data.get("action_config_version")
                 
-                # Solo crear sesión de BD si hay datos que persistir
-                needs_db = (
-                    contingency_active is not None
-                    or current_user is not None
-                    or "action_config_name" in data
-                    or "action_config_hash" in data
-                    or "action_config_version" in data
-                )
-                
-                if needs_db:
+                # Contingencia requiere persistencia inmediata + auditoría (evento raro)
+                if contingency_active is not None:
                     db = SessionLocal()
                     try:
-                        if contingency_active is not None:
-                            workstation_service.update_contingency_status(
-                                db=db,
-                                workstation_id=workstation_id,
-                                contingency_active=contingency_active,
-                                contingency_ip=contingency_printer_ip
-                            )
-                            # Registrar en auditoría
-                            audit_service.log_contingency_toggle(
-                                db=db,
-                                workstation_id=workstation_id,
-                                organization_id=str(workstation.organization_id),
-                                user_id=None,  # Cambio automático
-                                activated=contingency_active,
-                                ip_address=client_host
-                            )
-                        
-                        if current_user is not None:
-                            workstation_service.update_workstation_status(
-                                db=db,
-                                workstation_id=workstation_id,
-                                is_online=True,
-                                current_user=current_user
-                            )
-                        
-                        if "action_config_name" in data or "action_config_hash" in data or "action_config_version" in data:
-                            ws_record = db.query(Workstation).filter(
-                                Workstation.id == workstation_id
-                            ).first()
-                            if ws_record:
-                                ws_record.action_config_name = action_config_name
-                                ws_record.action_config_hash = action_config_hash
-                                ws_record.action_config_version = action_config_version
-                                db.commit()
+                        workstation_service.update_contingency_status(
+                            db=db,
+                            workstation_id=workstation_id,
+                            contingency_active=contingency_active,
+                            contingency_ip=contingency_printer_ip
+                        )
+                        # Registrar en auditoría
+                        audit_service.log_contingency_toggle(
+                            db=db,
+                            workstation_id=workstation_id,
+                            organization_id=str(workstation.organization_id),
+                            user_id=None,  # Cambio automático
+                            activated=contingency_active,
+                            ip_address=client_host
+                        )
                     finally:
                         db.close()
                         db = None
+                
+                # Campos de alta frecuencia (current_user, action_config_*):
+                # Encolar para batch write cada 5s en vez de 1 SessionLocal() por mensaje.
+                # Esto reduce ~300 conexiones simultaneas a 1 sola cada 5s.
+                if (current_user is not None
+                    or "action_config_name" in data
+                    or "action_config_hash" in data
+                    or "action_config_version" in data):
+                    from app.services.status_batch_writer import status_batch_writer
+                    status_batch_writer.enqueue_update(
+                        workstation_id=workstation_id,
+                        current_user=current_user,
+                        action_config_name=action_config_name if "action_config_name" in data else None,
+                        action_config_hash=action_config_hash if "action_config_hash" in data else None,
+                        action_config_version=action_config_version if "action_config_version" in data else None,
+                    )
                 
                 # Broadcast siempre (sin BD retenida)
                 status_broadcast_msg = {
