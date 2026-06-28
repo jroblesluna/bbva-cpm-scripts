@@ -22,6 +22,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\AlwaysPrint.Shared\AlwaysPrint.Shared.csproj" />
+    <ProjectReference Include="..\AlwaysPrintService\AlwaysPrintService.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- Referencias de ensamblado de .NET Framework 4.8 no incluidas por defecto en SDK-style -->

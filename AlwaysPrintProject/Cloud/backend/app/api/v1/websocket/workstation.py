@@ -438,6 +438,20 @@ async def workstation_websocket(
                 )
                 continue
             
+            # Mensajes de debugging: actualizan estado de sesión y notifican operadores.
+            # Usan BD on-demand (creación de sesión temporal) para actualizar status.
+            if message_type in (
+                "debugging_started", "debugging_ready",
+                "debugging_deleted", "debugging_error"
+            ):
+                await _handle_debugging_message(
+                    message_type=message_type,
+                    data=data,
+                    workstation_id=workstation_id,
+                    organization_id=str(workstation.organization_id),
+                )
+                continue
+            
             if message_type == "status_update":
                 # La workstation fue validada al conectar (handshake).
                 # No re-verificar existencia en cada status_update — causaba pool exhaustion
@@ -848,3 +862,113 @@ async def _handle_connectivity_result(
             str(e)
         )
         return None
+
+
+async def _handle_debugging_message(
+    message_type: str,
+    data: dict,
+    workstation_id: str,
+    organization_id: str,
+) -> None:
+    """
+    Procesa mensajes de debugging enviados por el cliente Windows.
+
+    Mensajes soportados:
+    - debugging_started: El cliente confirmó inicio de captura
+    - debugging_ready: El cliente terminó la captura y tiene datos listos
+    - debugging_deleted: El cliente eliminó los datos de debugging
+    - debugging_error: Error durante la captura en el cliente
+
+    Actualiza el estado de la sesión en BD y notifica a operadores vía broadcast.
+    Usa SessionLocal on-demand para no retener conexiones del pool.
+    """
+    from app.models.debugging import DebuggingSession, DebuggingSessionStatus
+
+    debugging_id = data.get("debugging_id")
+    if not debugging_id:
+        logger.warning(
+            "[WS_DEBUGGING] Mensaje %s sin debugging_id desde ws=%s",
+            message_type, workstation_id,
+        )
+        return
+
+    # Crear sesión de BD temporal para actualizar estado
+    temp_db = SessionLocal()
+    try:
+        session = temp_db.query(DebuggingSession).filter(
+            DebuggingSession.id == debugging_id,
+            DebuggingSession.workstation_id == workstation_id,
+        ).first()
+
+        if not session:
+            logger.warning(
+                "[WS_DEBUGGING] Sesión no encontrada: debugging_id=%s, ws=%s",
+                debugging_id, workstation_id,
+            )
+            return
+
+        # Actualizar estado según tipo de mensaje
+        if message_type == "debugging_started":
+            # Cliente confirmó que la captura inició
+            logger.info(
+                "[WS_DEBUGGING] Captura iniciada: debugging_id=%s, ws=%s",
+                debugging_id, workstation_id,
+            )
+            # Estado ya es 'active', no necesita cambio
+
+        elif message_type == "debugging_ready":
+            # Cliente terminó captura, datos disponibles para recolección
+            total_size = data.get("total_size_bytes", 0)
+            session.status = DebuggingSessionStatus.READY.value
+            session.end_time = datetime.utcnow()
+            session.total_data_size_bytes = total_size
+            temp_db.commit()
+            logger.info(
+                "[WS_DEBUGGING] Datos listos: debugging_id=%s, ws=%s, size=%d bytes",
+                debugging_id, workstation_id, total_size,
+            )
+
+        elif message_type == "debugging_deleted":
+            # Cliente eliminó los datos
+            session.status = DebuggingSessionStatus.DELETED.value
+            temp_db.commit()
+            logger.info(
+                "[WS_DEBUGGING] Datos eliminados: debugging_id=%s, ws=%s",
+                debugging_id, workstation_id,
+            )
+
+        elif message_type == "debugging_error":
+            # Error durante la captura
+            error_message = data.get("error_message", "Error desconocido")
+            session.status = DebuggingSessionStatus.FAILED.value
+            session.end_time = datetime.utcnow()
+            temp_db.commit()
+            logger.error(
+                "[WS_DEBUGGING] Error en captura: debugging_id=%s, ws=%s, error=%s",
+                debugging_id, workstation_id, error_message,
+            )
+
+        # Broadcast a operadores (para que el frontend actualice en tiempo real)
+        broadcast_msg = {
+            "type": "debugging_status_change",
+            "workstation_id": workstation_id,
+            "debugging_id": debugging_id,
+            "status": session.status,
+            "total_data_size_bytes": session.total_data_size_bytes,
+        }
+        if message_type == "debugging_error":
+            broadcast_msg["error_message"] = data.get("error_message")
+
+        await connection_manager.broadcast_to_organization(
+            organization_id=organization_id,
+            message=broadcast_msg,
+            db=None,
+        )
+
+    except Exception as e:
+        logger.error(
+            "[WS_DEBUGGING] Error procesando %s: debugging_id=%s, ws=%s, error=%s",
+            message_type, debugging_id, workstation_id, e,
+        )
+    finally:
+        temp_db.close()

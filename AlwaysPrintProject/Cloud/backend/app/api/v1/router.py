@@ -24,6 +24,7 @@ from app.api.v1.endpoints import (
     devices,
     documents,
     log_analysis,
+    debugging,
     system_status,
     system_metrics,
     health,
@@ -161,6 +162,13 @@ api_router.include_router(
     documents.router,
     prefix="/documents",
     tags=["Documentos"]
+)
+
+# Capturas de debugging a nivel de organización
+api_router.include_router(
+    debugging.router,
+    prefix="/debugging",
+    tags=["Debugging"]
 )
 
 # Monitoreo de estado del sistema (solo Admin)
