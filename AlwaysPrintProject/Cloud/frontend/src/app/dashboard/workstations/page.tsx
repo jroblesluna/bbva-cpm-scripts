@@ -58,6 +58,7 @@ import { ActionConfigSection } from '@/components/config/ActionConfigSection';
 import { LogAnalysisHistory } from '@/components/workstations/LogAnalysisHistory';
 import { LogAnalysisButton } from '@/components/workstations/LogAnalysisButton';
 import { OnDemandActionsSection } from '@/components/workstations/OnDemandActionsSection';
+import { WorkstationDebuggingSection } from '@/components/debugging/WorkstationDebuggingSection';
 
 type ViewMode = 'cards' | 'table';
 type SortField = 'ip_private' | 'hostname' | 'current_user' | 'organization' | 'tray_version' | 'action_config' | 'last_connection' | 'is_online';
@@ -2265,6 +2266,12 @@ function WorkstationDetailModal({
 
           {/* Sección de acciones OnDemand */}
           <OnDemandActionsSection
+            workstationId={workstation.id}
+            isOnline={workstation.is_online}
+          />
+
+          {/* Sección de Debugging */}
+          <WorkstationDebuggingSection
             workstationId={workstation.id}
             isOnline={workstation.is_online}
           />

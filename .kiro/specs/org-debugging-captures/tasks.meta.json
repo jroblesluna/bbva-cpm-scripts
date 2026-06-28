@@ -1,0 +1,593 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Crear modelo `DebuggingProfile` en `app/models/debugging.py` con todos los campos (id, organization_id, name, description, confirmation_message, external_logs, eventlog_groups, registry_keys, monitored_services, is_active, created_by, timestamps)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275572
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683282273
+      }
+    ],
+    "2. Crear modelo `DebuggingSession` en `app/models/debugging.py` con campos (id, organization_id, profile_id, workstation_id, status enum, duration_seconds, start_time, end_time, motivo, additional_instructions, total_data_size_bytes, s3_report_key, initiated_by, created_at)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275606
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683283420
+      }
+    ],
+    "3. Crear migración Alembic para tablas `debugging_profiles` y `debugging_sessions`": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275630
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683284218
+      }
+    ],
+    "4. Registrar modelos en `app/models/__init__.py` y verificar import desde `app.core.database`": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275661
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683285049
+      }
+    ],
+    "5. Crear schemas Pydantic en `app/schemas/debugging.py`: DebuggingProfileCreate, DebuggingProfileUpdate, DebuggingProfileResponse, DebuggingSessionCreate, DebuggingSessionResponse": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275683
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683286060
+      }
+    ],
+    "6. Implementar validadores: eventlog_groups solo permite System/Application/Security, al menos un target de monitoreo requerido, duration_seconds entre 15-300": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275700
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683289727
+      }
+    ],
+    "7. Crear endpoint `POST /api/v1/debugging/profiles` — Crear perfil (con invocación LLM para sugerencia de nombre/mensaje)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275716
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683290508
+      }
+    ],
+    "8. Crear endpoint `GET /api/v1/debugging/profiles` — Listar perfiles de la organización (filtro tenant isolation)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275733
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683291329
+      }
+    ],
+    "9. Crear endpoint `GET /api/v1/debugging/profiles/{id}` — Detalle de perfil": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275761
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683292142
+      }
+    ],
+    "10. Crear endpoint `PUT /api/v1/debugging/profiles/{id}` — Editar perfil": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275782
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683292962
+      }
+    ],
+    "11. Crear endpoint `DELETE /api/v1/debugging/profiles/{id}` — Desactivar perfil (soft delete)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275799
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683296613
+      }
+    ],
+    "12. Implementar gate de LLM: verificar que organización tiene `llm_model_id` o `openai_api_key` antes de permitir operaciones": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275816
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683297828
+      }
+    ],
+    "13. Crear endpoint `POST /api/v1/debugging/sessions` — Iniciar sesión (genera debugging_id, valida un solo debugging activo por workstation, envía comando WebSocket StartDebugging)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275833
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683299557
+      }
+    ],
+    "14. Crear endpoint `GET /api/v1/debugging/sessions` — Listar sesiones (filtro por workstation_id, status, organización)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275860
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683300613
+      }
+    ],
+    "15. Crear endpoint `GET /api/v1/debugging/sessions/{id}` — Detalle de sesión": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275878
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683301466
+      }
+    ],
+    "16. Crear endpoint `POST /api/v1/debugging/sessions/{id}/stop` — Detener sesión (envía StopDebugging vía WebSocket)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275898
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683305175
+      }
+    ],
+    "17. Crear endpoint `POST /api/v1/debugging/sessions/{id}/analyze` — Solicitar análisis (envía RequestDebugUpload vía WebSocket)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275914
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683306248
+      }
+    ],
+    "18. Crear endpoint `POST /api/v1/debugging/sessions/{id}/delete` — Solicitar eliminación (envía DeleteDebugData vía WebSocket)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275932
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683307255
+      }
+    ],
+    "19. Crear endpoint `GET /api/v1/debugging/sessions/{id}/report` — Generar presigned S3 URL para descarga del PDF": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275964
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683308478
+      }
+    ],
+    "20. Crear endpoint `POST /api/v1/debugging/{debugging_id}/upload` — Recibir ZIP multipart desde workstation (validar auth, session status, max 100MB)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683275983
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683310048
+      }
+    ],
+    "21. Implementar `DebuggingAnalysisService` en `app/services/debugging_analysis.py`: descomprimir ZIP, leer index.json, generar diffs entre snapshots inicial/final": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276006
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683314116
+      }
+    ],
+    "22. Implementar construcción de prompt LLM: incluir objetivo, motivo, instrucciones adicionales, índice, diffs, extractos de logs y eventos": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276054
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683315633
+      }
+    ],
+    "23. Implementar invocación al LLM usando el patrón existente de `log_analysis.py` (respetar openai_api_key o bedrock por org)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276073
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683317298
+      }
+    ],
+    "24. Implementar generación de PDF con el resultado del LLM (header con metadata, body con análisis, appendices)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276094
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683318572
+      }
+    ],
+    "25. Implementar upload del PDF a S3 (key: `debugging/{org_id}/{debugging_id}/report.pdf`) y actualización de session": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276116
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683319914
+      }
+    ],
+    "26. Definir comandos WebSocket salientes: `start_debugging`, `stop_debugging`, `request_debug_upload`, `delete_debug_data` con sus payloads": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276137
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683323695
+      }
+    ],
+    "27. Implementar handlers para mensajes entrantes del cliente: `debugging_started`, `debugging_ready`, `debugging_deleted`, `debugging_error` — actualizar estado de session y notificar frontend": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276160
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683325236
+      }
+    ],
+    "28. Implementar timeout de 10s para acknowledgment de StartDebugging (marcar session como \"failed\" si no responde)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276191
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683326570
+      }
+    ],
+    "29. Crear clase `DebuggingEngine` en `AlwaysPrintService/Debugging/DebuggingEngine.cs`: orquestación del ciclo de vida (start, timer, stop, package, delete), enforce single session": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276211
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683328751
+      }
+    ],
+    "30. Crear clase `SnapshotManager` en `AlwaysPrintService/Debugging/SnapshotManager.cs`: captura estado de servicios Windows (ServiceController) y valores de registro (RegistryKey, single level)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276235
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683330472
+      }
+    ],
+    "31. Crear clase `LogExtractor` en `AlwaysPrintService/Debugging/LogExtractor.cs`: conteo de líneas al inicio, extracción de líneas nuevas al final, soporte glob patterns, extracción log AlwaysPrint": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276257
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683334309
+      }
+    ],
+    "32. Crear clase `EventLogExtractor` en `AlwaysPrintService/Debugging/EventLogExtractor.cs`: extracción de eventos por grupo y rango de tiempo con formato texto": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276285
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683335663
+      }
+    ],
+    "33. Crear clase `IndexBuilder` en `AlwaysPrintService/Debugging/IndexBuilder.cs`: creación y actualización del index.json con metadata, files, errors": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276308
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683337035
+      }
+    ],
+    "34. Crear clase `ZipPacker` en `AlwaysPrintService/Debugging/ZipPacker.cs`: compresión de carpeta completa a ZIP, eliminación de originales post-zip": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276325
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683338532
+      }
+    ],
+    "35. Implementar handler para comando `start_debugging`: parsear payload, invocar DebuggingEngine.StartSession, enviar ack `debugging_started`": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276343
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683340111
+      }
+    ],
+    "36. Implementar handler para comando `stop_debugging`: invocar DebuggingEngine.StopSession": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276365
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683343785
+      }
+    ],
+    "37. Implementar handler para comando `request_debug_upload`: invocar ZipPacker, hacer HTTP POST del ZIP al endpoint de upload": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276382
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683344916
+      }
+    ],
+    "38. Implementar handler para comando `delete_debug_data`: invocar DebuggingEngine.DeleteSession, enviar ack `debugging_deleted`": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276402
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683345894
+      }
+    ],
+    "39. Implementar notificación `debugging_ready` al finalizar captura (timeout o stop): enviar debugging_id y total_size_bytes": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276440
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683347404
+      }
+    ],
+    "40. Crear componente de pestaña \"Debugging\" en configuración de organización con gate de LLM (mostrar solo si org tiene llm_model_id o openai_api_key)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276458
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683349179
+      }
+    ],
+    "41. Implementar formulario de creación de perfil: campos para external_logs (lista dinámica), eventlog_groups (checkboxes), registry_keys (lista dinámica), monitored_services (lista dinámica), description (textarea)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276474
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683352836
+      }
+    ],
+    "42. Implementar flujo de guardado con sugerencia LLM: mostrar nombre y mensaje sugeridos editables antes de confirmar": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276496
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683354288
+      }
+    ],
+    "43. Implementar listado de perfiles existentes con acciones: editar, desactivar/activar, eliminar": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276516
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683355533
+      }
+    ],
+    "44. Crear sección \"Debugging disponible\" en vista de detalle de workstation: lista de perfiles activos con nombre y descripción": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276540
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683356858
+      }
+    ],
+    "45. Implementar diálogo de confirmación para iniciar debugging: nombre, descripción, selector de duración (15-300s), campos opcionales motivo e instrucciones": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276565
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683358518
+      }
+    ],
+    "46. Implementar vista de sesión activa: timer countdown, tiempo restante, botón \"Detener Debugging\"": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276582
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683361833
+      }
+    ],
+    "47. Implementar vista de datos disponibles (status \"ready\"): botones \"Analizar\" y \"Eliminar\", tamaño total reportado": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276599
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683363247
+      }
+    ],
+    "48. Implementar vista de análisis completado: link de descarga del PDF, opción \"Descargar ZIP\" (si disponible)": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276617
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683364697
+      }
+    ],
+    "49. Implementar feedback de estados: loading durante captura, progress durante análisis, error states con mensajes descriptivos": [
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683276638
+      },
+      {
+        "executionId": "e30da60e-3539-4c00-b220-3e200804451f",
+        "chatSessionId": "sess_c9525dbb-ed20-44c3-9538-07c02adb9bda",
+        "timestamp": 1782683365934
+      }
+    ]
+  }
+}

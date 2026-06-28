@@ -24,14 +24,15 @@ import { ConnectivityCheckEditor } from '@/components/ConnectivityCheckEditor'
 import { LocaleSelector } from '@/components/LocaleSelector'
 import { ActionConfigSection } from '@/components/config/ActionConfigSection'
 import { CertificateSection } from '@/components/config/CertificateSection'
+import { DebuggingProfilesSection } from '@/components/config/DebuggingProfilesSection'
 import {
   ArrowLeft, Save, RotateCcw, Building2, Printer, Network, Wifi,
-  Download, Cog, Globe, Plus, X, Trash2, Info, AlertCircle, Pin, ShieldCheck,
+  Download, Cog, Globe, Plus, X, Trash2, Info, AlertCircle, Pin, ShieldCheck, Bug,
 } from 'lucide-react'
 import type { Organization, OrganizationUpdate, PublicIPCreate } from '@/types'
 import type { GlobalConfig, GlobalConfigUpdate, SearchTargets, ConnectivityCheck } from '@/types/config'
 
-type TabKey = 'general' | 'printing' | 'network' | 'connectivity' | 'updates' | 'actions' | 'ips' | 'certificate'
+type TabKey = 'general' | 'printing' | 'network' | 'connectivity' | 'updates' | 'actions' | 'ips' | 'certificate' | 'debugging'
 
 interface TabDef {
   key: TabKey
@@ -48,6 +49,7 @@ const TABS: TabDef[] = [
   { key: 'actions', labelKey: 'tabActions', icon: Cog },
   { key: 'ips', labelKey: 'tabIps', icon: Globe },
   { key: 'certificate', labelKey: 'tabCertificate', icon: ShieldCheck },
+  { key: 'debugging', labelKey: 'tabDebugging', icon: Bug },
 ]
 
 export default function EditOrganizationPage() {
@@ -652,6 +654,14 @@ export default function EditOrganizationPage() {
         {/* === TAB: CERTIFICATE === */}
         {activeTab === 'certificate' && (
           <CertificateSection organizationId={orgId} />
+        )}
+
+        {/* === TAB: DEBUGGING === */}
+        {activeTab === 'debugging' && (
+          <DebuggingProfilesSection
+            organizationId={orgId}
+            llmEnabled={!!(llmModelId || openaiApiKey)}
+          />
         )}
 
         {/* === TAB: IPS === */}

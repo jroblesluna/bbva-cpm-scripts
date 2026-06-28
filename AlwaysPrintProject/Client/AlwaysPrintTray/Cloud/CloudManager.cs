@@ -112,6 +112,7 @@ namespace AlwaysPrintTray.Cloud
         private TelemetryReporter? _telemetryReporter;
         private ConnectivityMonitor? _connectivityMonitor;
         private OfflineStateManager? _offlineState;
+        private DebuggingCommandHandler? _debuggingHandler;
         private bool _noConfigWarningShown;
         private bool _disposed;
 
@@ -783,6 +784,16 @@ namespace AlwaysPrintTray.Cloud
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"CloudManager: WorkstationId registrado = {workstationId}");
                     
+                    // Inicializar handler de debugging con el workstation_id
+                    if (_debuggingHandler == null && _wsClient != null)
+                    {
+                        _debuggingHandler = new DebuggingCommandHandler(
+                            _wsClient,
+                            new System.Net.Http.HttpClient(),
+                            workstationId!,
+                            _config.CloudApiUrl);
+                    }
+
                     // NOTA: La verificación de configuración de acciones ahora se gestiona
                     // vía Registration_Enrichment (ProcessRegistrationState) que recibe el estado
                     // completo desde el In_Memory_State_Map del servidor. Ya no se hace polling
@@ -1309,6 +1320,15 @@ namespace AlwaysPrintTray.Cloud
                     case "execute_on_demand":
                         var execParams = obj["params"] as JObject;
                         HandleExecuteOnDemandCommand(commandId, execParams);
+                        break;
+
+                    // Comandos de debugging: delegados al DebuggingCommandHandler
+                    case "start_debugging":
+                    case "stop_debugging":
+                    case "request_debug_upload":
+                    case "delete_debug_data":
+                        var debugParams = obj["params"] as JObject;
+                        _debuggingHandler?.HandleCommand(commandType, commandId, debugParams);
                         break;
 
                     default:

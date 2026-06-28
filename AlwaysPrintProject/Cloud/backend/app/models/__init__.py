@@ -18,6 +18,7 @@ from app.models.action_config import ActionConfig
 from app.models.device import Device
 from app.models.document import Document
 from app.models.log_analysis import LogAnalysis
+from app.models.debugging import DebuggingProfile, DebuggingSession, DebuggingSessionStatus
 from app.models.system_status import (
     StatusSnapshot,
     MetricRecord,
@@ -73,6 +74,11 @@ __all__ = [
     
     # Log analysis models
     "LogAnalysis",
+    
+    # Debugging models
+    "DebuggingProfile",
+    "DebuggingSession",
+    "DebuggingSessionStatus",
     
     # System status models
     "StatusSnapshot",
