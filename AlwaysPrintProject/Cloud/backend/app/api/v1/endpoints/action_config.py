@@ -2,6 +2,7 @@
 Endpoints para gestión de configuraciones de acciones administrativas.
 """
 
+import asyncio
 import logging
 import time
 import threading
@@ -39,10 +40,14 @@ _CONFIG_INFO_TTL = 30.0  # segundos
 
 async def _notify_workstations_config_changed(db: Session, organization_id) -> int:
     """
-    Envía mensaje 'action_config_changed' a todas las workstations online de una organización.
-    Las workstations al recibir este mensaje re-verifican su configuración de acciones
-    con jitter aleatorio del lado cliente (1-10s) para evitar thundering herd.
-    También invalida el caché de config_info para las workstations de la organización.
+    Invalida caché de config_info y envía 'action_config_changed' a workstations online.
+    Los envíos WebSocket se hacen en background sin retener sesión de BD.
+
+    Flujo:
+    1. Query BD: obtener workstations de la org (rápido, ~1 query)
+    2. Invalidar caché en memoria (inmediato)
+    3. Recopilar IDs online (consulta en memoria del connection_manager)
+    4. Disparar envío de notificaciones en background (fire-and-forget)
     """
     from app.services.websocket_manager import connection_manager
     from app.models.workstation import Workstation
@@ -51,26 +56,40 @@ async def _notify_workstations_config_changed(db: Session, organization_id) -> i
         Workstation.organization_id == organization_id
     ).all()
 
-    # Invalidar caché de config_info para todas las workstations de esta org
+    # Invalidar caché de config_info (rápido, en memoria)
     for ws in workstations:
         _config_info_cache.pop(str(ws.id), None)
 
+    # Recopilar IDs online (rápido, consulta en memoria del connection_manager)
+    online_ws_ids = [
+        str(ws.id) for ws in workstations
+        if connection_manager.is_workstation_online(str(ws.id))
+    ]
+
+    # Enviar notificaciones en background (no bloquea el response HTTP)
+    if online_ws_ids:
+        asyncio.ensure_future(_send_config_changed_notifications(online_ws_ids))
+
+    return len(online_ws_ids)
+
+
+async def _send_config_changed_notifications(ws_ids: list[str]) -> None:
+    """Envía action_config_changed a una lista de workstation IDs. Fire-and-forget."""
+    from app.services.websocket_manager import connection_manager
+
     message = {"type": "action_config_changed"}
-    dispatched = 0
-
-    for ws in workstations:
-        ws_id = str(ws.id)
-        if connection_manager.is_workstation_online(ws_id):
+    sent = 0
+    for ws_id in ws_ids:
+        try:
             await connection_manager.send_to_workstation(ws_id, message)
-            dispatched += 1
+            sent += 1
+        except Exception:
+            pass  # Best-effort, no falla si una WS se desconectó
 
-    if dispatched > 0:
-        logger.info(
-            "ActionConfig changed: notificadas %d workstations de org %s",
-            dispatched, organization_id
-        )
-
-    return dispatched
+    logger.info(
+        "ActionConfig changed: %d/%d notificaciones enviadas (background)",
+        sent, len(ws_ids)
+    )
 
 
 # Caché en memoria de configs firmadas por worker.
