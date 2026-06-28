@@ -24,9 +24,16 @@ async def test_lifespan_calls_graceful_shutdown():
 
     mock_app = MagicMock()
 
+    # Mock del StateMapService retornado por get_state_map_service
+    mock_state_map = AsyncMock()
+    mock_state_map.initialize = AsyncMock()
+    mock_state_map.shutdown = AsyncMock()
+
     with patch("app.main.connection_manager") as mock_cm, \
          patch("app.main.status_scheduler") as mock_scheduler, \
-         patch("app.main.scalability_collector") as mock_collector:
+         patch("app.main.scalability_collector") as mock_collector, \
+         patch("app.main.status_batch_writer") as mock_batch_writer, \
+         patch("app.main.get_state_map_service", return_value=mock_state_map):
 
         # Configurar mocks
         mock_cm.start_ping_loop = AsyncMock()
@@ -40,6 +47,8 @@ async def test_lifespan_calls_graceful_shutdown():
         mock_scheduler.start = MagicMock()
         mock_scheduler.stop = MagicMock()
         mock_collector.capture_baseline = MagicMock()
+        mock_batch_writer.start = MagicMock()
+        mock_batch_writer.stop = MagicMock()
 
         async with lifespan(mock_app):
             pass  # Simular que la app estuvo corriendo
@@ -59,9 +68,16 @@ async def test_lifespan_calls_stop_ping_loop():
 
     mock_app = MagicMock()
 
+    # Mock del StateMapService
+    mock_state_map = AsyncMock()
+    mock_state_map.initialize = AsyncMock()
+    mock_state_map.shutdown = AsyncMock()
+
     with patch("app.main.connection_manager") as mock_cm, \
          patch("app.main.status_scheduler") as mock_scheduler, \
-         patch("app.main.scalability_collector") as mock_collector:
+         patch("app.main.scalability_collector") as mock_collector, \
+         patch("app.main.status_batch_writer") as mock_batch_writer, \
+         patch("app.main.get_state_map_service", return_value=mock_state_map):
 
         mock_cm.start_ping_loop = AsyncMock()
         mock_cm.graceful_shutdown_workstations = AsyncMock()
@@ -73,6 +89,8 @@ async def test_lifespan_calls_stop_ping_loop():
         mock_scheduler.start = MagicMock()
         mock_scheduler.stop = MagicMock()
         mock_collector.capture_baseline = MagicMock()
+        mock_batch_writer.start = MagicMock()
+        mock_batch_writer.stop = MagicMock()
 
         async with lifespan(mock_app):
             pass
@@ -91,9 +109,16 @@ async def test_lifespan_initializes_redis_manager():
 
     mock_app = MagicMock()
 
+    # Mock del StateMapService
+    mock_state_map = AsyncMock()
+    mock_state_map.initialize = AsyncMock()
+    mock_state_map.shutdown = AsyncMock()
+
     with patch("app.main.connection_manager") as mock_cm, \
          patch("app.main.status_scheduler") as mock_scheduler, \
          patch("app.main.scalability_collector") as mock_collector, \
+         patch("app.main.status_batch_writer") as mock_batch_writer, \
+         patch("app.main.get_state_map_service", return_value=mock_state_map), \
          patch("app.main.settings") as mock_settings:
 
         mock_cm.initialize = AsyncMock()
@@ -106,6 +131,8 @@ async def test_lifespan_initializes_redis_manager():
         mock_scheduler.start = MagicMock()
         mock_scheduler.stop = MagicMock()
         mock_collector.capture_baseline = MagicMock()
+        mock_batch_writer.start = MagicMock()
+        mock_batch_writer.stop = MagicMock()
 
         async with lifespan(mock_app):
             pass

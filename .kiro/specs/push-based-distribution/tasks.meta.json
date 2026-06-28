@@ -1,0 +1,637 @@
+{
+  "pbtResults": {
+    "1.8 Property test: Cross-worker state synchronization round-trip (Property 3)": {
+      "status": "passed",
+      "lastRunTimestamp": 1782672251834
+    },
+    "1.6 Property test: State map initialization completeness (Property 1)": {
+      "status": "passed",
+      "lastRunTimestamp": 1782674231965
+    },
+    "1.9 Property test: State map scope structure (Property 4)": {
+      "status": "passed",
+      "lastRunTimestamp": 1782674326779
+    },
+    "1.7 Property test: State map local update consistency (Property 2)": {
+      "status": "passed",
+      "lastRunTimestamp": 1782674366204
+    },
+    "3.5 Property test: Load efficiency per organization (Property 9)": {
+      "status": "passed",
+      "lastRunTimestamp": 1782676026457
+    },
+    "6.6 Property test: Exponential backoff retry on S3 failure (Property 6)": {
+      "status": "passed",
+      "lastRunTimestamp": 1782676090901
+    },
+    "6.5 Property test: Diff-based download decision (Property 5)": {
+      "status": "passed",
+      "lastRunTimestamp": 1782676098660
+    },
+    "3.4 Property test: Zero database queries in distribution hot path (Property 8)": {
+      "status": "passed",
+      "lastRunTimestamp": 1782676467438
+    },
+    "4.2 Property test: Registration enrichment completeness (Property 7)": {
+      "status": "passed",
+      "lastRunTimestamp": 1782677208166
+    }
+  },
+  "executionHistory": {
+    "1.1 Crear data models y StateMapService base": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577091
+      },
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670582696
+      }
+    ],
+    "1.2 Implementar carga inicial desde BD": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577121
+      },
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670593996
+      },
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670949449
+      }
+    ],
+    "1.3 Implementar métodos de actualización local del state map": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577152
+      },
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670586435
+      }
+    ],
+    "1.4 Implementar sincronización Redis pub/sub": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577182
+      },
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670953698
+      },
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782671917387
+      }
+    ],
+    "1.5 Implementar manejo de errores y resiliencia Redis": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577210
+      },
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670954483
+      },
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782671918017
+      }
+    ],
+    "1.6 Property test: State map initialization completeness (Property 1)": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577237
+      },
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782671922282
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674145399
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674382989
+      }
+    ],
+    "1.7 Property test: State map local update consistency (Property 2)": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577267
+      },
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782671923086
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674146115
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674383737
+      }
+    ],
+    "1.8 Property test: Cross-worker state synchronization round-trip (Property 3)": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577294
+      },
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782671923830
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674141091
+      }
+    ],
+    "1.9 Property test: State map scope structure (Property 4)": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577319
+      },
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782671924643
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674147009
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674384531
+      }
+    ],
+    "2. Checkpoint - Verificar StateMapService": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577349
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782679590136
+      }
+    ],
+    "3.1 Crear PushDistributionService base": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577377
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674389840
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674630145
+      }
+    ],
+    "3.2 Implementar push de MSI y certificado": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577414
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674635198
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674836821
+      }
+    ],
+    "3.3 Integrar StateMapService y PushDistributionService en endpoints de admin": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577443
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674842355
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782675828596
+      }
+    ],
+    "3.4 Property test: Zero database queries in distribution hot path (Property 8)": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577490
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782675835092
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782676503573
+      }
+    ],
+    "3.5 Property test: Load efficiency per organization (Property 9)": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577516
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782675835819
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782676504996
+      }
+    ],
+    "4.1 Modificar flujo de registro WebSocket para incluir estado": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577543
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782676510859
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782677029827
+      }
+    ],
+    "4.2 Property test: Registration enrichment completeness (Property 7)": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577570
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782677034280
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782677222149
+      }
+    ],
+    "5. Checkpoint - Verificar backend completo": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577610
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782679594393
+      }
+    ],
+    "6.1 Crear modelo DistributionState y PushMessageHandler": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577643
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674390775
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674630884
+      }
+    ],
+    "6.2 Implementar procesamiento de Config_Push_Message": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577678
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674635931
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674837533
+      }
+    ],
+    "6.3 Implementar procesamiento de MSI_Push_Message y Cert_Push_Message": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577709
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674843210
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782675829419
+      }
+    ],
+    "6.4 Implementar retry con backoff exponencial para descargas S3": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577740
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674843961
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782675830157
+      }
+    ],
+    "6.5 Property test: Diff-based download decision (Property 5)": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577768
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782675836651
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782676505054
+      }
+    ],
+    "6.6 Property test: Exponential backoff retry on S3 failure (Property 6)": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577800
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782675837374
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782676505844
+      }
+    ],
+    "7.1 Modificar CloudManager para almacenar estado del registro enriquecido": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577826
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782677035066
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782677223117
+      }
+    ],
+    "7.2 Modificar ConfigManager para eliminar polling HTTP": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577856
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782677227995
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782677694224
+      }
+    ],
+    "7.3 Implementar verificación manual desde el Tray": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577889
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782677228698
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782677695147
+      }
+    ],
+    "7.4 Eliminar dependencia de endpoints de descarga de certificado y MSI": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577932
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782677699736
+      }
+    ],
+    "8. Checkpoint - Verificar cliente completo": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577959
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782679598695
+      }
+    ],
+    "9.1 Inicializar StateMapService en el startup de la aplicación": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670577994
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782678040696
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782678301019
+      }
+    ],
+    "9.2 Wiring completo: conectar todos los componentes": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670578027
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782678305488
+      }
+    ],
+    "9.3 Unit tests del backend": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670578052
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782679164398
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782679583832
+      }
+    ],
+    "9.4 Integration tests del backend": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670578081
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782679165091
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782679584448
+      }
+    ],
+    "10. Final checkpoint - Verificar integración completa": [
+      {
+        "executionId": "e03a7199-3f92-4b91-a1aa-3f9a48ad1a07",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782670578110
+      },
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782679603171
+      }
+    ],
+    "1. StateMapService - Mapa de estado en memoria": [
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782674384562
+      }
+    ],
+    "3. PushDistributionService - Envío de push messages": [
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782676505025
+      }
+    ],
+    "6. Cliente C# - PushMessageHandler": [
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782676505869
+      }
+    ],
+    "4. Registration Enrichment - Enriquecimiento del registro WebSocket": [
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782677222182
+      }
+    ],
+    "9. Integración y wiring final": [
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782679584498
+      }
+    ],
+    "7. Cliente C# - Modificaciones a CloudManager y ConfigManager": [
+      {
+        "executionId": "0b922b2a-bf9e-4b24-a00e-a7c8aa2f416a",
+        "chatSessionId": "sess_1942d6cd-baf0-4d15-b757-853bc2ec9293",
+        "timestamp": 1782679617423
+      }
+    ]
+  }
+}

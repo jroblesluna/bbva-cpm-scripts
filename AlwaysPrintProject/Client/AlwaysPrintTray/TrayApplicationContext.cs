@@ -635,8 +635,10 @@ namespace AlwaysPrintTray
 
         /// <summary>
         /// Acción manual del usuario: buscar actualizaciones desde el menú del tray.
-        /// Si no hay conexión Cloud, muestra notificación informativa.
-        /// Si hay conexión, ejecuta verificación inmediata y notifica resultado.
+        /// Usa GetCachedState() como fuente primaria de estado del servidor.
+        /// Si no hay estado cacheado (primer inicio o reconexión pendiente),
+        /// hace un solo request HTTP fallback al backend.
+        /// Compara estado local vs cacheado/recibido y descarga desde S3 lo que difiera.
         /// </summary>
         private async void CheckForUpdatesManual()
         {
@@ -658,28 +660,42 @@ namespace AlwaysPrintTray
                     LocalizationManager.Get("BalloonCheckingUpdates"),
                     ToolTipIcon.Info);
 
-                // 1. Verificar configuración de acciones (alwaysconfig)
-                AlwaysPrintLogger.WriteTrayInfo("Buscar Actualizaciones: verificando configuración de acciones...");
-                await _cloudManager.CheckActionConfigurationAsync();
+                // 1. Obtener estado de distribución: caché primario, HTTP fallback si es null
+                var state = _cloudManager.GetCachedState();
 
-                // 2. Verificar actualización de software (MSI)
-                if (_updateChecker == null)
+                if (state == null)
                 {
-                    // Sin UpdateChecker pero con CloudManager: solo se verificó config
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "Buscar Actualizaciones: sin estado cacheado. Realizando fallback HTTP al backend...");
+                    state = await FetchDistributionStateFromBackend();
+                }
+
+                if (state == null)
+                {
+                    // Ni caché ni backend disponible — notificar al usuario
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "Buscar Actualizaciones: no se pudo obtener estado del servidor (caché vacío y fallback HTTP falló).");
                     ShowBalloon(AppTitle,
-                        "Configuración verificada. No hay actualizador de software disponible.",
-                        ToolTipIcon.Info);
+                        "No se pudo obtener estado del servidor. Verifique la conexión.",
+                        ToolTipIcon.Warning);
                     return;
                 }
 
-                // Resetear flag antes de la verificación
-                _manualCheckFoundUpdate = false;
+                // 2. Comparar estado local vs cacheado/recibido y descargar desde S3 lo que difiera
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"Buscar Actualizaciones: comparando estado local vs remoto. " +
+                    $"ConfigHash={state.ConfigHash ?? "null"}, CertVersion={state.CertVersion}, " +
+                    $"MsiVersion={state.MsiVersion ?? "null"}");
 
-                // Ejecutar verificación inmediata de MSI
-                await _updateChecker.CheckNowAsync();
+                int updatedCount = await _cloudManager.SyncFromCachedStateAsync(state);
 
-                // Si no se disparó el evento UpdateAvailable, no hay actualización disponible
-                if (!_manualCheckFoundUpdate)
+                if (updatedCount > 0)
+                {
+                    ShowBalloon(AppTitle,
+                        $"Se actualizaron {updatedCount} componente(s).",
+                        ToolTipIcon.Info);
+                }
+                else
                 {
                     ShowBalloon(AppTitle,
                         LocalizationManager.Get("BalloonNoUpdates"),
@@ -694,6 +710,85 @@ namespace AlwaysPrintTray
                 ShowBalloon(AppTitle,
                     LocalizationManager.Get("BalloonUpdateError"),
                     ToolTipIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Fallback HTTP: obtiene el estado de distribución completo desde el backend
+        /// cuando no hay estado cacheado (primer inicio o reconexión pendiente).
+        /// Realiza UN solo request HTTP al endpoint /api/v1/workstations/{id}/distribution-state.
+        /// </summary>
+        /// <returns>DistributionState con los datos del servidor, o null si falla.</returns>
+        private async Task<DistributionState> FetchDistributionStateFromBackend()
+        {
+            try
+            {
+                var httpClient = _cloudManager?.HttpClient;
+                var workstationId = _cloudManager?.WorkstationId;
+
+                if (httpClient == null || string.IsNullOrEmpty(workstationId))
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "FetchDistributionState: HttpClient o WorkstationId no disponible. " +
+                        "No se puede hacer fallback HTTP.");
+                    return null;
+                }
+
+                string url = $"{_cloudManager.CloudApiUrl.TrimEnd('/')}/api/v1/workstations/{workstationId}/distribution-state";
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"FetchDistributionState: solicitando estado al backend. URL={url}");
+
+                var response = await httpClient.GetAsync(url);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"FetchDistributionState: backend retornó HTTP {(int)response.StatusCode}. " +
+                        "No se pudo obtener estado de distribución.");
+                    return null;
+                }
+
+                string json = await response.Content.ReadAsStringAsync();
+                var data = Newtonsoft.Json.Linq.JObject.Parse(json);
+
+                var distributionState = new DistributionState
+                {
+                    ConfigHash = data["config_hash"]?.ToString(),
+                    ConfigS3Url = data["config_s3_url"]?.ToString(),
+                    CertVersion = data["cert_version"]?.ToObject<int>() ?? 0,
+                    CertUrl = data["cert_url"]?.ToString(),
+                    MsiVersion = data["msi_version"]?.ToString(),
+                    MsiUrl = data["msi_url"]?.ToString(),
+                    LastUpdated = DateTime.UtcNow
+                };
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"FetchDistributionState: estado obtenido exitosamente desde backend. " +
+                    $"ConfigHash={distributionState.ConfigHash ?? "null"}, " +
+                    $"CertVersion={distributionState.CertVersion}, " +
+                    $"MsiVersion={distributionState.MsiVersion ?? "null"}");
+
+                return distributionState;
+            }
+            catch (System.Net.Http.HttpRequestException ex)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"FetchDistributionState: error de red al contactar backend: {ex.Message}");
+                return null;
+            }
+            catch (TaskCanceledException)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    "FetchDistributionState: timeout al contactar backend.");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"FetchDistributionState: error inesperado: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+                return null;
             }
         }
 

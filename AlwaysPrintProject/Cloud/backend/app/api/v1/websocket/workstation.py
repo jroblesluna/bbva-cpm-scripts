@@ -194,11 +194,85 @@ async def workstation_websocket(
         config = config_service.get_effective_config(db, workstation_id)
         print(f"[WS] Config obtenida, enviando...", flush=True)
         
-        # Enviar confirmación de registro con workstation_id
-        await websocket.send_json({
+        # Resolver estado de distribución desde el StateMapService (push-based)
+        # Si el state map no tiene datos para la org, carga desde BD una sola vez.
+        # No bloquea el registro si falla — la workstation se sincronizará vía push posterior.
+        distribution_state = None
+        try:
+            from app.services.push_services import get_state_map_service
+
+            state_map = get_state_map_service()
+            org_id_str = str(workstation.organization_id)
+            vlan_id_str = str(workstation.vlan_id) if workstation.vlan_id else None
+
+            # Consultar estado resuelto por scope para esta workstation
+            ws_state = await state_map.resolve_workstation_state(
+                org_id=org_id_str,
+                vlan_id=vlan_id_str,
+                ws_id=workstation_id,
+            )
+
+            # Verificar si el state map retornó datos vacíos (cold start)
+            has_data = any([
+                ws_state.get("config_hash"),
+                ws_state.get("cert_version", 0) > 0,
+                ws_state.get("msi_version"),
+            ])
+
+            if not has_data:
+                # Cold start: cargar estado de la org desde BD una sola vez
+                logger.info(
+                    f"[WS ENRICHMENT] Cold start para org={org_id_str}, "
+                    f"ws={workstation_id}. Cargando estado desde BD"
+                )
+                await state_map._load_org_state(org_id=org_id_str)
+                # Resolver de nuevo después de cargar
+                ws_state = await state_map.resolve_workstation_state(
+                    org_id=org_id_str,
+                    vlan_id=vlan_id_str,
+                    ws_id=workstation_id,
+                )
+
+            # Construir el objeto state solo si hay al menos un dato útil
+            has_useful_data = any([
+                ws_state.get("config_hash"),
+                ws_state.get("cert_version", 0) > 0,
+                ws_state.get("msi_version"),
+            ])
+            if has_useful_data:
+                distribution_state = {
+                    "config_hash": ws_state.get("config_hash"),
+                    "config_s3_url": ws_state.get("config_s3_url"),
+                    "cert_version": ws_state.get("cert_version", 0),
+                    "cert_url": ws_state.get("cert_url"),
+                    "msi_version": ws_state.get("msi_version"),
+                    "msi_url": ws_state.get("msi_url"),
+                }
+
+            logger.info(
+                f"[WS ENRICHMENT] Estado resuelto: ws={workstation_id}, "
+                f"org={org_id_str}, tiene_estado={has_useful_data}, "
+                f"config_hash={ws_state.get('config_hash')}, "
+                f"cert_version={ws_state.get('cert_version', 0)}, "
+                f"msi_version={ws_state.get('msi_version')}"
+            )
+        except Exception as e:
+            # No bloquear el registro si el state map falla
+            logger.warning(
+                f"[WS ENRICHMENT] Error al resolver estado de distribución: "
+                f"ws={workstation_id}, error={e}. Registro continúa sin enrichment"
+            )
+            distribution_state = None
+
+        # Enviar confirmación de registro con workstation_id y estado de distribución
+        registered_msg = {
             "type": "registered",
-            "workstation_id": workstation_id
-        })
+            "workstation_id": workstation_id,
+        }
+        if distribution_state is not None:
+            registered_msg["state"] = distribution_state
+
+        await websocket.send_json(registered_msg)
         print(f"[WS] Mensaje registered enviado: {workstation_id}", flush=True)
         
         await websocket.send_json({

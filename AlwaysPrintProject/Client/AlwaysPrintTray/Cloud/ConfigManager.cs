@@ -39,13 +39,22 @@ namespace AlwaysPrintTray.Cloud
         }
         
         // ═══════════════════════════════════════════════════════════════════════
-        // VERIFICACIÓN Y DESCARGA
+        // VERIFICACIÓN Y DESCARGA (LEGACY — DEPRECADO)
         // ═══════════════════════════════════════════════════════════════════════
         
         /// <summary>
-        /// Verifica si hay una configuración activa en la Cloud y la descarga si es necesaria.
+        /// [DEPRECADO] Verifica si hay una configuración activa en la Cloud y la descarga si es necesaria.
         /// Retorna true si la configuración local está actualizada.
+        /// 
+        /// Este método usaba polling HTTP a /workstations/{id}/config/info y /config/download.
+        /// Ahora la distribución es 100% push-based: los cambios llegan vía WebSocket
+        /// (Config_Push_Message) y se descargan directamente desde S3 a través de
+        /// DownloadAndApplyFromUrlAsync o ApplyDownloadedConfigAsync.
+        /// 
+        /// Se mantiene como fallback para el período de transición.
         /// </summary>
+        [Obsolete("Usar flujo push-based: DownloadAndApplyFromUrlAsync o ApplyDownloadedConfigAsync. " +
+                   "Este método será eliminado cuando se complete la migración a push-based distribution.")]
         public async Task<bool> CheckAndDownloadConfigAsync(string cloudApiUrl, string workstationId, string apiKey)
         {
             try
@@ -102,9 +111,15 @@ namespace AlwaysPrintTray.Cloud
         }
         
         // ═══════════════════════════════════════════════════════════════════════
-        // CONSULTA DE INFORMACIÓN
+        // CONSULTA DE INFORMACIÓN (LEGACY — DEPRECADO)
         // ═══════════════════════════════════════════════════════════════════════
         
+        /// <summary>
+        /// [DEPRECADO] Consulta /workstations/{id}/config/info vía HTTP.
+        /// Reemplazado por estado recibido vía Registration_Enrichment y push messages.
+        /// Se mantiene como fallback para el período de transición.
+        /// </summary>
+        [Obsolete("Usar estado del Registration_Enrichment o push messages vía PushMessageHandler.")]
         private async Task<CloudConfigInfo?> GetCloudConfigInfoAsync(string cloudApiUrl, string workstationId, string apiKey)
         {
             try
@@ -148,9 +163,15 @@ namespace AlwaysPrintTray.Cloud
         }
         
         // ═══════════════════════════════════════════════════════════════════════
-        // DESCARGA
+        // DESCARGA VÍA HTTP (LEGACY — DEPRECADO)
         // ═══════════════════════════════════════════════════════════════════════
         
+        /// <summary>
+        /// [DEPRECADO] Descarga configuración vía HTTP desde /workstations/{id}/config/download.
+        /// Reemplazado por DownloadAndApplyFromUrlAsync que descarga directamente desde S3.
+        /// Se mantiene como fallback para el período de transición.
+        /// </summary>
+        [Obsolete("Usar DownloadAndApplyFromUrlAsync para descarga directa desde S3.")]
         private async Task<bool> DownloadConfigAsync(string cloudApiUrl, string workstationId, string apiKey, string downloadUrl, string expectedHash, int? remoteCertVersion, string? certUrl)
         {
             try
@@ -339,14 +360,297 @@ namespace AlwaysPrintTray.Cloud
         }
         
         // ═══════════════════════════════════════════════════════════════════════
+        // DESCARGA DIRECTA DESDE S3 (PUSH-BASED)
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Descarga contenido directamente desde una URL de S3 provista por push message
+        /// o Registration_Enrichment. Este método es la interfaz de bajo nivel para
+        /// obtener archivos desde S3 sin pasar por el backend.
+        /// 
+        /// Nota: Este método solo descarga el contenido. Para configuraciones firmadas,
+        /// usar DownloadAndApplyFromUrlAsync que incluye verificación ECDSA y persistencia.
+        /// </summary>
+        /// <param name="s3Url">URL pública o presigned de S3 del recurso a descargar.</param>
+        /// <returns>Contenido descargado como string, o null si la descarga falla.</returns>
+        public async Task<string> DownloadFromS3(string s3Url)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(s3Url))
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        "ConfigManager: URL de S3 vacía o nula. No se puede descargar.");
+                    return null;
+                }
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"ConfigManager: descargando recurso desde S3. URL={s3Url.Substring(0, Math.Min(80, s3Url.Length))}...");
+
+                var response = await _httpClient.GetAsync(s3Url);
+                response.EnsureSuccessStatusCode();
+
+                string content = await response.Content.ReadAsStringAsync();
+
+                if (string.IsNullOrEmpty(content))
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "ConfigManager: contenido descargado desde S3 está vacío.");
+                    return null;
+                }
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"ConfigManager: recurso descargado exitosamente desde S3. " +
+                    $"Tamaño={content.Length} bytes");
+                return content;
+            }
+            catch (HttpRequestException ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"ConfigManager: error HTTP descargando desde S3: {ex.Message}", ex);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"ConfigManager: error inesperado descargando desde S3: {ex.Message}", ex);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Descarga un archivo de configuración firmado directamente desde una URL de S3,
+        /// verifica la firma ECDSA y lo persiste vía el Service.
+        /// Este método es invocado por PushMessageHandler al recibir un Config_Push_Message
+        /// con hash diferente al local.
+        /// </summary>
+        /// <param name="downloadUrl">URL pública de S3 del archivo firmado (.signed).</param>
+        /// <param name="expectedHash">Hash SHA256 corto (8 chars) esperado de la configuración.</param>
+        /// <returns>true si descarga, verificación y persistencia fueron exitosas.</returns>
+        public async Task<bool> DownloadAndApplyFromUrlAsync(string downloadUrl, string expectedHash)
+        {
+            try
+            {
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"ConfigManager: descargando configuración desde S3. hash_esperado={expectedHash}");
+
+                // 1. Descargar contenido directamente desde la URL de S3
+                var response = await _httpClient.GetAsync(downloadUrl);
+                response.EnsureSuccessStatusCode();
+
+                string downloadedContent = await response.Content.ReadAsStringAsync();
+
+                if (string.IsNullOrEmpty(downloadedContent))
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        "ConfigManager: contenido descargado desde S3 está vacío. Rechazando.");
+                    return false;
+                }
+
+                // 2. Validar que es un envelope firmado con estructura correcta
+                JObject parsed;
+                try
+                {
+                    parsed = JObject.Parse(downloadedContent);
+                }
+                catch (Newtonsoft.Json.JsonException)
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        "ConfigManager: contenido descargado desde S3 no es JSON válido. Rechazando.");
+                    return false;
+                }
+
+                if (parsed["config"] == null || parsed["hash"] == null ||
+                    parsed["signature"] == null || parsed["cert_version"] == null)
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        "ConfigManager: configuración descargada no tiene firma digital. " +
+                        "Rechazando (formato legacy no aceptado).");
+                    return false;
+                }
+
+                // 3. Verificar y actualizar certificado si es necesario
+                int envelopeCertVersion = parsed["cert_version"]!.Value<int>();
+                int localCertVersion = SignatureVerifier.GetLocalCertVersion(traySource: true);
+
+                string certPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "AlwaysPrint", "config", "org.cer");
+
+                bool certFileExists = File.Exists(certPath);
+                if (envelopeCertVersion > localCertVersion || !certFileExists)
+                {
+                    if (!certFileExists)
+                    {
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            $"ConfigManager: certificado no encontrado en disco ({certPath}). " +
+                            "No se puede verificar firma sin certificado.");
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            $"ConfigManager: cert_version del envelope ({envelopeCertVersion}) > local ({localCertVersion}). " +
+                            "Se intentará verificar con el certificado actual.");
+                    }
+
+                    // Nota: la descarga del certificado actualizado se gestiona por Cert_Push_Message
+                    // separado. Aquí intentamos verificar con lo que tenemos disponible.
+                }
+
+                // 4. Verificar firma ECDSA — FAIL-CLOSED: si no verifica, rechazar
+                if (!SignatureVerifier.VerifyConfig(downloadedContent, certPath, out string verifiedConfig, traySource: true))
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        "ConfigManager: verificación de firma ECDSA fallida para config descargada desde S3. " +
+                        "Rechazando configuración (fail-closed).");
+                    return false;
+                }
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "ConfigManager: firma ECDSA verificada exitosamente para config de S3");
+
+                // 5. Persistir vía Service (Named Pipe)
+                bool saved = SendSaveActionConfigToService(downloadedContent, expectedHash);
+
+                if (!saved)
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        "ConfigManager: el Service no pudo guardar la configuración descargada desde S3");
+                    return false;
+                }
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"ConfigManager: configuración de S3 aplicada exitosamente. hash={expectedHash}");
+                return true;
+            }
+            catch (HttpRequestException ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"ConfigManager: error HTTP descargando config desde S3: {ex.Message}", ex);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"ConfigManager: error inesperado en DownloadAndApplyFromUrlAsync: {ex.Message}", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Verifica la firma ECDSA y persiste contenido de configuración ya descargado.
+        /// Este método es invocado por PushMessageHandler después de descargar exitosamente
+        /// con retry. Separa la lógica de verificación/persistencia de la descarga HTTP
+        /// para permitir que el retry se aplique solo a la parte de red.
+        /// </summary>
+        /// <param name="downloadedContent">Contenido JSON del envelope firmado descargado desde S3.</param>
+        /// <param name="expectedHash">Hash SHA256 corto (8 chars) esperado de la configuración.</param>
+        /// <returns>true si verificación y persistencia fueron exitosas.</returns>
+        public Task<bool> ApplyDownloadedConfigAsync(string downloadedContent, string expectedHash)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(downloadedContent))
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        "ConfigManager: contenido de configuración vacío. Rechazando.");
+                    return Task.FromResult(false);
+                }
+
+                // 1. Validar que es un envelope firmado con estructura correcta
+                JObject parsed;
+                try
+                {
+                    parsed = JObject.Parse(downloadedContent);
+                }
+                catch (Newtonsoft.Json.JsonException)
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        "ConfigManager: contenido descargado no es JSON válido. Rechazando.");
+                    return Task.FromResult(false);
+                }
+
+                if (parsed["config"] == null || parsed["hash"] == null ||
+                    parsed["signature"] == null || parsed["cert_version"] == null)
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        "ConfigManager: configuración sin firma digital. " +
+                        "Rechazando (formato legacy no aceptado).");
+                    return Task.FromResult(false);
+                }
+
+                // 2. Verificar y actualizar certificado si es necesario
+                int envelopeCertVersion = parsed["cert_version"]!.Value<int>();
+                int localCertVersion = SignatureVerifier.GetLocalCertVersion(traySource: true);
+
+                string certPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "AlwaysPrint", "config", "org.cer");
+
+                bool certFileExists = File.Exists(certPath);
+                if (envelopeCertVersion > localCertVersion || !certFileExists)
+                {
+                    if (!certFileExists)
+                    {
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            $"ConfigManager: certificado no encontrado en disco ({certPath}). " +
+                            "No se puede verificar firma sin certificado.");
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            $"ConfigManager: cert_version del envelope ({envelopeCertVersion}) > local ({localCertVersion}). " +
+                            "Se intentará verificar con el certificado actual.");
+                    }
+
+                    // Nota: la descarga del certificado actualizado se gestiona por Cert_Push_Message
+                    // separado. Aquí intentamos verificar con lo que tenemos disponible.
+                }
+
+                // 3. Verificar firma ECDSA — FAIL-CLOSED: si no verifica, rechazar
+                if (!SignatureVerifier.VerifyConfig(downloadedContent, certPath, out string verifiedConfig, traySource: true))
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        "ConfigManager: verificación de firma ECDSA fallida. " +
+                        "Rechazando configuración (fail-closed).");
+                    return Task.FromResult(false);
+                }
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "ConfigManager: firma ECDSA verificada exitosamente");
+
+                // 4. Persistir vía Service (Named Pipe)
+                bool saved = SendSaveActionConfigToService(downloadedContent, expectedHash);
+
+                if (!saved)
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        "ConfigManager: el Service no pudo guardar la configuración");
+                    return Task.FromResult(false);
+                }
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"ConfigManager: configuración aplicada exitosamente. hash={expectedHash}");
+                return Task.FromResult(true);
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"ConfigManager: error en ApplyDownloadedConfigAsync: {ex.Message}", ex);
+                return Task.FromResult(false);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // HASH Y VERIFICACIÓN
         // ═══════════════════════════════════════════════════════════════════════
         
         /// <summary>
-        /// Obtiene el hash de la configuración local.
+        /// Obtiene el hash de la configuración local activa.
         /// Si el archivo es un envelope firmado, extrae el campo "hash" (primeros 8 chars).
+        /// Retorna null si no hay archivo de configuración local.
         /// </summary>
-        private string? GetLocalConfigHash()
+        public string GetLocalConfigHash()
         {
             try
             {

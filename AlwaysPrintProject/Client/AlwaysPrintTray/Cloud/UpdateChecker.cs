@@ -10,9 +10,22 @@ using Newtonsoft.Json;
 namespace AlwaysPrintTray.Cloud
 {
     /// <summary>
-    /// Verifica periódicamente si hay actualizaciones disponibles consultando al Cloud Backend.
-    /// Se ejecuta en el contexto del Tray (usuario). Implementa IDisposable para liberar el timer.
+    /// [DEPRECADO] Verificaba periódicamente si hay actualizaciones disponibles consultando
+    /// al Cloud Backend vía polling HTTP a /api/v1/updates/check cada 24 horas.
+    /// 
+    /// Con la implementación de push-based distribution, las actualizaciones de MSI
+    /// ahora llegan vía WebSocket (MSI_Push_Message tipo "check_update") con presigned URL
+    /// de S3 para descarga directa. El PushMessageHandler gestiona estos mensajes.
+    /// 
+    /// El polling periódico ha sido DESHABILITADO. Se mantiene únicamente:
+    /// - CheckNowAsync() como fallback para comandos remotos "check_update" legacy
+    ///   que no incluyen download_url (durante período de transición).
+    /// - La clase permanece instanciada pero sin timer activo.
+    /// 
+    /// Será eliminada completamente cuando se complete la migración a push-based distribution.
     /// </summary>
+    [Obsolete("La verificación de actualizaciones MSI es push-based vía WebSocket (PushMessageHandler). " +
+               "El polling periódico ha sido deshabilitado. CheckNowAsync() se mantiene como fallback legacy.")]
     public class UpdateChecker : IDisposable
     {
         private readonly Timer _timer;
@@ -54,10 +67,16 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
-        /// Inicia la verificación periódica de actualizaciones.
-        /// Si el flag local está habilitado, ejecuta una verificación inmediata y programa
-        /// las siguientes cada 24 horas.
+        /// [DEPRECADO] Anteriormente iniciaba la verificación periódica de actualizaciones cada 24h.
+        /// 
+        /// Con push-based distribution, las actualizaciones de MSI llegan vía WebSocket
+        /// (MSI_Push_Message) y se gestionan por PushMessageHandler. El polling periódico
+        /// ha sido deshabilitado para eliminar la dependencia del endpoint /api/v1/updates/check.
+        /// 
+        /// Se mantiene el método para compatibilidad de interfaz pero NO activa el timer.
+        /// CheckNowAsync() sigue disponible como fallback para comandos remotos legacy.
         /// </summary>
+        [Obsolete("Polling periódico de MSI deshabilitado. Usar push-based distribution vía PushMessageHandler.")]
         public void Start()
         {
             bool autoUpdateEnabled = _registry.LoadAutoUpdateEnabled();
@@ -69,26 +88,13 @@ namespace AlwaysPrintTray.Cloud
                 return;
             }
 
+            // NOTA: El timer periódico ha sido DESHABILITADO intencionalmente.
+            // Las actualizaciones de MSI ahora llegan vía WebSocket push (check_update message).
+            // El PushMessageHandler compara la versión y gestiona la descarga directa desde S3.
+            // Se mantiene CheckNowAsync() como fallback para comandos remotos legacy sin download_url.
             AlwaysPrintLogger.WriteTrayInfo(
-                "UpdateChecker: iniciando verificación periódica de actualizaciones (intervalo: 24h).");
-
-            // Programar timer con intervalo de 24 horas
-            _timer.Change(CheckIntervalMs, CheckIntervalMs);
-
-            // Ejecutar verificación inmediata de forma asíncrona (fire-and-forget)
-            Task.Run(async () =>
-            {
-                try
-                {
-                    await CheckNowAsync();
-                }
-                catch (Exception ex)
-                {
-                    AlwaysPrintLogger.WriteTrayError(
-                        $"UpdateChecker: error en verificación inmediata al inicio. {ex.Message}",
-                        AlwaysPrintLogger.EvtGenericError);
-                }
-            });
+                "UpdateChecker: polling periódico de actualizaciones DESHABILITADO (push-based distribution activa). " +
+                "CheckNowAsync() disponible como fallback para comandos remotos legacy.");
         }
 
         /// <summary>
@@ -101,9 +107,18 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
-        /// Ejecuta una verificación inmediata de actualización.
+        /// [LEGACY FALLBACK] Ejecuta una verificación inmediata de actualización vía HTTP.
+        /// 
+        /// Este método se mantiene EXCLUSIVAMENTE como fallback para comandos remotos
+        /// "check_update" que no incluyen download_url (clientes/servidores antiguos durante transición).
+        /// 
+        /// En operación normal, las actualizaciones de MSI llegan vía WebSocket push
+        /// (MSI_Push_Message con presigned URL) y se descargan directamente desde S3.
+        /// 
         /// Flujo: leer flag local → llamar API /updates/check → comparar versiones → disparar evento.
         /// </summary>
+        [Obsolete("Fallback legacy para comandos remotos sin download_url. " +
+                   "En operación normal, usar push-based distribution vía PushMessageHandler.")]
         public async Task CheckNowAsync()
         {
             try
@@ -210,8 +225,11 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
-        /// Callback del timer. Se ejecuta cada 24 horas para verificar actualizaciones.
+        /// [DEPRECADO] Callback del timer periódico (anteriormente cada 24h).
+        /// El timer ya no se activa — este callback no debería ejecutarse nunca.
+        /// Se mantiene por si el timer queda activo por un defecto.
         /// </summary>
+        [Obsolete("Timer periódico deshabilitado. Este callback no debería ejecutarse.")]
         private async void OnTimerElapsed(object? state)
         {
             try

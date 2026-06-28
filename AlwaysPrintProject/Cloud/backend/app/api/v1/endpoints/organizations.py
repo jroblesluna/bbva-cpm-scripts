@@ -45,6 +45,7 @@ from app.services.config import ConfigService
 from app.services.crypto_service import CryptoService
 from app.services.s3_config_service import S3ConfigService
 from app.services.s3_update_service import S3UpdateService
+from app.services.push_services import get_state_map_service, get_push_distribution_service
 
 logger = logging.getLogger(__name__)
 
@@ -386,6 +387,34 @@ async def toggle_my_auto_update(
                 "file_size": update_info["file_size"],
                 "auto_update_enabled": True,
             }
+
+            # Push-based distribution: actualizar state map → Redis
+            try:
+                state_map = get_state_map_service()
+                push_service = get_push_distribution_service()
+
+                await state_map.update_msi(
+                    org_id=str(organization.id),
+                    msi_version=update_info["version"],
+                    msi_url=update_info["download_url"],
+                )
+
+                enviados = await push_service.push_msi_update(
+                    org_id=str(organization.id),
+                    msi_version=update_info["version"],
+                    download_url=update_info["download_url"],
+                    file_size=update_info["file_size"],
+                )
+
+                logger.info(
+                    "push.msi_auto_update_operador: org_id=%s, version=%s, ws_notificadas=%d",
+                    organization.id, update_info["version"], enviados,
+                )
+            except Exception as e:
+                logger.error(
+                    "push.msi_auto_update_operador_error: org_id=%s, error=%s",
+                    organization.id, str(e),
+                )
         else:
             logger.warning(
                 "S3 no disponible para broadcast check_update, "
@@ -451,6 +480,45 @@ async def pin_my_version(
         "Versión pineada (operador): org_id=%s, version=%s, user_id=%s",
         organization.id, version, current_user.id,
     )
+    
+    # Push-based distribution: actualizar state map → Redis → push a workstations
+    if version:
+        try:
+            state_map = get_state_map_service()
+            push_service = get_push_distribution_service()
+
+            update_info = S3UpdateService().get_broadcast_update_info(
+                target_version=version
+            )
+
+            if update_info:
+                await state_map.update_msi(
+                    org_id=str(organization.id),
+                    msi_version=update_info["version"],
+                    msi_url=update_info["download_url"],
+                )
+
+                enviados = await push_service.push_msi_update(
+                    org_id=str(organization.id),
+                    msi_version=update_info["version"],
+                    download_url=update_info["download_url"],
+                    file_size=update_info["file_size"],
+                )
+
+                logger.info(
+                    "push.msi_pin_version_operador: org_id=%s, version=%s, ws_notificadas=%d",
+                    organization.id, version, enviados,
+                )
+            else:
+                logger.warning(
+                    "push.msi_pin_version_sin_s3: org_id=%s, version=%s",
+                    organization.id, version,
+                )
+        except Exception as e:
+            logger.error(
+                "push.msi_pin_version_error: org_id=%s, version=%s, error=%s",
+                organization.id, version, str(e),
+            )
     
     return {
         "target_version": organization.target_version,
@@ -1048,6 +1116,35 @@ async def toggle_auto_update(
                 "file_size": update_info["file_size"],
                 "auto_update_enabled": True,
             }
+
+            # Push-based distribution: actualizar state map → Redis
+            try:
+                state_map = get_state_map_service()
+                push_service = get_push_distribution_service()
+
+                await state_map.update_msi(
+                    org_id=str(org_id),
+                    msi_version=update_info["version"],
+                    msi_url=update_info["download_url"],
+                )
+
+                # Push a workstations online vía PushDistributionService
+                enviados = await push_service.push_msi_update(
+                    org_id=str(org_id),
+                    msi_version=update_info["version"],
+                    download_url=update_info["download_url"],
+                    file_size=update_info["file_size"],
+                )
+
+                logger.info(
+                    "push.msi_auto_update_completa: org_id=%s, version=%s, ws_notificadas=%d",
+                    org_id, update_info["version"], enviados,
+                )
+            except Exception as e:
+                logger.error(
+                    "push.msi_auto_update_error: org_id=%s, error=%s",
+                    org_id, str(e),
+                )
         else:
             logger.warning(
                 "S3 no disponible para broadcast check_update, "
@@ -1270,7 +1367,7 @@ async def toggle_forced_contingency(
         "Enviar null para volver a usar la última versión disponible (latest)."
     )
 )
-def set_target_version(
+async def set_target_version(
     org_id: UUID,
     body: TargetVersionRequest,
     current_user: User = Depends(require_admin),
@@ -1307,6 +1404,49 @@ def set_target_version(
         body.version,
         current_user.id,
     )
+
+    # Push-based distribution: actualizar state map → Redis → push a workstations
+    if body.version:
+        try:
+            state_map = get_state_map_service()
+            push_service = get_push_distribution_service()
+
+            # Obtener info de MSI desde S3 para enriquecer el push message
+            update_info = S3UpdateService().get_broadcast_update_info(
+                target_version=body.version
+            )
+
+            if update_info:
+                # Actualizar state map (publica automáticamente a Redis)
+                await state_map.update_msi(
+                    org_id=str(org_id),
+                    msi_version=update_info["version"],
+                    msi_url=update_info["download_url"],
+                )
+
+                # Push a workstations online
+                enviados = await push_service.push_msi_update(
+                    org_id=str(org_id),
+                    msi_version=update_info["version"],
+                    download_url=update_info["download_url"],
+                    file_size=update_info["file_size"],
+                )
+
+                logger.info(
+                    "push.msi_target_version_completa: org_id=%s, version=%s, ws_notificadas=%d",
+                    org_id, body.version, enviados,
+                )
+            else:
+                logger.warning(
+                    "push.msi_target_version_sin_s3: org_id=%s, version=%s, "
+                    "S3 no disponible, workstations se sincronizarán en próximo registro",
+                    org_id, body.version,
+                )
+        except Exception as e:
+            logger.error(
+                "push.msi_target_version_error: org_id=%s, version=%s, error=%s",
+                org_id, body.version, str(e),
+            )
 
     return TargetVersionResponse(
         target_version=organization.target_version,
@@ -1571,6 +1711,35 @@ async def rotate_certificate(
         ws_id = str(ws.id)
         if connection_manager.is_workstation_online(ws_id):
             await connection_manager.send_to_workstation(ws_id, cert_rotated_message)
+
+    # 9.1 Push-based distribution: actualizar state map → Redis → push a workstations
+    try:
+        state_map = get_state_map_service()
+        push_service = get_push_distribution_service()
+
+        # Actualizar state map (publica automáticamente a Redis)
+        await state_map.update_cert(
+            org_id=str(org_id),
+            cert_version=new_version,
+            cert_url=cert_url,
+        )
+
+        # Push a workstations online vía PushDistributionService
+        enviados = await push_service.push_cert_rotation(
+            org_id=str(org_id),
+            cert_version=new_version,
+            cert_url=cert_url,
+        )
+
+        logger.info(
+            "push.cert_rotacion_completa: org_id=%s, cert_version=%d, ws_notificadas=%d",
+            org_id, new_version, enviados,
+        )
+    except Exception as e:
+        logger.error(
+            "push.cert_rotacion_error: org_id=%s, cert_version=%d, error=%s",
+            org_id, new_version, str(e),
+        )
 
     # 10. Registrar en auditoría
     audit_service = AuditService()

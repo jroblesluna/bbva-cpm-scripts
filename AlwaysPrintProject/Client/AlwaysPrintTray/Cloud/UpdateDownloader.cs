@@ -41,11 +41,19 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
-        /// Descarga el MSI desde el endpoint /api/v1/updates/download y verifica su integridad por tamaño.
-        /// La descarga es asíncrona y no bloquea el hilo de la interfaz de usuario.
+        /// [DEPRECADO] Descarga el MSI desde el endpoint HTTP /api/v1/updates/download.
+        /// 
+        /// Con push-based distribution, la descarga de MSI se realiza directamente desde
+        /// presigned URLs de S3 provistas por MSI_Push_Message o Registration_Enrichment,
+        /// usando DownloadFromUrlAsync(). El endpoint HTTP solo se usa como fallback
+        /// cuando la presigned URL ha expirado (HTTP 403).
+        /// 
+        /// Este método será eliminado cuando se complete la migración a push-based distribution.
         /// </summary>
         /// <param name="expectedSize">Tamaño esperado del archivo en bytes (reportado por el backend).</param>
         /// <returns>Ruta completa del MSI descargado si la verificación es exitosa; null si falla.</returns>
+        [Obsolete("Usar DownloadFromUrlAsync con presigned URL de S3 (push-based). " +
+                   "Este método se mantiene como fallback cuando la presigned URL expira.")]
         public async Task<string?> DownloadAsync(long expectedSize)
         {
             var stopwatch = Stopwatch.StartNew();
