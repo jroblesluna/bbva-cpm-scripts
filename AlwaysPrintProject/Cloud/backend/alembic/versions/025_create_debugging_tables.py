@@ -11,6 +11,7 @@ para los estados del ciclo de vida de una sesión.
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 revision: str = '025_create_debugging'
 down_revision: Union[str, None] = '024_fix_audit_enum_case'
@@ -35,8 +36,8 @@ def upgrade() -> None:
     # Tabla debugging_profiles
     op.create_table(
         'debugging_profiles',
-        sa.Column('id', sa.String(36), primary_key=True),
-        sa.Column('organization_id', sa.String(36),
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column('organization_id', postgresql.UUID(as_uuid=True),
                   sa.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=False),
         sa.Column('name', sa.String(60), nullable=False),
         sa.Column('description', sa.Text(), nullable=False),
@@ -46,7 +47,7 @@ def upgrade() -> None:
         sa.Column('registry_keys', sa.Text(), nullable=False, server_default='[]'),
         sa.Column('monitored_services', sa.Text(), nullable=False, server_default='[]'),
         sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('created_by', sa.String(36),
+        sa.Column('created_by', postgresql.UUID(as_uuid=True),
                   sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
@@ -60,12 +61,12 @@ def upgrade() -> None:
     # Tabla debugging_sessions
     op.create_table(
         'debugging_sessions',
-        sa.Column('id', sa.String(36), primary_key=True),
-        sa.Column('organization_id', sa.String(36),
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column('organization_id', postgresql.UUID(as_uuid=True),
                   sa.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('profile_id', sa.String(36),
+        sa.Column('profile_id', postgresql.UUID(as_uuid=True),
                   sa.ForeignKey('debugging_profiles.id', ondelete='SET NULL'), nullable=True),
-        sa.Column('workstation_id', sa.String(36),
+        sa.Column('workstation_id', postgresql.UUID(as_uuid=True),
                   sa.ForeignKey('workstations.id', ondelete='CASCADE'), nullable=False),
         sa.Column('status',
                   sa.Enum('active', 'ready', 'uploading', 'analyzing', 'analyzed',
@@ -79,7 +80,7 @@ def upgrade() -> None:
         sa.Column('additional_instructions', sa.Text(), nullable=True),
         sa.Column('total_data_size_bytes', sa.BigInteger(), nullable=True),
         sa.Column('s3_report_key', sa.String(500), nullable=True),
-        sa.Column('initiated_by', sa.String(36),
+        sa.Column('initiated_by', postgresql.UUID(as_uuid=True),
                   sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
     )
