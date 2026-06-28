@@ -307,19 +307,68 @@ async def workstation_websocket(
         # Loop de recepción de mensajes
         while True:
             data = await websocket.receive_json()
+            message_type = data.get("type")
             
-            # Crear sesión de BD solo cuando llega un mensaje (no retener entre mensajes)
+            # Pong es el mensaje más frecuente (~66 cada 30s) y NO necesita BD.
+            # Procesarlo antes de crear SessionLocal() para no consumir pool.
+            if message_type == "pong":
+                await connection_manager.handle_pong(workstation_id)
+                await connection_manager.update_last_activity(workstation_id)
+                continue
+            
+            # command_result NO necesita BD — solo routing/broadcast en memoria/Redis.
+            # Evitar crear sesión innecesaria para reducir presión sobre el pool.
+            if message_type == "command_result":
+                command_id = data.get("command_id")
+                success = data.get("success")
+                output = data.get("output")
+                
+                response_data = {
+                    "command_id": command_id,
+                    "success": success,
+                    "output": output
+                }
+                
+                # Resolver waiter local o publicar cross-worker
+                resolved_locally = connection_manager.resolve_command_response(command_id, response_data)
+                if not resolved_locally and command_id:
+                    origin_worker = connection_manager._command_origins.pop(command_id, None)
+                    if origin_worker:
+                        logger.info(
+                            "[WS] command_result routing cross-worker: "
+                            "command_id=%s → origin_worker=%s",
+                            command_id, origin_worker,
+                        )
+                        await connection_manager.publish_command_response(
+                            command_id, response_data, origin_worker
+                        )
+                    else:
+                        logger.warning(
+                            "[WS] command_result sin waiter local ni origin_worker: "
+                            "command_id=%s, workstation_id=%s",
+                            command_id, workstation_id,
+                        )
+                
+                # Broadcast a operadores (sin BD)
+                cmd_broadcast_msg = {
+                    "type": "command_result",
+                    "workstation_id": workstation_id,
+                    "command_id": command_id,
+                    "success": success,
+                    "output": output
+                }
+                await connection_manager.broadcast_to_organization(
+                    organization_id=str(workstation.organization_id),
+                    message=cmd_broadcast_msg,
+                    db=None
+                )
+                continue
+            
+            # Para los demás tipos de mensaje, crear sesión de BD on-demand
             if db is None:
                 db = SessionLocal()
             
-            message_type = data.get("type")
-            
-            if message_type == "pong":
-                # Registrar pong y actualizar última actividad
-                await connection_manager.handle_pong(workstation_id)
-                await connection_manager.update_last_activity(workstation_id)
-            
-            elif message_type == "status_update":
+            if message_type == "status_update":
                 # Actualizar última actividad al recibir status_update
                 await connection_manager.update_last_activity(workstation_id)
                 # Verificar que la workstation aún existe en BD antes de actualizar
@@ -436,59 +485,6 @@ async def workstation_websocket(
                     old_values={field: old_value},
                     new_values={field: new_value},
                     ip_address=client_host
-                )
-            
-            elif message_type == "command_result":
-                # Resultado de ejecución de comando
-                command_id = data.get("command_id")
-                success = data.get("success")
-                output = data.get("output")
-                
-                response_data = {
-                    "command_id": command_id,
-                    "success": success,
-                    "output": output
-                }
-                
-                # Resolver waiter local o publicar cross-worker
-                resolved_locally = connection_manager.resolve_command_response(command_id, response_data)
-                if not resolved_locally and command_id:
-                    # Buscar si este comando vino de otro worker
-                    origin_worker = connection_manager._command_origins.pop(command_id, None)
-                    if origin_worker:
-                        logger.info(
-                            "[WS] command_result routing cross-worker: "
-                            "command_id=%s → origin_worker=%s",
-                            command_id, origin_worker,
-                        )
-                        await connection_manager.publish_command_response(
-                            command_id, response_data, origin_worker
-                        )
-                    else:
-                        logger.warning(
-                            "[WS] command_result sin waiter local ni origin_worker: "
-                            "command_id=%s, workstation_id=%s",
-                            command_id, workstation_id,
-                        )
-                
-                # Preparar mensaje de broadcast
-                cmd_broadcast_msg = {
-                    "type": "command_result",
-                    "workstation_id": workstation_id,
-                    "command_id": command_id,
-                    "success": success,
-                    "output": output
-                }
-                
-                # Liberar sesión de BD ANTES del broadcast (evita pool exhaustion)
-                db.close()
-                db = None
-                
-                # Notificar a operadores (sin consulta a BD — envía a todos los conectados)
-                await connection_manager.broadcast_to_organization(
-                    organization_id=str(workstation.organization_id),
-                    message=cmd_broadcast_msg,
-                    db=None
                 )
             
             elif message_type == "telemetry":
