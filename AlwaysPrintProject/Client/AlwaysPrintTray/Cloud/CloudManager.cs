@@ -316,7 +316,7 @@ namespace AlwaysPrintTray.Cloud
                     HandleCertRotated(json);
                     break;
                 case "action_config_changed":
-                    HandleActionConfigChanged();
+                    HandleActionConfigChanged(json);
                     break;
                 default:
                     AlwaysPrintLogger.WriteTrayInfo(
@@ -1774,19 +1774,49 @@ namespace AlwaysPrintTray.Cloud
 
         /// <summary>
         /// Maneja la notificación del servidor de que la configuración de acciones cambió.
-        /// Re-verifica la configuración con un jitter aleatorio para evitar thundering herd
-        /// (todas las workstations descargando al mismo tiempo).
+        /// Compara el hash remoto con el local para evitar descargas innecesarias.
+        /// Si el hash difiere (o no viene), re-verifica con jitter aleatorio para evitar thundering herd.
         /// </summary>
-        private async void HandleActionConfigChanged()
+        private async void HandleActionConfigChanged(string json)
         {
-            // Jitter aleatorio de 1-10 segundos para evitar thundering herd
-            int jitterMs = new Random().Next(1000, 10000);
-            AlwaysPrintLogger.WriteTrayInfo(
-                $"CloudManager: notificación action_config_changed recibida. " +
-                $"Re-verificando configuración en {jitterMs}ms...");
+            try
+            {
+                // Extraer hash de la nueva config del mensaje (si viene)
+                string? remoteHash = null;
+                try
+                {
+                    var data = JObject.Parse(json);
+                    remoteHash = data["config_hash"]?.ToString();
+                }
+                catch { }
 
-            await Task.Delay(jitterMs);
-            await CheckActionConfigurationAsync();
+                // Si el hash remoto coincide con el local, no hay cambio real → evitar descarga HTTP
+                if (!string.IsNullOrEmpty(remoteHash))
+                {
+                    var localInfo = _configManager?.GetLocalConfigInfo();
+                    if (localInfo != null && localInfo.Hash.Equals(remoteHash, StringComparison.OrdinalIgnoreCase))
+                    {
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"CloudManager: action_config_changed recibido pero hash local ({localInfo.Hash}) " +
+                            $"coincide con remoto ({remoteHash}). Sin cambios, descarga evitada.");
+                        return;
+                    }
+                }
+
+                // Jitter aleatorio de 1-10 segundos para distribuir descargas
+                int jitterMs = new Random().Next(1000, 10000);
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: notificación action_config_changed recibida (hash={remoteHash ?? "?"}). " +
+                    $"Re-verificando configuración en {jitterMs}ms...");
+
+                await Task.Delay(jitterMs);
+                await CheckActionConfigurationAsync();
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error procesando action_config_changed: {ex.Message}");
+            }
         }
 
         /// <summary>

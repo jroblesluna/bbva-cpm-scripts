@@ -38,7 +38,7 @@ _config_info_cache: dict[str, tuple[float, dict]] = {}
 _CONFIG_INFO_TTL = 30.0  # segundos
 
 
-async def _notify_workstations_config_changed(db: Session, organization_id) -> int:
+async def _notify_workstations_config_changed(db: Session, organization_id, config_hash: str = "") -> int:
     """
     Invalida caché de config_info y envía 'action_config_changed' a workstations online.
     Los envíos WebSocket se hacen en background sin retener sesión de BD.
@@ -48,6 +48,10 @@ async def _notify_workstations_config_changed(db: Session, organization_id) -> i
     2. Invalidar caché en memoria (inmediato)
     3. Recopilar IDs online (consulta en memoria del connection_manager)
     4. Disparar envío de notificaciones en background (fire-and-forget)
+
+    Args:
+        config_hash: hash de la configuración activa. Si se incluye, las workstations
+                     pueden comparar con su hash local y evitar la descarga HTTP si coincide.
     """
     from app.services.websocket_manager import connection_manager
     from app.models.workstation import Workstation
@@ -68,16 +72,16 @@ async def _notify_workstations_config_changed(db: Session, organization_id) -> i
 
     # Enviar notificaciones en background (no bloquea el response HTTP)
     if online_ws_ids:
-        asyncio.ensure_future(_send_config_changed_notifications(online_ws_ids))
+        asyncio.ensure_future(_send_config_changed_notifications(online_ws_ids, config_hash))
 
     return len(online_ws_ids)
 
 
-async def _send_config_changed_notifications(ws_ids: list[str]) -> None:
+async def _send_config_changed_notifications(ws_ids: list[str], config_hash: str = "") -> None:
     """Envía action_config_changed a una lista de workstation IDs. Fire-and-forget."""
     from app.services.websocket_manager import connection_manager
 
-    message = {"type": "action_config_changed"}
+    message = {"type": "action_config_changed", "config_hash": config_hash}
     sent = 0
     for ws_id in ws_ids:
         try:
@@ -87,8 +91,8 @@ async def _send_config_changed_notifications(ws_ids: list[str]) -> None:
             pass  # Best-effort, no falla si una WS se desconectó
 
     logger.info(
-        "ActionConfig changed: %d/%d notificaciones enviadas (background)",
-        sent, len(ws_ids)
+        "ActionConfig changed: %d/%d notificaciones enviadas (background, hash=%s)",
+        sent, len(ws_ids), config_hash or "vacío"
     )
 
 
@@ -227,7 +231,7 @@ async def upload_action_config(
         
         # Si se creó activa, notificar a las workstations para que re-descarguen
         if config.is_active:
-            await _notify_workstations_config_changed(db, organization_id)
+            await _notify_workstations_config_changed(db, organization_id, config.config_hash)
         
         return config
     except DuplicateConfigError as e:
@@ -390,7 +394,7 @@ async def update_action_config(
     
     # Si se activó una config, notificar a las workstations de la org para que re-descarguen
     if data.is_active and updated_config.is_active:
-        await _notify_workstations_config_changed(db, organization_id)
+        await _notify_workstations_config_changed(db, organization_id, updated_config.config_hash)
     
     return updated_config
 
