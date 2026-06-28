@@ -364,90 +364,70 @@ async def workstation_websocket(
                 )
                 continue
             
-            # Para los demás tipos de mensaje, crear sesión de BD on-demand
-            if db is None:
-                db = SessionLocal()
-            
             if message_type == "status_update":
-                # Actualizar última actividad al recibir status_update
+                # La workstation fue validada al conectar (handshake).
+                # No re-verificar existencia en cada status_update — causaba pool exhaustion
+                # con 303+ WS enviando simultáneamente cada 30s.
                 await connection_manager.update_last_activity(workstation_id)
-                # Verificar que la workstation aún existe en BD antes de actualizar
-                ws_exists = db.query(Workstation).filter(
-                    Workstation.id == workstation_id
-                ).first()
                 
-                if not ws_exists:
-                    # Workstation eliminada: verificar si la organización permite re-registro
-                    org = db.query(Organization).filter(
-                        Organization.id == workstation.organization_id
-                    ).first()
-                    
-                    if org and org.auto_reregister_enabled:
-                        logger.info(
-                            "[WS] status_update para workstation %s eliminada. "
-                            "auto_reregister_enabled=True para org %s. Solicitando re-registro.",
-                            workstation_id, org.name
-                        )
-                        await websocket.send_json({
-                            "type": "request_reregister",
-                            "reason": "workstation_not_found"
-                        })
-                        await _safe_close(websocket, 1000, "Re-registro requerido")
-                        return
-                    else:
-                        logger.warning(
-                            "[WS] status_update para workstation %s eliminada. "
-                            "auto_reregister_enabled=False. Descartando.",
-                            workstation_id
-                        )
-                        continue
-                
-                # Actualizar estado de contingencia
                 contingency_active = data.get("contingency_active")
                 contingency_printer_ip = data.get("contingency_printer_ip")
                 current_user = data.get("current_user")
-                
-                if contingency_active is not None:
-                    workstation_service.update_contingency_status(
-                        db=db,
-                        workstation_id=workstation_id,
-                        contingency_active=contingency_active,
-                        contingency_ip=contingency_printer_ip
-                    )
-                    
-                    # Registrar en auditoría
-                    audit_service.log_contingency_toggle(
-                        db=db,
-                        workstation_id=workstation_id,
-                        organization_id=str(workstation.organization_id),
-                        user_id=None,  # Cambio automático
-                        activated=contingency_active,
-                        ip_address=client_host
-                    )
-                
-                if current_user is not None:
-                    workstation_service.update_workstation_status(
-                        db=db,
-                        workstation_id=workstation_id,
-                        is_online=True,
-                        current_user=current_user
-                    )
-                
-                # Actualizar action_config info si viene en el mensaje
                 action_config_name = data.get("action_config_name")
                 action_config_hash = data.get("action_config_hash")
                 action_config_version = data.get("action_config_version")
-                if "action_config_name" in data or "action_config_hash" in data or "action_config_version" in data:
-                    ws_record = db.query(Workstation).filter(
-                        Workstation.id == workstation_id
-                    ).first()
-                    if ws_record:
-                        ws_record.action_config_name = action_config_name
-                        ws_record.action_config_hash = action_config_hash
-                        ws_record.action_config_version = action_config_version
-                        db.commit()
                 
-                # Preparar mensaje de broadcast ANTES de liberar la sesión de BD
+                # Solo crear sesión de BD si hay datos que persistir
+                needs_db = (
+                    contingency_active is not None
+                    or current_user is not None
+                    or "action_config_name" in data
+                    or "action_config_hash" in data
+                    or "action_config_version" in data
+                )
+                
+                if needs_db:
+                    db = SessionLocal()
+                    try:
+                        if contingency_active is not None:
+                            workstation_service.update_contingency_status(
+                                db=db,
+                                workstation_id=workstation_id,
+                                contingency_active=contingency_active,
+                                contingency_ip=contingency_printer_ip
+                            )
+                            # Registrar en auditoría
+                            audit_service.log_contingency_toggle(
+                                db=db,
+                                workstation_id=workstation_id,
+                                organization_id=str(workstation.organization_id),
+                                user_id=None,  # Cambio automático
+                                activated=contingency_active,
+                                ip_address=client_host
+                            )
+                        
+                        if current_user is not None:
+                            workstation_service.update_workstation_status(
+                                db=db,
+                                workstation_id=workstation_id,
+                                is_online=True,
+                                current_user=current_user
+                            )
+                        
+                        if "action_config_name" in data or "action_config_hash" in data or "action_config_version" in data:
+                            ws_record = db.query(Workstation).filter(
+                                Workstation.id == workstation_id
+                            ).first()
+                            if ws_record:
+                                ws_record.action_config_name = action_config_name
+                                ws_record.action_config_hash = action_config_hash
+                                ws_record.action_config_version = action_config_version
+                                db.commit()
+                    finally:
+                        db.close()
+                        db = None
+                
+                # Broadcast siempre (sin BD retenida)
                 status_broadcast_msg = {
                     "type": "workstation_status_change",
                     "workstation_id": workstation_id,
@@ -455,18 +435,16 @@ async def workstation_websocket(
                     "contingency_printer_ip": contingency_printer_ip,
                     "current_user": current_user
                 }
-                
-                # Liberar sesión de BD ANTES del broadcast (evita pool exhaustion).
-                # El broadcast puede awaitar Redis publish, reteniendo la coroutine.
-                db.close()
-                db = None
-                
-                # Notificar a operadores (sin consulta a BD — envía a todos los conectados)
                 await connection_manager.broadcast_to_organization(
                     organization_id=str(workstation.organization_id),
                     message=status_broadcast_msg,
                     db=None
                 )
+                continue
+            
+            # Para los demás tipos de mensaje, crear sesión de BD on-demand
+            if db is None:
+                db = SessionLocal()
             
             elif message_type == "config_change_report":
                 # Workstation reporta cambio de configuración local
