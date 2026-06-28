@@ -182,20 +182,27 @@ namespace AlwaysPrintTray.Cloud
                             Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                             "AlwaysPrint", "config", "org.cer");
                         
-                        // Si cert_version remoto > local, intentar descargar nuevo certificado
-                        if (envelopeCertVersion > localCertVersion)
+                        // Descargar certificado si: versión remota > local, O si el archivo no existe en disco
+                        bool certFileExists = File.Exists(certPath);
+                        if (envelopeCertVersion > localCertVersion || !certFileExists)
                         {
-                            AlwaysPrintLogger.WriteTrayWarning(
-                                $"ConfigManager: cert_version remoto ({envelopeCertVersion}) > local ({localCertVersion}). " +
-                                "Intentando actualizar certificado.");
+                            if (!certFileExists)
+                            {
+                                AlwaysPrintLogger.WriteTrayWarning(
+                                    $"ConfigManager: certificado no encontrado en disco ({certPath}). Descargando...");
+                            }
+                            else
+                            {
+                                AlwaysPrintLogger.WriteTrayWarning(
+                                    $"ConfigManager: cert_version remoto ({envelopeCertVersion}) > local ({localCertVersion}). " +
+                                    "Intentando actualizar certificado.");
+                            }
                             
                             if (!string.IsNullOrEmpty(certUrl))
                             {
                                 bool certDownloaded = await SignatureVerifier.DownloadCertAsync(certUrl, certPath, traySource: true);
                                 if (certDownloaded)
                                 {
-                                    // No escribir CertVersion en registro desde el Tray (requiere HKLM/admin).
-                                    // El Service lo actualizará al cargar y verificar la configuración firmada.
                                     AlwaysPrintLogger.WriteTrayInfo(
                                         $"ConfigManager: certificado actualizado a versión {envelopeCertVersion}");
                                 }
