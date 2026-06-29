@@ -450,6 +450,8 @@ class DebuggingAnalysisService:
 
         for line in analysis_text.split("\n"):
             line = sanitize(line)
+            # Resetear posición X para evitar desplazamiento residual
+            pdf.set_x(pdf.l_margin)
             # Detectar headers markdown
             if line.startswith("## "):
                 pdf.ln(3)
