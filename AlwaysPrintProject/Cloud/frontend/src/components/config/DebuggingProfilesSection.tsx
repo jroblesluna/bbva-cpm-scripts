@@ -136,19 +136,20 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
   // Mutation: confirmar y guardar perfil
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiClient.post('/debugging/profiles/confirm', null, {
-        params: {
-          organization_id: organizationId,
-        },
-        data: {
+      const res = await apiClient.post('/debugging/profiles/confirm', {
+        payload: {
           external_logs: externalLogs.filter(Boolean),
           eventlog_groups: eventlogGroups,
           registry_keys: registryKeys.filter(Boolean),
           monitored_services: monitoredServices.filter(Boolean),
           description,
+        },
+        confirm: {
           name: profileName,
           confirmation_message: confirmationMessage,
         },
+      }, {
+        params: { organization_id: organizationId },
       });
       return res.data;
     },
