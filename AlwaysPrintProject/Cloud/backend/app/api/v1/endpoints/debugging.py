@@ -917,12 +917,13 @@ async def delete_session_data(
         DebuggingSessionStatus.READY.value,
         DebuggingSessionStatus.ANALYZED.value,
         DebuggingSessionStatus.ANALYSIS_FAILED.value,
+        DebuggingSessionStatus.FAILED.value,
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
                 f"Solo se pueden eliminar datos de sesiones con status 'ready', "
-                f"'analyzed' o 'analysis_failed'. Estado actual: {session.status}"
+                f"'analyzed', 'analysis_failed' o 'failed'. Estado actual: {session.status}"
             ),
         )
 

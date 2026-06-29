@@ -1257,6 +1257,7 @@
     "wsCapturing": "Capturing data...",
     "wsExpiredNoResponse": "Time expired, no response from client",
     "wsDiscardSession": "Discard session",
+    "wsDiscard": "Discard",
     "wsTimeRemaining": "Time remaining: {seconds}s",
     "wsDataReady": "Data available",
     "wsDataSize": "Size: {size}",

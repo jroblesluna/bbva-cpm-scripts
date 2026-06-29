@@ -452,22 +452,34 @@ export function WorkstationDebuggingSection({
           <AlertCircle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between w-full">
             <span>{t('wsFailed')}</span>
-            {isOnline && (
+            <div className="flex items-center gap-2 ml-3">
+              {isOnline && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 border-red-300 text-red-700 hover:bg-red-50"
+                  disabled={analyzeMutation.isPending}
+                  onClick={() => analyzeMutation.mutate(failedSession.id)}
+                >
+                  {analyzeMutation.isPending ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : (
+                    <Play className="w-3 h-3 mr-1" />
+                  )}
+                  {t('wsRetryAnalysis')}
+                </Button>
+              )}
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="ml-3 h-7 border-red-300 text-red-700 hover:bg-red-50"
-                disabled={analyzeMutation.isPending}
-                onClick={() => analyzeMutation.mutate(failedSession.id)}
+                className="h-7 text-red-600 hover:text-red-800 hover:bg-red-50"
+                disabled={deleteMutation.isPending}
+                onClick={() => setDeleteConfirmSessionId(failedSession.id)}
               >
-                {analyzeMutation.isPending ? (
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                ) : (
-                  <Play className="w-3 h-3 mr-1" />
-                )}
-                {t('wsRetryAnalysis')}
+                <Trash2 className="w-3 h-3 mr-1" />
+                {t('wsDiscard')}
               </Button>
-            )}
+            </div>
           </AlertDescription>
         </Alert>
       )}
