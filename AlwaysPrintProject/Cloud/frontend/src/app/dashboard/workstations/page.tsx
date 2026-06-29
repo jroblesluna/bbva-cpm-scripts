@@ -49,6 +49,8 @@ import {
   Settings,
   ListChecks,
   Cog,
+  Eye,
+  Power,
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
@@ -77,10 +79,9 @@ export default function WorkstationsPage() {
   const debouncedSearch = useDebounce(searchTerm, 400);
   const [filterOnline, setFilterOnline] = useState<boolean | undefined>(undefined);
   const [filterContingency, setFilterContingency] = useState<boolean | undefined>(undefined);
-  const [filterWithConfig, setFilterWithConfig] = useState<boolean | undefined>(undefined);
   const [filterOrgId, setFilterOrgId] = useState<string | undefined>(() => searchParams.get('org_id') || undefined);
   const [filterVlanId, setFilterVlanId] = useState<string | undefined>(() => searchParams.get('vlan_id') || undefined);
-  const [filterVersion, setFilterVersion] = useState<boolean | undefined>(undefined);
+  const [filterVersion, setFilterVersion] = useState<'current' | 'outdated' | undefined>(undefined);
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
   const [editingWorkstation, setEditingWorkstation] = useState<Workstation | null>(null);
   const [contingencyTarget, setContingencyTarget] = useState<Workstation | null>(null);
@@ -293,17 +294,17 @@ export default function WorkstationsPage() {
 
   const workstations = (() => {
     let items = workstationsData?.items || [];
-    if (filterWithConfig) {
-      const configIds = new Set(stats?.workstations_with_config?.map(w => w.id) || []);
-      items = items.filter(ws => configIds.has(ws.id));
-    }
     if (filterVersion && latestVersion) {
-      items = items.filter(ws => ws.tray_version === latestVersion);
+      if (filterVersion === 'current') {
+        items = items.filter(ws => ws.tray_version === latestVersion);
+      } else {
+        items = items.filter(ws => ws.tray_version && ws.tray_version !== latestVersion);
+      }
     }
     return items;
   })();
 
-  const totalItems = filterWithConfig || filterVersion ? workstations.length : (workstationsData?.total || 0);
+  const totalItems = filterVersion ? workstations.length : (workstationsData?.total || 0);
   const totalPages = Math.ceil(totalItems / pageSize);
   const paginationStart = (page - 1) * pageSize + 1;
   const paginationEnd = Math.min(page * pageSize, totalItems);
@@ -517,19 +518,6 @@ export default function WorkstationsPage() {
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{t('withConfig')}</p>
-                  <p className="text-2xl md:text-3xl font-bold text-gray-900">
-                    {stats.workstations_with_config?.length || 0}
-                  </p>
-                </div>
-                <Settings className="w-8 h-8 md:w-12 md:h-12 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
         </div>
       )}
 
@@ -635,37 +623,34 @@ export default function WorkstationsPage() {
                 {t('onlyContingency')}
               </button>
               <button
-                onClick={() => { setFilterWithConfig(filterWithConfig === true ? undefined : true); setPage(1); }}
+                onClick={() => { setFilterVersion(filterVersion === 'current' ? undefined : 'current'); setPage(1); }}
                 className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-all select-none ${
-                  filterWithConfig === true
-                    ? 'border-green-300 bg-green-50 text-green-700'
+                  filterVersion === 'current'
+                    ? 'border-blue-300 bg-blue-50 text-blue-700'
                     : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
                 }`}
               >
-                <span className={`flex w-3.5 h-3.5 items-center justify-center rounded-sm border shrink-0 transition-colors ${filterWithConfig === true ? 'border-green-500 bg-green-500' : 'border-gray-300 bg-white'}`}>
-                  {filterWithConfig === true && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 5l2.5 2.5L8 3"/></svg>}
+                <span className={`flex w-3.5 h-3.5 items-center justify-center rounded-sm border shrink-0 transition-colors ${filterVersion === 'current' ? 'border-blue-500 bg-blue-500' : 'border-gray-300 bg-white'}`}>
+                  {filterVersion === 'current' && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 5l2.5 2.5L8 3"/></svg>}
                 </span>
-                {t('withConfig')}
+                {t('versionCurrent')}
               </button>
-              {latestVersion && (
-                <button
-                  onClick={() => { setFilterVersion(filterVersion === true ? undefined : true); setPage(1); }}
-                  className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-all select-none ${
-                    filterVersion === true
-                      ? 'border-blue-300 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                  }`}
-                >
-                  <span className={`flex w-3.5 h-3.5 items-center justify-center rounded-sm border shrink-0 transition-colors ${filterVersion === true ? 'border-blue-500 bg-blue-500' : 'border-gray-300 bg-white'}`}>
-                    {filterVersion === true && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 5l2.5 2.5L8 3"/></svg>}
-                  </span>
-                  {t('latestVersion')} (v{latestVersion})
-                </button>
-              )}
+              <button
+                onClick={() => { setFilterVersion(filterVersion === 'outdated' ? undefined : 'outdated'); setPage(1); }}
+                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-all select-none ${
+                  filterVersion === 'outdated'
+                    ? 'border-red-300 bg-red-50 text-red-700'
+                    : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                }`}
+              >
+                <span className={`flex w-3.5 h-3.5 items-center justify-center rounded-sm border shrink-0 transition-colors ${filterVersion === 'outdated' ? 'border-red-500 bg-red-500' : 'border-gray-300 bg-white'}`}>
+                  {filterVersion === 'outdated' && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 5l2.5 2.5L8 3"/></svg>}
+                </span>
+                {t('versionOutdated')}
+              </button>
               {(searchTerm ||
                 filterOnline !== undefined ||
                 filterContingency !== undefined ||
-                filterWithConfig !== undefined ||
                 filterVersion !== undefined ||
                 filterOrgId ||
                 filterVlanId) && (
@@ -676,7 +661,6 @@ export default function WorkstationsPage() {
                     setSearchTerm('');
                     setFilterOnline(undefined);
                     setFilterContingency(undefined);
-                    setFilterWithConfig(undefined);
                     setFilterOrgId(undefined);
                     setFilterVlanId(undefined);
                     setFilterVersion(undefined);
@@ -1407,8 +1391,10 @@ function WorkstationCard({
               variant="outline"
               size="sm"
               onClick={onViewDetails}
+              title={t('viewDetails')}
+              className="h-8 w-8 p-0"
             >
-              {t('viewDetails')}
+              <Eye className="w-4 h-4" />
             </Button>
             <Button
               variant="outline"
@@ -1435,7 +1421,7 @@ function WorkstationCard({
                   onClick={() => onCommand('restart_service')}
                   disabled={isCommandPending}
                 >
-                  <RotateCcw className="w-4 h-4" />
+                  <Power className="w-4 h-4" />
                 </Button>
                 <Button
                   variant="outline"
@@ -1560,7 +1546,7 @@ function WorkstationCard({
             className="h-8 w-8 p-0"
             title={t('viewDetails')}
           >
-            <Sparkles className="w-4 h-4" />
+            <Eye className="w-4 h-4" />
           </Button>
           <Button
             variant="outline"
@@ -1591,7 +1577,7 @@ function WorkstationCard({
                 disabled={isCommandPending}
                 className="h-8 w-8 p-0"
               >
-                <RotateCcw className="w-4 h-4" />
+                <Power className="w-4 h-4" />
               </Button>
               <Button
                 variant="outline"
@@ -1836,7 +1822,7 @@ function WorkstationTable({
                         title={t('viewDetails')}
                         className="h-7 w-7 p-0"
                       >
-                        <Sparkles className="w-3.5 h-3.5" />
+                        <Eye className="w-3.5 h-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -1867,7 +1853,7 @@ function WorkstationTable({
                             disabled={isCommandPending}
                             className="h-7 w-7 p-0"
                           >
-                            <RotateCcw className="w-3.5 h-3.5" />
+                            <Power className="w-3.5 h-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
