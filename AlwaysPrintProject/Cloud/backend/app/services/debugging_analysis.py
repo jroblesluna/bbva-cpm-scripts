@@ -441,12 +441,90 @@ class DebuggingAnalysisService:
         pdf.line(10, pdf.get_y(), 200, pdf.get_y())
         pdf.ln(5)
 
-        # Análisis del LLM
-        pdf.set_text_color(0, 0, 0)
-        pdf.set_font("Helvetica", "", 11)
-
-        # Procesar el texto del análisis línea por línea
+        # === Resumen de Datos Recopilados ===
         effective_width = pdf.w - pdf.l_margin - pdf.r_margin
+
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 7, "Resumen de Datos Recopilados", ln=True)
+        pdf.ln(2)
+
+        # Targets configurados
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_text_color(60, 60, 60)
+        pdf.cell(0, 5, "Targets del Perfil:", ln=True)
+        pdf.set_font("Helvetica", "", 9)
+
+        targets = index_data.get("targets", {})
+        ext_logs = targets.get("external_logs", [])
+        evt_groups = targets.get("eventlog_groups", [])
+        reg_keys = targets.get("registry_keys", [])
+        mon_services = targets.get("monitored_services", [])
+
+        if ext_logs:
+            pdf.set_x(pdf.l_margin + 4)
+            pdf.multi_cell(effective_width - 4, 4,
+                sanitize(f"- Logs externos: {', '.join(ext_logs)}"))
+        if evt_groups:
+            pdf.set_x(pdf.l_margin + 4)
+            pdf.multi_cell(effective_width - 4, 4,
+                sanitize(f"- Eventos Windows: {', '.join(evt_groups)}"))
+        if reg_keys:
+            pdf.set_x(pdf.l_margin + 4)
+            pdf.multi_cell(effective_width - 4, 4,
+                sanitize(f"- Llaves de registro: {', '.join(reg_keys)}"))
+        if mon_services:
+            pdf.set_x(pdf.l_margin + 4)
+            pdf.multi_cell(effective_width - 4, 4,
+                sanitize(f"- Servicios monitoreados: {', '.join(mon_services)}"))
+
+        pdf.ln(3)
+
+        # Archivos recopilados
+        files_list = index_data.get("files", [])
+        total_files = index_data.get("total_files", len(files_list))
+        total_size = index_data.get("total_size_bytes", 0)
+        total_size_kb = total_size / 1024 if total_size else 0
+
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(0, 5,
+            sanitize(f"Archivos recopilados: {total_files} ({total_size_kb:.1f} KB)"),
+            ln=True)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(80, 80, 80)
+
+        for f in files_list:
+            fname = f.get("filename", "")
+            fdesc = f.get("description", "")
+            fsize = f.get("size_bytes", 0)
+            pdf.set_x(pdf.l_margin + 4)
+            pdf.multi_cell(effective_width - 4, 4,
+                sanitize(f"- {fname} ({fsize} bytes) - {fdesc}"))
+
+        # Errores de captura (si los hay, mostrar aquí también)
+        errors = index_data.get("errors", [])
+        if errors:
+            pdf.ln(2)
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_text_color(180, 50, 50)
+            pdf.cell(0, 5, f"Advertencias de captura ({len(errors)}):", ln=True)
+            pdf.set_font("Helvetica", "", 8)
+            for err in errors:
+                pdf.set_x(pdf.l_margin + 4)
+                pdf.multi_cell(effective_width - 4, 4,
+                    sanitize(f"- {err.get('target', 'N/A')}: {err.get('error', 'N/A')}"))
+
+        pdf.ln(5)
+        pdf.set_draw_color(200, 200, 200)
+        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+        pdf.ln(5)
+
+        # === Análisis del LLM ===
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 7, "Analisis LLM", ln=True)
+        pdf.ln(2)
+        pdf.set_font("Helvetica", "", 11)
 
         for line in analysis_text.split("\n"):
             line = sanitize(line)
@@ -476,18 +554,6 @@ class DebuggingAnalysisService:
                 pdf.ln(3)
             else:
                 pdf.multi_cell(effective_width, 5, line)
-
-        # Footer con errores de captura si los hubo
-        errors = index_data.get("errors", [])
-        if errors:
-            pdf.ln(10)
-            pdf.set_font("Helvetica", "B", 11)
-            pdf.cell(0, 6, "Notas de Captura (errores durante recopilacion):", ln=True)
-            pdf.set_font("Helvetica", "", 9)
-            pdf.set_text_color(150, 50, 50)
-            for err in errors:
-                err_text = f"- {err.get('target', 'N/A')}: {err.get('error', 'N/A')}"
-                pdf.multi_cell(effective_width, 4, err_text)
 
         return pdf.output()
 
