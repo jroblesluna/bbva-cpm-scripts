@@ -186,6 +186,7 @@
     "allStatuses": "Todos los estados",
     "allAccounts": "Todas las organizaciones",
     "allVlans": "Todas las VLANs",
+    "allVersions": "Todas las versiones",
     "onlyContingency": "En contingencia",
     "withConfig": "Con config",
     "editTitle": "Editar Estación: {ip}",

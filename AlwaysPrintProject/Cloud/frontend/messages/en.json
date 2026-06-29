@@ -186,6 +186,7 @@
     "allStatuses": "All statuses",
     "allAccounts": "All organizations",
     "allVlans": "All VLANs",
+    "allVersions": "All versions",
     "onlyContingency": "In contingency",
     "withConfig": "With config",
     "editTitle": "Edit Workstation: {ip}",

@@ -80,6 +80,7 @@ export default function WorkstationsPage() {
   const [filterWithConfig, setFilterWithConfig] = useState<boolean | undefined>(undefined);
   const [filterOrgId, setFilterOrgId] = useState<string | undefined>(() => searchParams.get('org_id') || undefined);
   const [filterVlanId, setFilterVlanId] = useState<string | undefined>(() => searchParams.get('vlan_id') || undefined);
+  const [filterVersion, setFilterVersion] = useState<string | undefined>(undefined);
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
   const [editingWorkstation, setEditingWorkstation] = useState<Workstation | null>(null);
   const [contingencyTarget, setContingencyTarget] = useState<Workstation | null>(null);
@@ -283,10 +284,25 @@ export default function WorkstationsPage() {
   };
 
   const workstations = (() => {
+    let items = workstationsData?.items || [];
+    if (filterWithConfig) {
+      const configIds = new Set(stats?.workstations_with_config?.map(w => w.id) || []);
+      items = items.filter(ws => configIds.has(ws.id));
+    }
+    if (filterVersion) {
+      items = items.filter(ws => ws.tray_version === filterVersion);
+    }
+    return items;
+  })();
+
+  // Extraer versiones únicas de las workstations cargadas (para el filtro)
+  const availableVersions = (() => {
     const items = workstationsData?.items || [];
-    if (!filterWithConfig) return items;
-    const configIds = new Set(stats?.workstations_with_config?.map(w => w.id) || []);
-    return items.filter(ws => configIds.has(ws.id));
+    const versions = new Set<string>();
+    items.forEach(ws => {
+      if (ws.tray_version) versions.add(ws.tray_version);
+    });
+    return [...versions].sort((a, b) => b.localeCompare(a)); // Más reciente primero
   })();
   const totalItems = filterWithConfig ? workstations.length : (workstationsData?.total || 0);
   const totalPages = Math.ceil(totalItems / pageSize);
@@ -594,6 +610,26 @@ export default function WorkstationsPage() {
                 </select>
               </div>
             )}
+            {availableVersions.length > 1 && (
+              <div>
+                <select
+                  value={filterVersion || 'all'}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFilterVersion(value === 'all' ? undefined : value);
+                    setPage(1);
+                  }}
+                  className="w-full px-3 py-2 border rounded-md"
+                >
+                  <option value="all">{t('allVersions')}</option>
+                  {availableVersions.map((version) => (
+                    <option key={version} value={version}>
+                      v{version}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div className="flex items-center justify-between mt-4">
             <div className="flex items-center gap-2 flex-wrap">
@@ -628,7 +664,8 @@ export default function WorkstationsPage() {
                 filterContingency !== undefined ||
                 filterWithConfig !== undefined ||
                 filterOrgId ||
-                filterVlanId) && (
+                filterVlanId ||
+                filterVersion) && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -639,6 +676,7 @@ export default function WorkstationsPage() {
                     setFilterWithConfig(undefined);
                     setFilterOrgId(undefined);
                     setFilterVlanId(undefined);
+                    setFilterVersion(undefined);
                     setPage(1);
                   }}
                 >
