@@ -772,7 +772,7 @@ async def stop_session(
             detail=f"Solo se pueden detener sesiones activas. Estado actual: {session.status}",
         )
 
-    # Enviar comando StopDebugging
+    # Enviar comando StopDebugging (intento de cleanup en el cliente)
     ws_id_str = str(session.workstation_id)
     ws_message = {
         "type": "command",
@@ -783,12 +783,24 @@ async def stop_session(
         },
     }
 
-    await connection_manager.send_to_workstation(ws_id_str, ws_message)
+    sent = await connection_manager.send_to_workstation(ws_id_str, ws_message)
 
-    logger.info(
-        "[DEBUGGING] StopDebugging enviado: session=%s, ws=%s, por user=%s",
-        session.id, session.workstation_id, current_user.id,
-    )
+    # Si la duración ya expiró o no se pudo enviar el comando, marcar como failed directamente
+    time_elapsed = (datetime.utcnow() - session.start_time).total_seconds()
+    if time_elapsed > session.duration_seconds or not sent:
+        session.status = DebuggingSessionStatus.FAILED.value
+        session.end_time = datetime.utcnow()
+        db.commit()
+        logger.info(
+            "[DEBUGGING] Sesión marcada como failed (expirada o ws offline): session=%s, "
+            "elapsed=%.0fs, duration=%ds, ws_online=%s, por user=%s",
+            session.id, time_elapsed, session.duration_seconds, sent, current_user.id,
+        )
+    else:
+        logger.info(
+            "[DEBUGGING] StopDebugging enviado: session=%s, ws=%s, por user=%s",
+            session.id, session.workstation_id, current_user.id,
+        )
 
     return DebuggingSessionResponse.model_validate(session)
 

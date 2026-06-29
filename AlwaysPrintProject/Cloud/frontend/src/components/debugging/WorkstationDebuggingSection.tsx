@@ -744,27 +744,46 @@ function ActiveTimerView({ session, t, onStop, isStopPending }: ActiveTimerViewP
       </div>
 
       {/* Barra de progreso */}
-      <div className="w-full h-2 bg-amber-200 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-amber-500 rounded-full transition-all duration-1000"
-          style={{ width: `${progressPct}%` }}
-        />
-      </div>
+      {!isExpired && (
+        <div className="w-full h-2 bg-amber-200 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-amber-500 rounded-full transition-all duration-1000"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+      )}
 
-      {/* Botón de detener */}
-      <Button
-        size="sm"
-        variant="destructive"
-        onClick={onStop}
-        disabled={isStopPending}
-      >
-        {isStopPending ? (
-          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-        ) : (
-          <Square className="w-3.5 h-3.5 mr-1.5" />
-        )}
-        {t('wsStopDebugging')}
-      </Button>
+      {/* Acciones según estado */}
+      {isExpired ? (
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-red-300 text-red-700 hover:bg-red-50"
+          onClick={onStop}
+          disabled={isStopPending}
+        >
+          {isStopPending ? (
+            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+          ) : (
+            <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+          )}
+          {t('wsDiscardSession')}
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          variant="destructive"
+          onClick={onStop}
+          disabled={isStopPending}
+        >
+          {isStopPending ? (
+            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+          ) : (
+            <Square className="w-3.5 h-3.5 mr-1.5" />
+          )}
+          {t('wsStopDebugging')}
+        </Button>
+      )}
     </div>
   );
 }
