@@ -14,6 +14,8 @@ namespace AlwaysPrintService.Debugging
         /// <summary>
         /// Comprime todos los archivos de la carpeta en un ZIP.
         /// Elimina los archivos originales después de comprimir exitosamente.
+        /// Si ya existe un ZIP previo y no hay otros archivos, lo retorna directamente
+        /// (caso de reintento de upload).
         /// </summary>
         /// <param name="folderPath">Ruta de la carpeta de debugging.</param>
         /// <param name="debuggingId">ID para nombrar el ZIP.</param>
@@ -29,6 +31,21 @@ namespace AlwaysPrintService.Debugging
 
             string zipFileName = $"debug_{debuggingId}.zip";
             string zipPath = Path.Combine(folderPath, zipFileName);
+
+            // Si el ZIP ya existe y es el único archivo, retornarlo directamente (reintento de upload)
+            if (File.Exists(zipPath))
+            {
+                var allFiles = Directory.GetFiles(folderPath);
+                bool onlyZipRemains = allFiles.Length == 1 &&
+                    Path.GetFileName(allFiles[0]).Equals(zipFileName, StringComparison.OrdinalIgnoreCase);
+
+                if (onlyZipRemains)
+                {
+                    AlwaysPrintLogger.WriteInfo(
+                        $"ZipPacker: ZIP existente reutilizado (reintento): {zipPath}");
+                    return zipPath;
+                }
+            }
 
             try
             {
