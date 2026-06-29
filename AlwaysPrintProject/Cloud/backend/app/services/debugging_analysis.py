@@ -51,10 +51,14 @@ class DebuggingAnalysisService:
         session: DebuggingSession,
         zip_data: bytes,
         org: Organization,
+        workstation=None,
     ) -> str:
         """
         Ejecuta el pipeline completo de análisis.
         Retorna la S3 key del PDF generado.
+
+        Args:
+            workstation: Modelo Workstation con hostname, ip_private, current_user, etc.
 
         Raises:
             DebuggingAnalysisError: Si falla cualquier paso del pipeline.
@@ -88,7 +92,7 @@ class DebuggingAnalysisService:
             analysis_text = await self._invoke_llm(prompt, org)
 
             # 7. Generar PDF
-            pdf_bytes = self._generate_pdf(analysis_text, session, index_data)
+            pdf_bytes = self._generate_pdf(analysis_text, session, index_data, workstation)
 
             # 8. Upload ZIP original a S3 (para descarga posterior)
             zip_s3_key = f"debugging/{session.organization_id}/{session.id}/data.zip"
@@ -387,6 +391,7 @@ class DebuggingAnalysisService:
         analysis_text: str,
         session: DebuggingSession,
         index_data: dict,
+        workstation=None,
     ) -> bytes:
         """Genera un PDF con el análisis del LLM y metadata de la sesión."""
         from fpdf import FPDF
@@ -430,10 +435,26 @@ class DebuggingAnalysisService:
         metadata_lines = [
             f"Debugging ID: {session.id}",
             f"Perfil: {profile_name}",
-            f"Workstation: {session.workstation_id}",
+        ]
+
+        # Datos de la workstation
+        if workstation:
+            ws_hostname = getattr(workstation, 'hostname', None) or 'N/A'
+            ws_ip = getattr(workstation, 'ip_private', None) or 'N/A'
+            ws_user = getattr(workstation, 'current_user', None) or 'N/A'
+            ws_os = getattr(workstation, 'os_version', None) or ''
+            metadata_lines.append(f"Workstation: {ws_hostname} ({ws_ip})")
+            if ws_user != 'N/A':
+                metadata_lines.append(f"Usuario: {ws_user}")
+            if ws_os:
+                metadata_lines.append(f"SO: {ws_os}")
+        else:
+            metadata_lines.append(f"Workstation ID: {session.workstation_id}")
+
+        metadata_lines.extend([
             f"Periodo: {start_time} - {end_time} ({duration}s)",
             f"Generado: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}",
-        ]
+        ])
         if session.motivo:
             metadata_lines.append(f"Motivo: {session.motivo}")
 

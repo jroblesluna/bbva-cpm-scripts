@@ -1230,10 +1230,15 @@ async def upload_debugging_zip(
             detail="Organización no encontrada",
         )
 
+    # Obtener datos de la workstation para el reporte
+    workstation = db.query(Workstation).filter(
+        Workstation.id == session.workstation_id
+    ).first()
+
     # Ejecutar pipeline de análisis
     try:
         analysis_service = DebuggingAnalysisService()
-        s3_key = await analysis_service.analyze(session, zip_data, org)
+        s3_key = await analysis_service.analyze(session, zip_data, org, workstation=workstation)
 
         # Actualizar sesión con resultado
         session.status = DebuggingSessionStatus.ANALYZED.value
