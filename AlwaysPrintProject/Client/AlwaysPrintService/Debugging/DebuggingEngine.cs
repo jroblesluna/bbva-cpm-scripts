@@ -16,6 +16,10 @@ namespace AlwaysPrintService.Debugging
     public class DebuggingEngine
     {
         private const int MAX_DURATION_SECONDS = 300;
+
+        private static readonly string DebugBasePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "AlwaysPrint", "Debug");
         private const long MAX_FOLDER_SIZE_BYTES = 50L * 1024 * 1024; // 50MB
 
         private DebuggingSession? _activeSession;
@@ -65,7 +69,7 @@ namespace AlwaysPrintService.Debugging
                 try
                 {
                     // Crear carpeta temporal
-                    string basePath = Path.Combine(Path.GetTempPath(), "AlwaysPrint", "Debug", debuggingId);
+                    string basePath = Path.Combine(DebugBasePath, debuggingId);
                     Directory.CreateDirectory(basePath);
 
                     var session = new DebuggingSession
@@ -160,7 +164,7 @@ namespace AlwaysPrintService.Debugging
         {
             lock (_lock)
             {
-                string basePath = Path.Combine(Path.GetTempPath(), "AlwaysPrint", "Debug", debuggingId);
+                string basePath = Path.Combine(DebugBasePath, debuggingId);
                 if (!Directory.Exists(basePath))
                 {
                     AlwaysPrintLogger.WriteWarning(
@@ -178,7 +182,7 @@ namespace AlwaysPrintService.Debugging
         {
             lock (_lock)
             {
-                string basePath = Path.Combine(Path.GetTempPath(), "AlwaysPrint", "Debug", debuggingId);
+                string basePath = Path.Combine(DebugBasePath, debuggingId);
                 if (Directory.Exists(basePath))
                 {
                     try
@@ -214,7 +218,7 @@ namespace AlwaysPrintService.Debugging
         /// <summary>Obtiene la ruta del ZIP si existe.</summary>
         public string? GetZipPath(string debuggingId)
         {
-            string basePath = Path.Combine(Path.GetTempPath(), "AlwaysPrint", "Debug", debuggingId);
+            string basePath = Path.Combine(DebugBasePath, debuggingId);
             string zipFile = Path.Combine(basePath, $"debug_{debuggingId}.zip");
             return File.Exists(zipFile) ? zipFile : null;
         }
