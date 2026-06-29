@@ -691,6 +691,9 @@ async def list_sessions(
 
     if session_status:
         query = query.filter(DebuggingSession.status == session_status)
+    else:
+        # Por defecto excluir sesiones eliminadas
+        query = query.filter(DebuggingSession.status != DebuggingSessionStatus.DELETED.value)
 
     sessions = (
         query.order_by(DebuggingSession.created_at.desc())
