@@ -535,7 +535,7 @@ export default function WorkstationsPage() {
 
       <Card className="mb-6">
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-2">
               <div className="flex items-center">
                 <Search className="w-5 h-5 text-gray-400 mr-3" />
@@ -547,23 +547,6 @@ export default function WorkstationsPage() {
                   className="flex-1"
                 />
               </div>
-            </div>
-            <div>
-              <select
-                value={
-                  filterOnline === undefined ? 'all' : filterOnline ? 'online' : 'offline'
-                }
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFilterOnline(value === 'all' ? undefined : value === 'online');
-                  setPage(1);
-                }}
-                className="w-full px-3 py-2 border rounded-md"
-              >
-                <option value="all">{t('allStatuses')}</option>
-                <option value="online">{t('online')}</option>
-                <option value="offline">{t('offline')}</option>
-              </select>
             </div>
             {isAdmin && (
             <div>
@@ -612,6 +595,32 @@ export default function WorkstationsPage() {
           </div>
           <div className="flex items-center justify-between mt-4">
             <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => { setFilterOnline(filterOnline === true ? undefined : true); setPage(1); }}
+                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-all select-none ${
+                  filterOnline === true
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                    : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                }`}
+              >
+                <span className={`flex w-3.5 h-3.5 items-center justify-center rounded-sm border shrink-0 transition-colors ${filterOnline === true ? 'border-emerald-500 bg-emerald-500' : 'border-gray-300 bg-white'}`}>
+                  {filterOnline === true && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 5l2.5 2.5L8 3"/></svg>}
+                </span>
+                {t('online')}
+              </button>
+              <button
+                onClick={() => { setFilterOnline(filterOnline === false ? undefined : false); setPage(1); }}
+                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-all select-none ${
+                  filterOnline === false
+                    ? 'border-gray-400 bg-gray-100 text-gray-700'
+                    : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                }`}
+              >
+                <span className={`flex w-3.5 h-3.5 items-center justify-center rounded-sm border shrink-0 transition-colors ${filterOnline === false ? 'border-gray-500 bg-gray-500' : 'border-gray-300 bg-white'}`}>
+                  {filterOnline === false && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 5l2.5 2.5L8 3"/></svg>}
+                </span>
+                {t('offline')}
+              </button>
               <button
                 onClick={() => { setFilterContingency(filterContingency === true ? undefined : true); setPage(1); }}
                 className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-all select-none ${
