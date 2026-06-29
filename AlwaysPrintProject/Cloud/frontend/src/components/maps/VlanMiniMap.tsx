@@ -53,10 +53,22 @@ export function VlanMiniMap({
   const t = useTranslations('map')
   const mapRef = useRef<google.maps.Map | null>(null)
 
-  // Guardar referencia al mapa cuando se carga
+  // Guardar referencia al mapa cuando se carga y ajustar bounds inmediatamente
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map
-  }, [])
+
+    // fitBounds inmediato (las VLANs ya están disponibles cuando el mapa se monta)
+    if (vlans.length === 1) {
+      map.setCenter({ lat: vlans[0].latitude, lng: vlans[0].longitude })
+      map.setZoom(SINGLE_MARKER_ZOOM)
+    } else if (vlans.length > 1) {
+      const bounds = new google.maps.LatLngBounds()
+      vlans.forEach((vlan) => {
+        bounds.extend({ lat: vlan.latitude, lng: vlan.longitude })
+      })
+      map.fitBounds(bounds, { top: 30, right: 30, bottom: 30, left: 30 })
+    }
+  }, [vlans])
 
   // Auto-fit bounds cuando cambian las VLANs
   useEffect(() => {
@@ -75,7 +87,7 @@ export function VlanMiniMap({
       vlans.forEach((vlan) => {
         bounds.extend({ lat: vlan.latitude, lng: vlan.longitude })
       })
-      mapRef.current.fitBounds(bounds)
+      mapRef.current.fitBounds(bounds, { top: 30, right: 30, bottom: 30, left: 30 })
     }
   }, [vlans])
 
