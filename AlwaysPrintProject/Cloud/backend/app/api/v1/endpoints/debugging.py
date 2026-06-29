@@ -632,7 +632,30 @@ async def create_session(
         finally:
             check_db.close()
 
+    async def _check_debugging_expiry(debugging_id: str, duration: int):
+        """Marca como failed si la sesión sigue activa después de expirar (duration + 30s margen)."""
+        await asyncio.sleep(duration + 30)
+        check_db = _SessionLocal()
+        try:
+            s = check_db.query(DebuggingSession).filter(
+                DebuggingSession.id == debugging_id,
+            ).first()
+            if s and s.status == DebuggingSessionStatus.ACTIVE.value:
+                s.status = DebuggingSessionStatus.FAILED.value
+                s.end_time = datetime.utcnow()
+                check_db.commit()
+                logger.warning(
+                    "[DEBUGGING] Timeout expiración: session=%s marcada como failed "
+                    "(duración %ds + 30s margen sin respuesta del cliente)",
+                    debugging_id, duration,
+                )
+        except Exception as e:
+            logger.error("[DEBUGGING] Error en expiry check: %s", e)
+        finally:
+            check_db.close()
+
     asyncio.ensure_future(_check_debugging_ack(str(session.id)))
+    asyncio.ensure_future(_check_debugging_expiry(str(session.id), payload.duration_seconds))
 
     return DebuggingSessionResponse.model_validate(session)
 

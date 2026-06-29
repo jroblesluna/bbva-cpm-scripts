@@ -720,18 +720,27 @@ function ActiveTimerView({ session, t, onStop, isStopPending }: ActiveTimerViewP
   // Calcular progreso
   const elapsedSeconds = Math.max(0, session.duration_seconds - remainingSeconds);
   const progressPct = Math.min(100, (elapsedSeconds / session.duration_seconds) * 100);
+  const isExpired = remainingSeconds === 0;
 
   return (
-    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+    <div className={`p-4 border rounded-lg space-y-3 ${isExpired ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Timer className="w-4 h-4 text-amber-600 animate-pulse" />
-          <span className="text-sm font-medium text-amber-900">{t('wsCapturing')}</span>
+          {isExpired ? (
+            <AlertCircle className="w-4 h-4 text-red-600" />
+          ) : (
+            <Timer className="w-4 h-4 text-amber-600 animate-pulse" />
+          )}
+          <span className={`text-sm font-medium ${isExpired ? 'text-red-900' : 'text-amber-900'}`}>
+            {isExpired ? t('wsExpiredNoResponse') : t('wsCapturing')}
+          </span>
         </div>
-        <Badge variant="outline" className="text-xs font-mono">
-          <Clock className="w-3 h-3 mr-1" />
-          {t('wsTimeRemaining', { seconds: String(remainingSeconds) })}
-        </Badge>
+        {!isExpired && (
+          <Badge variant="outline" className="text-xs font-mono">
+            <Clock className="w-3 h-3 mr-1" />
+            {t('wsTimeRemaining', { seconds: String(remainingSeconds) })}
+          </Badge>
+        )}
       </div>
 
       {/* Barra de progreso */}

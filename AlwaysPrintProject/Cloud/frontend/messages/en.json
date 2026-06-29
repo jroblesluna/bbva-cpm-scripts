@@ -1255,6 +1255,7 @@
     "wsInstructions": "Additional instructions (optional)",
     "wsInstructionsPlaceholder": "Instructions to guide the LLM analysis...",
     "wsCapturing": "Capturing data...",
+    "wsExpiredNoResponse": "Time expired, no response from client",
     "wsTimeRemaining": "Time remaining: {seconds}s",
     "wsDataReady": "Data available",
     "wsDataSize": "Size: {size}",
