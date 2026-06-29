@@ -163,14 +163,16 @@ export function WorkstationDebuggingSection({
     },
   });
 
-  // Determinar la sesión relevante (la más reciente no-deleted/no-failed primero)
-  const activeSession = sessions?.find(s => s.status === 'active');
-  const readySession = sessions?.find(s => s.status === 'ready');
-  const analyzingSession = sessions?.find(s => s.status === 'analyzing' || s.status === 'uploading');
-  const analyzedSession = sessions?.find(s => s.status === 'analyzed');
-  const failedSession = sessions?.find(s => s.status === 'analysis_failed' || s.status === 'failed');
+  // Determinar la sesión más reciente relevante (el backend las retorna por created_at desc)
+  // Solo mostrar UNA sesión a la vez (la más reciente no-deleted)
+  const latestSession = sessions?.[0];
+  const activeSession = latestSession?.status === 'active' ? latestSession : undefined;
+  const readySession = latestSession?.status === 'ready' ? latestSession : undefined;
+  const analyzingSession = (latestSession?.status === 'analyzing' || latestSession?.status === 'uploading') ? latestSession : undefined;
+  const analyzedSession = latestSession?.status === 'analyzed' ? latestSession : undefined;
+  const failedSession = (latestSession?.status === 'analysis_failed' || latestSession?.status === 'failed') ? latestSession : undefined;
 
-  // Sesión "principal" a mostrar (prioridad: active > ready > analyzing > analyzed > failed)
+  // Sesión "principal" a mostrar
   const currentSession = activeSession || readySession || analyzingSession || analyzedSession || failedSession;
 
   // === Mutations ===
