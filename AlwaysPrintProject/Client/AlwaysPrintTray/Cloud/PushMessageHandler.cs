@@ -348,11 +348,50 @@ namespace AlwaysPrintTray.Cloud
                 {
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"PushMessageHandler: SyncFromState — msi_version difiere " +
-                        $"(local={currentVersion}, remoto={state.MsiVersion}). " +
-                        "La descarga de MSI se gestiona vía UpdateChecker/UpdateDownloader.");
-                    // Nota: la descarga de MSI usa su propio flujo (presigned URL o fallback HTTP).
-                    // Aquí solo notificamos que hay actualización disponible; el caller decidirá.
-                    updatedCount++; // Contamos como "algo difiere" para notificar al usuario
+                        $"(local={currentVersion}, remoto={state.MsiVersion}). Iniciando descarga.");
+
+                    // Disparar descarga si hay URL disponible
+                    if (!string.IsNullOrEmpty(state.MsiUrl))
+                    {
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                string? msiPath = await _updateDownloader.DownloadFromUrlAsync(
+                                    state.MsiUrl, 0, state.MsiVersion);
+
+                                if (msiPath != null)
+                                {
+                                    // Solicitar instalación al Service vía Named Pipe
+                                    var installMsg = PipeMessage.Create(MessageType.InstallUpdate,
+                                        new InstallUpdatePayload { MsiFilePath = msiPath });
+                                    _pipeClient.Send(installMsg);
+
+                                    AlwaysPrintLogger.WriteTrayInfo(
+                                        $"PushMessageHandler: MSI descargado y enviado a instalar. " +
+                                        $"Versión: {state.MsiVersion}, path: {msiPath}");
+                                }
+                                else
+                                {
+                                    AlwaysPrintLogger.WriteTrayWarning(
+                                        $"PushMessageHandler: descarga de MSI fallida. " +
+                                        $"Versión: {state.MsiVersion}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                AlwaysPrintLogger.WriteTrayError(
+                                    $"PushMessageHandler: error descargando/instalando MSI: {ex.Message}");
+                            }
+                        });
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            $"PushMessageHandler: SyncFromState — msi_version difiere pero no hay URL de descarga.");
+                    }
+
+                    updatedCount++;
                 }
                 else
                 {
