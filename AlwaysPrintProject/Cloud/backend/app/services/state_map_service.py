@@ -181,10 +181,22 @@ class StateMapService:
                     if row.cert_s3_key:
                         cert_url = self._build_public_url(row.cert_s3_key)
 
+                    # Resolver msi_version: explícita o latest de S3
+                    resolved_msi_version = row.msi_version
+                    if not resolved_msi_version and row.auto_update_enabled:
+                        try:
+                            from app.services.s3_update_service import S3UpdateService
+                            s3_service = S3UpdateService()
+                            metadata = s3_service.get_msi_metadata()
+                            if metadata and metadata.get("version"):
+                                resolved_msi_version = metadata["version"]
+                        except Exception:
+                            pass  # Si S3 no está disponible, msi_version queda None
+
                     org_state = OrgDistributionState(
                         cert_version=row.cert_version or 0,
                         cert_url=cert_url,
-                        msi_version=row.msi_version,
+                        msi_version=resolved_msi_version,
                     )
                     self._state[org_id] = org_state
 

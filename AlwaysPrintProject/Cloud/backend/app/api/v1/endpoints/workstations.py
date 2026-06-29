@@ -1782,16 +1782,26 @@ async def get_distribution_state(
     # MSI
     msi_version = org.target_version if hasattr(org, 'target_version') else None
     msi_url = None
-    if msi_version and hasattr(org, 'auto_update_enabled') and org.auto_update_enabled:
+
+    # Si auto_update está habilitado, resolver versión target (explícita o latest de S3)
+    if hasattr(org, 'auto_update_enabled') and org.auto_update_enabled:
         try:
             from app.services.s3_update_service import S3UpdateService
             s3_service = S3UpdateService()
-            # Resolver clave S3 según target_version
-            s3_key = f"versions/{msi_version}/AlwaysPrint.msi"
-            msi_url = s3_service.generate_download_url(key=s3_key, expires_in=3600)
+
+            if msi_version:
+                # Versión explícita: generar URL para esa versión
+                s3_key = f"versions/{msi_version}/AlwaysPrint.msi"
+                msi_url = s3_service.generate_download_url(key=s3_key, expires_in=3600)
+            else:
+                # Sin target_version: usar latest de S3
+                metadata = s3_service.get_msi_metadata()
+                if metadata and metadata.get("version"):
+                    msi_version = metadata["version"]
+                    msi_url = s3_service.generate_download_url(expires_in=3600)
         except Exception as e:
             logger.warning(
-                f"[DISTRIBUTION_STATE] Error generando presigned URL de MSI: {e}"
+                f"[DISTRIBUTION_STATE] Error resolviendo MSI: {e}"
             )
 
     logger.info(
