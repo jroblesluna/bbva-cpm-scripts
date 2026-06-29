@@ -49,5 +49,14 @@ namespace AlwaysPrint.Shared.Messages
 
         // Lifecycle del servicio
         ServiceStopping,             // Service → Tray (push): servicio se está deteniendo, ocultar icono
+
+        // Debugging remoto (captura con privilegios LocalSystem)
+        StartDebuggingCapture,       // Tray → Service: iniciar captura de debugging
+        StopDebuggingCapture,        // Tray → Service: detener captura activa
+        DebuggingCaptureReady,       // Service → Tray (push): captura finalizada, datos listos
+        DebuggingCaptureError,       // Service → Tray (push): error durante captura
+        PackageDebuggingZip,         // Tray → Service: empaquetar datos en ZIP
+        DebuggingZipReady,           // Service → Tray: ZIP listo con ruta
+        DeleteDebuggingData,         // Tray → Service: eliminar datos de una sesión
     }
 }

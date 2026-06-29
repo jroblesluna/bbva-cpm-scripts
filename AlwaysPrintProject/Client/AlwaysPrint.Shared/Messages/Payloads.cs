@@ -353,3 +353,92 @@ namespace AlwaysPrint.Shared.Messages
         public string? Message { get; set; }
     }
 }
+
+    // ── Debugging Remoto (captura con privilegios LocalSystem) ────────────────────
+
+    /// <summary>
+    /// Payload enviado del Tray al Service para iniciar una captura de debugging.
+    /// El Service ejecuta la captura con privilegios LocalSystem.
+    /// </summary>
+    public class StartDebuggingCapturePayload
+    {
+        /// <summary>ID único de la sesión de debugging (asignado por el backend).</summary>
+        [JsonProperty("debuggingId")]
+        public string DebuggingId { get; set; } = string.Empty;
+
+        /// <summary>Duración máxima de la captura en segundos.</summary>
+        [JsonProperty("durationSeconds")]
+        public int DurationSeconds { get; set; }
+
+        /// <summary>Perfil de debugging serializado como JSON (targets, nombre, etc.).</summary>
+        [JsonProperty("profileJson")]
+        public string ProfileJson { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Payload enviado del Tray al Service para detener una captura activa.
+    /// </summary>
+    public class StopDebuggingCapturePayload
+    {
+        [JsonProperty("debuggingId")]
+        public string DebuggingId { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Payload push del Service al Tray cuando la captura finaliza correctamente.
+    /// El Tray usa esta información para reportar debugging_ready al backend.
+    /// </summary>
+    public class DebuggingCaptureReadyPayload
+    {
+        [JsonProperty("debuggingId")]
+        public string DebuggingId { get; set; } = string.Empty;
+
+        /// <summary>Tamaño total de los archivos capturados en bytes.</summary>
+        [JsonProperty("totalSizeBytes")]
+        public long TotalSizeBytes { get; set; }
+    }
+
+    /// <summary>
+    /// Payload push del Service al Tray cuando ocurre un error durante la captura.
+    /// </summary>
+    public class DebuggingCaptureErrorPayload
+    {
+        [JsonProperty("debuggingId")]
+        public string DebuggingId { get; set; } = string.Empty;
+
+        [JsonProperty("errorMessage")]
+        public string ErrorMessage { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Payload enviado del Tray al Service para empaquetar los datos de debugging en ZIP.
+    /// Se usa cuando el backend solicita request_debug_upload.
+    /// </summary>
+    public class PackageDebuggingZipPayload
+    {
+        [JsonProperty("debuggingId")]
+        public string DebuggingId { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Respuesta del Service al Tray con la ruta del ZIP generado.
+    /// El Tray usa esta ruta para subir el archivo al backend.
+    /// </summary>
+    public class DebuggingZipReadyPayload
+    {
+        [JsonProperty("debuggingId")]
+        public string DebuggingId { get; set; } = string.Empty;
+
+        /// <summary>Ruta absoluta al archivo ZIP en disco.</summary>
+        [JsonProperty("zipPath")]
+        public string ZipPath { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Payload enviado del Tray al Service para eliminar datos de una sesión de debugging.
+    /// </summary>
+    public class DeleteDebuggingDataPayload
+    {
+        [JsonProperty("debuggingId")]
+        public string DebuggingId { get; set; } = string.Empty;
+    }

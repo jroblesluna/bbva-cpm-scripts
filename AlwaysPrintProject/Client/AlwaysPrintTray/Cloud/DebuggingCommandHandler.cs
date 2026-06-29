@@ -2,55 +2,55 @@ using System;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
-using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
-using AlwaysPrintService.Debugging;
+using AlwaysPrint.Shared.Messages;
+using AlwaysPrintTray.Pipe;
 using Newtonsoft.Json.Linq;
 
 namespace AlwaysPrintTray.Cloud
 {
     /// <summary>
     /// Maneja los comandos de debugging recibidos vía WebSocket.
-    /// Integra el DebuggingEngine con la comunicación al backend.
+    /// Delega la captura de datos al Service (LocalSystem) vía Named Pipe
+    /// y gestiona la comunicación con el backend (WebSocket + HTTP upload).
+    /// 
+    /// Flujo:
+    /// 1. WebSocket recibe comando → Tray delega al Service vía Pipe
+    /// 2. Service ejecuta captura con privilegios LocalSystem
+    /// 3. Service notifica resultado al Tray vía push message
+    /// 4. Tray reporta al backend vía WebSocket / HTTP upload
     /// 
     /// Comandos soportados:
-    /// - start_debugging: Inicia captura según perfil
-    /// - stop_debugging: Detiene captura activa
-    /// - request_debug_upload: Comprime y sube ZIP al backend
-    /// - delete_debug_data: Elimina datos de debugging del cliente
+    /// - start_debugging: Delega inicio de captura al Service
+    /// - stop_debugging: Delega detención al Service
+    /// - request_debug_upload: Solicita ZIP al Service y lo sube al backend
+    /// - delete_debug_data: Delega eliminación de datos al Service
     /// </summary>
     public class DebuggingCommandHandler
     {
-        private readonly DebuggingEngine _engine;
         private readonly CloudWebSocketClient _wsClient;
+        private readonly PipeClient _pipeClient;
         private readonly HttpClient _httpClient;
         private readonly string _workstationId;
         private readonly string _cloudApiUrl;
 
         public DebuggingCommandHandler(
             CloudWebSocketClient wsClient,
+            PipeClient pipeClient,
             HttpClient httpClient,
             string workstationId,
             string cloudApiUrl)
         {
             _wsClient = wsClient ?? throw new ArgumentNullException(nameof(wsClient));
+            _pipeClient = pipeClient ?? throw new ArgumentNullException(nameof(pipeClient));
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _workstationId = workstationId ?? throw new ArgumentNullException(nameof(workstationId));
             _cloudApiUrl = cloudApiUrl?.TrimEnd('/') ?? throw new ArgumentNullException(nameof(cloudApiUrl));
-
-            _engine = new DebuggingEngine();
-
-            // Suscribirse a eventos del engine
-            _engine.OnCaptureComplete += HandleCaptureComplete;
-            _engine.OnCaptureError += HandleCaptureError;
         }
 
         /// <summary>
         /// Procesa un comando de debugging recibido del backend vía WebSocket.
         /// </summary>
-        /// <param name="commandType">Tipo de comando: start_debugging, stop_debugging, etc.</param>
-        /// <param name="commandId">ID del comando para tracking.</param>
-        /// <param name="paramsObj">Parámetros del comando.</param>
         public void HandleCommand(string commandType, string commandId, JObject? paramsObj)
         {
             switch (commandType)
@@ -78,8 +78,38 @@ namespace AlwaysPrintTray.Cloud
             }
         }
 
+        /// <summary>
+        /// Procesa mensajes push del Service relacionados con debugging.
+        /// Llamado desde CloudManager.OnPipeMessageReceived.
+        /// </summary>
+        public void HandleServicePush(PipeMessage message)
+        {
+            switch (message.Type)
+            {
+                case MessageType.DebuggingCaptureReady:
+                    var readyPayload = message.GetPayload<DebuggingCaptureReadyPayload>();
+                    if (readyPayload != null)
+                    {
+                        SendDebuggingReady(readyPayload.DebuggingId, readyPayload.TotalSizeBytes);
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"DebuggingCommandHandler: Captura completada (Service). ID={readyPayload.DebuggingId}, size={readyPayload.TotalSizeBytes} bytes");
+                    }
+                    break;
+
+                case MessageType.DebuggingCaptureError:
+                    var errorPayload = message.GetPayload<DebuggingCaptureErrorPayload>();
+                    if (errorPayload != null)
+                    {
+                        SendDebuggingError(errorPayload.DebuggingId, errorPayload.ErrorMessage);
+                        AlwaysPrintLogger.WriteTrayError(
+                            $"DebuggingCommandHandler: Error en captura (Service). ID={errorPayload.DebuggingId}, error={errorPayload.ErrorMessage}");
+                    }
+                    break;
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
-        // HANDLERS DE COMANDOS
+        // HANDLERS DE COMANDOS (delegan al Service vía Named Pipe)
         // ═══════════════════════════════════════════════════════════════════════
 
         private void HandleStartDebugging(string commandId, JObject? paramsObj)
@@ -103,18 +133,39 @@ namespace AlwaysPrintTray.Cloud
                 return;
             }
 
-            bool started = _engine.StartSession(debuggingId, profile, durationSeconds);
+            // Delegar al Service vía Named Pipe
+            var pipeMsg = PipeMessage.Create(MessageType.StartDebuggingCapture,
+                new StartDebuggingCapturePayload
+                {
+                    DebuggingId = debuggingId,
+                    DurationSeconds = durationSeconds,
+                    ProfileJson = profile.ToString()
+                });
 
-            if (started)
+            var response = _pipeClient.Send(pipeMsg);
+
+            if (response != null)
             {
-                // Enviar acknowledgment al backend
-                SendDebuggingStarted(debuggingId);
-                AlwaysPrintLogger.WriteTrayInfo(
-                    $"DebuggingCommandHandler: Sesión iniciada. ID={debuggingId}, duración={durationSeconds}s");
+                var ack = response.GetPayload<AckPayload>();
+                if (ack?.Success == true)
+                {
+                    SendDebuggingStarted(debuggingId);
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"DebuggingCommandHandler: Captura delegada al Service. ID={debuggingId}, duración={durationSeconds}s");
+                }
+                else
+                {
+                    string errorMsg = ack?.Message ?? "Error desconocido al iniciar captura en Service";
+                    SendDebuggingError(debuggingId, errorMsg);
+                    AlwaysPrintLogger.WriteTrayError(
+                        $"DebuggingCommandHandler: Service rechazó inicio: {errorMsg}");
+                }
             }
             else
             {
-                SendDebuggingError(debuggingId, "No se pudo iniciar la sesión (ya hay una activa)");
+                SendDebuggingError(debuggingId, "No se pudo comunicar con el Service (pipe desconectado)");
+                AlwaysPrintLogger.WriteTrayError(
+                    "DebuggingCommandHandler: Pipe desconectado al intentar start_debugging");
             }
         }
 
@@ -129,9 +180,13 @@ namespace AlwaysPrintTray.Cloud
                 return;
             }
 
-            _engine.StopSession(debuggingId);
+            var pipeMsg = PipeMessage.Create(MessageType.StopDebuggingCapture,
+                new StopDebuggingCapturePayload { DebuggingId = debuggingId });
+
+            _pipeClient.Send(pipeMsg);
+
             AlwaysPrintLogger.WriteTrayInfo(
-                $"DebuggingCommandHandler: StopSession invocado para {debuggingId}");
+                $"DebuggingCommandHandler: Stop delegado al Service para {debuggingId}");
         }
 
         private void HandleRequestUpload(string commandId, JObject? paramsObj)
@@ -145,18 +200,29 @@ namespace AlwaysPrintTray.Cloud
                 return;
             }
 
-            // Empaquetar y subir en background
+            // Solicitar ZIP al Service y subir en background
             Task.Run(async () =>
             {
                 try
                 {
-                    // Comprimir
-                    string? zipPath = _engine.PackageForUpload(debuggingId);
-                    if (zipPath == null)
+                    // Pedir al Service que empaquete el ZIP
+                    var pipeMsg = PipeMessage.Create(MessageType.PackageDebuggingZip,
+                        new PackageDebuggingZipPayload { DebuggingId = debuggingId });
+
+                    var response = _pipeClient.Send(pipeMsg);
+
+                    if (response == null)
                     {
-                        AlwaysPrintLogger.WriteTrayError(
-                            $"DebuggingCommandHandler: No se pudo crear ZIP para {debuggingId}");
-                        SendDebuggingError(debuggingId, "Error creando ZIP para upload");
+                        SendDebuggingError(debuggingId, "No se pudo comunicar con el Service para empaquetar ZIP");
+                        return;
+                    }
+
+                    var zipReady = response.GetPayload<DebuggingZipReadyPayload>();
+                    string zipPath = zipReady?.ZipPath ?? "";
+
+                    if (string.IsNullOrEmpty(zipPath))
+                    {
+                        SendDebuggingError(debuggingId, "Error creando ZIP para upload (Service retornó ruta vacía)");
                         return;
                     }
 
@@ -186,29 +252,14 @@ namespace AlwaysPrintTray.Cloud
                 return;
             }
 
-            _engine.DeleteSession(debuggingId);
+            var pipeMsg = PipeMessage.Create(MessageType.DeleteDebuggingData,
+                new DeleteDebuggingDataPayload { DebuggingId = debuggingId });
+
+            _pipeClient.Send(pipeMsg);
             SendDebuggingDeleted(debuggingId);
 
             AlwaysPrintLogger.WriteTrayInfo(
                 $"DebuggingCommandHandler: Datos eliminados para {debuggingId}");
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // EVENT HANDLERS DEL ENGINE
-        // ═══════════════════════════════════════════════════════════════════════
-
-        private void HandleCaptureComplete(string debuggingId, long totalSizeBytes)
-        {
-            SendDebuggingReady(debuggingId, totalSizeBytes);
-            AlwaysPrintLogger.WriteTrayInfo(
-                $"DebuggingCommandHandler: Captura completada. ID={debuggingId}, size={totalSizeBytes} bytes");
-        }
-
-        private void HandleCaptureError(string debuggingId, string errorMessage)
-        {
-            SendDebuggingError(debuggingId, errorMessage);
-            AlwaysPrintLogger.WriteTrayError(
-                $"DebuggingCommandHandler: Error en captura. ID={debuggingId}, error={errorMessage}");
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -292,7 +343,7 @@ namespace AlwaysPrintTray.Cloud
             string uploadUrl = $"{_cloudApiUrl}/api/v1/debugging/{debuggingId}/upload";
 
             using (var content = new MultipartFormDataContent())
-            using (var fileStream = File.OpenRead(zipPath))
+            using (var fileStream = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (var streamContent = new StreamContent(fileStream))
             {
                 streamContent.Headers.ContentType =
@@ -300,7 +351,6 @@ namespace AlwaysPrintTray.Cloud
 
                 content.Add(streamContent, "file", Path.GetFileName(zipPath));
 
-                // Agregar header de autenticación de workstation
                 var request = new HttpRequestMessage(HttpMethod.Post, uploadUrl);
                 request.Headers.Add("X-Workstation-ID", _workstationId);
                 request.Content = content;

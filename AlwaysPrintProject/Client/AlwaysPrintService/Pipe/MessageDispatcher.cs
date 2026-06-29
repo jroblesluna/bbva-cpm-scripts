@@ -5,6 +5,7 @@ using System.Text;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
+using AlwaysPrintService.Debugging;
 using AlwaysPrintService.Queue;
 using AlwaysPrintService.Tasks;
 
@@ -28,12 +29,19 @@ namespace AlwaysPrintService.Pipe
         private readonly Action? _reloadActionConfigCallback;
         private readonly Action? _loadResourceVariablesCallback;
         private readonly Func<string, (bool success, string message)>? _executeOnDemandTriggerCallback;
+        private readonly DebuggingEngine _debuggingEngine;
 
         // Raised when the Tray sends TrayInitialized.
         public event Action<bool, string?>? TrayInitializedReceived;
 
         // Raised when the Tray sends ForcedContingencyChanged.
         public event Action<bool, string, string, string?>? ForcedContingencyReceived;
+
+        // Raised when the DebuggingEngine completes capture (para push al Tray).
+        public event Action<string, long>? DebuggingCaptureCompleted;
+
+        // Raised when the DebuggingEngine encounters an error.
+        public event Action<string, string>? DebuggingCaptureErrorOccurred;
 
         public MessageDispatcher(
             RegistryConfigManager registry,
@@ -49,6 +57,13 @@ namespace AlwaysPrintService.Pipe
             _reloadActionConfigCallback = reloadActionConfigCallback;
             _loadResourceVariablesCallback = loadResourceVariablesCallback;
             _executeOnDemandTriggerCallback = executeOnDemandTriggerCallback;
+
+            // Inicializar motor de debugging (corre con privilegios LocalSystem)
+            _debuggingEngine = new DebuggingEngine();
+            _debuggingEngine.OnCaptureComplete += (debugId, totalSize) =>
+                DebuggingCaptureCompleted?.Invoke(debugId, totalSize);
+            _debuggingEngine.OnCaptureError += (debugId, errorMsg) =>
+                DebuggingCaptureErrorOccurred?.Invoke(debugId, errorMsg);
         }
 
         public PipeMessage Dispatch(PipeMessage request)
@@ -71,6 +86,10 @@ namespace AlwaysPrintService.Pipe
                     MessageType.SaveResources               => HandleSaveResources(request),
                     MessageType.ServiceAction               => HandleServiceAction(request),
                     MessageType.ExecuteOnDemandTrigger      => HandleExecuteOnDemandTrigger(request),
+                    MessageType.StartDebuggingCapture       => HandleStartDebuggingCapture(request),
+                    MessageType.StopDebuggingCapture        => HandleStopDebuggingCapture(request),
+                    MessageType.PackageDebuggingZip         => HandlePackageDebuggingZip(request),
+                    MessageType.DeleteDebuggingData         => HandleDeleteDebuggingData(request),
                     _ => PipeMessage.Reply(request, MessageType.Error,
                             new ErrorPayload { Code = "UNKNOWN_TYPE", Message = $"Unknown message type: {request.Type}" })
                 };
@@ -676,6 +695,102 @@ namespace AlwaysPrintService.Pipe
                 return PipeMessage.Reply(req, MessageType.Ack,
                     new AckPayload { Success = false, Message = $"Error: {ex.Message}" });
             }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // DEBUGGING REMOTO (captura con privilegios LocalSystem)
+        // ═══════════════════════════════════════════════════════════════════════
+
+        private PipeMessage HandleStartDebuggingCapture(PipeMessage req)
+        {
+            var payload = req.GetPayload<StartDebuggingCapturePayload>();
+            if (payload == null || string.IsNullOrEmpty(payload.DebuggingId))
+            {
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = "Payload inválido: falta debuggingId." });
+            }
+
+            try
+            {
+                var profile = Newtonsoft.Json.Linq.JObject.Parse(payload.ProfileJson);
+                bool started = _debuggingEngine.StartSession(
+                    payload.DebuggingId, profile, payload.DurationSeconds);
+
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload
+                    {
+                        Success = started,
+                        Message = started
+                            ? $"Captura iniciada: {payload.DebuggingId}"
+                            : "No se pudo iniciar la captura (sesión activa o error)."
+                    });
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"HandleStartDebuggingCapture: error: {ex.Message}", AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = $"Error: {ex.Message}" });
+            }
+        }
+
+        private PipeMessage HandleStopDebuggingCapture(PipeMessage req)
+        {
+            var payload = req.GetPayload<StopDebuggingCapturePayload>();
+            if (payload == null || string.IsNullOrEmpty(payload.DebuggingId))
+            {
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = "Payload inválido: falta debuggingId." });
+            }
+
+            _debuggingEngine.StopSession(payload.DebuggingId);
+
+            return PipeMessage.Reply(req, MessageType.Ack,
+                new AckPayload { Success = true, Message = $"Stop enviado: {payload.DebuggingId}" });
+        }
+
+        private PipeMessage HandlePackageDebuggingZip(PipeMessage req)
+        {
+            var payload = req.GetPayload<PackageDebuggingZipPayload>();
+            if (payload == null || string.IsNullOrEmpty(payload.DebuggingId))
+            {
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = "Payload inválido: falta debuggingId." });
+            }
+
+            string? zipPath = _debuggingEngine.PackageForUpload(payload.DebuggingId);
+
+            if (zipPath == null)
+            {
+                return PipeMessage.Reply(req, MessageType.DebuggingZipReady,
+                    new DebuggingZipReadyPayload
+                    {
+                        DebuggingId = payload.DebuggingId,
+                        ZipPath = ""
+                    });
+            }
+
+            return PipeMessage.Reply(req, MessageType.DebuggingZipReady,
+                new DebuggingZipReadyPayload
+                {
+                    DebuggingId = payload.DebuggingId,
+                    ZipPath = zipPath
+                });
+        }
+
+        private PipeMessage HandleDeleteDebuggingData(PipeMessage req)
+        {
+            var payload = req.GetPayload<DeleteDebuggingDataPayload>();
+            if (payload == null || string.IsNullOrEmpty(payload.DebuggingId))
+            {
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = "Payload inválido: falta debuggingId." });
+            }
+
+            _debuggingEngine.DeleteSession(payload.DebuggingId);
+
+            return PipeMessage.Reply(req, MessageType.Ack,
+                new AckPayload { Success = true, Message = $"Datos eliminados: {payload.DebuggingId}" });
         }
     }
 }

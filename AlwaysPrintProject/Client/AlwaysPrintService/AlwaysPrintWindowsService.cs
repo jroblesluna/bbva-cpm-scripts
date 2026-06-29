@@ -254,6 +254,8 @@ namespace AlwaysPrintService
                 _dispatcher = new MessageDispatcher(_registry, _taskQueue, _state, ReloadActionConfiguration, LoadResourceVariables, _actionEngine.ExecuteOnDemandTrigger);
                 _dispatcher.TrayInitializedReceived += OnTrayInitialized;
                 _dispatcher.ForcedContingencyReceived += OnForcedContingencyReceived;
+                _dispatcher.DebuggingCaptureCompleted += OnDebuggingCaptureCompleted;
+                _dispatcher.DebuggingCaptureErrorOccurred += OnDebuggingCaptureError;
                 _pipeServer = new PipeServer(_dispatcher);
                 _pipeServer.Start();
 
@@ -437,6 +439,48 @@ namespace AlwaysPrintService
                 }
 
                 ExecuteActionTrigger(TriggerEvents.OnContingencyDeactivated);
+            }
+        }
+
+        /// <summary>
+        /// Evento del DebuggingEngine: captura finalizada exitosamente.
+        /// Envía push al Tray con el tamaño total para que reporte debugging_ready al backend.
+        /// </summary>
+        private void OnDebuggingCaptureCompleted(string debuggingId, long totalSizeBytes)
+        {
+            AlwaysPrintLogger.WriteInfo(
+                $"DebuggingCapture completada: id={debuggingId}, size={totalSizeBytes} bytes");
+
+            if (_pipeServer != null && _pipeServer.IsClientConnected)
+            {
+                var msg = PipeMessage.Create(MessageType.DebuggingCaptureReady,
+                    new DebuggingCaptureReadyPayload
+                    {
+                        DebuggingId = debuggingId,
+                        TotalSizeBytes = totalSizeBytes
+                    });
+                _pipeServer.SendToClient(msg);
+            }
+        }
+
+        /// <summary>
+        /// Evento del DebuggingEngine: error durante la captura.
+        /// Envía push al Tray para que reporte debugging_error al backend.
+        /// </summary>
+        private void OnDebuggingCaptureError(string debuggingId, string errorMessage)
+        {
+            AlwaysPrintLogger.WriteError(
+                $"DebuggingCapture error: id={debuggingId}, error={errorMessage}");
+
+            if (_pipeServer != null && _pipeServer.IsClientConnected)
+            {
+                var msg = PipeMessage.Create(MessageType.DebuggingCaptureError,
+                    new DebuggingCaptureErrorPayload
+                    {
+                        DebuggingId = debuggingId,
+                        ErrorMessage = errorMessage
+                    });
+                _pipeServer.SendToClient(msg);
             }
         }
 

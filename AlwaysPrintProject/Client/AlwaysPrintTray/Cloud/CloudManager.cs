@@ -477,6 +477,10 @@ namespace AlwaysPrintTray.Cloud
                     case MessageType.ContingencyResult:
                         HandleContingencyResult(message);
                         break;
+                    case MessageType.DebuggingCaptureReady:
+                    case MessageType.DebuggingCaptureError:
+                        _debuggingHandler?.HandleServicePush(message);
+                        break;
                     default:
                         AlwaysPrintLogger.WriteTrayInfo(
                             $"CloudManager: mensaje push del Service tipo='{message.Type}' no manejado.");
@@ -789,6 +793,7 @@ namespace AlwaysPrintTray.Cloud
                     {
                         _debuggingHandler = new DebuggingCommandHandler(
                             _wsClient,
+                            _pipe,
                             new System.Net.Http.HttpClient(),
                             workstationId!,
                             _config.CloudApiUrl);
