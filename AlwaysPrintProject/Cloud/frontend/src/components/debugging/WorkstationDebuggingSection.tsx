@@ -431,7 +431,7 @@ export function WorkstationDebuggingSection({
           <AlertCircle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between w-full">
             <span>{t('wsFailed')}</span>
-            {failedSession.status === 'analysis_failed' && isOnline && (
+            {isOnline && (
               <Button
                 variant="outline"
                 size="sm"

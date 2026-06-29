@@ -803,11 +803,11 @@ async def analyze_session(
             detail=f"Sesión de debugging con ID {session_id} no encontrada",
         )
 
-    if session.status not in (DebuggingSessionStatus.READY.value, DebuggingSessionStatus.ANALYSIS_FAILED.value):
+    if session.status not in (DebuggingSessionStatus.READY.value, DebuggingSessionStatus.ANALYSIS_FAILED.value, DebuggingSessionStatus.FAILED.value):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                f"Solo se pueden analizar sesiones con status 'ready' o 'analysis_failed'. "
+                f"Solo se pueden analizar sesiones con status 'ready', 'analysis_failed' o 'failed'. "
                 f"Estado actual: {session.status}"
             ),
         )
@@ -1062,15 +1062,16 @@ async def upload_debugging_zip(
             detail="La workstation no tiene permiso para subir datos de esta sesión",
         )
 
-    # Verificar status (debe ser uploading, ready, o analysis_failed para reintentos)
+    # Verificar status (debe ser uploading, ready, analysis_failed o failed para reintentos)
     if session.status not in (
         DebuggingSessionStatus.UPLOADING.value,
         DebuggingSessionStatus.READY.value,
         DebuggingSessionStatus.ANALYSIS_FAILED.value,
+        DebuggingSessionStatus.FAILED.value,
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Estado inválido para upload: {session.status}. Se requiere 'uploading', 'ready' o 'analysis_failed'.",
+            detail=f"Estado inválido para upload: {session.status}. Se requiere 'uploading', 'ready', 'analysis_failed' o 'failed'.",
         )
 
     # Leer el archivo

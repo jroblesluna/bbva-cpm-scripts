@@ -938,11 +938,13 @@ async def _handle_debugging_message(
             )
 
         elif message_type == "debugging_error":
-            # Error durante la captura
+            # Error durante la captura o upload
             error_message = data.get("error_message", "Error desconocido")
-            session.status = DebuggingSessionStatus.FAILED.value
-            session.end_time = datetime.utcnow()
-            temp_db.commit()
+            # No sobreescribir analysis_failed con failed (el análisis ya clasificó el error)
+            if session.status != DebuggingSessionStatus.ANALYSIS_FAILED.value:
+                session.status = DebuggingSessionStatus.FAILED.value
+                session.end_time = datetime.utcnow()
+                temp_db.commit()
             logger.error(
                 "[WS_DEBUGGING] Error en captura: debugging_id=%s, ws=%s, error=%s",
                 debugging_id, workstation_id, error_message,
