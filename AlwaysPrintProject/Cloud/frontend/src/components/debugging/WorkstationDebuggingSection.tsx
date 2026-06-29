@@ -680,7 +680,11 @@ function ActiveTimerView({ session, t, onStop, isStopPending }: ActiveTimerViewP
   // Calcular tiempo restante con actualización cada segundo
   useEffect(() => {
     const calculateRemaining = () => {
-      const startTime = new Date(session.start_time).getTime();
+      // Asegurar que start_time se interprete como UTC (el backend no incluye 'Z')
+      const startTimeStr = session.start_time.endsWith('Z')
+        ? session.start_time
+        : session.start_time + 'Z';
+      const startTime = new Date(startTimeStr).getTime();
       const endTime = startTime + session.duration_seconds * 1000;
       const now = Date.now();
       const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
