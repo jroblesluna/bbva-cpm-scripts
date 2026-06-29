@@ -332,6 +332,10 @@ async def list_profiles(
             name=p.name,
             description=p.description,
             confirmation_message=p.confirmation_message,
+            external_logs=json.loads(p.external_logs) if p.external_logs else [],
+            eventlog_groups=json.loads(p.eventlog_groups) if p.eventlog_groups else [],
+            registry_keys=json.loads(p.registry_keys) if p.registry_keys else [],
+            monitored_services=json.loads(p.monitored_services) if p.monitored_services else [],
             is_active=p.is_active,
             created_at=p.created_at,
         )

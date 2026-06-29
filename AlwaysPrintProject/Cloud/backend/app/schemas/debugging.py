@@ -286,6 +286,10 @@ class DebuggingProfileListItem(BaseModel):
     name: str
     description: str
     confirmation_message: str
+    external_logs: List[str] = []
+    eventlog_groups: List[str] = []
+    registry_keys: List[str] = []
+    monitored_services: List[str] = []
     is_active: bool
     created_at: datetime
 
