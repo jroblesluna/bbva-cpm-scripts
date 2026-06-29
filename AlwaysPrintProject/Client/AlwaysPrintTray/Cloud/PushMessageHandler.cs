@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
 using AlwaysPrint.Shared.Logging;
+using AlwaysPrint.Shared.Messages;
 using AlwaysPrint.Shared.Security;
 using AlwaysPrintTray.Pipe;
 using Newtonsoft.Json.Linq;
