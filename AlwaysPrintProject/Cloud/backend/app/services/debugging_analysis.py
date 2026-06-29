@@ -396,8 +396,23 @@ class DebuggingAnalysisService:
         """Genera un PDF con el análisis del LLM y metadata de la sesión."""
         from fpdf import FPDF
 
-        pdf = FPDF()
-        pdf.set_auto_page_break(auto=True, margin=15)
+        # Ruta al logo (relativa al módulo)
+        static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+        logo_path = os.path.join(static_dir, "alwaysprint_logo.png")
+
+        class DebuggingPDF(FPDF):
+            """PDF con footer de copyright en cada página."""
+            def footer(self):
+                self.set_y(-15)
+                self.set_font("Helvetica", "I", 7)
+                self.set_text_color(150, 150, 150)
+                year = datetime.utcnow().year
+                self.cell(0, 10,
+                    f"(c) {year} Inversiones On Line S.A.C. - Todos los derechos reservados",
+                    align="C")
+
+        pdf = DebuggingPDF()
+        pdf.set_auto_page_break(auto=True, margin=20)
         pdf.add_page()
 
         # Sanitizar texto para compatibilidad con fuente Helvetica (Latin-1)
@@ -416,12 +431,31 @@ class DebuggingAnalysisService:
             }
             for char, replacement in replacements.items():
                 text = text.replace(char, replacement)
-            # Eliminar cualquier carácter fuera de Latin-1 que quede
             return text.encode('latin-1', errors='replace').decode('latin-1')
 
-        # Header
+        # === Header con logos ===
+        if os.path.exists(logo_path):
+            pdf.image(logo_path, x=10, y=8, w=20)
+
+        # Robles.AI a la derecha
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_text_color(100, 100, 100)
+        pdf.set_xy(140, 10)
+        pdf.cell(60, 4, "Robles.AI", align="R")
+        pdf.set_font("Helvetica", "I", 7)
+        pdf.set_xy(140, 14)
+        pdf.cell(60, 4, "Familia de automatizacion", align="R")
+
+        # Título centrado
+        pdf.set_xy(10, 30)
+        pdf.set_text_color(0, 0, 0)
         pdf.set_font("Helvetica", "B", 16)
         pdf.cell(0, 10, "Reporte de Debugging - AlwaysPrint", ln=True, align="C")
+        pdf.ln(3)
+
+        # Separador
+        pdf.set_draw_color(200, 200, 200)
+        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
         pdf.ln(5)
 
         # Metadata
@@ -579,6 +613,24 @@ class DebuggingAnalysisService:
                 pdf.ln(3)
             else:
                 pdf.multi_cell(effective_width, 5, line)
+
+        # === Disclaimer ===
+        pdf.ln(10)
+        pdf.set_draw_color(200, 200, 200)
+        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+        pdf.ln(5)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.set_text_color(120, 120, 120)
+        disclaimer = (
+            "AVISO: Este reporte fue generado automaticamente a partir del analisis de logs "
+            "y datos de sistema recopilados durante la sesion de debugging. Las conclusiones y "
+            "recomendaciones se basan exclusivamente en la informacion disponible en los registros "
+            "capturados. Situaciones adicionales no reflejadas en los logs podrian contribuir a "
+            "los inconvenientes observados. Se recomienda siempre la revision por un especialista "
+            "para confirmar el diagnostico antes de tomar acciones correctivas."
+        )
+        effective_width = pdf.w - pdf.l_margin - pdf.r_margin
+        pdf.multi_cell(effective_width, 4, sanitize(disclaimer))
 
         return pdf.output()
 
