@@ -63,16 +63,49 @@ def _verify_llm_enabled(org: Organization) -> None:
         )
 
 
-def _get_user_organization(current_user: User, db: Session) -> Organization:
-    """Obtiene la organización del usuario actual."""
+def _get_user_organization(
+    current_user: User, db: Session, explicit_org_id: Optional[UUID] = None
+) -> Organization:
+    """
+    Obtiene la organización según el contexto:
+    - Si se pasa explicit_org_id y el usuario es Admin → usa esa org.
+    - Si el usuario tiene organization_id asignado → usa la suya.
+    - En otro caso → 404.
+    """
+    target_org_id = None
+
+    if explicit_org_id and current_user.role == UserRole.ADMIN:
+        # Admin puede operar en cualquier organización
+        target_org_id = explicit_org_id
+    elif current_user.organization_id:
+        target_org_id = current_user.organization_id
+    elif explicit_org_id:
+        # Operador con org_id explícito: solo si coincide (seguridad)
+        target_org_id = explicit_org_id
+
+    if not target_org_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se pudo determinar la organización. Proporcione organization_id.",
+        )
+
     org = db.query(Organization).filter(
-        Organization.id == current_user.organization_id
+        Organization.id == target_org_id
     ).first()
     if not org:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Organización del usuario no encontrada",
+            detail="Organización no encontrada",
         )
+
+    # Operadores solo pueden acceder a su propia organización
+    if current_user.role != UserRole.ADMIN and current_user.organization_id:
+        if org.id != current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tiene permisos para acceder a esta organización",
+            )
+
     return org
 
 
@@ -189,6 +222,7 @@ async def _get_llm_suggestion(
 )
 async def create_profile_get_suggestion(
     payload: DebuggingProfileCreate,
+    organization_id: Optional[UUID] = Query(None, description="ID de organización (requerido para Admin sin org asignada)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -200,7 +234,7 @@ async def create_profile_get_suggestion(
     Solo accesible por admins. Requiere LLM habilitado en la organización.
     """
     _require_admin(current_user)
-    org = _get_user_organization(current_user, db)
+    org = _get_user_organization(current_user, db, organization_id)
     _verify_llm_enabled(org)
 
     targets = {
@@ -223,6 +257,7 @@ async def create_profile_get_suggestion(
 async def create_profile_confirm(
     payload: DebuggingProfileCreate,
     confirm: DebuggingProfileConfirmSave,
+    organization_id: Optional[UUID] = Query(None, description="ID de organización (requerido para Admin sin org asignada)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -233,7 +268,7 @@ async def create_profile_confirm(
     Solo accesible por admins. Requiere LLM habilitado en la organización.
     """
     _require_admin(current_user)
-    org = _get_user_organization(current_user, db)
+    org = _get_user_organization(current_user, db, organization_id)
     _verify_llm_enabled(org)
 
     profile = DebuggingProfile(
@@ -270,6 +305,7 @@ async def create_profile_confirm(
 )
 async def list_profiles(
     include_inactive: bool = Query(False, description="Incluir perfiles desactivados"),
+    organization_id: Optional[UUID] = Query(None, description="ID de organización (requerido para Admin sin org asignada)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -278,7 +314,7 @@ async def list_profiles(
     Por defecto solo muestra perfiles activos.
     Accesible por admin y operadores.
     """
-    org = _get_user_organization(current_user, db)
+    org = _get_user_organization(current_user, db, organization_id)
     _verify_llm_enabled(org)
 
     query = db.query(DebuggingProfile).filter(
@@ -311,6 +347,7 @@ async def list_profiles(
 )
 async def get_profile(
     profile_id: UUID,
+    organization_id: Optional[UUID] = Query(None, description="ID de organización (requerido para Admin sin org asignada)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -318,7 +355,7 @@ async def get_profile(
     Retorna el detalle completo de un perfil de debugging.
     Accesible por admin y operadores.
     """
-    org = _get_user_organization(current_user, db)
+    org = _get_user_organization(current_user, db, organization_id)
     _verify_llm_enabled(org)
 
     profile = db.query(DebuggingProfile).filter(
@@ -344,6 +381,7 @@ async def get_profile(
 async def update_profile(
     profile_id: UUID,
     payload: DebuggingProfileUpdate,
+    organization_id: Optional[UUID] = Query(None, description="ID de organización (requerido para Admin sin org asignada)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -352,7 +390,7 @@ async def update_profile(
     Solo accesible por admins.
     """
     _require_admin(current_user)
-    org = _get_user_organization(current_user, db)
+    org = _get_user_organization(current_user, db, organization_id)
     _verify_llm_enabled(org)
 
     profile = db.query(DebuggingProfile).filter(
@@ -399,6 +437,7 @@ async def update_profile(
 )
 async def delete_profile(
     profile_id: UUID,
+    organization_id: Optional[UUID] = Query(None, description="ID de organización (requerido para Admin sin org asignada)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -407,7 +446,7 @@ async def delete_profile(
     Solo accesible por admins.
     """
     _require_admin(current_user)
-    org = _get_user_organization(current_user, db)
+    org = _get_user_organization(current_user, db, organization_id)
 
     profile = db.query(DebuggingProfile).filter(
         DebuggingProfile.id == profile_id,
@@ -444,6 +483,7 @@ async def delete_profile(
 )
 async def create_session(
     payload: DebuggingSessionCreate,
+    organization_id: Optional[UUID] = Query(None, description="ID de organización (requerido para Admin sin org asignada)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -457,7 +497,7 @@ async def create_session(
     """
     from app.services.websocket_manager import connection_manager
 
-    org = _get_user_organization(current_user, db)
+    org = _get_user_organization(current_user, db, organization_id)
     _verify_llm_enabled(org)
 
     # Verificar que el perfil existe y pertenece a la organización
@@ -604,6 +644,7 @@ async def list_sessions(
     session_status: Optional[str] = Query(None, alias="status", description="Filtrar por estado"),
     limit: int = Query(50, ge=1, le=200, description="Máximo de resultados"),
     offset: int = Query(0, ge=0, description="Offset para paginación"),
+    organization_id: Optional[UUID] = Query(None, description="ID de organización (requerido para Admin sin org asignada)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -612,7 +653,7 @@ async def list_sessions(
     Soporta filtros por workstation_id y estado.
     Accesible por admins y operadores.
     """
-    org = _get_user_organization(current_user, db)
+    org = _get_user_organization(current_user, db, organization_id)
 
     query = db.query(DebuggingSession).filter(
         DebuggingSession.organization_id == org.id
@@ -642,6 +683,7 @@ async def list_sessions(
 )
 async def get_session(
     session_id: UUID,
+    organization_id: Optional[UUID] = Query(None, description="ID de organización (requerido para Admin sin org asignada)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -649,7 +691,7 @@ async def get_session(
     Retorna el detalle completo de una sesión de debugging.
     Accesible por admins y operadores.
     """
-    org = _get_user_organization(current_user, db)
+    org = _get_user_organization(current_user, db, organization_id)
 
     session = db.query(DebuggingSession).filter(
         DebuggingSession.id == session_id,
@@ -673,6 +715,7 @@ async def get_session(
 )
 async def stop_session(
     session_id: UUID,
+    organization_id: Optional[UUID] = Query(None, description="ID de organización (requerido para Admin sin org asignada)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -683,7 +726,7 @@ async def stop_session(
     """
     from app.services.websocket_manager import connection_manager
 
-    org = _get_user_organization(current_user, db)
+    org = _get_user_organization(current_user, db, organization_id)
 
     session = db.query(DebuggingSession).filter(
         DebuggingSession.id == session_id,
@@ -730,6 +773,7 @@ async def stop_session(
 )
 async def analyze_session(
     session_id: UUID,
+    organization_id: Optional[UUID] = Query(None, description="ID de organización (requerido para Admin sin org asignada)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -741,7 +785,7 @@ async def analyze_session(
     """
     from app.services.websocket_manager import connection_manager
 
-    org = _get_user_organization(current_user, db)
+    org = _get_user_organization(current_user, db, organization_id)
     _verify_llm_enabled(org)
 
     session = db.query(DebuggingSession).filter(
@@ -806,6 +850,7 @@ async def analyze_session(
 )
 async def delete_session_data(
     session_id: UUID,
+    organization_id: Optional[UUID] = Query(None, description="ID de organización (requerido para Admin sin org asignada)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -816,7 +861,7 @@ async def delete_session_data(
     """
     from app.services.websocket_manager import connection_manager
 
-    org = _get_user_organization(current_user, db)
+    org = _get_user_organization(current_user, db, organization_id)
 
     session = db.query(DebuggingSession).filter(
         DebuggingSession.id == session_id,
@@ -892,6 +937,7 @@ async def delete_session_data(
 )
 async def get_session_report(
     session_id: UUID,
+    organization_id: Optional[UUID] = Query(None, description="ID de organización (requerido para Admin sin org asignada)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -900,7 +946,7 @@ async def get_session_report(
     Solo disponible para sesiones con status 'analyzed'.
     Accesible por admins y operadores.
     """
-    org = _get_user_organization(current_user, db)
+    org = _get_user_organization(current_user, db, organization_id)
 
     session = db.query(DebuggingSession).filter(
         DebuggingSession.id == session_id,

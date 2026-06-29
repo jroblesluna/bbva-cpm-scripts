@@ -94,6 +94,7 @@ interface DebuggingReportURL {
 
 interface WorkstationDebuggingSectionProps {
   workstationId: string;
+  organizationId?: string;
   isOnline: boolean;
 }
 
@@ -112,6 +113,7 @@ function formatBytes(bytes: number | null): string {
 
 export function WorkstationDebuggingSection({
   workstationId,
+  organizationId,
   isOnline,
 }: WorkstationDebuggingSectionProps) {
   const t = useTranslations('debugging');
@@ -131,10 +133,10 @@ export function WorkstationDebuggingSection({
 
   // Perfiles activos de la organización (el backend filtra por org del usuario)
   const { data: profiles, isLoading: profilesLoading } = useQuery<DebuggingProfile[]>({
-    queryKey: ['debugging-profiles', workstationId],
+    queryKey: ['debugging-profiles', workstationId, organizationId],
     queryFn: async () => {
       const res = await apiClient.get('/debugging/profiles', {
-        params: { include_inactive: false },
+        params: { include_inactive: false, organization_id: organizationId },
       });
       return res.data;
     },
@@ -145,7 +147,7 @@ export function WorkstationDebuggingSection({
     queryKey: ['debugging-sessions', workstationId],
     queryFn: async () => {
       const res = await apiClient.get('/debugging/sessions', {
-        params: { workstation_id: workstationId },
+        params: { workstation_id: workstationId, organization_id: organizationId },
       });
       return res.data;
     },
@@ -182,7 +184,9 @@ export function WorkstationDebuggingSection({
       motivo?: string;
       additional_instructions?: string;
     }) => {
-      const res = await apiClient.post('/debugging/sessions', data);
+      const res = await apiClient.post('/debugging/sessions', data, {
+        params: { organization_id: organizationId },
+      });
       return res.data;
     },
     onSuccess: () => {
@@ -198,7 +202,9 @@ export function WorkstationDebuggingSection({
   // Detener sesión
   const stopMutation = useMutation({
     mutationFn: async (sessionId: string) => {
-      await apiClient.post(`/debugging/sessions/${sessionId}/stop`);
+      await apiClient.post(`/debugging/sessions/${sessionId}/stop`, null, {
+        params: { organization_id: organizationId },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['debugging-sessions', workstationId] });
@@ -212,7 +218,9 @@ export function WorkstationDebuggingSection({
   // Analizar sesión
   const analyzeMutation = useMutation({
     mutationFn: async (sessionId: string) => {
-      await apiClient.post(`/debugging/sessions/${sessionId}/analyze`);
+      await apiClient.post(`/debugging/sessions/${sessionId}/analyze`, null, {
+        params: { organization_id: organizationId },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['debugging-sessions', workstationId] });
@@ -226,7 +234,9 @@ export function WorkstationDebuggingSection({
   // Eliminar datos de sesión
   const deleteMutation = useMutation({
     mutationFn: async (sessionId: string) => {
-      await apiClient.post(`/debugging/sessions/${sessionId}/delete`);
+      await apiClient.post(`/debugging/sessions/${sessionId}/delete`, null, {
+        params: { organization_id: organizationId },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['debugging-sessions', workstationId] });
@@ -242,7 +252,9 @@ export function WorkstationDebuggingSection({
   // Descargar reporte PDF
   const downloadReportMutation = useMutation({
     mutationFn: async (sessionId: string) => {
-      const res = await apiClient.get<DebuggingReportURL>(`/debugging/sessions/${sessionId}/report`);
+      const res = await apiClient.get<DebuggingReportURL>(`/debugging/sessions/${sessionId}/report`, {
+        params: { organization_id: organizationId },
+      });
       return res.data;
     },
     onSuccess: (data) => {

@@ -2273,6 +2273,7 @@ function WorkstationDetailModal({
           {/* Sección de Debugging */}
           <WorkstationDebuggingSection
             workstationId={workstation.id}
+            organizationId={workstation.organization_id}
             isOnline={workstation.is_online}
           />
         </CardContent>

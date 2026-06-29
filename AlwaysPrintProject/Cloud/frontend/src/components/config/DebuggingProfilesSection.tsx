@@ -101,7 +101,7 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
     queryKey: ['debugging-profiles', organizationId, includeInactive],
     queryFn: async () => {
       const res = await apiClient.get('/debugging/profiles', {
-        params: { include_inactive: includeInactive },
+        params: { include_inactive: includeInactive, organization_id: organizationId },
       });
       return res.data;
     },
@@ -117,7 +117,7 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
         registry_keys: registryKeys.filter(Boolean),
         monitored_services: monitoredServices.filter(Boolean),
         description,
-      });
+      }, { params: { organization_id: organizationId } });
       return res.data;
     },
     onSuccess: (data) => {
@@ -138,7 +138,7 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
     mutationFn: async () => {
       const res = await apiClient.post('/debugging/profiles/confirm', null, {
         params: {
-          // Los params van como query para el body doble (payload + confirm)
+          organization_id: organizationId,
         },
         data: {
           external_logs: externalLogs.filter(Boolean),
@@ -166,7 +166,9 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
   // Mutation: toggle activación
   const toggleMutation = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
-      await apiClient.put(`/debugging/profiles/${id}`, { is_active });
+      await apiClient.put(`/debugging/profiles/${id}`, { is_active }, {
+        params: { organization_id: organizationId },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['debugging-profiles'] });
@@ -180,7 +182,9 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
   // Mutation: eliminar (soft delete)
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiClient.delete(`/debugging/profiles/${id}`);
+      await apiClient.delete(`/debugging/profiles/${id}`, {
+        params: { organization_id: organizationId },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['debugging-profiles'] });
