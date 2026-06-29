@@ -425,11 +425,29 @@ export function WorkstationDebuggingSection({
         </div>
       )}
 
-      {/* Estado: ANALYSIS_FAILED o FAILED — Error */}
+      {/* Estado: ANALYSIS_FAILED o FAILED — Error con opción de reintento */}
       {failedSession && !activeSession && !readySession && !analyzingSession && !analyzedSession && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{t('wsFailed')}</AlertDescription>
+          <AlertDescription className="flex items-center justify-between w-full">
+            <span>{t('wsFailed')}</span>
+            {failedSession.status === 'analysis_failed' && isOnline && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-3 h-7 border-red-300 text-red-700 hover:bg-red-50"
+                disabled={analyzeMutation.isPending}
+                onClick={() => analyzeMutation.mutate(failedSession.id)}
+              >
+                {analyzeMutation.isPending ? (
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                ) : (
+                  <Play className="w-3 h-3 mr-1" />
+                )}
+                {t('wsRetryAnalysis')}
+              </Button>
+            )}
+          </AlertDescription>
         </Alert>
       )}
 

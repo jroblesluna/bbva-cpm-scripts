@@ -1270,6 +1270,7 @@
     "wsErrorStop": "Error deteniendo debugging",
     "wsErrorAnalyze": "Error solicitando análisis",
     "wsErrorDelete": "Error eliminando datos",
+    "wsRetryAnalysis": "Reintentar",
     "wsTargets": "Lo que se capturará:"
   }
 }
