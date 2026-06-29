@@ -277,6 +277,15 @@ namespace AlwaysPrintService.Debugging
                         new FileInfo(filePath).Length);
                 }
 
+                // Reportar targets de logs externos que no resolvieron archivos
+                if (externalLogs.Length > 0 && extractedLogs.Count == 0)
+                {
+                    foreach (var pattern in externalLogs)
+                    {
+                        indexBuilder.AddError(pattern, "No se encontraron archivos que coincidan con el patrón");
+                    }
+                }
+
                 // Extraer eventos Windows
                 var eventGroups = session.Profile?["eventlog_groups"]?.ToObject<string[]>() ?? Array.Empty<string>();
                 if (eventGroups.Length > 0)
