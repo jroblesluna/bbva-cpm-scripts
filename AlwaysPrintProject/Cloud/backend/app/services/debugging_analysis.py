@@ -90,7 +90,11 @@ class DebuggingAnalysisService:
             # 7. Generar PDF
             pdf_bytes = self._generate_pdf(analysis_text, session, index_data)
 
-            # 8. Upload PDF a S3
+            # 8. Upload ZIP original a S3 (para descarga posterior)
+            zip_s3_key = f"debugging/{session.organization_id}/{session.id}/data.zip"
+            self._upload_to_s3(zip_data, zip_s3_key)
+
+            # 9. Upload PDF a S3
             s3_key = f"debugging/{session.organization_id}/{session.id}/report.pdf"
             self._upload_to_s3(pdf_bytes, s3_key)
 

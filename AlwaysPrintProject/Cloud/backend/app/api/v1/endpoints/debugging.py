@@ -1009,6 +1009,83 @@ async def get_session_report(
         )
 
 
+@router.get(
+    "/sessions/{session_id}/data",
+    response_model=DebuggingReportURL,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener URL de descarga del ZIP de datos capturados",
+)
+async def get_session_data_zip(
+    session_id: UUID,
+    organization_id: Optional[UUID] = Query(None, description="ID de organización (requerido para Admin sin org asignada)"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Genera una URL presigned de S3 para descargar el ZIP con los datos capturados.
+    Solo disponible para sesiones con status 'analyzed'.
+    Accesible por admins y operadores.
+    """
+    org = _get_user_organization(current_user, db, organization_id)
+
+    session = db.query(DebuggingSession).filter(
+        DebuggingSession.id == session_id,
+        DebuggingSession.organization_id == org.id,
+    ).first()
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Sesión de debugging con ID {session_id} no encontrada",
+        )
+
+    if session.status != DebuggingSessionStatus.ANALYZED.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Los datos solo están disponibles para sesiones analizadas. Estado actual: {session.status}",
+        )
+
+    # Derivar la key del ZIP a partir de la key del PDF (convención: report.pdf → data.zip)
+    if not session.s3_report_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró la referencia a los datos en S3.",
+        )
+
+    zip_s3_key = session.s3_report_key.replace("report.pdf", "data.zip")
+
+    import boto3
+    try:
+        s3_client = boto3.client("s3", region_name=settings.LOG_ANALYZER_LLM_REGION)
+        expires_in = 3600
+
+        presigned_url = s3_client.generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": settings.S3_DOCS_BUCKET,
+                "Key": zip_s3_key,
+                "ResponseContentDisposition": (
+                    f'attachment; filename="debugging_data_{session.id}.zip"'
+                ),
+            },
+            ExpiresIn=expires_in,
+        )
+
+        return DebuggingReportURL(
+            report_url=presigned_url,
+            expires_in_seconds=expires_in,
+        )
+
+    except Exception as e:
+        logger.error(
+            "[DEBUGGING] Error generando presigned URL de ZIP: session=%s, key=%s, error=%s",
+            session.id, zip_s3_key, e,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error generando URL de descarga del ZIP.",
+        )
+
 
 # === UPLOAD ENDPOINT (WORKSTATION AUTHENTICATED) ===
 

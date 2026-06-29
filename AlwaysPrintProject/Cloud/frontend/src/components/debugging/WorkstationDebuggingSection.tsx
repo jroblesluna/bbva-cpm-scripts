@@ -265,6 +265,22 @@ export function WorkstationDebuggingSection({
     },
   });
 
+  // Descargar ZIP de datos capturados
+  const downloadZipMutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const res = await apiClient.get<DebuggingReportURL>(`/debugging/sessions/${sessionId}/data`, {
+        params: { organization_id: organizationId },
+      });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      window.open(data.report_url, '_blank');
+    },
+    onError: () => {
+      toast({ title: t('wsFailed'), variant: 'destructive' });
+    },
+  });
+
   // === Helpers ===
 
   const resetConfirmForm = () => {
@@ -409,9 +425,14 @@ export function WorkstationDebuggingSection({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => downloadReportMutation.mutate(analyzedSession.id)}
+                      disabled={downloadZipMutation.isPending}
+                      onClick={() => downloadZipMutation.mutate(analyzedSession.id)}
                     >
-                      <Archive className="w-3.5 h-3.5 mr-1.5" />
+                      {downloadZipMutation.isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Archive className="w-3.5 h-3.5 mr-1.5" />
+                      )}
                       ZIP
                     </Button>
                   </TooltipTrigger>
