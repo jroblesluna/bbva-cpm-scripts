@@ -80,7 +80,7 @@ export default function WorkstationsPage() {
   const [filterWithConfig, setFilterWithConfig] = useState<boolean | undefined>(undefined);
   const [filterOrgId, setFilterOrgId] = useState<string | undefined>(() => searchParams.get('org_id') || undefined);
   const [filterVlanId, setFilterVlanId] = useState<string | undefined>(() => searchParams.get('vlan_id') || undefined);
-  const [filterVersion, setFilterVersion] = useState<string | undefined>(undefined);
+  const [filterVersion, setFilterVersion] = useState<boolean | undefined>(undefined);
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
   const [editingWorkstation, setEditingWorkstation] = useState<Workstation | null>(null);
   const [contingencyTarget, setContingencyTarget] = useState<Workstation | null>(null);
@@ -283,28 +283,27 @@ export default function WorkstationsPage() {
     }
   };
 
+  // Determinar versión más reciente de las workstations cargadas
+  const latestVersion = (() => {
+    const items = workstationsData?.items || [];
+    const versions = items.map(ws => ws.tray_version).filter(Boolean) as string[];
+    if (versions.length === 0) return null;
+    return versions.sort((a, b) => b.localeCompare(a))[0];
+  })();
+
   const workstations = (() => {
     let items = workstationsData?.items || [];
     if (filterWithConfig) {
       const configIds = new Set(stats?.workstations_with_config?.map(w => w.id) || []);
       items = items.filter(ws => configIds.has(ws.id));
     }
-    if (filterVersion) {
-      items = items.filter(ws => ws.tray_version === filterVersion);
+    if (filterVersion && latestVersion) {
+      items = items.filter(ws => ws.tray_version === latestVersion);
     }
     return items;
   })();
 
-  // Extraer versiones únicas de las workstations cargadas (para el filtro)
-  const availableVersions = (() => {
-    const items = workstationsData?.items || [];
-    const versions = new Set<string>();
-    items.forEach(ws => {
-      if (ws.tray_version) versions.add(ws.tray_version);
-    });
-    return [...versions].sort((a, b) => b.localeCompare(a)); // Más reciente primero
-  })();
-  const totalItems = filterWithConfig ? workstations.length : (workstationsData?.total || 0);
+  const totalItems = filterWithConfig || filterVersion ? workstations.length : (workstationsData?.total || 0);
   const totalPages = Math.ceil(totalItems / pageSize);
   const paginationStart = (page - 1) * pageSize + 1;
   const paginationEnd = Math.min(page * pageSize, totalItems);
@@ -610,26 +609,6 @@ export default function WorkstationsPage() {
                 </select>
               </div>
             )}
-            {availableVersions.length > 1 && (
-              <div>
-                <select
-                  value={filterVersion || 'all'}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setFilterVersion(value === 'all' ? undefined : value);
-                    setPage(1);
-                  }}
-                  className="w-full px-3 py-2 border rounded-md"
-                >
-                  <option value="all">{t('allVersions')}</option>
-                  {availableVersions.map((version) => (
-                    <option key={version} value={version}>
-                      v{version}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
           </div>
           <div className="flex items-center justify-between mt-4">
             <div className="flex items-center gap-2 flex-wrap">
@@ -659,13 +638,28 @@ export default function WorkstationsPage() {
                 </span>
                 {t('withConfig')}
               </button>
+              {latestVersion && (
+                <button
+                  onClick={() => { setFilterVersion(filterVersion === true ? undefined : true); setPage(1); }}
+                  className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-all select-none ${
+                    filterVersion === true
+                      ? 'border-blue-300 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  }`}
+                >
+                  <span className={`flex w-3.5 h-3.5 items-center justify-center rounded-sm border shrink-0 transition-colors ${filterVersion === true ? 'border-blue-500 bg-blue-500' : 'border-gray-300 bg-white'}`}>
+                    {filterVersion === true && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 5l2.5 2.5L8 3"/></svg>}
+                  </span>
+                  {t('latestVersion')} (v{latestVersion})
+                </button>
+              )}
               {(searchTerm ||
                 filterOnline !== undefined ||
                 filterContingency !== undefined ||
                 filterWithConfig !== undefined ||
+                filterVersion !== undefined ||
                 filterOrgId ||
-                filterVlanId ||
-                filterVersion) && (
+                filterVlanId) && (
                 <Button
                   variant="outline"
                   size="sm"
