@@ -391,6 +391,25 @@ class DebuggingAnalysisService:
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
 
+        # Sanitizar texto para compatibilidad con fuente Helvetica (Latin-1)
+        def sanitize(text: str) -> str:
+            """Reemplaza caracteres Unicode incompatibles con Latin-1."""
+            replacements = {
+                '\u2022': '-',   # bullet
+                '\u2013': '-',   # en-dash
+                '\u2014': '--',  # em-dash
+                '\u2018': "'",   # left single quote
+                '\u2019': "'",   # right single quote
+                '\u201c': '"',   # left double quote
+                '\u201d': '"',   # right double quote
+                '\u2026': '...', # ellipsis
+                '\u00b7': '-',   # middle dot
+            }
+            for char, replacement in replacements.items():
+                text = text.replace(char, replacement)
+            # Eliminar cualquier carácter fuera de Latin-1 que quede
+            return text.encode('latin-1', errors='replace').decode('latin-1')
+
         # Header
         pdf.set_font("Helvetica", "B", 16)
         pdf.cell(0, 10, "Reporte de Debugging - AlwaysPrint", ln=True, align="C")
@@ -415,7 +434,7 @@ class DebuggingAnalysisService:
             metadata_lines.append(f"Motivo: {session.motivo}")
 
         for line in metadata_lines:
-            pdf.cell(0, 5, line, ln=True)
+            pdf.cell(0, 5, sanitize(line), ln=True)
 
         pdf.ln(5)
         pdf.set_draw_color(200, 200, 200)
@@ -430,6 +449,7 @@ class DebuggingAnalysisService:
         effective_width = pdf.w - pdf.l_margin - pdf.r_margin
 
         for line in analysis_text.split("\n"):
+            line = sanitize(line)
             # Detectar headers markdown
             if line.startswith("## "):
                 pdf.ln(3)
@@ -449,7 +469,7 @@ class DebuggingAnalysisService:
                 # Bullet con indentación: reducir ancho disponible
                 pdf.set_x(pdf.l_margin + 4)
                 bullet_width = effective_width - 4
-                pdf.multi_cell(bullet_width, 5, f"\u2022 {line[2:]}")
+                pdf.multi_cell(bullet_width, 5, f"- {line[2:]}")
             elif line.strip() == "":
                 pdf.ln(3)
             else:
@@ -464,7 +484,7 @@ class DebuggingAnalysisService:
             pdf.set_font("Helvetica", "", 9)
             pdf.set_text_color(150, 50, 50)
             for err in errors:
-                err_text = f"\u2022 {err.get('target', 'N/A')}: {err.get('error', 'N/A')}"
+                err_text = f"- {err.get('target', 'N/A')}: {err.get('error', 'N/A')}"
                 pdf.multi_cell(effective_width, 4, err_text)
 
         return pdf.output()
