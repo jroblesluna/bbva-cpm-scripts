@@ -78,7 +78,14 @@ namespace AlwaysPrintService.Debugging
                         continue;
                     }
 
-                    var lines = File.ReadAllLines(filePath);
+                    // Leer con FileShare.ReadWrite para acceder aunque otro proceso escriba
+                    string[] lines;
+                    using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                    using (var reader = new StreamReader(fs))
+                    {
+                        lines = reader.ReadToEnd().Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+                    }
+
                     if (lines.Length > startLine)
                     {
                         var newLines = lines.Skip((int)startLine).ToArray();
@@ -132,7 +139,13 @@ namespace AlwaysPrintService.Debugging
                 if (string.IsNullOrEmpty(logPath) || !File.Exists(logPath))
                     return "[Log de AlwaysPrint no encontrado]";
 
-                var lines = File.ReadAllLines(logPath);
+                string[] lines;
+                using (var fs = new FileStream(logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                using (var reader = new StreamReader(fs))
+                {
+                    lines = reader.ReadToEnd().Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+                }
+
                 if (lines.Length > fromLine)
                 {
                     var newLines = lines.Skip((int)fromLine).ToArray();
@@ -167,7 +180,9 @@ namespace AlwaysPrintService.Debugging
         private long CountLines(string filePath)
         {
             long count = 0;
-            using (var reader = new StreamReader(filePath))
+            // Abrir con FileShare.ReadWrite para leer aunque otro proceso escriba
+            using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (var reader = new StreamReader(fs))
             {
                 while (reader.ReadLine() != null)
                     count++;
