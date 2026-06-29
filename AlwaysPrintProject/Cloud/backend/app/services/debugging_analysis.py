@@ -427,28 +427,33 @@ class DebuggingAnalysisService:
         pdf.set_font("Helvetica", "", 11)
 
         # Procesar el texto del análisis línea por línea
+        effective_width = pdf.w - pdf.l_margin - pdf.r_margin
+
         for line in analysis_text.split("\n"):
             # Detectar headers markdown
             if line.startswith("## "):
                 pdf.ln(3)
                 pdf.set_font("Helvetica", "B", 13)
-                pdf.multi_cell(0, 6, line[3:])
+                pdf.multi_cell(effective_width, 6, line[3:])
                 pdf.set_font("Helvetica", "", 11)
             elif line.startswith("### "):
                 pdf.ln(2)
                 pdf.set_font("Helvetica", "B", 11)
-                pdf.multi_cell(0, 6, line[4:])
+                pdf.multi_cell(effective_width, 6, line[4:])
                 pdf.set_font("Helvetica", "", 11)
             elif line.startswith("**") and line.endswith("**"):
                 pdf.set_font("Helvetica", "B", 11)
-                pdf.multi_cell(0, 6, line.strip("*"))
+                pdf.multi_cell(effective_width, 6, line.strip("*"))
                 pdf.set_font("Helvetica", "", 11)
             elif line.startswith("- ") or line.startswith("* "):
-                pdf.multi_cell(0, 5, f"  {line}")
+                # Bullet con indentación: reducir ancho disponible
+                pdf.set_x(pdf.l_margin + 4)
+                bullet_width = effective_width - 4
+                pdf.multi_cell(bullet_width, 5, f"\u2022 {line[2:]}")
             elif line.strip() == "":
                 pdf.ln(3)
             else:
-                pdf.multi_cell(0, 5, line)
+                pdf.multi_cell(effective_width, 5, line)
 
         # Footer con errores de captura si los hubo
         errors = index_data.get("errors", [])
@@ -459,11 +464,8 @@ class DebuggingAnalysisService:
             pdf.set_font("Helvetica", "", 9)
             pdf.set_text_color(150, 50, 50)
             for err in errors:
-                pdf.cell(
-                    0, 4,
-                    f"- {err.get('target', 'N/A')}: {err.get('error', 'N/A')}",
-                    ln=True,
-                )
+                err_text = f"\u2022 {err.get('target', 'N/A')}: {err.get('error', 'N/A')}"
+                pdf.multi_cell(effective_width, 4, err_text)
 
         return pdf.output()
 
