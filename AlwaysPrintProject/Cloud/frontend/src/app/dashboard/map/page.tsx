@@ -157,7 +157,19 @@ function MapContent() {
   // Callback cuando el mapa se carga
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map
-  }, [])
+
+    // Si las VLANs ya están disponibles, ajustar bounds inmediatamente
+    if (vlans.length === 1) {
+      map.setCenter({ lat: vlans[0].latitude, lng: vlans[0].longitude })
+      map.setZoom(15)
+    } else if (vlans.length > 1) {
+      const bounds = new google.maps.LatLngBounds()
+      vlans.forEach((vlan) => {
+        bounds.extend({ lat: vlan.latitude, lng: vlan.longitude })
+      })
+      map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 })
+    }
+  }, [vlans])
 
   // Gestionar markers y clusterer cuando cambian las VLANs
   useEffect(() => {
@@ -211,7 +223,7 @@ function MapContent() {
       vlans.forEach((vlan) => {
         bounds.extend({ lat: vlan.latitude, lng: vlan.longitude })
       })
-      mapRef.current.fitBounds(bounds)
+      mapRef.current.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 })
     }
   }, [vlans])
 
