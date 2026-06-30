@@ -256,6 +256,9 @@ namespace AlwaysPrintService
                 _dispatcher.ForcedContingencyReceived += OnForcedContingencyReceived;
                 _dispatcher.DebuggingCaptureCompleted += OnDebuggingCaptureCompleted;
                 _dispatcher.DebuggingCaptureErrorOccurred += OnDebuggingCaptureError;
+
+                // Suscribir a eventos de progreso OnDemand para push al Tray
+                _actionEngine.OnActionProgress += OnActionProgress;
                 _pipeServer = new PipeServer(_dispatcher);
                 _pipeServer.Start();
 
@@ -479,6 +482,29 @@ namespace AlwaysPrintService
                     {
                         DebuggingId = debuggingId,
                         ErrorMessage = errorMessage
+                    });
+                _pipeServer.SendToClient(msg);
+            }
+        }
+
+        /// <summary>
+        /// Evento del ActionEngine: progreso de un paso OnDemand.
+        /// Envía push al Tray para actualizar la ventana de progreso.
+        /// </summary>
+        private void OnActionProgress(string triggerLabel, string actionType, string description, string status)
+        {
+            if (_pipeServer != null && _pipeServer.IsClientConnected)
+            {
+                bool isComplete = status.StartsWith("completed");
+                var msg = PipeMessage.Create(MessageType.OnDemandActionProgress,
+                    new OnDemandActionProgressPayload
+                    {
+                        TriggerLabel = triggerLabel,
+                        ActionType = actionType,
+                        StepName = description,
+                        Status = isComplete ? (status == "completed_ok" ? "ok" : "error") : status,
+                        IsComplete = isComplete,
+                        OverallSuccess = status == "completed_ok",
                     });
                 _pipeServer.SendToClient(msg);
             }

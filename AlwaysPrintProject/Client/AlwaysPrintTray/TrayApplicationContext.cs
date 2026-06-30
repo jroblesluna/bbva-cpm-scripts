@@ -1269,6 +1269,9 @@ namespace AlwaysPrintTray
                     case MessageType.ActionConfigChanged:
                         HandleActionConfigChanged();
                         break;
+                    case MessageType.OnDemandActionProgress:
+                        HandleOnDemandProgress(message);
+                        break;
                     case MessageType.ServiceStopping:
                         // Servicio se está deteniendo: ocultar icono inmediatamente para evitar fantasmas
                         AlwaysPrintLogger.WriteTrayInfo("Tray: mensaje ServiceStopping recibido. Ocultando icono.");
@@ -1331,6 +1334,25 @@ namespace AlwaysPrintTray
                         $"HandleActionConfigChanged: error actualizando UI. {ex.Message}",
                         AlwaysPrintLogger.EvtGenericError);
                 }
+            }, null);
+        }
+
+        private Forms.ActionProgressForm? _progressForm;
+
+        private void HandleOnDemandProgress(PipeMessage message)
+        {
+            var payload = message.GetPayload<OnDemandActionProgressPayload>();
+            if (payload == null) return;
+
+            _uiContext.Post(_ =>
+            {
+                if (_progressForm == null || _progressForm.IsDisposed)
+                {
+                    _progressForm = new Forms.ActionProgressForm(payload.TriggerLabel);
+                    _progressForm.Show();
+                }
+
+                _progressForm.AddProgress(payload);
             }, null);
         }
 

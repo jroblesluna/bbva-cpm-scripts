@@ -28,6 +28,13 @@ namespace AlwaysPrintService.Actions
         private ActionConfiguration? _config;
         private Func<bool>? _gracefulStopTrayCallback;
         private string? _loadedConfigHash;
+        private string? _currentOnDemandLabel;
+
+        /// <summary>
+        /// Evento emitido por cada paso de una ejecución OnDemand.
+        /// Parámetros: (triggerLabel, actionType, description, status: "running"|"ok"|"error")
+        /// </summary>
+        public event Action<string, string, string, string>? OnActionProgress;
 
         /// <summary>
         /// Hash de la configuración actualmente cargada en memoria.
@@ -317,12 +324,19 @@ namespace AlwaysPrintService.Actions
                 $"ActionEngine: iniciando ejecución OnDemand '{label}'");
             
             _variables.Clear();
+            _currentOnDemandLabel = label;
             bool success = ExecuteActions(trigger.Actions);
+            _currentOnDemandLabel = null;
             
             sw.Stop();
             AlwaysPrintLogger.WriteInfo(
                 $"ActionEngine: OnDemand '{label}' completado. " +
                 $"Success={success}, Duración={sw.ElapsedMilliseconds}ms");
+
+            // Emitir progreso final: completado
+            OnActionProgress?.Invoke(label, "COMPLETE", 
+                success ? "Ejecución completada" : "Ejecución completada con errores",
+                success ? "completed_ok" : "completed_error");
             
             return (success, success 
                 ? $"Trigger '{label}' ejecutado correctamente ({sw.ElapsedMilliseconds}ms)"
@@ -343,17 +357,30 @@ namespace AlwaysPrintService.Actions
                 {
                     AlwaysPrintLogger.WriteInfo($"ActionEngine: ejecutando acción '{action.Type}': {action.Description}");
                     
+                    // Emitir progreso: paso iniciando
+                    if (_currentOnDemandLabel != null)
+                        OnActionProgress?.Invoke(_currentOnDemandLabel, action.Type, action.Description ?? action.Type, "running");
+                    
                     bool success = ExecuteAction(action);
                     
                     if (!success)
                     {
                         AlwaysPrintLogger.WriteWarning($"ActionEngine: acción '{action.Type}' falló");
+                        if (_currentOnDemandLabel != null)
+                            OnActionProgress?.Invoke(_currentOnDemandLabel, action.Type, action.Description ?? action.Type, "error");
                         allSuccess = false;
+                    }
+                    else
+                    {
+                        if (_currentOnDemandLabel != null)
+                            OnActionProgress?.Invoke(_currentOnDemandLabel, action.Type, action.Description ?? action.Type, "ok");
                     }
                 }
                 catch (Exception ex)
                 {
                     AlwaysPrintLogger.WriteError($"ActionEngine: error ejecutando acción '{action.Type}': {ex.Message}", ex);
+                    if (_currentOnDemandLabel != null)
+                        OnActionProgress?.Invoke(_currentOnDemandLabel, action.Type, action.Description ?? action.Type, "error");
                     allSuccess = false;
                 }
             }

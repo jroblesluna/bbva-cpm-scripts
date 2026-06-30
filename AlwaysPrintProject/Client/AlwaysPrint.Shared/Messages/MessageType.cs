@@ -58,5 +58,8 @@ namespace AlwaysPrint.Shared.Messages
         PackageDebuggingZip,         // Tray → Service: empaquetar datos en ZIP
         DebuggingZipReady,           // Service → Tray: ZIP listo con ruta
         DeleteDebuggingData,         // Tray → Service: eliminar datos de una sesión
+
+        // Progreso de ejecución OnDemand
+        OnDemandActionProgress,      // Service → Tray (push): progreso de un paso de acción OnDemand
     }
 }

@@ -442,3 +442,44 @@ namespace AlwaysPrint.Shared.Messages
         [JsonProperty("debuggingId")]
         public string DebuggingId { get; set; } = string.Empty;
     }
+
+    // ── Progreso de Ejecución OnDemand ───────────────────────────────────────────
+
+    /// <summary>
+    /// Payload push del Service al Tray con el progreso de un paso de ejecución OnDemand.
+    /// El Tray lo muestra en tiempo real en la ventana de progreso.
+    /// </summary>
+    public class OnDemandActionProgressPayload
+    {
+        /// <summary>Label del trigger OnDemand que se está ejecutando.</summary>
+        [JsonProperty("triggerLabel")]
+        public string TriggerLabel { get; set; } = string.Empty;
+
+        /// <summary>Nombre/descripción del paso que se ejecutó.</summary>
+        [JsonProperty("stepName")]
+        public string StepName { get; set; } = string.Empty;
+
+        /// <summary>Tipo de acción: StopService, StartService, DeleteFolderContents, etc.</summary>
+        [JsonProperty("actionType")]
+        public string ActionType { get; set; } = string.Empty;
+
+        /// <summary>Estado del paso: "running", "ok", "error", "completed".</summary>
+        [JsonProperty("status")]
+        public string Status { get; set; } = string.Empty;
+
+        /// <summary>Mensaje adicional (detalle del resultado o error).</summary>
+        [JsonProperty("message")]
+        public string? Message { get; set; }
+
+        /// <summary>true si este es el último mensaje (ejecución completó).</summary>
+        [JsonProperty("isComplete")]
+        public bool IsComplete { get; set; }
+
+        /// <summary>Resultado global de la ejecución (solo relevante si isComplete=true).</summary>
+        [JsonProperty("overallSuccess")]
+        public bool OverallSuccess { get; set; }
+
+        /// <summary>Duración total en ms (solo relevante si isComplete=true).</summary>
+        [JsonProperty("durationMs")]
+        public long DurationMs { get; set; }
+    }
