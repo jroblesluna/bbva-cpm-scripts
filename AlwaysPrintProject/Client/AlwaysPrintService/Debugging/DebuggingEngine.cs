@@ -360,7 +360,6 @@ namespace AlwaysPrintService.Debugging
             }
             return size;
         }
-    }
 
     /// <summary>
     /// Al iniciar el servicio, busca sesiones activas no expiradas y las retoma.
@@ -485,6 +484,7 @@ namespace AlwaysPrintService.Debugging
                 File.Delete(checkpointPath);
         }
         catch { /* Best-effort cleanup */ }
+    }
     }
 
     /// <summary>
