@@ -748,6 +748,7 @@ def list_workstations(
     is_online: Optional[bool] = Query(None, description="Filtrar por estado online"),
     contingency_active: Optional[bool] = Query(None, description="Filtrar por contingencia activa"),
     search: Optional[str] = Query(None, description="Buscar por IP o hostname"),
+    version_filter: Optional[str] = Query(None, description="Filtrar por versión: 'current' (última) o 'outdated' (anteriores)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -815,6 +816,20 @@ def list_workstations(
             (Workstation.ip_private.ilike(f"%{search}%")) |
             (Workstation.hostname.ilike(f"%{search}%"))
         )
+    
+    # Filtrar por versión (current = última, outdated = anteriores)
+    if version_filter in ("current", "outdated"):
+        # Obtener la versión más reciente de la BD
+        from sqlalchemy import func as sa_func
+        latest_version = db.query(sa_func.max(Workstation.tray_version)).scalar()
+        if latest_version:
+            if version_filter == "current":
+                base_query = base_query.filter(Workstation.tray_version == latest_version)
+            else:
+                base_query = base_query.filter(
+                    Workstation.tray_version.isnot(None),
+                    Workstation.tray_version != latest_version
+                )
     
     # Contar total (sin joinedload para query limpia)
     total = base_query.count()

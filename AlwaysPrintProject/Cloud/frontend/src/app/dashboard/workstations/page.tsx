@@ -115,6 +115,7 @@ export default function WorkstationsPage() {
     contingency_active: filterContingency,
     organization_id: isAdmin ? filterOrgId : undefined,
     vlan_id: filterVlanId,
+    version_filter: filterVersion || undefined,
     page,
     page_size: pageSize,
   };
@@ -125,7 +126,7 @@ export default function WorkstationsPage() {
     isFetching,
     error,
   } = useQuery({
-    queryKey: ['workstations', debouncedSearch, filterOnline, filterContingency, filterOrgId, filterVlanId, page, pageSize],
+    queryKey: ['workstations', debouncedSearch, filterOnline, filterContingency, filterOrgId, filterVlanId, filterVersion, page, pageSize],
     queryFn: () => workstationsApi.list(filters),
     placeholderData: (prev) => prev,
   });
@@ -284,27 +285,9 @@ export default function WorkstationsPage() {
     }
   };
 
-  // Determinar versión más reciente de las workstations cargadas
-  const latestVersion = (() => {
-    const items = workstationsData?.items || [];
-    const versions = items.map(ws => ws.tray_version).filter(Boolean) as string[];
-    if (versions.length === 0) return null;
-    return versions.sort((a, b) => b.localeCompare(a))[0];
-  })();
+  const workstations = workstationsData?.items || [];
 
-  const workstations = (() => {
-    let items = workstationsData?.items || [];
-    if (filterVersion && latestVersion) {
-      if (filterVersion === 'current') {
-        items = items.filter(ws => ws.tray_version === latestVersion);
-      } else {
-        items = items.filter(ws => ws.tray_version && ws.tray_version !== latestVersion);
-      }
-    }
-    return items;
-  })();
-
-  const totalItems = filterVersion ? workstations.length : (workstationsData?.total || 0);
+  const totalItems = workstationsData?.total || 0;
   const totalPages = Math.ceil(totalItems / pageSize);
   const paginationStart = (page - 1) * pageSize + 1;
   const paginationEnd = Math.min(page * pageSize, totalItems);

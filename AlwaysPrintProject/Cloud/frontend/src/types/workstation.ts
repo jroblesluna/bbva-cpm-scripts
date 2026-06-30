@@ -83,6 +83,7 @@ export interface WorkstationFilter {
   contingency_active?: boolean
   is_online?: boolean
   search?: string
+  version_filter?: string
   page?: number
   page_size?: number
 }
