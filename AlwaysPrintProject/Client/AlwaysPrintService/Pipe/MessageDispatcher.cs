@@ -64,6 +64,9 @@ namespace AlwaysPrintService.Pipe
                 DebuggingCaptureCompleted?.Invoke(debugId, totalSize);
             _debuggingEngine.OnCaptureError += (debugId, errorMsg) =>
                 DebuggingCaptureErrorOccurred?.Invoke(debugId, errorMsg);
+
+            // Retomar sesiones de debugging que sobrevivieron un reinicio del servicio
+            _debuggingEngine.TryResumeFromCheckpoint();
         }
 
         public PipeMessage Dispatch(PipeMessage request)

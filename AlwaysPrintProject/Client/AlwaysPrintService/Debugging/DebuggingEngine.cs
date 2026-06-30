@@ -118,6 +118,9 @@ namespace AlwaysPrintService.Debugging
                     session.IndexBuilder = indexBuilder;
                     _activeSession = session;
 
+                    // Persistir checkpoint en disco (sobrevive reinicios del servicio)
+                    PersistCheckpoint(session);
+
                     // Iniciar timer de duración
                     _durationTimer = new Timer(
                         OnTimerExpired,
@@ -336,6 +339,7 @@ namespace AlwaysPrintService.Debugging
                     $"archivos recopilados, tamaño total={totalSize} bytes");
 
                 _activeSession = null;
+                RemoveCheckpoint(basePath);
                 OnCaptureComplete?.Invoke(session.DebuggingId, totalSize);
             }
             catch (Exception ex)
@@ -356,6 +360,131 @@ namespace AlwaysPrintService.Debugging
             }
             return size;
         }
+    }
+
+    /// <summary>
+    /// Al iniciar el servicio, busca sesiones activas no expiradas y las retoma.
+    /// Si el checkpoint está expirado, limpia la carpeta.
+    /// </summary>
+    public void TryResumeFromCheckpoint()
+    {
+        try
+        {
+            if (!Directory.Exists(DebugBasePath)) return;
+
+            foreach (var dir in Directory.GetDirectories(DebugBasePath))
+            {
+                string checkpointPath = Path.Combine(dir, "session_checkpoint.json");
+                if (!File.Exists(checkpointPath)) continue;
+
+                try
+                {
+                    string json = File.ReadAllText(checkpointPath);
+                    var checkpoint = JObject.Parse(json);
+
+                    string debuggingId = checkpoint["debugging_id"]?.ToString() ?? "";
+                    DateTime expiresAt = checkpoint["expires_at"]?.ToObject<DateTime>() ?? DateTime.MinValue;
+
+                    if (DateTime.UtcNow > expiresAt)
+                    {
+                        // Sesión expirada: limpiar checkpoint, dejar archivos para posible análisis
+                        File.Delete(checkpointPath);
+                        AlwaysPrintLogger.WriteInfo(
+                            $"DebuggingEngine: Checkpoint expirado eliminado: {debuggingId}");
+                        continue;
+                    }
+
+                    // Sesión no expirada: retomar captura
+                    var profile = checkpoint["profile"] as JObject;
+                    int durationSeconds = checkpoint["duration_seconds"]?.ToObject<int>() ?? 60;
+                    DateTime startTime = checkpoint["start_time"]?.ToObject<DateTime>() ?? DateTime.UtcNow;
+                    var initialLogCounts = checkpoint["initial_log_line_counts"]?.ToObject<Dictionary<string, long>>()
+                        ?? new Dictionary<string, long>();
+                    long apLogStartLine = checkpoint["alwaysprint_log_start_line"]?.ToObject<long>() ?? 0;
+
+                    int remainingSeconds = Math.Max(1, (int)(expiresAt - DateTime.UtcNow).TotalSeconds);
+
+                    var session = new DebuggingSession
+                    {
+                        DebuggingId = debuggingId,
+                        Profile = profile,
+                        DurationSeconds = durationSeconds,
+                        StartTime = startTime,
+                        FolderPath = dir,
+                        InitialLogLineCounts = initialLogCounts,
+                        AlwaysPrintLogStartLine = apLogStartLine,
+                        IndexBuilder = new IndexBuilder()
+                    };
+
+                    // Recrear el index builder con la info del checkpoint
+                    string profileName = profile?["name"]?.ToString() ?? "Perfil de Debugging";
+                    session.IndexBuilder.CreateIndex(debuggingId, profileName, startTime, durationSeconds, profile);
+
+                    _activeSession = session;
+
+                    // Iniciar timer con el tiempo restante
+                    _durationTimer = new Timer(
+                        OnTimerExpired,
+                        debuggingId,
+                        remainingSeconds * 1000,
+                        Timeout.Infinite
+                    );
+
+                    AlwaysPrintLogger.WriteInfo(
+                        $"DebuggingEngine: Sesión retomada desde checkpoint. ID={debuggingId}, " +
+                        $"restante={remainingSeconds}s");
+                    return; // Solo una sesión a la vez
+                }
+                catch (Exception ex)
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        $"DebuggingEngine: Error leyendo checkpoint en {dir}: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AlwaysPrintLogger.WriteError(
+                $"DebuggingEngine: Error en TryResumeFromCheckpoint: {ex.Message}");
+        }
+    }
+
+    /// <summary>Persiste el estado de la sesión en disco.</summary>
+    private void PersistCheckpoint(DebuggingSession session)
+    {
+        try
+        {
+            var checkpoint = new JObject
+            {
+                ["debugging_id"] = session.DebuggingId,
+                ["profile"] = session.Profile,
+                ["duration_seconds"] = session.DurationSeconds,
+                ["start_time"] = session.StartTime,
+                ["expires_at"] = session.StartTime.AddSeconds(session.DurationSeconds),
+                ["initial_log_line_counts"] = JObject.FromObject(session.InitialLogLineCounts ?? new Dictionary<string, long>()),
+                ["alwaysprint_log_start_line"] = session.AlwaysPrintLogStartLine,
+            };
+
+            string checkpointPath = Path.Combine(session.FolderPath, "session_checkpoint.json");
+            File.WriteAllText(checkpointPath, checkpoint.ToString());
+        }
+        catch (Exception ex)
+        {
+            AlwaysPrintLogger.WriteWarning(
+                $"DebuggingEngine: Error persistiendo checkpoint: {ex.Message}");
+        }
+    }
+
+    /// <summary>Elimina el checkpoint de disco (sesión finalizada correctamente).</summary>
+    private void RemoveCheckpoint(string folderPath)
+    {
+        try
+        {
+            string checkpointPath = Path.Combine(folderPath, "session_checkpoint.json");
+            if (File.Exists(checkpointPath))
+                File.Delete(checkpointPath);
+        }
+        catch { /* Best-effort cleanup */ }
     }
 
     /// <summary>
