@@ -1264,6 +1264,7 @@
     "wsTimeRemaining": "Time remaining: {seconds}s",
     "wsDataReady": "Data available",
     "wsDataSize": "Size: {size}",
+    "wsUploading": "Uploading data...",
     "wsAnalyzing": "Analyzing with LLM...",
     "wsAnalyzed": "Analysis completed",
     "wsFailed": "Session failed",

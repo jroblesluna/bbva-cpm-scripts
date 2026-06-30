@@ -769,10 +769,14 @@ async def stop_session(
             detail=f"Sesión de debugging con ID {session_id} no encontrada",
         )
 
-    if session.status != DebuggingSessionStatus.ACTIVE.value:
+    if session.status not in (
+        DebuggingSessionStatus.ACTIVE.value,
+        DebuggingSessionStatus.UPLOADING.value,
+        DebuggingSessionStatus.ANALYZING.value,
+    ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Solo se pueden detener sesiones activas. Estado actual: {session.status}",
+            detail=f"Solo se pueden detener sesiones activas, en upload o en análisis. Estado actual: {session.status}",
         )
 
     # Enviar comando StopDebugging (intento de cleanup en el cliente)
@@ -788,16 +792,22 @@ async def stop_session(
 
     sent = await connection_manager.send_to_workstation(ws_id_str, ws_message)
 
-    # Si la duración ya expiró o no se pudo enviar el comando, marcar como failed directamente
+    # Si la duración ya expiró, WS está offline, o está en uploading/analyzing stuck, marcar como failed
     time_elapsed = (datetime.utcnow() - session.start_time).total_seconds()
-    if time_elapsed > session.duration_seconds or not sent:
+    force_fail = (
+        time_elapsed > session.duration_seconds
+        or not sent
+        or session.status in (DebuggingSessionStatus.UPLOADING.value, DebuggingSessionStatus.ANALYZING.value)
+    )
+    if force_fail:
         session.status = DebuggingSessionStatus.FAILED.value
         session.end_time = datetime.utcnow()
         db.commit()
         logger.info(
-            "[DEBUGGING] Sesión marcada como failed (expirada o ws offline): session=%s, "
-            "elapsed=%.0fs, duration=%ds, ws_online=%s, por user=%s",
-            session.id, time_elapsed, session.duration_seconds, sent, current_user.id,
+            "[DEBUGGING] Sesión marcada como failed (stop forzado): session=%s, "
+            "elapsed=%.0fs, duration=%ds, prev_status=%s, ws_online=%s, por user=%s",
+            session.id, time_elapsed, session.duration_seconds,
+            session.status, sent, current_user.id,
         )
     else:
         logger.info(

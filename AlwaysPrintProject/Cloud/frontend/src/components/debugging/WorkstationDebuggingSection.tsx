@@ -380,22 +380,46 @@ export function WorkstationDebuggingSection({
         </div>
       )}
 
-      {/* Estado: UPLOADING — Subiendo datos */}
+      {/* Estado: UPLOADING — Subiendo datos (con timeout) */}
       {analyzingSession && analyzingSession.status === 'uploading' && !activeSession && !readySession && (
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-            <span className="text-sm font-medium text-blue-900">{t('wsCapturing')}</span>
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+              <span className="text-sm font-medium text-blue-900">{t('wsUploading')}</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-blue-700 hover:text-blue-900 hover:bg-blue-100"
+              onClick={() => stopMutation.mutate(analyzingSession.id)}
+              disabled={stopMutation.isPending}
+            >
+              <Trash2 className="w-3 h-3 mr-1" />
+              {t('wsDiscard')}
+            </Button>
           </div>
         </div>
       )}
 
-      {/* Estado: ANALYZING — Análisis en curso */}
+      {/* Estado: ANALYZING — Análisis en curso (con opción de cancelar) */}
       {analyzingSession && analyzingSession.status === 'analyzing' && !activeSession && !readySession && (
-        <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-          <div className="flex items-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
-            <span className="text-sm font-medium text-purple-900">{t('wsAnalyzing')}</span>
+        <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+              <span className="text-sm font-medium text-purple-900">{t('wsAnalyzing')}</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-purple-700 hover:text-purple-900 hover:bg-purple-100"
+              onClick={() => stopMutation.mutate(analyzingSession.id)}
+              disabled={stopMutation.isPending}
+            >
+              <Trash2 className="w-3 h-3 mr-1" />
+              {t('wsDiscard')}
+            </Button>
           </div>
         </div>
       )}
