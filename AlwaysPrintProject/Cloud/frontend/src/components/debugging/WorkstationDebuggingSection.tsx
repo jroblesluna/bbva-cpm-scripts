@@ -761,16 +761,16 @@ function ActiveTimerView({ session, t, onStop, isStopPending }: ActiveTimerViewP
   const isExpired = remainingSeconds === 0;
 
   return (
-    <div className={`p-4 border rounded-lg space-y-3 ${isExpired ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+    <div className={`p-4 border rounded-lg space-y-3 ${isExpired ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {isExpired ? (
-            <AlertCircle className="w-4 h-4 text-red-600" />
+            <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
           ) : (
             <Timer className="w-4 h-4 text-amber-600 animate-pulse" />
           )}
-          <span className={`text-sm font-medium ${isExpired ? 'text-red-900' : 'text-amber-900'}`}>
-            {isExpired ? t('wsExpiredNoResponse') : t('wsCapturing')}
+          <span className={`text-sm font-medium ${isExpired ? 'text-blue-900' : 'text-amber-900'}`}>
+            {isExpired ? t('wsExpiredWaiting') : t('wsCapturing')}
           </span>
         </div>
         {!isExpired && (
@@ -791,12 +791,19 @@ function ActiveTimerView({ session, t, onStop, isStopPending }: ActiveTimerViewP
         </div>
       )}
 
+      {/* Barra completa cuando expiró */}
+      {isExpired && (
+        <div className="w-full h-2 bg-blue-200 rounded-full overflow-hidden">
+          <div className="h-full bg-blue-500 rounded-full w-full" />
+        </div>
+      )}
+
       {/* Acciones según estado */}
       {isExpired ? (
         <Button
           size="sm"
           variant="outline"
-          className="border-red-300 text-red-700 hover:bg-red-50"
+          className="border-blue-300 text-blue-700 hover:bg-blue-50"
           onClick={onStop}
           disabled={isStopPending}
         >

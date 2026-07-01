@@ -1258,6 +1258,7 @@
     "wsInstructions": "Instrucciones adicionales (opcional)",
     "wsInstructionsPlaceholder": "Instrucciones para guiar el análisis del LLM...",
     "wsCapturing": "Capturando datos...",
+    "wsExpiredWaiting": "Captura finalizada. Esperando datos del cliente...",
     "wsExpiredNoResponse": "Tiempo expirado, sin respuesta del cliente",
     "wsDiscardSession": "Descartar sesión",
     "wsDiscard": "Descartar",
