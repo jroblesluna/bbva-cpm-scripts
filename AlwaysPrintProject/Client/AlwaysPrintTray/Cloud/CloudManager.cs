@@ -481,6 +481,9 @@ namespace AlwaysPrintTray.Cloud
                     case MessageType.DebuggingCaptureError:
                         _debuggingHandler?.HandleServicePush(message);
                         break;
+                    case MessageType.OnDemandActionProgress:
+                        // Se maneja en TrayApplicationContext.OnPipeMessageReceived (ventana de progreso)
+                        break;
                     default:
                         AlwaysPrintLogger.WriteTrayInfo(
                             $"CloudManager: mensaje push del Service tipo='{message.Type}' no manejado.");
@@ -899,7 +902,19 @@ namespace AlwaysPrintTray.Cloud
                     {
                         try
                         {
-                            await _pushMessageHandler.SyncFromStateAsync(distributionState);
+                            int updated = await _pushMessageHandler.SyncFromStateAsync(distributionState);
+                            // Reportar estado actualizado al backend
+                            if (updated > 0)
+                            {
+                                var localConfig = _configManager?.GetLocalConfigInfo();
+                                if (localConfig != null)
+                                {
+                                    SendActionConfigStatus(localConfig.Name, localConfig.Hash, localConfig.Version);
+                                    AlwaysPrintLogger.WriteTrayInfo(
+                                        $"CloudManager: status_update enviado tras descarga de config. " +
+                                        $"Name={localConfig.Name}, Hash={localConfig.Hash}, Version={localConfig.Version}");
+                                }
+                            }
                         }
                         catch (Exception syncEx)
                         {
