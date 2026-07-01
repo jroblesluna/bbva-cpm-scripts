@@ -885,6 +885,29 @@ namespace AlwaysPrintTray.Cloud
                     $"ConfigHash={distributionState.ConfigHash ?? "null"}, " +
                     $"CertVersion={distributionState.CertVersion}, " +
                     $"MsiVersion={distributionState.MsiVersion ?? "null"}");
+
+                // Si hay config asignada pero el archivo local no existe, forzar descarga
+                if (!string.IsNullOrEmpty(distributionState.ConfigHash) &&
+                    !string.IsNullOrEmpty(distributionState.ConfigS3Url) &&
+                    !File.Exists(PipeConstants.ActionConfigFilePath))
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: config asignada (hash={distributionState.ConfigHash}) pero " +
+                        "archivo local no existe. Forzando descarga...");
+
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _pushMessageHandler.SyncFromStateAsync(distributionState);
+                        }
+                        catch (Exception syncEx)
+                        {
+                            AlwaysPrintLogger.WriteTrayError(
+                                $"CloudManager: error en descarga forzada de config: {syncEx.Message}");
+                        }
+                    });
+                }
             }
             catch (Exception ex)
             {
