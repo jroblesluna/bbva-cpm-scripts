@@ -97,7 +97,7 @@ export default function WorkstationsPage() {
   const pageSize = viewMode === 'cards' ? 10 : 20;
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkAction, setBulkAction] = useState<'contingency_on' | 'contingency_off' | 'restart_tray' | 'restart_service' | null>(null);
+  const [bulkAction, setBulkAction] = useState<'contingency_on' | 'contingency_off' | 'restart_tray' | 'restart_service' | 'check_update' | null>(null);
   const [bulkPending, setBulkPending] = useState(false);
 
   // Resetear página al cambiar vista (el pageSize cambia)
@@ -391,6 +391,8 @@ export default function WorkstationsPage() {
     try {
       if (action === 'restart_service' || action === 'restart_tray') {
         await Promise.allSettled(ids.map(id => workstationsApi.sendCommand(id, action)));
+      } else if (action === 'check_update') {
+        await Promise.allSettled(ids.map(id => workstationsApi.sendCommand(id, 'check_update')));
       } else if (action === 'contingency_on') {
         await Promise.allSettled(ids.map(id => workstationsApi.toggleForcedContingency(id, true)));
       } else {
@@ -789,6 +791,27 @@ export default function WorkstationsPage() {
         </div>
       )}
 
+      {/* Paginación superior (compacta) */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2 py-1.5">
+          <p className="text-xs text-gray-500">
+            {t('pagination', { start: paginationStart, end: paginationEnd, total: totalItems })}
+          </p>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={() => setPage(1)} disabled={page <= 1} className="h-7 px-2 text-xs">
+              {tCommon('first')}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1} className="h-7 px-2">
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </Button>
+            <span className="text-xs text-gray-600 px-1.5">{page}/{totalPages}</span>
+            <Button variant="ghost" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages} className="h-7 px-2">
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Contenido principal: vista de tarjetas o tabla */}
       {viewMode === 'cards' ? (
         <div className="space-y-4">
@@ -1127,6 +1150,14 @@ export default function WorkstationsPage() {
               <Terminal className="w-4 h-4" />
               Reiniciar Tray
             </button>
+            <div className="w-px h-5 bg-white/10" />
+            <button
+              onClick={() => setBulkAction('check_update')}
+              className="flex items-center gap-2 px-3.5 py-3 text-sm font-medium text-blue-400 transition-colors hover:bg-blue-500/10 hover:text-blue-300 whitespace-nowrap"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Check Update
+            </button>
           </div>
         </div>
       )}
@@ -1166,8 +1197,17 @@ export default function WorkstationsPage() {
             confirmClass: 'bg-amber-600 hover:bg-amber-700 text-white',
             confirmLabel: 'Reiniciar Tray',
           },
+          check_update: {
+            icon: <RefreshCw className="w-5 h-5 text-blue-500" />,
+            accent: 'bg-blue-50 border-blue-100',
+            label: 'Verificar actualización',
+            description: 'Se enviará el comando de verificación de actualización. Las estaciones descargarán e instalarán si hay nueva versión disponible.',
+            confirmClass: 'bg-blue-600 hover:bg-blue-700 text-white',
+            confirmLabel: 'Enviar Check Update',
+          },
         }[bulkAction];
         const selected = workstations.filter(ws => selectedIds.has(ws.id));
+        const totalSelected = selectedIds.size;
         return (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 !mt-0">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
@@ -1195,9 +1235,14 @@ export default function WorkstationsPage() {
                     Estaciones afectadas
                   </span>
                   <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600">
-                    {selected.length}
+                    {totalSelected}
                   </span>
                 </div>
+                {totalSelected > selected.length && (
+                  <p className="text-xs text-gray-500 mb-2 italic">
+                    Mostrando {selected.length} de {totalSelected} seleccionadas (resto en otras páginas)
+                  </p>
+                )}
                 <div className="max-h-52 overflow-y-auto rounded-xl border border-gray-100 divide-y divide-gray-50">
                   {selected.map(ws => (
                     <div key={ws.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
