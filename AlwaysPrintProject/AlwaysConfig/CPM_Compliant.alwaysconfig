@@ -1,5 +1,5 @@
 {
-  "version": "7.3",
+  "version": "7.4",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -262,6 +262,16 @@
         },
         {
           "type": "RunProcess",
+          "description": "Configurar Datatype EMF en cola corporativa para compatibilidad con apps UWP (Snipping Tool, Photos)",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\reg.exe",
+            "arguments": "add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\{{corporate_queue_name}}\" /v Datatype /t REG_SZ /d \"NT EMF 1.008\" /f",
+            "timeout_seconds": 15,
+            "window_style": "Hidden"
+          }
+        },
+        {
+          "type": "RunProcess",
           "description": "Establecer cola corporativa como impresora predeterminada",
           "parameters": {
             "file_path": "C:\\Windows\\System32\\rundll32.exe",
@@ -397,6 +407,16 @@
             "service_name": "Spooler",
             "wait_for_running": true,
             "timeout_seconds": 30
+          }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Configurar Datatype EMF en cola corporativa para compatibilidad con apps UWP (Snipping Tool, Photos)",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\reg.exe",
+            "arguments": "add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\{{corporate_queue_name}}\" /v Datatype /t REG_SZ /d \"NT EMF 1.008\" /f",
+            "timeout_seconds": 15,
+            "window_style": "Hidden"
           }
         },
         {
@@ -615,6 +635,16 @@
         },
         {
           "type": "RunProcess",
+          "description": "Configurar Datatype EMF en cola corporativa para compatibilidad con apps UWP (Snipping Tool, Photos)",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\reg.exe",
+            "arguments": "add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\{{corporate_queue_name}}\" /v Datatype /t REG_SZ /d \"NT EMF 1.008\" /f",
+            "timeout_seconds": 15,
+            "window_style": "Hidden"
+          }
+        },
+        {
+          "type": "RunProcess",
           "description": "Establecer cola corporativa como impresora predeterminada",
           "parameters": {
             "file_path": "C:\\Windows\\System32\\rundll32.exe",
@@ -667,6 +697,16 @@
             "service_name": "Spooler",
             "wait_for_running": true,
             "timeout_seconds": 30
+          }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Configurar Datatype EMF en cola corporativa para compatibilidad con apps UWP (Snipping Tool, Photos)",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\reg.exe",
+            "arguments": "add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\{{corporate_queue_name}}\" /v Datatype /t REG_SZ /d \"NT EMF 1.008\" /f",
+            "timeout_seconds": 15,
+            "window_style": "Hidden"
           }
         },
         {
