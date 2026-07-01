@@ -264,6 +264,29 @@ async def workstation_websocket(
             )
             distribution_state = None
 
+        # Persistir action_config_name/hash/version en tabla de workstations durante el registro.
+        # Esto permite que el frontend muestre la config correcta sin depender de que el client
+        # lo reporte vía status_update (fix para versiones del client anteriores a ba50e44).
+        if distribution_state and distribution_state.get("config_hash"):
+            try:
+                from app.services.action_config import ActionConfigService
+                effective_config = ActionConfigService.resolve_effective_config(db, workstation_id)
+                if effective_config and effective_config.config_hash == distribution_state["config_hash"]:
+                    workstation.action_config_name = effective_config.name
+                    workstation.action_config_hash = effective_config.config_hash
+                    workstation.action_config_version = effective_config.version
+                    db.commit()
+                    logger.info(
+                        f"[WS ENRICHMENT] action_config persistido en ws={workstation_id}: "
+                        f"name={effective_config.name}, hash={effective_config.config_hash}, "
+                        f"version={effective_config.version}"
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"[WS ENRICHMENT] Error al persistir action_config en ws={workstation_id}: {e}"
+                )
+                db.rollback()
+
         # Enviar confirmación de registro con workstation_id y estado de distribución
         registered_msg = {
             "type": "registered",
