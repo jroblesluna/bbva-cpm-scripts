@@ -276,9 +276,25 @@ class DebuggingAnalysisService:
 
         # Contexto del sistema
         sections.append(
-            "Eres un experto en diagnóstico de sistemas Windows, impresión corporativa "
-            "y servicios de red. Analiza los datos de debugging recopilados y genera "
-            "un reporte claro con hallazgos, causa raíz probable, y recomendaciones."
+            "Eres un ingeniero senior especializado en diagnóstico de sistemas Windows, "
+            "impresión corporativa (Lexmark CPM, LPD/LPR, Spooler) y servicios de red. "
+            "Analiza los datos de debugging recopilados y genera un reporte técnico detallado.\n\n"
+            "REGLAS IMPORTANTES:\n"
+            "- SIEMPRE referencia la fuente exacta de cada hallazgo: nombre del archivo de log, "
+            "timestamp, nombre del evento Windows, o campo del JSON de servicios/registro.\n"
+            "- NO dramatices ni exageres hallazgos menores. Si un servicio fue detenido "
+            "intencionalmente (por una acción OnDemand o mantenimiento), NO lo reportes como "
+            "error — es una operación planificada.\n"
+            "- Las excepciones de Java tipo 'InterruptedException', 'Socket closed' durante un "
+            "shutdown de servicio son ESPERADAS y NO son errores.\n"
+            "- Si TODO está funcionando correctamente y no hay problemas reales, di exactamente eso. "
+            "No inventes problemas donde no los hay.\n"
+            "- SOLO incluye recomendaciones con comandos o configuraciones específicas cuando "
+            "hay un problema REAL que requiere intervención. No sugieras acciones para situaciones normales.\n"
+            "- Cuando SÍ haya un problema real, incluye comandos PowerShell/CMD específicos, "
+            "configuraciones de registro, o pasos exactos para resolverlo.\n"
+            "- Diferencia entre: (a) acciones ejecutadas intencionalmente por el administrador, "
+            "(b) errores reales del sistema, y (c) warnings informativos sin impacto operativo."
         )
 
         # Metadata de la sesión
@@ -329,13 +345,26 @@ class DebuggingAnalysisService:
         # Solicitud final
         sections.append(
             "\n## Solicitud de Análisis\n"
-            "Genera un reporte estructurado con:\n"
-            "1. **Resumen Ejecutivo** (2-3 oraciones)\n"
-            "2. **Hallazgos Principales** (lista de problemas encontrados con evidencia)\n"
-            "3. **Análisis de Causa Raíz** (correlación entre servicios, logs, eventos y registro)\n"
-            "4. **Recomendaciones** (acciones específicas para resolver los problemas)\n"
-            "5. **Riesgo** (nivel de urgencia: bajo/medio/alto/crítico)\n\n"
-            "Sé específico y referencia líneas de log o eventos concretos cuando sea posible."
+            "Genera un reporte estructurado con las siguientes secciones:\n\n"
+            "1. **Resumen Ejecutivo** (2-3 oraciones. Estado general: ¿hay problemas reales o todo opera correctamente?)\n\n"
+            "2. **Hallazgos Principales** (lista de problemas REALES encontrados. Para cada uno indica:\n"
+            "   - Qué se observó (descripción del problema)\n"
+            "   - Fuente: archivo/log/evento exacto donde se evidencia, con timestamp\n"
+            "   - Impacto: qué efecto tiene o puede tener en la operación\n"
+            "   Si no hay problemas reales, indica explícitamente que el sistema opera con normalidad.)\n\n"
+            "3. **Análisis de Causa Raíz** (correlación entre los datos de distintas fuentes. "
+            "Referencia archivos/timestamps específicos al explicar la cadena causal. "
+            "Diferencia entre operaciones planificadas y fallos genuinos.)\n\n"
+            "4. **Acciones Correctivas** (SOLO si hay problemas reales que requieren intervención. "
+            "Para cada acción incluye:\n"
+            "   - Problema que resuelve\n"
+            "   - Comando PowerShell/CMD exacto, configuración de registro, o pasos específicos\n"
+            "   - Ejemplo concreto aplicable a esta workstation\n"
+            "   Si todo está normal, indica que no se requiere intervención.)\n\n"
+            "5. **Nivel de Riesgo** (Bajo/Medio/Alto/Crítico con justificación basada en evidencia. "
+            "'Bajo' si todo opera correctamente y solo hay eventos informativos.)\n\n"
+            "IMPORTANTE: No incluyas recomendaciones genéricas como 'monitoreo continuo' o "
+            "'revisión periódica' a menos que haya evidencia concreta de un problema recurrente."
         )
 
         return "\n".join(sections)
@@ -437,14 +466,24 @@ class DebuggingAnalysisService:
         if os.path.exists(logo_path):
             pdf.image(logo_path, x=10, y=8, w=20)
 
-        # Robles.AI a la derecha
-        pdf.set_font("Helvetica", "B", 9)
-        pdf.set_text_color(100, 100, 100)
-        pdf.set_xy(140, 10)
-        pdf.cell(60, 4, "Robles.AI", align="R")
-        pdf.set_font("Helvetica", "I", 7)
-        pdf.set_xy(140, 14)
-        pdf.cell(60, 4, "Familia de automatizacion", align="R")
+        # Logo Robles.AI a la derecha (si existe)
+        robles_logo_path = os.path.join(static_dir, "robles_ai_logo.png")
+        if os.path.exists(robles_logo_path):
+            # Logo 200x700 → escalar a ~35mm de ancho para que quepa en la esquina
+            pdf.image(robles_logo_path, x=155, y=8, w=35)
+            pdf.set_font("Helvetica", "I", 6.5)
+            pdf.set_text_color(100, 100, 100)
+            pdf.set_xy(145, 19)
+            pdf.cell(55, 3, sanitize("Division de Automatizacion"), align="R")
+        else:
+            # Fallback: solo texto si no hay logo
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_text_color(100, 100, 100)
+            pdf.set_xy(130, 10)
+            pdf.cell(70, 4, "Robles.AI", align="R")
+            pdf.set_font("Helvetica", "I", 7)
+            pdf.set_xy(130, 14)
+            pdf.cell(70, 4, sanitize("Division de Automatizacion"), align="R")
 
         # Título centrado
         pdf.set_xy(10, 30)
