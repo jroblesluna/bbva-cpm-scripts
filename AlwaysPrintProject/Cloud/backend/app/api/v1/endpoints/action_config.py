@@ -710,8 +710,18 @@ def download_workstation_config(
             logger.error("Error al obtener config firmada: %s", str(e))
 
     # Fallback: retornar config sin firmar (org sin certificado o error de firma)
+    # Normalizar el JSON a formato compacto para que el hash coincida con config_hash
+    # (calculate_config_hash usa json.dumps con separators=(',',':'))
+    import json as _json
+    try:
+        normalized_json = _json.dumps(
+            _json.loads(config_json), ensure_ascii=False, separators=(',', ':')
+        )
+    except Exception:
+        normalized_json = config_json
+
     return Response(
-        content=config_json,
+        content=normalized_json,
         media_type="application/json",
         headers={
             "Content-Disposition": f'attachment; filename="{config_name}.alwaysconfig"',
