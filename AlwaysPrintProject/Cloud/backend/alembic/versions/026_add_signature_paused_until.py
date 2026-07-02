@@ -15,8 +15,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers
-revision = '026'
-down_revision = '025'
+revision = '026_add_signature_paused'
+down_revision = '025_create_debugging'
 branch_labels = None
 depends_on = None
 
