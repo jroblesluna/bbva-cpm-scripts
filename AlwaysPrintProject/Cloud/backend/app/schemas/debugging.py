@@ -131,6 +131,8 @@ class DebuggingProfileCreate(BaseModel):
 class DebuggingProfileUpdate(BaseModel):
     """Schema para actualizar un perfil de debugging existente."""
 
+    name: Optional[str] = Field(None, min_length=3, max_length=60)
+    confirmation_message: Optional[str] = Field(None, min_length=5, max_length=200)
     external_logs: Optional[List[str]] = None
     eventlog_groups: Optional[List[str]] = None
     registry_keys: Optional[List[str]] = None

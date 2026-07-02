@@ -1236,6 +1236,7 @@
     "profileName": "Profile Name",
     "confirmationMessage": "Message when starting",
     "editProfile": "Edit Profile",
+    "editProfileDesc": "Modify monitoring targets and profile metadata.",
     "deactivateProfile": "Deactivate",
     "activateProfile": "Activate",
     "deleteProfile": "Delete profile",

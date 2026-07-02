@@ -71,6 +71,17 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [includeInactive, setIncludeInactive] = useState(false);
 
+  // Edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editProfileId, setEditProfileId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editConfirmationMessage, setEditConfirmationMessage] = useState('');
+  const [editExternalLogs, setEditExternalLogs] = useState<string[]>([]);
+  const [editEventlogGroups, setEditEventlogGroups] = useState<string[]>([]);
+  const [editRegistryKeys, setEditRegistryKeys] = useState<string[]>([]);
+  const [editMonitoredServices, setEditMonitoredServices] = useState<string[]>([]);
+
   // Form state
   const [externalLogs, setExternalLogs] = useState<string[]>([]);
   const [eventlogGroups, setEventlogGroups] = useState<string[]>([]);
@@ -196,6 +207,42 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
     },
   });
 
+  // Mutation: editar perfil
+  const editMutation = useMutation({
+    mutationFn: async () => {
+      if (!editProfileId) return;
+      await apiClient.put(`/debugging/profiles/${editProfileId}`, {
+        name: editName,
+        description: editDescription,
+        confirmation_message: editConfirmationMessage,
+        external_logs: editExternalLogs.filter(Boolean),
+        eventlog_groups: editEventlogGroups,
+        registry_keys: editRegistryKeys.filter(Boolean),
+        monitored_services: editMonitoredServices.filter(Boolean),
+      }, { params: { organization_id: organizationId } });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['debugging-profiles'] });
+      toast({ title: t('updateSuccess') });
+      setEditDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: t('errorUpdate'), variant: 'destructive' });
+    },
+  });
+
+  const openEditDialog = (profile: DebuggingProfile) => {
+    setEditProfileId(profile.id);
+    setEditName(profile.name);
+    setEditDescription(profile.description);
+    setEditConfirmationMessage(profile.confirmation_message);
+    setEditExternalLogs(profile.external_logs.length > 0 ? profile.external_logs : ['']);
+    setEditEventlogGroups(profile.eventlog_groups);
+    setEditRegistryKeys(profile.registry_keys.length > 0 ? profile.registry_keys : ['']);
+    setEditMonitoredServices(profile.monitored_services.length > 0 ? profile.monitored_services : ['']);
+    setEditDialogOpen(true);
+  };
+
   const resetForm = () => {
     setExternalLogs([]);
     setEventlogGroups([]);
@@ -315,6 +362,15 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  title={t('editProfile')}
+                  onClick={() => openEditDialog(profile)}
+                >
+                  <Edit className="w-4 h-4" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -515,6 +571,145 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
                 </Button>
               </div>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de edición */}
+      <Dialog open={editDialogOpen} onOpenChange={(open) => { if (!open) setEditDialogOpen(false); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('editProfile')}</DialogTitle>
+            <DialogDescription>{t('editProfileDesc')}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Name */}
+            <div className="space-y-2">
+              <Label className="font-medium">{t('profileName')}</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                maxLength={60}
+              />
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label className="font-medium">{t('descriptionLabel')}</Label>
+              <Textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            {/* Confirmation message */}
+            <div className="space-y-2">
+              <Label className="font-medium">{t('suggestedMessage')}</Label>
+              <Textarea
+                value={editConfirmationMessage}
+                onChange={(e) => setEditConfirmationMessage(e.target.value)}
+                maxLength={200}
+                rows={2}
+              />
+            </div>
+
+            {/* External Logs */}
+            <div className="space-y-2">
+              <Label className="font-medium">{t('externalLogs')}</Label>
+              {editExternalLogs.map((log, idx) => (
+                <div key={idx} className="flex gap-2">
+                  <Input
+                    value={log}
+                    onChange={(e) => setEditExternalLogs(prev => prev.map((v, i) => i === idx ? e.target.value : v))}
+                    placeholder={t('logPathPlaceholder')}
+                    className="font-mono text-sm"
+                  />
+                  <Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => setEditExternalLogs(prev => prev.filter((_, i) => i !== idx))}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={() => setEditExternalLogs(prev => [...prev, ''])}>
+                <Plus className="w-3 h-3 mr-1" />{t('addLog')}
+              </Button>
+            </div>
+
+            {/* Event Log Groups */}
+            <div className="space-y-2">
+              <Label className="font-medium">{t('eventlogGroups')}</Label>
+              <div className="flex gap-2 flex-wrap">
+                {['System', 'Application', 'Security'].map((group) => (
+                  <label key={group} className="flex items-center gap-2 px-3 py-2 border rounded-md cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={editEventlogGroups.includes(group)}
+                      onChange={(e) => {
+                        if (e.target.checked) setEditEventlogGroups(prev => [...prev, group]);
+                        else setEditEventlogGroups(prev => prev.filter(g => g !== group));
+                      }}
+                    />
+                    <span className="text-sm">{group}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Registry Keys */}
+            <div className="space-y-2">
+              <Label className="font-medium">{t('registryKeys')}</Label>
+              {editRegistryKeys.map((key, idx) => (
+                <div key={idx} className="flex gap-2">
+                  <Input
+                    value={key}
+                    onChange={(e) => setEditRegistryKeys(prev => prev.map((v, i) => i === idx ? e.target.value : v))}
+                    placeholder={t('registryKeyPlaceholder')}
+                    className="font-mono text-sm"
+                  />
+                  <Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => setEditRegistryKeys(prev => prev.filter((_, i) => i !== idx))}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={() => setEditRegistryKeys(prev => [...prev, ''])}>
+                <Plus className="w-3 h-3 mr-1" />{t('addRegistryKey')}
+              </Button>
+            </div>
+
+            {/* Monitored Services */}
+            <div className="space-y-2">
+              <Label className="font-medium">{t('monitoredServices')}</Label>
+              {editMonitoredServices.map((svc, idx) => (
+                <div key={idx} className="flex gap-2">
+                  <Input
+                    value={svc}
+                    onChange={(e) => setEditMonitoredServices(prev => prev.map((v, i) => i === idx ? e.target.value : v))}
+                    placeholder={t('servicePlaceholder')}
+                    className="font-mono text-sm"
+                  />
+                  <Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => setEditMonitoredServices(prev => prev.filter((_, i) => i !== idx))}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={() => setEditMonitoredServices(prev => [...prev, ''])}>
+                <Plus className="w-3 h-3 mr-1" />{t('addService')}
+              </Button>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)} disabled={editMutation.isPending}>
+              {tCommon('cancel')}
+            </Button>
+            <Button
+              onClick={() => editMutation.mutate()}
+              disabled={!editName || !editDescription || editMutation.isPending}
+            >
+              {editMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {tCommon('save')}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
