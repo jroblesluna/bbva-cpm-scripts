@@ -153,6 +153,11 @@ REM Matar procesos del Tray
 echo [%date% %time%] Deteniendo AlwaysPrintTray... >> ""{logPath}""
 taskkill /f /im {TrayProcessName}.exe > nul 2>&1
 
+REM Deshabilitar Service Recovery temporalmente para evitar que SCM reinicie
+REM el servicio antes de que msiexec complete la instalación
+echo [%date% %time%] Deshabilitando Service Recovery... >> ""{logPath}""
+sc failure {ServiceName} reset= 0 actions= """"/""""/"""" > nul 2>&1
+
 REM Detener el servicio
 echo [%date% %time%] Deteniendo servicio {ServiceName}... >> ""{logPath}""
 net stop {ServiceName} > nul 2>&1
@@ -164,9 +169,13 @@ msiexec /i ""{msiFilePath}"" /quiet /norestart REINSTALLMODE=amus /l*v ""{logPat
 set INSTALL_EXIT=%errorlevel%
 echo [%date% %time%] msiexec finalizado con código: %INSTALL_EXIT% >> ""{logPath}""
 
+REM Restaurar Service Recovery (reiniciar en 5s ante fallo, reset counter cada 86400s)
+echo [%date% %time%] Restaurando Service Recovery... >> ""{logPath}""
+sc failure {ServiceName} reset= 86400 actions= restart/5000/restart/5000/restart/5000 > nul 2>&1
+
 REM Verificar resultado
 if %INSTALL_EXIT% neq 0 (
-    echo [%date% %time%] ERROR: Instalación fallida. Reiniciando servicio anterior... >> ""{logPath}""
+    echo [%date% %time%] ERROR: Instalación fallida con código %INSTALL_EXIT%. Reiniciando servicio anterior... >> ""{logPath}""
     net start {ServiceName} > nul 2>&1
     timeout /t 2 /nobreak > nul
     start """" ""{trayExePath}""
