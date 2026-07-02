@@ -280,7 +280,40 @@ namespace AlwaysPrintTray.Cloud
 
             int updatedCount = 0;
 
-            // 1. Comparar configuración de acciones (config_hash)
+            // 1. Comparar certificado ECDSA (cert_version) — PRIMERO para que la config pueda verificar firma
+            if (state.CertVersion > 0 && !string.IsNullOrEmpty(state.CertUrl))
+            {
+                int localCertVersion = SignatureVerifier.GetLocalCertVersion(traySource: true);
+                string certPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "AlwaysPrint", "config", "org.cer");
+                bool certFileExists = File.Exists(certPath);
+
+                // Descargar si: versión remota > local, O archivo no existe en disco
+                if (state.CertVersion > localCertVersion || !certFileExists)
+                {
+                    string reason = !certFileExists
+                        ? "archivo no existe en disco"
+                        : $"versión remota ({state.CertVersion}) > local ({localCertVersion})";
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"PushMessageHandler: SyncFromState — cert requiere descarga ({reason}).");
+
+                    bool downloaded = await DownloadCertWithRetryAsync(state.CertUrl, certPath);
+                    if (downloaded)
+                    {
+                        updatedCount++;
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"PushMessageHandler: SyncFromState — certificado actualizado a v{state.CertVersion}.");
+                    }
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"PushMessageHandler: SyncFromState — cert_version al día (local={localCertVersion}, remoto={state.CertVersion}).");
+                }
+            }
+
+            // 2. Comparar configuración de acciones (config_hash) — DESPUÉS del cert para poder verificar firma
             if (!string.IsNullOrEmpty(state.ConfigHash) && !string.IsNullOrEmpty(state.ConfigS3Url))
             {
                 string localHash = _configManager.GetLocalConfigHash();
@@ -307,35 +340,6 @@ namespace AlwaysPrintTray.Cloud
                 {
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"PushMessageHandler: SyncFromState — config_hash coincide ({state.ConfigHash}). Sin cambios.");
-                }
-            }
-
-            // 2. Comparar certificado ECDSA (cert_version)
-            if (state.CertVersion > 0 && !string.IsNullOrEmpty(state.CertUrl))
-            {
-                int localCertVersion = SignatureVerifier.GetLocalCertVersion(traySource: true);
-                if (state.CertVersion > localCertVersion)
-                {
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        $"PushMessageHandler: SyncFromState — cert_version difiere " +
-                        $"(local={localCertVersion}, remoto={state.CertVersion}). Descargando...");
-
-                    string certPath = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                        "AlwaysPrint", "config", "org.cer");
-
-                    bool downloaded = await DownloadCertWithRetryAsync(state.CertUrl, certPath);
-                    if (downloaded)
-                    {
-                        updatedCount++;
-                        AlwaysPrintLogger.WriteTrayInfo(
-                            $"PushMessageHandler: SyncFromState — certificado actualizado a v{state.CertVersion}.");
-                    }
-                }
-                else
-                {
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        $"PushMessageHandler: SyncFromState — cert_version al día (local={localCertVersion}, remoto={state.CertVersion}).");
                 }
             }
 
