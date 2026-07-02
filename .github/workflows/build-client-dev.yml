@@ -137,7 +137,7 @@ jobs:
         run: |
           # Notificar al backend para que actualice el state map
           HTTP_CODE=$(curl -s -o /tmp/notify_response.json -w "%{http_code}" \
-            -X POST "https://dev.alwaysprint.apps.iol.pe/api/v1/updates/notify-new-version" \
+            -X POST "https://alwaysprint.dev.iol.pe/api/v1/updates/notify-new-version" \
             -H "Content-Type: application/json")
 
           echo "Response code: ${HTTP_CODE}"
