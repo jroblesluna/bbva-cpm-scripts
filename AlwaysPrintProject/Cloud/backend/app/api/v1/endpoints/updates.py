@@ -883,3 +883,106 @@ def download_update(
             "Content-Length": str(s3_response.get('ContentLength', 0)),
         },
     )
+
+
+@router.post(
+    "/notify-new-version",
+    summary="Notificar nueva versión disponible (CI/CD)",
+    description=(
+        "Llamado por el CI después de subir un MSI a S3. "
+        "Refresca el state map de todas las organizaciones en modo 'Latest' "
+        "para que las workstations reciban la nueva versión en el próximo enrichment."
+    ),
+    responses={
+        200: {"description": "State map actualizado"},
+        401: {"description": "No autenticado"},
+        403: {"description": "No autorizado"},
+    },
+)
+async def notify_new_version(
+    request: Request,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Notifica al backend que hay una nueva versión MSI en S3.
+
+    Refresca el state map para todas las organizaciones que usan 'Latest (automatic)'
+    (target_version IS NULL y auto_update_enabled = True).
+
+    Llamado por GitHub Actions después del upload a S3.
+    """
+    from app.services.push_services import get_state_map_service, get_push_distribution_service
+
+    s3_service = S3UpdateService()
+    metadata = s3_service.get_msi_metadata()
+
+    if not metadata or not metadata.get("version"):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró metadata de MSI en S3 (latest).",
+        )
+
+    new_version = metadata["version"]
+    file_size = metadata.get("file_size", 0)
+
+    # Obtener organizaciones en modo "Latest" (sin versión pinneada, auto-update habilitado)
+    orgs = db.query(Organization).filter(
+        Organization.target_version.is_(None),
+        Organization.auto_update_enabled == True,
+    ).all()
+
+    if not orgs:
+        return {
+            "version": new_version,
+            "organizations_updated": 0,
+            "message": "No hay organizaciones en modo Latest con auto-update habilitado.",
+        }
+
+    state_map = get_state_map_service()
+    push_service = get_push_distribution_service()
+
+    # Obtener URL de descarga (presigned o pública)
+    update_info = s3_service.get_broadcast_update_info(target_version=new_version)
+    download_url = update_info["download_url"] if update_info else None
+
+    updated_orgs = 0
+    total_ws_notified = 0
+
+    for org in orgs:
+        org_id = str(org.id)
+        try:
+            # Actualizar state map en memoria
+            await state_map.update_msi(
+                org_id=org_id,
+                msi_version=new_version,
+                msi_url=download_url,
+            )
+
+            # Push a workstations online
+            if download_url:
+                enviados = await push_service.push_msi_update(
+                    org_id=org_id,
+                    msi_version=new_version,
+                    download_url=download_url,
+                    file_size=file_size,
+                )
+                total_ws_notified += enviados
+
+            updated_orgs += 1
+        except Exception as e:
+            logger.error(
+                "notify_new_version: error actualizando org=%s: %s", org_id, str(e)
+            )
+
+    logger.info(
+        "notify_new_version: version=%s, orgs_actualizadas=%d, ws_notificadas=%d",
+        new_version, updated_orgs, total_ws_notified,
+    )
+
+    return {
+        "version": new_version,
+        "organizations_updated": updated_orgs,
+        "workstations_notified": total_ws_notified,
+        "message": f"State map actualizado para {updated_orgs} organización(es). {total_ws_notified} WS notificadas.",
+    }
