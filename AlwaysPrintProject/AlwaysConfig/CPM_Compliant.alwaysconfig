@@ -1,5 +1,5 @@
 {
-  "version": "7.4",
+  "version": "7.5",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -794,6 +794,44 @@
           "description": "Reanudar cola corporativa",
           "parameters": {
             "queue_name": "{{corporate_queue_name}}"
+          }
+        }
+      ]
+    },
+    {
+      "event": "OnDemand",
+      "label": "Forzar Actualización MSI",
+      "description": "Deshabilita temporalmente la Service Recovery Policy, descarga e instala el MSI más reciente, y restaura la recovery. Usar cuando la actualización automática falla repetidamente por reinicio prematuro del servicio.",
+      "actions": [
+        {
+          "type": "RunProcess",
+          "description": "Deshabilitar Service Recovery temporalmente",
+          "parameters": {
+            "file_path": "sc.exe",
+            "arguments": "failure AlwaysPrintService reset= 0 actions= \"\"\"\"",
+            "timeout_seconds": 10,
+            "window_style": "Hidden"
+          }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Ejecutar instalación del MSI pendiente",
+          "parameters": {
+            "file_path": "msiexec.exe",
+            "arguments": "/i \"C:\\Users\\{{current_user}}\\AppData\\Local\\Temp\\AlwaysPrint\\Updates\\AlwaysPrint_update.msi\" /quiet /norestart REINSTALLMODE=amus",
+            "timeout_seconds": 120,
+            "window_style": "Hidden",
+            "run_as_user": false
+          }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Restaurar Service Recovery Policy",
+          "parameters": {
+            "file_path": "sc.exe",
+            "arguments": "failure AlwaysPrintService reset= 86400 actions= restart/5000/restart/5000/restart/5000",
+            "timeout_seconds": 10,
+            "window_style": "Hidden"
           }
         }
       ]
