@@ -940,7 +940,20 @@
     "certificateRotateDescription": "A new ECDSA key pair will be generated. All active configurations will be re-signed with the new key and online workstations will be notified to update their local certificate.",
     "certificateGenerateSuccess": "Certificate generated successfully",
     "certificateRotateSuccess": "Certificate rotated successfully",
-    "certificateRotateSuccessDesc": "{count} configuration(s) re-signed"
+    "certificateRotateSuccessDesc": "{count} configuration(s) re-signed",
+    "signaturePauseTitle": "Compatibility Mode (Signature Pause)",
+    "signaturePauseDescription": "Temporarily suspends digital signing so legacy workstations can download configuration and update. Auto-expires without manual intervention.",
+    "signaturePauseActive": "Signature paused. Remaining: {minutes} min",
+    "signaturePauseActivate": "Pause Signature",
+    "signaturePauseRestore": "Restore Signature",
+    "signaturePauseActivated": "ECDSA signature paused",
+    "signaturePauseDeactivated": "ECDSA signature restored",
+    "signaturePauseConfirmTitle": "Pause digital signature?",
+    "signaturePauseConfirmDesc": "During the pause, configurations will be served without digital signature. Legacy workstations will be able to download the config, enable auto-update, and upgrade automatically.",
+    "signaturePauseWarning": "The signature will be automatically restored when the time expires. While paused, configurations are not verified with ECDSA on legacy workstations.",
+    "signaturePauseDuration": "Duration (minutes)",
+    "signaturePauseDurationHelp": "Between 5 and 120 minutes. Signature is automatically restored on expiry.",
+    "signaturePauseConfirmBtn": "Pause Signature"
   },
   "systemStatus": {
     "title": "System Status",

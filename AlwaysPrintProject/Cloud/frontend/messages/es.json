@@ -940,7 +940,20 @@
     "certificateRotateDescription": "Se generará un nuevo par de claves ECDSA. Todas las configuraciones activas se re-firmarán con la nueva clave y las workstations en línea recibirán una notificación para actualizar su certificado local.",
     "certificateGenerateSuccess": "Certificado generado exitosamente",
     "certificateRotateSuccess": "Certificado renovado exitosamente",
-    "certificateRotateSuccessDesc": "{count} configuración(es) re-firmada(s)"
+    "certificateRotateSuccessDesc": "{count} configuración(es) re-firmada(s)",
+    "signaturePauseTitle": "Modo Compatibilidad (Pausa de Firma)",
+    "signaturePauseDescription": "Suspende temporalmente la firma digital para que workstations con versiones antiguas puedan descargar la configuración y actualizarse. Auto-expira sin intervención.",
+    "signaturePauseActive": "Firma pausada. Tiempo restante: {minutes} min",
+    "signaturePauseActivate": "Pausar Firma",
+    "signaturePauseRestore": "Restaurar Firma",
+    "signaturePauseActivated": "Firma ECDSA pausada",
+    "signaturePauseDeactivated": "Firma ECDSA restaurada",
+    "signaturePauseConfirmTitle": "¿Pausar firma digital?",
+    "signaturePauseConfirmDesc": "Durante la pausa, las configuraciones se servirán sin firma digital. Las workstations legacy podrán descargar la config, habilitar auto-update, y actualizarse automáticamente.",
+    "signaturePauseWarning": "La firma se restaurará automáticamente al expirar el tiempo. Mientras esté pausada, las configuraciones no se verifican con ECDSA en workstations antiguas.",
+    "signaturePauseDuration": "Duración (minutos)",
+    "signaturePauseDurationHelp": "Entre 5 y 120 minutos. La firma se restaura automáticamente al expirar.",
+    "signaturePauseConfirmBtn": "Pausar Firma"
   },
   "systemStatus": {
     "title": "Estado del Sistema",

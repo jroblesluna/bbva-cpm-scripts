@@ -693,10 +693,15 @@ def register_workstation(
                 f"cloud_api_url={cloud_api_url}"
             )
             
-            # Obtener cert_url si la org tiene certificado ECDSA
+            # Obtener cert_url si la org tiene certificado ECDSA (y firma no está pausada)
             cert_url = None
             cert_version = None
-            if org.ecdsa_cert_version and org.ecdsa_cert_version > 0 and org.ecdsa_cert_s3_key:
+            from datetime import datetime, timezone
+            signature_paused = (
+                org.signature_paused_until is not None
+                and org.signature_paused_until > datetime.now(timezone.utc).replace(tzinfo=None)
+            )
+            if org.ecdsa_cert_version and org.ecdsa_cert_version > 0 and org.ecdsa_cert_s3_key and not signature_paused:
                 from app.services.s3_config_service import S3ConfigService
                 cert_url = S3ConfigService().get_public_url(org.ecdsa_cert_s3_key)
                 cert_version = org.ecdsa_cert_version
@@ -1787,8 +1792,13 @@ async def get_distribution_state(
         from app.services.s3_config_service import S3ConfigService
         config_s3_url = S3ConfigService().get_public_url(config.storage_path)
 
-    # Certificado
-    cert_version = org.ecdsa_cert_version or 0
+    # Certificado (respetar pausa temporal de firma)
+    from datetime import datetime, timezone as _tz
+    _sig_paused = (
+        org.signature_paused_until is not None
+        and org.signature_paused_until > datetime.now(_tz.utc).replace(tzinfo=None)
+    )
+    cert_version = 0 if _sig_paused else (org.ecdsa_cert_version or 0)
     cert_url = None
     if cert_version > 0 and org.ecdsa_cert_s3_key:
         from app.services.s3_config_service import S3ConfigService

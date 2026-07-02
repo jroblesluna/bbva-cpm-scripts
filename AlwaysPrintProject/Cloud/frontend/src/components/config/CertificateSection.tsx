@@ -6,14 +6,16 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { ShieldCheck, ShieldOff, RefreshCw, ExternalLink, Loader2 } from 'lucide-react'
+import { ShieldCheck, ShieldOff, RefreshCw, ExternalLink, Loader2, Timer, PauseCircle, PlayCircle } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Dialog,
   DialogContent,
@@ -33,6 +35,8 @@ interface CertificateInfo {
   cert_version: number | null
   cert_url: string | null
   expires_at: string | null
+  signature_paused: boolean
+  signature_paused_until: string | null
 }
 
 /** Respuesta del endpoint POST generate/rotate */
@@ -57,6 +61,11 @@ export function CertificateSection({ organizationId }: CertificateSectionProps) 
 
   // Estado para el diálogo de confirmación de rotación
   const [showRotateConfirm, setShowRotateConfirm] = useState(false)
+  // Estado para el diálogo de pausa de firma
+  const [showPauseConfirm, setShowPauseConfirm] = useState(false)
+  const [pauseDurationMinutes, setPauseDurationMinutes] = useState(30)
+  // Countdown de pausa activa
+  const [remainingSeconds, setRemainingSeconds] = useState(0)
 
   // Obtener info del certificado
   const { data: certInfo, isLoading } = useQuery<CertificateInfo>({
@@ -117,6 +126,54 @@ export function CertificateSection({ organizationId }: CertificateSectionProps) 
       })
     },
   })
+
+  // Mutación para pausar firma
+  const pauseMutation = useMutation({
+    mutationFn: async (params: { pause: boolean; duration_minutes?: number }) => {
+      const res = await apiClient.put(
+        `/organizations/${organizationId}/certificate/signature-pause`,
+        null,
+        { params: { pause: params.pause, duration_minutes: params.duration_minutes || 30 } }
+      )
+      return res.data
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['certificate-info', organizationId] })
+      setShowPauseConfirm(false)
+      toast({
+        title: data.paused ? t('signaturePauseActivated') : t('signaturePauseDeactivated'),
+        description: data.message,
+      })
+    },
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { detail?: string } }; message?: string }
+      setShowPauseConfirm(false)
+      toast({
+        title: tCommon('error'),
+        description: err.response?.data?.detail || err.message || 'Error',
+        variant: 'destructive',
+      })
+    },
+  })
+
+  // Countdown para pausa activa
+  useEffect(() => {
+    if (!certInfo?.signature_paused || !certInfo?.signature_paused_until) {
+      setRemainingSeconds(0)
+      return
+    }
+
+    const calculateRemaining = () => {
+      const until = new Date(certInfo.signature_paused_until + 'Z').getTime()
+      const now = Date.now()
+      const remaining = Math.max(0, Math.floor((until - now) / 1000))
+      setRemainingSeconds(remaining)
+    }
+
+    calculateRemaining()
+    const interval = setInterval(calculateRemaining, 1000)
+    return () => clearInterval(interval)
+  }, [certInfo?.signature_paused, certInfo?.signature_paused_until])
 
   // Estado de carga
   if (isLoading) {
@@ -230,6 +287,104 @@ export function CertificateSection({ organizationId }: CertificateSectionProps) 
             >
               {rotateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t('certificateRotate')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* === Sección de Pausa de Firma (Modo Compatibilidad) === */}
+      {hasCertificate && (
+        <div className="border rounded-lg p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <PauseCircle className="h-4 w-4 text-orange-500" />
+            <h4 className="text-sm font-medium text-gray-900">{t('signaturePauseTitle')}</h4>
+          </div>
+          <p className="text-xs text-gray-500">{t('signaturePauseDescription')}</p>
+
+          {/* Estado actual de la pausa */}
+          {certInfo?.signature_paused && remainingSeconds > 0 ? (
+            <Alert className="border-orange-200 bg-orange-50">
+              <Timer className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="flex items-center justify-between w-full">
+                <span className="text-sm text-orange-900">
+                  {t('signaturePauseActive', {
+                    minutes: String(Math.ceil(remainingSeconds / 60))
+                  })}
+                </span>
+                <Badge variant="outline" className="font-mono text-xs text-orange-700 border-orange-300">
+                  {Math.floor(remainingSeconds / 60)}:{String(remainingSeconds % 60).padStart(2, '0')}
+                </Badge>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          {/* Botón de acción */}
+          <div className="flex items-center gap-2">
+            {certInfo?.signature_paused && remainingSeconds > 0 ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => pauseMutation.mutate({ pause: false })}
+                disabled={pauseMutation.isPending}
+              >
+                {pauseMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <PlayCircle className="mr-2 h-4 w-4" />
+                {t('signaturePauseRestore')}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                onClick={() => setShowPauseConfirm(true)}
+                disabled={pauseMutation.isPending}
+              >
+                <PauseCircle className="mr-2 h-4 w-4" />
+                {t('signaturePauseActivate')}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Diálogo de confirmación para pausa de firma */}
+      <Dialog open={showPauseConfirm} onOpenChange={setShowPauseConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('signaturePauseConfirmTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('signaturePauseConfirmDesc')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Alert className="border-orange-200 bg-orange-50">
+              <AlertDescription className="text-xs text-orange-800">
+                {t('signaturePauseWarning')}
+              </AlertDescription>
+            </Alert>
+            <div className="space-y-2">
+              <Label>{t('signaturePauseDuration')}</Label>
+              <Input
+                type="number"
+                min={5}
+                max={120}
+                value={pauseDurationMinutes}
+                onChange={(e) => setPauseDurationMinutes(Math.min(120, Math.max(5, parseInt(e.target.value) || 30)))}
+              />
+              <p className="text-xs text-gray-500">{t('signaturePauseDurationHelp')}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPauseConfirm(false)} disabled={pauseMutation.isPending}>
+              {tCommon('cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => pauseMutation.mutate({ pause: true, duration_minutes: pauseDurationMinutes })}
+              disabled={pauseMutation.isPending}
+            >
+              {pauseMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {t('signaturePauseConfirmBtn')}
             </Button>
           </DialogFooter>
         </DialogContent>

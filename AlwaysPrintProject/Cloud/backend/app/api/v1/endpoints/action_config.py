@@ -673,11 +673,20 @@ def download_workstation_config(
     
     org = db.query(Organization).filter(Organization.id == workstation.organization_id).first()
     
+    # Evaluar si la firma está activa (considerando pausa temporal)
+    from datetime import datetime, timezone
+    signature_paused = (
+        org is not None
+        and org.signature_paused_until is not None
+        and org.signature_paused_until > datetime.now(timezone.utc).replace(tzinfo=None)
+    )
+    
     org_has_cert = (
         org is not None
         and org.ecdsa_cert_version is not None
         and org.ecdsa_cert_version > 0
         and org.ecdsa_private_key_encrypted is not None
+        and not signature_paused
     )
     
     # Extraer datos de org necesarios para firma (si tiene cert)

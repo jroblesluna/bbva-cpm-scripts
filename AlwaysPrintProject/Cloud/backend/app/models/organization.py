@@ -123,6 +123,9 @@ class Organization(Base):
     ecdsa_cert_version = Column(Integer, nullable=False, default=0, server_default='0')
     # Fecha de expiración del certificado activo
     ecdsa_cert_expires_at = Column(DateTime, nullable=True)
+    # Pausa temporal de firma: si no es NULL y > now(), el endpoint sirve config sin firma
+    # Permite que workstations legacy descarguen configs y se actualicen. Auto-expira.
+    signature_paused_until = Column(DateTime, nullable=True)
 
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

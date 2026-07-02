@@ -1801,14 +1801,141 @@ def get_certificate_info(
             "cert_version": 0,
             "cert_url": None,
             "expires_at": None,
+            "signature_paused": False,
+            "signature_paused_until": None,
         }
 
     # 3. Construir URL pública del certificado
     cert_url = S3ConfigService().get_public_url(organization.ecdsa_cert_s3_key)
+
+    # 4. Evaluar si la firma está pausada temporalmente
+    from datetime import datetime, timezone
+    signature_paused = (
+        organization.signature_paused_until is not None
+        and organization.signature_paused_until > datetime.now(timezone.utc).replace(tzinfo=None)
+    )
 
     return {
         "has_certificate": True,
         "cert_version": organization.ecdsa_cert_version,
         "cert_url": cert_url,
         "expires_at": organization.ecdsa_cert_expires_at.isoformat() if organization.ecdsa_cert_expires_at else None,
+        "signature_paused": signature_paused,
+        "signature_paused_until": organization.signature_paused_until.isoformat() if signature_paused else None,
     }
+
+
+# === ENDPOINT DE PAUSA DE FIRMA (MODO COMPATIBILIDAD LEGACY) ===
+
+
+@router.put("/{org_id}/certificate/signature-pause", status_code=status.HTTP_200_OK)
+def toggle_signature_pause(
+    request: Request,
+    org_id: UUID,
+    duration_minutes: int = Query(
+        default=30, ge=5, le=120,
+        description="Duración de la pausa en minutos (5-120). Ignorado si pause=false."
+    ),
+    pause: bool = Query(
+        default=True,
+        description="true para activar pausa, false para desactivar"
+    ),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Activa o desactiva temporalmente la pausa de firma ECDSA para una organización.
+
+    Cuando la pausa está activa, el endpoint /config/download sirve configuraciones
+    sin firma digital. Esto permite que workstations con versiones legacy descarguen
+    la config, apliquen AutoUpdateEnabled=1, y se actualicen automáticamente.
+
+    La pausa auto-expira después de `duration_minutes`. No requiere intervención
+    manual para restaurar la firma.
+
+    Solo accesible por Admin.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    organization = db.query(Organization).filter(Organization.id == org_id).first()
+
+    if not organization:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Organización con ID {org_id} no encontrada"
+        )
+
+    # Verificar que la org tiene certificado activo (no tiene sentido pausar si no hay firma)
+    if not organization.ecdsa_cert_version or organization.ecdsa_cert_version == 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La organización no tiene certificado ECDSA activo. No hay firma que pausar."
+        )
+
+    if pause:
+        # Activar pausa
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        organization.signature_paused_until = now + timedelta(minutes=duration_minutes)
+        db.commit()
+
+        # Auditoría
+        from app.services.audit_service import AuditService
+        AuditService().log_action(
+            db=db,
+            action_type="config_change",
+            entity_type="organization",
+            entity_id=str(org_id),
+            user_id=str(current_user.id),
+            organization_id=str(org_id),
+            old_values={"signature_paused_until": None},
+            new_values={
+                "signature_paused_until": organization.signature_paused_until.isoformat(),
+                "duration_minutes": duration_minutes,
+            },
+            ip_address=get_client_ip(request),
+        )
+
+        logger.info(
+            "[ORG] Firma ECDSA PAUSADA: org_id=%s, hasta=%s (%d min), por user=%s",
+            org_id, organization.signature_paused_until.isoformat(),
+            duration_minutes, current_user.id,
+        )
+
+        return {
+            "paused": True,
+            "paused_until": organization.signature_paused_until.isoformat(),
+            "duration_minutes": duration_minutes,
+            "message": f"Firma ECDSA pausada por {duration_minutes} minutos. Auto-expira.",
+        }
+    else:
+        # Desactivar pausa (restaurar firma inmediatamente)
+        old_value = organization.signature_paused_until
+        organization.signature_paused_until = None
+        db.commit()
+
+        # Auditoría
+        from app.services.audit_service import AuditService
+        AuditService().log_action(
+            db=db,
+            action_type="config_change",
+            entity_type="organization",
+            entity_id=str(org_id),
+            user_id=str(current_user.id),
+            organization_id=str(org_id),
+            old_values={
+                "signature_paused_until": old_value.isoformat() if old_value else None,
+            },
+            new_values={"signature_paused_until": None},
+            ip_address=get_client_ip(request),
+        )
+
+        logger.info(
+            "[ORG] Firma ECDSA RESTAURADA: org_id=%s, por user=%s",
+            org_id, current_user.id,
+        )
+
+        return {
+            "paused": False,
+            "paused_until": None,
+            "message": "Firma ECDSA restaurada. Todas las configs se sirven firmadas.",
+        }
