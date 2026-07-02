@@ -58,10 +58,16 @@ namespace AlwaysPrintService.Tasks
                     Path.GetTempPath(), "AlwaysPrint", "Updates",
                     $"install_{DateTime.Now:yyyyMMdd_HHmmss}.cmd");
 
+                // Ruta del log del día actual (para que el script escriba con prefijo [UPD])
+                string logDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "AlwaysPrint", "logs");
+                string logFilePath = Path.Combine(logDir, $"AlwaysPrint_{DateTime.Now:yyyyMMdd}.log");
+
                 // Asegurar que el directorio existe
                 Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
 
-                string scriptContent = GenerateInstallScript(msiFilePath, trayExePath, scriptPath);
+                string scriptContent = GenerateInstallScript(msiFilePath, trayExePath, scriptPath, logFilePath);
                 File.WriteAllText(scriptPath, scriptContent);
 
                 AlwaysPrintLogger.WriteInfo(
@@ -130,74 +136,71 @@ namespace AlwaysPrintService.Tasks
         /// 7. Elimina el MSI temporal
         /// 8. Se auto-elimina
         /// </summary>
-        private static string GenerateInstallScript(string msiFilePath, string trayExePath, string scriptPath)
+        private static string GenerateInstallScript(string msiFilePath, string trayExePath, string scriptPath, string logFilePath)
         {
-            // Usar log en el mismo directorio del MSI para diagnóstico
-            string logPath = Path.Combine(
-                Path.GetDirectoryName(msiFilePath)!,
-                $"install_{DateTime.Now:yyyyMMdd_HHmmss}.log");
-
             return $@"@echo off
 REM ============================================================
 REM Script de actualización automática de AlwaysPrint
 REM Generado: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
 REM MSI: {msiFilePath}
+REM Log: {logFilePath}
 REM ============================================================
 
-echo [%date% %time%] Iniciando actualización de AlwaysPrint... >> ""{logPath}""
+set LOG=""{logFilePath}""
+
+echo [%date% %time%] [UPD] Event 1020: Iniciando script de actualizacion. MSI={msiFilePath} >> %LOG%
 
 REM Esperar 3 segundos para que el Service termine de responder
 timeout /t 3 /nobreak > nul
 
 REM Matar procesos del Tray
-echo [%date% %time%] Deteniendo AlwaysPrintTray... >> ""{logPath}""
+echo [%date% %time%] [UPD] Event 1020: Deteniendo procesos AlwaysPrintTray... >> %LOG%
 taskkill /f /im {TrayProcessName}.exe > nul 2>&1
 
 REM Deshabilitar Service Recovery temporalmente para evitar que SCM reinicie
 REM el servicio antes de que msiexec complete la instalación
-echo [%date% %time%] Deshabilitando Service Recovery... >> ""{logPath}""
+echo [%date% %time%] [UPD] Event 1020: Deshabilitando Service Recovery temporalmente. >> %LOG%
 sc failure {ServiceName} reset= 0 actions= """"/""""/"""" > nul 2>&1
 
 REM Detener el servicio
-echo [%date% %time%] Deteniendo servicio {ServiceName}... >> ""{logPath}""
+echo [%date% %time%] [UPD] Event 1020: Deteniendo servicio {ServiceName}... >> %LOG%
 net stop {ServiceName} > nul 2>&1
 timeout /t 2 /nobreak > nul
 
-REM Ejecutar instalación silenciosa (REINSTALLMODE=amus fuerza copia de archivos incluso en downgrade)
-echo [%date% %time%] Ejecutando msiexec... >> ""{logPath}""
-msiexec /i ""{msiFilePath}"" /quiet /norestart REINSTALLMODE=amus /l*v ""{logPath}.msiexec.log""
+REM Ejecutar instalación silenciosa
+echo [%date% %time%] [UPD] Event 1020: Ejecutando msiexec /i (silencioso)... >> %LOG%
+msiexec /i ""{msiFilePath}"" /quiet /norestart REINSTALLMODE=amus /l*v ""{msiFilePath}.msiexec.log""
 set INSTALL_EXIT=%errorlevel%
-echo [%date% %time%] msiexec finalizado con código: %INSTALL_EXIT% >> ""{logPath}""
+echo [%date% %time%] [UPD] Event 1020: msiexec finalizado con codigo de salida: %INSTALL_EXIT% >> %LOG%
 
 REM Restaurar Service Recovery (reiniciar en 5s ante fallo, reset counter cada 86400s)
-echo [%date% %time%] Restaurando Service Recovery... >> ""{logPath}""
+echo [%date% %time%] [UPD] Event 1020: Restaurando Service Recovery. >> %LOG%
 sc failure {ServiceName} reset= 86400 actions= restart/5000/restart/5000/restart/5000 > nul 2>&1
 
 REM Verificar resultado
 if %INSTALL_EXIT% neq 0 (
-    echo [%date% %time%] ERROR: Instalación fallida con código %INSTALL_EXIT%. Reiniciando servicio anterior... >> ""{logPath}""
+    echo [%date% %time%] [UPD] Event 1091: ERROR - Instalacion fallida con codigo %INSTALL_EXIT%. Reiniciando servicio anterior. >> %LOG%
     net start {ServiceName} > nul 2>&1
     timeout /t 2 /nobreak > nul
     start """" ""{trayExePath}""
     goto :cleanup
 )
 
-echo [%date% %time%] Instalación exitosa. Reiniciando servicio... >> ""{logPath}""
+echo [%date% %time%] [UPD] Event 1020: Instalacion exitosa. Iniciando servicio actualizado... >> %LOG%
 
 REM Iniciar el servicio actualizado
 net start {ServiceName} > nul 2>&1
 timeout /t 3 /nobreak > nul
 
 REM Lanzar el Tray actualizado
-echo [%date% %time%] Lanzando AlwaysPrintTray... >> ""{logPath}""
+echo [%date% %time%] [UPD] Event 1020: Lanzando AlwaysPrintTray.exe... >> %LOG%
 start """" ""{trayExePath}""
 
 REM Eliminar MSI temporal
-echo [%date% %time%] Eliminando MSI temporal... >> ""{logPath}""
 del /f /q ""{msiFilePath}"" > nul 2>&1
 
 :cleanup
-echo [%date% %time%] Actualización finalizada. >> ""{logPath}""
+echo [%date% %time%] [UPD] Event 1020: Script de actualizacion finalizado. >> %LOG%
 
 REM Auto-eliminar este script (con delay para que cmd lo suelte)
 (goto) 2>nul & del /f /q ""{scriptPath}""
