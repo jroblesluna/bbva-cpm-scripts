@@ -944,6 +944,15 @@ async def notify_new_version(
     # Obtener URL de descarga (presigned o pública)
     update_info = s3_service.get_broadcast_update_info(target_version=new_version)
     download_url = update_info["download_url"] if update_info else None
+    file_size_val = update_info["file_size"] if update_info else file_size
+
+    # Fallback: generar URL directamente si get_broadcast_update_info falla
+    if not download_url:
+        try:
+            download_url = s3_service.generate_download_url(expires_in=3600)
+        except Exception:
+            logger.warning("notify_new_version: no se pudo generar presigned URL")
+            download_url = None
 
     updated_orgs = 0
     total_ws_notified = 0

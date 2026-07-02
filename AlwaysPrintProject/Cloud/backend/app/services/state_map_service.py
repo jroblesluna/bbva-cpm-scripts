@@ -781,7 +781,7 @@ class StateMapService:
         self,
         org_id: str,
         msi_version: str,
-        msi_url: str,
+        msi_url: str | None = None,
         msi_url_expires_at: float = 0.0,
     ) -> None:
         """
@@ -790,13 +790,14 @@ class StateMapService:
         Args:
             org_id: UUID de la organización.
             msi_version: Versión target del MSI (e.g. "2.1.0").
-            msi_url: Presigned URL S3 del MSI.
+            msi_url: Presigned URL S3 del MSI. Si None, se generará on-demand al consultar.
             msi_url_expires_at: Epoch timestamp de expiración de la presigned URL.
         """
         org_state = self._get_or_create_org_state(org_id)
         org_state.msi_version = msi_version
-        org_state.msi_url = msi_url
-        org_state.msi_url_expires_at = msi_url_expires_at
+        if msi_url:
+            org_state.msi_url = msi_url
+            org_state.msi_url_expires_at = msi_url_expires_at
 
         logger.info(
             "state_map.msi_actualizado",
@@ -966,8 +967,38 @@ class StateMapService:
         Returns:
             URL de MSI válida (regenerada o existente).
         """
-        if not org_state.msi_url or not org_state.msi_version:
-            return org_state.msi_url
+        if not org_state.msi_version:
+            return None
+
+        # Si no hay URL pero sí hay versión, intentar generar una
+        if not org_state.msi_url:
+            try:
+                if self._s3_update_service is None:
+                    from app.services.s3_update_service import S3UpdateService
+                    self._s3_update_service = S3UpdateService()
+
+                expires_in = 3600
+                new_url = self._s3_update_service.generate_download_url(
+                    key=f"versions/{org_state.msi_version}/AlwaysPrint.msi",
+                    expires_in=expires_in,
+                )
+                org_state.msi_url = new_url
+                org_state.msi_url_expires_at = time.time() + expires_in
+
+                logger.info(
+                    "state_map.msi_url_generada_ondemand",
+                    org_id=org_id,
+                    msi_version=org_state.msi_version,
+                )
+                return new_url
+            except Exception as e:
+                logger.warning(
+                    "state_map.msi_url_generacion_fallida",
+                    org_id=org_id,
+                    msi_version=org_state.msi_version,
+                    error=str(e),
+                )
+                return None
 
         # Verificar si la URL está por expirar
         time_remaining = org_state.msi_url_expires_at - time.time()
