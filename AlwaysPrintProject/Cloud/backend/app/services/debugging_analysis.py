@@ -294,7 +294,12 @@ class DebuggingAnalysisService:
             "- Cuando SÍ haya un problema real, incluye comandos PowerShell/CMD específicos, "
             "configuraciones de registro, o pasos exactos para resolverlo.\n"
             "- Diferencia entre: (a) acciones ejecutadas intencionalmente por el administrador, "
-            "(b) errores reales del sistema, y (c) warnings informativos sin impacto operativo."
+            "(b) errores reales del sistema, y (c) warnings informativos sin impacto operativo.\n"
+            "- Si un servicio que se quiere monitorear NO EXISTE en la workstation (no aparece en "
+            "services_initial.json o services_final.json), SIEMPRE repórtalo como hallazgo. "
+            "Un servicio ausente cuando debería existir es una anomalía importante.\n"
+            "- Si logs externos configurados en el perfil no se encontraron (patrón sin coincidencias), "
+            "menciónalo como hallazgo — puede indicar que el software no está instalado."
         )
 
         # Metadata de la sesión
@@ -323,6 +328,69 @@ class DebuggingAnalysisService:
             sections.append("\n## Errores Durante la Captura")
             for err in errors:
                 sections.append(f"- Target: {err.get('target', 'N/A')}, Error: {err.get('error', 'N/A')}")
+
+        # Análisis de servicios monitoreados vs encontrados
+        # Resaltar servicios que el perfil quiere monitorear pero no existen en la workstation
+        targets = index_data.get("targets", {})
+        monitored_services = targets.get("monitored_services", [])
+        if monitored_services and diffs.get("services_diff"):
+            try:
+                import json as _json
+                services_data = _json.loads(diffs["services_diff"]) if isinstance(diffs["services_diff"], str) else diffs["services_diff"]
+                # services_data puede ser el diff textual o JSON; si es textual, buscar nombres
+                found_services = []
+                missing_services = []
+                stopped_services = []
+
+                if isinstance(services_data, str):
+                    # Formato textual — buscar cada servicio monitoreado
+                    for svc in monitored_services:
+                        svc_lower = svc.lower()
+                        if svc_lower not in services_data.lower():
+                            missing_services.append(svc)
+                        elif "stopped" in services_data.lower().split(svc_lower)[1][:50] if svc_lower in services_data.lower() else False:
+                            stopped_services.append(svc)
+                        else:
+                            found_services.append(svc)
+                else:
+                    # Formato JSON estructurado
+                    service_names = [s.get("name", "").lower() for s in services_data] if isinstance(services_data, list) else []
+                    for svc in monitored_services:
+                        if svc.lower() not in service_names:
+                            missing_services.append(svc)
+
+                if missing_services or stopped_services:
+                    sections.append("\n## ⚠️ Servicios Monitoreados con Anomalías")
+                    sections.append(
+                        "Los siguientes servicios están definidos en el perfil de monitoreo pero "
+                        "presentan anomalías. Esto es IMPORTANTE y debe mencionarse en el reporte:"
+                    )
+                    for svc in missing_services:
+                        sections.append(
+                            f"- **{svc}**: NO ENCONTRADO en la workstation. "
+                            "El servicio no está instalado o tiene un nombre diferente. "
+                            "Esto debe reportarse como hallazgo si el servicio debería existir."
+                        )
+                    for svc in stopped_services:
+                        sections.append(
+                            f"- **{svc}**: DETENIDO. Verificar si debería estar corriendo."
+                        )
+            except Exception:
+                pass  # Si falla el parsing, el LLM analizará el diff textual directamente
+
+        # Resaltar logs no encontrados como dato relevante para el LLM
+        if errors:
+            log_errors = [e for e in errors if "no se encontraron" in e.get("error", "").lower()
+                         or "not found" in e.get("error", "").lower()]
+            if log_errors:
+                sections.append("\n## ⚠️ Logs Externos No Encontrados")
+                sections.append(
+                    "Los siguientes logs configurados en el perfil NO existen en la workstation. "
+                    "Esto puede indicar que el software correspondiente no está instalado, "
+                    "no genera logs en la ruta esperada, o fue desinstalado:"
+                )
+                for err in log_errors:
+                    sections.append(f"- **{err.get('target', 'N/A')}**: {err.get('error', 'N/A')}")
 
         # Diff de servicios
         if diffs.get("services_diff"):
