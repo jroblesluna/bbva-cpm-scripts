@@ -895,13 +895,11 @@ def download_update(
     ),
     responses={
         200: {"description": "State map actualizado"},
-        401: {"description": "No autenticado"},
-        403: {"description": "No autorizado"},
+        404: {"description": "No se encontró metadata de MSI en S3"},
     },
 )
 async def notify_new_version(
     request: Request,
-    current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """
@@ -911,6 +909,7 @@ async def notify_new_version(
     (target_version IS NULL y auto_update_enabled = True).
 
     Llamado por GitHub Actions después del upload a S3.
+    No requiere autenticación JWT — es idempotente y solo refresca caché interno.
     """
     from app.services.push_services import get_state_map_service, get_push_distribution_service
 

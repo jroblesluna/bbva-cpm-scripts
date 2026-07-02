@@ -128,12 +128,9 @@ jobs:
 
       - name: Notify backend of new MSI version
         shell: bash
-        env:
-          ADMIN_TOKEN: ${{ secrets.ALWAYSPRINT_ADMIN_TOKEN }}
         run: |
           HTTP_CODE=$(curl -s -o /tmp/notify_response.json -w "%{http_code}" \
             -X POST "https://alwaysprint.apps.iol.pe/api/v1/updates/notify-new-version" \
-            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
             -H "Content-Type: application/json")
 
           echo "Response code: ${HTTP_CODE}"
