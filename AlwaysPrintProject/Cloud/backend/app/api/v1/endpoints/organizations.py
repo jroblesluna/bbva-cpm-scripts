@@ -1879,7 +1879,7 @@ def toggle_signature_pause(
         db.commit()
 
         # Auditoría
-        from app.services.audit_service import AuditService
+        from app.services.audit import AuditService
         AuditService().log_action(
             db=db,
             action_type="config_change",
@@ -1914,7 +1914,7 @@ def toggle_signature_pause(
         db.commit()
 
         # Auditoría
-        from app.services.audit_service import AuditService
+        from app.services.audit import AuditService
         AuditService().log_action(
             db=db,
             action_type="config_change",
