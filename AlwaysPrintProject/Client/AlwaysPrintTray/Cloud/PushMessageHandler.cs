@@ -345,7 +345,11 @@ namespace AlwaysPrintTray.Cloud
                 string currentVersion = System.Reflection.Assembly.GetExecutingAssembly()
                     .GetName().Version?.ToString() ?? "0.0.0.0";
 
-                if (!currentVersion.Equals(state.MsiVersion, StringComparison.OrdinalIgnoreCase))
+                // Solo actualizar si la versión remota es MAYOR que la local.
+                // Evita intentos de downgrade cuando el state map está desactualizado.
+                bool remoteIsNewer = IsVersionNewer(state.MsiVersion, currentVersion);
+
+                if (remoteIsNewer)
                 {
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"PushMessageHandler: SyncFromState — msi_version difiere " +
@@ -385,14 +389,14 @@ namespace AlwaysPrintTray.Cloud
                                     $"PushMessageHandler: error descargando/instalando MSI: {ex.Message}");
                             }
                         });
+
+                        updatedCount++;
                     }
                     else
                     {
                         AlwaysPrintLogger.WriteTrayWarning(
                             $"PushMessageHandler: SyncFromState — msi_version difiere pero no hay URL de descarga.");
                     }
-
-                    updatedCount++;
                 }
                 else
                 {
@@ -763,6 +767,25 @@ namespace AlwaysPrintTray.Cloud
 
             // Si la URL es muy larga, truncar
             return url.Length > 100 ? url.Substring(0, 100) + "..." : url;
+        }
+
+        /// <summary>
+        /// Compara dos versiones en formato X.Y.Z.W y determina si la remota es mayor que la local.
+        /// Retorna true si remoteVersion > localVersion.
+        /// </summary>
+        private static bool IsVersionNewer(string remoteVersion, string localVersion)
+        {
+            try
+            {
+                var remote = new Version(remoteVersion);
+                var local = new Version(localVersion);
+                return remote > local;
+            }
+            catch
+            {
+                // Si no se puede parsear, comparar como string (fallback)
+                return !remoteVersion.Equals(localVersion, StringComparison.OrdinalIgnoreCase);
+            }
         }
     }
 }

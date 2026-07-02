@@ -691,9 +691,10 @@ namespace AlwaysPrintTray
 
                 if (updatedCount > 0)
                 {
-                    ShowBalloon(AppTitle,
-                        $"Se actualizaron {updatedCount} componente(s).",
-                        ToolTipIcon.Info);
+                    string msg = updatedCount == 1
+                        ? "Se actualizó 1 componente."
+                        : $"Se actualizaron {updatedCount} componentes.";
+                    ShowBalloon(AppTitle, msg, ToolTipIcon.Info);
                 }
                 else
                 {
