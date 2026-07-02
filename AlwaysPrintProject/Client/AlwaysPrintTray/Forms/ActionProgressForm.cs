@@ -82,10 +82,12 @@ namespace AlwaysPrintTray.Forms
             bottomPanel.Controls.Add(_closeButton);
             Controls.Add(bottomPanel);
 
-            // Orden correcto de controles (DockStyle)
-            Controls.SetChildIndex(bottomPanel, 0);
-            Controls.SetChildIndex(_listView, 1);
-            Controls.SetChildIndex(_statusLabel, 2);
+            // Orden correcto para DockStyle layout:
+            // En WinForms, los controles se dockean desde index 0 hacia arriba.
+            // Bottom y Top deben procesarse antes que Fill.
+            Controls.SetChildIndex(_statusLabel, 0);
+            Controls.SetChildIndex(bottomPanel, 1);
+            Controls.SetChildIndex(_listView, 2);
 
             // Timer de auto-cierre (30s después de completar)
             _autoCloseTimer = new Timer { Interval = 30000 };

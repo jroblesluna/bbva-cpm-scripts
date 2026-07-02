@@ -1349,6 +1349,7 @@ namespace AlwaysPrintTray
                 if (_progressForm == null || _progressForm.IsDisposed)
                 {
                     _progressForm = new Forms.ActionProgressForm(payload.TriggerLabel);
+                    _progressForm.FormClosed += (__, ___) => _progressForm = null;
                     _progressForm.Show();
                 }
 
