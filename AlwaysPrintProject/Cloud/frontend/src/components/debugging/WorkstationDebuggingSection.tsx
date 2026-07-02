@@ -152,14 +152,14 @@ export function WorkstationDebuggingSection({
       return res.data;
     },
     enabled: !!workstationId,
-    // Refrescar cada 5s si hay sesión activa o en proceso
+    // Refrescar cada 2s si hay sesión activa o en proceso (para detectar cambio de estado rápido)
     refetchInterval: (query) => {
       const data = query.state.data as DebuggingSession[] | undefined;
       if (!data) return false;
       const hasActiveSession = data.some(s =>
         ['active', 'uploading', 'analyzing'].includes(s.status)
       );
-      return hasActiveSession ? 5000 : false;
+      return hasActiveSession ? 2000 : false;
     },
   });
 
@@ -444,30 +444,30 @@ export function WorkstationDebuggingSection({
               )}
               {t('wsDownloadPdf')}
             </Button>
-            {analyzedSession.total_data_size_bytes && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={downloadZipMutation.isPending}
-                      onClick={() => downloadZipMutation.mutate(analyzedSession.id)}
-                    >
-                      {downloadZipMutation.isPending ? (
-                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                      ) : (
-                        <Archive className="w-3.5 h-3.5 mr-1.5" />
-                      )}
-                      ZIP
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {t('wsDataSize', { size: formatBytes(analyzedSession.total_data_size_bytes) })}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={downloadZipMutation.isPending}
+                    onClick={() => downloadZipMutation.mutate(analyzedSession.id)}
+                  >
+                    {downloadZipMutation.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Archive className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    ZIP
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {analyzedSession.total_data_size_bytes
+                    ? t('wsDataSize', { size: formatBytes(analyzedSession.total_data_size_bytes) })
+                    : 'ZIP'}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       )}
