@@ -132,8 +132,8 @@ class TestFlujoCompletoActivacionConfig:
 
         assert sent_ws_id == ws_id
         assert sent_message["type"] == "action_config_changed"
-        assert sent_message["data"]["config_hash"] == config_hash
-        assert sent_message["data"]["download_url"] == config_s3_url
+        assert sent_message["config_hash"] == config_hash
+        assert sent_message["download_url"] == config_s3_url
 
     @pytest.mark.asyncio
     async def test_flujo_completo_con_redis_publish(self, org_id, ws_id):

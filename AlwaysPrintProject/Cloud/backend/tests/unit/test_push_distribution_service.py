@@ -193,10 +193,8 @@ class TestPushConfigChange:
         assert ws_id_arg == "ws-1"
         assert message_arg == {
             "type": "action_config_changed",
-            "data": {
-                "config_hash": "abc12345",
-                "download_url": "https://bucket.s3.us-east-1.amazonaws.com/configs/org-A/abc12345.signed",
-            },
+            "config_hash": "abc12345",
+            "download_url": "https://bucket.s3.us-east-1.amazonaws.com/configs/org-A/abc12345.signed",
         }
 
     @pytest.mark.asyncio
@@ -328,11 +326,9 @@ class TestPushMsiUpdate:
         assert ws_id_arg == "ws-4"
         assert message_arg == {
             "type": "check_update",
-            "data": {
-                "version": "2.1.0",
-                "download_url": "https://bucket.s3.amazonaws.com/versions/2.1.0/AlwaysPrint.msi?presigned",
-                "file_size": 15728640,
-            },
+            "version": "2.1.0",
+            "download_url": "https://bucket.s3.amazonaws.com/versions/2.1.0/AlwaysPrint.msi?presigned",
+            "file_size": 15728640,
         }
 
     @pytest.mark.asyncio
@@ -432,10 +428,8 @@ class TestPushCertRotation:
         assert ws_id_arg == "ws-4"
         assert message_arg == {
             "type": "cert_rotated",
-            "data": {
-                "cert_version": 5,
-                "cert_url": "https://bucket.s3.amazonaws.com/certs/org-B/v5.cer",
-            },
+            "cert_version": 5,
+            "cert_url": "https://bucket.s3.amazonaws.com/certs/org-B/v5.cer",
         }
 
     @pytest.mark.asyncio

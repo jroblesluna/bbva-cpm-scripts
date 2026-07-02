@@ -106,13 +106,11 @@ class PushDistributionService:
         """
         Envía Config_Push_Message a workstations afectadas por un cambio de config.
 
-        El mensaje sigue el formato Config_Push_Message del diseño:
+        El mensaje sigue formato plano (el cliente parsea campos en top-level):
         {
             "type": "action_config_changed",
-            "data": {
-                "config_hash": "a1b2c3d4",
-                "download_url": "https://bucket.s3.amazonaws.com/configs/org/hash.signed"
-            }
+            "config_hash": "a1b2c3d4",
+            "download_url": "https://bucket.s3.amazonaws.com/configs/org/hash.signed"
         }
 
         Zero queries a BD — config_hash y download_url provienen del caller,
@@ -142,13 +140,12 @@ class PushDistributionService:
             )
             return 0
 
-        # Construir mensaje Config_Push_Message
+        # Construir mensaje Config_Push_Message (formato plano — el cliente parsea
+        # config_hash y download_url directamente del top-level del JSON)
         message = {
             "type": "action_config_changed",
-            "data": {
-                "config_hash": config_hash,
-                "download_url": download_url,
-            },
+            "config_hash": config_hash,
+            "download_url": download_url,
         }
 
         # Enviar a cada workstation destino (fire-and-forget)
@@ -188,14 +185,12 @@ class PushDistributionService:
         """
         Envía MSI_Push_Message a todas las workstations online de la organización.
 
-        El mensaje sigue el formato MSI_Push_Message del diseño:
+        El mensaje sigue formato plano (el cliente parsea campos en top-level):
         {
             "type": "check_update",
-            "data": {
-                "version": "2.1.0",
-                "download_url": "https://bucket.s3.amazonaws.com/versions/2.1.0/AlwaysPrint.msi?presigned",
-                "file_size": 15728640
-            }
+            "version": "2.1.0",
+            "download_url": "https://bucket.s3.amazonaws.com/versions/2.1.0/AlwaysPrint.msi?presigned",
+            "file_size": 15728640
         }
 
         MSI siempre se distribuye a nivel org (todas las WS online reciben el push).
@@ -223,14 +218,13 @@ class PushDistributionService:
             )
             return 0
 
-        # Construir mensaje MSI_Push_Message
+        # Construir mensaje MSI_Push_Message (formato plano — el cliente parsea
+        # version y download_url directamente del top-level del JSON)
         message = {
             "type": "check_update",
-            "data": {
-                "version": msi_version,
-                "download_url": download_url,
-                "file_size": file_size,
-            },
+            "version": msi_version,
+            "download_url": download_url,
+            "file_size": file_size,
         }
 
         # Enviar a cada workstation destino (tolerante a fallos parciales)
@@ -269,13 +263,11 @@ class PushDistributionService:
         """
         Envía Cert_Push_Message a todas las workstations online de la organización.
 
-        El mensaje sigue el formato Cert_Push_Message del diseño:
+        El mensaje sigue formato plano (el cliente parsea campos en top-level):
         {
             "type": "cert_rotated",
-            "data": {
-                "cert_version": 3,
-                "cert_url": "https://bucket.s3.amazonaws.com/certs/org/v3.cer"
-            }
+            "cert_version": 3,
+            "cert_url": "https://bucket.s3.amazonaws.com/certs/org/v3.cer"
         }
 
         La rotación de certificado siempre es a nivel org (todas las WS online
@@ -302,13 +294,12 @@ class PushDistributionService:
             )
             return 0
 
-        # Construir mensaje Cert_Push_Message
+        # Construir mensaje Cert_Push_Message (formato plano — el cliente parsea
+        # cert_version y cert_url directamente del top-level del JSON)
         message = {
             "type": "cert_rotated",
-            "data": {
-                "cert_version": cert_version,
-                "cert_url": cert_url,
-            },
+            "cert_version": cert_version,
+            "cert_url": cert_url,
         }
 
         # Enviar a cada workstation destino (tolerante a fallos parciales)
