@@ -95,11 +95,21 @@ def list_vlans(
     
     # Calcular estadísticas
     from app.models.device import Device
+    from app.models.action_config import ActionConfig, ActionConfigScope
     from app.schemas.vlan import VLANListStats
     
     without_devices = 0
     with_config = 0
     in_contingency = 0
+    
+    # Obtener IDs de VLANs con action config activa (scope=vlan)
+    vlan_ids_with_config = set(
+        row[0] for row in db.query(ActionConfig.vlan_id).filter(
+            ActionConfig.scope == ActionConfigScope.VLAN,
+            ActionConfig.is_active == True,
+            ActionConfig.vlan_id.isnot(None),
+        ).all()
+    )
     
     for vlan in vlans:
         # Contar dispositivos activos en la VLAN
@@ -110,8 +120,8 @@ def list_vlans(
         if device_count == 0:
             without_devices += 1
         
-        # Verificar si tiene metadata/config
-        if vlan.vlan_metadata and len(vlan.vlan_metadata) > 0:
+        # Verificar si tiene AlwaysConfig específico (scope=vlan)
+        if vlan.id in vlan_ids_with_config:
             with_config += 1
         
         # Contingencia forzada
@@ -122,6 +132,7 @@ def list_vlans(
         without_devices=without_devices,
         with_config=with_config,
         in_contingency=in_contingency,
+        vlan_ids_with_config=[str(vid) for vid in vlan_ids_with_config],
     )
     
     return VLANListResponse(total=total_count, vlans=vlans, stats=stats)

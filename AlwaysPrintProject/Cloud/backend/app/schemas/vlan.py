@@ -168,8 +168,9 @@ class VLANDetailResponse(VLANResponse):
 class VLANListStats(BaseModel):
     """Estadísticas calculadas del listado de VLANs."""
     without_devices: int = Field(0, description="VLANs sin dispositivos activos")
-    with_config: int = Field(0, description="VLANs con metadata/config")
+    with_config: int = Field(0, description="VLANs con AlwaysConfig específico (scope=vlan)")
     in_contingency: int = Field(0, description="VLANs con contingencia forzada")
+    vlan_ids_with_config: list[str] = Field(default_factory=list, description="IDs de VLANs con AlwaysConfig activo")
 
 
 class VLANListResponse(BaseModel):

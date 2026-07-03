@@ -113,7 +113,7 @@ export default function VLANsPage() {
   const [contingencyDevices, setContingencyDevices] = useState<Device[]>([])
   const [contingencyDevicesLoading, setContingencyDevicesLoading] = useState(false)
   const [activeDeviceCounts, setActiveDeviceCounts] = useState<Record<string, number>>({})
-  const [vlanStats, setVlanStats] = useState<{ without_devices: number; with_config: number; in_contingency: number } | null>(null)
+  const [vlanStats, setVlanStats] = useState<{ without_devices: number; with_config: number; in_contingency: number; vlan_ids_with_config?: string[] } | null>(null)
   const [showAddDeviceModal, setShowAddDeviceModal] = useState(false)
   const [addDeviceVlan, setAddDeviceVlan] = useState<VLAN | null>(null)
   const [bulkCommandTarget, setBulkCommandTarget] = useState<{ vlan: VLAN; commandType: 'restart_service' | 'restart_tray' | 'check_update' } | null>(null)
@@ -224,7 +224,7 @@ export default function VLANsPage() {
       vlan.cidr_ranges.some((cidr) => cidr.includes(s))
     )
     const matchesContingency = !filterContingency || vlan.forced_contingency
-    const matchesConfig = !filterWithConfig || (vlan.metadata && Object.keys(vlan.metadata).length > 0)
+    const matchesConfig = !filterWithConfig || (vlanStats?.vlan_ids_with_config || []).includes(vlan.id)
     const matchesDevices = !filterWithDevices || (activeDeviceCounts[vlan.id] ?? 0) === 0
     return matchesSearch && matchesContingency && matchesConfig && matchesDevices
   })
