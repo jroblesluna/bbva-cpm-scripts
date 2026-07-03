@@ -39,6 +39,48 @@ namespace AlwaysPrintTray.Cloud
         }
         
         // ═══════════════════════════════════════════════════════════════════════
+        // INVALIDACIÓN DE CERTIFICADO
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Invalida el certificado local cuando la verificación de firma falla.
+        /// Elimina el archivo .cer de disco y resetea CertVersion a 0 en registro.
+        /// En el siguiente ciclo de sync, se forzará la re-descarga del cert correcto.
+        /// 
+        /// Escenarios donde esto aplica:
+        /// - Workstation movida de un entorno a otro (DEV→PROD) con cert viejo
+        /// - Atacante reemplazó el .cer local con un certificado falso
+        /// - Rotación de clave de firma sin actualización del cert
+        /// </summary>
+        private static void InvalidateLocalCert()
+        {
+            try
+            {
+                string certPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "AlwaysPrint", "config", "org.cer");
+
+                if (File.Exists(certPath))
+                {
+                    File.Delete(certPath);
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"ConfigManager: certificado local eliminado ({certPath}) por fallo de verificación de firma.");
+                }
+
+                // Resetear CertVersion a 0 para forzar re-descarga en el próximo sync
+                SignatureVerifier.SetLocalCertVersion(0);
+
+                AlwaysPrintLogger.WriteTrayWarning(
+                    "ConfigManager: CertVersion reseteado a 0. Se forzará re-descarga del certificado en el próximo ciclo.");
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"ConfigManager: error invalidando certificado local: {ex.Message}");
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // VERIFICACIÓN Y DESCARGA (LEGACY — DEPRECADO)
         // ═══════════════════════════════════════════════════════════════════════
         
@@ -248,6 +290,7 @@ namespace AlwaysPrintTray.Cloud
                         {
                             AlwaysPrintLogger.WriteTrayError(
                                 "ConfigManager: verificación de firma ECDSA fallida — rechazando configuración.");
+                            InvalidateLocalCert();
                             return false;
                         }
                         
@@ -503,6 +546,7 @@ namespace AlwaysPrintTray.Cloud
                     AlwaysPrintLogger.WriteTrayError(
                         "ConfigManager: verificación de firma ECDSA fallida para config descargada desde S3. " +
                         "Rechazando configuración (fail-closed).");
+                    InvalidateLocalCert();
                     return false;
                 }
 
@@ -613,6 +657,7 @@ namespace AlwaysPrintTray.Cloud
                     AlwaysPrintLogger.WriteTrayError(
                         "ConfigManager: verificación de firma ECDSA fallida. " +
                         "Rechazando configuración (fail-closed).");
+                    InvalidateLocalCert();
                     return Task.FromResult(false);
                 }
 
