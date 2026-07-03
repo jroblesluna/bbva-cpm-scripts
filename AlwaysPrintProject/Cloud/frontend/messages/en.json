@@ -171,9 +171,9 @@
     "orgMandatoryNo": "No",
     "orgSectionTitle": "Organizations",
     "orgTotal": "Total Organizations",
-    "orgWithConfig": "With Configuration",
-    "orgApplyingMandatory": "Mandatory Config",
-    "orgInContingency": "In Contingency"
+    "orgApplyingMandatory": "Mandatory config",
+    "orgInContingency": "In contingency",
+    "orgWithConfig": "With AlwaysConfig"
   },
   "workstations": {
     "title": "Workstations",

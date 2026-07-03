@@ -292,18 +292,6 @@ export default function DashboardPage() {
               <div className="p-4 border border-gray-200 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-gray-500">{t('orgWithConfig')}</p>
-                    <p className="text-2xl font-bold text-indigo-600">{orgStats.with_config}</p>
-                  </div>
-                  <div className="bg-indigo-100 rounded-full p-2">
-                    <Settings className="w-5 h-5 text-indigo-600" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 border border-gray-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
                     <p className="text-xs text-gray-500">{t('orgApplyingMandatory')}</p>
                     <p className="text-2xl font-bold text-green-600">{orgStats.applying_mandatory}</p>
                   </div>
@@ -321,6 +309,18 @@ export default function DashboardPage() {
                   </div>
                   <div className={`rounded-full p-2 ${orgStats.in_contingency > 0 ? 'bg-orange-100' : 'bg-orange-50'}`}>
                     <AlertTriangle className={`w-5 h-5 ${orgStats.in_contingency > 0 ? 'text-orange-600' : 'text-orange-400'}`} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border border-gray-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500">{t('orgWithConfig')}</p>
+                    <p className="text-2xl font-bold text-indigo-600">{orgStats.with_config}</p>
+                  </div>
+                  <div className="bg-indigo-100 rounded-full p-2">
+                    <Settings className="w-5 h-5 text-indigo-600" />
                   </div>
                 </div>
               </div>

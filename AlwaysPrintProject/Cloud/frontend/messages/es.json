@@ -171,9 +171,9 @@
     "orgMandatoryNo": "No",
     "orgSectionTitle": "Organizaciones",
     "orgTotal": "Total Organizaciones",
-    "orgWithConfig": "Con Configuración",
-    "orgApplyingMandatory": "Config Mandatory",
-    "orgInContingency": "En Contingencia"
+    "orgApplyingMandatory": "Config obligatoria",
+    "orgInContingency": "En contingencia",
+    "orgWithConfig": "Con AlwaysConfig"
   },
   "workstations": {
     "title": "Estaciones",
