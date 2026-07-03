@@ -41,8 +41,7 @@ namespace AlwaysPrintService.Watchdog
             if (!config.Enabled || config.Services.Count == 0)
             {
                 AlwaysPrintLogger.WriteInfo(
-                    "ServiceWatchdog: deshabilitado o sin servicios configurados. No se inicia.",
-                    AlwaysPrintLogger.EvtGenericInfo);
+                    "ServiceWatchdog: deshabilitado o sin servicios configurados. No se inicia.");
                 return;
             }
 
@@ -57,8 +56,7 @@ namespace AlwaysPrintService.Watchdog
             string serviceNames = string.Join(", ", config.Services.Select(s => s.Name));
             AlwaysPrintLogger.WriteInfo(
                 $"ServiceWatchdog: iniciado. Intervalo={config.IntervalSeconds}s, " +
-                $"Servicios=[{serviceNames}]",
-                AlwaysPrintLogger.EvtGenericInfo);
+                $"Servicios=[{serviceNames}]");
         }
 
         /// <summary>
@@ -71,8 +69,7 @@ namespace AlwaysPrintService.Watchdog
                 _timer.Dispose();
                 _timer = null;
                 AlwaysPrintLogger.WriteInfo(
-                    "ServiceWatchdog: detenido.",
-                    AlwaysPrintLogger.EvtGenericInfo);
+                    "ServiceWatchdog: detenido.");
             }
             _config = null;
         }
@@ -164,8 +161,7 @@ namespace AlwaysPrintService.Watchdog
                     if (sc.Status == ServiceControllerStatus.Running)
                     {
                         AlwaysPrintLogger.WriteInfo(
-                            $"ServiceWatchdog: '{entry.Name}' completó transición y ahora está Running.",
-                            AlwaysPrintLogger.EvtGenericInfo);
+                            $"ServiceWatchdog: '{entry.Name}' completó transición y ahora está Running.");
                         return;
                     }
                 }
@@ -177,8 +173,7 @@ namespace AlwaysPrintService.Watchdog
                 RecordRestart(entry.Name);
 
                 AlwaysPrintLogger.WriteInfo(
-                    $"ServiceWatchdog: '{entry.Name}' reiniciado exitosamente.",
-                    AlwaysPrintLogger.EvtGenericInfo);
+                    $"ServiceWatchdog: '{entry.Name}' reiniciado exitosamente.");
             }
             catch (System.ServiceProcess.TimeoutException)
             {
