@@ -108,7 +108,7 @@ export default function WorkstationsPage() {
   };
 
   // Resetear página cuando el término de búsqueda con debounce cambia
-  useEffect(() => { setPage(1) }, [debouncedSearch]);
+  useEffect(() => { setPage(1) }, [debouncedSearch, filterOnline, filterContingency, filterOrgId, filterVlanId, filterVersion, filterHasConfig, pageSize]);
 
   const filters = {
     search: debouncedSearch || undefined,
