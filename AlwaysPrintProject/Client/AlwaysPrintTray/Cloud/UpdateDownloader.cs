@@ -70,7 +70,7 @@ namespace AlwaysPrintTray.Cloud
                 }
 
                 AlwaysPrintLogger.WriteTrayInfo(
-                    $"UpdateDownloader: iniciando descarga del MSI. Tamaño esperado: {expectedSize} bytes.");
+                    $"UpdateDownloader: iniciando descarga del MSI. Tamaño esperado: {(expectedSize > 0 ? $"{expectedSize} bytes" : "desconocido")}.");
 
                 // 2. Llamar al endpoint de descarga (sigue redirect a presigned URL automáticamente)
                 string downloadUrl = $"{_cloudApiUrl.TrimEnd('/')}/api/v1/updates/download";
@@ -202,7 +202,7 @@ namespace AlwaysPrintTray.Cloud
 
                 AlwaysPrintLogger.WriteTrayInfo(
                     $"UpdateDownloader: iniciando descarga directa zero-query. " +
-                    $"Versión: {version}, tamaño esperado: {expectedSize} bytes, URL: [presigned]");
+                    $"Versión: {version}, tamaño esperado: {(expectedSize > 0 ? $"{expectedSize} bytes" : "desconocido")}, URL: [presigned]");
 
                 using (var response = await _httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
                 {
