@@ -435,7 +435,7 @@ export default function VLANsPage() {
             </div>
           </div>
         </div>
-        <div className={`bg-white rounded-lg shadow p-4 md:p-6 ${(vlanStats?.without_devices || 0) > 0 ? 'border border-orange-200 bg-orange-50' : ''}`}>
+        <div className="bg-white rounded-lg shadow p-4 md:p-6">
           <div className="flex items-center">
             <div className={`p-3 rounded-lg ${(vlanStats?.without_devices || 0) > 0 ? 'bg-orange-100' : 'bg-gray-100'}`}>
               <AlertTriangle className={`h-5 w-5 md:h-6 md:w-6 ${(vlanStats?.without_devices || 0) > 0 ? 'text-orange-600' : 'text-gray-400'}`} />
@@ -444,19 +444,6 @@ export default function VLANsPage() {
               <p className="text-xs md:text-sm font-medium text-gray-600">{t('statsNoDevices')}</p>
               <p className="text-xl md:text-2xl font-bold text-gray-900">
                 {vlanStats?.without_devices || 0}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 md:p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <Settings className="h-5 w-5 md:h-6 md:w-6 text-green-600" />
-            </div>
-            <div className="ml-3 md:ml-4">
-              <p className="text-xs md:text-sm font-medium text-gray-600">{t('statsWithConfig')}</p>
-              <p className="text-xl md:text-2xl font-bold text-gray-900">
-                {vlanStats?.with_config || 0}
               </p>
             </div>
           </div>
@@ -470,6 +457,19 @@ export default function VLANsPage() {
               <p className="text-xs md:text-sm font-medium text-gray-600">{t('statsInContingency')}</p>
               <p className="text-xl md:text-2xl font-bold text-gray-900">
                 {vlanStats?.in_contingency || 0}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4 md:p-6">
+          <div className="flex items-center">
+            <div className="p-3 bg-green-100 rounded-lg">
+              <Settings className="h-5 w-5 md:h-6 md:w-6 text-green-600" />
+            </div>
+            <div className="ml-3 md:ml-4">
+              <p className="text-xs md:text-sm font-medium text-gray-600">{t('statsWithConfig')}</p>
+              <p className="text-xl md:text-2xl font-bold text-gray-900">
+                {vlanStats?.with_config || 0}
               </p>
             </div>
           </div>
