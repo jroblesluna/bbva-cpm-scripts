@@ -685,9 +685,9 @@ export default function VLANsPage() {
                 </div>
                 {/* Contenido principal */}
                 <div className="flex-1 min-w-0">
-              {/* Fila 1: Nombre + CidrHealthBadge + niveles de contingencia */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 min-w-0 flex-wrap">
+              {/* Fila 1: Nombre + niveles de contingencia | Scoring columna derecha */}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-2 min-w-0 flex-wrap pt-1">
                   {selectionMode && (
                     <input
                       type="checkbox"
@@ -715,29 +715,30 @@ export default function VLANsPage() {
                     ) : null
                   })()}
                 </div>
-                <div className="flex items-center gap-2">
+                {/* Columna derecha: Scoring + Online/Total + CIDRs (vertical) */}
+                <div className="flex flex-col items-end gap-1 shrink-0">
                   {(() => {
                     const wsCounts = (vlanStats as any)?.ws_counts?.[vlan.id] as { total?: number; online?: number } | undefined;
                     const total = wsCounts?.total || 0;
                     const online = wsCounts?.online || 0;
                     const pct = total > 0 ? Math.round((online / total) * 100) : 0;
-                    if (total === 0) return null;
+                    if (total === 0) return <CidrHealthBadge cidrCount={vlan.cidr_ranges.length} />;
                     const pctColor = pct >= 95 ? 'bg-green-100 border-green-300 text-green-800'
                       : pct >= 50 ? 'bg-amber-100 border-amber-300 text-amber-800'
                       : 'bg-red-100 border-red-300 text-red-800';
                     return (
                       <>
-                        <div className={`flex items-center justify-center px-2.5 py-1 border rounded-lg ${pctColor}`}>
-                          <span className="text-lg font-bold">{pct}%</span>
+                        <div className={`flex items-center justify-center px-3 py-0.5 border rounded-lg ${pctColor}`}>
+                          <span className="text-xl font-bold">{pct}%</span>
                         </div>
-                        <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 border border-gray-200 rounded-md">
-                          <Monitor className="h-3.5 w-3.5 text-gray-500" />
-                          <span className="text-xs font-medium text-gray-700">{online}/{total}</span>
+                        <div className="flex items-center gap-1 px-2 py-0.5 bg-gray-50 border border-gray-200 rounded-md">
+                          <Monitor className="h-3 w-3 text-gray-500" />
+                          <span className="text-xs font-medium text-gray-600">{online}/{total}</span>
                         </div>
+                        <CidrHealthBadge cidrCount={vlan.cidr_ranges.length} />
                       </>
                     );
                   })()}
-                  <CidrHealthBadge cidrCount={vlan.cidr_ranges.length} />
                 </div>
               </div>
               {/* Fila 2: Organización, CIDRs, descripción */}
