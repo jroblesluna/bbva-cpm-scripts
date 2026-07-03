@@ -40,6 +40,14 @@ _config_info_cache: dict[str, tuple[float, dict]] = {}
 _CONFIG_INFO_TTL = 30.0  # segundos
 
 
+def _invalidate_config_cache_for_org(org_id: str) -> None:
+    """Invalida todas las entradas de caché de config_info para una organización.
+    Se invoca al activar/desactivar configuraciones."""
+    # Como el caché está indexado por workstation_id y no tenemos un mapeo
+    # org→workstations sin BD, limpiamos todo el caché (es pequeño y se reconstruye en 30s)
+    _config_info_cache.clear()
+
+
 async def _notify_workstations_config_changed(db: Session, organization_id, config_hash: str = "") -> int:
     """
     Invalida caché de config_info y envía 'action_config_changed' a workstations online.
@@ -122,6 +130,9 @@ async def _push_config_activation(
     try:
         state_map = get_state_map_service()
         push_service = get_push_distribution_service()
+
+        # Invalidar caché de config_info para esta organización
+        _invalidate_config_cache_for_org(org_id)
 
         # Construir URL pública S3 a partir del storage_path
         config_s3_url = None
@@ -302,8 +313,6 @@ async def upload_action_config(
         
         # Si se creó activa, notificar a las workstations para que re-descarguen
         if config.is_active:
-            await _notify_workstations_config_changed(db, organization_id, config.config_hash)
-            
             # Push-based distribution: actualizar state map → Redis → push a workstations
             await _push_config_activation(
                 org_id=str(organization_id),
@@ -474,8 +483,6 @@ async def update_action_config(
     
     # Si se activó una config, notificar a las workstations de la org para que re-descarguen
     if data.is_active and updated_config.is_active:
-        await _notify_workstations_config_changed(db, organization_id, updated_config.config_hash)
-        
         # Push-based distribution: actualizar state map → Redis → push a workstations
         # Determinar scope_id del config activado
         scope_id = None
