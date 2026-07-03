@@ -121,7 +121,16 @@ namespace AlwaysPrintTray.Forms
 
             try
             {
+                // Recargar triggers OnDemand desde disco
+                OnDemandConfigReader.Reload();
+
+                // Actualizar label de configuración
                 _valConfig.Text = LoadConfigName();
+
+                // Cerrar el form para que se reconstruya con los nuevos triggers al reabrirlo
+                // (la sección de botones OnDemand usa posicionamiento absoluto y no se puede
+                // actualizar dinámicamente sin reconstruir todo el layout)
+                Close();
             }
             catch (Exception ex)
             {
