@@ -1463,6 +1463,14 @@ namespace AlwaysPrintService.Actions
             
             return $"Configuración: {_config.Name} v{_config.Version} - {_config.Triggers.Count} triggers";
         }
+
+        /// <summary>
+        /// Obtiene la configuración del watchdog de servicios (si existe).
+        /// </summary>
+        public ServiceWatchdogConfig? GetServiceWatchdogConfig()
+        {
+            return _config?.ServiceWatchdog;
+        }
         
         /// <summary>
         /// Verifica si hay un trigger configurado para un evento específico.

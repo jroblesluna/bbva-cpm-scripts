@@ -28,6 +28,7 @@ namespace AlwaysPrintService
         private readonly RegistryConfigManager _registry  = new RegistryConfigManager();
         private readonly TaskQueueManager      _taskQueue = new TaskQueueManager();
         private readonly ActionEngine          _actionEngine = new ActionEngine();
+        private readonly Watchdog.ServiceWatchdogRunner _watchdog = new Watchdog.ServiceWatchdogRunner();
         private MessageDispatcher?   _dispatcher;
         private PipeServer?          _pipeServer;
 
@@ -135,6 +136,7 @@ namespace AlwaysPrintService
             _state.Transition(ServiceState.Stopping);
             _cts.Cancel();
             StopScheduledTaskTimer();
+            _watchdog.Stop();
             _userArrivedGate.Set();
             _pipeServer?.Stop();
             _taskQueue.Stop();
@@ -747,6 +749,9 @@ namespace AlwaysPrintService
                         
                         // Iniciar timer periódico si hay trigger OnScheduledTask configurado
                         StartScheduledTaskTimer();
+
+                        // Iniciar watchdog de servicios si está configurado
+                        StartServiceWatchdog();
                     }
                     else
                     {
@@ -857,6 +862,23 @@ namespace AlwaysPrintService
             }
         }
         
+        /// <summary>
+        /// Inicia o reinicia el watchdog de servicios según la configuración cargada.
+        /// Si la config no tiene sección service_watchdog o está deshabilitada, detiene el watchdog.
+        /// </summary>
+        private void StartServiceWatchdog()
+        {
+            var watchdogConfig = _actionEngine.GetServiceWatchdogConfig();
+            if (watchdogConfig != null && watchdogConfig.Enabled)
+            {
+                _watchdog.Start(watchdogConfig);
+            }
+            else
+            {
+                _watchdog.Stop();
+            }
+        }
+
         /// <summary>
         /// Inicia el timer periódico para ejecutar triggers OnScheduledTask.
         /// Lee el interval_seconds del trigger configurado en el .alwaysconfig.

@@ -28,6 +28,13 @@ namespace AlwaysPrint.Shared.Configuration
         /// </summary>
         [JsonProperty("monitored_services")]
         public List<MonitoredServiceConfig> MonitoredServices { get; set; } = new List<MonitoredServiceConfig>();
+
+        /// <summary>
+        /// Configuración del watchdog de servicios. Si es null o enabled=false,
+        /// no se ejecuta monitoreo periódico.
+        /// </summary>
+        [JsonProperty("service_watchdog")]
+        public ServiceWatchdogConfig? ServiceWatchdog { get; set; }
         
         [JsonProperty("triggers")]
         public List<TriggerConfig> Triggers { get; set; } = new List<TriggerConfig>();
@@ -165,5 +172,47 @@ namespace AlwaysPrint.Shared.Configuration
         public const string WriteAppSetting = "WriteAppSetting";
         public const string ReadPrintDriverVersion = "ReadPrintDriverVersion";
         public const string EnableWindowsFeature = "EnableWindowsFeature";
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // SERVICE WATCHDOG CONFIG
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Configuración del watchdog de servicios Windows.
+    /// Verifica periódicamente que los servicios listados estén corriendo
+    /// y los reinicia automáticamente si están detenidos.
+    /// </summary>
+    public class ServiceWatchdogConfig
+    {
+        /// <summary>Si está habilitado el monitoreo periódico.</summary>
+        [JsonProperty("enabled")]
+        public bool Enabled { get; set; } = true;
+
+        /// <summary>Intervalo de verificación en segundos (mínimo 60, default 180).</summary>
+        [JsonProperty("interval_seconds")]
+        public int IntervalSeconds { get; set; } = 180;
+
+        /// <summary>Lista de servicios a monitorear.</summary>
+        [JsonProperty("services")]
+        public List<WatchdogServiceEntry> Services { get; set; } = new List<WatchdogServiceEntry>();
+    }
+
+    /// <summary>
+    /// Entrada individual de un servicio en el watchdog.
+    /// </summary>
+    public class WatchdogServiceEntry
+    {
+        /// <summary>Nombre del servicio Windows (ej: "lpmc_universal_service").</summary>
+        [JsonProperty("name")]
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary>Acción al detectar servicio detenido: "restart" o "log_only".</summary>
+        [JsonProperty("action_on_down")]
+        public string ActionOnDown { get; set; } = "restart";
+
+        /// <summary>Máximo de reinicios permitidos por hora (0 = sin límite).</summary>
+        [JsonProperty("max_restarts_per_hour")]
+        public int MaxRestartsPerHour { get; set; } = 3;
     }
 }
