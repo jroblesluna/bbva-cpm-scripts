@@ -891,11 +891,10 @@ export default function VLANsPage() {
                   )}
                   <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colName')}</th>
                   <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colOrganization')}</th>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colDescription')}</th>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colCidr')}</th>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colHealth')}</th>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colCreated')}</th>
-                  <th className="px-4 md:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colActions')}</th>
+                  <th className="px-4 md:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colActivity')}</th>
+                  <th className="px-4 md:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colStations')}</th>
+                  <th className="px-4 md:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colCidr')}</th>
+                  <th className="px-4 md:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{t('colActions')}</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -932,21 +931,37 @@ export default function VLANsPage() {
                         {accounts.find((a) => a.id === vlan.organization_id)?.name || '-'}
                       </span>
                     </td>
-                    <td className="px-4 md:px-6 py-4">
-                      <span className="text-sm text-gray-500 line-clamp-1">{vlan.description || '-'}</span>
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap text-center">
+                      {(() => {
+                        const wsCounts = (vlanStats as any)?.ws_counts?.[vlan.id] as { total?: number; online?: number } | undefined;
+                        const total = wsCounts?.total || 0;
+                        const online = wsCounts?.online || 0;
+                        const pct = total > 0 ? Math.round((online / total) * 100) : 0;
+                        if (total === 0) return <span className="text-xs text-gray-400">—</span>;
+                        const pctColor = pct >= 95 ? 'bg-green-100 border-green-300 text-green-800'
+                          : pct >= 50 ? 'bg-amber-100 border-amber-300 text-amber-800'
+                          : 'bg-red-100 border-red-300 text-red-800';
+                        return (
+                          <span className={`inline-flex items-center px-2 py-0.5 border rounded-md text-sm font-bold ${pctColor}`}>
+                            {pct}%
+                          </span>
+                        );
+                      })()}
                     </td>
-                    <td className="px-4 md:px-6 py-4">
-                      <div className="flex flex-wrap gap-1">
-                        {vlan.cidr_ranges.map((cidr, idx) => (
-                          <Badge key={idx} variant="secondary">{cidr}</Badge>
-                        ))}
-                      </div>
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap text-center">
+                      {(() => {
+                        const wsCounts = (vlanStats as any)?.ws_counts?.[vlan.id] as { total?: number; online?: number } | undefined;
+                        const total = wsCounts?.total || 0;
+                        const online = wsCounts?.online || 0;
+                        if (total === 0) return <span className="text-xs text-gray-400">—</span>;
+                        return (
+                          <span className="text-sm text-gray-700 font-medium">{online}/{total}</span>
+                        );
+                      })()}
                     </td>
-                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap text-center">
                       <CidrHealthBadge cidrCount={vlan.cidr_ranges.length} />
                     </td>
-                    <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDateWithTimezone(vlan.created_at, timezone)}
                     </td>
                     <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex flex-wrap gap-1 justify-end items-center">
