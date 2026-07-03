@@ -369,18 +369,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="p-4 border border-gray-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-500">{t('vlanCardWithConfig')}</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.vlans_with_config || 0}</p>
-                  </div>
-                  <div className="bg-green-100 rounded-full p-2">
-                    <Settings className="w-5 h-5 text-green-600" />
-                  </div>
-                </div>
-              </div>
-
               <div className={`p-4 border rounded-lg ${(stats.vlans_in_contingency || 0) > 0 ? 'border-orange-200 bg-orange-50' : 'border-gray-200'}`}>
                 <div className="flex items-center justify-between">
                   <div>
@@ -389,6 +377,18 @@ export default function DashboardPage() {
                   </div>
                   <div className={`rounded-full p-2 ${(stats.vlans_in_contingency || 0) > 0 ? 'bg-orange-100' : 'bg-orange-50'}`}>
                     <ShieldAlert className={`w-5 h-5 ${(stats.vlans_in_contingency || 0) > 0 ? 'text-orange-600' : 'text-orange-400'}`} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border border-gray-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500">{t('vlanCardWithConfig')}</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.vlans_with_config || 0}</p>
+                  </div>
+                  <div className="bg-green-100 rounded-full p-2">
+                    <Settings className="w-5 h-5 text-green-600" />
                   </div>
                 </div>
               </div>
