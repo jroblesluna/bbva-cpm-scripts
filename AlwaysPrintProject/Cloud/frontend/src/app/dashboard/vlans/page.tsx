@@ -113,7 +113,7 @@ export default function VLANsPage() {
   const [contingencyDevices, setContingencyDevices] = useState<Device[]>([])
   const [contingencyDevicesLoading, setContingencyDevicesLoading] = useState(false)
   const [activeDeviceCounts, setActiveDeviceCounts] = useState<Record<string, number>>({})
-  const [vlanStats, setVlanStats] = useState<{ without_devices: number; with_config: number; in_contingency: number; vlan_ids_with_config?: string[] } | null>(null)
+  const [vlanStats, setVlanStats] = useState<{ without_devices: number; with_config: number; in_contingency: number; vlan_ids_with_config?: string[]; ws_counts?: Record<string, { total: number; online: number }> } | null>(null)
   const [showAddDeviceModal, setShowAddDeviceModal] = useState(false)
   const [addDeviceVlan, setAddDeviceVlan] = useState<VLAN | null>(null)
   const [bulkCommandTarget, setBulkCommandTarget] = useState<{ vlan: VLAN; commandType: 'restart_service' | 'restart_tray' | 'check_update' } | null>(null)
@@ -715,7 +715,23 @@ export default function VLANsPage() {
                     ) : null
                   })()}
                 </div>
-                <CidrHealthBadge cidrCount={vlan.cidr_ranges.length} />
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const wsCounts = (vlanStats as any)?.ws_counts?.[vlan.id] as { total?: number; online?: number } | undefined;
+                    const total = wsCounts?.total || 0;
+                    const online = wsCounts?.online || 0;
+                    const pct = total > 0 ? Math.round((online / total) * 100) : 0;
+                    if (total === 0) return null;
+                    return (
+                      <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 border border-blue-200 rounded-md">
+                        <Monitor className="h-3.5 w-3.5 text-blue-600" />
+                        <span className="text-sm font-semibold text-blue-900">{online}/{total}</span>
+                        <span className="text-xs text-blue-600">({pct}%)</span>
+                      </div>
+                    );
+                  })()}
+                  <CidrHealthBadge cidrCount={vlan.cidr_ranges.length} />
+                </div>
               </div>
               {/* Fila 2: Organización, CIDRs, descripción */}
               <div className="space-y-2 mb-3">

@@ -171,6 +171,10 @@ class VLANListStats(BaseModel):
     with_config: int = Field(0, description="VLANs con AlwaysConfig específico (scope=vlan)")
     in_contingency: int = Field(0, description="VLANs con contingencia forzada")
     vlan_ids_with_config: list[str] = Field(default_factory=list, description="IDs de VLANs con AlwaysConfig activo")
+    ws_counts: dict[str, dict[str, int]] = Field(
+        default_factory=dict,
+        description="Conteo de workstations por VLAN: {vlan_id: {total: N, online: M}}"
+    )
 
 
 class VLANListResponse(BaseModel):

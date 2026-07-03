@@ -128,11 +128,35 @@ def list_vlans(
         if vlan.forced_contingency:
             in_contingency += 1
     
+    # Conteo de workstations por VLAN (total + online)
+    from app.models.workstation import Workstation
+    from app.services.websocket_manager import connection_manager
+    from sqlalchemy import func
+
+    ws_by_vlan = db.query(
+        Workstation.vlan_id,
+        func.count(Workstation.id).label("total")
+    ).filter(
+        Workstation.vlan_id.isnot(None)
+    ).group_by(Workstation.vlan_id).all()
+
+    ws_counts: dict[str, dict[str, int]] = {}
+    for row in ws_by_vlan:
+        vlan_id_str = str(row.vlan_id)
+        ws_counts[vlan_id_str] = {"total": row.total, "online": 0}
+
+    # Contar online desde el connection_manager (sin query adicional)
+    for ws_id, org_id in connection_manager.org_ids.items():
+        vlan_id = getattr(connection_manager, '_ws_vlan_ids', {}).get(ws_id)
+        if vlan_id and vlan_id in ws_counts:
+            ws_counts[vlan_id]["online"] += 1
+
     stats = VLANListStats(
         without_devices=without_devices,
         with_config=with_config,
         in_contingency=in_contingency,
         vlan_ids_with_config=[str(vid) for vid in vlan_ids_with_config],
+        ws_counts=ws_counts,
     )
     
     return VLANListResponse(total=total_count, vlans=vlans, stats=stats)
