@@ -84,6 +84,7 @@ export interface WorkstationFilter {
   is_online?: boolean
   search?: string
   version_filter?: string
+  has_specific_config?: boolean
   page?: number
   page_size?: number
 }

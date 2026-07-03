@@ -82,6 +82,7 @@ export default function WorkstationsPage() {
   const [filterOrgId, setFilterOrgId] = useState<string | undefined>(() => searchParams.get('org_id') || undefined);
   const [filterVlanId, setFilterVlanId] = useState<string | undefined>(() => searchParams.get('vlan_id') || undefined);
   const [filterVersion, setFilterVersion] = useState<'current' | 'outdated' | undefined>(undefined);
+  const [filterHasConfig, setFilterHasConfig] = useState<boolean | undefined>(undefined);
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
   const [editingWorkstation, setEditingWorkstation] = useState<Workstation | null>(null);
   const [contingencyTarget, setContingencyTarget] = useState<Workstation | null>(null);
@@ -116,6 +117,7 @@ export default function WorkstationsPage() {
     organization_id: isAdmin ? filterOrgId : undefined,
     vlan_id: filterVlanId,
     version_filter: filterVersion || undefined,
+    has_specific_config: filterHasConfig,
     page,
     page_size: pageSize,
   };
@@ -126,7 +128,7 @@ export default function WorkstationsPage() {
     isFetching,
     error,
   } = useQuery({
-    queryKey: ['workstations', debouncedSearch, filterOnline, filterContingency, filterOrgId, filterVlanId, filterVersion, page, pageSize],
+    queryKey: ['workstations', debouncedSearch, filterOnline, filterContingency, filterOrgId, filterVlanId, filterVersion, filterHasConfig, page, pageSize],
     queryFn: () => workstationsApi.list(filters),
     placeholderData: (prev) => prev,
   });
@@ -503,6 +505,19 @@ export default function WorkstationsPage() {
               </div>
             </CardContent>
           </Card>
+          <Card className={(stats.workstations_with_config?.length || 0) > 0 ? 'border-purple-200 bg-purple-50' : ''}>
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">{t('withSpecificConfig')}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-gray-900">
+                    {stats.workstations_with_config?.length || 0}
+                  </p>
+                </div>
+                <Cog className={`w-8 h-8 md:w-12 md:h-12 ${(stats.workstations_with_config?.length || 0) > 0 ? 'text-purple-600' : 'text-purple-400'}`} />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -633,10 +648,24 @@ export default function WorkstationsPage() {
                 </span>
                 {t('versionOutdated')}
               </button>
+              <button
+                onClick={() => { setFilterHasConfig(filterHasConfig === true ? undefined : true); setPage(1); }}
+                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-all select-none ${
+                  filterHasConfig === true
+                    ? 'border-purple-300 bg-purple-50 text-purple-700'
+                    : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                }`}
+              >
+                <span className={`flex w-3.5 h-3.5 items-center justify-center rounded-sm border shrink-0 transition-colors ${filterHasConfig === true ? 'border-purple-500 bg-purple-500' : 'border-gray-300 bg-white'}`}>
+                  {filterHasConfig === true && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 5l2.5 2.5L8 3"/></svg>}
+                </span>
+                {t('withSpecificConfig')}
+              </button>
               {(searchTerm ||
                 filterOnline !== undefined ||
                 filterContingency !== undefined ||
                 filterVersion !== undefined ||
+                filterHasConfig !== undefined ||
                 filterOrgId ||
                 filterVlanId) && (
                 <Button
@@ -649,6 +678,7 @@ export default function WorkstationsPage() {
                     setFilterOrgId(undefined);
                     setFilterVlanId(undefined);
                     setFilterVersion(undefined);
+                    setFilterHasConfig(undefined);
                     setPage(1);
                   }}
                 >

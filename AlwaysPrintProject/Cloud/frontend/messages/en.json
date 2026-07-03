@@ -191,6 +191,7 @@
     "versionOutdated": "Outdated",
     "onlyContingency": "In contingency",
     "withConfig": "With config",
+    "withSpecificConfig": "With specific config",
     "editTitle": "Edit Workstation: {ip}",
     "hostname": "Hostname",
     "hostnamePlaceholder": "DESKTOP-ABC123",

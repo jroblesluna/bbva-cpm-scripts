@@ -191,6 +191,7 @@
     "versionOutdated": "Desactualizada",
     "onlyContingency": "En contingencia",
     "withConfig": "Con config",
+    "withSpecificConfig": "Con Config específica",
     "editTitle": "Editar Estación: {ip}",
     "hostname": "Hostname",
     "hostnamePlaceholder": "DESKTOP-ABC123",

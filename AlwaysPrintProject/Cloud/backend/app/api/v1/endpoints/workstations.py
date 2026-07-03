@@ -754,6 +754,7 @@ def list_workstations(
     contingency_active: Optional[bool] = Query(None, description="Filtrar por contingencia activa"),
     search: Optional[str] = Query(None, description="Buscar por IP o hostname"),
     version_filter: Optional[str] = Query(None, description="Filtrar por versión: 'current' (última) o 'outdated' (anteriores)"),
+    has_specific_config: Optional[bool] = Query(None, description="Filtrar workstations con action config propia (scope=workstation)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -821,6 +822,34 @@ def list_workstations(
             (Workstation.ip_private.ilike(f"%{search}%")) |
             (Workstation.hostname.ilike(f"%{search}%"))
         )
+    
+    # Filtrar por config específica (scope=workstation)
+    if has_specific_config is not None:
+        from app.models.action_config import ActionConfig, ActionConfigScope
+        if has_specific_config:
+            # Workstations que TIENEN action config propia activa
+            ws_ids_with_config = (
+                db.query(ActionConfig.workstation_id)
+                .filter(
+                    ActionConfig.scope == ActionConfigScope.WORKSTATION,
+                    ActionConfig.is_active == True,
+                    ActionConfig.workstation_id.isnot(None),
+                )
+                .subquery()
+            )
+            base_query = base_query.filter(Workstation.id.in_(ws_ids_with_config))
+        else:
+            # Workstations que NO tienen action config propia activa
+            ws_ids_with_config = (
+                db.query(ActionConfig.workstation_id)
+                .filter(
+                    ActionConfig.scope == ActionConfigScope.WORKSTATION,
+                    ActionConfig.is_active == True,
+                    ActionConfig.workstation_id.isnot(None),
+                )
+                .subquery()
+            )
+            base_query = base_query.filter(~Workstation.id.in_(ws_ids_with_config))
     
     # Filtrar por versión (current = última, outdated = anteriores)
     if version_filter in ("current", "outdated"):
