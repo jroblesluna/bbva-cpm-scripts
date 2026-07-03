@@ -1992,14 +1992,19 @@ namespace AlwaysPrintTray.Cloud
                     $"CloudManager: action_config_changed recibido (hash={remoteHash ?? "?"}). " +
                     "Descarga delegada a PushMessageHandler vía S3 directo.");
 
-                // Esperar un momento para que PushMessageHandler complete la descarga
-                // y luego actualizar UI con la info local
+                // Esperar a que PushMessageHandler complete la descarga y el Service
+                // confirme la escritura. La actualización de UI se gestiona vía
+                // HandleActionConfigChanged (pipe notification) que se ejecuta DESPUÉS
+                // de que el archivo esté en disco.
                 await Task.Delay(3000);
 
+                // Solo loguear — no invocar ActionConfigUpdated aquí porque el archivo
+                // puede no estar escrito aún. HandleActionConfigChanged se encarga de la UI.
                 var updatedInfo = _configManager?.GetLocalConfigInfo();
                 if (updatedInfo != null)
                 {
-                    ActionConfigUpdated?.Invoke(updatedInfo.Name, updatedInfo.Hash);
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: action_config_changed procesado. Config local: {updatedInfo.Name} hash={updatedInfo.Hash}");
                 }
             }
             catch (Exception ex)
