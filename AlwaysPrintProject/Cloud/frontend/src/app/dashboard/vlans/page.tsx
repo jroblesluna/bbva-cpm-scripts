@@ -423,7 +423,7 @@ export default function VLANsPage() {
       </div>
 
       {/* Tarjetas de estadísticas */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
         <div className="bg-white rounded-lg shadow p-4 md:p-6">
           <div className="flex items-center">
             <div className="p-3 bg-purple-100 rounded-lg">
@@ -432,24 +432,6 @@ export default function VLANsPage() {
             <div className="ml-3 md:ml-4">
               <p className="text-xs md:text-sm font-medium text-gray-600">{t('totalVlans')}</p>
               <p className="text-xl md:text-2xl font-bold text-gray-900">{vlans.length}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 md:p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Monitor className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
-            </div>
-            <div className="ml-3 md:ml-4">
-              <p className="text-xs md:text-sm font-medium text-gray-600">{t('statsOnlineStations')}</p>
-              <p className="text-xl md:text-2xl font-bold text-gray-900">
-                {(() => {
-                  const counts = vlanStats?.ws_counts || {};
-                  const online = Object.values(counts).reduce((sum, c) => sum + (c.online || 0), 0);
-                  const total = Object.values(counts).reduce((sum, c) => sum + (c.total || 0), 0);
-                  return `${online}/${total}`;
-                })()}
-              </p>
             </div>
           </div>
         </div>
