@@ -815,13 +815,41 @@
         },
         {
           "type": "RunProcess",
-          "description": "Ejecutar instalación del MSI pendiente",
+          "description": "Crear directorio de staging para el MSI",
+          "parameters": {
+            "file_path": "cmd.exe",
+            "arguments": "/c mkdir \"C:\\ProgramData\\AlwaysPrint\\Updates\" 2>nul & exit /b 0",
+            "timeout_seconds": 10,
+            "window_style": "Hidden",
+            "success_exit_codes": [0, 1]
+          }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Copiar MSI desde perfil de usuario a path de SYSTEM",
+          "parameters": {
+            "file_path": "cmd.exe",
+            "arguments": "/c copy /Y \"%TEMP%\\AlwaysPrint\\Updates\\AlwaysPrint_update.msi\" \"C:\\ProgramData\\AlwaysPrint\\Updates\\AlwaysPrint_update.msi\"",
+            "timeout_seconds": 15,
+            "window_style": "Hidden",
+            "run_as_logged_in_user": true
+          }
+        },
+        {
+          "type": "KillProcessesByName",
+          "description": "Terminar cualquier instancia de msiexec en ejecución",
+          "parameters": {
+            "process_name": "msiexec"
+          }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Ejecutar instalación del MSI como SYSTEM",
           "parameters": {
             "file_path": "msiexec.exe",
-            "arguments": "/i \"C:\\Users\\{{current_user}}\\AppData\\Local\\Temp\\AlwaysPrint\\Updates\\AlwaysPrint_update.msi\" /quiet /norestart REINSTALLMODE=amus",
+            "arguments": "/i \"C:\\ProgramData\\AlwaysPrint\\Updates\\AlwaysPrint_update.msi\" /quiet /norestart REINSTALLMODE=amus",
             "timeout_seconds": 120,
-            "window_style": "Hidden",
-            "run_as_user": false
+            "window_style": "Hidden"
           }
         },
         {

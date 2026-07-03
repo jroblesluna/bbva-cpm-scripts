@@ -824,16 +824,70 @@ def list_workstations(
     
     # Filtrar por versión (current = última, outdated = anteriores)
     if version_filter in ("current", "outdated"):
-        # Obtener la versión más reciente de la BD
-        from sqlalchemy import func as sa_func
-        latest_version = db.query(sa_func.max(Workstation.tray_version)).scalar()
-        if latest_version:
+        from app.models.organization import Organization
+        
+        def parse_version(v: str) -> tuple:
+            """Parsear versión '1.26.702.2322' como tupla numérica para comparación correcta."""
+            try:
+                return tuple(int(x) for x in v.lstrip("v").split("."))
+            except (ValueError, AttributeError):
+                return (0,)
+        
+        # Determinar la versión latest global (max numérica de tray_version)
+        all_versions = (
+            db.query(Workstation.tray_version)
+            .filter(Workstation.tray_version.isnot(None), Workstation.tray_version != "")
+            .distinct()
+            .all()
+        )
+        version_strings = [row[0] for row in all_versions if row[0]]
+        latest_version = max(version_strings, key=parse_version) if version_strings else None
+        
+        # Obtener versiones pinneadas por organización
+        pinned_orgs = (
+            db.query(Organization.id, Organization.target_version)
+            .filter(Organization.target_version.isnot(None), Organization.target_version != "")
+            .all()
+        )
+        pinned_map = {org_id: tv for org_id, tv in pinned_orgs}  # {org_id: target_version}
+        
+        if latest_version or pinned_map:
+            # Construir lista de IDs de workstations "vigentes":
+            # - Si su org tiene pinned → tray_version == pinned
+            # - Si su org NO tiene pinned → tray_version == latest_version
+            from sqlalchemy import or_, and_
+            
+            current_conditions = []
+            
+            # Workstations de orgs SIN pinned: vigente si tray_version == latest
+            if latest_version:
+                pinned_org_ids = list(pinned_map.keys())
+                if pinned_org_ids:
+                    current_conditions.append(
+                        and_(
+                            Workstation.organization_id.notin_(pinned_org_ids),
+                            Workstation.tray_version == latest_version
+                        )
+                    )
+                else:
+                    current_conditions.append(Workstation.tray_version == latest_version)
+            
+            # Workstations de orgs CON pinned: vigente si tray_version == target_version
+            for org_id, target_ver in pinned_map.items():
+                current_conditions.append(
+                    and_(
+                        Workstation.organization_id == org_id,
+                        Workstation.tray_version == target_ver
+                    )
+                )
+            
             if version_filter == "current":
-                base_query = base_query.filter(Workstation.tray_version == latest_version)
+                base_query = base_query.filter(or_(*current_conditions))
             else:
+                # Outdated = tiene versión pero NO cumple ninguna condición de "vigente"
                 base_query = base_query.filter(
                     Workstation.tray_version.isnot(None),
-                    Workstation.tray_version != latest_version
+                    ~or_(*current_conditions)
                 )
     
     # Contar total (sin joinedload para query limpia)
