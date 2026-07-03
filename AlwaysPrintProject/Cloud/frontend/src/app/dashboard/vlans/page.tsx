@@ -722,12 +722,19 @@ export default function VLANsPage() {
                     const online = wsCounts?.online || 0;
                     const pct = total > 0 ? Math.round((online / total) * 100) : 0;
                     if (total === 0) return null;
+                    const pctColor = pct >= 95 ? 'bg-green-100 border-green-300 text-green-800'
+                      : pct >= 50 ? 'bg-amber-100 border-amber-300 text-amber-800'
+                      : 'bg-red-100 border-red-300 text-red-800';
                     return (
-                      <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 border border-blue-200 rounded-md">
-                        <Monitor className="h-3.5 w-3.5 text-blue-600" />
-                        <span className="text-sm font-semibold text-blue-900">{online}/{total}</span>
-                        <span className="text-xs text-blue-600">({pct}%)</span>
-                      </div>
+                      <>
+                        <div className={`flex items-center justify-center px-2.5 py-1 border rounded-lg ${pctColor}`}>
+                          <span className="text-lg font-bold">{pct}%</span>
+                        </div>
+                        <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 border border-gray-200 rounded-md">
+                          <Monitor className="h-3.5 w-3.5 text-gray-500" />
+                          <span className="text-xs font-medium text-gray-700">{online}/{total}</span>
+                        </div>
+                      </>
                     );
                   })()}
                   <CidrHealthBadge cidrCount={vlan.cidr_ranges.length} />
