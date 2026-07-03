@@ -276,6 +276,7 @@
     "filterWithConfigOnly": "Specific AlwaysConfig",
     "filterWithDevices": "Without devices",
     "statsNoDevices": "No devices",
+    "statsOnlineStations": "Online stations",
     "statsWithConfig": "Specific AlwaysConfig",
     "statsInContingency": "In contingency",
     "emptyTitle": "No VLANs",
