@@ -1,5 +1,5 @@
 {
-  "version": "7.7",
+  "version": "7.8",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -153,15 +153,6 @@
               }
             },
             {
-              "type": "DeleteOrphanedFolders",
-              "description": "Eliminar carpetas de usuarios sin sesión",
-              "parameters": {
-                "base_path": "C:\\ProgramData\\LPMC\\Jobs",
-                "exclude_active_console_user": true,
-                "exclude_users_variable": "inactive_users"
-              }
-            },
-            {
               "type": "Conditional",
               "description": "Solo reiniciar CPM si no hay contingencia activa",
               "condition": {
@@ -180,6 +171,64 @@
                   }
                 }
               ]
+            }
+          ]
+        },
+        {
+          "type": "ClassifyOrphanedUsers",
+          "description": "Clasificar usuarios sin sesión: recientes (logoff hoy) vs stale (logoff antes de hoy)",
+          "parameters": {
+            "base_path": "C:\\ProgramData\\LPMC\\Jobs",
+            "exclude_active_console_user": true,
+            "exclude_users_variable": "inactive_users"
+          },
+          "store_result_in": "orphaned"
+        },
+        {
+          "type": "Conditional",
+          "description": "Si hay orphaned recientes: limpiar solo pre/post (preservar token)",
+          "condition": {
+            "variable": "orphaned_recent",
+            "operator": "not_empty"
+          },
+          "actions": [
+            {
+              "type": "DeleteFolderContents",
+              "description": "Eliminar pre de orphaned recientes",
+              "parameters": {
+                "path_template": "C:\\ProgramData\\LPMC\\Jobs\\{{username}}\\CloudHybrid\\pre",
+                "iterate_users": "{{orphaned_recent}}",
+                "recursive": true,
+                "ignore_errors": true
+              }
+            },
+            {
+              "type": "DeleteFolderContents",
+              "description": "Eliminar post de orphaned recientes",
+              "parameters": {
+                "path_template": "C:\\ProgramData\\LPMC\\Jobs\\{{username}}\\CloudHybrid\\post",
+                "iterate_users": "{{orphaned_recent}}",
+                "recursive": true,
+                "ignore_errors": true
+              }
+            }
+          ]
+        },
+        {
+          "type": "Conditional",
+          "description": "Si hay orphaned stale: eliminar carpetas completas (sin actividad hoy)",
+          "condition": {
+            "variable": "orphaned_stale",
+            "operator": "not_empty"
+          },
+          "actions": [
+            {
+              "type": "DeleteOrphanedFolders",
+              "description": "Eliminar carpetas completas de orphaned sin actividad hoy",
+              "parameters": {
+                "base_path": "C:\\ProgramData\\LPMC\\Jobs",
+                "users_variable": "{{orphaned_stale}}"
+              }
             }
           ]
         },

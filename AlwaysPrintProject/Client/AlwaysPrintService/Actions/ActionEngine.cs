@@ -421,6 +421,9 @@ namespace AlwaysPrintService.Actions
                 
                 case ActionTypes.DeleteOrphanedFolders:
                     return ExecuteDeleteOrphanedFolders(action);
+
+                case ActionTypes.ClassifyOrphanedUsers:
+                    return ExecuteClassifyOrphanedUsers(action);
                 
                 case ActionTypes.CreateTcpPort:
                 case ActionTypes.SetTcpPort:
@@ -699,9 +702,87 @@ namespace AlwaysPrintService.Actions
                 return false;
             }
 
+            // Modo directo: si se pasa users_variable, borrar esos usuarios específicos
+            string? usersVariable = action.Parameters?["users_variable"]?.ToString();
+            if (!string.IsNullOrEmpty(usersVariable))
+            {
+                // Remover {{}} si están presentes
+                string cleanVar = usersVariable!.Trim('{', '}').Trim();
+
+                if (_variables.TryGetValue(cleanVar, out var varValue) && varValue is List<string> userList && userList.Count > 0)
+                {
+                    AlwaysPrintLogger.WriteInfo(
+                        $"ActionEngine: DeleteOrphanedFolders (modo directo): eliminando {userList.Count} carpetas: [{string.Join(", ", userList)}]");
+
+                    int deleted = 0;
+                    foreach (string username in userList)
+                    {
+                        string fullPath = Path.Combine(basePath!, username);
+                        try
+                        {
+                            if (Directory.Exists(fullPath))
+                            {
+                                Directory.Delete(fullPath, recursive: true);
+                                deleted++;
+                                AlwaysPrintLogger.WriteInfo($"ActionEngine: DeleteOrphanedFolders: carpeta eliminada: {fullPath}");
+                            }
+                            else
+                            {
+                                AlwaysPrintLogger.WriteInfo($"ActionEngine: DeleteOrphanedFolders: carpeta no existe (omitida): {fullPath}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            AlwaysPrintLogger.WriteWarning($"ActionEngine: DeleteOrphanedFolders: error eliminando {fullPath}: {ex.Message}");
+                        }
+                    }
+
+                    AlwaysPrintLogger.WriteInfo($"ActionEngine: DeleteOrphanedFolders (modo directo): {deleted} carpetas eliminadas");
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteInfo(
+                        $"ActionEngine: DeleteOrphanedFolders - variable '{cleanVar}' no encontrada o vacía. Nada que eliminar.");
+                }
+
+                return true;
+            }
+
+            // Modo discovery: descubrir y eliminar carpetas huérfanas (comportamiento original)
             bool excludeActiveConsole = action.Parameters?["exclude_active_console_user"]?.Value<bool>() ?? true;
 
-            // Obtener lista de usuarios a preservar desde la variable especificada
+            var excludeUsers = new List<string>();
+            string? excludeVariable = action.Parameters?["exclude_users_variable"]?.ToString();
+
+            if (!string.IsNullOrEmpty(excludeVariable))
+            {
+                if (_variables.TryGetValue(excludeVariable!, out var varValue2) && varValue2 is List<string> userList2)
+                {
+                    excludeUsers.AddRange(userList2);
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteInfo(
+                        $"ActionEngine: DeleteOrphanedFolders - variable '{excludeVariable}' no encontrada o vacía");
+                }
+            }
+
+            int deletedCount = AdminActions.DeleteOrphanedFolders(basePath!, excludeUsers, excludeActiveConsole);
+            return true; // Siempre retorna éxito (los errores individuales se loguean internamente)
+        }
+
+        private bool ExecuteClassifyOrphanedUsers(ActionConfig action)
+        {
+            string? basePath = action.Parameters?["base_path"]?.ToString();
+            if (string.IsNullOrWhiteSpace(basePath))
+            {
+                AlwaysPrintLogger.WriteWarning("ActionEngine: ClassifyOrphanedUsers requiere 'base_path'");
+                return false;
+            }
+
+            bool excludeActiveConsole = action.Parameters?["exclude_active_console_user"]?.Value<bool>() ?? true;
+
+            // Obtener lista de usuarios a excluir desde la variable especificada
             var excludeUsers = new List<string>();
             string? excludeVariable = action.Parameters?["exclude_users_variable"]?.ToString();
 
@@ -714,12 +795,26 @@ namespace AlwaysPrintService.Actions
                 else
                 {
                     AlwaysPrintLogger.WriteInfo(
-                        $"ActionEngine: DeleteOrphanedFolders - variable '{excludeVariable}' no encontrada o vacía");
+                        $"ActionEngine: ClassifyOrphanedUsers - variable '{excludeVariable}' no encontrada o vacía");
                 }
             }
 
-            int deleted = AdminActions.DeleteOrphanedFolders(basePath!, excludeUsers, excludeActiveConsole);
-            return true; // Siempre retorna éxito (los errores individuales se loguean internamente)
+            var classification = AdminActions.ClassifyOrphanedUsers(basePath!, excludeUsers, excludeActiveConsole);
+
+            // Almacenar resultado en dos variables separadas: {store_result_in}_recent y {store_result_in}_stale
+            if (!string.IsNullOrEmpty(action.StoreResultIn))
+            {
+                string baseVarName = action.StoreResultIn!;
+                _variables[$"{baseVarName}_recent"] = classification.Recent;
+                _variables[$"{baseVarName}_stale"] = classification.Stale;
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"ActionEngine: ClassifyOrphanedUsers resultado almacenado: " +
+                    $"'{baseVarName}_recent'={classification.Recent.Count} usuarios, " +
+                    $"'{baseVarName}_stale'={classification.Stale.Count} usuarios");
+            }
+
+            return true;
         }
 
         private bool ExecuteCreateTcpPort(ActionConfig action)

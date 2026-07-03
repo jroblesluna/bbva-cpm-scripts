@@ -157,6 +157,7 @@ namespace AlwaysPrint.Shared.Configuration
         public const string StartTray = "StartTray";
         public const string Conditional = "Conditional";
         public const string DeleteOrphanedFolders = "DeleteOrphanedFolders";
+        public const string ClassifyOrphanedUsers = "ClassifyOrphanedUsers";
         public const string CreateTcpPort = "CreateTcpPort";
         public const string SetTcpPort = "SetTcpPort";
         public const string AssignPortToQueue = "AssignPortToQueue";

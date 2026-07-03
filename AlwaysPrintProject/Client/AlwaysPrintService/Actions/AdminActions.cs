@@ -391,6 +391,151 @@ namespace AlwaysPrintService.Actions
         }
         
         // ═══════════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════════════
+        // CLASIFICACIÓN DE USUARIOS HUÉRFANOS
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Resultado de la clasificación de usuarios huérfanos.
+        /// </summary>
+        public class OrphanedClassification
+        {
+            /// <summary>Usuarios con logoff hoy (NTUSER.DAT modificado hoy). Preservar token.</summary>
+            public List<string> Recent { get; set; } = new List<string>();
+
+            /// <summary>Usuarios con logoff antes de hoy (NTUSER.DAT no modificado hoy). Borrar completo.</summary>
+            public List<string> Stale { get; set; } = new List<string>();
+        }
+
+        /// <summary>
+        /// Clasifica usuarios huérfanos (sin sesión activa) en "recientes" y "stale"
+        /// basándose en la fecha de última modificación de NTUSER.DAT.
+        /// - Recientes: NTUSER.DAT modificado hoy → preservar token, solo limpiar jobs.
+        /// - Stale: NTUSER.DAT modificado antes de hoy → borrar carpeta completa.
+        /// </summary>
+        /// <param name="basePath">Directorio base donde están las carpetas de usuarios (ej: C:\ProgramData\LPMC\Jobs)</param>
+        /// <param name="excludeUsers">Lista de usuarios a excluir (ej: inactive_users con sesión disconnected)</param>
+        /// <param name="excludeActiveConsoleUser">Si true, excluye al usuario activo en consola</param>
+        /// <returns>Clasificación con listas de usuarios recientes y stale</returns>
+        public static OrphanedClassification ClassifyOrphanedUsers(
+            string basePath, List<string> excludeUsers, bool excludeActiveConsoleUser = true)
+        {
+            var result = new OrphanedClassification();
+
+            try
+            {
+                AlwaysPrintLogger.WriteInfo(
+                    $"ClassifyOrphanedUsers: iniciando en {basePath}, " +
+                    $"excludeUsers=[{string.Join(", ", excludeUsers)}], excludeActiveConsole={excludeActiveConsoleUser}");
+
+                if (!Directory.Exists(basePath))
+                {
+                    AlwaysPrintLogger.WriteWarning($"ClassifyOrphanedUsers: directorio base no existe: {basePath}");
+                    return result;
+                }
+
+                // Construir lista de usuarios a preservar (no clasificar)
+                var preserveUsers = new HashSet<string>(excludeUsers, StringComparer.OrdinalIgnoreCase);
+
+                if (excludeActiveConsoleUser)
+                {
+                    string? activeUser = GetActiveConsoleUser();
+                    if (!string.IsNullOrEmpty(activeUser))
+                    {
+                        preserveUsers.Add(activeUser!);
+                        AlwaysPrintLogger.WriteInfo($"ClassifyOrphanedUsers: preservando usuario de consola activa: {activeUser}");
+                    }
+                }
+
+                DateTime todayStart = DateTime.Today; // 00:00:00 del día actual
+
+                foreach (var dir in Directory.GetDirectories(basePath))
+                {
+                    string folderName = Path.GetFileName(dir);
+
+                    if (preserveUsers.Contains(folderName))
+                    {
+                        AlwaysPrintLogger.WriteInfo($"ClassifyOrphanedUsers: omitiendo usuario preservado: {folderName}");
+                        continue;
+                    }
+
+                    // Determinar si el usuario tuvo actividad hoy via NTUSER.DAT
+                    DateTime lastActivity = GetUserLastLogoffTime(folderName);
+
+                    if (lastActivity >= todayStart)
+                    {
+                        result.Recent.Add(folderName);
+                        AlwaysPrintLogger.WriteInfo(
+                            $"ClassifyOrphanedUsers: '{folderName}' clasificado como RECENT (última actividad: {lastActivity:yyyy-MM-dd HH:mm:ss})");
+                    }
+                    else
+                    {
+                        result.Stale.Add(folderName);
+                        AlwaysPrintLogger.WriteInfo(
+                            $"ClassifyOrphanedUsers: '{folderName}' clasificado como STALE (última actividad: {lastActivity:yyyy-MM-dd HH:mm:ss})");
+                    }
+                }
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"ClassifyOrphanedUsers: completado. Recent={result.Recent.Count} [{string.Join(", ", result.Recent)}], " +
+                    $"Stale={result.Stale.Count} [{string.Join(", ", result.Stale)}]");
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"ClassifyOrphanedUsers: error: {ex.Message}", ex);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Obtiene la fecha de último logoff del usuario consultando NTUSER.DAT.
+        /// Si no se puede acceder al archivo, se usa la fecha de modificación del perfil como fallback.
+        /// </summary>
+        private static DateTime GetUserLastLogoffTime(string username)
+        {
+            try
+            {
+                // Intentar leer NTUSER.DAT del perfil del usuario
+                string userProfilePath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)
+                        .Replace("ProgramData", "Users"),
+                    username);
+
+                // Path estándar: C:\Users\{username}\NTUSER.DAT
+                string ntuserPath = Path.Combine(userProfilePath, "NTUSER.DAT");
+
+                if (File.Exists(ntuserPath))
+                {
+                    DateTime lastWrite = File.GetLastWriteTime(ntuserPath);
+                    AlwaysPrintLogger.WriteInfo(
+                        $"GetUserLastLogoffTime: '{username}' NTUSER.DAT lastWrite={lastWrite:yyyy-MM-dd HH:mm:ss}");
+                    return lastWrite;
+                }
+
+                // Fallback: intentar con la ruta directa C:\Users\{username}\NTUSER.DAT
+                string directPath = $@"C:\Users\{username}\NTUSER.DAT";
+                if (File.Exists(directPath))
+                {
+                    DateTime lastWrite = File.GetLastWriteTime(directPath);
+                    AlwaysPrintLogger.WriteInfo(
+                        $"GetUserLastLogoffTime: '{username}' NTUSER.DAT (directPath) lastWrite={lastWrite:yyyy-MM-dd HH:mm:ss}");
+                    return lastWrite;
+                }
+
+                AlwaysPrintLogger.WriteWarning(
+                    $"GetUserLastLogoffTime: NTUSER.DAT no encontrado para '{username}'. Usando DateTime.MinValue (stale).");
+                return DateTime.MinValue;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning(
+                    $"GetUserLastLogoffTime: error accediendo NTUSER.DAT de '{username}': {ex.Message}. Usando DateTime.MinValue (stale).");
+                return DateTime.MinValue;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // OPERACIONES ATÓMICAS DE PUERTOS E IMPRESORAS
         // ═══════════════════════════════════════════════════════════════════════
 
