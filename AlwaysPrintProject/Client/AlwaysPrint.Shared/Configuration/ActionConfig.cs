@@ -215,5 +215,14 @@ namespace AlwaysPrint.Shared.Configuration
         /// <summary>Máximo de reinicios permitidos por hora (0 = sin límite).</summary>
         [JsonProperty("max_restarts_per_hour")]
         public int MaxRestartsPerHour { get; set; } = 3;
+
+        /// <summary>
+        /// Cuándo monitorear este servicio: "always", "normal" o "contingency".
+        /// - always: se monitorea sin importar el estado de contingencia (default).
+        /// - normal: solo se monitorea cuando NO hay contingencia activa.
+        /// - contingency: solo se monitorea cuando SÍ hay contingencia activa.
+        /// </summary>
+        [JsonProperty("monitor_when")]
+        public string MonitorWhen { get; set; } = "always";
     }
 }

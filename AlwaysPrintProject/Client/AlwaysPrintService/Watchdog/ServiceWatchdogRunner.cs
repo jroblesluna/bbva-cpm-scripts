@@ -81,10 +81,17 @@ namespace AlwaysPrintService.Watchdog
         {
             if (_config == null || _disposed) return;
 
+            // Leer estado de contingencia una vez por tick (no por cada servicio)
+            bool contingencyActive = IsContingencyActive();
+
             foreach (var entry in _config.Services)
             {
                 try
                 {
+                    // Filtrar por monitor_when
+                    if (!ShouldMonitor(entry, contingencyActive))
+                        continue;
+
                     CheckService(entry);
                 }
                 catch (Exception ex)
@@ -93,6 +100,43 @@ namespace AlwaysPrintService.Watchdog
                         $"ServiceWatchdog: error verificando '{entry.Name}': {ex.Message}",
                         AlwaysPrintLogger.EvtGenericError);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Determina si un servicio debe monitorearse según el modo actual.
+        /// </summary>
+        private static bool ShouldMonitor(WatchdogServiceEntry entry, bool contingencyActive)
+        {
+            switch (entry.MonitorWhen?.ToLowerInvariant())
+            {
+                case "normal":
+                    return !contingencyActive;
+                case "contingency":
+                    return contingencyActive;
+                case "always":
+                default:
+                    return true;
+            }
+        }
+
+        /// <summary>
+        /// Lee el semáforo ContingencyEnabled del registro.
+        /// Retorna true si contingencia está activa (valor = 1).
+        /// </summary>
+        private static bool IsContingencyActive()
+        {
+            try
+            {
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    RegistryConfigManager.RegistryPath);
+                if (key == null) return false;
+                var val = key.GetValue("ContingencyEnabled");
+                return val != null && val.ToString() == "1";
+            }
+            catch
+            {
+                return false; // En caso de error, asumir modo normal
             }
         }
 
