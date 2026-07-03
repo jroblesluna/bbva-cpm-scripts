@@ -965,6 +965,7 @@ async def notify_new_version(
                 org_id=org_id,
                 msi_version=new_version,
                 msi_url=download_url,
+                msi_file_size=file_size_val,
             )
 
             # Push a workstations online

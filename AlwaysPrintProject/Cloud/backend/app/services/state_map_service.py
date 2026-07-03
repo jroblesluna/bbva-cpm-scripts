@@ -82,6 +82,7 @@ class OrgDistributionState:
     msi_version: str | None = None
     msi_url: str | None = None
     msi_url_expires_at: float = 0.0  # epoch timestamp de expiración presigned URL
+    msi_file_size: int = 0  # tamaño del MSI en bytes (0 = desconocido)
 
     # Config overrides por scope
     vlan_configs: dict[str, VlanConfigState] = field(default_factory=dict)
@@ -783,6 +784,7 @@ class StateMapService:
         msi_version: str,
         msi_url: str | None = None,
         msi_url_expires_at: float = 0.0,
+        msi_file_size: int = 0,
     ) -> None:
         """
         Actualiza MSI en el map local y publica a Redis.
@@ -792,12 +794,15 @@ class StateMapService:
             msi_version: Versión target del MSI (e.g. "2.1.0").
             msi_url: Presigned URL S3 del MSI. Si None, se generará on-demand al consultar.
             msi_url_expires_at: Epoch timestamp de expiración de la presigned URL.
+            msi_file_size: Tamaño del archivo MSI en bytes (0 = desconocido).
         """
         org_state = self._get_or_create_org_state(org_id)
         org_state.msi_version = msi_version
         if msi_url:
             org_state.msi_url = msi_url
             org_state.msi_url_expires_at = msi_url_expires_at
+        if msi_file_size > 0:
+            org_state.msi_file_size = msi_file_size
 
         logger.info(
             "state_map.msi_actualizado",
@@ -879,6 +884,7 @@ class StateMapService:
             "cert_url": org_state.cert_url,
             "msi_version": org_state.msi_version,
             "msi_url": msi_url,
+            "msi_file_size": org_state.msi_file_size,
         }
 
     # =========================================================================

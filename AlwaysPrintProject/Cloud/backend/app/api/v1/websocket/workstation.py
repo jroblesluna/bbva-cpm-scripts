@@ -247,6 +247,7 @@ async def workstation_websocket(
                     "cert_url": ws_state.get("cert_url"),
                     "msi_version": ws_state.get("msi_version"),
                     "msi_url": ws_state.get("msi_url"),
+                    "msi_file_size": ws_state.get("msi_file_size", 0),
                 }
 
             logger.info(

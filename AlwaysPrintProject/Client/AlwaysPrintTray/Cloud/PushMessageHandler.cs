@@ -363,7 +363,7 @@ namespace AlwaysPrintTray.Cloud
                             try
                             {
                                 string? msiPath = await _updateDownloader.DownloadFromUrlAsync(
-                                    state.MsiUrl, 0, state.MsiVersion);
+                                    state.MsiUrl, state.MsiFileSize, state.MsiVersion);
 
                                 if (msiPath != null)
                                 {
@@ -534,6 +534,7 @@ namespace AlwaysPrintTray.Cloud
 
                     _lastKnownState.MsiVersion = version;
                     _lastKnownState.MsiUrl = downloadUrl;
+                    _lastKnownState.MsiFileSize = data["file_size"]?.ToObject<long>() ?? 0;
                     _lastKnownState.LastUpdated = DateTime.UtcNow;
                 }
 

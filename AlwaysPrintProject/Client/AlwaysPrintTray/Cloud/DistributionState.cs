@@ -27,6 +27,9 @@ namespace AlwaysPrintTray.Cloud
         /// <summary>Presigned URL de S3 para descarga directa del MSI.</summary>
         public string MsiUrl { get; set; }
 
+        /// <summary>Tamaño del archivo MSI en bytes (0 = desconocido).</summary>
+        public long MsiFileSize { get; set; }
+
         /// <summary>Fecha/hora UTC de la última actualización de este estado.</summary>
         public DateTime LastUpdated { get; set; }
     }

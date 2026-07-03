@@ -877,6 +877,7 @@ namespace AlwaysPrintTray.Cloud
                     CertUrl = stateObj["cert_url"]?.ToString(),
                     MsiVersion = stateObj["msi_version"]?.ToString(),
                     MsiUrl = stateObj["msi_url"]?.ToString(),
+                    MsiFileSize = stateObj["msi_file_size"]?.ToObject<long>() ?? 0,
                     LastUpdated = DateTime.UtcNow
                 };
 
