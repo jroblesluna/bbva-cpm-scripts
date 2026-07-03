@@ -1010,6 +1010,16 @@ def get_workstation_stats(
         vlans_without_devices = 0
         vlans_with_config = 0
         
+        # IDs de VLANs que tienen una ActionConfig con scope=vlan activa
+        from app.models.action_config import ActionConfig, ActionConfigScope
+        vlan_ids_with_active_config = set(
+            str(ac.vlan_id) for ac in db.query(ActionConfig.vlan_id).filter(
+                ActionConfig.scope == ActionConfigScope.VLAN,
+                ActionConfig.is_active == True,
+                ActionConfig.vlan_id.isnot(None),
+            ).all()
+        )
+        
         for v in all_vlans_for_stats:
             device_count = db.query(Device).filter(
                 Device.vlan_id == v.id,
@@ -1017,7 +1027,7 @@ def get_workstation_stats(
             ).count()
             if device_count == 0:
                 vlans_without_devices += 1
-            if v.vlan_metadata and len(v.vlan_metadata) > 0:
+            if str(v.id) in vlan_ids_with_active_config:
                 vlans_with_config += 1
 
         # Preparar respuesta base
