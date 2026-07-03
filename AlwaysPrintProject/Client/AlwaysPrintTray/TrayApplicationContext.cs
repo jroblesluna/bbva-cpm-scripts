@@ -351,6 +351,7 @@ namespace AlwaysPrintTray
             {
                 try
                 {
+                    OnDemandConfigReader.Reload();
                     RebuildOnDemandSubmenu();
 
                     // Refrescar StatusForm si está abierto
