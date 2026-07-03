@@ -86,6 +86,40 @@ namespace AlwaysPrintTray.OnDemand
         }
 
         /// <summary>
+        /// Lee la lista de servicios del watchdog desde la configuración activa.
+        /// Retorna lista vacía si no hay watchdog configurado.
+        /// </summary>
+        public static List<WatchdogServiceEntry> GetWatchdogServices()
+        {
+            return GetWatchdogServices(PipeConstants.ActionConfigFilePath);
+        }
+
+        /// <summary>
+        /// Lee la lista de servicios del watchdog desde una ruta específica.
+        /// </summary>
+        public static List<WatchdogServiceEntry> GetWatchdogServices(string filePath)
+        {
+            if (!File.Exists(filePath))
+                return new List<WatchdogServiceEntry>();
+
+            try
+            {
+                string json = File.ReadAllText(filePath);
+                string configJson = ExtractConfigJson(json);
+                var config = JsonConvert.DeserializeObject<ActionConfiguration>(configJson);
+
+                if (config?.ServiceWatchdog?.Services == null || !config.ServiceWatchdog.Enabled)
+                    return new List<WatchdogServiceEntry>();
+
+                return config.ServiceWatchdog.Services;
+            }
+            catch (Exception)
+            {
+                return new List<WatchdogServiceEntry>();
+            }
+        }
+
+        /// <summary>
         /// Lee el archivo de configuración y extrae los triggers OnDemand válidos.
         /// </summary>
         private static List<OnDemandTriggerInfo> ReadTriggersFromFile(string filePath)

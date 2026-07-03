@@ -67,6 +67,10 @@ namespace AlwaysPrintTray.Forms
         {
             public MonitoredServiceConfig Config { get; set; } = null!;
             public Label StateLabel { get; set; } = null!;
+            /// <summary>Indicador de watchdog activo para este servicio.</summary>
+            public Label WatchdogLabel { get; set; } = null!;
+            /// <summary>Configuración watchdog de este servicio (null si no tiene).</summary>
+            public WatchdogServiceEntry? WatchdogEntry { get; set; }
         }
 
         /// <summary>
@@ -300,6 +304,7 @@ namespace AlwaysPrintTray.Forms
         private void BuildServicesSection(ref int y)
         {
             var services = OnDemandConfigReader.GetMonitoredServices();
+            var watchdogServices = OnDemandConfigReader.GetWatchdogServices();
 
             foreach (var svc in services)
             {
@@ -323,10 +328,25 @@ namespace AlwaysPrintTray.Forms
                 };
                 Controls.Add(lblState);
 
+                // Indicador de watchdog
+                var watchdogEntry = watchdogServices.Find(w =>
+                    w.Name.Equals(svc.ServiceName, StringComparison.OrdinalIgnoreCase));
+
+                var lblWatchdog = new Label
+                {
+                    Text = "",
+                    Location = new Point(ButtonX, y + 4),
+                    AutoSize = true,
+                    Font = new Font("Segoe UI", 8f)
+                };
+                Controls.Add(lblWatchdog);
+
                 _serviceRows.Add(new ServiceRow
                 {
                     Config = svc,
-                    StateLabel = lblState
+                    StateLabel = lblState,
+                    WatchdogLabel = lblWatchdog,
+                    WatchdogEntry = watchdogEntry
                 });
 
                 y += 36;
@@ -416,6 +436,8 @@ namespace AlwaysPrintTray.Forms
         /// </summary>
         private void RefreshServiceStates()
         {
+            bool contingencyActive = IsContingencyEnabled();
+
             foreach (var row in _serviceRows)
             {
                 string state;
@@ -434,6 +456,32 @@ namespace AlwaysPrintTray.Forms
 
                 row.StateLabel.Text = state;
                 row.StateLabel.ForeColor = Color.FromArgb(0x66, 0x66, 0x66); // Siempre gris
+
+                // Actualizar indicador de watchdog según modo actual
+                if (row.WatchdogEntry == null)
+                {
+                    row.WatchdogLabel.Text = "";
+                }
+                else
+                {
+                    bool watchdogActive = IsWatchdogActiveForEntry(row.WatchdogEntry, contingencyActive);
+                    row.WatchdogLabel.Text = watchdogActive ? "🔄 Watchdog" : "";
+                    row.WatchdogLabel.ForeColor = Color.FromArgb(0x22, 0x8B, 0x22); // Verde
+                }
+            }
+        }
+
+        /// <summary>
+        /// Determina si el watchdog está activo para una entrada según el modo operativo actual.
+        /// </summary>
+        private static bool IsWatchdogActiveForEntry(WatchdogServiceEntry entry, bool contingencyActive)
+        {
+            switch (entry.MonitorWhen?.ToLowerInvariant())
+            {
+                case "normal": return !contingencyActive;
+                case "contingency": return contingencyActive;
+                case "always":
+                default: return true;
             }
         }
 
