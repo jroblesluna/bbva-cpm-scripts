@@ -962,7 +962,6 @@ export default function VLANsPage() {
                     <td className="px-4 md:px-6 py-4 whitespace-nowrap text-center">
                       <CidrHealthBadge cidrCount={vlan.cidr_ranges.length} />
                     </td>
-                    </td>
                     <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex flex-wrap gap-1 justify-end items-center">
                         <TooltipProvider>
