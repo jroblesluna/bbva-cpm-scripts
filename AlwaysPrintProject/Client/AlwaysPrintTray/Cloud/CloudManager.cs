@@ -909,39 +909,49 @@ namespace AlwaysPrintTray.Cloud
                     $"CertVersion={distributionState.CertVersion}, " +
                     $"MsiVersion={distributionState.MsiVersion ?? "null"}");
 
-                // Si hay config asignada pero el archivo local no existe, forzar descarga
+                // Si hay config asignada pero el archivo local no existe O su hash difiere
+                // del hash del servidor (ej: config residual de otro entorno), forzar descarga.
                 if (!string.IsNullOrEmpty(distributionState.ConfigHash) &&
-                    !string.IsNullOrEmpty(distributionState.ConfigS3Url) &&
-                    !File.Exists(PipeConstants.ActionConfigFilePath))
+                    !string.IsNullOrEmpty(distributionState.ConfigS3Url))
                 {
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        $"CloudManager: config asignada (hash={distributionState.ConfigHash}) pero " +
-                        "archivo local no existe. Forzando descarga...");
+                    string? localConfigHash = _configManager?.GetLocalConfigHash();
+                    bool needsDownload = !File.Exists(PipeConstants.ActionConfigFilePath) ||
+                        (localConfigHash != null && !localConfigHash.Equals(distributionState.ConfigHash, StringComparison.OrdinalIgnoreCase));
 
-                    _ = Task.Run(async () =>
+                    if (needsDownload)
                     {
-                        try
+                        string reason = !File.Exists(PipeConstants.ActionConfigFilePath)
+                            ? "archivo local no existe"
+                            : $"hash difiere (local={localConfigHash}, servidor={distributionState.ConfigHash})";
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"CloudManager: config asignada (hash={distributionState.ConfigHash}) pero " +
+                            $"{reason}. Forzando descarga...");
+
+                        _ = Task.Run(async () =>
                         {
-                            int updated = await _pushMessageHandler.SyncFromStateAsync(distributionState);
-                            // Reportar estado actualizado al backend
-                            if (updated > 0)
+                            try
                             {
-                                var localConfig = _configManager?.GetLocalConfigInfo();
-                                if (localConfig != null)
+                                int updated = await _pushMessageHandler.SyncFromStateAsync(distributionState);
+                                // Reportar estado actualizado al backend
+                                if (updated > 0)
                                 {
-                                    SendActionConfigStatus(localConfig.Name, localConfig.Hash, localConfig.Version);
-                                    AlwaysPrintLogger.WriteTrayInfo(
-                                        $"CloudManager: status_update enviado tras descarga de config. " +
-                                        $"Name={localConfig.Name}, Hash={localConfig.Hash}, Version={localConfig.Version}");
+                                    var localConfig = _configManager?.GetLocalConfigInfo();
+                                    if (localConfig != null)
+                                    {
+                                        SendActionConfigStatus(localConfig.Name, localConfig.Hash, localConfig.Version);
+                                        AlwaysPrintLogger.WriteTrayInfo(
+                                            $"CloudManager: status_update enviado tras descarga de config. " +
+                                            $"Name={localConfig.Name}, Hash={localConfig.Hash}, Version={localConfig.Version}");
+                                    }
                                 }
                             }
-                        }
-                        catch (Exception syncEx)
-                        {
-                            AlwaysPrintLogger.WriteTrayError(
-                                $"CloudManager: error en descarga forzada de config: {syncEx.Message}");
-                        }
-                    });
+                            catch (Exception syncEx)
+                            {
+                                AlwaysPrintLogger.WriteTrayError(
+                                    $"CloudManager: error en descarga forzada de config: {syncEx.Message}");
+                            }
+                        });
+                    }
                 }
             }
             catch (Exception ex)
