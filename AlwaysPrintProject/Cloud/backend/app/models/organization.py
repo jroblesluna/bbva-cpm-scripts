@@ -121,6 +121,8 @@ class Organization(Base):
     ecdsa_cert_s3_key = Column(String(500), nullable=True)
     # Versión del certificado actual (incrementa en cada rotación)
     ecdsa_cert_version = Column(Integer, nullable=False, default=0, server_default='0')
+    # SHA256 hex del contenido del .cer (para validación de integridad en workstations)
+    ecdsa_cert_hash = Column(String(64), nullable=True)
     # Fecha de expiración del certificado activo
     ecdsa_cert_expires_at = Column(DateTime, nullable=True)
     # Pausa temporal de firma: si no es NULL y > now(), el endpoint sirve config sin firma

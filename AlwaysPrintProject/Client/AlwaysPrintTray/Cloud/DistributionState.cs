@@ -30,6 +30,9 @@ namespace AlwaysPrintTray.Cloud
         /// <summary>Tamaño del archivo MSI en bytes (0 = desconocido).</summary>
         public long MsiFileSize { get; set; }
 
+        /// <summary>SHA256 hex del certificado ECDSA de la organización (para validar integridad del .cer local).</summary>
+        public string CertHash { get; set; }
+
         /// <summary>Fecha/hora UTC de la última actualización de este estado.</summary>
         public DateTime LastUpdated { get; set; }
     }

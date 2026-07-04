@@ -245,6 +245,7 @@ async def workstation_websocket(
                     "config_s3_url": ws_state.get("config_s3_url"),
                     "cert_version": ws_state.get("cert_version", 0),
                     "cert_url": ws_state.get("cert_url"),
+                    "cert_hash": ws_state.get("cert_hash"),
                     "msi_version": ws_state.get("msi_version"),
                     "msi_url": ws_state.get("msi_url"),
                     "msi_file_size": ws_state.get("msi_file_size", 0),

@@ -875,6 +875,7 @@ namespace AlwaysPrintTray.Cloud
                     ConfigS3Url = stateObj["config_s3_url"]?.ToString(),
                     CertVersion = stateObj["cert_version"]?.ToObject<int>() ?? 0,
                     CertUrl = stateObj["cert_url"]?.ToString(),
+                    CertHash = stateObj["cert_hash"]?.ToString(),
                     MsiVersion = stateObj["msi_version"]?.ToString(),
                     MsiUrl = stateObj["msi_url"]?.ToString(),
                     MsiFileSize = stateObj["msi_file_size"]?.ToObject<long>() ?? 0,
@@ -883,6 +884,9 @@ namespace AlwaysPrintTray.Cloud
 
                 // Pasar al PushMessageHandler para cacheo y posible sincronización
                 _pushMessageHandler?.UpdateState(distributionState);
+
+                // Actualizar cert_hash esperado para validación de integridad
+                ConfigManager.SetExpectedCertHash(distributionState.CertHash);
 
                 AlwaysPrintLogger.WriteTrayInfo(
                     $"CloudManager: estado de distribución recibido en registro enriquecido. " +

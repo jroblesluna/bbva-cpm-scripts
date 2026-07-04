@@ -77,6 +77,7 @@ class OrgDistributionState:
     # Certificado ECDSA
     cert_version: int = 0
     cert_url: str | None = None
+    cert_hash: str | None = None  # SHA256 hex del contenido del .cer (para validación de integridad)
 
     # MSI
     msi_version: str | None = None
@@ -156,6 +157,7 @@ class StateMapService:
                     o.id AS org_id,
                     o.ecdsa_cert_version AS cert_version,
                     o.ecdsa_cert_s3_key AS cert_s3_key,
+                    o.ecdsa_cert_hash AS cert_hash,
                     o.target_version AS msi_version,
                     o.auto_update_enabled,
                     ac.config_hash,
@@ -197,6 +199,7 @@ class StateMapService:
                     org_state = OrgDistributionState(
                         cert_version=row.cert_version or 0,
                         cert_url=cert_url,
+                        cert_hash=row.cert_hash,
                         msi_version=resolved_msi_version,
                     )
                     self._state[org_id] = org_state
@@ -882,6 +885,7 @@ class StateMapService:
             "config_s3_url": config_s3_url,
             "cert_version": org_state.cert_version,
             "cert_url": org_state.cert_url,
+            "cert_hash": org_state.cert_hash,
             "msi_version": org_state.msi_version,
             "msi_url": msi_url,
             "msi_file_size": org_state.msi_file_size,

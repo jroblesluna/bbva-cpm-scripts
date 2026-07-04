@@ -1577,6 +1577,11 @@ def generate_certificate(
     organization.ecdsa_cert_version = 1
     organization.ecdsa_cert_expires_at = expires_at
 
+    # Computar SHA256 del certificado para validación de integridad en workstations
+    import hashlib
+    cert_hash = hashlib.sha256(cert_pem.encode("utf-8")).hexdigest()
+    organization.ecdsa_cert_hash = cert_hash
+
     # 6. Commit a base de datos
     db.commit()
     db.refresh(organization)

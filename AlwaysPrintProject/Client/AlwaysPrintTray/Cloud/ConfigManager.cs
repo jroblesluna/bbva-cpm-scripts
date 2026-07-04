@@ -24,6 +24,22 @@ namespace AlwaysPrintTray.Cloud
         private readonly HttpClient _httpClient;
         private readonly PipeClient _pipeClient;
         private readonly string _configFilePath;
+
+        /// <summary>
+        /// Hash SHA256 del certificado esperado (recibido del servidor via enrichment TLS).
+        /// Se usa para validar que el org.cer en disco no fue manipulado antes de verificar firma.
+        /// Se actualiza cada vez que llega un enrichment con cert_hash.
+        /// </summary>
+        private static volatile string? _expectedCertHash;
+
+        /// <summary>
+        /// Actualiza el cert_hash esperado del servidor.
+        /// Llamado desde CloudManager al recibir el enrichment.
+        /// </summary>
+        public static void SetExpectedCertHash(string? certHash)
+        {
+            _expectedCertHash = certHash;
+        }
         
         /// <summary>Timeout en milisegundos para esperar respuesta del Service al guardar config.</summary>
         private const int SaveConfigTimeoutMs = 10_000;
@@ -38,6 +54,56 @@ namespace AlwaysPrintTray.Cloud
             _configFilePath = PipeConstants.ActionConfigFilePath;
         }
         
+        // ═══════════════════════════════════════════════════════════════════════
+        // VALIDACIÓN DE INTEGRIDAD DEL CERTIFICADO
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Valida que el certificado en disco no fue manipulado comparando su SHA256
+        /// contra el hash recibido del servidor (via enrichment TLS, confiable).
+        /// Retorna true si el cert es válido o si no hay hash de referencia disponible.
+        /// Retorna false si el hash no coincide (cert fue manipulado).
+        /// </summary>
+        private static bool ValidateCertIntegrity(string certPath)
+        {
+            // Si no tenemos hash de referencia del servidor, no podemos validar
+            // (backward-compatible con orgs que no tienen cert_hash calculado)
+            if (string.IsNullOrEmpty(_expectedCertHash))
+                return true;
+
+            if (!File.Exists(certPath))
+                return true; // Archivo no existe, se descargará después
+
+            try
+            {
+                byte[] certBytes = File.ReadAllBytes(certPath);
+                string localHash;
+                using (var sha256 = System.Security.Cryptography.SHA256.Create())
+                {
+                    byte[] hashBytes = sha256.ComputeHash(certBytes);
+                    localHash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+                }
+
+                if (localHash.Equals(_expectedCertHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                AlwaysPrintLogger.WriteTrayError(
+                    $"ConfigManager: ALERTA DE SEGURIDAD — certificado local manipulado. " +
+                    $"Hash local: {localHash.Substring(0, 16)}..., " +
+                    $"Hash esperado (servidor): {_expectedCertHash.Substring(0, 16)}...");
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"ConfigManager: error validando integridad del certificado: {ex.Message}");
+                return true; // En caso de error de I/O, no bloquear (fail-open para validación)
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // INVALIDACIÓN DE CERTIFICADO
         // ═══════════════════════════════════════════════════════════════════════
@@ -285,6 +351,15 @@ namespace AlwaysPrintTray.Cloud
                             }
                         }
                         
+                        // Verificar integridad del cert antes de usarlo para verificar firma
+                        if (!ValidateCertIntegrity(certPath))
+                        {
+                            AlwaysPrintLogger.WriteTrayError(
+                                "ConfigManager: certificado local no pasó validación de integridad. Invalidando y rechazando config.");
+                            InvalidateLocalCert();
+                            return false;
+                        }
+
                         // Verificar firma usando SignatureVerifier (fail-fast antes de persistir)
                         if (!SignatureVerifier.VerifyConfig(downloadedContent, certPath, out string verifiedConfig, traySource: true))
                         {
@@ -540,7 +615,15 @@ namespace AlwaysPrintTray.Cloud
                     // separado. Aquí intentamos verificar con lo que tenemos disponible.
                 }
 
-                // 4. Verificar firma ECDSA — FAIL-CLOSED: si no verifica, rechazar
+                // 4. Validar integridad del cert y verificar firma ECDSA — FAIL-CLOSED
+                if (!ValidateCertIntegrity(certPath))
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        "ConfigManager: certificado local no pasó validación de integridad (S3 download). Invalidando.");
+                    InvalidateLocalCert();
+                    return false;
+                }
+
                 if (!SignatureVerifier.VerifyConfig(downloadedContent, certPath, out string verifiedConfig, traySource: true))
                 {
                     AlwaysPrintLogger.WriteTrayError(
@@ -651,7 +734,15 @@ namespace AlwaysPrintTray.Cloud
                     // separado. Aquí intentamos verificar con lo que tenemos disponible.
                 }
 
-                // 3. Verificar firma ECDSA — FAIL-CLOSED: si no verifica, rechazar
+                // 3. Validar integridad del cert y verificar firma ECDSA — FAIL-CLOSED
+                if (!ValidateCertIntegrity(certPath))
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        "ConfigManager: certificado local no pasó validación de integridad (apply). Invalidando.");
+                    InvalidateLocalCert();
+                    return Task.FromResult(false);
+                }
+
                 if (!SignatureVerifier.VerifyConfig(downloadedContent, certPath, out string verifiedConfig, traySource: true))
                 {
                     AlwaysPrintLogger.WriteTrayError(
