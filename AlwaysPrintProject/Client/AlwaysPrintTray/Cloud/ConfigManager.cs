@@ -35,10 +35,29 @@ namespace AlwaysPrintTray.Cloud
         /// <summary>
         /// Actualiza el cert_hash esperado del servidor.
         /// Llamado desde CloudManager al recibir el enrichment.
+        /// Si el cert local no coincide con el hash del servidor, lo invalida inmediatamente
+        /// y fuerza re-descarga en el siguiente sync (CertVersion=0).
         /// </summary>
         public static void SetExpectedCertHash(string? certHash)
         {
             _expectedCertHash = certHash;
+
+            // Validación inmediata: si tenemos hash del servidor, verificar cert local ahora
+            if (!string.IsNullOrEmpty(certHash))
+            {
+                string certPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "AlwaysPrint", "config", "org.cer");
+
+                if (!ValidateCertIntegrity(certPath))
+                {
+                    // Cert en disco no matchea con lo que el servidor dice — invalidar
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "ConfigManager: cert_hash del servidor no coincide con cert local. " +
+                        "Invalidando cert para forzar re-descarga.");
+                    InvalidateLocalCert();
+                }
+            }
         }
         
         /// <summary>Timeout en milisegundos para esperar respuesta del Service al guardar config.</summary>
