@@ -994,6 +994,21 @@ def get_workstation_stats(
         total = workstation_service.get_total_count(db, org_id)
         online = workstation_service.get_online_count(db, org_id)
         contingency = workstation_service.get_contingency_count(db, org_id)
+
+        # Corregir conteo online con snapshot real de WebSocket (cross-worker).
+        # get_online_count() usa BD (puede estar stale); el snapshot es en tiempo real.
+        from app.services.websocket_manager import connection_manager
+        global_online = connection_manager.get_global_online_snapshot()
+        if global_online:
+            # Contar WS online que pertenecen a la org (si hay filtro)
+            if org_id:
+                all_ws_ids = {str(ws.id) for ws in db.query(Workstation.id).filter(
+                    Workstation.organization_id == org_id).all()}
+                online = len(global_online & all_ws_ids)
+            else:
+                # Admin sin filtro: todas las WS online
+                all_ws_ids = {str(ws.id) for ws in db.query(Workstation.id).all()}
+                online = len(global_online & all_ws_ids)
         
         # Contar VLANs totales de la organización
         from app.models.vlan import VLAN
