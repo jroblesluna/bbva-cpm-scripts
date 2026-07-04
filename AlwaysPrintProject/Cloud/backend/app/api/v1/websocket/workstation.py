@@ -734,8 +734,21 @@ async def _handle_telemetry(
     if ws and not ws.is_online:
         ws.is_online = True
         ws.last_connection = datetime.now(timezone.utc).replace(tzinfo=None)
-        db.commit()
-        logger.info("Telemetría restauró is_online=True para workstation_id=%s", workstation_id)
+        try:
+            db.commit()
+            logger.info("Telemetría restauró is_online=True para workstation_id=%s", workstation_id)
+        except Exception as e:
+            db.rollback()
+            logger.warning(
+                "Telemetría: falló commit de is_online=True para workstation_id=%s: %s",
+                workstation_id, str(e)
+            )
+    elif ws is None:
+        logger.warning(
+            "Telemetría: workstation_id=%s no encontrada en BD (type=%s). "
+            "No se puede restaurar is_online.",
+            workstation_id, type(workstation_id).__name__
+        )
 
     # Retornar datos de broadcast — el caller lo envía DESPUÉS de liberar la sesión de BD.
     # Esto evita pool exhaustion: la sesión se cierra antes del await a Redis/broadcast.
