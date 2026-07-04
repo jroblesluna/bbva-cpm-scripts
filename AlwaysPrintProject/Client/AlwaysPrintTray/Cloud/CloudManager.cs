@@ -839,6 +839,23 @@ namespace AlwaysPrintTray.Cloud
 
                 // Notificar que el registro fue exitoso (para que UpdateChecker pueda iniciar)
                 Registered?.Invoke();
+
+                // Reportar config actual al backend para mantener dashboard actualizado.
+                // Cubre el caso donde la WS ya tenía la config correcta en disco pero el
+                // backend nunca recibió el status_update (ej: reconexión, cambio de worker).
+                try
+                {
+                    var currentConfig = _configManager?.GetLocalConfigInfo();
+                    if (currentConfig != null && !string.IsNullOrEmpty(currentConfig.Hash))
+                    {
+                        SendActionConfigStatus(currentConfig.Name, currentConfig.Hash, currentConfig.Version);
+                    }
+                }
+                catch (Exception statusEx)
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"CloudManager: error enviando status_update de config al registrarse: {statusEx.Message}");
+                }
             }
             catch (Exception ex)
             {
