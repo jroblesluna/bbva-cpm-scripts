@@ -52,22 +52,6 @@ namespace AlwaysPrintTray.Forms
                 ForeColor = Color.DarkBlue,
                 BackColor = Color.FromArgb(240, 245, 255),
             };
-            Controls.Add(_statusLabel);
-
-            // ListView para los pasos
-            _listView = new ListView
-            {
-                Dock = DockStyle.Fill,
-                View = View.Details,
-                FullRowSelect = true,
-                GridLines = true,
-                HeaderStyle = ColumnHeaderStyle.Nonclickable,
-                Font = new Font("Consolas", 8.5f),
-            };
-            _listView.Columns.Add("Estado", 50);
-            _listView.Columns.Add("Acción", 120);
-            _listView.Columns.Add("Descripción", 280);
-            Controls.Add(_listView);
 
             // Panel inferior con botón
             var bottomPanel = new Panel
@@ -87,15 +71,28 @@ namespace AlwaysPrintTray.Forms
             _closeButton.Location = new Point(bottomPanel.Width - _closeButton.Width - 12, 5);
             _closeButton.Click += (_, _) => Close();
             bottomPanel.Controls.Add(_closeButton);
-            Controls.Add(bottomPanel);
 
-            // Orden correcto para DockStyle layout:
-            // En WinForms, el layout de docking procesa controles desde el índice MÁS ALTO
-            // hacia el más bajo. Los controles procesados primero (índices altos) reservan
-            // su espacio; el último procesado (índice 0, Fill) obtiene el espacio restante.
-            Controls.SetChildIndex(_listView, 0);      // Fill — procesado último, ocupa el resto
-            Controls.SetChildIndex(_statusLabel, 1);   // Top — procesado segundo, reserva arriba
-            Controls.SetChildIndex(bottomPanel, 2);    // Bottom — procesado primero, reserva abajo
+            // ListView para los pasos (Fill — ocupa todo el espacio restante)
+            _listView = new ListView
+            {
+                Dock = DockStyle.Fill,
+                View = View.Details,
+                FullRowSelect = true,
+                GridLines = true,
+                HeaderStyle = ColumnHeaderStyle.Nonclickable,
+                Font = new Font("Consolas", 8.5f),
+            };
+            _listView.Columns.Add("Estado", 50);
+            _listView.Columns.Add("Acción", 120);
+            _listView.Columns.Add("Descripción", 280);
+
+            // ORDEN DE AGREGADO CRÍTICO para DockStyle en WinForms:
+            // Los controles se dockean en orden INVERSO al de agregado.
+            // El ÚLTIMO agregado se dockea PRIMERO (reserva su espacio).
+            // Por lo tanto: Fill primero, luego Top y Bottom.
+            Controls.Add(_listView);      // Fill — agregado primero, se dockea último → espacio restante
+            Controls.Add(bottomPanel);    // Bottom — agregado segundo, se dockea segundo → reserva abajo
+            Controls.Add(_statusLabel);   // Top — agregado último, se dockea primero → reserva arriba
 
             // Timer de auto-cierre (30s después de completar)
             _autoCloseTimer = new Timer { Interval = 30000 };
