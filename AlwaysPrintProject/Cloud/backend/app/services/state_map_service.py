@@ -203,8 +203,12 @@ class StateMapService:
                             metadata = s3_service.get_msi_metadata()
                             if metadata and metadata.get("version"):
                                 resolved_msi_version = metadata["version"]
-                        except Exception:
-                            pass  # Si S3 no está disponible, msi_version queda None
+                        except Exception as e:
+                            logger.warning(
+                                "state_map.init_msi_latest_fallido",
+                                org_id=org_id,
+                                error=str(e),
+                            )
 
                     org_state = OrgDistributionState(
                         cert_version=row.cert_version or 0,
@@ -325,6 +329,7 @@ class StateMapService:
                     o.id AS org_id,
                     o.ecdsa_cert_version AS cert_version,
                     o.ecdsa_cert_s3_key AS cert_s3_key,
+                    o.ecdsa_cert_hash AS cert_hash,
                     o.target_version AS msi_version,
                     o.auto_update_enabled,
                     ac.config_hash,
@@ -356,7 +361,24 @@ class StateMapService:
                     org_state.cert_version = row.cert_version or 0
                     if row.cert_s3_key:
                         org_state.cert_url = self._build_public_url(row.cert_s3_key)
-                    org_state.msi_version = row.msi_version
+                    org_state.cert_hash = row.cert_hash
+
+                    # Resolver msi_version: explícita o latest de S3
+                    resolved_msi_version = row.msi_version
+                    if not resolved_msi_version and row.auto_update_enabled:
+                        try:
+                            from app.services.s3_update_service import S3UpdateService
+                            s3_service = S3UpdateService()
+                            metadata = s3_service.get_msi_metadata()
+                            if metadata and metadata.get("version"):
+                                resolved_msi_version = metadata["version"]
+                        except Exception as e:
+                            logger.warning(
+                                "state_map.load_org_msi_latest_fallido",
+                                org_id=org_id,
+                                error=str(e),
+                            )
+                    org_state.msi_version = resolved_msi_version
 
                 # Procesar action_config (puede ser None por LEFT JOIN)
                 if row.config_hash and row.config_s3_key:
