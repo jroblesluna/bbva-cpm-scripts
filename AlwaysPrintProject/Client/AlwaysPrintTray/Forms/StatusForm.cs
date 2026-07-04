@@ -56,6 +56,12 @@ namespace AlwaysPrintTray.Forms
         private Label _lblStatus = null!;
         private Button _btnClose = null!;
 
+        // ── Panel de progreso inline (debajo de la sección OnDemand) ─────────
+        private Panel _progressPanel = null!;
+        private ListView _progressListView = null!;
+        private Label _progressHeader = null!;
+        private readonly List<OnDemandActionProgressPayload> _progressSteps = new List<OnDemandActionProgressPayload>();
+
         // ── Estado global busy ──────────────────────────────────────────────────
         private bool _isBusy;
 
@@ -298,6 +304,43 @@ namespace AlwaysPrintTray.Forms
 
                 y += 36;
             }
+
+            // ── Panel de progreso inline (inicialmente oculto) ───────────────
+            _progressHeader = new Label
+            {
+                Text = "",
+                Location = new Point(LabelX, y),
+                Size = new Size(FormWidth - 40, 20),
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0x00, 0x66, 0xCC),
+                Visible = false
+            };
+            Controls.Add(_progressHeader);
+
+            _progressListView = new ListView
+            {
+                Location = new Point(LabelX, y + 22),
+                Size = new Size(FormWidth - 40, 120),
+                View = View.Details,
+                FullRowSelect = true,
+                GridLines = true,
+                HeaderStyle = ColumnHeaderStyle.Nonclickable,
+                Font = new Font("Consolas", 8.25f),
+                Visible = false
+            };
+            _progressListView.Columns.Add("", 32);
+            _progressListView.Columns.Add("Acción", 140);
+            _progressListView.Columns.Add("Descripción", FormWidth - 40 - 32 - 140 - 30);
+            Controls.Add(_progressListView);
+
+            _progressPanel = new Panel
+            {
+                Location = new Point(0, y),
+                Size = new Size(FormWidth, 148),
+                Visible = false
+            };
+            // El panel es solo un marcador de tamaño — los controles son hijos del form
+            // para evitar problemas de layout con Panel + posición absoluta.
         }
 
         /// <summary>Construye la sección de servicios monitoreados.</summary>
@@ -658,10 +701,24 @@ namespace AlwaysPrintTray.Forms
 
             if (result != DialogResult.OK) return;
 
-            // Activar estado busy global
+            // Activar estado busy global y mostrar panel de progreso
             SetBusyState(true);
+            ShowProgressPanel(trigger.Label);
 
-            // Ejecutar en BackgroundWorker para evitar deadlocks
+            // Suscribirse temporalmente a push messages para capturar progreso en tiempo real
+            Action<PipeMessage> progressHandler = null!;
+            progressHandler = (msg) =>
+            {
+                if (msg.Type != MessageType.OnDemandActionProgress) return;
+                var payload = msg.GetPayload<OnDemandActionProgressPayload>();
+                if (payload == null || payload.TriggerLabel != trigger.Label) return;
+
+                // Actualizar UI desde cualquier hilo
+                BeginInvoke(new Action(() => AddProgressStep(payload)));
+            };
+            _pipe.MessageReceived += progressHandler;
+
+            // Ejecutar en BackgroundWorker para no bloquear UI
             var worker = new BackgroundWorker();
             worker.DoWork += (s, args) =>
             {
@@ -691,23 +748,115 @@ namespace AlwaysPrintTray.Forms
             };
             worker.RunWorkerCompleted += (s, args) =>
             {
+                // Desuscribirse de push messages
+                _pipe.MessageReceived -= progressHandler;
                 SetBusyState(false);
 
                 if (args.Error != null)
                 {
-                    MessageBox.Show(this, $"Error: {args.Error.Message}", "Error",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    UpdateProgressHeader(false, args.Error.Message);
                 }
                 else if (args.Result is OperationResult opResult)
                 {
-                    var icon = opResult.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning;
-                    var title = opResult.Success ? "OK" : "Error";
-                    MessageBox.Show(this, opResult.Message, title, MessageBoxButtons.OK, icon);
+                    UpdateProgressHeader(opResult.Success, opResult.Message);
                 }
 
                 worker.Dispose();
             };
             worker.RunWorkerAsync();
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ── Panel de progreso inline ────────────────────────────────────────────
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Muestra el panel de progreso, limpia contenido anterior y expande el formulario.
+        /// </summary>
+        private void ShowProgressPanel(string triggerLabel)
+        {
+            _progressSteps.Clear();
+            _progressListView.Items.Clear();
+            _progressHeader.Text = $"⏳ Ejecutando: {triggerLabel}";
+            _progressHeader.ForeColor = Color.FromArgb(0x00, 0x66, 0xCC);
+            _progressHeader.Visible = true;
+            _progressListView.Visible = true;
+
+            // Expandir el formulario si el panel no estaba visible
+            int panelBottom = _progressListView.Bottom + 10;
+            int requiredHeight = panelBottom + 70; // espacio para status + botón cerrar
+            if (ClientSize.Height < requiredHeight)
+            {
+                // Mover controles inferiores (status + cerrar) y ajustar alto
+                _lblStatus.Location = new Point(_lblStatus.Location.X, panelBottom + 4);
+                _btnClose.Location = new Point(_btnClose.Location.X, panelBottom + 28);
+                ClientSize = new Size(FormWidth, panelBottom + 70);
+            }
+        }
+
+        /// <summary>
+        /// Agrega un paso de progreso al ListView inline. Thread-safe (debe llamarse via BeginInvoke).
+        /// </summary>
+        private void AddProgressStep(OnDemandActionProgressPayload progress)
+        {
+            if (IsDisposed) return;
+
+            // Mensaje de finalización — actualizar header
+            if (progress.IsComplete)
+            {
+                UpdateProgressHeader(progress.OverallSuccess,
+                    progress.OverallSuccess
+                        ? $"✓ Completado ({progress.DurationMs}ms)"
+                        : $"✗ Falló ({progress.DurationMs}ms)");
+                return;
+            }
+
+            _progressSteps.Add(progress);
+
+            string statusIcon = progress.Status switch
+            {
+                "running" => "⏳",
+                "ok" => "✓",
+                "error" => "✗",
+                _ => "·"
+            };
+
+            // Si el paso está "running", buscar si ya existe para actualizarlo
+            if (progress.Status != "running")
+            {
+                // Buscar item "running" del mismo tipo para actualizar
+                for (int i = _progressListView.Items.Count - 1; i >= 0; i--)
+                {
+                    var item = _progressListView.Items[i];
+                    if (item.SubItems[1].Text == progress.ActionType && item.SubItems[0].Text == "⏳")
+                    {
+                        item.SubItems[0].Text = statusIcon;
+                        item.ForeColor = progress.Status == "ok" ? Color.DarkGreen : Color.DarkRed;
+                        return;
+                    }
+                }
+            }
+
+            // Agregar nuevo item
+            var newItem = new ListViewItem(statusIcon);
+            newItem.SubItems.Add(progress.ActionType);
+            newItem.SubItems.Add(progress.StepName);
+            newItem.ForeColor = progress.Status == "running" ? Color.DarkBlue
+                : progress.Status == "ok" ? Color.DarkGreen : Color.DarkRed;
+            _progressListView.Items.Add(newItem);
+            _progressListView.EnsureVisible(_progressListView.Items.Count - 1);
+        }
+
+        /// <summary>
+        /// Actualiza el header del panel de progreso con el resultado final.
+        /// </summary>
+        private void UpdateProgressHeader(bool success, string message)
+        {
+            if (IsDisposed) return;
+            _progressHeader.Text = message;
+            _progressHeader.ForeColor = success
+                ? Color.FromArgb(0x22, 0x8B, 0x22)   // Verde
+                : Color.FromArgb(0xCC, 0x33, 0x00);   // Rojo
         }
 
         // ═══════════════════════════════════════════════════════════════════════

@@ -1271,7 +1271,8 @@ namespace AlwaysPrintTray
                         HandleActionConfigChanged();
                         break;
                     case MessageType.OnDemandActionProgress:
-                        HandleOnDemandProgress(message);
+                        // El progreso OnDemand se maneja directamente en StatusForm via
+                        // suscripción temporal a MessageReceived. No se necesita acción aquí.
                         break;
                     case MessageType.ServiceStopping:
                         // Servicio se está deteniendo: ocultar icono inmediatamente para evitar fantasmas
@@ -1335,41 +1336,6 @@ namespace AlwaysPrintTray
                         $"HandleActionConfigChanged: error actualizando UI. {ex.Message}",
                         AlwaysPrintLogger.EvtGenericError);
                 }
-            }, null);
-        }
-
-        private Forms.ActionProgressForm? _progressForm;
-
-        private void HandleOnDemandProgress(PipeMessage message)
-        {
-            var payload = message.GetPayload<OnDemandActionProgressPayload>();
-            if (payload == null) return;
-
-            _uiContext.Post(_ =>
-            {
-                // Si el form existe pero está disposed, limpiar la referencia explícitamente.
-                // Esto cubre edge cases donde FormClosed no se ejecutó (ej: Dispose directo).
-                if (_progressForm != null && _progressForm.IsDisposed)
-                {
-                    _progressForm = null;
-                }
-
-                // Si el form anterior ya completó y llega un nuevo trigger "running",
-                // cerrar el viejo y crear uno nuevo para la nueva acción.
-                if (_progressForm != null && _progressForm.IsComplete && !payload.IsComplete)
-                {
-                    _progressForm.Close();
-                    _progressForm = null;
-                }
-
-                if (_progressForm == null)
-                {
-                    _progressForm = new Forms.ActionProgressForm(payload.TriggerLabel);
-                    _progressForm.FormClosed += (__, ___) => _progressForm = null;
-                    _progressForm.Show();
-                }
-
-                _progressForm.AddProgress(payload);
             }, null);
         }
 
