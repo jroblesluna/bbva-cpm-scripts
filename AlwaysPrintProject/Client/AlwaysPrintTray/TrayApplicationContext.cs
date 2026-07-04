@@ -1347,7 +1347,22 @@ namespace AlwaysPrintTray
 
             _uiContext.Post(_ =>
             {
-                if (_progressForm == null || _progressForm.IsDisposed)
+                // Si el form existe pero está disposed, limpiar la referencia explícitamente.
+                // Esto cubre edge cases donde FormClosed no se ejecutó (ej: Dispose directo).
+                if (_progressForm != null && _progressForm.IsDisposed)
+                {
+                    _progressForm = null;
+                }
+
+                // Si el form anterior ya completó y llega un nuevo trigger "running",
+                // cerrar el viejo y crear uno nuevo para la nueva acción.
+                if (_progressForm != null && _progressForm.IsComplete && !payload.IsComplete)
+                {
+                    _progressForm.Close();
+                    _progressForm = null;
+                }
+
+                if (_progressForm == null)
                 {
                     _progressForm = new Forms.ActionProgressForm(payload.TriggerLabel);
                     _progressForm.FormClosed += (__, ___) => _progressForm = null;

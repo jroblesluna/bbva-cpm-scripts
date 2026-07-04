@@ -152,6 +152,17 @@ namespace AlwaysPrintTray.Cloud
                         $"ConfigManager: certificado local eliminado ({certPath}) por fallo de verificación de firma.");
                 }
 
+                // Eliminar también active.alwaysconfig: fue firmada con el cert que acabamos
+                // de invalidar, por lo tanto no es confiable. El Service la recargará vacía
+                // y descargará fresh del entorno correcto.
+                string configPath = PipeConstants.ActionConfigFilePath;
+                if (File.Exists(configPath))
+                {
+                    File.Delete(configPath);
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"ConfigManager: configuración activa eliminada ({configPath}) porque fue firmada con cert invalidado.");
+                }
+
                 // Resetear CertVersion a 0 para forzar re-descarga en el próximo sync
                 SignatureVerifier.SetLocalCertVersion(0);
 

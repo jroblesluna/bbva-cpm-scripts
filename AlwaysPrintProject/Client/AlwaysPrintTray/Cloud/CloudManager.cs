@@ -886,7 +886,15 @@ namespace AlwaysPrintTray.Cloud
                 _pushMessageHandler?.UpdateState(distributionState);
 
                 // Actualizar cert_hash esperado para validación de integridad
+                bool configExistedBefore = File.Exists(PipeConstants.ActionConfigFilePath);
                 ConfigManager.SetExpectedCertHash(distributionState.CertHash);
+
+                // Si el cert fue invalidado (mismatch detectado), InvalidateLocalCert eliminó
+                // el archivo de config. Notificar al Service para que descargue su configuración de memoria.
+                if (configExistedBefore && !File.Exists(PipeConstants.ActionConfigFilePath))
+                {
+                    NotifyServiceActionConfigChanged();
+                }
 
                 AlwaysPrintLogger.WriteTrayInfo(
                     $"CloudManager: estado de distribución recibido en registro enriquecido. " +
@@ -1879,6 +1887,34 @@ namespace AlwaysPrintTray.Cloud
             {
                 AlwaysPrintLogger.WriteTrayError(
                     $"CloudManager: error notificando estado Cloud al Service. {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Notifica al Service que la configuración de acciones cambió (o fue eliminada).
+        /// El Service ejecutará ReloadActionConfiguration que detectará archivo ausente
+        /// y descargará la configuración de memoria.
+        /// </summary>
+        private void NotifyServiceActionConfigChanged()
+        {
+            try
+            {
+                if (!_pipe.IsConnected)
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "CloudManager: pipe no conectado, no se puede notificar invalidación de config al Service.");
+                    return;
+                }
+
+                var msg = PipeMessage.Create(MessageType.ActionConfigChanged);
+                _pipe.Send(msg);
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "CloudManager: notificación ActionConfigChanged enviada al Service (config invalidada por cert mismatch).");
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error notificando invalidación de config al Service. {ex.Message}");
             }
         }
 

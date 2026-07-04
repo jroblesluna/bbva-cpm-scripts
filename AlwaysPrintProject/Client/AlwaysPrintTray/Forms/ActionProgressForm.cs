@@ -20,6 +20,13 @@ namespace AlwaysPrintTray.Forms
         private readonly string _triggerLabel;
         private bool _isComplete;
 
+        /// <summary>
+        /// Indica si la ejecución mostrada en este form ya finalizó (exitosa o con error).
+        /// Usado por TrayApplicationContext para cerrar un form completado cuando llega
+        /// un nuevo trigger distinto.
+        /// </summary>
+        public bool IsComplete => _isComplete;
+
         public ActionProgressForm(string triggerLabel)
         {
             _triggerLabel = triggerLabel;
@@ -83,11 +90,12 @@ namespace AlwaysPrintTray.Forms
             Controls.Add(bottomPanel);
 
             // Orden correcto para DockStyle layout:
-            // En WinForms, los controles se dockean desde index 0 hacia arriba.
-            // Bottom y Top deben procesarse antes que Fill.
-            Controls.SetChildIndex(_statusLabel, 0);
-            Controls.SetChildIndex(bottomPanel, 1);
-            Controls.SetChildIndex(_listView, 2);
+            // En WinForms, el layout de docking procesa controles desde el índice MÁS ALTO
+            // hacia el más bajo. Los controles procesados primero (índices altos) reservan
+            // su espacio; el último procesado (índice 0, Fill) obtiene el espacio restante.
+            Controls.SetChildIndex(_listView, 0);      // Fill — procesado último, ocupa el resto
+            Controls.SetChildIndex(_statusLabel, 1);   // Top — procesado segundo, reserva arriba
+            Controls.SetChildIndex(bottomPanel, 2);    // Bottom — procesado primero, reserva abajo
 
             // Timer de auto-cierre (30s después de completar)
             _autoCloseTimer = new Timer { Interval = 30000 };

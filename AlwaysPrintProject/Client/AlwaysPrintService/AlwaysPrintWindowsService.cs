@@ -761,6 +761,11 @@ namespace AlwaysPrintService
                 else
                 {
                     AlwaysPrintLogger.WriteInfo($"No existe archivo de configuración de acciones: {ConfigFilePath}");
+                    // Si previamente había una configuración cargada, limpiar el estado del engine.
+                    // Esto cubre el caso donde el archivo fue eliminado (ej: cert invalidado por cambio de entorno).
+                    _actionEngine.UnloadConfiguration();
+                    StopScheduledTaskTimer();
+                    _watchdog.Stop();
                 }
             }
             catch (Exception ex)
@@ -838,6 +843,9 @@ namespace AlwaysPrintService
                     AlwaysPrintLogger.WriteInfo(
                         $"ReloadActionConfiguration: primera carga de config (hash={newHash?.Substring(0, 8)}). " +
                         "Omitiendo trigger OnConfigChange (no hay config previo que reemplazar).");
+                    // SIEMPRE notificar al Tray para que reconstruya el submenú OnDemand,
+                    // incluso en primera carga (el Tray necesita saber que hay config disponible).
+                    NotifyTrayActionConfigChanged();
                     return;
                 }
                 
@@ -855,10 +863,47 @@ namespace AlwaysPrintService
                     $"ReloadActionConfiguration: config cambió (previo={previousHash?.Substring(0, 8)}, nuevo={newHash?.Substring(0, 8)}). " +
                     "Ejecutando trigger OnConfigChange.");
                 ExecuteActionTrigger(TriggerEvents.OnConfigChange);
+                
+                // Notificar al Tray para que reconstruya el submenú OnDemand
+                NotifyTrayActionConfigChanged();
             }
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteError($"Error recargando configuración de acciones: {ex.Message}", ex);
+            }
+        }
+        
+        /// <summary>
+        /// Envía un push ActionConfigChanged al Tray vía Named Pipe para que reconstruya
+        /// el submenú OnDemand y actualice el StatusForm. Se invoca tanto en primera carga
+        /// como en cambios de configuración.
+        /// </summary>
+        private void NotifyTrayActionConfigChanged()
+        {
+            try
+            {
+                if (_pipeServer == null || !_pipeServer.IsClientConnected)
+                {
+                    AlwaysPrintLogger.WriteInfo(
+                        "NotifyTrayActionConfigChanged: pipe desconectado, notificación omitida (el Tray la recibirá al conectarse).");
+                    return;
+                }
+
+                var msg = PipeMessage.Create(MessageType.ActionConfigChanged);
+                bool sent = _pipeServer.SendToClient(msg);
+
+                if (sent)
+                    AlwaysPrintLogger.WriteInfo("NotifyTrayActionConfigChanged: notificación enviada al Tray.");
+                else
+                    AlwaysPrintLogger.WriteWarning(
+                        "NotifyTrayActionConfigChanged: no se pudo enviar notificación al Tray.",
+                        AlwaysPrintLogger.EvtGenericWarning);
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning(
+                    $"NotifyTrayActionConfigChanged: error al enviar notificación. {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericWarning);
             }
         }
         

@@ -202,6 +202,23 @@ namespace AlwaysPrintService.Actions
                     AlwaysPrintLogger.EvtGenericError);
             }
         }
+
+        /// <summary>
+        /// Descarga la configuración de memoria sin eliminar archivo de disco.
+        /// Se usa cuando el archivo fue eliminado externamente (ej: cert invalidado por cambio de entorno)
+        /// para que el engine quede en estado limpio hasta que llegue una nueva configuración.
+        /// </summary>
+        public void UnloadConfiguration()
+        {
+            if (_config == null && _loadedConfigHash == null)
+                return; // Ya estaba descargada
+
+            _config = null;
+            _loadedConfigHash = null;
+            _variables.Clear();
+            AlwaysPrintLogger.WriteInfo(
+                "ActionEngine: configuración descargada de memoria (archivo no existe en disco).");
+        }
         
         /// <summary>
         /// Carga la configuración desde un string JSON.
