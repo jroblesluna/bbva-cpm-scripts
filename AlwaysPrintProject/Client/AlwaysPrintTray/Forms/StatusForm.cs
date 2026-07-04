@@ -773,6 +773,9 @@ namespace AlwaysPrintTray.Forms
                     UpdateProgressHeader(opResult.Success, opResult.Message);
                 }
 
+                // Escribir resumen de pasos en log del Tray
+                LogProgressSummary(trigger.Label);
+
                 worker.Dispose();
             };
             worker.RunWorkerAsync();
@@ -857,6 +860,34 @@ namespace AlwaysPrintTray.Forms
             _progressHeader.ForeColor = success
                 ? Color.FromArgb(0x22, 0x8B, 0x22)   // Verde
                 : Color.FromArgb(0xCC, 0x33, 0x00);   // Rojo
+        }
+
+        /// <summary>
+        /// Escribe un resumen de los pasos ejecutados en el log del Tray.
+        /// Formato: una línea por paso con [✓] o [✗] y la descripción.
+        /// </summary>
+        private void LogProgressSummary(string triggerLabel)
+        {
+            try
+            {
+                if (_progressSteps.Count == 0) return;
+
+                var lines = new System.Text.StringBuilder();
+                lines.AppendLine($"OnDemand '{triggerLabel}' — {_progressSteps.Count} pasos:");
+
+                foreach (var step in _progressSteps)
+                {
+                    string icon = step.Status == "ok" ? "✓" : step.Status == "error" ? "✗" : "·";
+                    lines.AppendLine($"  [{icon}] {step.ActionType}: {step.StepName}");
+                }
+
+                AlwaysPrintLogger.WriteTrayInfo(lines.ToString().TrimEnd());
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"StatusForm.LogProgressSummary: error escribiendo resumen: {ex.Message}");
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════════
