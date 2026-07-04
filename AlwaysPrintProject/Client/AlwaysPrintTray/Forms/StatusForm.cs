@@ -23,12 +23,13 @@ namespace AlwaysPrintTray.Forms
     public sealed class StatusForm : Form
     {
         // ── Constantes de layout ────────────────────────────────────────────────
-        private const int FormWidth = 680;
-        private const int LabelX = 16;
-        private const int ValueX = 150;
-        private const int ServiceNameWidth = 350;
-        private const int StateX = 380;
-        private const int ButtonX = 490;
+        private const int FormWidth = 960;
+        private const int LeftColX = 16;
+        private const int LeftColWidth = 420;
+        private const int RightColX = 460;
+        private const int RightColWidth = 480;
+        private const int LabelX = 16;       // Alias para compatibilidad con helpers
+        private const int ValueX = 140;
         private const int RowHeight = 24;
         private const int SectionSpacing = 12;
 
@@ -56,8 +57,7 @@ namespace AlwaysPrintTray.Forms
         private Label _lblStatus = null!;
         private Button _btnClose = null!;
 
-        // ── Panel de progreso inline (debajo de la sección OnDemand) ─────────
-        private Panel _progressPanel = null!;
+        // ── Panel de progreso inline (columna derecha) ────────────────────────
         private ListView _progressListView = null!;
         private Label _progressHeader = null!;
         private readonly List<OnDemandActionProgressPayload> _progressSteps = new List<OnDemandActionProgressPayload>();
@@ -168,68 +168,83 @@ namespace AlwaysPrintTray.Forms
             KeyPreview = true;
             KeyDown += OnKeyDown;
 
-            int y = 12;
+            // ═══════════════════════════════════════════════════════════════════
+            // COLUMNA IZQUIERDA: Info General + Cloud + Servicios
+            // ═══════════════════════════════════════════════════════════════════
+            int yL = 12;
 
-            // ── Sección A: Información General ──────────────────────────────────
-            AddSectionHeader(LocalizationManager.Get("StatusSectionGeneralInfo"), ref y);
-            _valState = AddFieldRow(LocalizationManager.Get("StatusLabelState"), "...", ref y);
-            _valVersion = AddFieldRow(LocalizationManager.Get("StatusLabelVersion"), "...", ref y);
-            _valQueue = AddFieldRow(LocalizationManager.Get("StatusLabelActiveQueue"), "...", ref y);
-            _valQueueStatus = AddFieldRow(LocalizationManager.Get("StatusLabelQueueStatus"), "...", ref y);
-            _valDriver = AddFieldRow(LocalizationManager.Get("StatusLabelDriver"), "...", ref y);
-            _valConfig = AddFieldRow(LocalizationManager.Get("StatusLabelConfig"), "...", ref y);
+            AddSectionHeaderAt(LocalizationManager.Get("StatusSectionGeneralInfo"), LeftColX, ref yL);
+            _valState = AddFieldRowAt(LocalizationManager.Get("StatusLabelState"), "...", LeftColX, ValueX, ref yL);
+            _valVersion = AddFieldRowAt(LocalizationManager.Get("StatusLabelVersion"), "...", LeftColX, ValueX, ref yL);
+            _valQueue = AddFieldRowAt(LocalizationManager.Get("StatusLabelActiveQueue"), "...", LeftColX, ValueX, ref yL);
+            _valQueueStatus = AddFieldRowAt(LocalizationManager.Get("StatusLabelQueueStatus"), "...", LeftColX, ValueX, ref yL);
+            _valDriver = AddFieldRowAt(LocalizationManager.Get("StatusLabelDriver"), "...", LeftColX, ValueX, ref yL);
+            _valConfig = AddFieldRowAt(LocalizationManager.Get("StatusLabelConfig"), "...", LeftColX, ValueX, ref yL);
 
-            y += SectionSpacing;
-            AddSeparator(ref y);
+            yL += SectionSpacing;
+            AddSeparatorAt(LeftColX, LeftColWidth, ref yL);
 
-            // ── Sección A2: Conectividad Cloud ──────────────────────────────────
-            AddSectionHeader(LocalizationManager.Get("StatusSectionCloudConnectivity"), ref y);
-            _valCloudStatus = AddFieldRow(LocalizationManager.Get("StatusLabelCloudStatus"), "...", ref y);
-            // Detalles con word-wrap (ancho fijo para que no se salga del formulario)
+            // ── Conectividad Cloud ──────────────────────────────────────────────
+            AddSectionHeaderAt(LocalizationManager.Get("StatusSectionCloudConnectivity"), LeftColX, ref yL);
+            _valCloudStatus = AddFieldRowAt(LocalizationManager.Get("StatusLabelCloudStatus"), "...", LeftColX, ValueX, ref yL);
             {
                 var lblDetails = new Label
                 {
                     Text = LocalizationManager.Get("StatusLabelCloudDetails"),
-                    Location = new Point(LabelX, y),
+                    Location = new Point(LeftColX, yL),
                     AutoSize = true,
                     ForeColor = Color.FromArgb(0x55, 0x55, 0x55)
                 };
                 _valCloudDetails = new Label
                 {
                     Text = "",
-                    Location = new Point(ValueX, y),
-                    Size = new Size(FormWidth - ValueX - 20, 36),
+                    Location = new Point(ValueX, yL),
+                    Size = new Size(LeftColWidth - ValueX + LeftColX, 36),
                     AutoSize = false,
                     AutoEllipsis = false,
                     ForeColor = Color.FromArgb(0x66, 0x66, 0x66)
                 };
                 Controls.Add(lblDetails);
                 Controls.Add(_valCloudDetails);
-                y += 40; // Espacio extra para 2 líneas de texto
+                yL += 40;
             }
 
-            y += SectionSpacing;
-            AddSeparator(ref y);
+            yL += SectionSpacing;
+            AddSeparatorAt(LeftColX, LeftColWidth, ref yL);
 
-            // ── Sección B: Acciones A Demanda ───────────────────────────────────
-            AddSectionHeader(LocalizationManager.Get("StatusSectionOnDemand"), ref y);
-            BuildTriggersSection(ref y);
+            // ── Servicios ───────────────────────────────────────────────────────
+            AddSectionHeaderAt(LocalizationManager.Get("StatusSectionServices"), LeftColX, ref yL);
+            BuildServicesSection(ref yL);
 
-            y += SectionSpacing;
-            AddSeparator(ref y);
+            // ═══════════════════════════════════════════════════════════════════
+            // COLUMNA DERECHA: Acciones A Demanda + Progreso
+            // ═══════════════════════════════════════════════════════════════════
+            int yR = 12;
 
-            // ── Sección C: Servicios ────────────────────────────────────────────
-            AddSectionHeader(LocalizationManager.Get("StatusSectionServices"), ref y);
-            BuildServicesSection(ref y);
+            AddSectionHeaderAt(LocalizationManager.Get("StatusSectionOnDemand"), RightColX, ref yR);
+            BuildTriggersSection(ref yR);
 
-            y += SectionSpacing;
-            AddSeparator(ref y);
+            // ── Separador vertical (línea entre columnas) ───────────────────────
+            var vertSep = new Label
+            {
+                Location = new Point(LeftColX + LeftColWidth + 10, 12),
+                Size = new Size(1, Math.Max(yL, yR) - 24),
+                BorderStyle = BorderStyle.Fixed3D
+            };
+            Controls.Add(vertSep);
 
-            // ── Etiqueta de estado (busy) ───────────────────────────────────────
+            // ═══════════════════════════════════════════════════════════════════
+            // PIE: Status + Botón Cerrar
+            // ═══════════════════════════════════════════════════════════════════
+            int yBottom = Math.Max(yL, yR) + SectionSpacing;
+
+            // Separador horizontal antes del pie
+            AddSeparatorAt(LeftColX, FormWidth - 32, ref yBottom);
+
             _lblStatus = new Label
             {
                 Text = "",
-                Location = new Point(LabelX, y),
+                Location = new Point(LeftColX, yBottom),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(0x00, 0x66, 0xCC),
                 Font = new Font("Segoe UI", 9f, FontStyle.Italic),
@@ -237,8 +252,6 @@ namespace AlwaysPrintTray.Forms
             };
             Controls.Add(_lblStatus);
 
-            // ── Botón Cerrar (bottom-right) ─────────────────────────────────────
-            y += 28;
             _btnClose = new Button
             {
                 Text = LocalizationManager.Get("StatusButtonClose"),
@@ -248,16 +261,14 @@ namespace AlwaysPrintTray.Forms
             };
             _btnClose.Click += (s, e) => Close();
             Controls.Add(_btnClose);
-            // Posicionar después de AutoSize
-            _btnClose.Location = new Point(FormWidth - _btnClose.PreferredSize.Width - 20, y);
+            _btnClose.Location = new Point(FormWidth - _btnClose.PreferredSize.Width - 20, yBottom);
             CancelButton = _btnClose;
 
-            // ── Calcular alto total del formulario ──────────────────────────────
-            y += 36 + 24;
-            ClientSize = new Size(FormWidth, y);
+            yBottom += 36 + 12;
+            ClientSize = new Size(FormWidth, yBottom);
         }
 
-        /// <summary>Construye la sección de triggers OnDemand.</summary>
+        /// <summary>Construye la sección de triggers OnDemand (columna derecha).</summary>
         private void BuildTriggersSection(ref int y)
         {
             var triggers = OnDemandConfigReader.GetOnDemandTriggers();
@@ -267,7 +278,7 @@ namespace AlwaysPrintTray.Forms
                 var lbl = new Label
                 {
                     Text = LocalizationManager.Get("StatusNoActionsAvailable"),
-                    Location = new Point(LabelX, y),
+                    Location = new Point(RightColX, y),
                     AutoSize = true,
                     ForeColor = Color.Gray,
                     Font = new Font("Segoe UI", 9f, FontStyle.Italic)
@@ -277,22 +288,21 @@ namespace AlwaysPrintTray.Forms
                 return;
             }
 
+            int btnX = RightColX + RightColWidth - 90;
             foreach (var trigger in triggers)
             {
-                // Etiqueta del trigger
                 var lbl = new Label
                 {
                     Text = trigger.Label,
-                    Location = new Point(LabelX, y + 4),
+                    Location = new Point(RightColX, y + 4),
                     AutoSize = true
                 };
                 Controls.Add(lbl);
 
-                // Botón "Ejecutar"
                 var btn = new Button
                 {
                     Text = LocalizationManager.Get("StatusButtonExecute"),
-                    Location = new Point(ButtonX, y),
+                    Location = new Point(btnX, y),
                     AutoSize = true,
                     Padding = new Padding(12, 2, 12, 2),
                     Tag = trigger,
@@ -302,83 +312,77 @@ namespace AlwaysPrintTray.Forms
                 Controls.Add(btn);
                 _allActionButtons.Add(btn);
 
-                y += 36;
+                y += 32;
             }
 
-            // ── Panel de progreso inline (inicialmente oculto) ───────────────
+            y += SectionSpacing;
+            AddSeparatorAt(RightColX, RightColWidth, ref y);
+
+            // ── Panel de progreso inline (siempre visible, se llena al ejecutar) ─
             _progressHeader = new Label
             {
-                Text = "",
-                Location = new Point(LabelX, y),
-                Size = new Size(FormWidth - 40, 20),
+                Text = "Progreso",
+                Location = new Point(RightColX, y),
+                Size = new Size(RightColWidth, 20),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(0x00, 0x66, 0xCC),
-                Visible = false
+                ForeColor = Color.FromArgb(0x66, 0x66, 0x66)
             };
             Controls.Add(_progressHeader);
+            y += 22;
 
             _progressListView = new ListView
             {
-                Location = new Point(LabelX, y + 22),
-                Size = new Size(FormWidth - 40, 120),
+                Location = new Point(RightColX, y),
+                Size = new Size(RightColWidth, 180),
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
                 HeaderStyle = ColumnHeaderStyle.Nonclickable,
                 Font = new Font("Consolas", 8.25f),
-                Visible = false
             };
-            _progressListView.Columns.Add("", 32);
-            _progressListView.Columns.Add("Acción", 140);
-            _progressListView.Columns.Add("Descripción", FormWidth - 40 - 32 - 140 - 30);
+            _progressListView.Columns.Add("", 28);
+            _progressListView.Columns.Add("Acción", 130);
+            _progressListView.Columns.Add("Descripción", RightColWidth - 28 - 130 - 25);
             Controls.Add(_progressListView);
-
-            _progressPanel = new Panel
-            {
-                Location = new Point(0, y),
-                Size = new Size(FormWidth, 148),
-                Visible = false
-            };
-            // El panel es solo un marcador de tamaño — los controles son hijos del form
-            // para evitar problemas de layout con Panel + posición absoluta.
+            y += 184;
         }
 
-        /// <summary>Construye la sección de servicios monitoreados.</summary>
+        /// <summary>Construye la sección de servicios monitoreados (columna izquierda).</summary>
         private void BuildServicesSection(ref int y)
         {
             var services = OnDemandConfigReader.GetMonitoredServices();
             var watchdogServices = OnDemandConfigReader.GetWatchdogServices();
 
+            int stateX = LeftColX + 260;
+            int watchdogX = LeftColX + 340;
+
             foreach (var svc in services)
             {
-                // Nombre del servicio (con ancho máximo para no invadir columna de estado)
                 var lblName = new Label
                 {
                     Text = svc.DisplayName,
-                    Location = new Point(LabelX, y + 4),
-                    Size = new Size(ServiceNameWidth, 24),
+                    Location = new Point(LeftColX, y + 4),
+                    Size = new Size(240, 20),
                     AutoEllipsis = true
                 };
                 Controls.Add(lblName);
 
-                // Estado del servicio (siempre gris, solo lectura)
                 var lblState = new Label
                 {
                     Text = "...",
-                    Location = new Point(StateX, y + 4),
+                    Location = new Point(stateX, y + 4),
                     AutoSize = true,
                     ForeColor = Color.FromArgb(0x66, 0x66, 0x66)
                 };
                 Controls.Add(lblState);
 
-                // Indicador de watchdog
                 var watchdogEntry = watchdogServices.Find(w =>
                     w.Name.Equals(svc.ServiceName, StringComparison.OrdinalIgnoreCase));
 
                 var lblWatchdog = new Label
                 {
                     Text = "",
-                    Location = new Point(ButtonX, y + 4),
+                    Location = new Point(watchdogX, y + 4),
                     AutoSize = true,
                     Font = new Font("Segoe UI", 8f)
                 };
@@ -392,7 +396,7 @@ namespace AlwaysPrintTray.Forms
                     WatchdogEntry = watchdogEntry
                 });
 
-                y += 36;
+                y += 28;
             }
         }
 
@@ -771,7 +775,8 @@ namespace AlwaysPrintTray.Forms
         // ═══════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Muestra el panel de progreso, limpia contenido anterior y expande el formulario.
+        /// Muestra el panel de progreso con el nombre del trigger que se va a ejecutar.
+        /// Limpia contenido anterior.
         /// </summary>
         private void ShowProgressPanel(string triggerLabel)
         {
@@ -779,19 +784,6 @@ namespace AlwaysPrintTray.Forms
             _progressListView.Items.Clear();
             _progressHeader.Text = $"⏳ Ejecutando: {triggerLabel}";
             _progressHeader.ForeColor = Color.FromArgb(0x00, 0x66, 0xCC);
-            _progressHeader.Visible = true;
-            _progressListView.Visible = true;
-
-            // Expandir el formulario si el panel no estaba visible
-            int panelBottom = _progressListView.Bottom + 10;
-            int requiredHeight = panelBottom + 70; // espacio para status + botón cerrar
-            if (ClientSize.Height < requiredHeight)
-            {
-                // Mover controles inferiores (status + cerrar) y ajustar alto
-                _lblStatus.Location = new Point(_lblStatus.Location.X, panelBottom + 4);
-                _btnClose.Location = new Point(_btnClose.Location.X, panelBottom + 28);
-                ClientSize = new Size(FormWidth, panelBottom + 70);
-            }
         }
 
         /// <summary>
@@ -1057,12 +1049,12 @@ namespace AlwaysPrintTray.Forms
         // ── Helpers de layout ───────────────────────────────────────────────────
         // ═══════════════════════════════════════════════════════════════════════
 
-        private void AddSectionHeader(string text, ref int y)
+        private void AddSectionHeaderAt(string text, int x, ref int y)
         {
             var lbl = new Label
             {
                 Text = text,
-                Location = new Point(12, y),
+                Location = new Point(x, y),
                 AutoSize = true,
                 Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(0x00, 0x66, 0xCC)
@@ -1071,19 +1063,19 @@ namespace AlwaysPrintTray.Forms
             y += 26;
         }
 
-        private Label AddFieldRow(string label, string value, ref int y)
+        private Label AddFieldRowAt(string label, string value, int x, int valueX, ref int y)
         {
             var lbl = new Label
             {
                 Text = label,
-                Location = new Point(LabelX, y),
+                Location = new Point(x, y),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(0x55, 0x55, 0x55)
             };
             var val = new Label
             {
                 Text = value,
-                Location = new Point(ValueX, y),
+                Location = new Point(valueX, y),
                 AutoSize = true,
                 ForeColor = Color.Black
             };
@@ -1093,17 +1085,22 @@ namespace AlwaysPrintTray.Forms
             return val;
         }
 
-        private void AddSeparator(ref int y)
+        private void AddSeparatorAt(int x, int width, ref int y)
         {
             var sep = new Label
             {
-                Location = new Point(12, y),
-                Size = new Size(FormWidth - 24, 1),
+                Location = new Point(x, y),
+                Size = new Size(width, 1),
                 BorderStyle = BorderStyle.Fixed3D
             };
             Controls.Add(sep);
             y += SectionSpacing;
         }
+
+        // Helpers legacy (mantener compatibilidad con código existente que use las versiones sin "At")
+        private void AddSectionHeader(string text, ref int y) => AddSectionHeaderAt(text, LeftColX, ref y);
+        private Label AddFieldRow(string label, string value, ref int y) => AddFieldRowAt(label, value, LeftColX, ValueX, ref y);
+        private void AddSeparator(ref int y) => AddSeparatorAt(LeftColX, LeftColWidth, ref y);
 
         // ═══════════════════════════════════════════════════════════════════════
         // ── Eventos del formulario ──────────────────────────────────────────────
