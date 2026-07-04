@@ -934,16 +934,16 @@ def list_workstations(
         .all()
     )
     
-    # Enriquecer is_online con conexiones WebSocket del worker actual.
-    # La columna BD puede quedar stale (False) si la WS reconectó sin actualizar BD.
-    # Solo cubre conexiones locales de este worker (no cross-worker), pero es mejor
-    # que mostrar offline una WS que claramente está conectada aquí.
+    # Enriquecer is_online con snapshot global de conexiones WebSocket (todos los workers).
+    # El snapshot se actualiza cada ~30s en background (heartbeat loop) via Redis.
+    # Lectura sync de un set en memoria — zero queries, zero await, zero latencia.
     from app.services.websocket_manager import connection_manager
-    local_online = set(connection_manager.workstation_connections.keys())
+    global_online = connection_manager.get_global_online_snapshot()
     for ws in workstations:
         ws_id_str = str(ws.id)
-        if ws_id_str in local_online and not ws.is_online:
-            ws.is_online = True
+        real_online = ws_id_str in global_online
+        if real_online != ws.is_online:
+            ws.is_online = real_online
 
     return WorkstationListResponse(
         items=workstations,

@@ -640,6 +640,13 @@ class ConnectionManager:
             True si está online, False si no
         """
         return workstation_id in self.workstation_connections
+
+    def get_global_online_snapshot(self) -> set:
+        """
+        Retorna set de workstation_ids online (single-worker, solo local).
+        Interfaz compatible con RedisConnectionManager.
+        """
+        return set(self.workstation_connections.keys())
     
     def get_connection_count(self) -> dict:
         """

@@ -99,6 +99,10 @@ class RedisConnectionManager:
         # Contador de workstations por organización (lazy subscribe/unsubscribe)
         self._org_ws_count: Dict[str, int] = {}
 
+        # Snapshot global de WS online (todos los workers). Actualizado cada heartbeat (~30s).
+        # Consultable de forma sync por endpoints REST sin await ni queries Redis.
+        self._global_online_snapshot: set = set()
+
         # VLAN de cada workstation conectada (para filtrado local)
         self._ws_vlan_ids: Dict[str, Optional[str]] = {}
 
@@ -1119,6 +1123,7 @@ class RedisConnectionManager:
         """
         Loop que renueva el TTL del WorkerRegistry periódicamente.
         Se ejecuta cada TTL/2 segundos para evitar expiración accidental.
+        También actualiza el snapshot global de workstations online (para consultas sync).
         """
         interval = settings.WORKER_REGISTRY_TTL // 2
         while True:
@@ -1126,6 +1131,10 @@ class RedisConnectionManager:
                 await asyncio.sleep(interval)
                 if self._worker_registry and self._redis_available:
                     await self._worker_registry.heartbeat()
+
+                    # Actualizar snapshot global de WS online (lectura de todos los workers)
+                    await self._refresh_online_snapshot()
+
                     # Publicar métricas del worker para consolidación global
                     ws_count = len(self.workstation_connections)
                     rss_mb = self._get_rss_mb()
@@ -1149,6 +1158,35 @@ class RedisConnectionManager:
                 break
             except Exception as e:
                 logger.warning("worker.heartbeat_error", error=str(e))
+
+    async def _refresh_online_snapshot(self) -> None:
+        """
+        Actualiza el snapshot global de workstations online leyendo los SETs
+        de WorkerRegistry de TODOS los workers activos en Redis.
+
+        Tiempo: O(W * N) donde W=workers y N=promedio de WS por worker.
+        Con 2 workers y ~500 WS total, son ~2 SMEMBERS → <5ms.
+        Se ejecuta cada 30s (heartbeat interval), no en hot path.
+        """
+        try:
+            online = set(self.workstation_connections.keys())  # locales siempre
+            async for key in self._redis.scan_iter(match="workers:*:workstations"):
+                members = await self._redis.smembers(key)
+                online.update(members)
+            self._global_online_snapshot = online
+        except Exception as e:
+            # Si falla, mantener snapshot anterior + locales
+            self._global_online_snapshot = set(self.workstation_connections.keys())
+            logger.debug("worker.online_snapshot_error", error=str(e))
+
+    def get_global_online_snapshot(self) -> set:
+        """
+        Retorna el snapshot global de WS online (todos los workers).
+        Sync-safe: lee un set en memoria, actualizado cada ~30s por heartbeat.
+        Usar en endpoints sync que necesitan saber qué WS están online.
+        """
+        # Merge con conexiones locales actuales (más frescas que el snapshot)
+        return self._global_online_snapshot | set(self.workstation_connections.keys())
 
     def _get_rss_mb(self) -> float:
         """Obtiene RSS del proceso actual en MB."""
