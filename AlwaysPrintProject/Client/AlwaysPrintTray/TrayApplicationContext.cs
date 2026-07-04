@@ -661,28 +661,34 @@ namespace AlwaysPrintTray
                     LocalizationManager.Get("BalloonCheckingUpdates"),
                     ToolTipIcon.Info);
 
-                // 1. Obtener estado de distribución: caché primario, HTTP fallback si es null
-                var state = _cloudManager.GetCachedState();
+                // 1. Obtener estado de distribución fresco del backend (no usar caché).
+                // El usuario explícitamente quiere verificar si hay algo nuevo — el caché
+                // puede tener datos obsoletos si el push no llegó (ej: MSI subido después de connect).
+                DistributionState? state = await FetchDistributionStateFromBackend();
 
+                // Si el backend no responde, usar caché como fallback
                 if (state == null)
                 {
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        "Buscar Actualizaciones: sin estado cacheado. Realizando fallback HTTP al backend...");
-                    state = await FetchDistributionStateFromBackend();
+                    state = _cloudManager.GetCachedState();
+                    if (state != null)
+                    {
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            "Buscar Actualizaciones: backend no respondió, usando estado cacheado como fallback.");
+                    }
                 }
 
                 if (state == null)
                 {
-                    // Ni caché ni backend disponible — notificar al usuario
+                    // Ni backend ni caché disponible — notificar al usuario
                     AlwaysPrintLogger.WriteTrayWarning(
-                        "Buscar Actualizaciones: no se pudo obtener estado del servidor (caché vacío y fallback HTTP falló).");
+                        "Buscar Actualizaciones: no se pudo obtener estado del servidor (backend y caché no disponibles).");
                     ShowBalloon(AppTitle,
                         "No se pudo obtener estado del servidor. Verifique la conexión.",
                         ToolTipIcon.Warning);
                     return;
                 }
 
-                // 2. Comparar estado local vs cacheado/recibido y descargar desde S3 lo que difiera
+                // 2. Comparar estado local vs remoto y descargar desde S3 lo que difiera
                 AlwaysPrintLogger.WriteTrayInfo(
                     $"Buscar Actualizaciones: comparando estado local vs remoto. " +
                     $"ConfigHash={state.ConfigHash ?? "null"}, CertVersion={state.CertVersion}, " +
