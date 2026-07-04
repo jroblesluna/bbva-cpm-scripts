@@ -939,11 +939,21 @@ def list_workstations(
     # Lectura sync de un set en memoria — zero queries, zero await, zero latencia.
     from app.services.websocket_manager import connection_manager
     global_online = connection_manager.get_global_online_snapshot()
+    dirty = False
     for ws in workstations:
         ws_id_str = str(ws.id)
         real_online = ws_id_str in global_online
         if real_online != ws.is_online:
             ws.is_online = real_online
+            dirty = True
+
+    # Persistir correcciones en BD para mantenerla sincronizada.
+    # Solo hace UPDATE si hay discrepancias (no en cada request).
+    if dirty:
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
 
     return WorkstationListResponse(
         items=workstations,
