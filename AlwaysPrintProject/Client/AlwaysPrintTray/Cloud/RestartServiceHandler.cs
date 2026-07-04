@@ -2,13 +2,17 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using AlwaysPrint.Shared.Logging;
+using AlwaysPrint.Shared.Messages;
+using AlwaysPrintTray.Pipe;
 
 namespace AlwaysPrintTray.Cloud
 {
     /// <summary>
-    /// Genera y ejecuta un script .cmd independiente que reinicia el servicio AlwaysPrintService.
-    /// El script sobrevive a la muerte del Tray y del Service.
-    /// Patrón: mismo que UpdateInstallHandler del proyecto Service.
+    /// Ejecuta el reinicio del servicio AlwaysPrintService.
+    /// Estrategia: envía mensaje pipe al Service para que él genere y lance
+    /// el script de reinicio (corre como SYSTEM, tiene permisos para net stop/start).
+    /// Fallback: si el pipe no está conectado, intenta lanzar script directo
+    /// (puede fallar si el usuario no es admin).
     /// </summary>
     public static class RestartServiceHandler
     {
@@ -16,15 +20,57 @@ namespace AlwaysPrintTray.Cloud
         private const string TrayProcessName = "AlwaysPrintTray";
 
         /// <summary>
-        /// Genera y lanza un script .cmd que reinicia el servicio AlwaysPrintService.
-        /// El script se ejecuta como proceso independiente que sobrevive al Tray y al Service.
+        /// Solicita al Service que se reinicie a sí mismo vía Named Pipe.
+        /// El Service corre como SYSTEM y tiene permisos para ejecutar net stop/start.
         /// </summary>
-        /// <returns>Tupla con resultado: success indica si el script fue lanzado, message con detalle.</returns>
-        public static (bool success, string message) Execute()
+        /// <param name="pipe">Cliente pipe para comunicación con el Service.</param>
+        /// <returns>Tupla con resultado: success indica si el reinicio fue iniciado.</returns>
+        public static (bool success, string message) Execute(PipeClient? pipe = null)
+        {
+            // Estrategia 1: delegar al Service vía pipe (preferido — corre como SYSTEM)
+            if (pipe != null && pipe.IsConnected)
+            {
+                try
+                {
+                    var msg = PipeMessage.Create(MessageType.ServiceAction,
+                        new ServiceActionPayload { Action = "restart" });
+                    var response = pipe.Send(msg);
+
+                    if (response?.Type == MessageType.Ack)
+                    {
+                        var ack = response.GetPayload<AckPayload>();
+                        if (ack?.Success == true)
+                        {
+                            AlwaysPrintLogger.WriteTrayInfo(
+                                "RestartServiceHandler: Service confirmó reinicio. El servicio se reiniciará en breve.");
+                            return (true, "Reinicio de servicio iniciado por el Service (SYSTEM).");
+                        }
+                        else
+                        {
+                            AlwaysPrintLogger.WriteTrayWarning(
+                                $"RestartServiceHandler: Service reportó error: {ack?.Message}. Intentando fallback directo.");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"RestartServiceHandler: error comunicando con Service: {ex.Message}. Intentando fallback directo.");
+                }
+            }
+
+            // Estrategia 2: fallback — lanzar script directo (requiere admin, puede fallar)
+            return ExecuteDirectScript();
+        }
+
+        /// <summary>
+        /// Fallback: genera y lanza un script .cmd directo que reinicia el servicio.
+        /// Solo funciona si el proceso tiene privilegios de administrador.
+        /// </summary>
+        private static (bool success, string message) ExecuteDirectScript()
         {
             try
             {
-                // Generar ruta del script temporal
                 string scriptDir = Path.Combine(Path.GetTempPath(), "AlwaysPrint", "Commands");
                 Directory.CreateDirectory(scriptDir);
 
@@ -32,14 +78,12 @@ namespace AlwaysPrintTray.Cloud
                     scriptDir,
                     $"restart_service_{DateTime.Now:yyyyMMdd_HHmmss}.cmd");
 
-                // Generar contenido del script de reinicio
                 string scriptContent = GenerateRestartScript(scriptPath);
                 File.WriteAllText(scriptPath, scriptContent);
 
                 AlwaysPrintLogger.WriteTrayInfo(
-                    $"RestartServiceHandler: script de reinicio generado en {scriptPath}");
+                    $"RestartServiceHandler: script de reinicio (fallback) generado en {scriptPath}");
 
-                // Lanzar como proceso independiente (no hijo del Tray)
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
@@ -52,42 +96,30 @@ namespace AlwaysPrintTray.Cloud
                 var process = Process.Start(startInfo);
                 if (process == null)
                 {
-                    string errorMsg = "RestartServiceHandler: no se pudo lanzar el script de reinicio.";
+                    string errorMsg = "RestartServiceHandler: no se pudo lanzar el script de reinicio (fallback).";
                     AlwaysPrintLogger.WriteTrayError(errorMsg);
                     return (false, errorMsg);
                 }
 
                 AlwaysPrintLogger.WriteTrayInfo(
-                    $"RestartServiceHandler: script de reinicio lanzado (PID={process.Id}). " +
-                    "El servicio se reiniciará en breve.");
+                    $"RestartServiceHandler: script de reinicio (fallback) lanzado (PID={process.Id}).");
 
-                return (true, "Script de reinicio de servicio lanzado exitosamente.");
+                return (true, "Script de reinicio lanzado (fallback directo, puede requerir permisos admin).");
             }
             catch (Exception ex)
             {
-                string errorMsg = $"RestartServiceHandler: error al generar/lanzar script de reinicio: {ex.Message}";
+                string errorMsg = $"RestartServiceHandler: error en fallback directo: {ex.Message}";
                 AlwaysPrintLogger.WriteTrayError(errorMsg);
                 return (false, errorMsg);
             }
         }
 
-        /// <summary>
-        /// Genera el contenido del script .cmd que reinicia el servicio.
-        /// Secuencia:
-        /// 1. Espera 3 segundos (para que el Tray termine de enviar command_result)
-        /// 2. Mata el proceso AlwaysPrintTray
-        /// 3. Detiene el servicio AlwaysPrintService
-        /// 4. Espera 3 segundos
-        /// 5. Inicia el servicio (que relanzará el Tray automáticamente)
-        /// 6. Se auto-elimina
-        /// </summary>
         private static string GenerateRestartScript(string scriptPath)
         {
             return $@"@echo off
 REM ============================================================
-REM Script de reinicio de servicio AlwaysPrint
+REM Script de reinicio de servicio AlwaysPrint (fallback)
 REM Generado: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
-REM Comando remoto desde Cloud Manager
 REM ============================================================
 timeout /t 3 /nobreak > nul
 taskkill /f /im {TrayProcessName}.exe > nul 2>&1

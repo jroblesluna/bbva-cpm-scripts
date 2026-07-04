@@ -1425,7 +1425,7 @@ namespace AlwaysPrintTray.Cloud
         /// </summary>
         private void HandleRestartServiceCommand(string commandId)
         {
-            var (success, message) = RestartServiceHandler.Execute();
+            var (success, message) = RestartServiceHandler.Execute(_pipe);
             SendCommandResult(commandId, success, message);
 
             if (success)

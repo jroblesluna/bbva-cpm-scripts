@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.ServiceProcess;
 using System.Text;
@@ -486,6 +487,15 @@ namespace AlwaysPrintService.Pipe
                 AlwaysPrintLogger.WriteInfo(
                     $"ServiceAction: ejecutando '{payload.Action}' sobre servicio '{payload.ServiceName}'");
 
+                // Caso especial: reinicio propio (AlwaysPrintService).
+                // No se puede usar ServiceController para detenerse a sí mismo (deadlock).
+                // Se genera un script cmd independiente que sobrevive al proceso.
+                if (payload.ServiceName.Equals("AlwaysPrintService", StringComparison.OrdinalIgnoreCase) &&
+                    payload.Action.Equals("Restart", StringComparison.OrdinalIgnoreCase))
+                {
+                    return HandleSelfRestart(req, payload);
+                }
+
                 using (var sc = new ServiceController(payload.ServiceName))
                 {
                     var timeout = TimeSpan.FromSeconds(30);
@@ -602,6 +612,68 @@ namespace AlwaysPrintService.Pipe
                         NewState = "Unknown",
                         Message = $"Error inesperado: {ex.Message}"
                     });
+            }
+        }
+
+        /// <summary>
+        /// Reinicio propio del Service: genera un script cmd que detiene y reinicia
+        /// AlwaysPrintService. El script corre como SYSTEM (hereda contexto del Service)
+        /// y sobrevive a la muerte del proceso.
+        /// </summary>
+        private PipeMessage HandleSelfRestart(PipeMessage req, ServiceActionPayload payload)
+        {
+            try
+            {
+                string scriptDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                    "Temp", "AlwaysPrint", "Commands");
+                Directory.CreateDirectory(scriptDir);
+
+                string scriptPath = Path.Combine(scriptDir,
+                    $"self_restart_{DateTime.Now:yyyyMMdd_HHmmss}.cmd");
+
+                string scriptContent = $@"@echo off
+REM Script de auto-reinicio de AlwaysPrintService (ejecutado como SYSTEM)
+REM Generado: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
+timeout /t 2 /nobreak > nul
+net stop AlwaysPrintService
+timeout /t 3 /nobreak > nul
+net start AlwaysPrintService
+(goto) 2>nul & del /f /q ""{scriptPath}""
+";
+                File.WriteAllText(scriptPath, scriptContent);
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c \"{scriptPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = Path.GetTempPath()
+                };
+
+                var process = Process.Start(startInfo);
+                if (process == null)
+                {
+                    AlwaysPrintLogger.WriteError(
+                        "HandleSelfRestart: no se pudo lanzar script de auto-reinicio.");
+                    return PipeMessage.Reply(req, MessageType.Ack,
+                        new AckPayload { Success = false, Message = "No se pudo lanzar script de reinicio." });
+                }
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"HandleSelfRestart: script de auto-reinicio lanzado (PID={process.Id}). " +
+                    "El servicio se detendrá y reiniciará en ~5 segundos.");
+
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = true, Message = "Auto-reinicio de servicio iniciado." });
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"HandleSelfRestart: error: {ex.Message}", ex);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = $"Error: {ex.Message}" });
             }
         }
 
