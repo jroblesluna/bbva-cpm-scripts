@@ -40,6 +40,8 @@ namespace AlwaysPrintTray.Forms
         // ── Controles de información general ────────────────────────────────────
         private Label _valState = null!;
         private Label _valVersion = null!;
+        private Label _valHostname = null!;
+        private Label _valIp = null!;
         private Label _valQueue = null!;
         private Label _valQueueStatus = null!;
         private Label _valDriver = null!;
@@ -176,6 +178,8 @@ namespace AlwaysPrintTray.Forms
             AddSectionHeaderAt(LocalizationManager.Get("StatusSectionGeneralInfo"), LeftColX, ref yL);
             _valState = AddFieldRowAt(LocalizationManager.Get("StatusLabelState"), "...", LeftColX, ValueX, ref yL);
             _valVersion = AddFieldRowAt(LocalizationManager.Get("StatusLabelVersion"), "...", LeftColX, ValueX, ref yL);
+            _valHostname = AddFieldRowAt("Hostname:", "...", LeftColX, ValueX, ref yL);
+            _valIp = AddFieldRowAt("IP:", "...", LeftColX, ValueX, ref yL);
             _valQueue = AddFieldRowAt(LocalizationManager.Get("StatusLabelActiveQueue"), "...", LeftColX, ValueX, ref yL);
             _valQueueStatus = AddFieldRowAt(LocalizationManager.Get("StatusLabelQueueStatus"), "...", LeftColX, ValueX, ref yL);
             _valDriver = AddFieldRowAt(LocalizationManager.Get("StatusLabelDriver"), "...", LeftColX, ValueX, ref yL);
@@ -416,6 +420,8 @@ namespace AlwaysPrintTray.Forms
                     : Color.FromArgb(0x22, 0x8B, 0x22);   // Verde
                 _valVersion.Text = System.Reflection.Assembly.GetExecutingAssembly()
                     .GetName().Version?.ToString() ?? "0.0.0.0";
+                _valHostname.Text = AlwaysPrint.Shared.Network.NetworkHelper.GetHostname();
+                _valIp.Text = AlwaysPrint.Shared.Network.NetworkHelper.GetOutboundLocalIP();
                 _valQueue.Text = LoadQueueName();
                 RefreshQueueStatus();
                 _valDriver.Text = LoadDriverVersion();
@@ -569,8 +575,9 @@ namespace AlwaysPrintTray.Forms
         {
             _valCloudStatus.Text = LocalizationManager.Get("StatusCloudConnected");
             _valCloudStatus.ForeColor = Color.FromArgb(0x22, 0x8B, 0x22); // Verde
-            _valCloudDetails.Text = "";
-            _valCloudDetails.Visible = false;
+            _valCloudDetails.Text = LoadCloudServerUrl();
+            _valCloudDetails.ForeColor = Color.FromArgb(0x66, 0x66, 0x66);
+            _valCloudDetails.Visible = true;
         }
 
         /// <summary>
@@ -583,8 +590,9 @@ namespace AlwaysPrintTray.Forms
                 case "Connected":
                     _valCloudStatus.Text = FormatConnectedStatus(state);
                     _valCloudStatus.ForeColor = Color.FromArgb(0x22, 0x8B, 0x22); // Verde
-                    _valCloudDetails.Text = "";
-                    _valCloudDetails.Visible = false;
+                    _valCloudDetails.Text = LoadCloudServerUrl();
+                    _valCloudDetails.ForeColor = Color.FromArgb(0x66, 0x66, 0x66);
+                    _valCloudDetails.Visible = true;
                     break;
 
                 case "Connecting":
@@ -1043,6 +1051,26 @@ namespace AlwaysPrintTray.Forms
                     string.IsNullOrWhiteSpace(config.Version) ? "?" : config.Version);
             }
             catch { return "Error al leer"; }
+        }
+
+        /// <summary>
+        /// Obtiene la URL del servidor Cloud desde el registro (CloudApiUrl).
+        /// Retorna solo el host para mostrar en la UI.
+        /// </summary>
+        private string LoadCloudServerUrl()
+        {
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    RegistryConfigManager.RegistryPath))
+                {
+                    string? url = key?.GetValue("CloudApiUrl")?.ToString();
+                    if (string.IsNullOrEmpty(url)) return "";
+                    var uri = new Uri(url);
+                    return uri.Host;
+                }
+            }
+            catch { return ""; }
         }
 
         // ═══════════════════════════════════════════════════════════════════════
