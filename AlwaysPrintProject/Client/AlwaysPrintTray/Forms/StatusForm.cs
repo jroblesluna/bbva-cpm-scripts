@@ -864,20 +864,26 @@ namespace AlwaysPrintTray.Forms
 
         /// <summary>
         /// Escribe un resumen de los pasos ejecutados en el log del Tray.
+        /// Solo incluye pasos con estado final (ok/error), no los intermedios (running).
         /// Formato: una línea por paso con [✓] o [✗] y la descripción.
         /// </summary>
         private void LogProgressSummary(string triggerLabel)
         {
             try
             {
-                if (_progressSteps.Count == 0) return;
+                // Filtrar solo pasos con resultado final (no "running")
+                var finalSteps = _progressSteps.FindAll(s => s.Status == "ok" || s.Status == "error");
+                if (finalSteps.Count == 0) return;
+
+                int okCount = finalSteps.FindAll(s => s.Status == "ok").Count;
+                int errorCount = finalSteps.FindAll(s => s.Status == "error").Count;
 
                 var lines = new System.Text.StringBuilder();
-                lines.AppendLine($"OnDemand '{triggerLabel}' — {_progressSteps.Count} pasos:");
+                lines.AppendLine($"OnDemand '{triggerLabel}' — {finalSteps.Count} pasos ({okCount} ok, {errorCount} error):");
 
-                foreach (var step in _progressSteps)
+                foreach (var step in finalSteps)
                 {
-                    string icon = step.Status == "ok" ? "✓" : step.Status == "error" ? "✗" : "·";
+                    string icon = step.Status == "ok" ? "✓" : "✗";
                     lines.AppendLine($"  [{icon}] {step.ActionType}: {step.StepName}");
                 }
 
