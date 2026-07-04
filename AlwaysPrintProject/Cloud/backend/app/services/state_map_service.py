@@ -42,6 +42,11 @@ _STATE_MAP_CHANNEL = "state_map:update"
 # Threshold para regenerar presigned URL de MSI (5 minutos antes de expirar)
 _MSI_URL_REFRESH_THRESHOLD_SECONDS = 300
 
+# TTL del state_map por org: si la org no se recargó en este tiempo,
+# se fuerza una recarga desde BD al próximo acceso. Garantiza que incluso
+# si Redis pub/sub pierde un mensaje, el worker se sincroniza en ≤5 min.
+_STATE_MAP_TTL_SECONDS = 300
+
 logger = get_logger(__name__)
 
 
@@ -88,6 +93,11 @@ class OrgDistributionState:
     # Config overrides por scope
     vlan_configs: dict[str, VlanConfigState] = field(default_factory=dict)
     ws_configs: dict[str, WsConfigState] = field(default_factory=dict)
+
+    # Timestamp de última carga desde BD (epoch). Se usa para invalidar
+    # el caché periódicamente y recargar desde BD en caso de que Redis pub/sub
+    # haya perdido un mensaje de actualización (fire-and-forget).
+    loaded_at: float = field(default_factory=time.time)
 
 
 @dataclass
@@ -632,6 +642,9 @@ class StateMapService:
             worker_id=self._worker_id,
         )
 
+        # Resetear TTL: la org fue sincronizada exitosamente via Redis
+        org_state.loaded_at = time.time()
+
     @staticmethod
     def _build_public_url(s3_key: str) -> str:
         """
@@ -756,6 +769,11 @@ class StateMapService:
             "scope_id": scope_id,
         })
 
+        # Resetear TTL del estado local (acabamos de actualizar)
+        org_state = self._state.get(org_id)
+        if org_state:
+            org_state.loaded_at = time.time()
+
     async def update_cert(self, org_id: str, cert_version: int, cert_url: str) -> None:
         """
         Actualiza cert en el map local y publica a Redis.
@@ -858,6 +876,20 @@ class StateMapService:
                 "msi_version": None,
                 "msi_url": None,
             }
+
+        # TTL check: si el estado lleva más de _STATE_MAP_TTL_SECONDS sin recargar
+        # desde BD, forzar recarga para garantizar consistencia eventual
+        # (cubre pérdida de mensajes Redis pub/sub).
+        if (time.time() - org_state.loaded_at) > _STATE_MAP_TTL_SECONDS:
+            logger.info(
+                "state_map.ttl_expirado_recargando",
+                org_id=org_id,
+                ws_id=ws_id,
+                edad_segundos=int(time.time() - org_state.loaded_at),
+            )
+            reloaded = await self._load_org_state(org_id=org_id)
+            if reloaded is not None:
+                org_state = reloaded
 
         # Resolución jerárquica de config: org < vlan < workstation
         config_hash = org_state.config_hash
