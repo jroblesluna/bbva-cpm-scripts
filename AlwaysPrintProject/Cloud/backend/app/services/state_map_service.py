@@ -44,8 +44,8 @@ _MSI_URL_REFRESH_THRESHOLD_SECONDS = 300
 
 # TTL del state_map por org: si la org no se recargó en este tiempo,
 # se fuerza una recarga desde BD al próximo acceso. Garantiza que incluso
-# si Redis pub/sub pierde un mensaje, el worker se sincroniza en ≤5 min.
-_STATE_MAP_TTL_SECONDS = 300
+# si Redis pub/sub pierde un mensaje, el worker se sincroniza en ≤60s.
+_STATE_MAP_TTL_SECONDS = 60
 
 logger = get_logger(__name__)
 
