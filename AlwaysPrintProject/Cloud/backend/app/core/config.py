@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     
     # === CONFIGURACIÓN DE RATE LIMITING ===
     RATE_LIMIT_LOGIN: int = 5  # intentos por minuto
-    RATE_LIMIT_API: int = 100  # peticiones por minuto
+    RATE_LIMIT_API: int = 300  # peticiones por minuto
 
     # === CONFIGURACIÓN DE BOOTSTRAP DOMAINS ===
     # Dominios de bootstrap por defecto para nuevas configuraciones globales.
