@@ -1548,6 +1548,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
   const t = useTranslations('vlans')
   const tCommon = useTranslations('common')
   const tMap = useTranslations('map')
+  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [devices, setDevices] = useState<Device[]>([])
   const [devicesLoading, setDevicesLoading] = useState(true)
@@ -1674,7 +1675,11 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
         }
       }
       console.error('Error:', error)
-      alert(msg)
+      toast({
+        title: 'Error al actualizar VLAN',
+        description: msg,
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
