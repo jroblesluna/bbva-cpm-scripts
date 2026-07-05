@@ -669,7 +669,7 @@ export default function VLANsPage() {
               {/* Layout: en desktop imagen a la izquierda + contenido a la derecha */}
               <div className="flex flex-col md:flex-row md:gap-4">
                 {/* Thumbnail de imagen (solo desktop) */}
-                <div className="hidden md:block flex-shrink-0 w-28 h-20 rounded-md overflow-hidden border border-gray-200 bg-gray-100">
+                <div className="hidden md:block flex-shrink-0 w-32 h-24 rounded-md overflow-hidden border border-gray-200 bg-gray-100">
                   {vlan.location_image_url ? (
                     <img
                       src={vlan.location_image_url}
@@ -686,7 +686,7 @@ export default function VLANsPage() {
                 {/* Contenido principal */}
                 <div className="flex-1 min-w-0">
               {/* Fila 1: Nombre + niveles de contingencia | Scoring columna derecha */}
-              <div className="flex items-start justify-between mb-1">
+              <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2 min-w-0 flex-wrap">
                   {selectionMode && (
                     <input
@@ -742,7 +742,7 @@ export default function VLANsPage() {
                 </div>
               </div>
               {/* Fila 2: Organización, CIDRs, descripción */}
-              <div className="space-y-1 mb-1">
+              <div className="space-y-0.5">
                 <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
                   <span className="font-medium">
                     {accounts.find((a) => a.id === vlan.organization_id)?.name || '-'}
