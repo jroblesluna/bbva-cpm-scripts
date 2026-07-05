@@ -164,3 +164,26 @@ resource "aws_s3_bucket_policy" "docs" {
     ]
   })
 }
+
+# Lifecycle: eliminar objetos temporales de imágenes (tagueados temporal=true) después de 1 día
+resource "aws_s3_bucket_lifecycle_configuration" "docs" {
+  bucket = aws_s3_bucket.docs.id
+
+  rule {
+    id     = "limpiar-imagenes-temporales"
+    status = "Enabled"
+
+    filter {
+      and {
+        prefix = "vlan-images/"
+        tags = {
+          temporal = "true"
+        }
+      }
+    }
+
+    expiration {
+      days = 1
+    }
+  }
+}

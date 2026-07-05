@@ -80,6 +80,7 @@ class S3ImagesService:
                             Body=photo_data,
                             ContentType="image/jpeg",
                             CacheControl="no-cache",
+                            Tagging="temporal=true",
                         )
                         options.append(f"{self._get_public_url(s3_key)}?v={cache_buster}")
                     # La recomendada es la primera Places Photo (si existe)
@@ -138,6 +139,7 @@ class S3ImagesService:
                                 Body=resp.content,
                                 ContentType="image/jpeg",
                                 CacheControl="no-cache",
+                                Tagging="temporal=true",
                             )
                             options.append(f"{self._get_public_url(s3_key)}?v={cache_buster}")
 
@@ -158,6 +160,7 @@ class S3ImagesService:
                         Body=resp.content,
                         ContentType="image/jpeg",
                         CacheControl="no-cache",
+                        Tagging="temporal=true",
                     )
                     options.append(f"{self._get_public_url(s3_key)}?v={cache_buster}")
 
