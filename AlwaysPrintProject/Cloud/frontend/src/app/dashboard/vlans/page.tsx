@@ -1664,12 +1664,12 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
       }
       onSuccess()
     } catch (error: unknown) {
-      // Mostrar mensaje de error del backend (ej: conflicto de CIDR duplicado)
+      // El interceptor de apiClient transforma errores a {detail, status}
       let msg = 'Error desconocido'
       if (error && typeof error === 'object') {
-        const axiosErr = error as { response?: { data?: { detail?: string }; status?: number } }
-        if (axiosErr.response?.data?.detail) {
-          msg = axiosErr.response.data.detail
+        const apiErr = error as { detail?: string; status?: number }
+        if (apiErr.detail) {
+          msg = apiErr.detail
         } else if (error instanceof Error) {
           msg = error.message
         }
