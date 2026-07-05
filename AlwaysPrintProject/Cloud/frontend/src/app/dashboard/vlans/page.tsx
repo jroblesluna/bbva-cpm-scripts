@@ -99,6 +99,7 @@ export default function VLANsPage() {
   const [filterContingency, setFilterContingency] = useState(false)
   const [filterWithConfig, setFilterWithConfig] = useState(false)
   const [filterWithDevices, setFilterWithDevices] = useState(false)
+  const [filterMandatory, setFilterMandatory] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -226,7 +227,8 @@ export default function VLANsPage() {
     const matchesContingency = !filterContingency || vlan.forced_contingency
     const matchesConfig = !filterWithConfig || (vlanStats?.vlan_ids_with_config || []).includes(vlan.id)
     const matchesDevices = !filterWithDevices || (activeDeviceCounts[vlan.id] ?? 0) === 0
-    return matchesSearch && matchesContingency && matchesConfig && matchesDevices
+    const matchesMandatory = !filterMandatory || vlan.action_config_mandatory
+    return matchesSearch && matchesContingency && matchesConfig && matchesDevices && matchesMandatory
   })
 
   const totalFiltered = filteredVlans.length
@@ -542,6 +544,19 @@ export default function VLANsPage() {
                 {filterWithConfig && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 5l2.5 2.5L8 3"/></svg>}
               </span>
               {t('filterWithConfigOnly')}
+            </button>
+            <button
+              onClick={() => { setFilterMandatory(!filterMandatory); setPage(1) }}
+              className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-all select-none ${
+                filterMandatory
+                  ? 'border-purple-300 bg-purple-50 text-purple-700'
+                  : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              }`}
+            >
+              <span className={`flex w-3.5 h-3.5 items-center justify-center rounded-sm border shrink-0 transition-colors ${filterMandatory ? 'border-purple-500 bg-purple-500' : 'border-gray-300 bg-white'}`}>
+                {filterMandatory && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 5l2.5 2.5L8 3"/></svg>}
+              </span>
+              {t('filterMandatoryConfig')}
             </button>
           </div>
           <div className="flex items-center gap-2">

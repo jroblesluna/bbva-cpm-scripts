@@ -11,6 +11,7 @@ export interface VLAN {
   forced_contingency: boolean
   contingency_inherited: boolean | null
   default_device_id: string | null
+  action_config_mandatory: boolean
   metadata: Record<string, string> | null
   address: string | null
   latitude: number | null

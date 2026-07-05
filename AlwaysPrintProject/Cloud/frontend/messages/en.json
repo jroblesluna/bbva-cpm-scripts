@@ -274,6 +274,7 @@
     "allOrganizations": "All organizations",
     "filterContingencyOnly": "In contingency",
     "filterWithConfigOnly": "Specific AlwaysConfig",
+    "filterMandatoryConfig": "Mandatory config",
     "filterWithDevices": "Without devices",
     "statsNoDevices": "No devices",
     "statsWithConfig": "Specific AlwaysConfig",
