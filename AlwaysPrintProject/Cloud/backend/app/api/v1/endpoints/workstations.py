@@ -808,15 +808,25 @@ def list_workstations(
     if vlan_id:
         base_query = base_query.filter(Workstation.vlan_id == vlan_id)
     
-    # Filtrar por estado online usando snapshot Redis (no BD stale).
-    # Se aplica en SQL con IN/NOT IN para mantener paginación eficiente.
+    # Obtener snapshot global de WS online (usado para filtro Y enriquecimiento).
     from app.services.websocket_manager import connection_manager
     global_online = connection_manager.get_global_online_snapshot()
+
+    # Filtrar por estado online usando snapshot Redis (no BD stale).
+    # Se aplica en SQL con IN/NOT IN para mantener paginación eficiente.
     if is_online is not None and global_online:
+        # Convertir strings a UUIDs para match correcto con columna UUID de PostgreSQL
+        from uuid import UUID as PyUUID
+        online_uuids = set()
+        for ws_id in global_online:
+            try:
+                online_uuids.add(PyUUID(ws_id) if not isinstance(ws_id, PyUUID) else ws_id)
+            except (ValueError, AttributeError):
+                pass
         if is_online:
-            base_query = base_query.filter(Workstation.id.in_(global_online))
+            base_query = base_query.filter(Workstation.id.in_(online_uuids))
         else:
-            base_query = base_query.filter(~Workstation.id.in_(global_online))
+            base_query = base_query.filter(~Workstation.id.in_(online_uuids))
     elif is_online is not None and not global_online:
         # Snapshot vacío (Redis no disponible): fallback a BD
         base_query = base_query.filter(Workstation.is_online.is_(is_online))
