@@ -950,15 +950,15 @@ def download_msi_by_org(
 
 @router.get(
     "/pkg/{organization_id}",
-    summary="Descargar MSI disfrazado como binario genérico (bypass proxy)",
+    summary="Descargar MSI codificado en base64 (bypass proxy DPI)",
     description=(
-        "Endpoint idéntico a /msi/{org_id} pero sirve el archivo con "
-        "Content-Type application/octet-stream y sin extensión .msi en el "
-        "filename. Diseñado para workstations cuyo proxy (Zscaler/BlueCoat) "
-        "bloquea descargas con content-type application/x-msi o extensión .msi."
+        "Endpoint que sirve el MSI codificado en base64 como text/plain. "
+        "Diseñado para workstations cuyo proxy (Zscaler/BlueCoat) "
+        "bloquea descargas binarias por inspección de contenido (magic bytes MSI/OLE). "
+        "El cliente debe decodificar el base64 para obtener el MSI."
     ),
     responses={
-        200: {"description": "Archivo binario (streaming, contenido MSI)"},
+        200: {"description": "MSI codificado en base64 (text/plain)"},
         403: {"description": "Auto-actualizaciones deshabilitadas"},
         404: {"description": "Organización no encontrada o sin paquete disponible"},
     },
@@ -967,7 +967,9 @@ def download_pkg_by_org(
     organization_id: str,
     db: Session = Depends(get_db),
 ):
-    """Descarga el MSI latest disfrazado como binario genérico para bypass de proxy."""
+    """Descarga el MSI latest codificado en base64 para bypass de proxy DPI."""
+    import base64
+    from io import BytesIO
     from app.models.organization import Organization
 
     account = db.query(Organization).filter(
@@ -996,17 +998,21 @@ def download_pkg_by_org(
     except Exception:
         raise HTTPException(status_code=500, detail="Error al obtener paquete")
 
+    # Leer todo el contenido y codificar en base64
+    raw_bytes = s3_response['Body'].read()
+    b64_data = base64.b64encode(raw_bytes)
+
     logger.info(
-        "Descarga pkg (proxy bypass): organization_id=%s, key=%s",
-        organization_id, target_key or "latest",
+        "Descarga pkg b64 (proxy DPI bypass): organization_id=%s, key=%s, size_raw=%d, size_b64=%d",
+        organization_id, target_key or "latest", len(raw_bytes), len(b64_data),
     )
 
     return StreamingResponse(
-        s3_response['Body'].iter_chunks(chunk_size=65536),
-        media_type="application/octet-stream",
+        BytesIO(b64_data),
+        media_type="text/plain",
         headers={
-            "Content-Disposition": "attachment; filename=update.bin",
-            "Content-Length": str(s3_response.get('ContentLength', 0)),
+            "Content-Length": str(len(b64_data)),
+            "X-Original-Size": str(len(raw_bytes)),
         },
     )
 
