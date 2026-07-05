@@ -1161,22 +1161,36 @@ class RedisConnectionManager:
 
     async def _refresh_online_snapshot(self) -> None:
         """
-        Actualiza el snapshot global de workstations online leyendo los SETs
-        de WorkerRegistry de TODOS los workers activos en Redis.
+        Actualiza el snapshot global de workstations online usando SUNIONSTORE.
 
-        Tiempo: O(W * N) donde W=workers y N=promedio de WS por worker.
-        Con 2 workers y ~500 WS total, son ~2 SMEMBERS → <5ms.
+        En vez de que cada worker haga scan_iter + smembers por separado
+        (puede dar resultados inconsistentes entre workers por timing),
+        usa SUNIONSTORE para generar una key compartida con la unión
+        de todos los SETs de workers, y luego lee esa key.
+
+        Tiempo: O(N) total de WS online. Con 500 WS = <5ms.
         Se ejecuta cada 30s (heartbeat interval), no en hot path.
         """
         try:
-            online = set(self.workstation_connections.keys())  # locales siempre
+            # Encontrar todas las keys de workers activos
+            worker_keys = []
             async for key in self._redis.scan_iter(match="workers:*:workstations"):
-                members = await self._redis.smembers(key)
-                online.update(members)
-            self._global_online_snapshot = online
+                worker_keys.append(key)
+
+            if worker_keys:
+                # SUNIONSTORE: unión atómica de todos los SETs → key temporal compartida
+                dest_key = "global:online_workstations"
+                await self._redis.sunionstore(dest_key, *worker_keys)
+                await self._redis.expire(dest_key, 60)  # TTL safety
+                # Leer el resultado
+                online = await self._redis.smembers(dest_key)
+                self._global_online_snapshot = online | set(self.workstation_connections.keys())
+            else:
+                # No hay keys de workers — solo locales
+                self._global_online_snapshot = set(self.workstation_connections.keys())
         except Exception as e:
             # Si falla, mantener snapshot anterior + locales
-            self._global_online_snapshot = set(self.workstation_connections.keys())
+            self._global_online_snapshot = self._global_online_snapshot | set(self.workstation_connections.keys())
             logger.debug("worker.online_snapshot_error", error=str(e))
 
     def get_global_online_snapshot(self) -> set:
