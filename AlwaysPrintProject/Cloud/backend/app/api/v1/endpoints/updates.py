@@ -885,6 +885,69 @@ def download_update(
     )
 
 
+@router.get(
+    "/msi/{organization_id}",
+    summary="Descargar MSI por organización (sin auth)",
+    description=(
+        "Endpoint público que sirve el MSI latest para una organización. "
+        "No requiere autenticación — usado por workstations que no pueden "
+        "enviar headers custom (bitsadmin via alwaysconfig OnDemand). "
+        "La seguridad se basa en conocer el UUID de la organización."
+    ),
+    responses={
+        200: {"description": "Archivo MSI (streaming)"},
+        403: {"description": "Auto-actualizaciones deshabilitadas"},
+        404: {"description": "Organización no encontrada o sin MSI disponible"},
+    },
+)
+def download_msi_by_org(
+    organization_id: str,
+    db: Session = Depends(get_db),
+):
+    """Descarga el MSI latest para una organización sin requerir auth headers."""
+    from app.models.organization import Organization
+
+    account = db.query(Organization).filter(
+        Organization.id == organization_id,
+        Organization.is_active == True,
+    ).first()
+
+    if not account:
+        raise HTTPException(status_code=404, detail="Organización no encontrada")
+
+    if not account.auto_update_enabled:
+        raise HTTPException(status_code=403, detail="Auto-actualizaciones deshabilitadas")
+
+    # Determinar key del MSI (pinned o latest)
+    target_key = None
+    if account.target_version:
+        target_key = f"versions/{account.target_version}/AlwaysPrint.msi"
+
+    db.close()
+
+    try:
+        s3_service = S3UpdateService()
+        s3_response = s3_service.get_object(key=target_key)
+    except ClientError:
+        raise HTTPException(status_code=404, detail="MSI no encontrado en S3")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al descargar MSI")
+
+    logger.info(
+        "Descarga MSI pública: organization_id=%s, key=%s",
+        organization_id, target_key or "latest",
+    )
+
+    return StreamingResponse(
+        s3_response['Body'].iter_chunks(chunk_size=65536),
+        media_type="application/x-msi",
+        headers={
+            "Content-Disposition": "attachment; filename=AlwaysPrint.msi",
+            "Content-Length": str(s3_response.get('ContentLength', 0)),
+        },
+    )
+
+
 @router.post(
     "/notify-new-version",
     summary="Notificar nueva versión disponible (CI/CD)",
