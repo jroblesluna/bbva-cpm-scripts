@@ -1002,10 +1002,15 @@ namespace AlwaysPrintService.Actions
 
             bool result = AdminActions.RunProcess(filePath, arguments, timeoutSeconds, windowStyle, runAsLoggedInUser, successExitCodes);
 
-            // Si se especificó store_result_in, guardar el resultado
+            // Si se especificó store_result_in, guardar en ambos diccionarios:
+            // _variables (para EvaluateCondition/GetVariable) y _configVariables (para ReplaceTemplates)
             if (!string.IsNullOrEmpty(action.StoreResultIn))
             {
-                SetConfigVariable(action.StoreResultIn, result ? "success" : "failed");
+                string resultValue = result ? "success" : "failed";
+                _variables[action.StoreResultIn!] = resultValue;
+                _configVariables[action.StoreResultIn!] = resultValue;
+                AlwaysPrintLogger.WriteInfo(
+                    $"ActionEngine: resultado de RunProcess almacenado en variable '{action.StoreResultIn}': {resultValue}");
             }
 
             return result;
