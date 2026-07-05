@@ -136,7 +136,20 @@ export default function WorkstationsPage() {
   const { data: stats } = useQuery({
     queryKey: ['workstations', 'stats'],
     queryFn: () => workstationsApi.stats(),
+    // Stats del endpoint separado como fallback — se sobreescribe con inline si disponible
   });
+
+  // Preferir stats inline del listado (misma lectura de snapshot = consistencia exacta)
+  const effectiveStats = workstationsData?.online_count != null
+    ? {
+        ...stats,
+        total: stats?.total ?? workstationsData?.total ?? 0,
+        online: workstationsData.online_count,
+        offline: workstationsData.offline_count ?? 0,
+        contingency_active: stats?.contingency_active ?? 0,
+        specific_config_count: stats?.specific_config_count ?? 0,
+      }
+    : stats;
 
   const { data: accounts } = useQuery({
     queryKey: ['accounts'],
@@ -457,14 +470,14 @@ export default function WorkstationsPage() {
         </div>
       </div>
 
-      {stats && (
+      {effectiveStats && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6 mb-6">
           <Card>
             <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{t('total')}</p>
-                  <p className="text-2xl md:text-3xl font-bold text-gray-900">{stats.total}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-gray-900">{effectiveStats.total}</p>
                 </div>
                 <Monitor className="w-8 h-8 md:w-12 md:h-12 text-blue-600" />
               </div>
@@ -475,7 +488,7 @@ export default function WorkstationsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{t('online')}</p>
-                  <p className="text-2xl md:text-3xl font-bold text-gray-900">{stats.online}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-gray-900">{effectiveStats.online}</p>
                 </div>
                 <CheckCircle className="w-8 h-8 md:w-12 md:h-12 text-green-600" />
               </div>
@@ -486,35 +499,35 @@ export default function WorkstationsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{t('offline')}</p>
-                  <p className="text-2xl md:text-3xl font-bold text-gray-600">{stats.offline}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-gray-600">{effectiveStats.offline}</p>
                 </div>
                 <XCircle className="w-8 h-8 md:w-12 md:h-12 text-gray-400" />
               </div>
             </CardContent>
           </Card>
-          <Card className={stats.contingency_active > 0 ? 'border-orange-200 bg-orange-50' : ''}>
+          <Card className={effectiveStats.contingency_active > 0 ? 'border-orange-200 bg-orange-50' : ''}>
             <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{t('contingency')}</p>
                   <p className="text-2xl md:text-3xl font-bold text-gray-900">
-                    {stats.contingency_active}
+                    {effectiveStats.contingency_active}
                   </p>
                 </div>
-                <ShieldAlert className={`w-8 h-8 md:w-12 md:h-12 ${stats.contingency_active > 0 ? 'text-orange-600' : 'text-orange-400'}`} />
+                <ShieldAlert className={`w-8 h-8 md:w-12 md:h-12 ${effectiveStats.contingency_active > 0 ? 'text-orange-600' : 'text-orange-400'}`} />
               </div>
             </CardContent>
           </Card>
-          <Card className={(stats.workstations_with_config?.length || 0) > 0 ? 'border-purple-200 bg-purple-50' : ''}>
+          <Card className={(effectiveStats.workstations_with_config?.length || 0) > 0 ? 'border-purple-200 bg-purple-50' : ''}>
             <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{t('withSpecificConfig')}</p>
                   <p className="text-2xl md:text-3xl font-bold text-gray-900">
-                    {stats.workstations_with_config?.length || 0}
+                    {effectiveStats.workstations_with_config?.length || 0}
                   </p>
                 </div>
-                <Cog className={`w-8 h-8 md:w-12 md:h-12 ${(stats.workstations_with_config?.length || 0) > 0 ? 'text-purple-600' : 'text-purple-400'}`} />
+                <Cog className={`w-8 h-8 md:w-12 md:h-12 ${(effectiveStats.workstations_with_config?.length || 0) > 0 ? 'text-purple-600' : 'text-purple-400'}`} />
               </div>
             </CardContent>
           </Card>

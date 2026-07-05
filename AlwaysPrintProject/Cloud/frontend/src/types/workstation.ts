@@ -94,4 +94,6 @@ export interface WorkstationListResponse {
   total: number
   skip: number
   limit: number
+  online_count?: number
+  offline_count?: number
 }
