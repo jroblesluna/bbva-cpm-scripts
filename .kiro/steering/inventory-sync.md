@@ -82,10 +82,16 @@ The inventory CSV has these columns:
 ## Execution Method
 
 All operations are executed via AWS SSM on the EC2 instance running the backend Docker container:
-1. Upload the script to EC2 via base64 encoding in SSM command
-2. Upload CSV to S3 temporarily, download inside EC2
-3. Execute Python script inside `alwaysprint-backend-1` container with `-e PYTHONPATH=/app`
-4. Clean up temporary S3 files after execution
+1. Write the Python sync script to a local temp file (e.g. `/tmp/inventory_sync_full.py`)
+2. Write a SEPARATE Python helper file (e.g. `/tmp/gen_sync_params.py`) that:
+   - Reads the sync script and base64-encodes it
+   - Uploads the CSV to S3 temporarily
+   - Builds the SSM command JSON and writes it to `/tmp/ssm_sync.json`
+3. Execute the helper with `python3 /tmp/gen_sync_params.py`
+4. Send the SSM command with `aws ssm send-command --parameters file:///tmp/ssm_sync.json`
+5. Clean up temporary S3 files after execution
+
+**CRITICAL**: NEVER use inline `python3 -c "..."` for multi-line Python code. Always write to a `.py` file first and execute with `python3 /path/to/file.py`. The bash tool does not support multi-line Python in `-c` arguments.
 
 ## Important Notes
 - The EC2 instance ID for PROD is `i-0b42738edf1860c00`
