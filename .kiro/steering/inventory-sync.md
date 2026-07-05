@@ -91,7 +91,7 @@ All operations are executed via AWS SSM on the EC2 instance running the backend 
 4. Send the SSM command with `aws ssm send-command --parameters file:///tmp/ssm_sync.json`
 5. Clean up temporary S3 files after execution
 
-**CRITICAL**: NEVER use inline `python3 -c "..."` for multi-line Python code. Always write to a `.py` file first and execute with `python3 /path/to/file.py`. The bash tool does not support multi-line Python in `-c` arguments.
+**IMPORTANT**: Always write Python scripts to temp files before executing. See steering `no-inline-python`.
 
 ## Important Notes
 - The EC2 instance ID for PROD is `i-0b42738edf1860c00`
