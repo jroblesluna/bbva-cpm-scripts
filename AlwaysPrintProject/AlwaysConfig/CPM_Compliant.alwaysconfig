@@ -1,5 +1,5 @@
 {
-  "version": "8.1",
+  "version": "8.3",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -908,7 +908,7 @@
           "description": "Generar script de instalación y ejecutar (detiene servicio, instala, reinicia)",
           "parameters": {
             "file_path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-            "arguments": "-NoProfile -ExecutionPolicy Bypass -Command \"$msi = 'C:\\ProgramData\\AlwaysPrint\\Updates\\AlwaysPrint_update.msi'; if (-not (Test-Path $msi)) { Write-Output 'ERROR: MSI no encontrado.'; exit 1 }; $sz = (Get-Item $msi).Length; if ($sz -lt 100000) { Write-Output \\\"ERROR: MSI corrupto ($sz bytes). Eliminando.\\\"; Remove-Item $msi -Force; exit 1 }; $script = @\\\"\\r\\n@echo off\\r\\nnet stop AlwaysPrintService /y\\r\\ntimeout /t 5 /nobreak >nul\\r\\nmsiexec /i `\\\"$msi`\\\" /quiet /norestart REINSTALLMODE=amus\\r\\nset EC=%errorlevel%\\r\\nsc failure AlwaysPrintService reset= 86400 actions= restart/5000/restart/5000/restart/5000\\r\\nnet start AlwaysPrintService\\r\\nexit /b %EC%\\r\\n\\\"@; $scriptPath = \\\"C:\\Windows\\Temp\\ap_force_update.cmd\\\"; Set-Content -Path $scriptPath -Value $script -Encoding ASCII; Write-Output \\\"Lanzando instalacion ($sz bytes) via script externo...\\\"; Start-Process cmd.exe -ArgumentList '/c', $scriptPath -WindowStyle Hidden; Write-Output 'Script lanzado. Servicio se detendrá en breve.'; exit 0\"",
+            "arguments": "-NoProfile -ExecutionPolicy Bypass -Command \"$msi = 'C:\\ProgramData\\AlwaysPrint\\Updates\\AlwaysPrint_update.msi'; if (-not (Test-Path $msi)) { Write-Output 'ERROR: MSI no encontrado.'; exit 1 }; $sz = (Get-Item $msi).Length; if ($sz -lt 100000) { Write-Output \\\"ERROR: MSI corrupto ($sz bytes). Eliminando.\\\"; Remove-Item $msi -Force; exit 1 }; $nl = [Environment]::NewLine; $script = '@echo off' + $nl + 'net stop AlwaysPrintService /y' + $nl + 'timeout /t 5 /nobreak >nul' + $nl + 'msiexec /i \\\"' + $msi + '\\\" /quiet /norestart REINSTALLMODE=amus' + $nl + 'set EC=%errorlevel%' + $nl + 'sc failure AlwaysPrintService reset= 86400 actions= restart/5000/restart/5000/restart/5000' + $nl + 'net start AlwaysPrintService' + $nl + 'exit /b %EC%'; $scriptPath = 'C:\\Windows\\Temp\\ap_force_update.cmd'; Set-Content -Path $scriptPath -Value $script -Encoding ASCII; Write-Output \\\"Lanzando instalacion ($sz bytes) via script externo...\\\"; Start-Process cmd.exe -ArgumentList '/c', $scriptPath -WindowStyle Hidden; Write-Output 'Script lanzado. Servicio se detendra en breve.'; exit 0\"",
             "timeout_seconds": 15,
             "window_style": "Hidden"
           }
