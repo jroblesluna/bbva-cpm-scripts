@@ -681,9 +681,9 @@ export default function VLANsPage() {
         <div className="space-y-4">
           {paginatedVlans.map((vlan) => (
             <div key={vlan.id} id={`vlan-${vlan.id}`} className={`bg-white rounded-lg shadow p-3 md:p-4 transition-all ${selectedVlanIds.has(vlan.id) ? 'ring-2 ring-blue-500' : ''} ${highlightedVlanId === vlan.id ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}>
-              {/* Layout: en desktop imagen a la izquierda + contenido a la derecha */}
-              <div className="flex flex-col md:flex-row md:gap-3">
-                {/* Thumbnail de imagen (solo desktop) */}
+              {/* Layout desktop: 3 columnas [Foto | Nombre+Detalles | Scoring] */}
+              <div className="flex flex-col md:flex-row md:gap-3 md:items-start">
+                {/* Col 1: Thumbnail (solo desktop) */}
                 <div className="hidden md:block flex-shrink-0 w-32 h-24 rounded-md overflow-hidden border border-gray-200 bg-gray-100">
                   {vlan.location_image_url ? (
                     <img
@@ -698,40 +698,65 @@ export default function VLANsPage() {
                     </div>
                   )}
                 </div>
-                {/* Contenido principal */}
+                {/* Col 2: Nombre + Detalles (pegados) */}
                 <div className="flex-1 min-w-0">
-              {/* Fila 1: Nombre + niveles de contingencia | Scoring columna derecha */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                  {selectionMode && (
-                    <input
-                      type="checkbox"
-                      checked={selectedVlanIds.has(vlan.id)}
-                      onChange={() => toggleVlanSelect(vlan.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0 cursor-pointer"
-                    />
-                  )}
-                  <Network className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                  <span className="text-sm md:text-base font-medium text-gray-900 truncate">
-                    {vlan.name}
-                  </span>
-                  {vlan.forced_contingency && !vlan.contingency_inherited && (
-                    <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
-                      {t('contingencyLevelVlan')}
-                    </Badge>
-                  )}
-                  {(() => {
-                    const org = accounts.find((a) => a.id === vlan.organization_id)
-                    return org?.forced_contingency ? (
+                  {/* Nombre */}
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                    {selectionMode && (
+                      <input
+                        type="checkbox"
+                        checked={selectedVlanIds.has(vlan.id)}
+                        onChange={() => toggleVlanSelect(vlan.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0 cursor-pointer"
+                      />
+                    )}
+                    <Network className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                    <span className="text-sm md:text-base font-medium text-gray-900 truncate">
+                      {vlan.name}
+                    </span>
+                    {vlan.forced_contingency && !vlan.contingency_inherited && (
                       <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
-                        {t('contingencyLevelOrg')}
+                        {t('contingencyLevelVlan')}
                       </Badge>
-                    ) : null
-                  })()}
+                    )}
+                    {(() => {
+                      const org = accounts.find((a) => a.id === vlan.organization_id)
+                      return org?.forced_contingency ? (
+                        <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
+                          {t('contingencyLevelOrg')}
+                        </Badge>
+                      ) : null
+                    })()}
+                  </div>
+                  {/* Detalles: Org | CIDRs, descripción, fecha */}
+                  <div className="space-y-0.5 mt-0.5">
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                      <span className="font-medium">
+                        {accounts.find((a) => a.id === vlan.organization_id)?.name || '-'}
+                      </span>
+                      <span className="text-gray-300">|</span>
+                      <div className="flex flex-wrap gap-1">
+                        {vlan.cidr_ranges.map((cidr, idx) => (
+                          <Badge key={idx} variant="secondary" className="text-xs">
+                            {cidr}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    {vlan.description && (
+                      <p className="text-sm text-gray-500 line-clamp-2">
+                        {vlan.description}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-1 text-xs text-gray-400">
+                      <Calendar className="h-3 w-3" />
+                      <span>{formatDateWithTimezone(vlan.created_at, timezone)}</span>
+                    </div>
+                  </div>
                 </div>
-                {/* Columna derecha: Scoring + Online/Total + CIDRs (vertical) */}
-                <div className="flex flex-col items-end gap-1 shrink-0">
+                {/* Col 3: Scoring badges (solo desktop) */}
+                <div className="hidden md:flex flex-col items-end gap-1 shrink-0">
                   {(() => {
                     const wsCounts = (vlanStats as any)?.ws_counts?.[vlan.id] as { total?: number; online?: number } | undefined;
                     const total = wsCounts?.total || 0;
@@ -756,33 +781,6 @@ export default function VLANsPage() {
                   })()}
                 </div>
               </div>
-              {/* Fila 2: Organización, CIDRs, descripción */}
-              <div className="space-y-0.5">
-                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                  <span className="font-medium">
-                    {accounts.find((a) => a.id === vlan.organization_id)?.name || '-'}
-                  </span>
-                  <span className="text-gray-300">|</span>
-                  <div className="flex flex-wrap gap-1">
-                    {vlan.cidr_ranges.map((cidr, idx) => (
-                      <Badge key={idx} variant="secondary" className="text-xs">
-                        {cidr}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-                {vlan.description && (
-                  <p className="text-sm text-gray-500 line-clamp-2">
-                    {vlan.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-1 text-xs text-gray-400">
-                  <Calendar className="h-3 w-3" />
-                  <span>{formatDateWithTimezone(vlan.created_at, timezone)}</span>
-                </div>
-              </div>
-                </div>{/* cierre flex-1 min-w-0 (contenido principal) */}
-              </div>{/* cierre flex container desktop */}
 
               {/* Imagen de ubicación (solo mobile — full width) */}
               {vlan.location_image_url && (
