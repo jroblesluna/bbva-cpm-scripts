@@ -10,12 +10,23 @@ All text, comments, and log messages MUST be in Spanish.
 
 ## Pre-requisites
 
-Before executing, you MUST:
-1. Ask the user to confirm the CSV file to use (show the path found)
-2. Ask the user to confirm the environment (DEV or PROD), showing the AWS Profile:
-   - DEV: Profile `AlwaysPrint-dev-040982755196`, server `alwaysprint.dev.iol.pe`
-   - PROD: Profile `AlwaysPrint-prod-425642439683`, server `alwaysprint.apps.iol.pe`
-3. Ask the user to confirm the organization to apply the inventory to (query organizations from the backend)
+Before executing, you MUST confirm each step sequentially (not all at once):
+
+### Paso 1: Confirmar archivo CSV
+- Buscar archivos `Inventario*.csv` en el repositorio
+- Mostrar el path encontrado y preguntar: "¿Usar este archivo? (sí/no)"
+
+### Paso 2: Confirmar entorno
+- Preguntar: "¿En qué entorno ejecutar?"
+- Mostrar opciones como lista simple:
+  - **DEV**: Profile `AlwaysPrint-dev-040982755196`, servidor `alwaysprint.dev.iol.pe`
+  - **PROD**: Profile `AlwaysPrint-prod-425642439683`, servidor `alwaysprint.apps.iol.pe`
+- Esperar respuesta del usuario antes de continuar
+
+### Paso 3: Confirmar organización
+- Consultar las organizaciones disponibles en el entorno elegido (via SSM al backend)
+- Mostrar la lista y preguntar: "¿A cuál organización aplicar el inventario?"
+- Esperar respuesta del usuario antes de ejecutar
 
 ## CSV Format
 
