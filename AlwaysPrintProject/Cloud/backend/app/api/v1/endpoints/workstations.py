@@ -960,11 +960,19 @@ def list_workstations(
         if real_online != ws.is_online:
             ws.is_online = real_online
 
+    # Stats inline: computados con el MISMO snapshot que la lista.
+    # Esto garantiza que los conteos top sean consistentes con los indicadores.
+    all_ws_ids = {str(row[0]) for row in db.query(Workstation.id).all()}
+    online_count = len(global_online & all_ws_ids)
+    offline_count = len(all_ws_ids) - online_count
+
     return WorkstationListResponse(
         items=workstations,
         total=total,
         skip=offset,
-        limit=page_size
+        limit=page_size,
+        online_count=online_count,
+        offline_count=offline_count,
     )
 
 

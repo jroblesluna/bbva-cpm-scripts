@@ -178,6 +178,9 @@ class WorkstationListResponse(BaseModel):
     total: int
     skip: int
     limit: int
+    # Stats inline (computados con el mismo snapshot que la lista)
+    online_count: int | None = None
+    offline_count: int | None = None
 
 
 class VLANSummaryItem(BaseModel):
