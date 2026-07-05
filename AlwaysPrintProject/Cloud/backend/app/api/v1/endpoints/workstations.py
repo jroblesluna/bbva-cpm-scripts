@@ -808,9 +808,10 @@ def list_workstations(
     if vlan_id:
         base_query = base_query.filter(Workstation.vlan_id == vlan_id)
     
-    # Filtrar por estado online si se proporciona
-    if is_online is not None:
-        base_query = base_query.filter(Workstation.is_online.is_(is_online))
+    # Filtrar por estado online: NO se aplica en SQL porque el estado real
+    # se determina post-enriquecimiento con el snapshot de Redis.
+    # Se aplica después del enriquecimiento para consistencia filtro ↔ display.
+    _filter_is_online = is_online  # Guardar para aplicar después
     
     # Filtrar por contingencia activa si se proporciona
     if contingency_active is not None:
@@ -922,17 +923,19 @@ def list_workstations(
     # Contar total (sin joinedload para query limpia)
     total = base_query.count()
     
-    # Paginar y cargar relaciones
+    # Paginar y cargar relaciones.
+    # Si hay filtro is_online, se carga todo (sin offset/limit) y se pagina post-enriquecimiento.
     offset = (page - 1) * page_size
-    workstations = (
+    query = (
         base_query
         .options(joinedload(Workstation.organization))
         .options(joinedload(Workstation.vlan))
         .order_by(Workstation.ip_private.asc())
-        .offset(offset)
-        .limit(page_size)
-        .all()
     )
+    if _filter_is_online is None:
+        workstations = query.offset(offset).limit(page_size).all()
+    else:
+        workstations = query.all()
     
     # Enriquecer is_online con snapshot global de conexiones WebSocket (todos los workers).
     # El snapshot se actualiza cada ~30s en background (heartbeat loop) via Redis.
@@ -954,6 +957,13 @@ def list_workstations(
             db.commit()
         except Exception:
             db.rollback()
+
+    # Aplicar filtro is_online POST-enriquecimiento para consistencia filtro ↔ display.
+    if _filter_is_online is not None:
+        workstations = [ws for ws in workstations if ws.is_online == _filter_is_online]
+        total = len(workstations)
+        # Paginar en Python (ya se cargó todo arriba)
+        workstations = workstations[offset:offset + page_size]
 
     return WorkstationListResponse(
         items=workstations,
