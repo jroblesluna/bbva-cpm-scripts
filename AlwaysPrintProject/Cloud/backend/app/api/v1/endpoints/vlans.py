@@ -9,8 +9,11 @@ Este módulo define los endpoints para:
 
 from typing import Optional
 from uuid import UUID
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -383,6 +386,31 @@ def update_vlan(
     
     db.commit()
     db.refresh(vlan)
+    
+    # Si se actualizaron CIDRs, reasignar workstations huérfanas que matcheen
+    if vlan_data.cidr_ranges is not None:
+        from app.models.workstation import Workstation
+        import ipaddress as _ipaddress
+        orphans = db.query(Workstation).filter(
+            Workstation.organization_id == vlan.organization_id,
+            Workstation.vlan_id.is_(None),
+            Workstation.cidr.isnot(None),
+        ).all()
+        reassigned = 0
+        for ws in orphans:
+            try:
+                ws_network = str(_ipaddress.ip_network(ws.cidr, strict=False))
+                if ws_network in vlan.cidr_ranges:
+                    ws.vlan_id = vlan.id
+                    reassigned += 1
+            except (ValueError, TypeError):
+                continue
+        if reassigned > 0:
+            db.commit()
+            logger.info(
+                "update_vlan: %d workstation(s) huérfana(s) reasignada(s) a VLAN '%s'",
+                reassigned, vlan.name
+            )
     
     audit_service = AuditService()
     audit_service.log_update(

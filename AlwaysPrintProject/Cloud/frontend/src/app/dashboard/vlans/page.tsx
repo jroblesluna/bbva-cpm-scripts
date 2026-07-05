@@ -1592,6 +1592,24 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
   /** Verifica si hay algún CIDR inválido entre los que tienen contenido. */
   const hasInvalidCidrs = (formData.cidr_ranges || []).some((c) => c.trim() && !isValidCidr(c))
 
+  /** Verifica si hay CIDRs duplicados en la lista actual. */
+  const getDuplicateCidrs = (): Set<number> => {
+    const cidrs = (formData.cidr_ranges || []).map(c => c.trim()).filter(Boolean)
+    const seen = new Map<string, number>()
+    const duplicateIndices = new Set<number>()
+    cidrs.forEach((cidr, idx) => {
+      if (seen.has(cidr)) {
+        duplicateIndices.add(seen.get(cidr)!)
+        duplicateIndices.add(idx)
+      } else {
+        seen.set(cidr, idx)
+      }
+    })
+    return duplicateIndices
+  }
+  const duplicateCidrIndices = getDuplicateCidrs()
+  const hasDuplicateCidrs = duplicateCidrIndices.size > 0
+
   // Cargar dispositivos de la VLAN al abrir el modal
   useEffect(() => {
     const loadDevices = async () => {
@@ -1612,8 +1630,7 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
     e.preventDefault()
     const validCidrs = formData.cidr_ranges?.filter((c) => c.trim()) || []
     if (!formData.name?.trim() || validCidrs.length === 0) return
-    if (hasInvalidCidrs) return
-    // Validar UNC paths en metadata
+    if (hasInvalidCidrs || hasDuplicateCidrs) return
     const invalidUnc = metadataEntries.find(entry => entry.value && !isValidUncPath(entry.value))
     if (invalidUnc) return
     try {
@@ -1646,7 +1663,16 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
       }
       onSuccess()
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : 'Error desconocido'
+      // Mostrar mensaje de error del backend (ej: conflicto de CIDR duplicado)
+      let msg = 'Error desconocido'
+      if (error && typeof error === 'object') {
+        const axiosErr = error as { response?: { data?: { detail?: string }; status?: number } }
+        if (axiosErr.response?.data?.detail) {
+          msg = axiosErr.response.data.detail
+        } else if (error instanceof Error) {
+          msg = error.message
+        }
+      }
       console.error('Error:', error)
       alert(msg)
     } finally {
@@ -1696,12 +1722,13 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
               <div className="space-y-2">
                 {(formData.cidr_ranges || []).map((cidr, index) => {
                   const showError = cidr.trim() && !isValidCidr(cidr)
+                  const isDuplicate = duplicateCidrIndices.has(index)
                   return (
                     <div key={index}>
                       <div className="flex gap-2">
                         <input type="text" value={cidr} onChange={(e) => updateCidrField(index, e.target.value)}
                           placeholder="Ej: 192.168.1.0/24"
-                          className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${showError ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
+                          className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${showError || isDuplicate ? 'border-red-400 focus:ring-red-500 bg-red-50' : 'border-gray-300 focus:ring-blue-500'}`} />
                         {(formData.cidr_ranges?.length || 0) > 1 && (
                           <Button type="button" variant="outline" size="sm" onClick={() => removeCidrField(index)}>
                             <X className="h-4 w-4" />
@@ -1710,6 +1737,9 @@ function EditVLANModal({ vlan, detail, onClose, onSuccess }: { vlan: VLAN; detai
                       </div>
                       {showError && (
                         <p className="mt-1 text-xs text-red-600">{t('cidrInvalid')}</p>
+                      )}
+                      {isDuplicate && !showError && (
+                        <p className="mt-1 text-xs text-red-600">CIDR duplicado en esta lista</p>
                       )}
                     </div>
                   )
