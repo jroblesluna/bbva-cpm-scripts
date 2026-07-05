@@ -147,7 +147,6 @@ export default function WorkstationsPage() {
         online: workstationsData.online_count,
         offline: workstationsData.offline_count ?? 0,
         contingency_active: stats?.contingency_active ?? 0,
-        specific_config_count: stats?.specific_config_count ?? 0,
       }
     : stats;
 
