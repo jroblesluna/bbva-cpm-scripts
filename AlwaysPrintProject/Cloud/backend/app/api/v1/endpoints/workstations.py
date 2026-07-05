@@ -808,10 +808,18 @@ def list_workstations(
     if vlan_id:
         base_query = base_query.filter(Workstation.vlan_id == vlan_id)
     
-    # Filtrar por estado online: NO se aplica en SQL porque el estado real
-    # se determina post-enriquecimiento con el snapshot de Redis.
-    # Se aplica después del enriquecimiento para consistencia filtro ↔ display.
-    _filter_is_online = is_online  # Guardar para aplicar después
+    # Filtrar por estado online usando snapshot Redis (no BD stale).
+    # Se aplica en SQL con IN/NOT IN para mantener paginación eficiente.
+    from app.services.websocket_manager import connection_manager
+    global_online = connection_manager.get_global_online_snapshot()
+    if is_online is not None and global_online:
+        if is_online:
+            base_query = base_query.filter(Workstation.id.in_(global_online))
+        else:
+            base_query = base_query.filter(~Workstation.id.in_(global_online))
+    elif is_online is not None and not global_online:
+        # Snapshot vacío (Redis no disponible): fallback a BD
+        base_query = base_query.filter(Workstation.is_online.is_(is_online))
     
     # Filtrar por contingencia activa si se proporciona
     if contingency_active is not None:
@@ -923,47 +931,24 @@ def list_workstations(
     # Contar total (sin joinedload para query limpia)
     total = base_query.count()
     
-    # Paginar y cargar relaciones.
-    # Si hay filtro is_online, se carga todo (sin offset/limit) y se pagina post-enriquecimiento.
+    # Paginar y cargar relaciones
     offset = (page - 1) * page_size
-    query = (
+    workstations = (
         base_query
         .options(joinedload(Workstation.organization))
         .options(joinedload(Workstation.vlan))
         .order_by(Workstation.ip_private.asc())
+        .offset(offset)
+        .limit(page_size)
+        .all()
     )
-    if _filter_is_online is None:
-        workstations = query.offset(offset).limit(page_size).all()
-    else:
-        workstations = query.all()
     
-    # Enriquecer is_online con snapshot global de conexiones WebSocket (todos los workers).
-    # El snapshot se actualiza cada ~30s en background (heartbeat loop) via Redis.
-    # Lectura sync de un set en memoria — zero queries, zero await, zero latencia.
-    from app.services.websocket_manager import connection_manager
-    global_online = connection_manager.get_global_online_snapshot()
-    dirty = False
+    # Enriquecer is_online con snapshot global (para items de esta página).
     for ws in workstations:
         ws_id_str = str(ws.id)
         real_online = ws_id_str in global_online
         if real_online != ws.is_online:
             ws.is_online = real_online
-            dirty = True
-
-    # Persistir correcciones en BD para mantenerla sincronizada.
-    # Solo hace UPDATE si hay discrepancias (no en cada request).
-    if dirty:
-        try:
-            db.commit()
-        except Exception:
-            db.rollback()
-
-    # Aplicar filtro is_online POST-enriquecimiento para consistencia filtro ↔ display.
-    if _filter_is_online is not None:
-        workstations = [ws for ws in workstations if ws.is_online == _filter_is_online]
-        total = len(workstations)
-        # Paginar en Python (ya se cargó todo arriba)
-        workstations = workstations[offset:offset + page_size]
 
     return WorkstationListResponse(
         items=workstations,
