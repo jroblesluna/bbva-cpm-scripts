@@ -178,6 +178,39 @@ async def _push_config_activation(
         )
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# RESOLUCIÓN DE TEMPLATES DE SERVIDOR ({{%...%}})
+# ═══════════════════════════════════════════════════════════════════════
+
+def _resolve_server_templates(config_json: str, org_id: str) -> str:
+    """
+    Resuelve placeholders de servidor en el config_json antes de firmar/servir.
+
+    Placeholders soportados:
+      {{%SERVER_URL%}}       → URL pública del backend (FRONTEND_URL de settings)
+      {{%ORGANIZATION_ID%}}  → UUID de la organización
+
+    Se distinguen de los placeholders del ActionEngine ({{variable}}) por los '%'.
+    El backend los resuelve al servir; el cliente nunca los ve.
+
+    Si el config_json no contiene ningún placeholder, retorna el string sin cambios.
+    """
+    if "{{%" not in config_json:
+        return config_json
+
+    # FRONTEND_URL es inyectada por Terraform como https://{subdomain}.{zone_name}
+    # (ej: https://alwaysprint.apps.iol.pe). Fallback para desarrollo local.
+    server_url = settings.FRONTEND_URL
+    if not server_url or server_url.startswith("http://localhost"):
+        first_domain = settings.DEFAULT_BOOTSTRAP_DOMAINS.split(",")[0].strip()
+        server_url = f"https://alwaysprint.{first_domain}"
+
+    config_json = config_json.replace("{{%SERVER_URL%}}", server_url)
+    config_json = config_json.replace("{{%ORGANIZATION_ID%}}", org_id or "")
+
+    return config_json
+
+
 # Caché en memoria de configs firmadas por worker.
 # Key: (config_id, config_hash, cert_version) → signed_json string.
 # Se invalida naturalmente cuando config cambia (nuevo hash) o cert rota (nueva version).
@@ -705,6 +738,10 @@ def download_workstation_config(
     db.close()
     
     # === A partir de aquí, NO se usa 'db' ni objetos SQLAlchemy ===
+
+    # Resolver templates de servidor ({{%SERVER_URL%}}, {{%ORGANIZATION_ID%}})
+    # antes de firmar/servir. El cliente recibe valores concretos.
+    config_json = _resolve_server_templates(config_json, org_id)
     
     if org_has_cert:
         try:

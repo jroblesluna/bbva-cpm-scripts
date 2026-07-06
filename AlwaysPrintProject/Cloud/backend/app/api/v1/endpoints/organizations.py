@@ -1680,14 +1680,18 @@ async def rotate_certificate(
     s3_service = S3ConfigService()
 
     for config in active_configs:
+        # Resolver templates de servidor antes de re-firmar
+        from app.api.v1.endpoints.action_config import _resolve_server_templates
+        resolved_json = _resolve_server_templates(config.config_json, str(org_id))
+
         # Firmar con la nueva clave privada
         hash_full, signature_b64 = CryptoService.sign_config(
-            encrypted_private_key, config.config_json, settings.SECRET_KEY, str(org_id)
+            encrypted_private_key, resolved_json, settings.SECRET_KEY, str(org_id)
         )
 
         # Construir JSON envolvente firmado
         signed_json = CryptoService.build_signed_config(
-            config.config_json, hash_full, signature_b64, new_version
+            resolved_json, hash_full, signature_b64, new_version
         )
 
         # Subir config re-firmado a S3

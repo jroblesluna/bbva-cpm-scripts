@@ -251,17 +251,21 @@ class ActionConfigService:
                 and org.ecdsa_cert_version > 0
                 and org.ecdsa_private_key_encrypted is not None
             ):
-                # Firmar la configuración con la clave privada de la org
+                # Resolver templates de servidor antes de firmar
+                from app.api.v1.endpoints.action_config import _resolve_server_templates
+                resolved_json = _resolve_server_templates(data.config_json, str(organization_id))
+
+                # Firmar la configuración resuelta con la clave privada de la org
                 hash_full, signature_b64 = CryptoService.sign_config(
                     org.ecdsa_private_key_encrypted,
-                    data.config_json,
+                    resolved_json,
                     settings.SECRET_KEY,
                     str(organization_id),
                 )
                 
                 # Construir JSON envolvente firmado
                 signed_json = CryptoService.build_signed_config(
-                    data.config_json,
+                    resolved_json,
                     hash_full,
                     signature_b64,
                     org.ecdsa_cert_version,
@@ -330,12 +334,15 @@ class ActionConfigService:
                 ).first()
                 
                 if org and org.ecdsa_cert_version and org.ecdsa_cert_version > 0 and org.ecdsa_private_key_encrypted:
+                    from app.api.v1.endpoints.action_config import _resolve_server_templates
+                    resolved_json = _resolve_server_templates(config.config_json, str(config.organization_id))
+
                     hash_full, signature_b64 = CryptoService.sign_config(
-                        org.ecdsa_private_key_encrypted, config.config_json,
+                        org.ecdsa_private_key_encrypted, resolved_json,
                         settings.SECRET_KEY, str(config.organization_id)
                     )
                     signed_json = CryptoService.build_signed_config(
-                        config.config_json, hash_full, signature_b64, org.ecdsa_cert_version
+                        resolved_json, hash_full, signature_b64, org.ecdsa_cert_version
                     )
                     s3_key = S3ConfigService().upload_signed_config(
                         str(config.organization_id), hash_full[:8], signed_json
