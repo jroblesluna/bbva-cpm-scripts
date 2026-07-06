@@ -347,14 +347,11 @@ async def upload_action_config(
         
         # Si se creó activa, notificar a las workstations para que re-descarguen
         if config.is_active:
-            # Hash del JSON resuelto (lo que el cliente descargará de S3)
-            resolved_hash = calculate_config_hash(
-                _resolve_server_templates(config.config_json, str(organization_id))
-            )
             # Push-based distribution: actualizar state map → Redis → push a workstations
+            # config.config_hash ya es el hash del JSON resuelto (se calcula así al crear)
             await _push_config_activation(
                 org_id=str(organization_id),
-                config_hash=resolved_hash,
+                config_hash=config.config_hash,
                 storage_path=config.storage_path,
                 scope=scope,
                 scope_id=str(vlan_id) if vlan_id else (str(workstation_id) if workstation_id else None),
@@ -536,9 +533,7 @@ async def update_action_config(
         
         await _push_config_activation(
             org_id=str(organization_id),
-            config_hash=calculate_config_hash(
-                _resolve_server_templates(updated_config.config_json, str(organization_id))
-            ),
+            config_hash=updated_config.config_hash,
             storage_path=updated_config.storage_path,
             scope=config_scope,
             scope_id=scope_id,

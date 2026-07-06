@@ -170,8 +170,10 @@ class ActionConfigService:
             logger.error(f"JSON inválido en config_json para org {organization_id}")
             raise ValueError("config_json no es un JSON válido")
         
-        # Calcular hash
-        config_hash = calculate_config_hash(data.config_json)
+        # Calcular hash sobre el JSON con templates resueltos (lo que el cliente verificará)
+        from app.api.v1.endpoints.action_config import _resolve_server_templates
+        resolved_json_for_hash = _resolve_server_templates(data.config_json, str(organization_id))
+        config_hash = calculate_config_hash(resolved_json_for_hash)
         
         # Verificar duplicado dentro del mismo scope/target (no globalmente)
         # El mismo archivo puede subirse a diferentes VLANs/workstations,
