@@ -11,8 +11,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = '024_extend_place_id_length'
-down_revision = '023_normalize_config_hash'
+revision = '028_extend_place_id_length'
+down_revision = '027_add_ecdsa_cert_hash'
 branch_labels = None
 depends_on = None
 
