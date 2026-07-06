@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 revision = '024_extend_place_id_length'
-down_revision = '023'
+down_revision = '023_normalize_config_hash'
 branch_labels = None
 depends_on = None
 
