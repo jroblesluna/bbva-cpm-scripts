@@ -23,6 +23,7 @@ from app.schemas.action_config import (
     ActionConfigInfo,
     ActionConfigDetail,
     ActionConfigDownloadInfo,
+    calculate_config_hash,
 )
 from app.services.action_config import ActionConfigService, DuplicateConfigError
 from app.services.crypto_service import CryptoService
@@ -346,10 +347,14 @@ async def upload_action_config(
         
         # Si se creó activa, notificar a las workstations para que re-descarguen
         if config.is_active:
+            # Hash del JSON resuelto (lo que el cliente descargará de S3)
+            resolved_hash = calculate_config_hash(
+                _resolve_server_templates(config.config_json, str(organization_id))
+            )
             # Push-based distribution: actualizar state map → Redis → push a workstations
             await _push_config_activation(
                 org_id=str(organization_id),
-                config_hash=config.config_hash,
+                config_hash=resolved_hash,
                 storage_path=config.storage_path,
                 scope=scope,
                 scope_id=str(vlan_id) if vlan_id else (str(workstation_id) if workstation_id else None),
@@ -531,7 +536,9 @@ async def update_action_config(
         
         await _push_config_activation(
             org_id=str(organization_id),
-            config_hash=updated_config.config_hash,
+            config_hash=calculate_config_hash(
+                _resolve_server_templates(updated_config.config_json, str(organization_id))
+            ),
             storage_path=updated_config.storage_path,
             scope=config_scope,
             scope_id=scope_id,
@@ -742,6 +749,9 @@ def download_workstation_config(
     # Resolver templates de servidor ({{%SERVER_URL%}}, {{%ORGANIZATION_ID%}})
     # antes de firmar/servir. El cliente recibe valores concretos.
     config_json = _resolve_server_templates(config_json, org_id)
+
+    # Recalcular hash sobre el JSON resuelto (el que el cliente verificará)
+    config_hash = calculate_config_hash(config_json)
     
     if org_has_cert:
         try:

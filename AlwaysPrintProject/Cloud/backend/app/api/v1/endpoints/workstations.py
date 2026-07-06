@@ -1933,7 +1933,12 @@ async def get_distribution_state(
     config_hash = None
     config_s3_url = None
     if config and config.config_hash and config.storage_path:
-        config_hash = config.config_hash
+        # Hash recalculado sobre el JSON resuelto (lo que hay en S3 y lo que el cliente verifica)
+        from app.api.v1.endpoints.action_config import _resolve_server_templates
+        from app.schemas.action_config import calculate_config_hash
+        config_hash = calculate_config_hash(
+            _resolve_server_templates(config.config_json, str(org.id))
+        )
         from app.services.s3_config_service import S3ConfigService
         config_s3_url = S3ConfigService().get_public_url(config.storage_path)
 
