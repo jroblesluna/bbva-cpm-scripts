@@ -202,19 +202,17 @@ export default function VLANsPage() {
   }
 
   const loadActiveDeviceCounts = async (vlanList: VLAN[]) => {
-    const counts: Record<string, number> = {}
-    await Promise.all(
-      vlanList.map(async (vlan) => {
-        try {
-          const response = await apiClient.get(`/devices/?vlan_id=${vlan.id}`)
-          const devices: Device[] = response.data.devices || []
-          counts[vlan.id] = devices.filter((d) => d.is_active).length
-        } catch {
-          counts[vlan.id] = 0
-        }
-      })
-    )
-    setActiveDeviceCounts(counts)
+    try {
+      const params: Record<string, string> = {}
+      if (filterOrgId) params.organization_id = filterOrgId
+      const queryString = new URLSearchParams(params).toString()
+      const url = queryString ? `/devices/counts-by-vlan?${queryString}` : '/devices/counts-by-vlan'
+      const response = await apiClient.get(url)
+      setActiveDeviceCounts(response.data.counts || {})
+    } catch (error) {
+      console.error('Error cargando conteo de dispositivos:', error)
+      setActiveDeviceCounts({})
+    }
   }
 
   const filteredVlans = vlans.filter((vlan) => {

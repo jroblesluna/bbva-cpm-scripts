@@ -98,6 +98,40 @@ def list_devices(
     return DeviceListResponse(total=len(device_responses), devices=device_responses)
 
 
+@router.get("/counts-by-vlan")
+def get_device_counts_by_vlan(
+    organization_id: Optional[str] = Query(None, description="Filtrar por organización (solo Admin)"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retorna conteo de dispositivos activos agrupado por VLAN en una sola query.
+    Evita que el frontend haga N requests individuales (uno por VLAN).
+    """
+    from sqlalchemy import func
+
+    if current_user.role == UserRole.OPERATOR:
+        org_id = current_user.organization_id
+        if not org_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
+    else:
+        org_id = organization_id
+
+    query = db.query(
+        Device.vlan_id,
+        func.count(Device.id).label("active_count")
+    ).filter(Device.is_active == True)
+
+    if org_id:
+        query = query.filter(Device.organization_id == org_id)
+
+    query = query.filter(Device.vlan_id.isnot(None)).group_by(Device.vlan_id)
+
+    results = query.all()
+    counts = {str(row.vlan_id): row.active_count for row in results}
+    return {"counts": counts}
+
+
 @router.post("/", response_model=DeviceResponse, status_code=status.HTTP_201_CREATED)
 def create_device(
     request: Request,
