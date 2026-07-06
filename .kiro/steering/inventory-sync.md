@@ -46,25 +46,34 @@ The inventory CSV has these columns:
 ## Execution Steps (incremental — only process what's missing)
 
 ### Step 1: Rename VLANs
-- Extract agency code from workstation hostnames (chars [3:6] of hostname W10XXX01PZZ)
-- Expected format: `{code_3dig} - Ag. {name}` (replace "Agencia " with "Ag.")
+- Extract agency code from workstation hostnames: `hostname[3:6]` (e.g. W10**277**01P04 → code `277`)
+- Hostname format: `W1{0|1}XXX{0|1}{1|S}P{ZZ}` where XXX (positions 3-5, 0-indexed) = agency code
+- Expected VLAN name format: `{code_3dig} - Ag. {name}` (replace "Agencia " with "Ag.")
 - Only rename VLANs that don't match the expected name
 - Clean double spaces, normalize parentheses
 
-### Step 2: Geocode addresses
-- For VLANs without `address`, `latitude`, or `longitude`
+### Step 2: Reassign workstations to correct VLAN by hostname
+- For each workstation: extract agency code from hostname[3:6]
+- If the workstation's current vlan_id doesn't match the VLAN for that code → reassign
+- Additionally, ensure the workstation's CIDR is in the target VLAN's `cidr_ranges`:
+  - Add the CIDR to the correct VLAN if not present
+  - Remove the CIDR from any other VLAN that has it (avoid duplicates)
+- This overrides CIDR-based auto-assignment (hostname is the source of truth for agency)
+
+### Step 3: Geocode addresses
+- For VLANs without `address`, `latitude`, or `longitude` in `vlan_metadata`
 - Build query: `{DIRECCION},{DISTRITO},{PROVINCIA},{DEPARTAMENTO},Peru`
 - Use Google Geocoding API (key from organization's `google_maps_api_key`)
-- Save: address (formatted from Google), latitude, longitude, place_id
+- Save in `vlan_metadata`: address (formatted from Google), latitude, longitude, place_id, distrito, provincia, departamento
 
-### Step 3: Generate location images
+### Step 4: Generate location images
 - For VLANs without `location_image_url` that have coordinates
 - Use ONLY the first Google Places Photo (from place_id) — download and save directly as `vlan-images/{vlan_id}.jpg` (no temporary options)
 - If no Places Photo available: use Street View with heading pointing toward the building
 - If no Street View: use satellite map as last resort
 - Save directly to S3, update `location_image_url` in DB
 
-### Step 4: Upsert devices (printers)
+### Step 5: Upsert devices (printers)
 - For each row in CSV, match by IP address within the organization
 - If exists: UPDATE name, description, model, location, port, vlan_id
 - If not exists: INSERT new device
@@ -116,4 +125,4 @@ Always use `--profile` corresponding to the target environment in all AWS CLI co
 - If SSM command fails, show the error output and ask the user how to proceed
 - If geocoding fails for a specific address, log it and continue with the next
 - If S3 upload fails, retry once before asking the user
-- Always show a summary at the end: how many VLANs renamed, geocoded, images generated, devices upserted/created
+- Always show a summary at the end: how many VLANs renamed, workstations reassigned, CIDRs moved, geocoded, images generated, devices upserted/created
