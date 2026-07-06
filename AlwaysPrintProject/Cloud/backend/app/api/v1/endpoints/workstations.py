@@ -960,11 +960,13 @@ async def list_workstations(
         if real_online != ws.is_online:
             ws.is_online = real_online
 
-    # Stats inline: computados con el MISMO snapshot que la lista.
-    # Esto garantiza que los conteos top sean consistentes con los indicadores.
+    # Stats inline: conteo exacto basado en métricas de workers (len(workstation_connections))
+    # Esto es más preciso que contar IDs del SUNIONSTORE que puede tener micro-gap del batch.
     all_ws_ids = {str(row[0]) for row in db.query(Workstation.id).all()}
-    online_count = len(global_online & all_ws_ids)
-    offline_count = len(all_ws_ids) - online_count
+    total_registered = len(all_ws_ids)
+    global_metrics = await connection_manager.get_global_connection_count()
+    online_count = min(global_metrics.get("workstations", 0), total_registered)
+    offline_count = total_registered - online_count
 
     return WorkstationListResponse(
         items=workstations,
@@ -1021,17 +1023,18 @@ async def get_workstation_stats(
         # Corregir conteo online con snapshot real de WebSocket (cross-worker).
         # get_online_count() usa BD (puede estar stale); el snapshot es en tiempo real.
         from app.services.websocket_manager import connection_manager
-        global_online = await connection_manager.get_global_online_snapshot_async()
-        if global_online:
-            # Contar WS online que pertenecen a la org (si hay filtro)
-            if org_id:
+        if not org_id:
+            # Admin sin filtro: usar suma exacta de métricas de workers
+            global_metrics = await connection_manager.get_global_connection_count()
+            online = min(global_metrics.get("workstations", 0), total)
+        else:
+            # Con filtro por org: usar SUNIONSTORE + intersección con IDs de la org
+            global_online = await connection_manager.get_global_online_snapshot_async()
+            if global_online:
                 all_ws_ids = {str(ws.id) for ws in db.query(Workstation.id).filter(
                     Workstation.organization_id == org_id).all()}
                 online = len(global_online & all_ws_ids)
-            else:
-                # Admin sin filtro: todas las WS online
-                all_ws_ids = {str(ws.id) for ws in db.query(Workstation.id).all()}
-                online = len(global_online & all_ws_ids)
+            # else: mantener valor de get_online_count() (BD)
         
         # Contar VLANs totales de la organización
         from app.models.vlan import VLAN

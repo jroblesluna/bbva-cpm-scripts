@@ -253,12 +253,12 @@ class RedisConnectionManager:
         """
         Flush batch de registros Redis pendientes.
 
-        Espera 1 segundo, luego hace SADD batch de todas las workstations
-        pendientes + SUBSCRIBE de organizaciones nuevas. Esto evita crear
-        un asyncio.Task individual por cada connect_workstation durante
-        ramp-up rápido (que saturaba el event loop con 100+ tasks).
+        Hace SADD batch con pipeline (un solo RTT) de todas las workstations
+        pendientes + SUBSCRIBE de organizaciones nuevas. Se ejecuta en el
+        próximo tick del event loop para agrupar connects simultáneos sin
+        introducir delay observable en la visibilidad cross-worker.
         """
-        await asyncio.sleep(1)
+        await asyncio.sleep(0)  # Yield al event loop para agrupar connects del mismo frame
 
         # Copiar y limpiar colas
         ws_ids = self._pending_registrations.copy()
@@ -270,10 +270,14 @@ class RedisConnectionManager:
             return
 
         try:
-            # Batch SADD de todas las workstations al WorkerRegistry
+            # Batch SADD con pipeline (un solo RTT a Redis)
             if self._worker_registry and ws_ids:
+                pipe = self._worker_registry._redis.pipeline()
                 for ws_id in ws_ids:
-                    await self._worker_registry.register_workstation(ws_id)
+                    pipe.sadd(self._worker_registry._workstations_key, ws_id)
+                pipe.expire(self._worker_registry._workstations_key, self._worker_registry._ttl)
+                pipe.set(self._worker_registry._heartbeat_key, "alive", ex=self._worker_registry._ttl)
+                await pipe.execute()
 
             # Lazy subscribe de organizaciones nuevas
             if org_ids and self._redis_available and self._pubsub:

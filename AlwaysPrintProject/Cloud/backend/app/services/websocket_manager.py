@@ -670,6 +670,17 @@ class ConnectionManager:
             "operators": len(self.operator_connections)
         }
 
+    async def get_global_connection_count(self) -> dict:
+        """
+        Versión async del conteo global (single-worker, solo local).
+        Interfaz compatible con RedisConnectionManager.
+        """
+        return {
+            "workstations": len(self.workstation_connections),
+            "operators": len(self.operator_connections),
+            "workers": 1,
+        }
+
     def register_command_waiter(self, command_id: str) -> asyncio.Event:
         """
         Registra un waiter para esperar la respuesta de un comando específico.
