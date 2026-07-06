@@ -161,9 +161,12 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // Si el backend no responde (network error o 502/503), redirigir a mantenimiento
+    // Si el backend no responde (network error o 502/503), redirigir a página principal
+    // que ya muestra el estado de "Servicio no disponible"
     if (!error.response || error.response.status === 502 || error.response.status === 503) {
-      if (typeof window !== 'undefined' && !window.location.pathname.includes('/maintenance')) {
+      if (typeof window !== 'undefined'
+        && window.location.pathname.startsWith('/dashboard')
+        && !window.location.pathname.includes('/maintenance')) {
         window.location.href = '/maintenance'
       }
     }
