@@ -2,41 +2,18 @@
 
 import { useEffect, useState } from 'react'
 import { RefreshCw, Server } from 'lucide-react'
-import { apiClient } from '@/lib/api'
 
 /**
  * Página de mantenimiento.
- * Se muestra cuando el backend no está disponible (network error, 502, 503).
- * Verifica periódicamente si el backend vuelve y redirige automáticamente.
+ * Verifica primero si el backend realmente está caído.
+ * Si responde OK, redirige al dashboard inmediatamente.
+ * Si no responde, muestra la pantalla de mantenimiento con auto-retry.
  */
 export default function MaintenancePage() {
-  const [checking, setChecking] = useState(false)
+  const [checking, setChecking] = useState(true)
+  const [backendDown, setBackendDown] = useState(false)
 
-  useEffect(() => {
-    // Verificar cada 10 segundos si el backend volvió
-    const interval = setInterval(async () => {
-      try {
-        setChecking(true)
-        const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/v1/health`, {
-          method: 'GET',
-          signal: AbortSignal.timeout(5000),
-        })
-        if (resp.ok) {
-          // Backend disponible — volver al dashboard
-          window.location.href = '/dashboard'
-        }
-      } catch {
-        // Sigue sin responder
-      } finally {
-        setChecking(false)
-      }
-    }, 10000)
-
-    return () => clearInterval(interval)
-  }, [])
-
-  const handleRetry = async () => {
-    setChecking(true)
+  const checkBackend = async () => {
     try {
       const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/v1/health`, {
         method: 'GET',
@@ -44,12 +21,30 @@ export default function MaintenancePage() {
       })
       if (resp.ok) {
         window.location.href = '/dashboard'
+        return
       }
     } catch {
-      // Sigue sin responder
-    } finally {
-      setChecking(false)
+      // No responde
     }
+    setBackendDown(true)
+    setChecking(false)
+  }
+
+  useEffect(() => {
+    checkBackend()
+    const interval = setInterval(checkBackend, 10000)
+    return () => clearInterval(interval)
+  }, [])
+
+  if (checking && !backendDown) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Verificando estado del servicio...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -62,10 +57,11 @@ export default function MaintenancePage() {
           Servicio en mantenimiento
         </h1>
         <p className="text-gray-600 mb-6">
-          El servidor está reiniciándose o en mantenimiento. Se reconectará automáticamente cuando esté disponible.
+          El servidor está reiniciándose o en mantenimiento.
+          Se reconectará automáticamente cuando esté disponible.
         </p>
         <button
-          onClick={handleRetry}
+          onClick={() => { setChecking(true); checkBackend() }}
           disabled={checking}
           className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
         >
