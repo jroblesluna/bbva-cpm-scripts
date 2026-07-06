@@ -99,7 +99,7 @@ class VLANUpdate(BaseModel):
     address: Optional[str] = Field(None, max_length=500, description="Dirección formateada de Google Places")
     latitude: Optional[float] = Field(None, ge=-90, le=90, description="Latitud (-90 a 90)")
     longitude: Optional[float] = Field(None, ge=-180, le=180, description="Longitud (-180 a 180)")
-    place_id: Optional[str] = Field(None, max_length=100, description="Google Place ID")
+    place_id: Optional[str] = Field(None, max_length=300, description="Google Place ID")
     location_image_url: Optional[str] = Field(None, max_length=500, description="URL de imagen de la ubicación física")
 
     @model_validator(mode="after")

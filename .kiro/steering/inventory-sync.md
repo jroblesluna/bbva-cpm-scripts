@@ -55,7 +55,6 @@ The inventory CSV has these columns:
 - For VLANs without `address`, `latitude`, or `longitude`
 - Build query: `{DIRECCION},{DISTRITO},{PROVINCIA},{DEPARTAMENTO},Peru`
 - Use Google Geocoding API (key from organization's `google_maps_api_key`)
-- Truncate `place_id` to 100 chars
 - Save: address (formatted from Google), latitude, longitude, place_id
 
 ### Step 3: Generate location images

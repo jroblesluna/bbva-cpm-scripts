@@ -61,7 +61,7 @@ class VLAN(Base):
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     # Identificador único de Google Places para la ubicación verificada
-    place_id = Column(String(100), nullable=True)
+    place_id = Column(String(300), nullable=True)
     # URL de imagen/foto de la ubicación física
     location_image_url = Column(String(500), nullable=True)
 
