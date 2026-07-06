@@ -745,7 +745,7 @@ def register_workstation(
 # === ENDPOINTS AUTENTICADOS ===
 
 @router.get("/", response_model=WorkstationListResponse)
-def list_workstations(
+async def list_workstations(
     page: int = Query(1, ge=1, description="Número de página"),
     page_size: int = Query(50, ge=1, le=1000, description="Tamaño de página"),
     vlan_id: Optional[UUID] = Query(None, description="Filtrar por VLAN"),
@@ -808,9 +808,9 @@ def list_workstations(
     if vlan_id:
         base_query = base_query.filter(Workstation.vlan_id == vlan_id)
     
-    # Obtener snapshot global de WS online (usado para filtro Y enriquecimiento).
+    # Obtener snapshot global de WS online (lectura fresca de Redis, cross-worker).
     from app.services.websocket_manager import connection_manager
-    global_online = connection_manager.get_global_online_snapshot()
+    global_online = await connection_manager.get_global_online_snapshot_async()
 
     # Filtrar por estado online usando snapshot Redis (no BD stale).
     # Se aplica en SQL con IN/NOT IN para mantener paginación eficiente.
@@ -977,7 +977,7 @@ def list_workstations(
 
 
 @router.get("/stats", response_model=WorkstationStatsResponse)
-def get_workstation_stats(
+async def get_workstation_stats(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1021,7 +1021,7 @@ def get_workstation_stats(
         # Corregir conteo online con snapshot real de WebSocket (cross-worker).
         # get_online_count() usa BD (puede estar stale); el snapshot es en tiempo real.
         from app.services.websocket_manager import connection_manager
-        global_online = connection_manager.get_global_online_snapshot()
+        global_online = await connection_manager.get_global_online_snapshot_async()
         if global_online:
             # Contar WS online que pertenecen a la org (si hay filtro)
             if org_id:

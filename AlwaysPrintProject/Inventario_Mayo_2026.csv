@@ -1,0 +1,656 @@
+﻿CENTRO DE COSTO,AREA,UNIDAD,SUBUNIDAD,SEDE,OFICINA / AREA,UBICACIÓN,MODELO INSTALADO,SERIE,IP,DIRECCION,DISTRITO,PROVINCIA,DEPARTAMENTO,OWNER,TIPO
+10,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Andahuaylas,Operaciones,MX722adhe,7464939022R0V,118.205.68.68,av Peru 342,Andahuaylas,Andahuaylas,Apurimac,Lexmark,Contrato 2021
+10,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Andahuaylas,Gerencia,MX722adhe,7464939022R32,118.205.68.69,av Peru 342,Andahuaylas,Andahuaylas,Apurimac,Lexmark,Contrato 2021
+13,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Paseo La Castellana,Gerencia,MX722adhe,7464111124764,118.205.70.68,av Paseo la Castellana 103,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+13,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Paseo La Castellana,Plataforma,MX722adhe,746411112475N,118.205.70.69,av Paseo la Castellana 103,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+23,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Ovalo Quiñonez,Territorial,MX522adhe,701701130LPDW,118.205.74.70,av Guardia Civil 787,San Borja,Lima,Lima,Lexmark,Contrato 2021
+23,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Ovalo Quiñonez,Plataforma,MX722adhe,746411112476N,118.205.74.68,av Guardia Civil 787,San Borja,Lima,Lima,Lexmark,Contrato 2021
+23,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Ovalo Quiñonez,Sala Prime,MX722adhe,746411112475C,118.205.74.69,av Guardia Civil 787,San Borja,Lima,Lima,Lexmark,Contrato 2021
+30,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Ovalo Larco Trujillo,Sub Gerencia,MX722adhe,746410202415W,118.205.76.68,Jr America del Sur 4040,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+30,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Ovalo Larco Trujillo,Plataforma,MX722adhe,74641050242T4,118.205.76.69,Jr America del Sur 4040,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+38,Banca Comercial,Division Sur,Oficina Cusco,Provincia,Agencia Mantas,Sub Gerencia,MX722adhe,74641101246L0,118.207.250.69,Calle Portal  N 130 Mantas,Cusco,Cusco,Cusco,Lexmark,Contrato 2021
+48,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Mega Exp Ves,Plataforma,MX722adhe,7464111124759,118.205.78.68,av Lima 2500,Villa el Salvador,Lima,Lima,Lexmark,Contrato 2021
+48,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Mega Exp Ves,Plataforma,MX722adhe,7464111124752,118.205.78.69,av Lima 2500,Villa el Salvador,Lima,Lima,Lexmark,Contrato 2021
+60,Red Comercial,Division Cusco,AEP Urubamba,Provincia,Agencia AEP URUBAMBA,Sub Gerencia,MX722adhe,74641101246L5,118.206.226.68,Jr Sucre 348,Urubamba,Urubamba,Cusco,Lexmark,Contrato 2021
+81,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Bagua Grande,Sub Gerencia,MX722adhe,7464939022R4B,118.205.90.68,av Chachapoyas 2044 Sector Visalot,Bagua Grande,Utcubamba,Amazonas,Lexmark,Contrato 2021
+81,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Bagua Grande,Plataforma,MX722adhe,7464939022P66,118.205.90.69,av Chachapoyas 2044 Sector Visalot,Bagua Grande,Utcubamba,Amazonas,Lexmark,Contrato 2021
+83,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Real Plaza  Cusco,Operaciones,MX722adhe,7464939022PCF,118.205.92.68,av Collasuyo 2964,Cusco,Cusco,Cusco,Lexmark,Contrato 2021
+83,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Real Plaza  Cusco,Operaciones,MX722adhe,7464939022R0C,118.205.92.69,av Collasuyo 2964,Cusco,Cusco,Cusco,Lexmark,Contrato 2021
+91,Negocio Individuos Alto Valor,Banca Privada,Oficina Banca Privada Pardo y Aliaga,Lima,Agencia Banca Privada Pardo Y Aliaga,Ejecutivos,CX625adhe,75299291450T4,118.205.4.70,av Pardo y Aliaga 652 2 P,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+91,Negocio Individuos Alto Valor,Banca Privada,Oficina Banca Privada Pardo y Aliaga,Lima,Agencia Banca Privada Pardo Y Aliaga,Sub Gerencia,MX722adhe,746410202417B,118.205.4.68,av Pardo y Aliaga 652 2 P,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+91,Negocio Individuos Alto Valor,Banca Privada,Oficina Banca Privada Pardo y Aliaga,Lima,Agencia Banca Privada Pardo Y Aliaga,Recepcion,MX722adhe,746410202416N,118.205.4.69,av Pardo y Aliaga 652 2 P,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+94,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Real Plaza Salaverry,Sub Gerencia,MX722adhe,746410202418N,118.205.98.68,av Salaverry 2370,Jesus Maria,Lima,Lima,Lexmark,Contrato 2021
+94,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Real Plaza Salaverry,Banca Comercial,MX722adhe,74641020241CW,118.205.98.69,av Salaverry 2370,Jesus Maria,Lima,Lima,Lexmark,Contrato 2021
+101,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Camana,Plataforma,MX722adhe,74641030241ZF,118.205.100.68,av Emancipacion 200,Lima,Lima,Lima,Lexmark,Contrato 2021
+101,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Camana,Plataforma,MX722adhe,746410302421R,118.205.100.69,av Emancipacion 200,Lima,Lima,Lima,Lexmark,Contrato 2021
+102,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Callao,Plataforma,MX722adhe,74641101246C3,118.205.102.68,av Saenz Pena 323,Callao,Callao,Lima,Lexmark,Contrato 2021
+102,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Callao,Plataforma,MX722adhe,746411112478D,118.205.102.69,av Saenz Pena 323,Callao,Callao,Lima,Lexmark,Contrato 2021
+103,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Capon,Plataforma,MX722adhe,7464049023WWK,118.205.104.68,Jr Ucayali 735,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+103,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Capon,Plataforma,MX722adhe,7464049023WWL,118.205.104.69,Jr Ucayali 735,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+106,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia El Remanso,Sala Prime,MX432adwe,701941340M407,118.205.108.69,av Raul Ferrero 1292 Urb el Remanso,La Molina,Lima,Lima,Lexmark,Contrato 2021
+106,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia El Remanso,Sub Gerencia,MX722adhe,746410202417H,118.205.108.68,av Raul Ferrero 1292 Urb el Remanso,La Molina,Lima,Lima,Lexmark,Contrato 2021
+106,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia El Remanso,Banca Negocio,MX722adhe,7464102024187,118.205.108.70,av Raul Ferrero 1292 Urb el Remanso,La Molina,Lima,Lima,Lexmark,Contrato 2021
+107,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Faucett,Sub Gerencia,MX722adhe,746410202418D,118.205.110.68,av Faucett 216,San Miguel,Lima,Lima,Lexmark,Contrato 2021
+107,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Faucett,Comercial,MX722adhe,746410202419D,118.205.110.69,av Faucett 216,San Miguel,Lima,Lima,Lexmark,Contrato 2021
+108,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Brena,Sub Gerencia,MX722adhe,74641101246D8,118.205.112.68,Jr Huaraz 1600,Breña,Lima,Lima,Lexmark,Contrato 2021
+108,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Brena,Ventanilla,MX722adhe,746411112476Y,118.205.112.69,Jr Huaraz 1600,Breña,Lima,Lima,Lexmark,Adenda 5
+109,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia La Molina,Sub Gerencia,MX722adhe,7464111124777,118.205.114.68,av la Molina 746,La Molina,Lima,Lima,Lexmark,Contrato 2021
+109,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia La Molina,Ventanilla,MX722adhe,74641101246KT,118.205.114.69,av la Molina 746,La Molina,Lima,Lima,Lexmark,Adenda 5
+111,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Los Olivos,Sub Gerencia,MX722adhe,7464049023WXG,118.205.118.68,Alfredo Mendiola 3685,Los Olivos,Lima,Lima,Lexmark,Adenda 5
+111,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Los Olivos,Plataforma,MX722adhe,7464049023WXX,118.205.118.69,Alfredo Mendiola 3685,Los Olivos,Lima,Lima,Lexmark,Contrato 2021
+112,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia México,Plataforma,MX722adhe,746410302420V,118.205.120.68,av Mexico 568,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+112,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia México,Plataforma,MX722adhe,74641030241ZC,118.205.120.69,av Mexico 568,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+113,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Ingenieria,Sub Gerencia,MX722adhe,74641101246DX,118.205.122.68,Alfredo Mendiola 300,San Martin de Porres,Lima,Lima,Lexmark,Contrato 2021
+113,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Ingenieria,Plataforma,MX722adhe,746411112474K,118.205.122.69,Alfredo Mendiola 300,San Martin de Porres,Lima,Lima,Lexmark,Adenda 5
+114,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Barranco,Banca Personal,MX522adhe,701701030LHZL,118.205.124.70,av Grau 414,Barranco,Lima,Lima,Lexmark,Adenda 5
+114,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Barranco,Sub Gerencia,MX722adhe,74641101246BY,118.205.124.68,av Grau 414,Barranco,Lima,Lima,Lexmark,Adenda 5
+114,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Barranco,Banca Personal,MX722adhe,74641101246LX,118.205.124.69,av Grau 414,Barranco,Lima,Lima,Lexmark,Contrato 2021
+115,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia La Victoria,Sub Gerencia,MX722adhe,7464103024211,118.205.126.68,av Manco Capac 300,La Victoria,Lima,Lima,Lexmark,Adenda 5
+115,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia La Victoria,Jefe de Atencion al cliente,MX722adhe,74641020241CV,118.205.126.70,av Manco Capac 300,La Victoria,Lima,Lima,Lexmark,Adenda 5
+116,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Comas,Sub Gerencia,MS826de,40649370197T8,118.205.128.68,AV TUPAC AMARU 1175,Comas,Lima,Lima,Lexmark,Contrato 2021
+116,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Comas,Banca Negocio,MX722adhe,74641020241CB,118.205.128.69,AV TUPAC AMARU 1175,Comas,Lima,Lima,Lexmark,Adenda 5
+117,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Larco Tarata,Sala Prime,MX432adwe,701941340M3ZY,118.205.6.70,av Larco 631,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+117,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Larco Tarata,Plataforma,MX722adhe,7464049023WWD,118.205.6.68,av Larco 631,Miraflores,Lima,Lima,Lexmark,Adenda 5
+117,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Larco Tarata,Plataforma,MX722adhe,7464049023WVF,118.205.6.69,av Larco 631,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+118,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Bolivar,Sala Prime,MX522adhe,701701130LPNX,118.205.130.69,Av Bolivar 1188 1190,Pueblo Libre,Lima,Lima,Lexmark,Adenda 5
+118,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Bolivar,Sub Gerencia,MX722adhe,74641111247BX,118.205.130.68,Av Bolivar 1188 1190,Pueblo Libre,Lima,Lima,Lexmark,Adenda 5
+119,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia San Antonio,Sub Gerencia,MX722adhe,7464049023WVZ,118.205.132.68,av 28 de Julio 1297,Miraflores,Lima,Lima,Lexmark,Adenda 5
+119,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia San Antonio,Comercial,MX722adhe,7464049023WX4,118.205.132.69,av 28 de Julio 1297,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+120,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Universidad Catolica,Sala Prime,MX522adhe,701701130LPBV,118.205.134.69,Av Universitaria Cdra 18,San Miguel,Lima,Lima,Lexmark,Adenda 5
+120,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Universidad Catolica,Sub Gerencia,MX722adhe,7464049023X2M,118.205.134.68,Av Universitaria Cdra 18,San Miguel,Lima,Lima,Lexmark,Adenda 5
+120,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Universidad Catolica,Sala Prime,MX722adhe,74641030241YP,118.205.134.70,Av Universitaria Cdra 18,San Miguel,Lima,Lima,Lexmark,Adenda 5
+121,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Club Regatas Lima,Plataforma,MX722adhe,74641020241CD,118.205.136.68,Av Chachi Dibos,Chorrillos,Lima,Lima,Lexmark,Adenda 5
+121,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Club Regatas Lima,Plataforma,MX722adhe,74641020241D7,118.205.136.69,Av Chachi Dibos,Chorrillos,Lima,Lima,Lexmark,Adenda 5
+122,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Magdalena,Sub Gerencia,MX722adhe,74641101246HX,118.205.138.68,JR FRANCISCO BOLOGNESI 399,Magdalena,Lima,Lima,Lexmark,Adenda 5
+122,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Magdalena,Plataforma,MX722adhe,746411112475B,118.205.138.69,JR FRANCISCO BOLOGNESI 399,Magdalena,Lima,Lima,Lexmark,Adenda 5
+123,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Camino Real,Sala Prime,MX522adhe,701701030LK93,118.205.140.70,av Camino Real 355,San Isidro,Lima,Lima,Lexmark,Adenda 5
+123,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Camino Real,Plataforma,MX722adhe,7464049023WWC,118.205.140.68,av Camino Real 355,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+123,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Camino Real,Gerencia,MX722adhe,7464049023WY0,118.205.140.69,av Camino Real 355,San Isidro,Lima,Lima,Lexmark,Adenda 5
+126,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Colmena,Sub Gerencia,MX722adhe,7464102024162,118.205.8.68,av Nicolas de Pierola 649,Lima,Lima,Lima,Lexmark,Contrato 2021
+126,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Colmena,Plataforma,MX722adhe,74641020241CC,118.205.8.69,av Nicolas de Pierola 649,Lima,Lima,Lima,Lexmark,Adenda 5
+127,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Minka,Sub Gerencia,MX722adhe,74641101246L8,118.205.146.68,Pabellon 4,Callao,Callao,Lima,Lexmark,Contrato 2021
+127,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Minka,Gerencia,MX722adhe,7464111124799,118.205.146.69,Pabellon 4,Callao,Callao,Lima,Lexmark,Contrato 2021
+128,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Las Flores,Comercial,MX722adhe,74641020241D8,118.205.148.68,av Proceres de la Independ 1643,San Juan de Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+128,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Las Flores,Comercial,MX722adhe,74641050242R8,118.205.148.69,av Proceres de la Independ 1643,San Juan de Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+129,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Vitarte,Comercial,MX722adhe,74641101246HR,118.205.150.68,Jr Progreso 102,Ate,Lima,Lima,Lexmark,Contrato 2021
+129,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Vitarte,Gerencia,MX722adhe,74641101246CH,118.205.150.69,Jr Progreso 102,Ate,Lima,Lima,Lexmark,Contrato 2021
+130,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Lima,Sub Gerencia,MX722adhe,746410202416V,118.205.152.68,Jr Carabaya 841,Lima,Lima,Lima,Lexmark,Adenda 5
+130,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Lima,Plataforma,MX722adhe,7464049023WY4,118.205.152.69,Jr Carabaya 841,Lima,Lima,Lima,Lexmark,Contrato 2021
+130,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Lima,Plataforma,MX722adhe,7464049023WXP,118.205.152.70,Jr Carabaya 841,Lima,Lima,Lima,Lexmark,Contrato 2021
+131,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Nicolas Arriola 1,Plataforma,MX722adhe,74641050242WC,118.205.154.68,av Nicolas Arriola 607,La Victoria,Lima,Lima,Lexmark,Adenda 5
+131,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Nicolas Arriola 1,Plataforma,MX722adhe,746410202415H,118.205.154.69,av Nicolas Arriola 607,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+133,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Villa Maria De Triunfo,Sub Gerencia,MX722adhe,74641101246CL,118.205.158.68,av Pachacutec 2101,Villa Maria del Triunfo,Lima,Lima,Lexmark,Contrato 2021
+133,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Villa Maria De Triunfo,Plataforma,MX722adhe,74641101246BV,118.205.158.69,av Pachacutec 2101,Villa Maria del Triunfo,Lima,Lima,Lexmark,Adenda 5
+135,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia San Juan De Miraflores,Plataforma,MX722adhe,746411112474V,118.205.160.68,av de los Heroes 502,San Juan de Miraflores,Lima,Lima,Lexmark,Adenda 5
+135,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia San Juan De Miraflores,Comercial,MX722adhe,7464111124756,118.205.160.69,av de los Heroes 502,San Juan de Miraflores,Lima,Lima,Lexmark,Adenda 5
+136,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Salamanca,Sub Gerencia,MX722adhe,74641111247BR,118.205.162.68,Av Paracas 203 Urb Salamanca,Ate,Lima,Lima,Lexmark,Contrato 2021
+136,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Salamanca,Banca Negocio,MX722adhe,746411112479Z,118.205.162.69,Av Paracas 203 Urb Salamanca,Ate,Lima,Lima,Lexmark,Contrato 2021
+137,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Villa Marina,Plataforma,MX722adhe,74641030241ZK,118.205.164.68,av Guardia Civil 152 156,Chorrillos,Lima,Lima,Lexmark,Contrato 2021
+137,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Villa Marina,Gerencia,MX722adhe,746410302420C,118.205.164.69,av Guardia Civil 152 156,Chorrillos,Lima,Lima,Lexmark,Contrato 2021
+138,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Cc Aurora,Sala Prime,MX432adwe,701941340M406,118.205.166.70,c Luis Arias Schereiber 215 217,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+138,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Cc Aurora,Plataforma,MX722adhe,7464049023X1V,118.205.166.68,c Luis Arias Schereiber 215 217,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+138,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Cc Aurora,Plataforma,MX722adhe,74641020241CR,118.205.166.69,c Luis Arias Schereiber 215 217,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+139,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Zarate,Plataforma,MX722adhe,7464049023X0D,118.205.168.68,av Gran Chimu 399 Urb Zarate,San Juan de Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+139,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Zarate,Sub Gerencia,MX722adhe,7464049023X0T,118.205.168.69,av Gran Chimu 399 Urb Zarate,San Juan de Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+140,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Jesus Maria,Plataforma,MX722adhe,746410202415X,118.205.170.68,av Republica Dominicana 355 359,Jesus Maria,Lima,Lima,Lexmark,Contrato 2021
+140,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Jesus Maria,Sub Gerencia,MX722adhe,74641050242T0,118.205.170.69,av Republica Dominicana 355 359,Jesus Maria,Lima,Lima,Lexmark,Contrato 2021
+141,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Avenida Peru,Sub Gerencia,MX722adhe,746411112477W,118.205.172.68,av Peru 3442-3444,San Martin de Porres,Lima,Lima,Lexmark,Contrato 2021
+141,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Avenida Peru,Plataforma,MX722adhe,7464111124786,118.205.172.69,av Peru 3442-3444,San Martin de Porres,Lima,Lima,Lexmark,Contrato 2021
+142,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Cc San Isidro,Sub Gerencia,MX722adhe,74641050242TR,118.205.174.68,av Rivera Navarrete 815,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+142,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Cc San Isidro,Plataforma,MX722adhe,74641030241Z1,118.205.174.69,av Rivera Navarrete 815,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+143,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Victor A Belaunde,Plataforma,MX722adhe,7464102024192,118.205.176.68,AV TUPAC AMARU 3046,Comas,Lima,Lima,Lexmark,Contrato 2021
+143,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Victor A Belaunde,Gerencia,MX722adhe,7464102024194,118.205.176.69,AV TUPAC AMARU 3046,Comas,Lima,Lima,Lexmark,Contrato 2021
+144,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Gamarra,Plataforma,MX722adhe,74641050242RH,118.205.178.68,Prolong Unanue 1599,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+144,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Gamarra,Plataforma,MX722adhe,74641020241BD,118.205.178.69,Prolong Unanue 1599,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+145,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Rinconada,Ventanilla,MX722adhe,746411112477K,118.205.180.68,av la Universidad 1810,La Molina,Lima,Lima,Lexmark,Contrato 2021
+145,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Rinconada,Comercial,MX722adhe,746411112475L,118.205.180.69,av la Universidad 1810,La Molina,Lima,Lima,Lexmark,Contrato 2021
+146,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Puruchuco,Sub Gerencia,MX722adhe,746411112479R,118.205.182.68,av Nicolas Ayllon 4770,Ate,Lima,Lima,Lexmark,Contrato 2021
+146,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Puruchuco,Gerencia,MX722adhe,746411112477P,118.205.182.69,av Nicolas Ayllon 4770,Ate,Lima,Lima,Lexmark,Contrato 2021
+147,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Arenales,Sala Prime,MX522adhe,701701030LK91,118.205.184.69,av Arenales 701,Lima,Lima,Lima,Lexmark,Contrato 2021
+147,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Arenales,Territorial,MX522adhe,701701030LHZ4,118.205.184.71,av Arenales 701,Lima,Lima,Lima,Lexmark,Contrato 2021
+147,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Arenales,Sub Gerencia,MX722adhe,74641020241D2,118.205.184.68,av Arenales 701,Lima,Lima,Lima,Lexmark,Contrato 2021
+147,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Arenales,Sala Prime,MX722adhe,74641050242T3,118.205.184.70,av Arenales 701,Lima,Lima,Lima,Lexmark,Contrato 2021
+148,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Cc Sucre,Sub Gerencia,MX722adhe,74641101246FH,118.205.186.68,JR LEGUIA Y MELENDEZ 998,Pueblo Libre,Lima,Lima,Lexmark,Contrato 2021
+148,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Cc Sucre,Plataforma,MX722adhe,74641101246FK,118.205.186.69,JR LEGUIA Y MELENDEZ 998,Pueblo Libre,Lima,Lima,Lexmark,Contrato 2021
+150,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Cc Higuereta,Sub Gerencia,MX722adhe,74641020241B2,118.205.190.68,av Benavides 3501,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+150,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Cc Higuereta,Gerencia,MX722adhe,746410202417L,118.205.190.69,av Benavides 3501,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+151,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Maranga,Sub Gerencia,MX722adhe,746410302420B,118.205.192.68,av la Marina 2671,San Miguel,Lima,Lima,Lexmark,Contrato 2021
+151,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Maranga,Plataforma,MX722adhe,74641050242T2,118.205.192.69,av la Marina 2671,San Miguel,Lima,Lima,Lexmark,Contrato 2021
+152,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia San Borja,Sala Prime,MX522adhe,701701030LK70,118.205.194.69,av Aviacion 2465 2467,San Borja,Lima,Lima,Lexmark,Contrato 2021
+152,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia San Borja,Sub Gerencia,MX722adhe,7464111124783,118.205.194.68,av Aviacion 2465 2467,San Borja,Lima,Lima,Lexmark,Contrato 2021
+152,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia San Borja,Plataforma,MX722adhe,7464111124744,118.205.194.70,av Aviacion 2465 2467,San Borja,Lima,Lima,Lexmark,Contrato 2021
+153,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Cc Risso,Plataforma,MX722adhe,746410202419M,118.205.196.68,av Arequipa Esq Jr Risso,Lince,Lima,Lima,Lexmark,Contrato 2021
+153,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Cc Risso,Gerencia,MX722adhe,74641050242W5,118.205.196.69,av Arequipa Esq Jr Risso,Lince,Lima,Lima,Lexmark,Contrato 2021
+156,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Pardo,Plataforma,MX722adhe,7464049023X2D,118.205.200.68,av Pardo 791,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+156,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Pardo,Plataforma,MX722adhe,7464049023X0F,118.205.200.69,av Pardo 791,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+157,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Las Gardenias,Plataforma,MX722adhe,746410302420G,118.205.202.68,av Benavides 5096,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+157,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Las Gardenias,Plataforma,MX722adhe,74641030241ZD,118.205.202.69,av Benavides 5096,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+159,Banca Comercial,Banca Comercial Hunter,Banca Comercial,Provincia,Agencia Hunter,Ventanilla,MX722adhe,74641101246K9,118.206.254.68,av las americas N 117,Jacobo Hunter,Arequipa,Arequipa,Lexmark,Contrato 2021
+159,Banca Comercial,Banca Comercial Hunter,Banca Comercial,Provincia,Agencia Hunter,Sub Gerencia,MX722adhe,74641050242VB,118.206.254.69,av las americas N 117,Jacobo Hunter,Arequipa,Arequipa,Lexmark,Contrato 2021
+160,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Cc Monterrico,Sub Gerencia,MX722adhe,74641050242VG,118.205.204.68,av la Encalada 615 CC Monterrico,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+160,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Cc Monterrico,Operaciones,MX722adhe,74641050242VM,118.205.204.69,av la Encalada 615 CC Monterrico,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+162,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Aeropuerto,Sub Gerencia,MX722adhe,746411112475M,118.205.208.68,CENTRO AÉREO COMERCIAL,Callao,Callao,Lima,Lexmark,Contrato 2021
+162,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Aeropuerto,Ventanilla,MX722adhe,74641101246D6,118.205.208.69,CENTRO AÉREO COMERCIAL,Callao,Callao,Lima,Lexmark,Contrato 2021
+163,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Apolo,Sub Gerencia,MX722adhe,74641030241ZL,118.205.210.68,av Mexico 1700,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+163,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Apolo,Plataforma,MX722adhe,7464103024203,118.205.210.69,av Mexico 1700,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+164,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Venezuela 3,Sub Gerencia,MX722adhe,74641101246K4,118.205.212.68,av Venezuela 1254,Breña,Lima,Lima,Lexmark,Contrato 2021
+164,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Venezuela 3,Plataforma,MX722adhe,74641101246F5,118.205.212.69,av Venezuela 1254,Breña,Lima,Lima,Lexmark,Contrato 2021
+165,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Base Naval,Sub Gerencia,MX722adhe,746411112479X,118.205.214.68,av Contralmirante  Mora SN,Callao,Callao,Lima,Lexmark,Contrato 2021
+165,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Base Naval,Plataforma,MX722adhe,746411112475F,118.205.214.69,av Contralmirante  Mora SN,Callao,Callao,Lima,Lexmark,Contrato 2021
+166,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Colonial,Sub Gerencia,MX722adhe,746411112479L,118.205.10.68,c Omega 149,Callao,Callao,Lima,Lexmark,Contrato 2021
+166,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Colonial,Plataforma,MX722adhe,74641101246CT,118.205.10.69,c Omega 149,Callao,Callao,Lima,Lexmark,Contrato 2021
+169,BANCA COMERCIAL,GT MIRAFLORES,OFICINA COMANDANTE ESPINAR,Lima,Agencia Comandante Espinar,Sub Gerencia,MX722adhe,7464102024180,118.205.220.68,av Comandante Espinar 372 388,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+170,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Avenida Sucre,Sub Gerencia,MX722adhe,746411112476M,118.205.222.68,AV SUCRE 970,Pueblo Libre,Lima,Lima,Lexmark,Contrato 2021
+170,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Avenida Sucre,Plataforma,MX722adhe,746411112477L,118.205.222.69,AV SUCRE 970,Pueblo Libre,Lima,Lima,Lexmark,Contrato 2021
+172,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Cc Fiori,Sala Prime,MX532adwe,702025210043D,118.205.226.69,Prolong 499 G Tomas Valle,San Martin de Porres,Lima,Lima,Lexmark,Contrato 2021
+172,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Cc Fiori,Sub Gerencia,MX722adhe,74641101246K6,118.205.226.68,Prolong 499 G Tomas Valle,San Martin de Porres,Lima,Lima,Lexmark,Contrato 2021
+174,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Megaplaza,Sub Gerencia,MX722adhe,746410202417P,118.205.12.68,av Alfredo Mendiola 3698,Independencia,Lima,Lima,Lexmark,Contrato 2021
+174,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Megaplaza,Ventanilla,MX722adhe,746410202416Y,118.205.12.69,av Alfredo Mendiola 3698,Independencia,Lima,Lima,Lexmark,Contrato 2021
+175,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Real Pza Centro Civico,Sala Prime,MX532adwe,7020252100440,118.205.228.69,pz Cc Real Centro Civico,Lima,Lima,Lima,Lexmark,Contrato 2021
+175,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Real Pza Centro Civico,Sub Gerencia,MX722adhe,7464049023WYP,118.205.228.70,pz Cc Real Centro Civico,Lima,Lima,Lima,Lexmark,Contrato 2021
+175,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Real Pza Centro Civico,Ejecutivo EBP,MX722adhe,7464049023WZG,118.205.228.68,pz Cc Real Centro Civico,Lima,Lima,Lima,Lexmark,Contrato 2021
+176,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia El Trebol,Comercial,MX722adhe,746411112478X,118.205.230.68,Av Gamarra Km 14 5 c Panam Norte,Los Olivos,Lima,Lima,Lexmark,Contrato 2021
+176,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia El Trebol,Sub Gerencia,MX722adhe,746411112475K,118.205.230.69,Av Gamarra Km 14 5 c Panam Norte,Los Olivos,Lima,Lima,Lexmark,Contrato 2021
+177,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Alcazar,Sub Gerencia,MX722adhe,746411112475W,118.205.232.68,av Amancaes 192 194,Rimac,Lima,Lima,Lexmark,Contrato 2021
+177,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Alcazar,Banca Empresa,MX722adhe,74641101246F4,118.205.232.69,av Amancaes 192 194,Rimac,Lima,Lima,Lexmark,Contrato 2021
+178,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Camacho,Sala Prime,MX432adwe,701941340M403,118.205.234.69,av Prolong Javier Prado este 4921,La Molina,Lima,Lima,Lexmark,Contrato 2021
+178,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Camacho,Gerencia,MX722adhe,74641101246KZ,118.205.234.68,av Prolong Javier Prado este 4921,La Molina,Lima,Lima,Lexmark,Contrato 2021
+179,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Cavenecia,Sala Prime,MX522adhe,701704330NNY8,118.205.236.70,c Esq Jr Cavenecia Con Tudela y Varela,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+179,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Cavenecia,Banca Comercial,MX722adhe,7464049023WWG,118.205.236.68,c Esq Jr Cavenecia Con Tudela y Varela,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+179,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Cavenecia,Sub Gerencia,MX722adhe,7464049023X1G,118.205.236.69,c Esq Jr Cavenecia Con Tudela y Varela,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+182,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Santa Monica,Sub Gerencia,MX722adhe,7464102024177,118.205.242.68,av Juan Pezet 1425,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+182,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Santa Monica,Gerencia,MX722adhe,74641050242R7,118.205.242.69,av Juan Pezet 1425,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+183,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Santa Anita,Sub Gerencia,MX722adhe,74641101246DL,118.205.14.68,c las Alondras 257,Santa Anita,Lima,Lima,Lexmark,Contrato 2021
+183,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Santa Anita,Plataforma,MX722adhe,74641101246KY,118.205.14.69,c las Alondras 257,Santa Anita,Lima,Lima,Lexmark,Contrato 2021
+184,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia San Felipe,Sub Gerencia,MX722adhe,7464049023WXW,118.205.244.68,Residencial San Felipe Tda 23,Jesus Maria,Lima,Lima,Lexmark,Contrato 2021
+184,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia San Felipe,Plataforma,MX722adhe,746410202418K,118.205.244.69,Residencial San Felipe Tda 23,Jesus Maria,Lima,Lima,Lexmark,Contrato 2021
+186,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia La Rambla,Gerencia,MX722adhe,74641141248H6,118.205.248.68,av Javier Prado este 2010,San Borja,Lima,Lima,Lexmark,Contrato 2021
+186,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia La Rambla,Plataforma,MX722adhe,746411112475Z,118.205.248.69,av Javier Prado este 2010,San Borja,Lima,Lima,Lexmark,Contrato 2021
+187,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Aramburu,Plataforma,MX722adhe,74641020241C4,118.205.250.68,av Aramburu 154,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+187,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Aramburu,Plataforma,MX722adhe,74641020241BC,118.205.250.69,av Aramburu 154,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+189,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Dos De Mayo,Sub Gerencia,MX722adhe,7464049023WYF,118.205.254.68,c los Laureles 214,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+189,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Dos De Mayo,Ventanilla,MX722adhe,7464049023WYK,118.205.254.69,c los Laureles 214,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+190,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Cc san Miguel,Sub Gerencia,MX722adhe,746410202416M,118.206.0.68,CC Plaza San Miguel  Piso 3,San Miguel,Lima,Lima,Lexmark,Contrato 2021
+190,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Cc san Miguel,Plataforma,MX722adhe,746410202419L,118.206.0.69,CC Plaza San Miguel  Piso 3,San Miguel,Lima,Lima,Lexmark,Contrato 2021
+190,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Cc san Miguel,Sala Prime,MX722adhe,74641050242T6,118.206.0.70,CC Plaza San Miguel  Piso 3,San Miguel,Lima,Lima,Lexmark,Contrato 2021
+194,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Chacarilla,Plataforma,MX722adhe,74641020241BP,118.205.18.68,av Primavera 1054 Urb Chacarilla,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+194,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Chacarilla,Sub Gerencia,MX722adhe,746410202418C,118.205.18.69,av Primavera 1054 Urb Chacarilla,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+194,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Chacarilla,Coworking,MX522adhe,701701130LPF1,118.205.18.73,av Primavera 1054 Urb Chacarilla,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+195,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Cuartel Gral Ejercito,Sala Prime,MX432adwe,701941340M3RP,118.206.6.70,Interior Ctel Gral del Ejercito,San Borja,Lima,Lima,Lexmark,Contrato 2021
+195,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Cuartel Gral Ejercito,Sub Gerencia,MX722adhe,746411112476P,118.206.6.68,Interior Ctel Gral del Ejercito,San Borja,Lima,Lima,Lexmark,Contrato 2021
+195,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Cuartel Gral Ejercito,Plataforma,MX722adhe,7464111124768,118.206.6.69,Interior Ctel Gral del Ejercito,San Borja,Lima,Lima,Lexmark,Contrato 2021
+196,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia San Martin De Porres,Sub Gerencia,MX722adhe,74641111247BW,118.206.8.68,av Peru 2254,San Martin de Porres,Lima,Lima,Lexmark,Contrato 2021
+196,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia San Martin De Porres,Banca Negocio,MX722adhe,746411112478N,118.206.8.69,av Peru 2254,San Martin de Porres,Lima,Lima,Lexmark,Contrato 2021
+197,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Nicolas Arriola 2,Plataforma,MX722adhe,7464103024204,118.206.10.68,av Nicolas Arriola 1799,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+197,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Nicolas Arriola 2,Plataforma,MX722adhe,74641030241ZR,118.206.10.69,av Nicolas Arriola 1799,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+200,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Cusco,Centro de Negocios,MX522adhe,701701030LK02,118.205.20.71,av el Sol 366,Cusco,Cusco,Cusco,Lexmark,Contrato 2021
+200,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Cusco,Atencion al Cliente,MX722adhe,7464939022PW3,118.205.20.68,av el Sol 366,Cusco,Cusco,Cusco,Lexmark,Contrato 2021
+200,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Cusco,Plataforma,MX722adhe,7464939022R4K,118.205.20.70,av el Sol 366,Cusco,Cusco,Cusco,Lexmark,Contrato 2021
+200,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Cusco,Plataforma,MX722adhe,7464939022PWC,118.205.20.72,av el Sol 366,Cusco,Cusco,Cusco,Lexmark,Contrato 2021
+201,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Wanchaq,Sub Gerencia,MX722adhe,7464939022PWZ,118.206.12.68,av Garcilazo 300,Wanchaq,Cusco,Cusco,Lexmark,Contrato 2021
+201,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Wanchaq,Plataforma,MX722adhe,7464939022R12,118.206.12.69,av Garcilazo 300,Wanchaq,Cusco,Cusco,Lexmark,Contrato 2021
+202,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Ayacucho,Plataforma,MX722adhe,7464939022R37,118.206.14.68,c Portal Union 24,Ayacucho,Huamanga,Ayacucho,Lexmark,Contrato 2021
+202,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Ayacucho,Plataforma,MX722adhe,7464939022R03,118.206.14.69,c Portal Union 24,Ayacucho,Huamanga,Ayacucho,Lexmark,Contrato 2021
+203,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Provincia,Agencia San Martin,Sala Prime,MX432adwe,701934240K201,118.206.16.70,av San Martin 1144 Urb San Isidro,Ica,Ica,Ica,Lexmark,Contrato 2021
+203,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Provincia,Agencia San Martin,Sub Gerencia,MX722adhe,74641050242W9,118.206.16.68,av San Martin 1144 Urb San Isidro,Ica,Ica,Ica,Lexmark,Contrato 2021
+203,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Provincia,Agencia San Martin,Comercial,MX722adhe,74641020241C1,118.206.16.69,av San Martin 1144 Urb San Isidro,Ica,Ica,Ica,Lexmark,Contrato 2021
+204,Banca Empresa Y Corporativa,Gerencia Regional Be 2,Gerencia Regional Be 2,Provincia,Banca Empresa Cusco,Banca Empresa,MX722adhe,7464939022PCK,118.205.20.73,av el Sol 366,Cusco,Cusco,Cusco,Lexmark,Contrato 2021
+204,Banca Empresa Y Corporativa,Gerencia Regional Be 2,Gerencia Regional Be 2,Provincia,Banca Empresa Cusco,Banca Empresa,MX722adhe,7464939022PDD,118.205.20.74,av el Sol 366,Cusco,Cusco,Cusco,Lexmark,Contrato 2021
+205,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Tintaya,Gerencia,MX722adhe,7464049023X1X,118.207.248.68,Av San Martin 331,Espinar,Espinar,Cusco,Lexmark,Contrato 2021
+205,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Tintaya,Gerencia,MX722adhe,7464939022R43,118.245.45.11,Av San Martin 331,Espinar,Espinar,Cusco,Lexmark,Contrato 2021
+208,Banca Comercial,Division Sur,Division Sur,Provincia,Agencia Huayruropata,Plataforma,MX722adhe,7464102024189,118.206.4.68,Av Huayruropata N 1024,Wanchaq,Cusco,Cusco,Lexmark,Contrato 2021
+208,Banca Comercial,Division Sur,Division Sur,Provincia,Agencia Huayruropata,Sub Gerencia,MX722adhe,74641101246H9,118.206.4.69,Av Huayruropata N 1024,Wanchaq,Cusco,Cusco,Lexmark,Contrato 2021
+210,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Huanuco,Atencion al Cliente,MX722adhe,746410302421L,118.206.20.68,Jr Independencia 1601 1799,Huanuco,Huanuco,Huanuco,Lexmark,Contrato 2021
+210,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Huanuco,Gerencia,MX722adhe,746410202419B,118.206.20.69,Jr Independencia 1601 1799,Huanuco,Huanuco,Huanuco,Lexmark,Contrato 2021
+211,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Canete,Operaciones,MX722adhe,74641101246K3,118.206.22.68,av Dos de Mayo 434  438,San Vicente de Cañete,Cañete,Lima,Lexmark,Contrato 2021
+211,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Canete,Comercial,MX722adhe,7464111124753,118.206.22.69,av Dos de Mayo 434  438,San Vicente de Cañete,Cañete,Lima,Lexmark,Contrato 2021
+215,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Provincia,Agencia Chincha,Operaciones,MX722adhe,746410202415B,118.205.22.68,Mariscal Benavides 117 125,Chincha Alta,Chincha,Ica,Lexmark,Contrato 2021
+215,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Provincia,Agencia Chincha,Comercial,MX722adhe,746410202418L,118.205.22.69,Mariscal Benavides 117 125,Chincha Alta,Chincha,Ica,Lexmark,Contrato 2021
+218,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Quillabamba,Sub Gerencia,MX722adhe,7464939022PT5,118.206.28.68,av Bolognesi 155-157,Santa Ana,La Convencion,Cusco,Lexmark,Contrato 2021
+218,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Quillabamba,Plataforma,MX722adhe,7464939022P9Y,118.206.28.69,av Bolognesi 155-157,Santa Ana,La Convencion,Cusco,Lexmark,Contrato 2021
+220,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Arequipa,Centro de Negocios,MX522adhe,701701130LPBH,118.205.0.69,c San Francisco 108,Arequipa,Arequipa,Arequipa,Lexmark,Contrato 2021
+220,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Arequipa,Sala Prime,MX532adwe,702025210043W,118.205.0.70,c San Francisco 108,Arequipa,Arequipa,Arequipa,Lexmark,Contrato 2021
+220,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Arequipa,Operaciones,MX722adhe,7464939022PDZ,118.205.0.68,c San Francisco 108,Arequipa,Arequipa,Arequipa,Lexmark,Contrato 2021
+220,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Arequipa,Gerencia,MX722adhe,7464939022P9P,118.205.0.71,c San Francisco 108,Arequipa,Arequipa,Arequipa,Lexmark,Contrato 2021
+220,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Arequipa,Banca Negocio,MX722adhe,7464939022PY7,118.205.0.72,c San Francisco 108,Arequipa,Arequipa,Arequipa,Lexmark,Contrato 2021
+221,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia San Camilo,Sub Gerencia,MX722adhe,7464939022R1T,118.206.30.68,c Peru 324,Arequipa,Arequipa,Arequipa,Lexmark,Contrato 2021
+221,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia San Camilo,Plataforma,MX722adhe,7464939022R4M,118.206.30.69,c Peru 324,Arequipa,Arequipa,Arequipa,Lexmark,Contrato 2021
+222,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Miraflores (Arequipa),Plataforma,MX722adhe,7464049023X0B,118.206.32.68,Cc la Negrita Tda 2,Miraflores,Arequipa,Arequipa,Lexmark,Contrato 2021
+222,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Miraflores (Arequipa),Plataforma,MX722adhe,7464939022R5H,118.206.32.69,Cc la Negrita Tda 2,Miraflores,Arequipa,Arequipa,Lexmark,Contrato 2021
+223,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Cayma,Plataforma,MS826de,40649370194TH,118.206.34.70,av Ejercito 710,Yanahuara,Arequipa,Arequipa,Lexmark,Contrato 2021
+223,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Cayma,Sala Prime,MX432adwe,701934240K206,118.206.34.72,av Ejercito 710,Yanahuara,Arequipa,Arequipa,Lexmark,Contrato 2021
+223,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Cayma,Caja,MX722adhe,7464939022R0R,118.206.34.68,av Ejercito 710,Yanahuara,Arequipa,Arequipa,Lexmark,Contrato 2021
+223,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Cayma,Caja,MX722adhe,7464939022P60,118.206.34.69,av Ejercito 710,Yanahuara,Arequipa,Arequipa,Lexmark,Contrato 2021
+224,Banca Comercial,Division Sur,Oficina Magisterio,Provincia,Agencia Magisterio,Ventanilla,MX722adhe,74641030241Z8,118.205.246.68,av de la Cultura N 2109,Cusco,Cusco,Cusco,Lexmark,Contrato 2021
+224,Banca Comercial,Division Sur,Oficina Magisterio,Provincia,Agencia Magisterio,Sub Gerencia,MX722adhe,74641020241BV,118.205.246.69,av de la Cultura N 2109,Cusco,Cusco,Cusco,Lexmark,Contrato 2021
+225,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Camana (Arequipa),Operaciones,MX722adhe,7464939022PZR,118.206.36.68,Jr 28 De Julio 405,Camana,Camana,Arequipa,Lexmark,Contrato 2021
+225,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Camana (Arequipa),Operaciones,MX722adhe,7464939022R2G,118.206.36.69,Jr 28 De Julio 405,Camana,Camana,Arequipa,Lexmark,Contrato 2021
+226,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Parque Industrial,Sub Gerencia,MX722adhe,7464939022PBV,118.206.38.68,av Jacinto Ibanez 521,Arequipa,Arequipa,Arequipa,Lexmark,Contrato 2021
+226,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Parque Industrial,Atencion al Cliente,MX722adhe,7464939022R5X,118.206.38.69,av Jacinto Ibanez 521,Arequipa,Arequipa,Arequipa,Lexmark,Contrato 2021
+228,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Juliaca,Operaciones,MX722adhe,74641050242TW,118.205.24.68,Jr San Roman 441,Juliaca,San Roman,Puno,Lexmark,Contrato 2021
+228,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Juliaca,Comercial,MX722adhe,74641050242VR,118.205.24.69,Jr San Roman 441,Juliaca,San Roman,Puno,Lexmark,Contrato 2021
+228,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Juliaca,Creditos,MX722adhe,74641050242V3,118.205.24.70,Jr San Roman 441,Juliaca,San Roman,Puno,Lexmark,Contrato 2021
+229,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Puno,Atencion al Cliente,MX722adhe,74641050242VD,118.206.40.68,Jr Lima 400,Puno,Puno,Puno,Lexmark,Contrato 2021
+229,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Puno,Atencion al Cliente,MX722adhe,74641020241CN,118.206.40.69,Jr Lima 400,Puno,Puno,Puno,Lexmark,Contrato 2021
+231,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Ilo,Plataforma,MX722adhe,746410202418Z,118.206.42.68,Psje Malatesta 103,Ilo,Ilo,Moquegua,Lexmark,Contrato 2021
+231,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Ilo,Plataforma,MX722adhe,7464102024195,118.206.42.69,Psje Malatesta 103,Ilo,Ilo,Moquegua,Lexmark,Contrato 2021
+232,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Tacna,Sala Prime,MX432adwe,701934240K1ZR,118.205.26.72,av San Martin 665,Tacna,Tacna,Tacna,Lexmark,Contrato 2021
+232,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Tacna,Sub Gerencia,MX722adhe,746410202418P,118.205.26.68,av San Martin 665,Tacna,Tacna,Tacna,Lexmark,Contrato 2021
+232,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Tacna,Banca Personal,MX722adhe,746410202419H,118.205.26.69,av San Martin 665,Tacna,Tacna,Tacna,Lexmark,Contrato 2021
+232,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Tacna,Banca Personal,MX722adhe,74641050242WH,118.205.26.70,av San Martin 665,Tacna,Tacna,Tacna,Lexmark,Contrato 2021
+232,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Tacna,Atencion al Cliente,MX722adhe,74641050242TH,118.205.26.71,av San Martin 665,Tacna,Tacna,Tacna,Lexmark,Contrato 2021
+233,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia 7 De Junio,Sub Gerencia,MX722adhe,74641050242T9,118.206.44.68,Jr 7 Junio 201,Calleria,Coronel Portillo,Ucayali,Lexmark,Contrato 2021
+233,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia 7 De Junio,Plataforma,MX722adhe,74641050242R0,118.206.44.69,Jr 7 Junio 201,Calleria,Coronel Portillo,Ucayali,Lexmark,Contrato 2021
+234,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Pque Industrial Ves,Sub Gerencia,MX722adhe,74641101246FT,118.206.46.68,Pqe Industrial Cono Sur,Villa El Salvador,Lima,Lima,Lexmark,Contrato 2021
+234,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Pque Industrial Ves,Gerencia,MX722adhe,74641101246CB,118.206.46.69,Pqe Industrial Cono Sur,Villa El Salvador,Lima,Lima,Lexmark,Contrato 2021
+235,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Huancayo,Sala Prime,MX432adwe,701934240K203,118.205.28.72,c Real 631 639,Huancayo,Huancayo,Junin,Lexmark,Contrato 2021
+235,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Huancayo,Gerencia Territorial,MX522adhe,701701030LHZV,118.205.28.73,c Real 631 639,Huancayo,Huancayo,Junin,Lexmark,Contrato 2021
+235,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Huancayo,Sub Gerencia,MX722adhe,7464102024191,118.205.28.68,c Real 631 639,Huancayo,Huancayo,Junin,Lexmark,Contrato 2021
+235,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Huancayo,Gerencia,MX722adhe,746410202416P,118.205.28.69,c Real 631 639,Huancayo,Huancayo,Junin,Lexmark,Contrato 2021
+235,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Huancayo,Gerencia,MX722adhe,746410202416H,118.205.28.70,c Real 631 639,Huancayo,Huancayo,Junin,Lexmark,Contrato 2021
+236,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia La Oroya,Operaciones,MX722adhe,746410302420Y,118.206.48.68,av Horacio Zevallos 406,La Oroya,Yauli,Junin,Lexmark,Contrato 2021
+236,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia La Oroya,Banca Empresa,MX722adhe,746410302421C,118.206.48.69,av Horacio Zevallos 406,La Oroya,Yauli,Junin,Lexmark,Contrato 2021
+237,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia El Tambo,Operaciones,MX722adhe,7464102024178,118.206.50.68,av Mariscal Castilla 1610,El Tambo,Huancayo,Junin,Lexmark,Contrato 2021
+237,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia El Tambo,Analista,MX722adhe,746410202415V,118.206.50.69,av Mariscal Castilla 1610,El Tambo,Huancayo,Junin,Lexmark,Contrato 2021
+238,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia La Merced,Operaciones,MX722adhe,74641050242RB,118.206.52.68,Jr Tarma 444 La Merced,Chanchamayo,Chanchamayo,Junin,Lexmark,Contrato 2021
+238,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia La Merced,Banca Empresa,MX722adhe,74641050242T1,118.206.52.69,Jr Tarma 444 La Merced,Chanchamayo,Chanchamayo,Junin,Lexmark,Contrato 2021
+239,Banca Empresa Y Corporativa,Gerencia Regional Be 2,Gerencia Regional Be 2,Provincia,Banca Empresa Arequipa,Banca Empresa,MX722adhe,7464939022R1C,118.205.0.73,San Francisco 108 2 P,Arequipa,Arequipa,Arequipa,Lexmark,Contrato 2021
+239,Banca Empresa Y Corporativa,Gerencia Regional Be 2,Gerencia Regional Be 2,Provincia,Banca Empresa Arequipa,Banca Empresa,MX722adhe,7464049023WZK,118.205.0.74,San Francisco 108 2 P,Arequipa,Arequipa,Arequipa,Lexmark,Contrato 2021
+240,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Provincia,Agencia Ica,Plataforma,MX722adhe,74641111247C1,118.206.54.68,Jr Libertad 141 165,Ica,Ica,Ica,Lexmark,Contrato 2021
+240,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Provincia,Agencia Ica,Comercial,MX722adhe,74641020241BH,118.206.54.70,Jr Libertad 141 165,Ica,Ica,Ica,Lexmark,Contrato 2021
+240,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Provincia,Agencia Ica,Comercial,MX722adhe,74641050242V1,118.206.54.69,Jr Libertad 141 165,Ica,Ica,Ica,Lexmark,Contrato 2021
+241,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Provincia,Agencia Pisco,Operaciones,MX722adhe,746410202419W,118.206.56.68,c Perez Figuerola 194,Pisco,Pisco,Ica,Lexmark,Contrato 2021
+241,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Provincia,Agencia Pisco,Plataforma,MX722adhe,746410202419X,118.206.56.69,c Perez Figuerola 194,Pisco,Pisco,Ica,Lexmark,Contrato 2021
+242,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Damero Gamarra,Ventanilla,MX722adhe,74641050242RW,118.206.58.68,av 28 de Julio 2498,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+242,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Damero Gamarra,Plataforma,MX722adhe,74641030241ZB,118.206.58.69,av 28 de Julio 2498,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+244,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Hipolito Unanue,Plataforma,MX722adhe,746410202416X,118.206.60.68,Jr Hipolito Unanue 1616 1620,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+244,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Hipolito Unanue,Sub Gerencia,MX722adhe,74641050242W1,118.206.60.69,Jr Hipolito Unanue 1616 1620,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+245,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Miraflores ( Piura ),Sala Prime,MX432adwe,701934240K209,118.206.62.70,Av Ramon Mujica 108A,Piura,Piura,Piura,Lexmark,Contrato 2021
+245,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Miraflores ( Piura ),Sub Gerencia,MX722adhe,74641050242R3,118.206.62.68,Av Ramon Mujica 108A,Piura,Piura,Piura,Lexmark,Contrato 2021
+245,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Miraflores ( Piura ),Plataforma,MX722adhe,74641050242R4,118.206.62.69,Av Ramon Mujica 108A,Piura,Piura,Piura,Lexmark,Contrato 2021
+246,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Husares De Junin,Sala Prime,MX432adwe,701941340M40D,118.206.64.70,av Husares de Junin 896,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+246,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Husares De Junin,Atencion Al Cliente,MX722adhe,746410302421V,118.206.64.68,av Husares de Junin 896,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+246,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Husares De Junin,Atencion Al Cliente,MX722adhe,746410302420X,118.206.64.69,av Husares de Junin 896,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+247,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Chepen,Atencion al Cliente,MX722adhe,746410202416B,118.206.66.68,c San Pedro 101,Chepen,Chepen,La Libertad,Lexmark,Contrato 2021
+247,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Chepen,Atencion al Cliente,MX722adhe,746410202417X,118.206.66.69,c San Pedro 101,Chepen,Chepen,La Libertad,Lexmark,Contrato 2021
+248,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Cc El Quinde Cajamarca,Sub Gerencia,MX722adhe,74641020241C0,118.206.68.68,Jr Sor Manuela Gil 151,Cajamarca,Cajamarca,Cajamarca,Lexmark,Contrato 2021
+248,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Cc El Quinde Cajamarca,Plataforma,MX722adhe,746410202418H,118.206.68.69,Jr Sor Manuela Gil 151,Cajamarca,Cajamarca,Cajamarca,Lexmark,Contrato 2021
+249,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Trujillo,Sala Prime,MX432adwe,701941340M3ZP,118.205.2.72,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+249,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Trujillo,Atencion al Cliente,MX722adhe,7464103024219,118.205.2.68,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+249,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Trujillo,Atencion Al Cliente,MX722adhe,74641030241Z3,118.205.2.69,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+249,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Trujillo,Atencion al Cliente,MX722adhe,746410302420R,118.205.2.70,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+249,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Trujillo,Atencion al Cliente,MX722adhe,7464102024176,118.205.2.71,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+249,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Trujillo_Descentralizada,Fundo Camposol Viru,MX522adhe,701701130LPCZ,118.205.224.68,Jr Francisco Pizarro 620,Viru,Trujillo,La Libertad,Lexmark,Contrato 2021
+250,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Primavera,Plataforma,MX722adhe,746410202415D,118.206.70.68,av Nicolas de Pierola 766,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+250,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Primavera,Plataforma,MX722adhe,74641020241CL,118.206.70.69,av Nicolas de Pierola 766,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+251,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Mcdo Mayorista,Atencion Al Cliente,MX722adhe,746410302420M,118.206.72.68,av Vallejo 268,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+251,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Mcdo Mayorista,Atencion Al Cliente,MX722adhe,746410302421F,118.206.72.69,av Vallejo 268,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+252,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Mall Aventura Plaza,Sub Gerencia,MX722adhe,74641101246DB,118.206.74.68,Av Oscar R Benavides 3866,Bellavista,Callao,Callao,Lexmark,Contrato 2021
+252,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Mall Aventura Plaza,Plataforma,MX722adhe,746411112474T,118.206.74.69,Av Oscar R Benavides 3866,Bellavista,Callao,Callao,Lexmark,Contrato 2021
+253,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Real Plaza Pro,Plataforma,MX722adhe,746410202416C,118.206.76.68,av Alfredo Mendiola 7058,San Martin De Porres,Lima,Lima,Lexmark,Contrato 2021
+254,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Larco Trujillo,Sub Gerencia,MX722adhe,74641030241ZX,118.206.78.68,av Larco 261,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+254,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Larco Trujillo,Atencion al Cliente,MX722adhe,746410302421K,118.206.78.69,av Larco 261,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+256,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia El Muro,Sub Gerencia,MX722adhe,746411112476C,118.206.80.68,Av Wiesse Tienda Programa,San Juan de Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+256,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia El Muro,Banca Negocio,MX722adhe,746411112477Y,118.206.80.69,Av Wiesse Tienda Programa,San Juan de Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+257,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Gran Chimu,Sala Prime,MX432adwe,701934240K1YC,118.206.82.69,av Gran Chimu 789 Urb Zarate,San Juan de Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+257,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Gran Chimu,Sub Gerencia,MX722adhe,74641050242TD,118.206.82.68,av Gran Chimu 789 Urb Zarate,San Juan de Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+258,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Larapa,Atencion al Cliente,MX722adhe,7464939022P45,118.206.84.68,URB CACHIMAYO C 21 A SAN SEBASTIAN,San Jeronimo,Cusco,Cusco,Lexmark,Contrato 2021
+258,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Larapa,Atencion al Cliente,MX722adhe,7464939022PTR,118.206.84.69,URB CACHIMAYO C 21 A SAN SEBASTIAN,San Jeronimo,Cusco,Cusco,Lexmark,Contrato 2021
+259,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Cc Canta Callao,Sub Gerencia,MX722adhe,746411112478W,118.206.86.68,av Canta Callao Esq Bertello,Callao,Callao,Lima,Lexmark,Contrato 2021
+259,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Cc Canta Callao,Plataforma,MX722adhe,746411112476Z,118.206.86.69,av Canta Callao Esq Bertello,Callao,Callao,Lima,Lexmark,Contrato 2021
+260,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Huaraz,Operaciones,MX722adhe,7464049023WX0,118.206.88.68,c 2 Esq Jr Jose Sucre,Huaraz,Huaraz,Ancash,Lexmark,Contrato 2021
+260,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Huaraz,Comercial,MX722adhe,7464939022PCH,118.206.88.69,c 2 Esq Jr Jose Sucre,Huaraz,Huaraz,Ancash,Lexmark,Contrato 2021
+261,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Cc Mall Del Sur,Sub Gerencia,MX722adhe,7464049023X24,118.206.90.68,av Los Lirios 301,San Juan de Miraflores,Lima,Lima,Lexmark,Contrato 2021
+261,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Cc Mall Del Sur,Plataforma,MX722adhe,74641141248L8,118.206.90.69,av Los Lirios 301,San Juan de Miraflores,Lima,Lima,Lexmark,Contrato 2021
+262,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia La Planicie,Sub Gerencia,MX722adhe,74641020241CX,118.206.92.68,av Ricardo Elias Aparicio 675,La Molina,Lima,Lima,Lexmark,Contrato 2021
+262,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia La Planicie,Operaciones,MX722adhe,7464049023X0V,118.206.92.69,av Ricardo Elias Aparicio 675,La Molina,Lima,Lima,Lexmark,Contrato 2021
+263,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Puerto Maldonado,Operaciones,MX722adhe,74641050242VC,118.206.94.68,Jr Arequipa 245 249,Tambopata,Tambopata,Madre De Dios,Lexmark,Contrato 2021
+263,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Puerto Maldonado,Operaciones,MX722adhe,74641050242TT,118.206.94.69,Jr Arequipa 245 249,Tambopata,Tambopata,Madre De Dios,Lexmark,Contrato 2021
+264,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Chancay,Sub Gerencia,MX722adhe,74641030241ZZ,118.206.96.68,c Diego Lopez de Zuniga 262,Chancay,Huaral,Lima,Lexmark,Contrato 2021
+264,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Chancay,Ventanilla,MX722adhe,74641030241YY,118.206.96.69,c Diego Lopez de Zuniga 262,Chancay,Huaral,Lima,Lexmark,Contrato 2021
+265,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Tumbes,Sub Gerencia,MX722adhe,74641050242V4,118.206.98.68,paseo los Libertadores 237,Tumbes,Tumbes,Tumbes,Lexmark,Contrato 2021
+265,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Tumbes,Plataforma,MX722adhe,74641050242R9,118.206.98.69,paseo los Libertadores 237,Tumbes,Tumbes,Tumbes,Lexmark,Contrato 2021
+266,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Real Plaza Huancayo,Operaciones,MX722adhe,74641050242VZ,118.206.100.68,ESTACION FERROVIARIA HUANCAYO S/N,Huancayo,Huancayo,Junin,Lexmark,Contrato 2021
+266,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Real Plaza Huancayo,Ventanilla,MX722adhe,7464049023WYC,118.206.100.69,Estacion Ferroviaria Huancayo S/N,Huancayo,Huancayo,Junin,Lexmark,Contrato 2021
+267,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Piura,Sub Gerencia,MX722adhe,746410302421W,118.205.30.68,c Tacna 598 Ayacucho 440,Piura,Piura,Piura,Lexmark,Contrato 2021
+267,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Piura,Plataforma,MX722adhe,74641050242TK,118.205.30.69,c Tacna 598 Ayacucho 440,Piura,Piura,Piura,Lexmark,Contrato 2021
+267,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Piura,Ventanilla,MX722adhe,7464103024220,118.205.30.70,c Tacna 598 Ayacucho 440,Piura,Piura,Piura,Lexmark,Contrato 2021
+267,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Piura,Banqueros,MX722adhe,74641050242RR,118.205.30.71,c Tacna 598 Ayacucho 440,Piura,Piura,Piura,Lexmark,Contrato 2021
+268,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Mcdo Modelo Piura,Atencion al Cliente,MX722adhe,7464102024161,118.206.102.68,av Sanchez Cerro 1234,Piura,Piura,Piura,Lexmark,Contrato 2021
+268,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Mcdo Modelo Piura,Atencion al Cliente,MX722adhe,74641020241DC,118.206.102.69,av Sanchez Cerro 1234,Piura,Piura,Piura,Lexmark,Contrato 2021
+269,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia El Agustino,Plataforma,MX722adhe,746410202417W,118.206.104.68,av Riva Aguero 1400,El Agustino,Lima,Lima,Lexmark,Contrato 2021
+269,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia El Agustino,Gerencia,MX722adhe,746410202418X,118.206.104.69,av Riva Aguero 1400,El Agustino,Lima,Lima,Lexmark,Contrato 2021
+270,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Talara,Sub Gerencia,MX722adhe,7464102024168,118.206.106.68,Centro Civico 159,Pariñas,Talara,Piura,Lexmark,Contrato 2021
+270,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Talara,Plataforma,MX722adhe,74641050242RV,118.206.106.69,Centro Civico 159,Pariñas,Talara,Piura,Lexmark,Contrato 2021
+271,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Paita Piura,Plataforma,MX722adhe,746410202415R,118.206.108.68,Jr Junin 263,Paita,Paita,Piura,Lexmark,Contrato 2021
+271,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Paita Piura,Plataforma,MX722adhe,746410202415L,118.206.108.69,Jr Junin 263,Paita,Paita,Piura,Lexmark,Contrato 2021
+272,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Provincia,Agencia Nuevo Chimbote,Operaciones,MX722adhe,7464111124770,118.206.110.68,Prog Vivienda 1era Etapa Unid U1,Nuevo Chimbote,Santa,Ancash,Lexmark,Contrato 2021
+272,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Provincia,Agencia Nuevo Chimbote,Gerencia,MX722adhe,7464049023WXR,118.206.110.69,Prog Vivienda 1era Etapa Unid U1,Nuevo Chimbote,Santa,Ancash,Lexmark,Contrato 2021
+273,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Huaral,Ventanilla,MX722adhe,7464103024213,118.206.112.68,c Derecha 370,Huaral,Huaral,Lima,Lexmark,Contrato 2021
+273,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Huaral,Comercial,MX722adhe,74641030241ZG,118.206.112.69,c Derecha 370,Huaral,Huaral,Lima,Lexmark,Contrato 2021
+274,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Sullana,Atencion al Cliente,MX722adhe,74641050242TL,118.206.114.68,Jr San Martin 900,Sullana,Sullana,Piura,Lexmark,Contrato 2021
+274,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Sullana,Atencion al Cliente,MX722adhe,74641050242TC,118.206.114.69,Jr San Martin 900,Sullana,Sullana,Piura,Lexmark,Contrato 2021
+275,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Huacho,Sub Gerencia,MX722adhe,74641030241Z7,118.206.116.68,av 28 de Julio 391,Huacho,Huaura,Lima,Lexmark,Contrato 2021
+275,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Huacho,Plataforma,MX722adhe,74641050242W6,118.206.116.69,av 28 de Julio 391,Huacho,Huaura,Lima,Lexmark,Contrato 2021
+276,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Barranca,Plataforma,MX722adhe,74641101246DP,118.206.118.68,av Jose Galvez 285,Barranca,Barranca,Lima,Lexmark,Contrato 2021
+276,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Barranca,Banca Negocio,MX722adhe,74641101246FV,118.206.118.69,av Jose Galvez 285,Barranca,Barranca,Lima,Lexmark,Contrato 2021
+277,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Cajamarca,Banca Negocio,MX722adhe,746410202417R,118.206.120.68,Jr Tarapaca 719 721,Cajamarca,Cajamarca,Cajamarca,Lexmark,Contrato 2021
+277,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Cajamarca,Banca Personal,MX722adhe,746410202419C,118.206.120.69,Jr Tarapaca 719 721,Cajamarca,Cajamarca,Cajamarca,Lexmark,Contrato 2021
+278,Banca Empresa Y Corporativa,Gerencia Regional Be 1,Gerencia Regional Be 1,Provincia,Banca Empresa Piura,Plataforma,MX722adhe,7464103024228,118.205.30.72,c Tacna 598 Ayacucho 440 2 P,Piura,Piura,Piura,Lexmark,Contrato 2021
+278,Banca Empresa Y Corporativa,Gerencia Regional Be 1,Gerencia Regional Be 1,Provincia,Banca Empresa Piura,Sub Gerencia,MX722adhe,746410202418W,118.205.30.73,c Tacna 598 Ayacucho 440 2 P,Piura,Piura,Piura,Lexmark,Contrato 2021
+279,Banca Empresa Y Corporativa,Gerencia Regional Be 1,Gerencia Regional Be 1,Provincia,Banca Empresa Chiclayo,Atencion al Cliente,MX722adhe,74641050242W4,118.205.32.73,av Balta 651 2 P,Chiclayo,Chiclayo,Lambayeque,Lexmark,Contrato 2021
+280,Banca Empresa Y Corporativa,Gerencia Regional Be 1,Gerencia Regional Be 1,Provincia,Banca Empresa Trujillo,Banca Empresa,MS826de,4064939019DLV,118.205.2.75,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+280,Banca Empresa Y Corporativa,Gerencia Regional Be 1,Gerencia Regional Be 1,Provincia,Banca Empresa Trujillo,Banca Empresa,MX722adhe,7464103024212,118.205.2.73,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+280,Banca Empresa Y Corporativa,Gerencia Regional Be 1,Gerencia Regional Be 1,Provincia,Banca Empresa Trujillo,Banca Empresa,MX722adhe,746410302421N,118.205.2.74,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+281,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Jaen,Sub Gerencia,MX722adhe,746410302421H,118.206.122.68,c San Martin 1499,Jaen,Jaen,Cajamarca,Lexmark,Contrato 2021
+281,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Jaen,Banca Empresa,MX722adhe,746410302420T,118.206.122.69,c San Martin 1499,Jaen,Jaen,Cajamarca,Lexmark,Contrato 2021
+281,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Jaen,Plataforma,MX722adhe,7464049023WZH,118.206.122.70,c San Martin 1499,Jaen,Lima,Cajamarca,Lexmark,Contrato 2021
+284,Red Comercial,Division Lima Norte,Oficina Plaza Lima Norte,Lima,Agencia Plaza Lima Norte,Sub Gerencia,MX722adhe,746410202419T,118.206.126.68,av Cruce Tomas Valle,Independencia,Lima,Lima,Lexmark,Contrato 2021
+284,Red Comercial,Division Lima Norte,Oficina Plaza Lima Norte,Lima,Agencia Plaza Lima Norte,Caja,MX722adhe,746410202419V,118.206.126.69,av Cruce Tomas Valle,Independencia,Lima,Lima,Lexmark,Contrato 2021
+285,Banca Empresa Y Corporativa,Gerencia Regional Be 1,Gerencia Regional Be 1,Provincia,Agencia Chiclayo,Working Subdivisión,MX722adhe,74641050242RC,118.205.32.74,av Balta 651 2 P,Chiclayo,Chiclayo,Lambayeque,Lexmark,Contrato 2021
+285,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Chiclayo,Sala Prime,MX432adwe,701934240K204,118.205.32.72,av Balta 651,Chiclayo,Chiclayo,Lambayeque,Lexmark,Contrato 2021
+285,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Chiclayo,Atencion al Cliente,MX722adhe,74641050242WK,118.205.32.68,av Balta 651,Chiclayo,Chiclayo,Lambayeque,Lexmark,Contrato 2021
+285,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Chiclayo,Atencion al Cliente,MX722adhe,74641050242V5,118.205.32.69,av Balta 651,Chiclayo,Chiclayo,Lambayeque,Lexmark,Contrato 2021
+285,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Chiclayo,Atencion al Cliente,MX722adhe,74641050242RD,118.205.32.70,av Balta 651,Chiclayo,Chiclayo,Lambayeque,Lexmark,Contrato 2021
+286,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Los Alamos,Sala Prime,MX432adwe,701941340M400,118.206.128.69,av Primavera 2180 2190,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+286,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Los Alamos,Plataforma,MX722adhe,74641020241D9,118.206.128.68,av Primavera 2180 2190,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+287,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Mcdo Modelo,Atencion al Cliente,MX722adhe,7464102024174,118.206.130.68,av Arica 1030-1032,Chiclayo,Chiclayo,Lambayeque,Lexmark,Contrato 2021
+287,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Mcdo Modelo,Atencion al Cliente,MX722adhe,7464102024179,118.206.130.69,av Arica 1030-1032,Chiclayo,Chiclayo,Lambayeque,Lexmark,Contrato 2021
+288,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Moshoqueque,Sub Gerencia,MX722adhe,74641020241BL,118.206.132.68,Av El Dorado 1209,Jose Leonardo Ortiz,Chiclayo,Lambayeque,Lexmark,Contrato 2021
+288,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Moshoqueque,Ventanilla,MX722adhe,746410202418T,118.206.132.69,Av El Dorado 1209,Jose Leonardo Ortiz,Chiclayo,Lambayeque,Lexmark,Contrato 2021
+291,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Pacasmayo,Area Ejecutiva,MX722adhe,746410302420D,118.206.134.68,c Dos de Mayo 9,Pacasmayo,Pacasmayo,La Libertad,Lexmark,Contrato 2021
+291,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Pacasmayo,Sub Gerencia,MX722adhe,746410302421B,118.206.134.69,c Dos de Mayo 9,Pacasmayo,Pacasmayo,La Libertad,Lexmark,Contrato 2021
+295,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Provincia,Agencia Chimbote,Sala Prime,MX432adwe,701934240K1ZM,118.205.34.71,av Francisco Bolognesi 696,Chimbote,Santa,Ancash,Lexmark,Contrato 2021
+295,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Provincia,Agencia Chimbote,Operaciones,MX722adhe,7464939022PVF,118.205.34.68,av Francisco Bolognesi 696,Chimbote,Santa,Ancash,Lexmark,Contrato 2021
+295,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Provincia,Agencia Chimbote,Sub Gerencia,MX722adhe,7464939022R51,118.205.34.69,av Francisco Bolognesi 696,Chimbote,Santa,Ancash,Lexmark,Contrato 2021
+295,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Provincia,Agencia Chimbote,Comercial,MX722adhe,7464939022P7N,118.205.34.70,av Francisco Bolognesi 696,Chimbote,Santa,Ancash,Lexmark,Contrato 2021
+297,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Provincia,Agencia Mercado Mod Chimbote,Gerencia,MX722adhe,7464939022PTT,118.205.36.68,Ca Espinar 600 JR ELÍAS AGUIRRE 498,Chimbote,Santa,Ancash,Lexmark,Contrato 2021
+297,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Provincia,Agencia Mercado Mod Chimbote,Gerencia,MX722adhe,7464939022PBR,118.205.36.69,Ca Espinar 600 JR ELÍAS AGUIRRE 498,Chimbote,Santa,Ancash,Lexmark,Contrato 2021
+299,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Bellavista San Martin,Sub Gerencia,MX722adhe,746410202417Y,118.206.136.68,Jr Augus B Leguia Esq Jr San Martin,Bellavista,Bellavista,San Martin,Lexmark,Contrato 2021
+299,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Bellavista San Martin,Operaciones,MX722adhe,7464102024182,118.206.136.69,Jr Augus B Leguia Esq Jr San Martin,Bellavista,Bellavista,San Martin,Lexmark,Contrato 2021
+300,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Global Wealth,Operaciones,CX625adhe,7529902141TT5,118.206.34.71,av Ejercito 710 2 P,Yanahuara,Arequipa,Arequipa,Lexmark,Contrato 2021
+301,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Iquitos,Sala Prime,MX432adwe,701934240K1Z1,118.205.38.70,Sargento Lores 171,Iquitos,Maynas,Loreto,Lexmark,Contrato 2021
+301,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Iquitos,Plataforma,MX722adhe,74641101246HV,118.205.38.68,Sargento Lores 171,Iquitos,Maynas,Loreto,Lexmark,Contrato 2021
+301,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Iquitos,Atencion al Cliente,MX722adhe,746411112474N,118.205.38.69,Sargento Lores 171,Iquitos,Maynas,Loreto,Lexmark,Contrato 2021
+301,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Iquitos,Sub Gerencia,MX722adhe,74641101246H4,118.205.38.71,Sargento Lores 171,Iquitos,Maynas,Loreto,Lexmark,Contrato 2021
+304,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Belen,Sub Gerencia,MX722adhe,74641101246CF,118.205.40.68,Jr Prospero 1171,Iquitos,Maynas,Loreto,Lexmark,Contrato 2021
+304,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Belen,Plataforma,MX722adhe,74641101246KG,118.205.40.69,Jr Prospero 1171,Iquitos,Maynas,Loreto,Lexmark,Contrato 2021
+306,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Provincia,Agencia Pucallpa,Sala Prime,MX432adwe,701934240K1Z3,118.205.42.72,Ucayali Esq Raymondi 699,Calleria,Coronel Portillo,Ucayali,Lexmark,Contrato 2021
+306,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Pucallpa,Plataforma,MX722adhe,74641050242TG,118.205.42.68,Ucayali Esq Raymondi 699,Calleria,Coronel Portillo,Ucayali,Lexmark,Contrato 2021
+306,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Pucallpa,Banca Empresa,MX722adhe,74641050242TF,118.205.42.69,Ucayali Esq Raymondi 699,Calleria,Coronel Portillo,Ucayali,Lexmark,Contrato 2021
+306,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Pucallpa,Banca Ejecutiva,MX722adhe,7464102024175,118.205.42.70,Ucayali Esq Raymondi 699,Calleria,Coronel Portillo,Ucayali,Lexmark,Contrato 2021
+306,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Pucallpa,Banca Ejecutiva,MX722adhe,746410202416F,118.205.42.71,Ucayali Esq Raymondi 699,Calleria,Coronel Portillo,Ucayali,Lexmark,Contrato 2021
+307,Banca Empresa Y Corporativa,Gerencia Regional Be 1,Gerencia Regional Be 1,Lima,Banca Empresa Lima Norte,Sub Gerencia,MX722adhe,7464049023WW2,118.206.138.68,av Industrial 3515 3517,Independencia,Lima,Lima,Lexmark,Contrato 2021
+307,Banca Empresa Y Corporativa,Gerencia Regional Be 1,Gerencia Regional Be 1,Lima,Banca Empresa Lima Norte,Plataforma,MX722adhe,746410202419Y,118.206.138.69,av Industrial 3515 3517,Independencia,Lima,Lima,Lexmark,Contrato 2021
+310,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Pymes Tarapoto,Pymes,MS826de,40649380198KY,118.205.44.70,Jr Ramirez Hurtado 149,Tarapoto,San Martin,San Martin,Lexmark,Contrato 2021
+310,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Tarapoto,Sala Prime,MX432adwe,701934240K1ZG,118.205.44.71,Jr Ramirez Hurtado 149,Tarapoto,San Martin,San Martin,Lexmark,Contrato 2021
+310,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Tarapoto,Staf Territorial Oriente,MX522adhe,701701030LHZ8,118.205.44.74,Jr Ramirez Hurtado 149,Tarapoto,San Martin,San Martin,Lexmark,Contrato 2021
+310,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Tarapoto,Sub Gerencia,MX722adhe,74641050242RN,118.205.44.68,Jr Ramirez Hurtado 149,Tarapoto,San Martin,San Martin,Lexmark,Contrato 2021
+310,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Tarapoto,Atencion al Cliente,MX722adhe,746410202415K,118.205.44.72,Jr Ramirez Hurtado 149,Tarapoto,San Martin,San Martin,Lexmark,Contrato 2021
+310,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Tarapoto,Atencion Al Cliente,MX722adhe,746410202416L,118.205.44.73,Jr Ramirez Hurtado 149,Tarapoto,San Martin,San Martin,Lexmark,Contrato 2021
+310,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Tarapoto,Plataforma,MX722adhe,74641050242RP,118.205.44.69,Jr Ramirez Hurtado 149,Tarapoto,San Martin,San Martin,Lexmark,Contrato 2021
+311,Banca Empresa Y Corporativa,Gerencia Regional Be 2,Gerencia Regional Be 2,Provincia,Banca Empresa Chincha,Banca Empresa,MX722adhe,746410202416D,118.205.22.70,MCAL  BENAVIDES 117 125  2 PISO,Chincha Alta,Chincha,Ica,Lexmark,Contrato 2021
+311,Banca Empresa Y Corporativa,Gerencia Regional Be 2,Gerencia Regional Be 2,Provincia,Banca Empresa Chincha,Banca Empresa,MX722adhe,746410202417G,118.205.22.71,MCAL  BENAVIDES 117 125  2 PISO,Chincha Alta,Chincha,Ica,Lexmark,Contrato 2021
+312,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Pro,Sub Gerencia,MX722adhe,746410202417V,118.206.142.68,av Alfredo Mendiola 7859,Los Olivos,Lima,Lima,Lexmark,Contrato 2021
+312,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Pro,Banca Negocio,MX722adhe,74641020241B9,118.206.142.69,av Alfredo Mendiola 7859,Los Olivos,Lima,Lima,Lexmark,Contrato 2021
+314,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Moyobamba,Operaciones,MX722adhe,7464103024217,118.206.144.68,Jr San Martin 490 494,Moyobamba,Moyobamba,San Martin,Lexmark,Contrato 2021
+314,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Moyobamba,Gerencia,MX722adhe,7464103024224,118.206.144.69,Jr San Martin 490 494,Moyobamba,Moyobamba,San Martin,Lexmark,Contrato 2021
+315,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Backus,Sub Gerencia,MX722adhe,74641111247B3,118.206.146.68,av Nicolas Ayllon 3986 Plant Backus,Ate,Lima,Lima,Lexmark,Contrato 2021
+316,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Puente Piedra,Banca Empresarial,MX722adhe,7464111124774,118.206.148.68,Urb Santo Domingo Mz C Lote 4,Puente Piedra,Lima,Lima,Lexmark,Contrato 2021
+316,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Puente Piedra,Banca Empresarial,MX722adhe,746411112476T,118.206.148.69,Urb Santo Domingo Mz C Lote 4,Puente Piedra,Lima,Lima,Lexmark,Contrato 2021
+317,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Plaza Lima Sur,Proyecto Aurora,MX722adhe,746410202416W,118.206.150.68,Pz CC Lima Sur Urb Matellini,Chorrillos,Lima,Lima,Lexmark,Contrato 2021
+317,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Plaza Lima Sur,Proyecto Aurora,MX722adhe,74641020241B3,118.206.150.69,Pz CC Lima Sur Urb Matellini,Chorrillos,Lima,Lima,Lexmark,Contrato 2021
+318,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Tingo Maria,Atencion al Cliente,MX722adhe,74641050242W2,118.206.152.68,av Raymondi 543,Rupa-Rupa,Leoncio Prado,Huanuco,Lexmark,Contrato 2021
+318,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Tingo Maria,Atencion al Cliente,MX722adhe,74641050242W3,118.206.152.69,av Raymondi 543,Rupa-Rupa,Leoncio Prado,Huanuco,Lexmark,Contrato 2021
+319,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Izaguirre,Sub Gerencia,MX722adhe,7464111124758,118.206.154.68,av Carlos Izaguirre 929,Los Olivos,Lima,Lima,Lexmark,Contrato 2021
+319,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Izaguirre,Banca Negocio,MX722adhe,746411112477F,118.206.154.69,av Carlos Izaguirre 929,Los Olivos,Lima,Lima,Lexmark,Contrato 2021
+320,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Essalud,Sala Prime,MX522adhe,701701130LPPM,118.207.146.68,av Arenales 1302,Jesus Maria,Lima,Lima,Lexmark,Contrato 2021
+320,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Essalud,Sub Gerencia,MX722adhe,7464049023WVL,118.206.156.68,av Arenales 1302,Jesus Maria,Lima,Lima,Lexmark,Contrato 2021
+320,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Essalud,Plataforma,MX722adhe,746410202417N,118.206.156.69,av Arenales 1302,Jesus Maria,Lima,Lima,Lexmark,Contrato 2021
+321,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Cerro De Pasco,Plataforma,MX722adhe,746410302420N,118.206.158.68,JR SAN MARTIN SECTOR 2,Yanacancha,Pasco,Pasco,Lexmark,Contrato 2021
+321,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Cerro De Pasco,Banca Negocio,MX722adhe,74641030241YX,118.206.158.69,JR SAN MARTIN SECTOR 2,Yanacancha,Pasco,Pasco,Lexmark,Contrato 2021
+322,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Canto Grande,Plataforma,MX722adhe,7464049023X11,118.206.160.68,Av Canto Grande 2309,San Juan de Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+322,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Canto Grande,Banca Negocio,MX722adhe,7464049023WW5,118.206.160.69,Av Canto Grande 2309,San Juan de Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+323,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Villa El Salvador,Sub Gerencia,MX722adhe,7464111124775,118.205.46.68,Av Revolucion Mz G Lt 17 Sector 2,Villa El Salvador,Lima,Lima,Lexmark,Contrato 2021
+323,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Villa El Salvador,Ventanilla,MX722adhe,746411112476X,118.205.46.69,Av Revolucion Mz G Lt 17 Sector 2,Villa El Salvador,Lima,Lima,Lexmark,Contrato 2021
+324,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Yurimaguas,Sub Gerencia,MX722adhe,74641030241Z5,118.206.162.68,Carlle Sargento Lores 132,Yurimaguas,Alto Amazonas,Loreto,Lexmark,Contrato 2021
+324,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Yurimaguas,Plataforma,MX722adhe,746410302420F,118.206.162.69,Carlle Sargento Lores 132,Yurimaguas,Alto Amazonas,Loreto,Lexmark,Contrato 2021
+327,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Juanjui,Sub Gerencia,MX722adhe,746410202416R,118.206.164.68,Jr Huallaga 597,Juanjui,Mariscal Caceres,San Martin,Lexmark,Contrato 2021
+327,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Juanjui,Gerencia,MX722adhe,7464102024164,118.206.164.69,Jr Huallaga 597,Juanjui,Mariscal Caceres,San Martin,Lexmark,Contrato 2021
+331,Banca Minorista,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Hosp Almenara,Sub Gerencia,MX722adhe,7464049023X1T,118.206.166.68,Jr Cangallo 180,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+332,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Mdo Prod Sta Anita,Banca Negocio,MX722adhe,74641101246DZ,118.206.168.68,av la Cultura 701,Santa Anita,Lima,Lima,Lexmark,Contrato 2021
+332,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Mdo Prod Sta Anita,Sub Gerencia,MX722adhe,746411112477N,118.206.168.69,av la Cultura 701,Santa Anita,Lima,Lima,Lexmark,Contrato 2021
+333,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Miraflores,Sala Prime,MX532adwe,7020252100441,118.205.50.69,av Larco 1204,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+333,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Miraflores,Sub Gerencia,MX722adhe,746410202419N,118.205.50.68,av Larco 1204,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+333,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Miraflores,Banca Negocio,MX722adhe,7464049023WYD,118.205.50.70,av Larco 1204,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+335,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia El Pino,Plataforma,MX722adhe,74641101246FD,118.206.170.68,av Circunvalacion 1999 Urb el Pino,San Luis,Lima,Lima,Lexmark,Contrato 2021
+335,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia El Pino,Plataforma,MX722adhe,74641101246KL,118.206.170.69,av Circunvalacion 1999 Urb el Pino,San Luis,Lima,Lima,Lexmark,Contrato 2021
+339,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Ventanilla,Sub Gerencia,MX722adhe,74641101246F3,118.206.176.68,MZ C3 LOTE 19 MLCON A A CACERES,Ventanilla,Callao,Lima,Lexmark,Contrato 2021
+339,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Ventanilla,Plataforma,MX722adhe,7464111124750,118.206.176.69,MZ C3 LOTE 19 MLCON A A CACERES,Ventanilla,Callao,Lima,Lexmark,Contrato 2021
+340,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia 28 De Julio,Sub Gerencia,MX722adhe,74641050242R5,118.206.178.68,av 28 de Julio 775,Lima,Lima,Lima,Lexmark,Contrato 2021
+340,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia 28 De Julio,Gerencia,MX722adhe,74641050242PZ,118.206.178.69,av 28 de Julio 775,Lima,Lima,Lima,Lexmark,Contrato 2021
+341,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Canada La Rosa Toro,Ventanilla,MX722adhe,74641111247C3,118.206.180.68,av la Rosa Toro 998,San Luis,Lima,Lima,Lexmark,Contrato 2021
+341,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Canada La Rosa Toro,Plataforma,MX722adhe,746411112476R,118.206.180.69,av la Rosa Toro 998,San Luis,Lima,Lima,Lexmark,Contrato 2021
+342,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Multiplaza,Sub Gerencia,MX722adhe,7464049023X22,118.206.182.68,av Carlos Izaguirre 275,Los Olivos,Lima,Lima,Lexmark,Contrato 2021
+342,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Multiplaza,Plataforma,MX722adhe,74641020241BB,118.206.182.69,av Carlos Izaguirre 275,Los Olivos,Lima,Lima,Lexmark,Contrato 2021
+344,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Bienestar De La Marina,Plataforma,MX722adhe,74641050242VX,118.206.184.68,av Venezuela Cdra 34,San Miguel,Lima,Lima,Lexmark,Contrato 2021
+345,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Chosica,Plataforma,MX722adhe,74641111247B8,118.206.186.68,av 28 de Julio 160 164 168,San Juan De Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+345,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Chosica,Plataforma,MX722adhe,746411112478K,118.206.186.69,av 28 de Julio 160 164 168,San Juan De Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+346,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Paruro,Plataforma,MX722adhe,7464049023X13,118.206.188.68,Jr Paruro 875  877,Lima,Lima,Lima,Lexmark,Contrato 2021
+346,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Paruro,Plataforma,MX722adhe,7464049023WZ7,118.206.188.69,Jr Paruro 875  877,Lima,Lima,Lima,Lexmark,Contrato 2021
+347,Banca Empresa Y Corporativa,Gerencia Regional Be 2,Gerencia Regional Be 2,Lima,Banca Empresa La Molina,Plataforma,MX722adhe,746411112477C,118.205.56.71,av la Molina 540 2 P,La Molina,Lima,Lima,Lexmark,Contrato 2021
+347,Banca Empresa Y Corporativa,Gerencia Regional Be 2,Gerencia Regional Be 2,Lima,Banca Empresa La Molina,Banca Empresa,MX722adhe,746411112479K,118.205.56.72,av la Molina 540 2 P,La Molina,Lima,Lima,Lexmark,Contrato 2021
+348,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Real Plaza Chiclayo,Sub Gerencia,MX722adhe,74641020241D5,118.206.190.68,Jr Miguel de Cervantes 300 CC Real Chiclayo,Chiclayo,Chiclayo,Lambayeque,Lexmark,Contrato 2021
+348,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Real Plaza Chiclayo,Gerencia,MX722adhe,746410202418G,118.206.190.69,Jr Miguel de Cervantes 300 CC Real Chiclayo,Chiclayo,Chiclayo,Lambayeque,Lexmark,Contrato 2021
+349,Banca Empresa Y Corporativa,Gerencia Regional Be 3,Gerencia Regional Be 3,Lima,Banca Empresa Lima,Banca Empresarial,MS826de,40649370194LW,118.205.8.70,AV NICOLAS DE PIEROLA 649 2 PISO,Lima,Lima,Lima,Lexmark,Contrato 2021
+349,Banca Empresa Y Corporativa,Gerencia Regional Be 3,Gerencia Regional Be 3,Lima,Banca Empresa Lima,Banca Empresarial,MX722adhe,74641020241C8,118.205.8.72,AV NICOLAS DE PIEROLA 649 2 PISO,Lima,Lima,Lima,Lexmark,Contrato 2021
+350,Banca Empresa Y Corporativa,Gerencia Regional Be 3,Gerencia Regional Be 3,Lima,Banca Empresa Callao,Sub Gerencia,MX722adhe,74641101246DR,118.207.230.68,Av Juan de Aliaga 425 piso 9,Magdalena del Mar,Lima,Lima,Lexmark,Contrato 2021
+352,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Las Tiendas,Sub Gerencia,MX722adhe,74641111247C4,118.206.192.68,av las Tiendas 209,Surquillo,Lima,Lima,Lexmark,Contrato 2021
+353,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Domingo Cueto,Plataforma,MX722adhe,746411112479P,118.206.194.68,Jr Domingo Cueto 150,Lince,Lima,Lima,Lexmark,Contrato 2021
+353,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Domingo Cueto,Plataforma,MX722adhe,746411112474Z,118.206.194.69,Jr Domingo Cueto 150,Lince,Lima,Lima,Lexmark,Contrato 2021
+354,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Las Begonias,Sala Prime,MX522adhe,701701130LPDC,118.206.196.70,av las Begonias 425  429,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+354,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Las Begonias,Plataforma,MX722adhe,746410202417M,118.206.196.68,av las Begonias 425  429,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+354,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Las Begonias,Comercial,MX722adhe,74641020241BZ,118.206.196.69,av las Begonias 425  429,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+355,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Aviacion,Sub Gerencia,MX722adhe,7464102024167,118.206.198.68,av Aviacion 2801 2805,San Borja,Lima,Lima,Lexmark,Contrato 2021
+355,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Aviacion,Banca Ejecutiva,MX722adhe,74641111247BT,118.206.198.69,av Aviacion 2801 2805,San Borja,Lima,Lima,Lexmark,Contrato 2021
+358,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia San Luis,Sub Gerencia,MX522adhe,701701130LPT6,118.206.204.69,av Javier Prado Este  2884 SAN B,San Borja,Lima,Lima,Lexmark,Contrato 2021
+358,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia San Luis,Sala Prime,MX722adhe,746411112474H,118.206.204.68,av Javier Prado Este  2884 SAN B,San Borja,Lima,Lima,Lexmark,Contrato 2021
+359,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Avenida Central,Sala Prime,MX522adhe,701701130LPDB,118.206.206.69,Av Jorge Basadre 133,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+359,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Avenida Central,Comercial,MX722adhe,7464049023WZN,118.206.206.68,Av Jorge Basadre 133,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+359,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Avenida Central,Solucion Miraflores,MX722adhe,7464049023X25,118.206.206.70,Av Jorge Basadre 133 piso 2,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+360,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Cc Jockey Plaza,Sub Gerencia,MX722adhe,74641020241CG,118.206.208.68,av Javier Prado este 4200,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+360,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Cc Jockey Plaza,Gerencia,MX722adhe,74641020241D6,118.206.208.69,av Javier Prado este 4200,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+361,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Abancay Congreso,Plataforma,MX722adhe,74641050242VN,118.206.210.68,av Abancay 260 262,Lima,Lima,Lima,Lexmark,Contrato 2021
+361,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Abancay Congreso,Sub Gerencia,MX722adhe,74641050242T7,118.206.210.69,av Abancay 260 262,Lima,Lima,Lima,Lexmark,Contrato 2021
+362,Banca Empresa Y Corporativa,Gerencia Regional Be 3,Gerencia Regional Be 3,Lima,Banca Empresa Colonial,Recepcion,MX722adhe,74641101246HP,118.207.230.69,Av Juan de Aliaga 425 piso 9,Magdalena del Mar,Lima,Lima,Lexmark,Contrato 2021
+362,Banca Empresa Y Corporativa,Gerencia Regional Be 3,Gerencia Regional Be 3,Lima,Banca Empresa Colonial,Recepcion,MX722adhe,7464111124769,118.207.230.70,Av Juan de Aliaga 425 piso 9,Magdalena del Mar,Lima,Lima,Lexmark,Contrato 2021
+365,Banca Comercial,Banca Comercial,Banca Comercial,Provincia,Agencia Abancay Apurimac,Ventanilla,MX722adhe,74641050242TY,118.205.142.68,Av. Nuñez c/ Av. Diaz Barcena,Abancay,Abancay,Apurimac,Lexmark,Contrato 2021
+365,Banca Comercial,Banca Comercial,Banca Comercial,Provincia,Agencia Abancay Apurimac,Sub Gerencia,MX722adhe,746411112474L,118.205.142.69,Av. Nuñez c/ Av. Diaz Barcena,Abancay,Abancay,Apurimac,Lexmark,Contrato 2021
+368,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Ricardo Palma,Sub Gerencia,MX722adhe,74641020241D1,118.206.218.68,av Ricardo Palma 296 298,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+368,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Ricardo Palma,Gerencia,MX722adhe,7464102024186,118.206.218.69,av Ricardo Palma 296 298,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+370,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Limatambo,Ventanilla,MX722adhe,74641101246DY,118.206.222.68,av Aviacion 3328,san borja,Lima,Lima,Lexmark,Contrato 2021
+370,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Limatambo,Sub Gerencia,MX722adhe,74641101246C6,118.206.222.69,av Aviacion 3328,san borja,Lima,Lima,Lexmark,Contrato 2021
+372,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Los Robles,Sub Gerencia,MX722adhe,74641020241BR,118.205.52.69,av Dos de Mayo 1198,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+372,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Los Robles,Gerencia,MX722adhe,7464049023X2F,118.205.52.68,av Dos de Mayo 1198,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+377,Banca Empresa Y Corporativa,Gerencia Regional Be 2,Gerencia Regional Be 2,Lima,Banca Empresa Santa Cruz,Banca Empresa,MX722adhe,746410202415F,118.205.58.71,av Santa Cruz 695,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+377,Banca Empresa Y Corporativa,Gerencia Regional Be 2,Gerencia Regional Be 2,Lima,Banca Empresa Santa Cruz,Banca Empresa,MX722adhe,74641020241BX,118.205.58.72,av Santa Cruz 695,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+378,Banca Empresa Y Corporativa,Gerencia Regional Be 1,Gerencia Regional Be 1,Lima,Banca Empresa Miraflores,Banca Empresa,MX722adhe,74641020241B5,118.205.50.71,av Larco 1204 2 P,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+378,Banca Empresa Y Corporativa,Gerencia Regional Be 1,Gerencia Regional Be 1,Lima,Banca Empresa Miraflores,Sub Gerencia,MX722adhe,746410202418M,118.205.50.72,av Larco 1204 2 P,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+380,Banca Empresa Y Corporativa,Gerencia Regional Be 2,Gerencia Regional Be 2,Lima,Banca Empresa Chacarilla,Sub Gerencia,MS826de,406493701984V,118.205.18.70,av Primavera 1050,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+380,Banca Empresa Y Corporativa,Gerencia Regional Be 2,Gerencia Regional Be 2,Lima,Banca Empresa Chacarilla,Atencion al Cliente,MX722adhe,74641020241D3,118.205.18.71,av Primavera 1050,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+380,Banca Empresa Y Corporativa,Gerencia Regional Be 2,Gerencia Regional Be 2,Lima,Banca Empresa Chacarilla,Plataforma,MX722adhe,74641020241C6,118.205.18.72,av Primavera 1050,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+383,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Faucett Metro,Sub Gerencia,MX722adhe,7464049023WY5,118.206.228.68,Av Venezuela 5414 Tda 1152  1160,San Miguel,Lima,Lima,Lexmark,Contrato 2021
+383,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Faucett Metro,Ventanilla,MX722adhe,7464939022PD4,118.206.228.69,Av Venezuela 5414 Tda 1152  1160,San Miguel,Lima,Lima,Lexmark,Contrato 2021
+387,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Canaval Y Moreyra,Banca Personal,MX722adhe,7464049023WX7,118.206.230.68,av Canaval y Moreyra 243 245,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+387,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia Canaval Y Moreyra,Plataforma,MX722adhe,7464049023WW3,118.206.230.69,av Canaval y Moreyra 243 245,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+396,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Covida,Sub Gerencia,MX722adhe,7464049023X06,118.206.234.68,av Antunez de Mayolo 1402,Los Olivos,Lima,Lima,Lexmark,Contrato 2021
+396,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Covida,Plataforma,MX722adhe,7464103024206,118.206.234.69,av Antunez de Mayolo 1402,Los Olivos,Lima,Lima,Lexmark,Contrato 2021
+421,Banca Comercial,Division Lima Centro,Oficina Mall Plaza San Juan De Lurigancho,Lima,Agencia Mall San Juan De Lurigancho,Sub Gerencia,MX722adhe,7464102024197,118.205.48.68,Avenida Lurigancho 997 - 999,San Juan de Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+421,Banca Comercial,Division Lima Centro,Oficina Mall Plaza San Juan De Lurigancho,Lima,Agencia Mall San Juan De Lurigancho,Plataforma,MX722adhe,74641101246D7,118.205.48.69,Avenida Lurigancho 997 - 999,San Juan de Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+425,Red Comercial,Division Centro Oriente,Nueva Cajamarca,Provincia,Agencia AEP Nueva Cajamarca,Sub Gerencia,MX522adhe,70178231026FY,118.72.184.56,Jr Huallaga 314,Nueva Cajamarca,Rioja,San Martin,Lexmark,Contrato 2021
+426,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Avenida Del Ejercito,Sub Gerencia,MX722adhe,7464045023RBN,118.206.240.68,av del Ejercito 789,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+426,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Avenida Del Ejercito,Plataforma,MX722adhe,74641020241CZ,118.206.240.69,av del Ejercito 789,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+427,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Bolognesi,Sub Gerencia,MX722adhe,74641050242W8,118.206.242.68,av Coronel Mendoza 1337,Tacna,Tacna,Tacna,Lexmark,Contrato 2021
+427,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Bolognesi,Plataforma,MX722adhe,74641050242VF,118.206.242.69,av Coronel Mendoza 1337,Tacna,Tacna,Tacna,Lexmark,Contrato 2021
+441,Banca Empresa Y Corporativa,Gerencia Regional Be 3,Gerencia Regional Be 3,Provincia,Banca Empresa Iquitos,Sub Gerencia,MX722adhe,74641101246GY,118.205.38.72,Sargento Lores 171 2 P,Iquitos,Maynas,Loreto,Lexmark,Contrato 2021
+441,Banca Empresa Y Corporativa,Gerencia Regional Be 3,Gerencia Regional Be 3,Provincia,Banca Empresa Iquitos,Plataforma,MX722adhe,74641101246GB,118.205.38.73,Sargento Lores 171 2 P,Iquitos,Maynas,Loreto,Lexmark,Contrato 2021
+442,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Lambayeque,Sub Gerencia,MX722adhe,7464103024225,118.206.244.68,c Ramon Castilla 848 854,Lambayeque,Lambayeque,Lambayeque,Lexmark,Contrato 2021
+442,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Lambayeque,Plataforma,MX722adhe,7464103024200,118.206.244.69,c Ramon Castilla 848 854,Lambayeque,Lambayeque,Lambayeque,Lexmark,Contrato 2021
+467,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Guardia Chalaca,Sala Prime,MX522adhe,701701030LK7P,118.206.250.70,av la Marina 495,Callao,Callao,Lima,Lexmark,Contrato 2021
+467,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia Guardia Chalaca,Banca Negocio,MX722adhe,7464111124749,118.206.250.68,av la Marina 495,Callao,Callao,Lima,Lexmark,Contrato 2021
+480,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia La Marina,Sala Prime,MX522adhe,701701130LPF6,118.206.252.70,av la Marina 2355,San Miguel,Lima,Lima,Lexmark,Contrato 2021
+480,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia La Marina,Sub Gerencia,MX722adhe,7464102024166,118.206.252.68,av la Marina 2355,San Miguel,Lima,Lima,Lexmark,Contrato 2021
+480,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Lima,Agencia La Marina,Plataforma,MX722adhe,7464102024159,118.206.252.69,av la Marina 2355,San Miguel,Lima,Lima,Lexmark,Contrato 2021
+484,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Huaycan,Sub Gerencia,MX722adhe,74641101246CK,118.207.0.68,av 15 de Julio Lote 33,Ate,Lima,Lima,Lexmark,Contrato 2021
+484,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Huaycan,Banca Empresarial,MX722adhe,746411112475G,118.207.0.69,av 15 de Julio Lote 33,Ate,Lima,Lima,Lexmark,Contrato 2021
+486,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia San Isidro,Sala Prime,MX522adhe,701701130LPDV,118.205.54.71,av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+486,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia San Isidro,Sub Gerencia,MX722adhe,74641050242V2,118.205.54.68,av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+486,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia San Isidro,Banca Negocio,MX722adhe,7464939022PZD,118.205.54.69,av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+486,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia San Isidro,Sala Prime,MX722adhe,74641101246K2,118.205.54.70,av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+508,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Open Plaza Angamos,Sub Gerencia,MX722adhe,746411112475T,118.207.2.68,pz Esq Angamos con Tomas Marsano,Surquillo,Lima,Lima,Lexmark,Contrato 2021
+508,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Open Plaza Angamos,Banca Negocio,MX722adhe,746411112476D,118.207.2.69,pz Esq Angamos con Tomas Marsano,Surquillo,Lima,Lima,Lexmark,Contrato 2021
+521,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Strip Center Proceres,Plataforma,MX722adhe,7464111124795,118.207.6.68,Av Proceres 1002 Urb los Proceres,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+521,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Strip Center Proceres,Gerencia,MX722adhe,74641111247BZ,118.207.6.69,Av Proceres 1002 Urb los Proceres,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+554,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Open Plaza Piura,Sub Gerencia,MX722adhe,74641050242R1,118.207.10.68,av Andrés Avelino Caceres 147,Castilla,Piura,Piura,Lexmark,Contrato 2021
+554,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Open Plaza Piura,Plataforma,MX722adhe,74641050242R2,118.207.10.69,av Andrés Avelino Caceres 147,Castilla,Piura,Piura,Lexmark,Contrato 2021
+564,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Plaza Butters,Sub Gerencia,MX722adhe,746411112474C,118.207.12.68,pz Butters 301,Barranco,Lima,Lima,Lexmark,Contrato 2021
+564,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Plaza Butters,Plataforma,MX722adhe,74641101246CR,118.207.12.69,pz Butters 301,Barranco,Lima,Lima,Lexmark,Contrato 2021
+566,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Metro Plaza Castilla,Sub Gerencia,MX722adhe,74641050242V0,118.207.14.68,av Alfonso Ugarte 279 293,Lima,Lima,Lima,Lexmark,Contrato 2021
+566,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Metro Plaza Castilla,Plataforma,MX722adhe,7464102024171,118.207.14.69,av Alfonso Ugarte 279 293,Lima,Lima,Lima,Lexmark,Contrato 2021
+584,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Real Plaza Juliaca,Operaciones,MX722adhe,74641050242VK,118.207.16.68,Jr Tumbes 499,Juliaca,San Roman,Puno,Lexmark,Contrato 2021
+584,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Real Plaza Juliaca,Creditos,MX722adhe,74641050242W7,118.207.16.69,Jr Tumbes 499,Juliaca,San Roman,Puno,Lexmark,Contrato 2021
+597,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Pichanaqui,Operaciones,MX722adhe,74641020241BG,118.207.18.68,Jr Independencia Mz R SubLte 13A,Pichanaqui,Chanchamayo,Junin,Lexmark,Contrato 2021
+597,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Pichanaqui,Gerencia,MX722adhe,746410202415G,118.207.18.69,Jr Independencia Mz R SubLte 13A,Pichanaqui,Chanchamayo,Junin,Lexmark,Contrato 2021
+609,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia San Rafael,Sub Gerencia,MX722adhe,74641050242VW,118.207.20.68,av Colonial 1381,Lima,Lima,Lima,Lexmark,Contrato 2021
+609,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia San Rafael,Plataforma,MX722adhe,7464102024185,118.207.20.69,av Colonial 1381,Lima,Lima,Lima,Lexmark,Contrato 2021
+614,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Separadora  Industrial,Sala Prime,MX432adwe,701941340M3ZG,118.205.56.70,av la Molina 540,La Molina,Lima,Lima,Lexmark,Contrato 2021
+614,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Separadora  Industrial,Sub Gerencia,MX722adhe,746411112479N,118.205.56.68,av la Molina 540,La Molina,Lima,Lima,Lexmark,Contrato 2021
+614,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Separadora  Industrial,Plataforma,MX722adhe,74641111247B0,118.205.56.69,av la Molina 540,La Molina,Lima,Lima,Lexmark,Contrato 2021
+615,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia San Borja Sur,Sala Prime,MX522adhe,701701030LK7H,118.207.22.70,av San Luis 2599,San Borja,Lima,Lima,Lexmark,Contrato 2021
+615,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia San Borja Sur,Sub Gerencia,MX722adhe,74641111247BY,118.207.22.68,av San Luis 2599,San Borja,Lima,Lima,Lexmark,Contrato 2021
+615,Banca Comercial,Gt Lima Residencial,Gt Lima Residencial,Lima,Agencia San Borja Sur,Gerencia,MX722adhe,74641101246GZ,118.207.22.69,av San Luis 2599,San Borja,Lima,Lima,Lexmark,Contrato 2021
+616,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Angamos Este,Plataforma,MX722adhe,7464049023WXT,118.207.24.68,av Angamos este 215 227,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+616,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Angamos Este,Plataforma,MX722adhe,74641020241DK,118.207.24.69,av Angamos este 215 227,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+621,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Moquegua,Sub Gerencia,MX722adhe,7464939022R1N,118.207.234.68,Av Circunvalacion Lt 1B Sub Lt 1,Moquegua,Mariscal Nieto,Moquegua,Lexmark,Contrato 2021
+621,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Moquegua,Plataforma,MX722adhe,7464939022P91,118.207.234.69,Av Circunvalacion Lt 1B Sub Lt 1,Moquegua,Mariscal Nieto,Moquegua,Lexmark,Contrato 2021
+627,Banca Comercial,Gt Centro,Gt Centro,Lima,Contenedor Sedapal,Sub Gerencia,MX722adhe,74641030241YN,118.207.28.68,Autopista Ramiro Priale Km 1,El Agustino,Lima,Lima,Lexmark,Contrato 2021
+628,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Satipo,Operaciones,MX722adhe,74641030241Z9,118.207.30.68,Jr Manuel Prado 217,Satipo,Satipo,Junin,Lexmark,Contrato 2021
+628,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Satipo,Banca Empresa,MX722adhe,7464103024210,118.207.30.69,Jr Manuel Prado 217,Satipo,Satipo,Junin,Lexmark,Contrato 2021
+643,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Tarma,Operaciones,MX722adhe,7464102024188,118.207.32.68,Jiron Arequipa 301,Tarma,Tarma,Junin,Lexmark,Contrato 2021
+643,Banca Comercial,Gt Centro,Gt Centro,Provincia,Agencia Tarma,Banca Empresa,MX722adhe,7464102024160,118.207.32.69,Jiron Arequipa 301,Tarma,Tarma,Junin,Lexmark,Contrato 2021
+645,Banca Comercial,Division Lima Oeste,Division Lima Oeste,Lima,Agencia Division Lima Oeste,Sala Prime,MX522adhe,701701030LKB4,118.205.52.70,Av. 2 De Mayo 1198 Esq. Los Robles; San Isidro(11 Javier Prado Oeste),San Isidro,Lima,Lima,Lexmark,Contrato 2021
+648,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Chota,Sub Gerencia,MX722adhe,7464939022PYT,118.207.36.68,av Anaximandro Vega 413 417,Chota,Chota,Cajamarca,Lexmark,Contrato 2021
+648,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Chota,Plataforma,MX722adhe,7464939022R5W,118.207.36.69,av Anaximandro Vega 413 417,Chota,Chota,Cajamarca,Lexmark,Contrato 2021
+659,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Sebastian Barranca,Sala Prime,MX522adhe,701701030LK00,118.207.40.70,av Iquitos 795 799,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+659,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Sebastian Barranca,Sub Gerencia,MX722adhe,74641020241D0,118.207.40.68,av Iquitos 795 799,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+659,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia Sebastian Barranca,Plataforma,MX722adhe,74641020241D4,118.207.40.69,av Iquitos 795 799,La Victoria,Lima,Lima,Lexmark,Contrato 2021
+661,Banca Institucional,Banca Institucional,Banca Institucional,Sede Central,Sede Central Bbva,Banca Institucional,MX722adhe,7464049023WVP,118.220.54.4,Av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+667,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Real Plaza Piura,Sub Gerencia,MX722adhe,7464102024198,118.207.42.68,av Sanchez Cerro Sub Lote N 234 239,Piura,Piura,Piura,Lexmark,Contrato 2021
+667,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Real Plaza Piura,Plataforma,MX722adhe,746410302421T,118.207.42.69,av Sanchez Cerro Sub Lote N 234 239,Piura,Piura,Piura,Lexmark,Contrato 2021
+668,Banca Comercial,Gt Norte,Gt Norte,Provincia,Gerencia Territorial Norte,Gerencia,MX722adhe,746410302421Z,118.205.2.76,Jr Pizarro 620 2 P,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+668,Banca Comercial,Gt Norte,Gt Norte,Provincia,Gerencia Territorial Norte,Gerencia,MX722adhe,7464939022R35,118.205.2.77,Jr Pizarro 620 2 P,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+679,Engineering,Corporate Security,Corporate Security,Sede Central,Sede Central Bbva,Informes Juridicos,MS826de,4064939019DX7,118.220.52.102,Av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+679,Engineering,Engineering,Engineering,Sede Central,Sede Central Bbva,Swift,MS826de,4064939019DKW,118.220.52.126,Av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+679,Engineering,Engineering,Engineering,Sede Central,Sede Central Bbva,Corona,MS826de,40649370198F9,118.220.53.166,Av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+679,Engineering,Engineering,Engineering,Sede Central,Sede Central Bbva,Enterprise Services,MX522adhe,701701130LPBT,118.220.23.154,Av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+679,Engineering,Engineering,Engineering,Sede Central,Sede Central Bbva,Open Space,MX722adhe,74641101246CW,118.220.30.195,Av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+679,Engineering,Engineering,Engineering,Sede Central,Sede Central Bbva,Operaciones Centralizadas,MX722adhe,7464049023X0M,118.220.52.76,Av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+679,Engineering,Engineering,Engineering,Sede Central,Sede Central Bbva,Servicios Juridicos,MX722adhe,7464049023WVD,118.220.53.216,Av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+679,Engineering,Engineering,Engineering,Lima,Agencia Miraflores,Site Alterno,MX722adhe,746410202415C,118.225.12.12,av Larco 1204,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+679,Engineering,Engineering,Engineering,Lima,Agencia Miraflores,Site Alterno,MX722adhe,7464102024184,118.225.12.13,av Larco 1204,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+679,Engineering,Engineering,Engineering,Lima,Agencia Miraflores,Site Alterno,MX722adhe,74641020241B4,118.225.12.14,av Larco 1204,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+679,Engineering,Engineering,Engineering,Sede Central,Sede Central Bbva,Banca Remota,MX722adhe,746410202417C,118.220.53.135,Av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+679,Engineering,Engineering,Engineering,Sede Central,Sede Central Bbva,Gerencia General,CX833se,7566433010NB6,118.220.53.122,Av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2025
+679,Engineering,Engineering,Engineering,Lima,Agencia Miraflores,Site Alterno,MX722adhe,74641020241B8,118.225.11.12,av Larco 1204,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+679,Global Operations,Post-Trade Services,Post-Trade Services,Lima,BANCA EMPRESAS LIMA 1,Site Alterno,MX722adhe,74641050242TN,118.225.11.11,av Diego Ferrer 391,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+679,Engineering,Engineering,Engineering,Sede Central,Sede Central Bbva,Gerencia General,CX431adw,350025023L7WV,10.17.176.10,Av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+679,Engineering,Engineering,Engineering,Sede Central,Sede Central Bbva,Banca Empresas e Instituciones,CX625adhe,75299291450NW,118.220.53.103,Av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+679,Engineering,Engineering,Engineering,Sede Central,Sede Central Bbva,Laboratorio Casg Handling,MX522adhe,701701130LPT1,118.220.53.26,Av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+679,Engineering,Engineering,Engineering,Sede Central,Sede Central Bbva,Open Space,MX522adhe,701701030LKGT,118.220.53.71,Av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Adenda 4
+679,Engineering,Engineering,Engineering,Sede Central,Sede Central Bbva,Comercio Exterior,MX722adhe,74641030241ZW,118.220.54.5,Av Republica de Panama 3055,San Isidro,Lima,Lima,Lexmark,Contrato 2021
+688,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Gcia Territorial Sur,Territorial,MX722adhe,7464939022PM6,118.206.34.73,av del Ejercito 710 2 P,Yanahuara,Arequipa,Arequipa,Lexmark,Contrato 2021
+688,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Gcia Territorial Sur,Gerencia Territorial,MX722adhe,7464939022PRY,118.206.34.74,av del Ejercito 710 2 P,Yanahuara,Arequipa,Arequipa,Lexmark,Contrato 2021
+712,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Mall Av Pza Sta Anita,Sub Gerencia,MX722adhe,74641101246DW,118.207.44.68,av Carretera Central 111,Santa Anita,Lima,Lima,Lexmark,Contrato 2021
+712,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Mall Av Pza Sta Anita,Plataforma,MX722adhe,746411112476K,118.207.44.69,av Carretera Central 111,Santa Anita,Lima,Lima,Lexmark,Contrato 2021
+713,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Caminos Del Inca,Sub Gerencia,MX722adhe,7464103024214,118.207.46.68,av Caminos del Inca 252 256,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+713,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Caminos Del Inca,Gerencia,MX722adhe,7464103024223,118.207.46.69,av Caminos del Inca 252 256,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+713,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Universidad San Pablo,Sub Gerencia,MX722adhe,7464049023X12,118.207.62.68,URB LA CAMPINA PAISAJISTA SN,Arequipa,Arequipa,Arequipa,Lexmark,Contrato 2021
+716,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Santa Cruz,Sala Prime,MX432adwe,701941340M409,118.205.58.69,av Santa Cruz 695,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+716,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Santa Cruz,Sub Gerencia,MX722adhe,74641020241CF,118.205.58.68,av Santa Cruz 695,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+716,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Santa Cruz,Plataforma,MX722adhe,74641020241BT,118.205.58.70,av Santa Cruz 695,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+717,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Bustamante Y Rivero,Plataforma,MX722adhe,7464939022PXW,118.207.48.68,Coop Vvda Lanificio Mz E Sub Lt 6A,Jose Luis Bustamante y Rivero,Arequipa,Arequipa,Lexmark,Contrato 2021
+717,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Bustamante Y Rivero,Plataforma,MX722adhe,7464939022PZF,118.207.48.69,Coop Vvda Lanificio Mz E Sub Lt 6A,Jose Luis Bustamante y Rivero,Arequipa,Arequipa,Lexmark,Contrato 2021
+732,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Salaverry,Sala Prime,MX432adwe,701941340M3RC,118.207.50.69,av Salaverry 3230,Magdalena del Mar,Lima,Lima,Lexmark,Contrato 2021
+732,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Salaverry,Sub Gerencia,MX722adhe,74641101246K5,118.207.50.68,av Salaverry 3230,Magdalena del Mar,Lima,Lima,Lexmark,Contrato 2021
+737,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Staff División Miraflores,Sub Gerencia,MX722adhe,74641020241BM,118.205.6.71,"Av. Larco 631, Miraflores (Shell) (Parque Keneddy)",Miraflores,Lima,Lima,Lexmark,Contrato 2021
+750,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Cc Real Pza Sta Clara,Sub Gerencia,MX722adhe,74641101246DV,118.207.56.68,av Nicolas Ayllon 8694,Ate,Lima,Lima,Lexmark,Contrato 2021
+750,Banca Comercial,Gt Centro,Gt Centro,Lima,Agencia Cc Real Pza Sta Clara,Banca Negocio,MX722adhe,74641101246GX,118.207.56.69,av Nicolas Ayllon 8694,Ate,Lima,Lima,Lexmark,Contrato 2021
+751,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Cc El Trigal,Sala Prime,MX432adwe,701941340M40B,118.207.58.70,c los Antares 318,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+751,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Cc El Trigal,Sub Gerencia,MX722adhe,746411112475D,118.207.58.68,c los Antares 318,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+751,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Cc El Trigal,Banca Negocio,MX722adhe,746411112477D,118.207.58.69,c los Antares 318,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+752,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia San Felipe Comas,Ventanilla,MX722adhe,746410202419R,118.207.60.68,AV UNIVERSITARIA 10583 10587,Comas,Lima,Lima,Lexmark,Contrato 2021
+752,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia San Felipe Comas,Gerencia,MX722adhe,7464049023WZP,118.207.60.69,AV UNIVERSITARIA 10583 10587,Comas,Lima,Lima,Lexmark,Contrato 2021
+760,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Floresta,Sub Gerencia,MX722adhe,74641020241BF,118.207.64.68,av Primavera 606,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+760,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Floresta,Plataforma,CX625adhe,7529902141TTB,118.207.64.69,av Primavera 606,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+763,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia El Pedregal,Sub Gerencia,MX722adhe,7464939022P89,118.207.66.68,c Zamacola Mz G Lote 1 Urb,Majes,Caylloma,Arequipa,Lexmark,Contrato 2021
+763,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia El Pedregal,Atencion al Cliente,MX722adhe,7464939022PBT,118.207.66.69,c Zamacola Mz G Lote 1 Urb,Majes,Caylloma,Arequipa,Lexmark,Contrato 2021
+764,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Mall Av Pza Arequipa,Sub Gerencia,MX722adhe,7464939022P9T,118.207.68.68,av Porongoche 500,Arequipa,Arequipa,Arequipa,Lexmark,Contrato 2021
+764,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Mall Av Pza Arequipa,Plataforma,MX722adhe,7464939022PWP,118.207.68.69,av Porongoche 500,Arequipa,Arequipa,Arequipa,Lexmark,Contrato 2021
+766,Asset Management&Global Wealth,Banca Privada Cs,Banca Privada Cs,Lima,Agencia Premium El Polo,Sub Gerencia,CX625adhe,75299291450T3,118.207.70.68,av el Polo 670 7 P Block C,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+766,Asset Management&Global Wealth,Banca Privada Cs,Banca Privada Cs,Lima,Agencia Premium El Polo,Comercial,MX722adhe,7464939022PVD,118.207.70.69,av el Polo 670 7 P Block C,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+766,Asset Management&Global Wealth,Banca Privada Cs,Banca Privada Cs,Lima,Agencia Premium El Polo,Recepcion,MX722adhe,7464939022PC4,118.207.70.70,av el Polo 670 7 P Block C,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+778,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Cerro Colorado,Sub Gerencia,MX722adhe,7464939022R34,118.207.72.68,av Aviacion 602,Cerro Colorado,Arequipa,Arequipa,Lexmark,Contrato 2021
+778,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Cerro Colorado,Plataforma,MX722adhe,7464939022R1P,118.207.72.69,av Aviacion 602,Cerro Colorado,Arequipa,Arequipa,Lexmark,Contrato 2021
+787,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Montegrande,Sub Gerencia,MX722adhe,74641101246CM,118.207.74.68,c Monte Grande 133,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+787,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Montegrande,Banca Negocio,MX722adhe,74641111247C2,118.207.74.69,c Monte Grande 133,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+791,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Rotonda,Sub Gerencia,MX722adhe,74641101246C8,118.207.76.68,Av La Fontana 371,La Molina,Lima,Lima,Lexmark,Contrato 2021
+791,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Rotonda,Plataforma,MX722adhe,74641101246KV,118.207.76.69,Av La Fontana 371,La Molina,Lima,Lima,Lexmark,Contrato 2021
+796,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Metro Santa Elena,Sub Gerencia,MX722adhe,7464102024170,118.207.80.68,av Juan Tomas Stack 250,Chiclayo,Chiclayo,Lambayeque,Lexmark,Contrato 2021
+796,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Metro Santa Elena,Plataforma,MX722adhe,746410302420W,118.207.80.69,av Juan Tomas Stack 250,Chiclayo,Chiclayo,Lambayeque,Lexmark,Contrato 2021
+797,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Barrio Comercio,Operaciones,MX722adhe,74641050242V9,118.207.82.68,Jr Tahuantinsuyo 298C2,Tarapoto,San Martin,San Martin,Lexmark,Contrato 2021
+797,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Barrio Comercio,Sub Gerencia,MX722adhe,74641050242V7,118.207.82.69,Jr Tahuantinsuyo 298C2,Tarapoto,San Martin,San Martin,Lexmark,Contrato 2021
+827,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Plaza De Armas Huanuco,Gerencia,MX722adhe,74641050242VH,118.207.84.68,Jr DOS De Mayo 1137,Huanuco,Huanuco,Huanuco,Lexmark,Contrato 2021
+827,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Plaza De Armas Huanuco,Comercial,MX722adhe,746410202419G,118.207.84.69,Jr DOS De Mayo 1137,Huanuco,Huanuco,Huanuco,Lexmark,Contrato 2021
+832,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia El Sol,Banca Negocio,MX722adhe,7464103024201,118.207.86.68,av Proceres Independ 2704 2708,San Juan de Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+832,Banca Comercial,Gt Lima Centro,Gt Lima Centro,Lima,Agencia El Sol,Banca Negocio,MX722adhe,74641050242TM,118.207.86.69,av Proceres Independ 2704 2708,San Juan de Lurigancho,Lima,Lima,Lexmark,Contrato 2021
+841,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Especial Senati,Sub Gerencia,MX432adwe,701941340M3MB,118.207.88.68,av Alfredo Mendiola 3520,Independencia,Lima,Lima,Lexmark,Contrato 2021
+842,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Carabayllo,Ventanilla,MX722adhe,746411112475X,118.207.90.68,av Tupac Amaru 3368,Carabayllo,Lima,Lima,Lexmark,Contrato 2021
+842,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Carabayllo,Plataforma,MX722adhe,746411112477G,118.207.90.69,av Tupac Amaru 3368,Carabayllo,Lima,Lima,Lexmark,Contrato 2021
+843,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Ovalo Papal,Atencion al Cliente,MX722adhe,74641050242VV,118.207.92.68,Mz J Lote 01 Local 1088,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+843,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Ovalo Papal,Atencion al Cliente,MX722adhe,74641050242RL,118.207.92.69,Mz J Lote 01 Local 1088,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+847,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia El Retablo,Plataforma,MX722adhe,74641020241BW,118.207.96.68,Av. Los Angeles 602,Comas,Lima,Lima,Lexmark,Contrato 2021
+847,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia El Retablo,Gerencia,MX722adhe,7464102024196,118.207.96.69,Av. Los Angeles 602,Comas,Lima,Lima,Lexmark,Contrato 2021
+849,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Cedros De Villa,Sub Gerencia,MX722adhe,746410202416Z,118.207.98.68,Av Alameda Sur Esq Av Sn Marcos,Chorrillos,Lima,Lima,Lexmark,Contrato 2021
+849,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Cedros De Villa,Plataforma,MX722adhe,74641050242RK,118.207.98.69,Av Alameda Sur Esq Av Sn Marcos,Chorrillos,Lima,Lima,Lexmark,Contrato 2021
+857,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Valle Sharon,Sala Prime,MX432adwe,701941340M401,118.207.100.69,av Victor Castro Iglesias 790,San Juan de Miraflores,Lima,Lima,Lexmark,Contrato 2021
+857,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Valle Sharon,Plataforma,MX722adhe,74641101246L7,118.207.100.68,av Victor Castro Iglesias 790,San Juan de Miraflores,Lima,Lima,Lexmark,Contrato 2021
+868,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Mala,Plataforma,MX722adhe,74641020241CH,118.207.102.68,Jr Real 305,Mala,Cañete,Lima,Lexmark,Contrato 2021
+868,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Mala,Plataforma,MX722adhe,746410202419P,118.207.102.69,Jr Real 305,Mala,Cañete,Lima,Lexmark,Contrato 2021
+876,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Javier Prado Oeste,Sala Prime,MX522adhe,701701030LK7L,118.207.106.69,av Javier Prado ote 604,Magdalena del Mar,Lima,Lima,Lexmark,Contrato 2021
+876,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Javier Prado Oeste,Sub Gerencia,MX722adhe,746411112478L,118.207.106.68,av Javier Prado ote 604,Magdalena del Mar,Lima,Lima,Lexmark,Contrato 2021
+879,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Embajada De Ee.Uu,Cancilleria,MX522adhe,701701130LPDH,118.207.140.69,Avenida La Encalada cdra 17,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+879,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia El Polo Plaza,Sub Gerencia,MX722adhe,74641050242RT,118.207.108.68,Jr. El Polo N° 759,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+879,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia El Polo Plaza,Plataforma,MX722adhe,74641050242RX,118.207.108.69,Jr. El Polo N° 759,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+879,Banca Comercial,Gt Surco La Molina,Gt Surco La Molina,Lima,Agencia Embajada De Ee.Uu,AID,MX432adwe,701941340M3ZZ,118.205.252.68,Avenida La Encalada cdra 17,Santiago de Surco,Lima,Lima,Lexmark,Contrato 2021
+891,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Express Rioja,Operaciones,MX722adhe,7464103024202,118.207.110.68,Jr 2 De Mayo 702,Rioja,Rioja,San Martin,Lexmark,Contrato 2021
+891,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Express Rioja,Gerencia,MX722adhe,74641020241B0,118.207.110.69,Jr 2 De Mayo 702,Rioja,Rioja,San Martin,Lexmark,Contrato 2021
+900,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Mall Plaza Trujillo,Sub Gerencia,MX722adhe,746410202418B,118.207.112.68,av America ote 750,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+900,Banca Comercial,Gt Callao San Miguel,Gt Callao San Miguel,Provincia,Agencia Mall Plaza Trujillo,Plataforma,MX722adhe,746411112476W,118.207.112.69,av America ote 750,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+908,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Yanahuara,Sub Gerencia,MX722adhe,7464939022PB4,118.207.114.68,Av Jose Ab Quinones 700,Yanahuara,Arequipa,Arequipa,Lexmark,Contrato 2021
+908,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Yanahuara,Gerencia,MX722adhe,7464939022R3V,118.207.114.69,Av Jose Ab Quinones 700,Yanahuara,Arequipa,Arequipa,Lexmark,Contrato 2021
+918,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Real Plaza Trujillo,Atencion Al Cliente,MX722adhe,74641020241DG,118.207.116.68,av Cesar Vallejo ote 1345,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+918,Banca Comercial,Gt Norte,Gt Norte,Provincia,Agencia Real Plaza Trujillo,Atencion Al Cliente,MX722adhe,746410202415N,118.207.116.69,av Cesar Vallejo ote 1345,Trujillo,Trujillo,La Libertad,Lexmark,Contrato 2021
+933,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Lurin,Sub Gerencia,MX722adhe,74641101246KM,118.207.120.68,Urb Las Virreynas Lote 1-2,Lurin,Lima,Lima,Lexmark,Contrato 2021
+933,Banca Comercial,Gt Sur Chico,Gt Sur Chico,Lima,Agencia Lurin,Operaciones,MX722adhe,74641101246LW,118.207.120.69,Urb Las Virreynas Lote 1-2,Lurin,Lima,Lima,Lexmark,Contrato 2021
+939,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Ovalo El Pacifico,Sub Gerencia,MX722adhe,746410202417D,118.207.122.68,av Jose Pardo 320,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+939,Banca Comercial,Gt Miraflores,Gt Miraflores,Lima,Agencia Ovalo El Pacifico,Banca Negocio,MX722adhe,7464049023WXD,118.207.122.69,av Jose Pardo 320,Miraflores,Lima,Lima,Lexmark,Contrato 2021
+960,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Plaza Diez Canseco,Plataforma,MX722adhe,74641020241B1,118.207.124.68,Jr Huamachuco 1301,Jesus Maria,Lima,Lima,Lexmark,Contrato 2021
+960,Banca Comercial,Gt Lince,Gt Lince,Lima,Agencia Plaza Diez Canseco,Gerencia,MX722adhe,7464102024193,118.207.124.69,Jr Huamachuco 1301,Jesus Maria,Lima,Lima,Lexmark,Contrato 2021
+967,Banca Empresa Y Corporativa,Gerencia Regional Be 3,Gerencia Regional Be 3,Provincia,Banca Empresa Huancayo,Banca Empresa,MX722adhe,7464102024173,118.205.28.74,c Real 631 639 2 piso,Huancayo,Huancayo,Junin,Lexmark,Contrato 2021
+967,Banca Empresa Y Corporativa,Gerencia Regional Be 3,Gerencia Regional Be 3,Provincia,Banca Empresa Huancayo,Banca Empresa,MX722adhe,74641030241ZH,118.205.28.75,c Real 631 639 2 piso,Huancayo,Huancayo,Junin,Lexmark,Contrato 2021
+970,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Ovalo Naranjal,Sub Gerencia,MX722adhe,746411112479M,118.207.126.68,av Naranjal 1425,Los Olivos,Lima,Lima,Lexmark,Contrato 2021
+970,Banca Comercial,Gt Norte Chico,Gt Norte Chico,Lima,Agencia Ovalo Naranjal,Banca Empresarial,MX722adhe,746411112479W,118.207.126.69,av Naranjal 1425,Los Olivos,Lima,Lima,Lexmark,Contrato 2021
+976,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Las Bambas,Ventanilla,MX722adhe,7464049023WXK,118.207.136.68,Plz Armas Chalhuahuacho,Challhuahuacho,Cotabambas,Apurimac,Lexmark,Contrato 2021
+976,Banca Comercial,Gt Sur,Gt Sur,Provincia,Agencia Las Bambas,Ventanilla,MX722adhe,74641020241BK,118.207.136.69,Plz Armas Chalhuahuacho,Challhuahuacho,Cotabambas,Apurimac,Lexmark,Contrato 2021
+982,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Open Plaza Pucallpa,Sub Gerencia,MX722adhe,746410202417Z,118.207.130.68,av Centenario 4614,Yarinacocha,Coronel Portillo,Ucayali,Lexmark,Contrato 2021
+982,Banca Comercial,Gt Oriente,Gt Oriente,Provincia,Agencia Open Plaza Pucallpa,Plataforma,MX722adhe,7464102024165,118.207.130.69,av Centenario 4614,Yarinacocha,Coronel Portillo,Ucayali,Lexmark,Contrato 2021

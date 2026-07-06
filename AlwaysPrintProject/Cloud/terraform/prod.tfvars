@@ -26,7 +26,7 @@ backend_port  = 8000
 frontend_port = 3000
 
 # En Free Tier: t3.small (2GB) / c7i-flex.large (4GB) / m7i-flex.large (8GB)
-ec2_instance_type = "m7i-flex.large"
+ec2_instance_type = "t3.micro"
 
 backend_env_vars = {
   LOG_LEVEL                   = "INFO"

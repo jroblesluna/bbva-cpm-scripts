@@ -384,6 +384,10 @@ class RedisConnectionManager:
         if self._worker_registry:
             await self._worker_registry.unregister_workstation(workstation_id)
 
+        # Invalidar snapshot cacheado: remover la WS desconectada para que
+        # el fallback sync también sea consistente sin esperar al próximo heartbeat.
+        self._global_online_snapshot.discard(workstation_id)
+
         # Encolar para batch update de BD
         self._disconnect_queue.append(workstation_id)
         if self._disconnect_flush_task is None or self._disconnect_flush_task.done():
@@ -1201,6 +1205,47 @@ class RedisConnectionManager:
         """
         # Merge con conexiones locales actuales (más frescas que el snapshot)
         return self._global_online_snapshot | set(self.workstation_connections.keys())
+
+    async def get_global_online_snapshot_async(self) -> set:
+        """
+        Lectura fresca de Redis: SUNIONSTORE + SMEMBERS en tiempo real.
+
+        A diferencia de get_global_online_snapshot() (que retorna un cache de ~30s),
+        este método ejecuta SUNIONSTORE sobre los SETs de todos los workers activos
+        y retorna el resultado en tiempo real. Costo: <2ms con ~500 WS en Redis local.
+
+        Usar en endpoints async que requieren conteo exacto cross-worker.
+        Fallback: si Redis no está disponible, retorna snapshot cacheado + locales.
+        """
+        if not self._redis_available or not self._redis:
+            return self._global_online_snapshot | set(self.workstation_connections.keys())
+
+        try:
+            # Encontrar todas las keys de workers activos
+            worker_keys = []
+            async for key in self._redis.scan_iter(match="workers:*:workstations"):
+                worker_keys.append(key)
+
+            if worker_keys:
+                # SUNIONSTORE: unión atómica de todos los SETs → key compartida
+                dest_key = "global:online_workstations"
+                await self._redis.sunionstore(dest_key, *worker_keys)
+                await self._redis.expire(dest_key, 60)
+                # Leer resultado fresco
+                online = await self._redis.smembers(dest_key)
+                # Decode bytes si es necesario
+                decoded = set()
+                for item in online:
+                    decoded.add(item.decode("utf-8") if isinstance(item, bytes) else item)
+                # Merge con locales actuales (pueden haber connects muy recientes aún no en Redis)
+                return decoded | set(self.workstation_connections.keys())
+            else:
+                # No hay keys de workers en Redis — solo locales
+                return set(self.workstation_connections.keys())
+        except Exception as e:
+            logger.debug("worker.online_snapshot_async_error", error=str(e))
+            # Fallback al snapshot cacheado + locales
+            return self._global_online_snapshot | set(self.workstation_connections.keys())
 
     def _get_rss_mb(self) -> float:
         """Obtiene RSS del proceso actual en MB."""

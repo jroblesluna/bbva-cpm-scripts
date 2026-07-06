@@ -647,6 +647,13 @@ class ConnectionManager:
         Interfaz compatible con RedisConnectionManager.
         """
         return set(self.workstation_connections.keys())
+
+    async def get_global_online_snapshot_async(self) -> set:
+        """
+        Versión async (single-worker retorna lo mismo que sync).
+        Interfaz compatible con RedisConnectionManager.
+        """
+        return set(self.workstation_connections.keys())
     
     def get_connection_count(self) -> dict:
         """
