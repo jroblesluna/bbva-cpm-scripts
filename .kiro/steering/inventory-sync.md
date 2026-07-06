@@ -61,10 +61,10 @@ The inventory CSV has these columns:
 - This overrides CIDR-based auto-assignment (hostname is the source of truth for agency)
 
 ### Step 3: Geocode addresses
-- For VLANs without `address`, `latitude`, or `longitude` in `vlan_metadata`
+- For VLANs without `address`, `latitude`, or `longitude` (direct model fields, NOT metadata)
 - Build query: `{DIRECCION},{DISTRITO},{PROVINCIA},{DEPARTAMENTO},Peru`
 - Use Google Geocoding API (key from organization's `google_maps_api_key`)
-- Save in `vlan_metadata`: address (formatted from Google), latitude, longitude, place_id, distrito, provincia, departamento
+- Save in VLAN model fields: `address` (formatted from Google), `latitude`, `longitude`, `place_id`
 
 ### Step 4: Generate location images
 - For VLANs without `location_image_url` that have coordinates
