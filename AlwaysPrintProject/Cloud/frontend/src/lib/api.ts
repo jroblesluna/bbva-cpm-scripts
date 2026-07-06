@@ -160,6 +160,13 @@ apiClient.interceptors.response.use(
         window.location.href = '/login'
       }
     }
+
+    // Si el backend no responde (network error o 502/503), redirigir a mantenimiento
+    if (!error.response || error.response.status === 502 || error.response.status === 503) {
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/maintenance')) {
+        window.location.href = '/maintenance'
+      }
+    }
     
     // Transformar error a formato consistente
     const apiError: ApiError = {
