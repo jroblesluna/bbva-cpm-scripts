@@ -1,5 +1,5 @@
 {
-  "version": "8.6",
+  "version": "8.7",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -366,6 +366,119 @@
           }
         },
         {
+          "type": "Conditional",
+          "description": "Limpiar spools: si modo normal reiniciar stack LPD completo, si contingencia solo Spooler.",
+          "condition": {
+            "variable": "contingency_enabled",
+            "operator": "not_equals",
+            "value": "1"
+          },
+          "actions": [
+            {
+              "type": "StopService",
+              "description": "Detener LpdServiceMonitor",
+              "parameters": {
+                "service_name": "LpdServiceMonitor",
+                "graceful_timeout_seconds": 15,
+                "force_kill_on_timeout": true
+              }
+            },
+            {
+              "type": "StopService",
+              "description": "Detener LPDSVC",
+              "parameters": {
+                "service_name": "LPDSVC",
+                "graceful_timeout_seconds": 15,
+                "force_kill_on_timeout": true
+              }
+            },
+            {
+              "type": "StopService",
+              "description": "Detener Spooler",
+              "parameters": {
+                "service_name": "Spooler",
+                "graceful_timeout_seconds": 15,
+                "force_kill_on_timeout": true
+              }
+            },
+            {
+              "type": "DeleteFolderContents",
+              "description": "Limpiar spool pendiente",
+              "parameters": {
+                "path": "C:\\Windows\\System32\\Spool\\Printers",
+                "recursive": true,
+                "ignore_errors": true
+              }
+            },
+            {
+              "type": "StartService",
+              "description": "Iniciar Spooler",
+              "parameters": {
+                "service_name": "Spooler",
+                "wait_for_running": true,
+                "timeout_seconds": 30
+              }
+            },
+            {
+              "type": "StartService",
+              "description": "Iniciar LPDSVC",
+              "parameters": {
+                "service_name": "LPDSVC",
+                "wait_for_running": true,
+                "timeout_seconds": 30
+              }
+            },
+            {
+              "type": "StartService",
+              "description": "Iniciar LpdServiceMonitor",
+              "parameters": {
+                "service_name": "LpdServiceMonitor",
+                "wait_for_running": true,
+                "timeout_seconds": 30
+              }
+            }
+          ],
+          "else_actions": [
+            {
+              "type": "StopService",
+              "description": "Detener Spooler (contingencia)",
+              "parameters": {
+                "service_name": "Spooler",
+                "graceful_timeout_seconds": 15,
+                "force_kill_on_timeout": true
+              }
+            },
+            {
+              "type": "DeleteFolderContents",
+              "description": "Limpiar spool pendiente (contingencia)",
+              "parameters": {
+                "path": "C:\\Windows\\System32\\Spool\\Printers",
+                "recursive": true,
+                "ignore_errors": true
+              }
+            },
+            {
+              "type": "StartService",
+              "description": "Iniciar Spooler (contingencia)",
+              "parameters": {
+                "service_name": "Spooler",
+                "wait_for_running": true,
+                "timeout_seconds": 30
+              }
+            }
+          ]
+        },
+        {
+          "type": "RunProcess",
+          "description": "Reanudar (quitar pausa) cola corporativa",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+            "arguments": "-NoProfile -Command \"Get-Printer -Name '{{corporate_queue_name}}' -ErrorAction SilentlyContinue | Resume-Printer\"",
+            "timeout_seconds": 15,
+            "window_style": "Hidden"
+          }
+        },
+        {
           "type": "RunProcess",
           "description": "Establecer cola corporativa como impresora predeterminada",
           "parameters": {
@@ -685,6 +798,17 @@
             "arguments": "-NoProfile -Command \"Get-Printer -Name '{{corporate_queue_name}}' -ErrorAction SilentlyContinue | Resume-Printer\"",
             "timeout_seconds": 15,
             "window_style": "Hidden"
+          }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Establecer cola corporativa como impresora predeterminada",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\rundll32.exe",
+            "arguments": "printui.dll,PrintUIEntry /y /n \"{{corporate_queue_name}}\"",
+            "timeout_seconds": 15,
+            "window_style": "Hidden",
+            "run_as_logged_in_user": true
           }
         }
       ]
