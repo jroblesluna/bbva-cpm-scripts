@@ -36,11 +36,18 @@ If the user specifies environment, organization, and CSV explicitly, skip confir
 
 Todos los pasos se ejecutan en UN SOLO script Python. Solo se procesan items que necesitan cambio.
 
-### Step 1: Rename VLANs
-- Código de agencia = `hostname[3:6]` (0-indexed) de workstations (ej: W10**277**01P04 → `277`)
+### Step 1: Build VLAN map + Rename + Create missing (NO duplicates)
+- Construir mapa `code → VLAN` extrayendo el código del nombre: `name.split(" - ")[0].strip().zfill(3)`
+- Si una VLAN existente ya matchea el código → renombrar si el nombre difiere del esperado
+- Código de agencia de workstations = `hostname[3:6]` (0-indexed, ej: W10**277**01P04 → `277`)
 - Formato esperado: `{code_3dig} - Ag. {name}` (reemplazar "Agencia " con "Ag.")
-- Solo renombrar si el nombre actual no coincide
-- Crear VLANs faltantes (códigos del CSV sin VLAN existente)
+- **Crear VLANs SOLO si el código NO existe ya en el mapa** (evitar duplicados)
+- Si hay duplicados existentes (mismo código, múltiples VLANs): **mergear** antes de continuar:
+  - Conservar la VLAN con más workstations
+  - Reasignar WS, dispositivos, y action_configs de las duplicadas a la keeper
+  - Consolidar `cidr_ranges` (unión de sets)
+  - Copiar address/image si keeper no tiene
+  - Eliminar las duplicadas
 
 ### Step 2: Reassign workstations + CIDRs
 - Para cada workstation: extraer código de agencia de `hostname[3:6]`
