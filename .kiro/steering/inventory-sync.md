@@ -1,6 +1,6 @@
 ---
 name: inventory-sync
-description: "Sincroniza el inventario de impresoras con la plataforma AlwaysPrint. Renombra VLANs, actualiza direcciones/coordenadas/imágenes, y actualiza dispositivos desde un archivo CSV de inventario. Usar cuando se necesite procesar un CSV de inventario y sincronizar datos con el backend en PROD o DEV."
+description: "Sincroniza el inventario de impresoras con la plataforma AlwaysPrint. Renombra VLANs, reasigna workstations, asigna dispositivos huérfanos, y actualiza dispositivos desde CSV. Usar cuando se necesite procesar un CSV de inventario y sincronizar datos con el backend en PROD o DEV."
 inclusion: manual
 ---
 
@@ -10,119 +10,110 @@ All text, comments, and log messages MUST be in Spanish.
 
 ## Pre-requisites
 
-Before executing, you MUST confirm each step sequentially (not all at once):
+If the user specifies environment, organization, and CSV explicitly, skip confirmations and execute directly. Otherwise confirm sequentially:
 
-### Paso 1: Confirmar archivo CSV
-- Buscar archivos `Inventario*.csv` en el repositorio
-- Mostrar el path encontrado y preguntar: "¿Usar este archivo? (sí/no)"
-
-### Paso 2: Confirmar entorno
-- Preguntar: "¿En qué entorno ejecutar?"
-- Mostrar opciones como lista simple:
-  - **DEV**: Profile `AlwaysPrint-dev-040982755196`, servidor `alwaysprint.dev.iol.pe`
-  - **PROD**: Profile `AlwaysPrint-prod-425642439683`, servidor `alwaysprint.apps.iol.pe`
-- Esperar respuesta del usuario antes de continuar
-
-### Paso 3: Confirmar organización
-- Consultar las organizaciones disponibles en el entorno elegido (via SSM al backend)
-- Mostrar la lista y preguntar: "¿A cuál organización aplicar el inventario?"
-- Esperar respuesta del usuario antes de ejecutar
+1. **Archivo CSV**: Buscar `Inventario*.csv` en el repositorio. Confirmar si hay ambigüedad.
+2. **Entorno**: DEV (`AlwaysPrint-dev-040982755196`) o PROD (`AlwaysPrint-prod-425642439683`).
+3. **Organización**: Consultar vía SSM si no se especifica.
 
 ## CSV Format
 
-The inventory CSV has these columns:
-- `CENTRO DE COSTO`: Agency code (maps to VLAN code, zero-padded to 3 digits)
-- `OFICINA / AREA`: Agency name
-- `IP`: Printer IP address
-- `MODELO INSTALADO`: Printer model
-- `SERIE`: Serial number
-- `TIPO`: Contract type
-- `UBICACIÓN`: Physical location within the agency
-- `DIRECCION`: Street address
-- `DISTRITO`: District
-- `PROVINCIA`: Province
-- `DEPARTAMENTO`: Department
+| Columna | Uso |
+|---------|-----|
+| `CENTRO DE COSTO` | Código de agencia (zero-pad a 3 dígitos) → mapea a VLAN |
+| `OFICINA / AREA` | Nombre de la agencia |
+| `IP` | IP de la impresora |
+| `MODELO INSTALADO` | Modelo del dispositivo |
+| `SERIE` | Número de serie |
+| `TIPO` | Tipo de contrato |
+| `UBICACIÓN` | Ubicación física dentro de la agencia |
+| `DIRECCION` | Dirección de la calle (para geocoding) |
+| `DISTRITO` | Distrito |
+| `PROVINCIA` | Provincia |
+| `DEPARTAMENTO` | Departamento |
 
-## Execution Steps (incremental — only process what's missing)
+## Execution Steps
+
+Todos los pasos se ejecutan en UN SOLO script Python. Solo se procesan items que necesitan cambio.
 
 ### Step 1: Rename VLANs
-- Extract agency code from workstation hostnames: `hostname[3:6]` (e.g. W10**277**01P04 → code `277`)
-- Hostname format: `W1{0|1}XXX{0|1}{1|S}P{ZZ}` where XXX (positions 3-5, 0-indexed) = agency code
-- Expected VLAN name format: `{code_3dig} - Ag. {name}` (replace "Agencia " with "Ag.")
-- Only rename VLANs that don't match the expected name
-- Clean double spaces, normalize parentheses
+- Código de agencia = `hostname[3:6]` (0-indexed) de workstations (ej: W10**277**01P04 → `277`)
+- Formato esperado: `{code_3dig} - Ag. {name}` (reemplazar "Agencia " con "Ag.")
+- Solo renombrar si el nombre actual no coincide
+- Crear VLANs faltantes (códigos del CSV sin VLAN existente)
 
-### Step 2: Reassign workstations to correct VLAN by hostname
-- For each workstation: extract agency code from hostname[3:6]
-- If the workstation's current vlan_id doesn't match the VLAN for that code → reassign
-- Additionally, ensure the workstation's CIDR is in the target VLAN's `cidr_ranges`:
-  - Add the CIDR to the correct VLAN if not present
-  - Remove the CIDR from any other VLAN that has it (avoid duplicates)
-- This overrides CIDR-based auto-assignment (hostname is the source of truth for agency)
+### Step 2: Reassign workstations + CIDRs
+- Para cada workstation: extraer código de agencia de `hostname[3:6]`
+- Si `vlan_id` actual ≠ VLAN del código → reasignar
+- Asegurar que el CIDR de la WS esté en `cidr_ranges` de la VLAN target
+- Remover ese CIDR de cualquier otra VLAN que lo tenga (sin duplicados)
+- **Hostname es source of truth**, no el CIDR
 
-### Step 3: Geocode addresses
-- For VLANs without `address`, `latitude`, or `longitude` (direct model fields, NOT metadata)
-- Build query: `{DIRECCION},{DISTRITO},{PROVINCIA},{DEPARTAMENTO},Peru`
-- Use Google Geocoding API (key from organization's `google_maps_api_key`)
-- Save in VLAN model fields: `address` (formatted from Google), `latitude`, `longitude`, `place_id`
+### Step 3: Upsert devices (printers) from CSV
+- Match por IP dentro de la organización
+- Si existe: UPDATE (name, description, model, location, port, vlan_id)
+- Si no existe: INSERT
+- Campos: name=`{IP} - {MODELO}`, description=`{SERIE} - {TIPO}`, model, location=`{UBICACIÓN}`, port=9100
+- `vlan_id` = VLAN del código de agencia del CSV
 
-### Step 4: Generate location images
-- For VLANs without `location_image_url` that have coordinates
-- Use ONLY the first Google Places Photo (from place_id) — download and save directly as `vlan-images/{vlan_id}.jpg` (no temporary options)
-- If no Places Photo available: use Street View with heading pointing toward the building
-- If no Street View: use satellite map as last resort
-- Save directly to S3, update `location_image_url` in DB
+### Step 4: Assign orphan devices to VLAN by IP/CIDR
+- Buscar dispositivos de la organización que tienen `vlan_id = NULL`
+- Para cada uno: verificar si su IP cae dentro de algún CIDR de las VLANs
+- Si match → asignar `vlan_id`
+- Usar `ipaddress.ip_address(ip) in ipaddress.ip_network(cidr)` para el match
 
-### Step 5: Upsert devices (printers)
-- For each row in CSV, match by IP address within the organization
-- If exists: UPDATE name, description, model, location, port, vlan_id
-- If not exists: INSERT new device
-- Device fields:
-  - name: `{IP} - {MODELO INSTALADO}`
-  - ip_address: `{IP}`
-  - description: `{SERIE} - {TIPO}`
-  - model: `{MODELO INSTALADO}`
-  - location: `{UBICACIÓN}`
-  - port: 9100
-  - vlan_id: matched by agency code from CSV
-- Skip rows where the agency code has no VLAN in the system
+### Step 5: Geocode addresses (optional, only if VLANs lack address)
+- Solo para VLANs sin campo `address` (modelo VLAN, NO metadata)
+- Query: `{DIRECCION},{DISTRITO},{PROVINCIA},{DEPARTAMENTO},Peru`
+- Google Geocoding API (key de `organization.google_maps_api_key`)
+- Guardar en campos del modelo: `address`, `latitude`, `longitude`, `place_id`
+- Rate limit: 0.2s entre requests
+
+### Step 6: Generate location images (optional, only if VLANs lack image)
+- Solo para VLANs sin `location_image_url` que tienen coordenadas
+- Prioridad: Google Places Photo → Street View → Satellite map
+- Subir a S3 como `vlan-images/{vlan_id}.jpg`
+- Rate limit: 0.3s entre requests
 
 ## Execution Method
 
-All operations are executed via AWS SSM on the EC2 instance running the backend Docker container:
-1. Write the Python sync script to a local temp file (e.g. `/tmp/inventory_sync_full.py`)
-2. Write a SEPARATE Python helper file (e.g. `/tmp/gen_sync_params.py`) that:
-   - Reads the sync script and base64-encodes it
-   - Uploads the CSV to S3 temporarily
-   - Builds the SSM command JSON and writes it to `/tmp/ssm_sync.json`
-3. Execute the helper with `python3 /tmp/gen_sync_params.py`
-4. Send the SSM command with `aws ssm send-command --parameters file:///tmp/ssm_sync.json`
-5. Clean up temporary S3 files after execution
+Via AWS SSM en la EC2 con el container Docker del backend:
 
-**IMPORTANT**: Always write Python scripts to temp files before executing. See steering `no-inline-python`.
+1. Escribir script Python en `/tmp/inventory_sync_full.py`
+2. Escribir helper `/tmp/gen_sync_full.py` que:
+   - Base64-encodea el script
+   - Sube CSV a S3 temporalmente
+   - Construye JSON de SSM params → `/tmp/ssm_sync.json`
+3. Ejecutar helper: `python3 /tmp/gen_sync_full.py`
+4. Enviar SSM: `aws ssm send-command --parameters file:///tmp/ssm_sync.json`
+5. Limpiar CSV temporal de S3
 
-## Important Notes
-- The EC2 instance ID for PROD is `i-0b42738edf1860c00`
-- The backend container is `alwaysprint-backend-1`
-- The VLAN model is `VLAN` (not `Vlan`) from `app.models.vlan`
-- The Device model is `Device` from `app.models.device`
-- Organization model is `Organization` from `app.models.organization`
-- Always use `PYTHONPATH=/app` when executing in the container
-- S3 docs bucket: `alwaysprint-{env}-docs` (env = prod or dev)
-- Commit to DB after each VLAN/device to avoid rollback on errors
-- Rate limit Google API calls: 0.2s delay between requests
+**IMPORTANTE**: Siempre escribir scripts en archivos temp. Ver steering `no-inline-python`.
 
-## AWS Profiles
+## Infrastructure
 
-| Environment | AWS_PROFILE | Account ID |
-|-------------|-------------|------------|
-| DEV | AlwaysPrint-dev-040982755196 | 040982755196 |
-| PROD | AlwaysPrint-prod-425642439683 | 425642439683 |
+| Dato | PROD | DEV |
+|------|------|-----|
+| EC2 Instance | `i-0b42738edf1860c00` | (consultar) |
+| Container | `alwaysprint-backend-1` | `alwaysprint-backend-1` |
+| S3 Bucket | `alwaysprint-prod-docs` | `alwaysprint-dev-docs` |
+| Profile | `AlwaysPrint-prod-425642439683` | `AlwaysPrint-dev-040982755196` |
+| Region | `us-west-2` | `us-west-2` |
 
-Always use `--profile` corresponding to the target environment in all AWS CLI commands.
+## Models & Imports
+
+```python
+from app.models.vlan import VLAN          # VLAN (cidr_ranges, address, latitude, longitude, place_id, location_image_url)
+from app.models.device import Device      # Device (ip_address, vlan_id, name, model, etc.)
+from app.models.workstation import Workstation  # Workstation (hostname, vlan_id, cidr, ip_private)
+from app.models.organization import Organization
+```
+
+Always use `PYTHONPATH=/app` and `sys.path.insert(0, '/app')` in container scripts.
 
 ## Error Handling
-- If SSM command fails, show the error output and ask the user how to proceed
-- If geocoding fails for a specific address, log it and continue with the next
-- If S3 upload fails, retry once before asking the user
-- Always show a summary at the end: how many VLANs renamed, workstations reassigned, CIDRs moved, geocoded, images generated, devices upserted/created
+
+- Error en SSM → mostrar output y preguntar al usuario
+- Error en geocoding individual → loguear y continuar
+- Commit cada 50-100 registros para evitar rollback masivo
+- Siempre mostrar resumen final con conteos por paso
