@@ -163,6 +163,15 @@ namespace AlwaysPrintService
             if (userArrived && _state.Is(ServiceState.WaitingUser))
                 _userArrivedGate.Set();
 
+            // Disparar trigger OnSessionUnlocked al desbloquear pantalla
+            if (reason == SessionChangeReason.SessionUnlock && _state.Is(ServiceState.Running))
+            {
+                AlwaysPrintLogger.WriteInfo(
+                    $"Sesión desbloqueada (session {changeDescription.SessionId}). Ejecutando trigger OnSessionUnlocked.",
+                    AlwaysPrintLogger.EvtUserDetected);
+                ExecuteActionTrigger(TriggerEvents.OnSessionUnlocked);
+            }
+
             if (userLeft && (_state.Is(ServiceState.TrayStarted) || _state.Is(ServiceState.Running)))
             {
                 AlwaysPrintLogger.WriteWarning("Sesión de usuario finalizada. Eliminando Tray y esperando nueva sesión.",

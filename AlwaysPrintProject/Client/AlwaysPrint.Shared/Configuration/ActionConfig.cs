@@ -136,6 +136,7 @@ namespace AlwaysPrint.Shared.Configuration
         public const string OnConfigChange = "OnConfigChange";
         public const string OnUserLogon = "OnUserLogon";
         public const string OnUserLogoff = "OnUserLogoff";
+        public const string OnSessionUnlocked = "OnSessionUnlocked";
         public const string OnContingencyActivated = "OnContingencyActivated";
         public const string OnContingencyDeactivated = "OnContingencyDeactivated";
         public const string OnScheduledTask = "OnScheduledTask";
