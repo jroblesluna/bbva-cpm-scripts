@@ -1,5 +1,5 @@
 {
-  "version": "8.7",
+  "version": "8.8",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -472,8 +472,8 @@
           "type": "RunProcess",
           "description": "Reanudar (quitar pausa) cola corporativa",
           "parameters": {
-            "file_path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-            "arguments": "-NoProfile -Command \"Get-Printer -Name '{{corporate_queue_name}}' -ErrorAction SilentlyContinue | Resume-Printer\"",
+            "file_path": "C:\\Windows\\System32\\rundll32.exe",
+            "arguments": "printui.dll,PrintUIEntry /Xs /n \"{{corporate_queue_name}}\" status resume",
             "timeout_seconds": 15,
             "window_style": "Hidden"
           }
@@ -794,8 +794,8 @@
           "type": "RunProcess",
           "description": "Reanudar (quitar pausa) cola corporativa",
           "parameters": {
-            "file_path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-            "arguments": "-NoProfile -Command \"Get-Printer -Name '{{corporate_queue_name}}' -ErrorAction SilentlyContinue | Resume-Printer\"",
+            "file_path": "C:\\Windows\\System32\\rundll32.exe",
+            "arguments": "printui.dll,PrintUIEntry /Xs /n \"{{corporate_queue_name}}\" status resume",
             "timeout_seconds": 15,
             "window_style": "Hidden"
           }
