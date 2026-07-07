@@ -929,9 +929,9 @@ class StateMapService:
             config_hash = ws_state.config_hash
             config_s3_url = ws_state.config_s3_url
 
-        # Verificar expiración de presigned URL de MSI y regenerar si es necesario
+        # Verificar/generar presigned URL de MSI (lazy: se genera al primer request)
         msi_url = org_state.msi_url
-        if org_state.msi_version and org_state.msi_url:
+        if org_state.msi_version:
             msi_url = await self._check_msi_url_expiration(org_id, org_state)
 
         return {
@@ -1042,8 +1042,9 @@ class StateMapService:
                     self._s3_update_service = S3UpdateService()
 
                 expires_in = 3600
+                # Si msi_version fue resuelto de latest (no hay target_version en BD),
+                # usar key=None (default: latest/AlwaysPrint.msi)
                 new_url = self._s3_update_service.generate_download_url(
-                    key=f"versions/{org_state.msi_version}/AlwaysPrint.msi",
                     expires_in=expires_in,
                 )
                 org_state.msi_url = new_url
