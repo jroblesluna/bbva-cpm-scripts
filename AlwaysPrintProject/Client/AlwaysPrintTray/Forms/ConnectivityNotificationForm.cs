@@ -123,6 +123,8 @@ namespace AlwaysPrintTray.Forms
             var form = new ConnectivityNotificationForm(results, percent, payload);
             Current = form;
             form.Show();
+            form.BringToFront();  // Forzar visibilidad sobre diálogos modales (ej: StatusForm con ShowDialog)
+            form.Activate();      // Dar foco al formulario para asegurar que se renderiza correctamente
             form._fadeInTimer.Start();
 
             // Iniciar auto-cierre después del fade-in (si aplica)

@@ -74,9 +74,20 @@ namespace AlwaysPrintTray.Connectivity
                 // (puede ocurrir si el proxy no responde durante la negociación)
                 using var totalCts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
 
-                // 1. Detectar proxy del sistema
-                var proxyUri = ProxyHelper.GetSystemProxyUri(new Uri(payload.Urls[0]));
+                // 1. Detectar proxy del sistema (buscar una URL que no esté en bypass)
+                Uri proxyUri = null;
                 bool proxyActive = false;
+
+                foreach (var url in payload.Urls)
+                {
+                    try
+                    {
+                        var uri = new Uri(url.StartsWith("http") ? url : "https://" + url);
+                        proxyUri = ProxyHelper.GetSystemProxyUri(uri);
+                        if (proxyUri != null) break; // Encontramos un proxy configurado
+                    }
+                    catch { /* URL inválida, seguir con la siguiente */ }
+                }
 
                 if (proxyUri != null)
                 {
@@ -85,14 +96,37 @@ namespace AlwaysPrintTray.Connectivity
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"ConnectivityCheck: proxy {proxyUri.Host}:{proxyUri.Port} — " +
                         (proxyActive ? "activo" : "inactivo"),
-                        AlwaysPrintLogger.EvtGenericWarning);
+                        AlwaysPrintLogger.EvtConnectivitySummary);
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "ConnectivityCheck: no se detectó proxy del sistema (todas las URLs en bypass o conexión directa).",
+                        AlwaysPrintLogger.EvtConnectivitySummary);
                 }
 
-                // 2. Crear HttpClient con proxy del sistema
+                // 2. Crear HttpClient — CON proxy solo si está activo y accesible
+                // Si el proxy no responde, usar conexión directa para evitar hang infinito
+                // durante la negociación HTTP en .NET Framework 4.8
+                HttpClientHandler httpHandler;
+                if (proxyUri != null && proxyActive)
+                {
+                    httpHandler = ProxyHelper.CreateHandler();
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"ConnectivityCheck: usando proxy {proxyUri.Host}:{proxyUri.Port}",
+                        AlwaysPrintLogger.EvtConnectivitySummary);
+                }
+                else
+                {
+                    httpHandler = new HttpClientHandler { UseProxy = false };
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "ConnectivityCheck: usando conexión directa (proxy no disponible o inactivo).",
+                        AlwaysPrintLogger.EvtConnectivitySummary);
+                }
+
                 // Timeout = Infinite porque gestionamos timeouts por request con CancellationToken
                 // (HttpClient.Timeout no es confiable con proxies en .NET Framework 4.8)
-                var handler = ProxyHelper.CreateHandler();
-                using var client = new HttpClient(handler)
+                using var client = new HttpClient(httpHandler)
                 {
                     Timeout = System.Threading.Timeout.InfiniteTimeSpan
                 };
