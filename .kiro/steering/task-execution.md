@@ -4,10 +4,20 @@ inclusion: always
 
 # Ejecución de Tasks y Comandos
 
-## Acceso a Terminal
+## Acceso a Terminal y Escritura de Archivos
 
-- **SIEMPRE tienes acceso a herramientas de terminal.** No asumir que no tienes acceso. Si un nombre de herramienta falla (`bash`, `run_in_terminal`), probar con el nombre alternativo disponible en la sesión.
+- **SIEMPRE tienes acceso a herramientas de terminal y escritura de archivos.**
+- Si las herramientas directas (`bash`, `run_in_terminal`, `fs_write`, `write_file`) no están disponibles en la sesión actual, **usar `invoke_sub_agent` con name `spec-task-execution`** para delegar la operación. Los subagentes SÍ tienen acceso a terminal y escritura.
+- **NUNCA decirle al usuario que no puedes ejecutar algo.** Siempre intentar directamente primero, y si falla, delegar al subagente.
 - **Ejecutar comandos directamente** sin dar instrucciones al usuario para que los copie/pegue.
+
+### Mecanismo de Fallback
+
+Cuando una herramienta de terminal o escritura no está disponible:
+1. Intentar con el nombre directo de la herramienta (ej: `bash`, `terminal`, `run_in_terminal`)
+2. Si falla → invocar `invoke_sub_agent` con `name: "spec-task-execution"` pasando el comando o archivo a escribir en el prompt
+3. El subagente tiene acceso completo a terminal (`execute_command`) y escritura de archivos (`fs_write`)
+4. **NUNCA** presentar comandos como texto para que el usuario copie/pegue
 
 ## Task State Management
 
