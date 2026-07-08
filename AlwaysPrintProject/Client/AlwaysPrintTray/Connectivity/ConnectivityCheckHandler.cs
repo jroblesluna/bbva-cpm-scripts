@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
 using AlwaysPrintTray.Cloud;
@@ -169,11 +170,9 @@ namespace AlwaysPrintTray.Connectivity
                         AlwaysPrintLogger.EvtConnectivityFail);
                 }
 
-                // 6. Mostrar notificación en el hilo UI
-                _uiContext.Post(_ =>
-                {
-                    ConnectivityNotificationForm.ShowResult(results, percent, payload);
-                }, null);
+                // 6. Mostrar notificación en un thread STA dedicado para evitar conflictos
+                // con diálogos modales (StatusForm usa ShowDialog que bloquea el UI thread principal)
+                ShowNotificationOnDedicatedThread(results, percent, payload);
             }
             catch (OperationCanceledException)
             {
@@ -191,6 +190,34 @@ namespace AlwaysPrintTray.Connectivity
             {
                 _checkInProgress = false;
             }
+        }
+
+        /// <summary>
+        /// Muestra la notificación en un thread STA dedicado con su propio message loop.
+        /// Esto evita conflictos con ShowDialog() del StatusForm que bloquea el UI thread principal.
+        /// </summary>
+        private void ShowNotificationOnDedicatedThread(
+            List<UrlCheckResult> results, int percent, ConnectivityCheckPayload payload)
+        {
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    Application.EnableVisualStyles();
+                    ConnectivityNotificationForm.ShowResult(results, percent, payload);
+                    Application.Run(); // Message loop propio para esta notificación
+                }
+                catch (Exception ex)
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        $"ConnectivityCheck: error mostrando notificación: {ex.Message}",
+                        AlwaysPrintLogger.EvtGenericError);
+                }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.IsBackground = true;
+            thread.Name = "ConnectivityNotification";
+            thread.Start();
         }
 
         /// <summary>

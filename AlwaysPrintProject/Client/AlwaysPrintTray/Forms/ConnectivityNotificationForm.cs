@@ -30,16 +30,18 @@ namespace AlwaysPrintTray.Forms
         private const int FadeStepMs = 20;
         private const double FadeIncrement = 0.067; // ~15 pasos en 300ms (20ms * 15 = 300ms)
 
-        // === SINGLETON ===
+        // === SINGLETON (thread-safe para thread STA dedicado) ===
         private static ConnectivityNotificationForm _current;
+        private static readonly object _lock = new object();
 
         /// <summary>
         /// Instancia activa del formulario de notificación. Null si no hay ninguna visible.
+        /// Thread-safe: la notificación se ejecuta en un thread STA dedicado.
         /// </summary>
         public static ConnectivityNotificationForm Current
         {
-            get => _current;
-            private set => _current = value;
+            get { lock (_lock) return _current; }
+            private set { lock (_lock) _current = value; }
         }
 
         // === CAMPOS INTERNOS ===
@@ -103,8 +105,8 @@ namespace AlwaysPrintTray.Forms
 
         /// <summary>
         /// Muestra el resultado del check de conectividad al usuario.
-        /// Debe invocarse desde el UI thread.
-        /// Gestiona el singleton: cierra la notificación previa si existe.
+        /// Gestiona el singleton: cierra la notificación previa si existe (thread-safe).
+        /// Se invoca desde el thread STA dedicado de la notificación.
         /// </summary>
         /// <param name="results">Lista de resultados por URL.</param>
         /// <param name="percent">Porcentaje de URLs accesibles (0-100).</param>
@@ -112,22 +114,29 @@ namespace AlwaysPrintTray.Forms
         public static void ShowResult(
             List<UrlCheckResult> results, int percent, ConnectivityCheckPayload payload)
         {
-            // Cerrar notificación previa si existe
-            if (Current != null && !Current.IsDisposed)
+            // Cerrar notificación previa si existe (thread-safe)
+            var prev = Current;
+            if (prev != null && !prev.IsDisposed)
             {
-                try { Current.Close(); } catch { /* ignorar si ya fue cerrado */ }
+                try
+                {
+                    if (prev.InvokeRequired)
+                        prev.Invoke(new Action(() => prev.Close()));
+                    else
+                        prev.Close();
+                }
+                catch { /* ignorar si ya fue cerrado */ }
             }
             Current = null;
 
-            // Crear y mostrar nueva notificación
+            // Crear y mostrar nueva notificación (ya estamos en el thread STA correcto)
             var form = new ConnectivityNotificationForm(results, percent, payload);
             Current = form;
             form.Show();
-            form.BringToFront();  // Forzar visibilidad sobre diálogos modales (ej: StatusForm con ShowDialog)
-            form.Activate();      // Dar foco al formulario para asegurar que se renderiza correctamente
+            form.BringToFront();
+            form.Activate();
             form._fadeInTimer.Start();
 
-            // Iniciar auto-cierre después del fade-in (si aplica)
             if (form._severity != Severity.Red)
             {
                 form._autoCloseTimer.Start();
@@ -267,14 +276,15 @@ namespace AlwaysPrintTray.Forms
         }
 
         /// <summary>
-        /// Handler del botón "Ver Reporte". Abre el formulario de reporte detallado (no modal).
+        /// Handler del botón "Ver Reporte". Abre el formulario de reporte detallado.
+        /// Modal relativo a la notificación (mismo thread STA dedicado, no bloquea el UI principal).
         /// </summary>
         private void OnVerReporteClick(object sender, EventArgs e)
         {
             try
             {
                 var reportForm = new ConnectivityReportForm(_results, _percent);
-                reportForm.Show(); // No modal para evitar bloquear la UI
+                reportForm.ShowDialog(this); // Modal relativo a la notificación (mismo thread, no bloquea main)
             }
             catch
             {
@@ -337,7 +347,8 @@ namespace AlwaysPrintTray.Forms
         }
 
         /// <summary>
-        /// Al cerrar, limpiar la referencia singleton y detener timers.
+        /// Al cerrar, limpiar la referencia singleton, detener timers y
+        /// terminar el message loop del thread STA dedicado.
         /// </summary>
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
@@ -345,6 +356,9 @@ namespace AlwaysPrintTray.Forms
                 Current = null;
 
             base.OnFormClosed(e);
+
+            // Terminar el message loop del thread dedicado de notificación
+            Application.ExitThread();
         }
 
         /// <summary>
