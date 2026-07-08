@@ -135,10 +135,26 @@ namespace AlwaysPrintTray.Connectivity
                 // 3. Ejecutar checks secuencialmente (medir duración total)
                 var totalSw = Stopwatch.StartNew();
                 var results = new List<UrlCheckResult>();
+                int urlIndex = 0;
                 foreach (var url in payload.Urls)
                 {
+                    urlIndex++;
                     var result = await CheckUrlWithRetriesAsync(client, url, payload, totalCts.Token);
                     results.Add(result);
+
+                    // Log progreso por URL para diagnóstico
+                    if (result.Success)
+                    {
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"ConnectivityCheck: [{urlIndex}/{payload.Urls.Count}] {result.Url} — OK ({result.LatencyMs}ms, {result.Attempts} intento(s))",
+                            AlwaysPrintLogger.EvtConnectivitySummary);
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"ConnectivityCheck: [{urlIndex}/{payload.Urls.Count}] {result.Url} — FALLO ({result.Error}, {result.Attempts} intento(s))",
+                            AlwaysPrintLogger.EvtConnectivitySummary);
+                    }
                 }
                 totalSw.Stop();
 
@@ -172,6 +188,9 @@ namespace AlwaysPrintTray.Connectivity
 
                 // 6. Mostrar notificación en un thread STA dedicado para evitar conflictos
                 // con diálogos modales (StatusForm usa ShowDialog que bloquea el UI thread principal)
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"ConnectivityCheck: mostrando notificación ({(percent == 100 ? "verde" : percent > 0 ? "amarilla" : "roja")}, {percent}%).",
+                    AlwaysPrintLogger.EvtConnectivitySummary);
                 ShowNotificationOnDedicatedThread(results, percent, payload);
             }
             catch (OperationCanceledException)
