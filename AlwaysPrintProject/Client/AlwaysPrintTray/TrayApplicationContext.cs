@@ -815,9 +815,25 @@ namespace AlwaysPrintTray
                     _cts.Token.WaitHandle.WaitOne(TimeSpan.FromSeconds(30));
                     if (_cts.Token.IsCancellationRequested) break;
 
-                    // Heartbeat: verificar que el servicio sigue activo.
-                    if (_pipe.IsConnected && !_pipe.Ping())
+                    if (!_pipe.IsConnected)
+                    {
+                        // Pipe desconectado — intentar reconexión
+                        AlwaysPrintLogger.WriteTrayInfo("MonitoringLoop: pipe desconectado, intentando reconexión...");
+                        if (_pipe.Connect())
+                        {
+                            AlwaysPrintLogger.WriteTrayInfo("MonitoringLoop: reconexión exitosa.");
+                        }
+                        else
+                        {
+                            AlwaysPrintLogger.WriteTrayWarning(
+                                "MonitoringLoop: reconexión fallida. Se reintentará en 30s.",
+                                AlwaysPrintLogger.EvtGenericWarning);
+                        }
+                    }
+                    else if (!_pipe.Ping())
+                    {
                         AlwaysPrintLogger.WriteTrayWarning("Servicio no responde al ping.");
+                    }
                 }
                 catch (Exception ex)
                 {
