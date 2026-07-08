@@ -1,5 +1,8 @@
 namespace AlwaysPrintTray.Connectivity
 {
+    /// <summary>Nivel de severidad del resultado del check de conectividad.</summary>
+    public enum ConnectivitySeverity { Green, Yellow, Orange, Red }
+
     /// <summary>
     /// Modelo que almacena el resultado de verificar la conectividad de una URL individual.
     /// </summary>

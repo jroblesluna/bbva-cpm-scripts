@@ -1059,7 +1059,7 @@ namespace AlwaysPrintService.Actions
             {
                 // Extraer parámetros del JSON
                 var urlsToken = action.Parameters?["urls"];
-                var urls = urlsToken?.ToObject<List<string>>() ?? new List<string>();
+                var urls = urlsToken?.ToObject<List<ConnectivityUrl>>() ?? new List<ConnectivityUrl>();
                 int timeoutSeconds = GetParameter<int>(action, "timeout_seconds", 5);
                 int notificationGreenTimeout = GetParameter<int>(action, "notification_green_timeout_seconds", 5);
                 int notificationYellowTimeout = GetParameter<int>(action, "notification_yellow_timeout_seconds", 10);

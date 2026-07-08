@@ -25,29 +25,6 @@ namespace AlwaysPrintTray.Connectivity
         private volatile bool _checkInProgress;
         private readonly SynchronizationContext _uiContext;
 
-        // Metadatos de URLs conocidas: función y flag critical
-        private static readonly Dictionary<string, (string Function, bool Critical)> UrlMetadata =
-            new Dictionary<string, (string, bool)>(StringComparer.OrdinalIgnoreCase)
-            {
-                // critical=true (All customers, CPM only, propio)
-                { "cloud.lexmark.com", ("Portal LCS", true) },
-                { "idp.us.iss.lexmark.com", ("Identity Provider", true) },
-                { "login.microsoftonline.com", ("Identity Provider", true) },
-                { "lexmarkb2c.b2clogin.com", ("Identity Provider", true) },
-                { "api.us.iss.lexmark.com", ("API", true) },
-                { "apis.us.iss.lexmark.com", ("APIS", true) },
-                { "us.iss.lexmark.com", ("Cloud Fleet Management", true) },
-                { "prod-lex-cloud-iot.azure-devices.net", ("Cloud Fleet Management", true) },
-                { "prodlexcloudk8s239.blob.core.windows.net", ("Cloud Fleet Management", true) },
-                { "ccs.lexmark.com", ("CCS", true) },
-                { "ccs-cdn.lexmark.com", ("CDN", true) },
-                { "prodlexcloudk8s19.blob.core.windows.net", ("Cloud Print Management", true) },
-                // critical=false (Native Agent only)
-                { "apis.iss.lexmark.com", ("Cloud Fleet Management (Native)", false) },
-                { "iss.lexmark.com", ("Cloud Fleet Management (Native)", false) },
-                { "global.azure-devices-provisioning.net", ("Cloud Fleet Management (Native)", false) },
-            };
-
         public ConnectivityCheckHandler(SynchronizationContext uiContext)
         {
             _uiContext = uiContext ?? throw new ArgumentNullException(nameof(uiContext));
@@ -86,11 +63,12 @@ namespace AlwaysPrintTray.Connectivity
                 // Detectar proxy
                 Uri proxyUri = null;
                 bool proxyActive = false;
-                foreach (var url in payload.Urls)
+                foreach (var entry in payload.Urls)
                 {
                     try
                     {
-                        var uri = new Uri(url.StartsWith("http") ? url : "https://" + url);
+                        var rawUrl = entry.Url;
+                        var uri = new Uri(rawUrl.StartsWith("http") ? rawUrl : "https://" + rawUrl);
                         proxyUri = ProxyHelper.GetSystemProxyUri(uri);
                         if (proxyUri != null) break;
                     }
@@ -138,12 +116,11 @@ namespace AlwaysPrintTray.Connectivity
                 var tasks = new List<Task<UrlCheckResult>>();
                 int index = 0;
 
-                foreach (var url in payload.Urls)
+                foreach (var entry in payload.Urls)
                 {
                     int idx = ++index;
-                    var meta = GetUrlMetadata(url, idx == 1); // Primera URL = SERVER_URL = critical
-                    tasks.Add(CheckSingleUrlAsync(client, url, idx, payload.Urls.Count,
-                        payload.TimeoutSeconds, meta.Critical, meta.Function,
+                    tasks.Add(CheckSingleUrlAsync(client, entry.Url, idx, payload.Urls.Count,
+                        payload.TimeoutSeconds, entry.Critical, entry.Function,
                         semaphore, totalCts.Token));
                 }
 
@@ -173,22 +150,33 @@ namespace AlwaysPrintTray.Connectivity
                         AlwaysPrintLogger.EvtConnectivityFail);
                 }
 
-                // Determinar severidad SOLO sobre críticos
-                int criticalFails = criticalTotal - criticalOk;
-                bool serverUrlFailed = results.Length > 0 && results[0].Critical && !results[0].Success;
+                // Determinar severidad 4 niveles
+                int totalFails = results.Count(r => !r.Success);
+                int criticalFails = results.Count(r => r.Critical && !r.Success);
+                int totalOk = results.Count(r => r.Success);
 
-                // Verde = 100% críticos OK → NO mostrar notificación
-                if (criticalFails == 0)
+                // Verde: todo OK → no mostrar notificación
+                if (totalFails == 0)
                 {
                     AlwaysPrintLogger.WriteTrayInfo(
-                        "ConnectivityCheck: todos los servicios críticos accesibles. Sin notificación.",
+                        "ConnectivityCheck: todos los servicios accesibles. Sin notificación.",
                         AlwaysPrintLogger.EvtConnectivitySummary);
-                    return; // No mostrar notificación
+                    return;
                 }
 
-                // Amarillo o Rojo → mostrar notificación
-                ShowNotificationOnDedicatedThread(results.ToList(), percent, payload,
-                    criticalFails, criticalTotal, serverUrlFailed);
+                // Determinar severidad:
+                // Rojo: fallan TODOS (sin conectividad)
+                // Naranja: falla al menos 1 crítico pero hay conectividad parcial
+                // Amarillo: solo fallan no-críticos, todos los críticos OK
+                ConnectivitySeverity severity;
+                if (totalOk == 0)
+                    severity = ConnectivitySeverity.Red;
+                else if (criticalFails > 0)
+                    severity = ConnectivitySeverity.Orange;
+                else
+                    severity = ConnectivitySeverity.Yellow;
+
+                ShowNotificationOnDedicatedThread(results.ToList(), percent, payload, severity);
             }
             catch (OperationCanceledException)
             {
@@ -391,38 +379,18 @@ namespace AlwaysPrintTray.Connectivity
         }
 
         /// <summary>
-        /// Obtiene metadatos (función, critical) para una URL.
-        /// La primera URL siempre es SERVER_URL y es critical=true.
-        /// </summary>
-        private static (string Function, bool Critical) GetUrlMetadata(string url, bool isServerUrl)
-        {
-            if (isServerUrl) return ("AlwaysPrint APCM", true);
-
-            try
-            {
-                var host = new Uri(url.StartsWith("http") ? url : "https://" + url).Host;
-                if (UrlMetadata.TryGetValue(host, out var meta))
-                    return meta;
-            }
-            catch { }
-
-            return ("Desconocido", true); // Por defecto, tratar como crítico
-        }
-
-        /// <summary>
         /// Muestra la notificación en un thread STA dedicado con su propio message loop.
         /// </summary>
         private void ShowNotificationOnDedicatedThread(
             List<UrlCheckResult> results, int percent, ConnectivityCheckPayload payload,
-            int criticalFails, int criticalTotal, bool serverUrlFailed)
+            ConnectivitySeverity severity)
         {
             var thread = new Thread(() =>
             {
                 try
                 {
                     Application.EnableVisualStyles();
-                    ConnectivityNotificationForm.ShowResult(results, percent, payload,
-                        criticalFails, criticalTotal, serverUrlFailed);
+                    ConnectivityNotificationForm.ShowResult(results, percent, payload, severity);
                     Application.Run();
                 }
                 catch (Exception ex)

@@ -356,6 +356,21 @@ namespace AlwaysPrint.Shared.Messages
     // ── Connectivity Check ──────────────────────────────────────────────────────
 
     /// <summary>
+    /// URL individual para el check de conectividad con metadatos.
+    /// </summary>
+    public class ConnectivityUrl
+    {
+        [JsonProperty("url")]
+        public string Url { get; set; } = string.Empty;
+
+        [JsonProperty("critical")]
+        public bool Critical { get; set; } = true;
+
+        [JsonProperty("function")]
+        public string Function { get; set; } = string.Empty;
+    }
+
+    /// <summary>
     /// Payload enviado del Service al Tray para ejecutar un check de conectividad
     /// contra una lista de URLs. El Tray ejecuta los HTTP checks, muestra
     /// notificación y escribe en log.
@@ -363,7 +378,7 @@ namespace AlwaysPrint.Shared.Messages
     public class ConnectivityCheckPayload
     {
         [JsonProperty("urls")]
-        public List<string> Urls { get; set; } = new();
+        public List<ConnectivityUrl> Urls { get; set; } = new();
 
         [JsonProperty("timeout_seconds")]
         public int TimeoutSeconds { get; set; } = 5;
