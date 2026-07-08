@@ -125,8 +125,9 @@ namespace AlwaysPrintTray.Connectivity
                         AlwaysPrintLogger.EvtConnectivitySummary);
                 }
 
-                // Timeout = Infinite porque gestionamos timeouts por request con CancellationToken
-                // (HttpClient.Timeout no es confiable con proxies en .NET Framework 4.8)
+                // Timeout = Infinite porque gestionamos timeouts por request con Task.WhenAny + Task.Delay.
+                // En .NET Framework 4.8, ni HttpClient.Timeout ni CancellationToken interrumpen
+                // la resolución DNS o la conexión TCP — Task.WhenAny es el único mecanismo fiable.
                 using var client = new HttpClient(httpHandler)
                 {
                     Timeout = System.Threading.Timeout.InfiniteTimeSpan
@@ -243,6 +244,12 @@ namespace AlwaysPrintTray.Connectivity
         /// Verifica una URL individual con reintentos. Primero intenta HEAD;
         /// si el servidor responde 405 (Method Not Allowed), reintenta con GET.
         /// Considera exitosos: 2xx, 301, 302, 403 (el servidor respondió).
+        /// 
+        /// IMPORTANTE: Usa Task.WhenAny con Task.Delay para timeout REAL.
+        /// En .NET Framework 4.8, CancellationToken NO puede interrumpir la resolución DNS
+        /// ni la conexión TCP — esas operaciones de sistema ignoran el token y se cuelgan
+        /// indefinidamente. Task.WhenAny garantiza que si el Delay gana, continuamos
+        /// sin esperar a que la request bloqueada termine (se abandona en background).
         /// </summary>
         /// <param name="client">HttpClient configurado con proxy.</param>
         /// <param name="url">URL a verificar.</param>
@@ -260,7 +267,6 @@ namespace AlwaysPrintTray.Connectivity
 
             for (int i = 0; i <= payload.MaxRetries; i++)
             {
-                // Verificar cancelación global antes de cada intento
                 if (cancellationToken.IsCancellationRequested)
                 {
                     lastError = "Cancelado (timeout global)";
@@ -271,34 +277,68 @@ namespace AlwaysPrintTray.Connectivity
 
                 // Esperar entre reintentos (no en el primer intento)
                 if (i > 0)
-                    await Task.Delay(payload.RetryDelaySeconds * 1000, cancellationToken);
+                {
+                    try { await Task.Delay(payload.RetryDelaySeconds * 1000, cancellationToken); }
+                    catch (OperationCanceledException) { lastError = "Cancelado (timeout global)"; break; }
+                }
 
                 var sw = Stopwatch.StartNew();
                 try
                 {
-                    // Timeout per-request con CancellationTokenSource enlazado al token global
-                    // Esto asegura que el request se cancela tanto si excede su propio timeout
-                    // como si se alcanza el timeout global de 3 minutos
-                    using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                    requestCts.CancelAfter(TimeSpan.FromSeconds(payload.TimeoutSeconds));
-
-                    // Intentar con HEAD primero
+                    // REAL timeout usando Task.WhenAny — .NET Framework 4.8 CancellationToken
+                    // NO cancela de forma fiable la resolución DNS ni la conexión TCP
                     var request = new HttpRequestMessage(HttpMethod.Head, url);
-                    var response = await client.SendAsync(request, requestCts.Token);
+                    var sendTask = client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                    var timeoutTask = Task.Delay(payload.TimeoutSeconds * 1000, cancellationToken);
+
+                    var completed = await Task.WhenAny(sendTask, timeoutTask);
                     sw.Stop();
                     lastLatencyMs = sw.ElapsedMilliseconds;
+
+                    if (completed == timeoutTask)
+                    {
+                        // Timeout — la request sigue corriendo en background pero no la esperamos
+                        lastError = "Timeout";
+                        continue; // Reintentar
+                    }
+
+                    // sendTask completó — verificar si falló
+                    if (sendTask.IsFaulted)
+                    {
+                        var ex = sendTask.Exception?.InnerException;
+                        lastError = ex?.Message ?? "Error desconocido";
+                        continue;
+                    }
+
+                    var response = sendTask.Result;
                     lastStatusCode = (int)response.StatusCode;
 
                     // Si el servidor no soporta HEAD, reintentar con GET
                     if (lastStatusCode == 405)
                     {
                         sw = Stopwatch.StartNew();
-                        using var getCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                        getCts.CancelAfter(TimeSpan.FromSeconds(payload.TimeoutSeconds));
                         var getRequest = new HttpRequestMessage(HttpMethod.Get, url);
-                        response = await client.SendAsync(getRequest, getCts.Token);
+                        var getSendTask = client.SendAsync(getRequest, HttpCompletionOption.ResponseHeadersRead);
+                        var getTimeoutTask = Task.Delay(payload.TimeoutSeconds * 1000, cancellationToken);
+
+                        var getCompleted = await Task.WhenAny(getSendTask, getTimeoutTask);
                         sw.Stop();
                         lastLatencyMs = sw.ElapsedMilliseconds;
+
+                        if (getCompleted == getTimeoutTask)
+                        {
+                            lastError = "Timeout (GET fallback)";
+                            continue;
+                        }
+
+                        if (getSendTask.IsFaulted)
+                        {
+                            var ex = getSendTask.Exception?.InnerException;
+                            lastError = ex?.Message ?? "Error desconocido";
+                            continue;
+                        }
+
+                        response = getSendTask.Result;
                         lastStatusCode = (int)response.StatusCode;
                     }
 
@@ -327,13 +367,7 @@ namespace AlwaysPrintTray.Connectivity
                     lastError = "Cancelado (timeout global)";
                     break; // No reintentar si el timeout global se alcanzó
                 }
-                catch (OperationCanceledException)
-                {
-                    sw.Stop();
-                    lastLatencyMs = sw.ElapsedMilliseconds;
-                    lastError = "Timeout";
-                }
-                catch (HttpRequestException ex)
+                catch (Exception ex)
                 {
                     sw.Stop();
                     lastLatencyMs = sw.ElapsedMilliseconds;
