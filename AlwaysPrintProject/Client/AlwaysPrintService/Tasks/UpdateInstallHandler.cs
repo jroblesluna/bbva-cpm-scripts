@@ -203,9 +203,6 @@ call :ts
 echo %TS% [UPD] Event 1020: Lanzando AlwaysPrintTray.exe... >> %LOG%
 start """" ""{trayExePath}""
 
-REM Eliminar MSI temporal
-del /f /q ""{msiFilePath}"" > nul 2>&1
-
 :cleanup
 REM ============================================================
 REM Esperar 30 segundos antes de verificar (dar tiempo al servicio para estabilizarse)
@@ -275,6 +272,9 @@ if %VERIFY_OK% equ 0 (
         start """" ""{trayExePath}""
     )
 )
+
+REM Eliminar MSI temporal (después de verificación para permitir reinstalación si fue necesaria)
+del /f /q ""{msiFilePath}"" > nul 2>&1
 
 call :ts
 echo %TS% [UPD] Event 1020: Script de actualizacion finalizado. >> %LOG%
