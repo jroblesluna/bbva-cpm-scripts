@@ -211,6 +211,13 @@ del /f /q ""{msiFilePath}"" > nul 2>&1
 
 :cleanup
 REM ============================================================
+REM Esperar 30 segundos antes de verificar (dar tiempo al servicio para estabilizarse)
+REM ============================================================
+call :ts
+echo %TS% [UPD] Event 1020: Esperando 30 segundos antes de verificacion post-instalacion... >> %LOG%
+timeout /t 30 /nobreak > nul
+
+REM ============================================================
 REM Verificación final: asegurar que el servicio está corriendo
 REM Intenta hasta 10 veces con 3s entre intentos
 REM ============================================================
@@ -255,8 +262,7 @@ REM Auto-eliminar este script (con delay para que cmd lo suelte)
 exit /b
 
 :ts
-for /f ""tokens=2 delims=="" %%I in ('wmic os get localdatetime /value 2^^^>nul') do set ""DT=%%I""
-set ""TS=[%DT:~0,4%-%DT:~4,2%-%DT:~6,2% %DT:~8,2%:%DT:~10,2%:%DT:~12,2%]""
+for /f ""delims="" %%a in ('powershell -NoProfile -Command ""Get-Date -Format '[yyyy-MM-dd HH:mm:ss]'""') do set ""TS=%%a""
 goto :eof
 ";
         }
