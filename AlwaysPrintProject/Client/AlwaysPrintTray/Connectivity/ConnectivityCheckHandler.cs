@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Threading;
@@ -15,42 +16,50 @@ using AlwaysPrintTray.Forms;
 namespace AlwaysPrintTray.Connectivity
 {
     /// <summary>
-    /// Orquestador de checks de conectividad. Recibe un ConnectivityCheckPayload
-    /// vía Named Pipe desde el Service, ejecuta verificaciones HTTP contra cada URL,
-    /// registra resultados en log y muestra notificación al usuario.
+    /// Orquestador de checks de conectividad de TRANSPORTE. Verifica que las URLs
+    /// de Lexmark Cloud Services (US Data Center) sean alcanzables a nivel de red.
+    /// Cualquier respuesta HTTP (2xx-5xx) = OK. Solo excepciones de transporte = FALLO.
     /// </summary>
     public class ConnectivityCheckHandler
     {
-        /// <summary>
-        /// Flag para evitar ejecuciones superpuestas. Si un check está en curso,
-        /// las solicitudes adicionales se descartan con un warning en log.
-        /// </summary>
         private volatile bool _checkInProgress;
-
-        /// <summary>
-        /// Contexto de sincronización del hilo UI para mostrar notificaciones
-        /// en el thread correcto (WinForms requiere crear controles en el UI thread).
-        /// </summary>
         private readonly SynchronizationContext _uiContext;
 
-        /// <summary>
-        /// Crea una nueva instancia del handler de conectividad.
-        /// </summary>
-        /// <param name="uiContext">Contexto de sincronización del hilo UI para marshaling de notificaciones.</param>
+        // Metadatos de URLs conocidas: función y flag critical
+        private static readonly Dictionary<string, (string Function, bool Critical)> UrlMetadata =
+            new Dictionary<string, (string, bool)>(StringComparer.OrdinalIgnoreCase)
+            {
+                // critical=true (All customers, CPM only, propio)
+                { "cloud.lexmark.com", ("Portal LCS", true) },
+                { "idp.us.iss.lexmark.com", ("Identity Provider", true) },
+                { "login.microsoftonline.com", ("Identity Provider", true) },
+                { "lexmarkb2c.b2clogin.com", ("Identity Provider", true) },
+                { "api.us.iss.lexmark.com", ("API", true) },
+                { "apis.us.iss.lexmark.com", ("APIS", true) },
+                { "us.iss.lexmark.com", ("Cloud Fleet Management", true) },
+                { "prod-lex-cloud-iot.azure-devices.net", ("Cloud Fleet Management", true) },
+                { "prodlexcloudk8s239.blob.core.windows.net", ("Cloud Fleet Management", true) },
+                { "ccs.lexmark.com", ("CCS", true) },
+                { "ccs-cdn.lexmark.com", ("CDN", true) },
+                { "prodlexcloudk8s19.blob.core.windows.net", ("Cloud Print Management", true) },
+                // critical=false (Native Agent only)
+                { "apis.iss.lexmark.com", ("Cloud Fleet Management (Native)", false) },
+                { "iss.lexmark.com", ("Cloud Fleet Management (Native)", false) },
+                { "global.azure-devices-provisioning.net", ("Cloud Fleet Management (Native)", false) },
+            };
+
         public ConnectivityCheckHandler(SynchronizationContext uiContext)
         {
             _uiContext = uiContext ?? throw new ArgumentNullException(nameof(uiContext));
         }
 
         /// <summary>
-        /// Ejecuta el check de conectividad completo: detecta proxy, verifica cada URL
-        /// con reintentos, calcula porcentaje de éxito, escribe en log y muestra notificación.
-        /// Si ya hay un check en curso, retorna inmediatamente con un warning.
+        /// Ejecuta el check de conectividad de transporte completo: detecta proxy,
+        /// verifica cada URL con paralelismo de 4, calcula severidad basada en URLs
+        /// críticas, escribe en log y muestra notificación si hay fallos.
         /// </summary>
-        /// <param name="payload">Payload con URLs y parámetros de configuración.</param>
         public async Task ExecuteCheckAsync(ConnectivityCheckPayload payload)
         {
-            // Evitar ejecuciones superpuestas
             if (_checkInProgress)
             {
                 AlwaysPrintLogger.WriteTrayWarning(
@@ -71,114 +80,91 @@ namespace AlwaysPrintTray.Connectivity
                     return;
                 }
 
-                // Timeout global de 3 minutos para evitar que el check se quede colgado indefinidamente
-                // (puede ocurrir si el proxy no responde durante la negociación)
-                using var totalCts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+                // Timeout global 90 segundos
+                using var totalCts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
 
-                // 1. Detectar proxy del sistema (buscar una URL que no esté en bypass)
+                // Detectar proxy
                 Uri proxyUri = null;
                 bool proxyActive = false;
-
                 foreach (var url in payload.Urls)
                 {
                     try
                     {
                         var uri = new Uri(url.StartsWith("http") ? url : "https://" + url);
                         proxyUri = ProxyHelper.GetSystemProxyUri(uri);
-                        if (proxyUri != null) break; // Encontramos un proxy configurado
+                        if (proxyUri != null) break;
                     }
-                    catch { /* URL inválida, seguir con la siguiente */ }
+                    catch { }
                 }
 
                 if (proxyUri != null)
                 {
-                    // Verificar que el proxy esté activo con TCP connect (2s timeout)
                     proxyActive = await TestTcpConnectAsync(proxyUri.Host, proxyUri.Port, 2000);
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"ConnectivityCheck: proxy {proxyUri.Host}:{proxyUri.Port} — " +
                         (proxyActive ? "activo" : "inactivo"),
                         AlwaysPrintLogger.EvtConnectivitySummary);
                 }
-                else
-                {
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        "ConnectivityCheck: no se detectó proxy del sistema (todas las URLs en bypass o conexión directa).",
-                        AlwaysPrintLogger.EvtConnectivitySummary);
-                }
 
-                // 2. Crear HttpClient — CON proxy solo si está activo y accesible
-                // Si el proxy no responde, usar conexión directa para evitar hang infinito
-                // durante la negociación HTTP en .NET Framework 4.8
+                // Crear HttpClient
                 HttpClientHandler httpHandler;
                 if (proxyUri != null && proxyActive)
                 {
                     httpHandler = ProxyHelper.CreateHandler();
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        $"ConnectivityCheck: usando proxy {proxyUri.Host}:{proxyUri.Port}",
-                        AlwaysPrintLogger.EvtConnectivitySummary);
                 }
                 else
                 {
                     httpHandler = new HttpClientHandler { UseProxy = false };
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        "ConnectivityCheck: usando conexión directa (proxy no disponible o inactivo).",
-                        AlwaysPrintLogger.EvtConnectivitySummary);
                 }
+                // AllowAutoRedirect=false: un 3xx ya prueba conectividad
+                httpHandler.AllowAutoRedirect = false;
 
-                // Timeout = Infinite porque gestionamos timeouts por request con Task.WhenAny + Task.Delay.
-                // En .NET Framework 4.8, ni HttpClient.Timeout ni CancellationToken interrumpen
-                // la resolución DNS o la conexión TCP — Task.WhenAny es el único mecanismo fiable.
                 using var client = new HttpClient(httpHandler)
                 {
                     Timeout = System.Threading.Timeout.InfiniteTimeSpan
                 };
 
-                // 3. Ejecutar checks secuencialmente (medir duración total)
-                var totalSw = Stopwatch.StartNew();
-                var results = new List<UrlCheckResult>();
-                int urlIndex = 0;
-                foreach (var url in payload.Urls)
-                {
-                    urlIndex++;
-                    var result = await CheckUrlWithRetriesAsync(client, url, payload, totalCts.Token);
-                    results.Add(result);
-
-                    // Log progreso por URL para diagnóstico
-                    if (result.Success)
-                    {
-                        AlwaysPrintLogger.WriteTrayInfo(
-                            $"ConnectivityCheck: [{urlIndex}/{payload.Urls.Count}] {result.Url} — OK ({result.LatencyMs}ms, {result.Attempts} intento(s))",
-                            AlwaysPrintLogger.EvtConnectivitySummary);
-                    }
-                    else
-                    {
-                        AlwaysPrintLogger.WriteTrayInfo(
-                            $"ConnectivityCheck: [{urlIndex}/{payload.Urls.Count}] {result.Url} — FALLO ({result.Error}, {result.Attempts} intento(s))",
-                            AlwaysPrintLogger.EvtConnectivitySummary);
-                    }
-                }
-                totalSw.Stop();
-
-                // 4. Calcular porcentaje de éxito
-                int total = results.Count;
-                int okCount = results.Count(r => r.Success);
-                int percent = (okCount * 100) / total;
-
-                // 5. Registrar resumen en log (Event ID 1090)
-                string proxyDisplay = proxyUri != null
+                string proxyMode = proxyUri != null && proxyActive
                     ? $"{proxyUri.Host}:{proxyUri.Port}"
                     : "directo";
-                string proxyStatus = proxyUri != null
-                    ? (proxyActive ? "activo" : "inactivo")
-                    : "inactivo";
 
                 AlwaysPrintLogger.WriteTrayInfo(
-                    $"ConnectivityCheck: completado. OK={okCount}/{total} ({percent}%). " +
-                    $"Proxy={proxyDisplay} ({proxyStatus}). " +
-                    $"Duración={totalSw.ElapsedMilliseconds}ms",
+                    $"ConnectivityCheck: iniciando ({payload.Urls.Count} URLs, proxy={proxyMode}).",
                     AlwaysPrintLogger.EvtConnectivitySummary);
 
-                // Registrar fallos individuales (Event ID 1091)
+                // Ejecutar checks con paralelismo de 4
+                var totalSw = Stopwatch.StartNew();
+                var semaphore = new SemaphoreSlim(4);
+                var tasks = new List<Task<UrlCheckResult>>();
+                int index = 0;
+
+                foreach (var url in payload.Urls)
+                {
+                    int idx = ++index;
+                    var meta = GetUrlMetadata(url, idx == 1); // Primera URL = SERVER_URL = critical
+                    tasks.Add(CheckSingleUrlAsync(client, url, idx, payload.Urls.Count,
+                        payload.TimeoutSeconds, meta.Critical, meta.Function,
+                        semaphore, totalCts.Token));
+                }
+
+                var results = await Task.WhenAll(tasks);
+                totalSw.Stop();
+
+                // Calcular resultados
+                int total = results.Length;
+                int okCount = results.Count(r => r.Success);
+                int percent = total > 0 ? (okCount * 100) / total : 0;
+                int criticalTotal = results.Count(r => r.Critical);
+                int criticalOk = results.Count(r => r.Critical && r.Success);
+
+                // Log resumen
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"ConnectivityCheck: completado. OK={okCount}/{total} ({percent}%). " +
+                    $"Críticos OK={criticalOk}/{criticalTotal}. " +
+                    $"Proxy={proxyMode}. Duración={totalSw.ElapsedMilliseconds}ms",
+                    AlwaysPrintLogger.EvtConnectivitySummary);
+
+                // Log fallos individuales
                 foreach (var fail in results.Where(r => !r.Success))
                 {
                     AlwaysPrintLogger.WriteTrayError(
@@ -187,17 +173,27 @@ namespace AlwaysPrintTray.Connectivity
                         AlwaysPrintLogger.EvtConnectivityFail);
                 }
 
-                // 6. Mostrar notificación en un thread STA dedicado para evitar conflictos
-                // con diálogos modales (StatusForm usa ShowDialog que bloquea el UI thread principal)
-                AlwaysPrintLogger.WriteTrayInfo(
-                    $"ConnectivityCheck: mostrando notificación ({(percent == 100 ? "verde" : percent > 0 ? "amarilla" : "roja")}, {percent}%).",
-                    AlwaysPrintLogger.EvtConnectivitySummary);
-                ShowNotificationOnDedicatedThread(results, percent, payload);
+                // Determinar severidad SOLO sobre críticos
+                int criticalFails = criticalTotal - criticalOk;
+                bool serverUrlFailed = results.Length > 0 && results[0].Critical && !results[0].Success;
+
+                // Verde = 100% críticos OK → NO mostrar notificación
+                if (criticalFails == 0)
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        "ConnectivityCheck: todos los servicios críticos accesibles. Sin notificación.",
+                        AlwaysPrintLogger.EvtConnectivitySummary);
+                    return; // No mostrar notificación
+                }
+
+                // Amarillo o Rojo → mostrar notificación
+                ShowNotificationOnDedicatedThread(results.ToList(), percent, payload,
+                    criticalFails, criticalTotal, serverUrlFailed);
             }
             catch (OperationCanceledException)
             {
                 AlwaysPrintLogger.WriteTrayError(
-                    "ConnectivityCheck: timeout global de 3 minutos alcanzado, abortando check.",
+                    "ConnectivityCheck: timeout global de 90 segundos alcanzado, abortando check.",
                     AlwaysPrintLogger.EvtGenericError);
             }
             catch (Exception ex)
@@ -213,19 +209,221 @@ namespace AlwaysPrintTray.Connectivity
         }
 
         /// <summary>
+        /// Verifica una URL individual. Cualquier respuesta HTTP = OK.
+        /// Solo excepciones de transporte = FALLO (con 1 retry, 500ms backoff).
+        /// </summary>
+        private async Task<UrlCheckResult> CheckSingleUrlAsync(
+            HttpClient client, string url, int index, int total,
+            int timeoutSeconds, bool critical, string function,
+            SemaphoreSlim semaphore, CancellationToken cancellationToken)
+        {
+            await semaphore.WaitAsync(cancellationToken);
+            try
+            {
+                return await CheckUrlWithTransportRetry(client, url, index, total,
+                    timeoutSeconds, critical, function, cancellationToken);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }
+
+        private async Task<UrlCheckResult> CheckUrlWithTransportRetry(
+            HttpClient client, string url, int index, int total,
+            int timeoutSeconds, bool critical, string function,
+            CancellationToken cancellationToken)
+        {
+            int maxAttempts = 2; // 1 intento + 1 retry
+            int attempts = 0;
+            string lastError = null;
+            long lastLatencyMs = 0;
+
+            for (int attempt = 0; attempt < maxAttempts; attempt++)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    lastError = "Cancelado (timeout global)";
+                    break;
+                }
+
+                attempts++;
+
+                // 500ms backoff antes del retry (no en el primer intento)
+                if (attempt > 0)
+                {
+                    try { await Task.Delay(500, cancellationToken); }
+                    catch (OperationCanceledException) { lastError = "Cancelado (timeout global)"; break; }
+                }
+
+                var sw = Stopwatch.StartNew();
+                try
+                {
+                    var request = new HttpRequestMessage(HttpMethod.Get, url);
+                    var sendTask = client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                    var timeoutTask = Task.Delay(timeoutSeconds * 1000, cancellationToken);
+
+                    var completed = await Task.WhenAny(sendTask, timeoutTask);
+                    sw.Stop();
+                    lastLatencyMs = sw.ElapsedMilliseconds;
+
+                    if (completed == timeoutTask)
+                    {
+                        lastError = "Timeout";
+                        continue; // Retry on timeout (excepción de transporte)
+                    }
+
+                    if (sendTask.IsFaulted)
+                    {
+                        var ex = sendTask.Exception?.InnerException ?? sendTask.Exception;
+                        lastError = ClassifyTransportError(ex);
+                        continue; // Retry on transport exception
+                    }
+
+                    // CUALQUIER respuesta HTTP = SUCCESS (conectividad de transporte probada)
+                    var response = sendTask.Result;
+                    int statusCode = (int)response.StatusCode;
+
+                    // Log OK con código de estado (valor diagnóstico)
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"ConnectivityCheck: [{index}/{total}] {url} — OK (HTTP {statusCode}, {lastLatencyMs}ms, {attempts} intento(s))",
+                        AlwaysPrintLogger.EvtConnectivitySummary);
+
+                    return new UrlCheckResult
+                    {
+                        Url = url,
+                        Success = true,
+                        LatencyMs = lastLatencyMs,
+                        StatusCode = statusCode,
+                        Attempts = attempts,
+                        Critical = critical,
+                        Function = function
+                    };
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    sw.Stop();
+                    lastLatencyMs = sw.ElapsedMilliseconds;
+                    lastError = "Cancelado (timeout global)";
+                    break; // No reintentar si el timeout global se alcanzó
+                }
+                catch (Exception ex)
+                {
+                    sw.Stop();
+                    lastLatencyMs = sw.ElapsedMilliseconds;
+                    lastError = ClassifyTransportError(ex);
+                    continue; // Retry on transport exception
+                }
+            }
+
+            // Todos los intentos fallaron — log FALLO
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"ConnectivityCheck: [{index}/{total}] {url} — FALLO ({lastError}, {attempts} intento(s))",
+                AlwaysPrintLogger.EvtConnectivitySummary);
+
+            return new UrlCheckResult
+            {
+                Url = url,
+                Success = false,
+                LatencyMs = lastLatencyMs,
+                StatusCode = 0,
+                Attempts = attempts,
+                Error = lastError,
+                Critical = critical,
+                Function = function
+            };
+        }
+
+        /// <summary>
+        /// Clasifica el tipo de excepción de transporte para el log.
+        /// </summary>
+        private static string ClassifyTransportError(Exception ex)
+        {
+            if (ex == null) return "Error desconocido";
+
+            // Unwrap AggregateException
+            if (ex is AggregateException agg && agg.InnerException != null)
+                ex = agg.InnerException;
+
+            if (ex is HttpRequestException httpEx)
+            {
+                var inner = httpEx.InnerException;
+                if (inner is WebException webEx)
+                {
+                    switch (webEx.Status)
+                    {
+                        case WebExceptionStatus.NameResolutionFailure:
+                            return "DNS: no se pudo resolver";
+                        case WebExceptionStatus.ConnectFailure:
+                            return "TCP: conexión rechazada";
+                        case WebExceptionStatus.Timeout:
+                            return "Timeout";
+                        case WebExceptionStatus.SecureChannelFailure:
+                        case WebExceptionStatus.TrustFailure:
+                            return $"TLS: {inner.Message}";
+                        default:
+                            return $"Red: {webEx.Status} — {webEx.Message}";
+                    }
+                }
+                if (inner is SocketException sockEx)
+                {
+                    return $"Socket: {sockEx.SocketErrorCode} — {sockEx.Message}";
+                }
+                // Errores TLS
+                if (inner != null && inner.GetType().Name.Contains("Authentication"))
+                {
+                    return $"TLS: {inner.Message}";
+                }
+                return $"HTTP: {httpEx.Message}";
+            }
+
+            if (ex is SocketException socketEx)
+            {
+                return $"Socket: {socketEx.SocketErrorCode}";
+            }
+
+            if (ex is OperationCanceledException || ex is TaskCanceledException)
+            {
+                return "Timeout";
+            }
+
+            return $"{ex.GetType().Name}: {ex.Message}";
+        }
+
+        /// <summary>
+        /// Obtiene metadatos (función, critical) para una URL.
+        /// La primera URL siempre es SERVER_URL y es critical=true.
+        /// </summary>
+        private static (string Function, bool Critical) GetUrlMetadata(string url, bool isServerUrl)
+        {
+            if (isServerUrl) return ("AlwaysPrint APCM", true);
+
+            try
+            {
+                var host = new Uri(url.StartsWith("http") ? url : "https://" + url).Host;
+                if (UrlMetadata.TryGetValue(host, out var meta))
+                    return meta;
+            }
+            catch { }
+
+            return ("Desconocido", true); // Por defecto, tratar como crítico
+        }
+
+        /// <summary>
         /// Muestra la notificación en un thread STA dedicado con su propio message loop.
-        /// Esto evita conflictos con ShowDialog() del StatusForm que bloquea el UI thread principal.
         /// </summary>
         private void ShowNotificationOnDedicatedThread(
-            List<UrlCheckResult> results, int percent, ConnectivityCheckPayload payload)
+            List<UrlCheckResult> results, int percent, ConnectivityCheckPayload payload,
+            int criticalFails, int criticalTotal, bool serverUrlFailed)
         {
             var thread = new Thread(() =>
             {
                 try
                 {
                     Application.EnableVisualStyles();
-                    ConnectivityNotificationForm.ShowResult(results, percent, payload);
-                    Application.Run(); // Message loop propio para esta notificación
+                    ConnectivityNotificationForm.ShowResult(results, percent, payload,
+                        criticalFails, criticalTotal, serverUrlFailed);
+                    Application.Run();
                 }
                 catch (Exception ex)
                 {
@@ -241,159 +439,8 @@ namespace AlwaysPrintTray.Connectivity
         }
 
         /// <summary>
-        /// Verifica una URL individual con reintentos. Primero intenta HEAD;
-        /// si el servidor responde 405 (Method Not Allowed), reintenta con GET.
-        /// Considera exitosos: 2xx, 301, 302, 403 (el servidor respondió).
-        /// 
-        /// IMPORTANTE: Usa Task.WhenAny con Task.Delay para timeout REAL.
-        /// En .NET Framework 4.8, CancellationToken NO puede interrumpir la resolución DNS
-        /// ni la conexión TCP — esas operaciones de sistema ignoran el token y se cuelgan
-        /// indefinidamente. Task.WhenAny garantiza que si el Delay gana, continuamos
-        /// sin esperar a que la request bloqueada termine (se abandona en background).
-        /// </summary>
-        /// <param name="client">HttpClient configurado con proxy.</param>
-        /// <param name="url">URL a verificar.</param>
-        /// <param name="payload">Payload con parámetros de reintentos y delays.</param>
-        /// <param name="cancellationToken">Token de cancelación global para abortar si se excede el timeout total.</param>
-        /// <returns>Resultado del check para esta URL.</returns>
-        private async Task<UrlCheckResult> CheckUrlWithRetriesAsync(
-            HttpClient client, string url, ConnectivityCheckPayload payload,
-            CancellationToken cancellationToken = default)
-        {
-            int attempts = 0;
-            string lastError = null;
-            int lastStatusCode = 0;
-            long lastLatencyMs = 0;
-
-            for (int i = 0; i <= payload.MaxRetries; i++)
-            {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    lastError = "Cancelado (timeout global)";
-                    break;
-                }
-
-                attempts++;
-
-                // Esperar entre reintentos (no en el primer intento)
-                if (i > 0)
-                {
-                    try { await Task.Delay(payload.RetryDelaySeconds * 1000, cancellationToken); }
-                    catch (OperationCanceledException) { lastError = "Cancelado (timeout global)"; break; }
-                }
-
-                var sw = Stopwatch.StartNew();
-                try
-                {
-                    // REAL timeout usando Task.WhenAny — .NET Framework 4.8 CancellationToken
-                    // NO cancela de forma fiable la resolución DNS ni la conexión TCP
-                    var request = new HttpRequestMessage(HttpMethod.Head, url);
-                    var sendTask = client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-                    var timeoutTask = Task.Delay(payload.TimeoutSeconds * 1000, cancellationToken);
-
-                    var completed = await Task.WhenAny(sendTask, timeoutTask);
-                    sw.Stop();
-                    lastLatencyMs = sw.ElapsedMilliseconds;
-
-                    if (completed == timeoutTask)
-                    {
-                        // Timeout — la request sigue corriendo en background pero no la esperamos
-                        lastError = "Timeout";
-                        continue; // Reintentar
-                    }
-
-                    // sendTask completó — verificar si falló
-                    if (sendTask.IsFaulted)
-                    {
-                        var ex = sendTask.Exception?.InnerException;
-                        lastError = ex?.Message ?? "Error desconocido";
-                        continue;
-                    }
-
-                    var response = sendTask.Result;
-                    lastStatusCode = (int)response.StatusCode;
-
-                    // Si el servidor no soporta HEAD, reintentar con GET
-                    if (lastStatusCode == 405)
-                    {
-                        sw = Stopwatch.StartNew();
-                        var getRequest = new HttpRequestMessage(HttpMethod.Get, url);
-                        var getSendTask = client.SendAsync(getRequest, HttpCompletionOption.ResponseHeadersRead);
-                        var getTimeoutTask = Task.Delay(payload.TimeoutSeconds * 1000, cancellationToken);
-
-                        var getCompleted = await Task.WhenAny(getSendTask, getTimeoutTask);
-                        sw.Stop();
-                        lastLatencyMs = sw.ElapsedMilliseconds;
-
-                        if (getCompleted == getTimeoutTask)
-                        {
-                            lastError = "Timeout (GET fallback)";
-                            continue;
-                        }
-
-                        if (getSendTask.IsFaulted)
-                        {
-                            var ex = getSendTask.Exception?.InnerException;
-                            lastError = ex?.Message ?? "Error desconocido";
-                            continue;
-                        }
-
-                        response = getSendTask.Result;
-                        lastStatusCode = (int)response.StatusCode;
-                    }
-
-                    // Éxito: 2xx, 301, 302 o 403 (el servidor respondió)
-                    if (response.IsSuccessStatusCode ||
-                        lastStatusCode == 301 ||
-                        lastStatusCode == 302 ||
-                        lastStatusCode == 403)
-                    {
-                        return new UrlCheckResult
-                        {
-                            Url = url,
-                            Success = true,
-                            LatencyMs = lastLatencyMs,
-                            StatusCode = lastStatusCode,
-                            Attempts = attempts
-                        };
-                    }
-
-                    lastError = $"HTTP {lastStatusCode}";
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    sw.Stop();
-                    lastLatencyMs = sw.ElapsedMilliseconds;
-                    lastError = "Cancelado (timeout global)";
-                    break; // No reintentar si el timeout global se alcanzó
-                }
-                catch (Exception ex)
-                {
-                    sw.Stop();
-                    lastLatencyMs = sw.ElapsedMilliseconds;
-                    lastError = ex.InnerException?.Message ?? ex.Message;
-                }
-            }
-
-            return new UrlCheckResult
-            {
-                Url = url,
-                Success = false,
-                LatencyMs = lastLatencyMs,
-                StatusCode = lastStatusCode,
-                Attempts = attempts,
-                Error = lastError
-            };
-        }
-
-        /// <summary>
         /// Verifica conectividad TCP a un host:puerto con timeout.
-        /// Se usa para verificar que el proxy está activo antes de intentar HTTP.
         /// </summary>
-        /// <param name="host">Host destino (IP o hostname del proxy).</param>
-        /// <param name="port">Puerto destino.</param>
-        /// <param name="timeoutMs">Timeout de conexión en milisegundos.</param>
-        /// <returns>true si la conexión TCP fue exitosa dentro del timeout.</returns>
         private async Task<bool> TestTcpConnectAsync(string host, int port, int timeoutMs)
         {
             try
@@ -401,19 +448,10 @@ namespace AlwaysPrintTray.Connectivity
                 using var tcp = new TcpClient();
                 var connectTask = tcp.ConnectAsync(host, port);
                 var timeoutTask = Task.Delay(timeoutMs);
-
                 var completed = await Task.WhenAny(connectTask, timeoutTask);
-                if (completed == connectTask && !connectTask.IsFaulted)
-                {
-                    return true;
-                }
-
-                return false;
+                return completed == connectTask && !connectTask.IsFaulted;
             }
-            catch
-            {
-                return false;
-            }
+            catch { return false; }
         }
     }
 }

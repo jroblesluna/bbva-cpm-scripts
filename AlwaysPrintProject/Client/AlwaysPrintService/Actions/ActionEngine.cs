@@ -1061,8 +1061,6 @@ namespace AlwaysPrintService.Actions
                 var urlsToken = action.Parameters?["urls"];
                 var urls = urlsToken?.ToObject<List<string>>() ?? new List<string>();
                 int timeoutSeconds = GetParameter<int>(action, "timeout_seconds", 5);
-                int maxRetries = GetParameter<int>(action, "max_retries", 2);
-                int retryDelaySeconds = GetParameter<int>(action, "retry_delay_seconds", 30);
                 int notificationGreenTimeout = GetParameter<int>(action, "notification_green_timeout_seconds", 5);
                 int notificationYellowTimeout = GetParameter<int>(action, "notification_yellow_timeout_seconds", 10);
 
@@ -1077,8 +1075,6 @@ namespace AlwaysPrintService.Actions
                 {
                     Urls = urls,
                     TimeoutSeconds = timeoutSeconds,
-                    MaxRetries = maxRetries,
-                    RetryDelaySeconds = retryDelaySeconds,
                     NotificationGreenTimeoutSeconds = notificationGreenTimeout,
                     NotificationYellowTimeoutSeconds = notificationYellowTimeout
                 };
@@ -1106,7 +1102,7 @@ namespace AlwaysPrintService.Actions
                 }
 
                 AlwaysPrintLogger.WriteInfo(
-                    $"ActionEngine: ConnectivityCheck: comando enviado al Tray ({urls.Count} URLs, timeout={timeoutSeconds}s, retries={maxRetries})");
+                    $"ActionEngine: ConnectivityCheck: comando enviado al Tray ({urls.Count} URLs, timeout={timeoutSeconds}s)");
 
                 return true;
             }

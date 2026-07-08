@@ -11,14 +11,14 @@ namespace AlwaysPrintTray.Forms
     /// <summary>
     /// Formulario de reporte detallado de conectividad.
     /// Muestra una tabla (DataGridView) con los resultados de cada URL verificada,
-    /// un header con información de resumen (proxy, totales) y un botón "Cerrar".
+    /// incluyendo función, criticidad, un header con información de resumen y un botón "Cerrar".
     /// Se abre como modal desde el ConnectivityNotificationForm.
     /// </summary>
     public sealed class ConnectivityReportForm : Form
     {
         // === CONSTANTES DE LAYOUT ===
-        private const int FormW = 750;
-        private const int FormH = 450;
+        private const int FormW = 850;
+        private const int FormH = 500;
         private const int HeaderHeight = 80;
         private const int FooterHeight = 50;
         private const int Pad = 12;
@@ -55,7 +55,7 @@ namespace AlwaysPrintTray.Forms
         }
 
         // =====================================================================
-        // HEADER — información de resumen (proxy, totales)
+        // HEADER — información de resumen (proxy, totales, críticos)
         // =====================================================================
 
         /// <summary>
@@ -86,14 +86,17 @@ namespace AlwaysPrintTray.Forms
             };
             pnlHeader.Controls.Add(lblProxy);
 
-            // === Línea 2: totales de URLs ===
+            // === Línea 2: totales de URLs con info de críticos ===
             int total = _results.Count;
             int exitosas = _results.Count(r => r.Success);
             int fallidas = total - exitosas;
+            int critTotal = _results.Count(r => r.Critical);
+            int critOk = _results.Count(r => r.Critical && r.Success);
 
             var lblTotales = new Label
             {
-                Text = $"URLs verificadas: {total}  |  Exitosas: {exitosas}  |  Fallidas: {fallidas}",
+                Text = $"URLs verificadas: {total}  |  Exitosas: {exitosas}  |  Fallidas: {fallidas}  |  " +
+                       $"Cr\u00edticos OK: {critOk}/{critTotal}",
                 Font = (Font)AppTheme.FontBold.Clone(),
                 ForeColor = AppTheme.TextSubtitle,
                 Location = new Point(Pad, 38),
@@ -118,7 +121,7 @@ namespace AlwaysPrintTray.Forms
 
         /// <summary>
         /// Construye el DataGridView con los resultados de conectividad.
-        /// Columnas: URL, Estado (✓/✗), Latencia, Intentos, Error.
+        /// Columnas: URL, Función, Crítico, Estado, Latencia, Intentos, Error.
         /// </summary>
         private void ConstruirDataGridView()
         {
@@ -167,36 +170,54 @@ namespace AlwaysPrintTray.Forms
             dgv.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
 
             // === Definir columnas ===
-            dgv.Columns.Add(CrearColumna("URL", "URL", 310));
-            dgv.Columns.Add(CrearColumna("Estado", "Estado", 60, DataGridViewContentAlignment.MiddleCenter));
-            dgv.Columns.Add(CrearColumna("Latencia", "Latencia", 90, DataGridViewContentAlignment.MiddleRight));
-            dgv.Columns.Add(CrearColumna("Intentos", "Intentos", 70, DataGridViewContentAlignment.MiddleCenter));
-            dgv.Columns.Add(CrearColumna("Error", "Error", 180));
+            dgv.Columns.Add(CrearColumna("URL", "URL", 220));
+            dgv.Columns.Add(CrearColumna("Funcion", "Funci\u00f3n", 140));
+            dgv.Columns.Add(CrearColumna("Critico", "Cr\u00edtico", 55, DataGridViewContentAlignment.MiddleCenter));
+            dgv.Columns.Add(CrearColumna("Estado", "Estado", 55, DataGridViewContentAlignment.MiddleCenter));
+            dgv.Columns.Add(CrearColumna("Latencia", "Latencia", 80, DataGridViewContentAlignment.MiddleRight));
+            dgv.Columns.Add(CrearColumna("Intentos", "Intentos", 60, DataGridViewContentAlignment.MiddleCenter));
+            dgv.Columns.Add(CrearColumna("Error", "Error", 200));
 
             // === Llenar filas con datos ===
             foreach (var r in _results)
             {
                 string estado = r.Success ? "\u2713" : "\u2717";
+                string critico = r.Critical ? "\u2713" : "\u2014";
+                string funcion = r.Function ?? "Desconocido";
                 string latencia = r.Success
                     ? $"{r.LatencyMs} ms"
                     : (r.Error != null && r.Error.Contains("Timeout") ? "Timeout" : $"{r.LatencyMs} ms");
                 string error = r.Error ?? "";
 
-                int rowIdx = dgv.Rows.Add(r.Url, estado, latencia, r.Attempts.ToString(), error);
+                int rowIdx = dgv.Rows.Add(r.Url, funcion, critico, estado, latencia, r.Attempts.ToString(), error);
 
                 // Colorear la celda de estado según éxito/fallo
                 var estadoCell = dgv.Rows[rowIdx].Cells["Estado"];
                 if (r.Success)
                 {
-                    estadoCell.Style.ForeColor = Color.FromArgb(76, 175, 80); // verde
+                    estadoCell.Style.ForeColor = Color.FromArgb(76, 175, 80);
                     estadoCell.Style.SelectionForeColor = Color.FromArgb(76, 175, 80);
                     estadoCell.Style.Font = new Font("Segoe UI", 11f, FontStyle.Bold);
                 }
                 else
                 {
-                    estadoCell.Style.ForeColor = Color.FromArgb(244, 67, 54); // rojo
+                    estadoCell.Style.ForeColor = Color.FromArgb(244, 67, 54);
                     estadoCell.Style.SelectionForeColor = Color.FromArgb(244, 67, 54);
                     estadoCell.Style.Font = new Font("Segoe UI", 11f, FontStyle.Bold);
+
+                    // Colorear filas de fallo según criticidad
+                    if (r.Critical)
+                    {
+                        // Fallo crítico: fondo rojo suave
+                        dgv.Rows[rowIdx].DefaultCellStyle.BackColor = Color.FromArgb(255, 235, 238);
+                        dgv.Rows[rowIdx].DefaultCellStyle.SelectionBackColor = Color.FromArgb(255, 235, 238);
+                    }
+                    else
+                    {
+                        // Fallo no crítico: fondo gris suave
+                        dgv.Rows[rowIdx].DefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245);
+                        dgv.Rows[rowIdx].DefaultCellStyle.SelectionBackColor = Color.FromArgb(245, 245, 245);
+                    }
                 }
             }
 
@@ -284,13 +305,11 @@ namespace AlwaysPrintTray.Forms
 
         /// <summary>
         /// Detecta el proxy del sistema y retorna un texto descriptivo para el header.
-        /// Usa ProxyHelper.GetSystemProxyUri() con la primera URL de los resultados.
         /// </summary>
         private string DetectarProxyTexto()
         {
             try
             {
-                // Usar la primera URL de resultados como target para detectar proxy
                 Uri targetUri = null;
                 if (_results.Count > 0 && !string.IsNullOrEmpty(_results[0].Url))
                 {

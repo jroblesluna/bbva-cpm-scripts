@@ -51,6 +51,7 @@ namespace AlwaysPrintTray.Forms
         private readonly List<UrlCheckResult> _results;
         private readonly int _percent;
         private readonly Severity _severity;
+        private readonly int _criticalFails;
 
         /// <summary>Nivel de severidad de la notificación.</summary>
         private enum Severity
@@ -64,11 +65,13 @@ namespace AlwaysPrintTray.Forms
         /// Constructor privado. Usar <see cref="ShowResult"/> para crear y mostrar.
         /// </summary>
         private ConnectivityNotificationForm(
-            List<UrlCheckResult> results, int percent, ConnectivityCheckPayload payload)
+            List<UrlCheckResult> results, int percent, ConnectivityCheckPayload payload,
+            int criticalFails, int criticalTotal, bool serverUrlFailed)
         {
             _results = results;
             _percent = percent;
-            _severity = DeterminarSeveridad(percent);
+            _criticalFails = criticalFails;
+            _severity = DeterminarSeveridad(criticalFails, serverUrlFailed);
 
             // === Configuración del Form ===
             FormBorderStyle = FormBorderStyle.None;
@@ -89,31 +92,31 @@ namespace AlwaysPrintTray.Forms
             _fadeInTimer = new Timer { Interval = FadeStepMs };
             _fadeInTimer.Tick += OnFadeInTick;
 
-            // === Timer de auto-cierre (solo verde y amarillo) ===
+            // === Timer de auto-cierre (solo amarillo) ===
             _autoCloseTimer = new Timer();
-            if (_severity == Severity.Green)
-            {
-                _autoCloseTimer.Interval = payload.NotificationGreenTimeoutSeconds * 1000;
-                _autoCloseTimer.Tick += (s, e) => Close();
-            }
-            else if (_severity == Severity.Yellow)
+            if (_severity == Severity.Yellow)
             {
                 _autoCloseTimer.Interval = payload.NotificationYellowTimeoutSeconds * 1000;
                 _autoCloseTimer.Tick += (s, e) => Close();
             }
-            // Rojo: sin auto-cierre
+            // Rojo: sin auto-cierre (persistente)
         }
 
         /// <summary>
         /// Muestra el resultado del check de conectividad al usuario.
         /// Gestiona el singleton: cierra la notificación previa si existe (thread-safe).
         /// Se invoca desde el thread STA dedicado de la notificación.
+        /// NOTA: No se llama cuando criticalFails == 0 (verde = sin notificación).
         /// </summary>
         /// <param name="results">Lista de resultados por URL.</param>
         /// <param name="percent">Porcentaje de URLs accesibles (0-100).</param>
         /// <param name="payload">Payload original con parámetros de timeouts de notificación.</param>
+        /// <param name="criticalFails">Número de URLs críticas con fallo de transporte.</param>
+        /// <param name="criticalTotal">Total de URLs críticas verificadas.</param>
+        /// <param name="serverUrlFailed">true si la primera URL (SERVER_URL) falló.</param>
         public static void ShowResult(
-            List<UrlCheckResult> results, int percent, ConnectivityCheckPayload payload)
+            List<UrlCheckResult> results, int percent, ConnectivityCheckPayload payload,
+            int criticalFails = 0, int criticalTotal = 0, bool serverUrlFailed = false)
         {
             // Cerrar notificación previa si existe (thread-safe)
             var prev = Current;
@@ -131,7 +134,8 @@ namespace AlwaysPrintTray.Forms
             Current = null;
 
             // Crear y mostrar nueva notificación (ya estamos en el thread STA correcto)
-            var form = new ConnectivityNotificationForm(results, percent, payload);
+            var form = new ConnectivityNotificationForm(results, percent, payload,
+                criticalFails, criticalTotal, serverUrlFailed);
             Current = form;
             form.Show();
             form.BringToFront();
@@ -139,7 +143,8 @@ namespace AlwaysPrintTray.Forms
             form._fadeInTimer.Start();
 
             AlwaysPrintLogger.WriteTrayInfo(
-                $"ConnectivityNotificationForm: mostrada ({(form._severity == Severity.Green ? "verde" : form._severity == Severity.Yellow ? "amarilla" : "roja")}, {percent}%).",
+                $"ConnectivityNotificationForm: mostrada ({(form._severity == Severity.Yellow ? "amarilla" : "roja")}, " +
+                $"críticos fallidos={criticalFails}/{criticalTotal}).",
                 AlwaysPrintLogger.EvtConnectivitySummary);
 
             if (form._severity != Severity.Red)
@@ -179,7 +184,7 @@ namespace AlwaysPrintTray.Forms
             // === Label con texto del resultado ===
             var lblTexto = new Label
             {
-                Text = ObtenerTexto(_severity, _percent),
+                Text = ObtenerTexto(_severity, _criticalFails),
                 Font = new Font("Segoe UI", 10f, FontStyle.Bold),
                 ForeColor = AppTheme.TextPrimary,
                 Location = new Point(60, 16),
@@ -228,7 +233,6 @@ namespace AlwaysPrintTray.Forms
                     using (var pen = new Pen(GreenIcon, 3f))
                     {
                         g.DrawEllipse(pen, rect);
-                        // Dibuja el checkmark
                         g.DrawLine(pen, 12, 20, 17, 26);
                         g.DrawLine(pen, 17, 26, 28, 14);
                     }
@@ -246,18 +250,16 @@ namespace AlwaysPrintTray.Forms
                             new Point(36, 34)
                         };
                         g.DrawPolygon(pen, triangle);
-                        // Signo de exclamación
                         g.FillRectangle(brush, 18, 14, 4, 10);
                         g.FillEllipse(brush, 18, 27, 4, 4);
                     }
                     break;
 
                 case Severity.Red:
-                    // Icono de impresora en rojo (simplificado como X en círculo)
+                    // X en círculo rojo
                     using (var pen = new Pen(RedIcon, 3f))
                     {
                         g.DrawEllipse(pen, rect);
-                        // X dentro del círculo
                         g.DrawLine(pen, 13, 13, 27, 27);
                         g.DrawLine(pen, 27, 13, 13, 27);
                     }
@@ -267,7 +269,6 @@ namespace AlwaysPrintTray.Forms
 
         /// <summary>
         /// Handler del tick del timer de fade-in.
-        /// Incrementa la opacidad gradualmente.
         /// </summary>
         private void OnFadeInTick(object sender, EventArgs e)
         {
@@ -282,29 +283,28 @@ namespace AlwaysPrintTray.Forms
 
         /// <summary>
         /// Handler del botón "Ver Reporte". Abre el formulario de reporte detallado.
-        /// Modal relativo a la notificación (mismo thread STA dedicado, no bloquea el UI principal).
         /// </summary>
         private void OnVerReporteClick(object sender, EventArgs e)
         {
             try
             {
                 var reportForm = new ConnectivityReportForm(_results, _percent);
-                reportForm.ShowDialog(this); // Modal relativo a la notificación (mismo thread, no bloquea main)
+                reportForm.ShowDialog(this);
             }
-            catch
-            {
-                // Si ConnectivityReportForm falla por alguna razón, ignorar
-            }
+            catch { }
         }
 
         /// <summary>
-        /// Determina la severidad según el porcentaje de éxito.
+        /// Determina la severidad según fallos críticos.
+        /// Verde: 0 fallos críticos (no debería llegar aquí — no se muestra notificación).
+        /// Amarillo: 1-2 fallos críticos.
+        /// Rojo: 3+ fallos críticos O SERVER_URL falla.
         /// </summary>
-        private static Severity DeterminarSeveridad(int percent)
+        private static Severity DeterminarSeveridad(int criticalFails, bool serverUrlFailed)
         {
-            if (percent == 100) return Severity.Green;
-            if (percent > 0) return Severity.Yellow;
-            return Severity.Red;
+            if (criticalFails == 0) return Severity.Green;
+            if (criticalFails >= 3 || serverUrlFailed) return Severity.Red;
+            return Severity.Yellow;
         }
 
         /// <summary>
@@ -322,19 +322,18 @@ namespace AlwaysPrintTray.Forms
         }
 
         /// <summary>
-        /// Obtiene el texto de la notificación según la severidad y porcentaje.
+        /// Obtiene el texto de la notificación según la severidad y fallos críticos.
         /// </summary>
-        private static string ObtenerTexto(Severity severity, int percent)
+        private static string ObtenerTexto(Severity severity, int criticalFails)
         {
             switch (severity)
             {
                 case Severity.Green:
                     return "Conectividad: Todo OK 100%";
                 case Severity.Yellow:
-                    int fallidas = 100 - percent;
-                    return $"Conectividad: {fallidas}% fallidas";
+                    return $"Conectividad: {criticalFails} servicio(s) cr\u00edtico(s) inaccesible(s)";
                 case Severity.Red:
-                    return "Sin acceso a Internet \u2014 Requiere autenticaci\u00f3n en ZScaler";
+                    return "Sin acceso a servicios cr\u00edticos de impresi\u00f3n";
                 default:
                     return string.Empty;
             }
@@ -346,7 +345,6 @@ namespace AlwaysPrintTray.Forms
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-            // Borde sutil alrededor del form
             using var pen = new Pen(Color.FromArgb(60, Color.Black), 1);
             e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
         }

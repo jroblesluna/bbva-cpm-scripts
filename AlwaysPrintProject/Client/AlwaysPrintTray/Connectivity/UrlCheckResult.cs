@@ -11,7 +11,8 @@ namespace AlwaysPrintTray.Connectivity
         public string Url { get; set; }
 
         /// <summary>
-        /// Indica si la URL fue accesible (respuesta exitosa o código esperado).
+        /// Indica si la URL fue accesible (cualquier respuesta HTTP = OK).
+        /// Solo excepciones de transporte (DNS, TCP, TLS, timeout) = FALLO.
         /// </summary>
         public bool Success { get; set; }
 
@@ -34,5 +35,11 @@ namespace AlwaysPrintTray.Connectivity
         /// Mensaje de error si la verificación falló; null si fue exitosa.
         /// </summary>
         public string Error { get; set; }
+
+        /// <summary>true si la URL es crítica para el semáforo de notificación.</summary>
+        public bool Critical { get; set; }
+
+        /// <summary>Función descriptiva de la URL (para el reporte).</summary>
+        public string Function { get; set; }
     }
 }

@@ -368,12 +368,6 @@ namespace AlwaysPrint.Shared.Messages
         [JsonProperty("timeout_seconds")]
         public int TimeoutSeconds { get; set; } = 5;
 
-        [JsonProperty("max_retries")]
-        public int MaxRetries { get; set; } = 2;
-
-        [JsonProperty("retry_delay_seconds")]
-        public int RetryDelaySeconds { get; set; } = 30;
-
         [JsonProperty("notification_green_timeout_seconds")]
         public int NotificationGreenTimeoutSeconds { get; set; } = 5;
 
