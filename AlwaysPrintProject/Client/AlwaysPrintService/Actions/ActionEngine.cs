@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
+using AlwaysPrint.Shared.Messages;
 using AlwaysPrint.Shared.Security;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -27,6 +28,7 @@ namespace AlwaysPrintService.Actions
         private readonly Dictionary<string, string> _configVariables = new Dictionary<string, string>();
         private ActionConfiguration? _config;
         private Func<bool>? _gracefulStopTrayCallback;
+        private Func<PipeMessage, bool>? _sendPipeMessageCallback;
         private string? _loadedConfigHash;
         private string? _currentOnDemandLabel;
 
@@ -49,6 +51,15 @@ namespace AlwaysPrintService.Actions
         public void SetGracefulStopTrayCallback(Func<bool> callback)
         {
             _gracefulStopTrayCallback = callback;
+        }
+
+        /// <summary>
+        /// Establece un callback para enviar mensajes al Tray vía Named Pipe.
+        /// Retorna true si el mensaje se envió, false si el pipe está desconectado.
+        /// </summary>
+        public void SetSendPipeMessageCallback(Func<PipeMessage, bool> callback)
+        {
+            _sendPipeMessageCallback = callback;
         }
         
         // ═══════════════════════════════════════════════════════════════════════
@@ -493,6 +504,9 @@ namespace AlwaysPrintService.Actions
 
                 case ActionTypes.EnableWindowsFeature:
                     return ExecuteEnableWindowsFeature(action);
+                
+                case ActionTypes.ConnectivityCheck:
+                    return ExecuteConnectivityCheck(action);
                 
                 default:
                     AlwaysPrintLogger.WriteWarning($"ActionEngine: tipo de acción desconocido: {action.Type}");
@@ -1032,6 +1046,75 @@ namespace AlwaysPrintService.Actions
             }
             
             return AdminActions.EnableWindowsFeature(featureName);
+        }
+
+        /// <summary>
+        /// Ejecuta un ConnectivityCheck enviando el comando al Tray vía Named Pipe.
+        /// El Tray es responsable de ejecutar los HTTP checks, mostrar notificación y loguear.
+        /// Fire-and-forget: retorna true siempre (no bloquea el trigger).
+        /// </summary>
+        private bool ExecuteConnectivityCheck(ActionConfig action)
+        {
+            try
+            {
+                // Extraer parámetros del JSON
+                var urlsToken = action.Parameters?["urls"];
+                var urls = urlsToken?.ToObject<List<string>>() ?? new List<string>();
+                int timeoutSeconds = GetParameter<int>(action, "timeout_seconds", 5);
+                int maxRetries = GetParameter<int>(action, "max_retries", 2);
+                int retryDelaySeconds = GetParameter<int>(action, "retry_delay_seconds", 30);
+                int notificationGreenTimeout = GetParameter<int>(action, "notification_green_timeout_seconds", 5);
+                int notificationYellowTimeout = GetParameter<int>(action, "notification_yellow_timeout_seconds", 10);
+
+                if (urls.Count == 0)
+                {
+                    AlwaysPrintLogger.WriteWarning("ActionEngine: ConnectivityCheck sin URLs configuradas");
+                    return true;
+                }
+
+                // Construir payload
+                var payload = new ConnectivityCheckPayload
+                {
+                    Urls = urls,
+                    TimeoutSeconds = timeoutSeconds,
+                    MaxRetries = maxRetries,
+                    RetryDelaySeconds = retryDelaySeconds,
+                    NotificationGreenTimeoutSeconds = notificationGreenTimeout,
+                    NotificationYellowTimeoutSeconds = notificationYellowTimeout
+                };
+
+                // Verificar si hay callback de envío de mensajes configurado
+                if (_sendPipeMessageCallback == null)
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        "ActionEngine: ConnectivityCheck - no hay callback de pipe configurado. No se puede enviar al Tray.",
+                        AlwaysPrintLogger.EvtGenericWarning);
+                    return true;
+                }
+
+                // Enviar vía pipe al Tray
+                var message = PipeMessage.Create(MessageType.ConnectivityCheck, payload);
+                bool sent = _sendPipeMessageCallback(message);
+
+                if (!sent)
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        $"ActionEngine: ConnectivityCheck - pipe no conectado, comando no enviado al Tray. " +
+                        $"Se reintentará en el próximo ciclo.",
+                        AlwaysPrintLogger.EvtGenericWarning);
+                    return true;
+                }
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"ActionEngine: ConnectivityCheck: comando enviado al Tray ({urls.Count} URLs, timeout={timeoutSeconds}s, retries={maxRetries})");
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"ActionEngine: ConnectivityCheck - error: {ex.Message}", ex);
+                return true; // Fire-and-forget: no bloquear el trigger por errores
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════════

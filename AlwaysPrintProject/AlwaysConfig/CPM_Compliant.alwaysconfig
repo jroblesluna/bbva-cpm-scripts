@@ -1,5 +1,5 @@
 {
-  "version": "8.8",
+  "version": "9.0",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -1173,6 +1173,43 @@
             "arguments": "failure AlwaysPrintService reset= 86400 actions= restart/5000/restart/5000/restart/5000",
             "timeout_seconds": 10,
             "window_style": "Hidden"
+          }
+        }
+      ]
+    },
+    {
+      "event": "OnScheduledTask",
+      "interval_seconds": 300,
+      "run_immediately": false,
+      "description": "Verificación periódica de conectividad a servicios críticos de impresión",
+      "actions": [
+        {
+          "type": "ConnectivityCheck",
+          "description": "Verificar acceso a URLs de impresión corporativa vía proxy",
+          "parameters": {
+            "urls": [
+              "{{%SERVER_URL%}}",
+              "https://cloud.lexmark.com",
+              "https://idp.us.iss.lexmark.com",
+              "https://login.microsoftonline.com",
+              "https://lexmarkb2c.b2clogin.com",
+              "https://api.us.iss.lexmark.com",
+              "https://apis.us.iss.lexmark.com",
+              "https://us.iss.lexmark.com",
+              "https://prod-lex-cloud-iot.azure-devices.net",
+              "https://apis.iss.lexmark.com",
+              "https://iss.lexmark.com",
+              "https://global.azure-devices-provisioning.net",
+              "https://prodlexcloudk8s239.blob.core.windows.net",
+              "https://ccs.lexmark.com",
+              "https://ccs-cdn.lexmark.com",
+              "https://prodlexcloudk8s19.blob.core.windows.net"
+            ],
+            "timeout_seconds": 5,
+            "max_retries": 2,
+            "retry_delay_seconds": 30,
+            "notification_green_timeout_seconds": 5,
+            "notification_yellow_timeout_seconds": 10
           }
         }
       ]

@@ -352,6 +352,34 @@ namespace AlwaysPrint.Shared.Messages
         [JsonProperty("message")]
         public string? Message { get; set; }
     }
+
+    // ── Connectivity Check ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Payload enviado del Service al Tray para ejecutar un check de conectividad
+    /// contra una lista de URLs. El Tray ejecuta los HTTP checks, muestra
+    /// notificación y escribe en log.
+    /// </summary>
+    public class ConnectivityCheckPayload
+    {
+        [JsonProperty("urls")]
+        public List<string> Urls { get; set; } = new();
+
+        [JsonProperty("timeout_seconds")]
+        public int TimeoutSeconds { get; set; } = 5;
+
+        [JsonProperty("max_retries")]
+        public int MaxRetries { get; set; } = 2;
+
+        [JsonProperty("retry_delay_seconds")]
+        public int RetryDelaySeconds { get; set; } = 30;
+
+        [JsonProperty("notification_green_timeout_seconds")]
+        public int NotificationGreenTimeoutSeconds { get; set; } = 5;
+
+        [JsonProperty("notification_yellow_timeout_seconds")]
+        public int NotificationYellowTimeoutSeconds { get; set; } = 10;
+    }
 }
 
     // ── Debugging Remoto (captura con privilegios LocalSystem) ────────────────────

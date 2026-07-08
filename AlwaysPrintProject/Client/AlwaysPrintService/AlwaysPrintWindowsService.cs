@@ -287,6 +287,16 @@ namespace AlwaysPrintService
                     return false;
                 });
 
+                // Establecer callback para envío de mensajes pipe desde ActionEngine
+                _actionEngine.SetSendPipeMessageCallback((msg) =>
+                {
+                    if (_pipeServer != null && _pipeServer.IsClientConnected)
+                    {
+                        return _pipeServer.SendToClient(msg);
+                    }
+                    return false;
+                });
+
                 // 6. Bucle principal: esperar usuario → lanzar Tray → monitorear.
                 RunSessionLoop();
             }

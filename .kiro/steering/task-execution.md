@@ -4,6 +4,11 @@ inclusion: always
 
 # Ejecución de Tasks y Comandos
 
+## Acceso a Terminal
+
+- **SIEMPRE tienes acceso a herramientas de terminal.** No asumir que no tienes acceso. Si un nombre de herramienta falla (`bash`, `run_in_terminal`), probar con el nombre alternativo disponible en la sesión.
+- **Ejecutar comandos directamente** sin dar instrucciones al usuario para que los copie/pegue.
+
 ## Task State Management
 
 Al ejecutar tasks de un spec:

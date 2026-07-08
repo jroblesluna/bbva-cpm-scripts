@@ -1,0 +1,646 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "Agregar `ConnectivityCheck` a `MessageType.cs`": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879297
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471904493
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471947857
+      }
+    ],
+    "Crear `ConnectivityCheckPayload` en `Payloads.cs` con campos: urls, timeout_seconds, max_retries, retry_delay_seconds, notification_green_timeout_seconds, notification_yellow_timeout_seconds": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879342
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471953443
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783472006885
+      }
+    ],
+    "Crear clase `UrlCheckResult` en `AlwaysPrintTray/Connectivity/UrlCheckResult.cs` con: Url, Success, LatencyMs, StatusCode, Attempts, Error": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879377
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783472012494
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783472096982
+      }
+    ],
+    "Agregar `ActionTypes.ConnectivityCheck = \"ConnectivityCheck\"` en `ActionConfig.cs`": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879411
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783472102347
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783472149318
+      }
+    ],
+    "Agregar case `ActionTypes.ConnectivityCheck` en el switch de `ExecuteAction()`": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879493
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783472155761
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783472193998
+      }
+    ],
+    "Implementar `ExecuteConnectivityCheck(ActionConfig action)`:": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879566
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783472198988
+      }
+    ],
+    "El ActionEngine necesita acceso al PipeServer — pasar referencia vía constructor o callback (evaluar approach menos invasivo)": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879621
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783472450905
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783472456291
+      }
+    ],
+    "Crear `AlwaysPrintTray/Connectivity/ConnectivityCheckHandler.cs`": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879695
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783472466905
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473458025
+      }
+    ],
+    "Implementar `ExecuteCheckAsync(ConnectivityCheckPayload payload)`:": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879743
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473462175
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473466923
+      }
+    ],
+    "Implementar `CheckUrlWithRetriesAsync(HttpClient, url, payload)`:": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879779
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473470116
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473473734
+      }
+    ],
+    "Implementar `TestTcpConnectAsync(host, port, timeoutMs)` para verificar proxy activo": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879812
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473477486
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473480968
+      }
+    ],
+    "En `OnPipeMessageReceived`, agregar case `MessageType.ConnectivityCheck`:": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879847
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473485218
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473566811
+      }
+    ],
+    "Instanciar `ConnectivityCheckHandler` en el constructor de `TrayApplicationContext` (pasando `SynchronizationContext` para UI thread y logger)": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879880
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473570631
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473612426
+      }
+    ],
+    "Crear `AlwaysPrintTray/Forms/ConnectivityNotificationForm.cs` (WinForms)": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879916
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473620137
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473778046
+      }
+    ],
+    "Diseño visual:": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879955
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473781786
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473785587
+      }
+    ],
+    "Lógica singleton:": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471879994
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473789333
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473793105
+      }
+    ],
+    "Timer de auto-cierre:": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880030
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473796596
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473800562
+      }
+    ],
+    "Animación fade-in (opacity de 0 a 1 en 300ms)": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880066
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473804460
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473808386
+      }
+    ],
+    "Crear `AlwaysPrintTray/Forms/ConnectivityReportForm.cs` (WinForms)": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880147
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783473812947
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474012456
+      }
+    ],
+    "DataGridView o ListView con columnas: URL, Estado (✓/✗), Latencia, Intentos, Error": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880178
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474016462
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474020172
+      }
+    ],
+    "Header con info resumen: proxy detectado, estado, total URLs, exitosas, fallidas": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880209
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474023689
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474027121
+      }
+    ],
+    "Botón \"Cerrar\"": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880239
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474030630
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474033874
+      }
+    ],
+    "Se abre como modal desde el NotificationForm": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880280
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474037113
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474040632
+      }
+    ],
+    "En `ConnectivityCheckHandler`, después de completar todos los checks:": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880321
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474048499
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474121686
+      }
+    ],
+    "En `ActionEngine.ExecuteConnectivityCheck`: log al enviar comando: `ConnectivityCheck: comando enviado al Tray ({n} URLs, timeout={t}s, retries={r})`": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880365
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474126560
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474131791
+      }
+    ],
+    "Agregar trigger `OnScheduledTask` con acción `ConnectivityCheck`:": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880409
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474136147
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474384749
+      }
+    ],
+    "Bump versión del alwaysconfig": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880453
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474388293
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474393943
+      }
+    ],
+    "Verificar que con `run_immediately: true` el check se ejecuta inmediatamente al cargar config": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880492
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474719579
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474723354
+      }
+    ],
+    "Verificar que con `run_immediately: false` el check NO se dispara al inicio sino después del primer intervalo": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880529
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474727137
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474731798
+      }
+    ],
+    "Verificar check con todas las URLs accesibles → notificación verde (auto-cierre 5s)": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880566
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474735635
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474739377
+      }
+    ],
+    "Verificar check con algunas URLs bloqueadas → notificación amarilla con % correcto": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880603
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474743040
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474746723
+      }
+    ],
+    "Verificar check con red desconectada → notificación roja persistente": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880643
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474750547
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474754397
+      }
+    ],
+    "Verificar que acknowledge cierra la notificación": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880678
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474758420
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474761944
+      }
+    ],
+    "Verificar que \"Ver Reporte\" muestra tabla detallada correcta": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880713
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474765704
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474769417
+      }
+    ],
+    "Verificar que un segundo check reemplaza notificación anterior si aún está visible": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880753
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474772954
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474776809
+      }
+    ],
+    "Verificar que sin Tray conectado el Service loguea warning sin error": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880794
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474780579
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474784226
+      }
+    ],
+    "Verificar reintentos: URL que falla 2 veces y luego responde → se marca como OK": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880832
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474788187
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474791975
+      }
+    ],
+    "Verificar log con formato correcto (resumen + fallos individuales)": [
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783471880896
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474795735
+      },
+      {
+        "executionId": "4e39680a-3745-4381-a0a0-dbe89fabf3fd",
+        "chatSessionId": "sess_b10039e1-671e-4c50-917e-3279ba699293",
+        "timestamp": 1783474799281
+      }
+    ]
+  }
+}

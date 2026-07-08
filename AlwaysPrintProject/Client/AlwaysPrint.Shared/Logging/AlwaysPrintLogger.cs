@@ -35,6 +35,10 @@ namespace AlwaysPrint.Shared.Logging
         public const int EvtGenericWarning       = 1090;
         public const int EvtGenericError         = 1091;
 
+        // Connectivity Check
+        public const int EvtConnectivitySummary  = 1090;
+        public const int EvtConnectivityFail     = 1091;
+
         private static readonly string LogDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
             "AlwaysPrint", "logs");

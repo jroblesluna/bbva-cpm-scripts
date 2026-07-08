@@ -61,5 +61,9 @@ namespace AlwaysPrint.Shared.Messages
 
         // Progreso de ejecución OnDemand
         OnDemandActionProgress,      // Service → Tray (push): progreso de un paso de acción OnDemand
+
+        // Connectivity Check
+        ConnectivityCheck,           // Service → Tray: ejecutar check de URLs
+        ConnectivityCheckResult,     // Tray → Service: resultado (opcional, para log del Service)
     }
 }

@@ -11,6 +11,7 @@ using AlwaysPrint.Shared.Messages;
 using AlwaysPrint.Shared.Security;
 using AlwaysPrintTray.Bootstrap;
 using AlwaysPrintTray.Cloud;
+using AlwaysPrintTray.Connectivity;
 using AlwaysPrintTray.Forms;
 using AlwaysPrintTray.Localization;
 using AlwaysPrintTray.OnDemand;
@@ -66,10 +67,14 @@ namespace AlwaysPrintTray
         // Flag para distinguir la primera carga de config (no notificar) de actualizaciones reales
         private bool _firstConfigUpdateReceived;
 
+        // Handler de checks de conectividad (ejecuta verificaciones HTTP por comando del Service)
+        private ConnectivityCheckHandler? _connectivityHandler;
+
         public TrayApplicationContext(uint showStatusMsgId)
         {
             _showStatusMsgId = showStatusMsgId;
             _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
+            _connectivityHandler = new ConnectivityCheckHandler(_uiContext);
             _pipe      = new PipeClient();
             _trayIcon  = BuildTrayIcon();
 
@@ -1287,6 +1292,10 @@ namespace AlwaysPrintTray
                         {
                             _trayIcon.Visible = false;
                         }, null);
+                        break;
+                    case MessageType.ConnectivityCheck:
+                        var connectivityPayload = message.GetPayload<ConnectivityCheckPayload>();
+                        _ = Task.Run(() => _connectivityHandler?.ExecuteCheckAsync(connectivityPayload));
                         break;
                     default:
                         // Otros mensajes push se ignoran aquí (CloudManager los maneja por separado)
