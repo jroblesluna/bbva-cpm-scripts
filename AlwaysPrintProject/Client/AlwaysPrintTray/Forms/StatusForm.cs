@@ -262,13 +262,14 @@ namespace AlwaysPrintTray.Forms
             _btnClose = new Button
             {
                 Text = LocalizationManager.Get("StatusButtonClose"),
-                AutoSize = true,
+                AutoSize = false,
+                Size = new Size(110, 30),
                 Padding = new Padding(12, 2, 12, 2),
                 FlatStyle = FlatStyle.Standard
             };
             _btnClose.Click += (s, e) => Close();
             Controls.Add(_btnClose);
-            _btnClose.Location = new Point(FormWidth - _btnClose.PreferredSize.Width - 20, yBottom);
+            _btnClose.Location = new Point(FormWidth - _btnClose.Width - 32, yBottom);
             CancelButton = _btnClose;
 
             yBottom += 36 + 12;

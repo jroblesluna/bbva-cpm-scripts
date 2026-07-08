@@ -25,7 +25,7 @@ namespace AlwaysPrintTray.Forms
 
         // === CONSTANTES DE LAYOUT ===
         private const int FormWidth = 380;
-        private const int FormHeight = 100;
+        private const int FormHeight = 120;
         private const int FadeStepMs = 20;
         private const double FadeIncrement = 0.067; // ~15 pasos en 300ms (20ms * 15 = 300ms)
 
@@ -169,7 +169,7 @@ namespace AlwaysPrintTray.Forms
             // === Panel de icono (izquierda) ===
             var pnlIcono = new Panel
             {
-                Location = new Point(12, 12),
+                Location = new Point(12, 16),
                 Size = new Size(40, 40),
                 BackColor = Color.Transparent
             };
@@ -182,9 +182,10 @@ namespace AlwaysPrintTray.Forms
                 Text = notifConfig.Text,
                 Font = new Font("Segoe UI", 10f, FontStyle.Bold),
                 ForeColor = AppTheme.TextPrimary,
-                Location = new Point(60, 16),
-                Size = new Size(FormWidth - 72, 28),
-                TextAlign = ContentAlignment.MiddleLeft
+                Location = new Point(60, 12),
+                Size = new Size(FormWidth - 72, 42),
+                TextAlign = ContentAlignment.TopLeft,
+                AutoEllipsis = true
             };
             Controls.Add(lblTexto);
 
@@ -193,7 +194,7 @@ namespace AlwaysPrintTray.Forms
             {
                 Text = "Ver Reporte",
                 Size = new Size(100, 30),
-                Location = new Point(60, FormHeight - 44),
+                Location = new Point(68, FormHeight - 42),
                 IsPrimary = false,
                 ShowBorder = true
             };
@@ -206,7 +207,7 @@ namespace AlwaysPrintTray.Forms
             {
                 Text = isPersistent ? "Entendido" : "OK",
                 Size = new Size(isPersistent ? 100 : 70, 30),
-                Location = new Point(FormWidth - (isPersistent ? 112 : 82), FormHeight - 44),
+                Location = new Point(FormWidth - (isPersistent ? 112 : 82), FormHeight - 42),
                 IsPrimary = true
             };
             btnAck.Click += (s, e) => Close();
