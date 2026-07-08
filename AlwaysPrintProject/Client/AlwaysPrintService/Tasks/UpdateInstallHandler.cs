@@ -210,6 +210,43 @@ REM Eliminar MSI temporal
 del /f /q ""{msiFilePath}"" > nul 2>&1
 
 :cleanup
+REM ============================================================
+REM Verificación final: asegurar que el servicio está corriendo
+REM Intenta hasta 10 veces con 3s entre intentos
+REM ============================================================
+call :ts
+echo %TS% [UPD] Event 1020: Verificacion final - asegurando que el servicio esta activo... >> %LOG%
+
+set VERIFY_ATTEMPT=0
+set VERIFY_OK=0
+
+:verify_loop
+set /a VERIFY_ATTEMPT+=1
+if %VERIFY_ATTEMPT% gtr 10 goto :verify_done
+
+sc query {ServiceName} | findstr /i ""RUNNING"" > nul 2>&1
+if %errorlevel% equ 0 (
+    call :ts
+    echo %TS% [UPD] Event 1020: Verificacion %VERIFY_ATTEMPT%/10: servicio ACTIVO. >> %LOG%
+    set VERIFY_OK=1
+    goto :verify_done
+)
+
+call :ts
+echo %TS% [UPD] Event 1020: Verificacion %VERIFY_ATTEMPT%/10: servicio NO activo. Intentando iniciar... >> %LOG%
+net start {ServiceName} > nul 2>&1
+timeout /t 3 /nobreak > nul
+goto :verify_loop
+
+:verify_done
+if %VERIFY_OK% equ 0 (
+    call :ts
+    echo %TS% [UPD] Event 1091: CRITICO - Servicio no pudo iniciarse despues de 10 intentos. Requiere intervencion manual. >> %LOG%
+) else (
+    call :ts
+    echo %TS% [UPD] Event 1020: Servicio verificado activo. Actualizacion completada. >> %LOG%
+)
+
 call :ts
 echo %TS% [UPD] Event 1020: Script de actualizacion finalizado. >> %LOG%
 
