@@ -12,9 +12,8 @@ namespace AlwaysPrintService.Tasks
     /// 1. Detiene el servicio AlwaysPrintService
     /// 2. Mata procesos AlwaysPrintTray
     /// 3. Ejecuta msiexec /i silencioso
-    /// 4. Reinicia el servicio
-    /// 5. Lanza el Tray
-    /// 6. Se auto-elimina
+    /// 4. Reinicia el servicio (el Service lanza el Tray via CreateProcessAsUser)
+    /// 5. Se auto-elimina
     /// </summary>
     public sealed class UpdateInstallHandler
     {
@@ -131,10 +130,9 @@ namespace AlwaysPrintService.Tasks
         /// 2. Mata procesos del Tray
         /// 3. Detiene el servicio
         /// 4. Ejecuta msiexec silencioso
-        /// 5. Inicia el servicio
-        /// 6. Lanza el Tray
-        /// 7. Elimina el MSI temporal
-        /// 8. Se auto-elimina
+        /// 5. Inicia el servicio (el Service lanza el Tray via CreateProcessAsUser)
+        /// 6. Elimina el MSI temporal
+        /// 7. Se auto-elimina
         /// </summary>
         private static string GenerateInstallScript(string msiFilePath, string trayExePath, string scriptPath, string logFilePath)
         {
@@ -198,10 +196,7 @@ REM Iniciar el servicio actualizado
 net start {ServiceName} > nul 2>&1
 timeout /t 3 /nobreak > nul
 
-REM Lanzar el Tray actualizado
-call :ts
-echo %TS% [UPD] Event 1020: Lanzando AlwaysPrintTray.exe... >> %LOG%
-start """" ""{trayExePath}""
+REM El Tray será lanzado automáticamente por el Service (CreateProcessAsUser en sesión del usuario)
 
 :cleanup
 REM ============================================================
@@ -264,13 +259,7 @@ if %VERIFY_OK% equ 0 (
 ) else (
     call :ts
     echo %TS% [UPD] Event 1020: Servicio verificado activo. Actualizacion completada. >> %LOG%
-    REM Lanzar Tray si no está corriendo (caso de error donde no se lanzó antes)
-    tasklist /fi ""IMAGENAME eq {TrayProcessName}.exe"" | findstr /i ""{TrayProcessName}"" > nul 2>&1
-    if %errorlevel% neq 0 (
-        call :ts
-        echo %TS% [UPD] Event 1020: Lanzando AlwaysPrintTray.exe (post-verificacion)... >> %LOG%
-        start """" ""{trayExePath}""
-    )
+    REM El Tray será lanzado automáticamente por el Service al iniciar (CreateProcessAsUser)
 )
 
 REM Eliminar MSI temporal (después de verificación para permitir reinstalación si fue necesaria)
