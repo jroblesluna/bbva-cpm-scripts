@@ -70,6 +70,10 @@ namespace AlwaysPrintTray.Connectivity
                     return;
                 }
 
+                // Timeout global de 3 minutos para evitar que el check se quede colgado indefinidamente
+                // (puede ocurrir si el proxy no responde durante la negociación)
+                using var totalCts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+
                 // 1. Detectar proxy del sistema
                 var proxyUri = ProxyHelper.GetSystemProxyUri(new Uri(payload.Urls[0]));
                 bool proxyActive = false;
@@ -85,10 +89,12 @@ namespace AlwaysPrintTray.Connectivity
                 }
 
                 // 2. Crear HttpClient con proxy del sistema
+                // Timeout = Infinite porque gestionamos timeouts por request con CancellationToken
+                // (HttpClient.Timeout no es confiable con proxies en .NET Framework 4.8)
                 var handler = ProxyHelper.CreateHandler();
                 using var client = new HttpClient(handler)
                 {
-                    Timeout = TimeSpan.FromSeconds(payload.TimeoutSeconds)
+                    Timeout = System.Threading.Timeout.InfiniteTimeSpan
                 };
 
                 // 3. Ejecutar checks secuencialmente (medir duración total)
@@ -96,7 +102,7 @@ namespace AlwaysPrintTray.Connectivity
                 var results = new List<UrlCheckResult>();
                 foreach (var url in payload.Urls)
                 {
-                    var result = await CheckUrlWithRetriesAsync(client, url, payload);
+                    var result = await CheckUrlWithRetriesAsync(client, url, payload, totalCts.Token);
                     results.Add(result);
                 }
                 totalSw.Stop();
@@ -135,6 +141,12 @@ namespace AlwaysPrintTray.Connectivity
                     ConnectivityNotificationForm.ShowResult(results, percent, payload);
                 }, null);
             }
+            catch (OperationCanceledException)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    "ConnectivityCheck: timeout global de 3 minutos alcanzado, abortando check.",
+                    AlwaysPrintLogger.EvtGenericError);
+            }
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteTrayError(
@@ -155,9 +167,11 @@ namespace AlwaysPrintTray.Connectivity
         /// <param name="client">HttpClient configurado con proxy.</param>
         /// <param name="url">URL a verificar.</param>
         /// <param name="payload">Payload con parámetros de reintentos y delays.</param>
+        /// <param name="cancellationToken">Token de cancelación global para abortar si se excede el timeout total.</param>
         /// <returns>Resultado del check para esta URL.</returns>
         private async Task<UrlCheckResult> CheckUrlWithRetriesAsync(
-            HttpClient client, string url, ConnectivityCheckPayload payload)
+            HttpClient client, string url, ConnectivityCheckPayload payload,
+            CancellationToken cancellationToken = default)
         {
             int attempts = 0;
             string lastError = null;
@@ -166,18 +180,31 @@ namespace AlwaysPrintTray.Connectivity
 
             for (int i = 0; i <= payload.MaxRetries; i++)
             {
+                // Verificar cancelación global antes de cada intento
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    lastError = "Cancelado (timeout global)";
+                    break;
+                }
+
                 attempts++;
 
                 // Esperar entre reintentos (no en el primer intento)
                 if (i > 0)
-                    await Task.Delay(payload.RetryDelaySeconds * 1000);
+                    await Task.Delay(payload.RetryDelaySeconds * 1000, cancellationToken);
 
                 var sw = Stopwatch.StartNew();
                 try
                 {
+                    // Timeout per-request con CancellationTokenSource enlazado al token global
+                    // Esto asegura que el request se cancela tanto si excede su propio timeout
+                    // como si se alcanza el timeout global de 3 minutos
+                    using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    requestCts.CancelAfter(TimeSpan.FromSeconds(payload.TimeoutSeconds));
+
                     // Intentar con HEAD primero
                     var request = new HttpRequestMessage(HttpMethod.Head, url);
-                    var response = await client.SendAsync(request);
+                    var response = await client.SendAsync(request, requestCts.Token);
                     sw.Stop();
                     lastLatencyMs = sw.ElapsedMilliseconds;
                     lastStatusCode = (int)response.StatusCode;
@@ -186,8 +213,10 @@ namespace AlwaysPrintTray.Connectivity
                     if (lastStatusCode == 405)
                     {
                         sw = Stopwatch.StartNew();
+                        using var getCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                        getCts.CancelAfter(TimeSpan.FromSeconds(payload.TimeoutSeconds));
                         var getRequest = new HttpRequestMessage(HttpMethod.Get, url);
-                        response = await client.SendAsync(getRequest);
+                        response = await client.SendAsync(getRequest, getCts.Token);
                         sw.Stop();
                         lastLatencyMs = sw.ElapsedMilliseconds;
                         lastStatusCode = (int)response.StatusCode;
@@ -211,7 +240,14 @@ namespace AlwaysPrintTray.Connectivity
 
                     lastError = $"HTTP {lastStatusCode}";
                 }
-                catch (TaskCanceledException)
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    sw.Stop();
+                    lastLatencyMs = sw.ElapsedMilliseconds;
+                    lastError = "Cancelado (timeout global)";
+                    break; // No reintentar si el timeout global se alcanzó
+                }
+                catch (OperationCanceledException)
                 {
                     sw.Stop();
                     lastLatencyMs = sw.ElapsedMilliseconds;

@@ -484,6 +484,9 @@ namespace AlwaysPrintTray.Cloud
                     case MessageType.OnDemandActionProgress:
                         // Se maneja en TrayApplicationContext.OnPipeMessageReceived (ventana de progreso)
                         break;
+                    case MessageType.ConnectivityCheck:
+                        // Se maneja en TrayApplicationContext.OnPipeMessageReceived (handler de conectividad)
+                        break;
                     default:
                         AlwaysPrintLogger.WriteTrayInfo(
                             $"CloudManager: mensaje push del Service tipo='{message.Type}' no manejado.");

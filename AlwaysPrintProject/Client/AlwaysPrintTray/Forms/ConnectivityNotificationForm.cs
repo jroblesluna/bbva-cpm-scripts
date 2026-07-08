@@ -265,16 +265,14 @@ namespace AlwaysPrintTray.Forms
         }
 
         /// <summary>
-        /// Handler del botón "Ver Reporte". Abre el formulario de reporte detallado como modal.
+        /// Handler del botón "Ver Reporte". Abre el formulario de reporte detallado (no modal).
         /// </summary>
         private void OnVerReporteClick(object sender, EventArgs e)
         {
             try
             {
-                using (var reportForm = new ConnectivityReportForm(_results, _percent))
-                {
-                    reportForm.ShowDialog(this);
-                }
+                var reportForm = new ConnectivityReportForm(_results, _percent);
+                reportForm.Show(); // No modal para evitar bloquear la UI
             }
             catch
             {
