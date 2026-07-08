@@ -105,7 +105,7 @@ namespace AlwaysPrintTray.Cloud
                     string snippet = "";
                     try
                     {
-                        byte[] head = new byte[Math.Min(200, (int)actualSize)];
+                        byte[] head = new byte[Math.Min(1024, (int)actualSize)];
                         using (var fs = System.IO.File.OpenRead(filePath))
                             fs.Read(head, 0, head.Length);
                         snippet = System.Text.Encoding.UTF8.GetString(head).Replace("\r", "").Replace("\n", " ");
@@ -238,7 +238,7 @@ namespace AlwaysPrintTray.Cloud
                     string snippet = "";
                     try
                     {
-                        byte[] head = new byte[Math.Min(200, (int)actualSize)];
+                        byte[] head = new byte[Math.Min(1024, (int)actualSize)];
                         using (var fs = System.IO.File.OpenRead(filePath))
                             fs.Read(head, 0, head.Length);
                         snippet = System.Text.Encoding.UTF8.GetString(head).Replace("\r", "").Replace("\n", " ");
