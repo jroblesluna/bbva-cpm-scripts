@@ -155,19 +155,22 @@ namespace AlwaysPrintTray.Connectivity
                 int criticalFails = results.Count(r => r.Critical && !r.Success);
                 int totalOk = results.Count(r => r.Success);
 
-                // Verde: todo OK → verificar si notificación verde está habilitada
+                // Verde: todo OK → verificar si notificación verde está configurada
                 if (totalFails == 0)
                 {
                     var greenConfig = payload.Notifications?.Green;
-                    if (greenConfig != null && greenConfig.Enabled)
+                    if (greenConfig != null)
                     {
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            "ConnectivityCheck: todos los servicios accesibles. Mostrando notificación verde.",
+                            AlwaysPrintLogger.EvtConnectivitySummary);
                         ShowNotificationOnDedicatedThread(results.ToList(), percent, payload,
                             ConnectivitySeverity.Green, greenConfig);
                     }
                     else
                     {
                         AlwaysPrintLogger.WriteTrayInfo(
-                            "ConnectivityCheck: todos los servicios accesibles. Notificación verde deshabilitada.",
+                            "ConnectivityCheck: todos los servicios accesibles. Sin notificación (verde no configurada).",
                             AlwaysPrintLogger.EvtConnectivitySummary);
                     }
                     return;
@@ -186,12 +189,12 @@ namespace AlwaysPrintTray.Connectivity
                     severity = ConnectivitySeverity.Yellow;
 
                 // Obtener configuración de notificación para este nivel
-                var notifConfig = GetNotificationConfig(payload.Notifications, severity);
+                var notifConfig = GetNotificationLevel(payload.Notifications, severity);
 
-                if (!notifConfig.Enabled)
+                if (notifConfig == null)
                 {
                     AlwaysPrintLogger.WriteTrayInfo(
-                        $"ConnectivityCheck: severidad {severity} — notificación deshabilitada en config.",
+                        $"ConnectivityCheck: severidad {severity} — sin notificación configurada.",
                         AlwaysPrintLogger.EvtConnectivitySummary);
                     return;
                 }
@@ -428,18 +431,19 @@ namespace AlwaysPrintTray.Connectivity
 
         /// <summary>
         /// Obtiene la configuración de notificación para un nivel de severidad dado.
+        /// Retorna null si el nivel no está configurado (= no notificar).
         /// </summary>
-        private static NotificationLevel GetNotificationConfig(NotificationConfig config, ConnectivitySeverity severity)
+        private static NotificationLevel? GetNotificationLevel(NotificationConfig? config, ConnectivitySeverity severity)
         {
-            if (config == null) return new NotificationLevel { Enabled = true, Text = "Conectividad", TimeoutSeconds = 0, Color = "#FFF3E0" };
+            if (config == null) return null;
 
             switch (severity)
             {
-                case ConnectivitySeverity.Green: return config.Green ?? new NotificationLevel { Enabled = false };
-                case ConnectivitySeverity.Yellow: return config.Yellow ?? new NotificationLevel { Enabled = true, Text = "Conectividad: servicios no críticos inaccesibles", TimeoutSeconds = 10, Color = "#FFF8E1" };
-                case ConnectivitySeverity.Orange: return config.Orange ?? new NotificationLevel { Enabled = true, Text = "Conectividad: servicios críticos inaccesibles", TimeoutSeconds = 0, Color = "#FFF3E0" };
-                case ConnectivitySeverity.Red: return config.Red ?? new NotificationLevel { Enabled = true, Text = "Sin conectividad a Internet", TimeoutSeconds = 0, Color = "#FFEBEE" };
-                default: return new NotificationLevel { Enabled = true };
+                case ConnectivitySeverity.Green: return config.Green;
+                case ConnectivitySeverity.Yellow: return config.Yellow;
+                case ConnectivitySeverity.Orange: return config.Orange;
+                case ConnectivitySeverity.Red: return config.Red;
+                default: return null;
             }
         }
 

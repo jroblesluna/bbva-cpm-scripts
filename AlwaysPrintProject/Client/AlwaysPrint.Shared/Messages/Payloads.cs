@@ -389,44 +389,30 @@ namespace AlwaysPrint.Shared.Messages
 
     /// <summary>
     /// Configuración de notificaciones por nivel de severidad.
-    /// Toda la personalización es desde el alwaysconfig (textos, colores, timeouts, visibilidad).
+    /// Si un nivel está presente → se muestra notificación con esos parámetros.
+    /// Si un nivel es null (ausente en el JSON) → no se muestra notificación para ese nivel.
     /// </summary>
     public class NotificationConfig
     {
         [JsonProperty("green")]
-        public NotificationLevel Green { get; set; } = new NotificationLevel 
-        { 
-            Enabled = false, Text = "Conectividad: Todo OK", TimeoutSeconds = 5, Color = "#E8F5E9" 
-        };
+        public NotificationLevel? Green { get; set; }
 
         [JsonProperty("yellow")]
-        public NotificationLevel Yellow { get; set; } = new NotificationLevel 
-        { 
-            Enabled = true, Text = "Conectividad: servicios no críticos inaccesibles", TimeoutSeconds = 10, Color = "#FFF8E1" 
-        };
+        public NotificationLevel? Yellow { get; set; }
 
         [JsonProperty("orange")]
-        public NotificationLevel Orange { get; set; } = new NotificationLevel 
-        { 
-            Enabled = true, Text = "Conectividad: servicios críticos inaccesibles", TimeoutSeconds = 0, Color = "#FFF3E0" 
-        };
+        public NotificationLevel? Orange { get; set; }
 
         [JsonProperty("red")]
-        public NotificationLevel Red { get; set; } = new NotificationLevel 
-        { 
-            Enabled = true, Text = "Sin conectividad a Internet", TimeoutSeconds = 0, Color = "#FFEBEE" 
-        };
+        public NotificationLevel? Red { get; set; }
     }
 
     /// <summary>
     /// Configuración de un nivel de notificación individual.
+    /// Su presencia en la config indica que la notificación está habilitada.
     /// </summary>
     public class NotificationLevel
     {
-        /// <summary>true para mostrar la notificación, false para omitirla.</summary>
-        [JsonProperty("enabled")]
-        public bool Enabled { get; set; } = true;
-
         /// <summary>Texto principal mostrado al usuario.</summary>
         [JsonProperty("text")]
         public string Text { get; set; } = string.Empty;
