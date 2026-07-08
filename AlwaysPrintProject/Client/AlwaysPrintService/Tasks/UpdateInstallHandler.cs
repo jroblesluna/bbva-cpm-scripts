@@ -148,62 +148,79 @@ REM ============================================================
 
 set LOG=""{logFilePath}""
 
-echo [%date% %time%] [UPD] Event 1020: Iniciando script de actualizacion. MSI={msiFilePath} >> %LOG%
+call :ts
+echo %TS% [UPD] Event 1020: Iniciando script de actualizacion. MSI={msiFilePath} >> %LOG%
 
 REM Esperar 3 segundos para que el Service termine de responder
 timeout /t 3 /nobreak > nul
 
 REM Matar procesos del Tray
-echo [%date% %time%] [UPD] Event 1020: Deteniendo procesos AlwaysPrintTray... >> %LOG%
+call :ts
+echo %TS% [UPD] Event 1020: Deteniendo procesos AlwaysPrintTray... >> %LOG%
 taskkill /f /im {TrayProcessName}.exe > nul 2>&1
 
 REM Deshabilitar Service Recovery temporalmente para evitar que SCM reinicie
 REM el servicio antes de que msiexec complete la instalación
-echo [%date% %time%] [UPD] Event 1020: Deshabilitando Service Recovery temporalmente. >> %LOG%
+call :ts
+echo %TS% [UPD] Event 1020: Deshabilitando Service Recovery temporalmente. >> %LOG%
 sc failure {ServiceName} reset= 0 actions= """"/""""/"""" > nul 2>&1
 
 REM Detener el servicio
-echo [%date% %time%] [UPD] Event 1020: Deteniendo servicio {ServiceName}... >> %LOG%
+call :ts
+echo %TS% [UPD] Event 1020: Deteniendo servicio {ServiceName}... >> %LOG%
 net stop {ServiceName} > nul 2>&1
 timeout /t 2 /nobreak > nul
 
 REM Ejecutar instalación silenciosa
-echo [%date% %time%] [UPD] Event 1020: Ejecutando msiexec /i (silencioso)... >> %LOG%
+call :ts
+echo %TS% [UPD] Event 1020: Ejecutando msiexec /i (silencioso)... >> %LOG%
 msiexec /i ""{msiFilePath}"" /quiet /norestart REINSTALLMODE=amus /l*v ""{msiFilePath}.msiexec.log""
 set INSTALL_EXIT=%errorlevel%
-echo [%date% %time%] [UPD] Event 1020: msiexec finalizado con codigo de salida: %INSTALL_EXIT% >> %LOG%
+call :ts
+echo %TS% [UPD] Event 1020: msiexec finalizado con codigo de salida: %INSTALL_EXIT% >> %LOG%
 
 REM Restaurar Service Recovery (reiniciar en 5s ante fallo, reset counter cada 86400s)
-echo [%date% %time%] [UPD] Event 1020: Restaurando Service Recovery. >> %LOG%
+call :ts
+echo %TS% [UPD] Event 1020: Restaurando Service Recovery. >> %LOG%
 sc failure {ServiceName} reset= 86400 actions= restart/5000/restart/5000/restart/5000 > nul 2>&1
 
 REM Verificar resultado
 if %INSTALL_EXIT% neq 0 (
-    echo [%date% %time%] [UPD] Event 1091: ERROR - Instalacion fallida con codigo %INSTALL_EXIT%. Reiniciando servicio anterior. >> %LOG%
+    call :ts
+    echo %TS% [UPD] Event 1091: ERROR - Instalacion fallida con codigo %INSTALL_EXIT%. Reiniciando servicio anterior. >> %LOG%
     net start {ServiceName} > nul 2>&1
     timeout /t 2 /nobreak > nul
     start """" ""{trayExePath}""
     goto :cleanup
 )
 
-echo [%date% %time%] [UPD] Event 1020: Instalacion exitosa. Iniciando servicio actualizado... >> %LOG%
+call :ts
+echo %TS% [UPD] Event 1020: Instalacion exitosa. Iniciando servicio actualizado... >> %LOG%
 
 REM Iniciar el servicio actualizado
 net start {ServiceName} > nul 2>&1
 timeout /t 3 /nobreak > nul
 
 REM Lanzar el Tray actualizado
-echo [%date% %time%] [UPD] Event 1020: Lanzando AlwaysPrintTray.exe... >> %LOG%
+call :ts
+echo %TS% [UPD] Event 1020: Lanzando AlwaysPrintTray.exe... >> %LOG%
 start """" ""{trayExePath}""
 
 REM Eliminar MSI temporal
 del /f /q ""{msiFilePath}"" > nul 2>&1
 
 :cleanup
-echo [%date% %time%] [UPD] Event 1020: Script de actualizacion finalizado. >> %LOG%
+call :ts
+echo %TS% [UPD] Event 1020: Script de actualizacion finalizado. >> %LOG%
 
 REM Auto-eliminar este script (con delay para que cmd lo suelte)
 (goto) 2>nul & del /f /q ""{scriptPath}""
+exit /b
+
+:ts
+for /f ""tokens=2 delims=="" %%I in ('wmic os get localdatetime /value 2^^^>nul') do set ""DT=%%I""
+set ""TS=[%DT:~0,4%-%DT:~4,2%-%DT:~6,2% %DT:~8,2%:%DT:~10,2%:%DT:~12,2%]""
+goto :eof
 ";
         }
     }
