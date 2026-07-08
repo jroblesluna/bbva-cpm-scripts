@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
 using AlwaysPrintTray.Connectivity;
 
@@ -136,6 +137,10 @@ namespace AlwaysPrintTray.Forms
             form.BringToFront();
             form.Activate();
             form._fadeInTimer.Start();
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"ConnectivityNotificationForm: mostrada ({(form._severity == Severity.Green ? "verde" : form._severity == Severity.Yellow ? "amarilla" : "roja")}, {percent}%).",
+                AlwaysPrintLogger.EvtConnectivitySummary);
 
             if (form._severity != Severity.Red)
             {
@@ -354,6 +359,10 @@ namespace AlwaysPrintTray.Forms
         {
             if (Current == this)
                 Current = null;
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                "ConnectivityNotificationForm: cerrada.",
+                AlwaysPrintLogger.EvtConnectivitySummary);
 
             base.OnFormClosed(e);
 

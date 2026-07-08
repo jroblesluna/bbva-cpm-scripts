@@ -1369,6 +1369,7 @@ namespace AlwaysPrintTray
             // Si ya hay un formulario abierto, traerlo al frente y no abrir otro
             if (_activeForm != null && !_activeForm.IsDisposed)
             {
+                AlwaysPrintLogger.WriteTrayInfo("StatusForm: ya existe una instancia abierta, activando.");
                 _activeForm.Activate();
                 return;
             }
@@ -1418,8 +1419,15 @@ namespace AlwaysPrintTray
             var form = new StatusForm(_pipe, connectivityProvider);
             _activeForm = form;
             _statusForm = form;
-            form.FormClosed += (_, __) => { _activeForm = null; _statusForm = null; };
+            form.FormClosed += (_, __) => 
+            { 
+                _activeForm = null; 
+                _statusForm = null;
+                AlwaysPrintLogger.WriteTrayInfo("StatusForm cerrado.");
+            };
+            AlwaysPrintLogger.WriteTrayInfo("StatusForm abierto (ShowDialog).");
             form.ShowDialog();
+            AlwaysPrintLogger.WriteTrayInfo("StatusForm.ShowDialog() retornó.");
         }
 
         /// <summary>

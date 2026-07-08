@@ -263,6 +263,26 @@ namespace AlwaysPrintTray.Forms
         // =====================================================================
 
         /// <summary>
+        /// Log al mostrar el formulario.
+        /// </summary>
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            AlwaysPrint.Shared.Logging.AlwaysPrintLogger.WriteTrayInfo(
+                "ConnectivityReportForm: mostrado.");
+        }
+
+        /// <summary>
+        /// Log al cerrar el formulario.
+        /// </summary>
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            AlwaysPrint.Shared.Logging.AlwaysPrintLogger.WriteTrayInfo(
+                "ConnectivityReportForm: cerrado.");
+            base.OnFormClosed(e);
+        }
+
+        /// <summary>
         /// Detecta el proxy del sistema y retorna un texto descriptivo para el header.
         /// Usa ProxyHelper.GetSystemProxyUri() con la primera URL de los resultados.
         /// </summary>
