@@ -383,11 +383,61 @@ namespace AlwaysPrint.Shared.Messages
         [JsonProperty("timeout_seconds")]
         public int TimeoutSeconds { get; set; } = 5;
 
-        [JsonProperty("notification_green_timeout_seconds")]
-        public int NotificationGreenTimeoutSeconds { get; set; } = 5;
+        [JsonProperty("notifications")]
+        public NotificationConfig Notifications { get; set; } = new NotificationConfig();
+    }
 
-        [JsonProperty("notification_yellow_timeout_seconds")]
-        public int NotificationYellowTimeoutSeconds { get; set; } = 10;
+    /// <summary>
+    /// Configuración de notificaciones por nivel de severidad.
+    /// Toda la personalización es desde el alwaysconfig (textos, colores, timeouts, visibilidad).
+    /// </summary>
+    public class NotificationConfig
+    {
+        [JsonProperty("green")]
+        public NotificationLevel Green { get; set; } = new NotificationLevel 
+        { 
+            Enabled = false, Text = "Conectividad: Todo OK", TimeoutSeconds = 5, Color = "#E8F5E9" 
+        };
+
+        [JsonProperty("yellow")]
+        public NotificationLevel Yellow { get; set; } = new NotificationLevel 
+        { 
+            Enabled = true, Text = "Conectividad: servicios no críticos inaccesibles", TimeoutSeconds = 10, Color = "#FFF8E1" 
+        };
+
+        [JsonProperty("orange")]
+        public NotificationLevel Orange { get; set; } = new NotificationLevel 
+        { 
+            Enabled = true, Text = "Conectividad: servicios críticos inaccesibles", TimeoutSeconds = 0, Color = "#FFF3E0" 
+        };
+
+        [JsonProperty("red")]
+        public NotificationLevel Red { get; set; } = new NotificationLevel 
+        { 
+            Enabled = true, Text = "Sin conectividad a Internet", TimeoutSeconds = 0, Color = "#FFEBEE" 
+        };
+    }
+
+    /// <summary>
+    /// Configuración de un nivel de notificación individual.
+    /// </summary>
+    public class NotificationLevel
+    {
+        /// <summary>true para mostrar la notificación, false para omitirla.</summary>
+        [JsonProperty("enabled")]
+        public bool Enabled { get; set; } = true;
+
+        /// <summary>Texto principal mostrado al usuario.</summary>
+        [JsonProperty("text")]
+        public string Text { get; set; } = string.Empty;
+
+        /// <summary>Auto-cierre en segundos (0 = persistente, requiere acknowledge manual).</summary>
+        [JsonProperty("timeout_seconds")]
+        public int TimeoutSeconds { get; set; }
+
+        /// <summary>Color de fondo de la notificación (formato hex: #RRGGBB).</summary>
+        [JsonProperty("color")]
+        public string Color { get; set; } = "#FFFFFF";
     }
 }
 

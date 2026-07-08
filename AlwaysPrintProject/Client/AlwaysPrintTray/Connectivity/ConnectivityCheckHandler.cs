@@ -155,12 +155,21 @@ namespace AlwaysPrintTray.Connectivity
                 int criticalFails = results.Count(r => r.Critical && !r.Success);
                 int totalOk = results.Count(r => r.Success);
 
-                // Verde: todo OK → no mostrar notificación
+                // Verde: todo OK → verificar si notificación verde está habilitada
                 if (totalFails == 0)
                 {
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        "ConnectivityCheck: todos los servicios accesibles. Sin notificación.",
-                        AlwaysPrintLogger.EvtConnectivitySummary);
+                    var greenConfig = payload.Notifications?.Green;
+                    if (greenConfig != null && greenConfig.Enabled)
+                    {
+                        ShowNotificationOnDedicatedThread(results.ToList(), percent, payload,
+                            ConnectivitySeverity.Green, greenConfig);
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            "ConnectivityCheck: todos los servicios accesibles. Notificación verde deshabilitada.",
+                            AlwaysPrintLogger.EvtConnectivitySummary);
+                    }
                     return;
                 }
 
@@ -176,7 +185,18 @@ namespace AlwaysPrintTray.Connectivity
                 else
                     severity = ConnectivitySeverity.Yellow;
 
-                ShowNotificationOnDedicatedThread(results.ToList(), percent, payload, severity);
+                // Obtener configuración de notificación para este nivel
+                var notifConfig = GetNotificationConfig(payload.Notifications, severity);
+
+                if (!notifConfig.Enabled)
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"ConnectivityCheck: severidad {severity} — notificación deshabilitada en config.",
+                        AlwaysPrintLogger.EvtConnectivitySummary);
+                    return;
+                }
+
+                ShowNotificationOnDedicatedThread(results.ToList(), percent, payload, severity, notifConfig);
             }
             catch (OperationCanceledException)
             {
@@ -383,14 +403,14 @@ namespace AlwaysPrintTray.Connectivity
         /// </summary>
         private void ShowNotificationOnDedicatedThread(
             List<UrlCheckResult> results, int percent, ConnectivityCheckPayload payload,
-            ConnectivitySeverity severity)
+            ConnectivitySeverity severity, NotificationLevel notifConfig)
         {
             var thread = new Thread(() =>
             {
                 try
                 {
                     Application.EnableVisualStyles();
-                    ConnectivityNotificationForm.ShowResult(results, percent, payload, severity);
+                    ConnectivityNotificationForm.ShowResult(results, percent, payload, severity, notifConfig);
                     Application.Run();
                 }
                 catch (Exception ex)
@@ -404,6 +424,23 @@ namespace AlwaysPrintTray.Connectivity
             thread.IsBackground = true;
             thread.Name = "ConnectivityNotification";
             thread.Start();
+        }
+
+        /// <summary>
+        /// Obtiene la configuración de notificación para un nivel de severidad dado.
+        /// </summary>
+        private static NotificationLevel GetNotificationConfig(NotificationConfig config, ConnectivitySeverity severity)
+        {
+            if (config == null) return new NotificationLevel { Enabled = true, Text = "Conectividad", TimeoutSeconds = 0, Color = "#FFF3E0" };
+
+            switch (severity)
+            {
+                case ConnectivitySeverity.Green: return config.Green ?? new NotificationLevel { Enabled = false };
+                case ConnectivitySeverity.Yellow: return config.Yellow ?? new NotificationLevel { Enabled = true, Text = "Conectividad: servicios no críticos inaccesibles", TimeoutSeconds = 10, Color = "#FFF8E1" };
+                case ConnectivitySeverity.Orange: return config.Orange ?? new NotificationLevel { Enabled = true, Text = "Conectividad: servicios críticos inaccesibles", TimeoutSeconds = 0, Color = "#FFF3E0" };
+                case ConnectivitySeverity.Red: return config.Red ?? new NotificationLevel { Enabled = true, Text = "Sin conectividad a Internet", TimeoutSeconds = 0, Color = "#FFEBEE" };
+                default: return new NotificationLevel { Enabled = true };
+            }
         }
 
         /// <summary>

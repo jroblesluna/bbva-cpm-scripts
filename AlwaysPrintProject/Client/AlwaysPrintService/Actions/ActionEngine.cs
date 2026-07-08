@@ -1061,8 +1061,14 @@ namespace AlwaysPrintService.Actions
                 var urlsToken = action.Parameters?["urls"];
                 var urls = urlsToken?.ToObject<List<ConnectivityUrl>>() ?? new List<ConnectivityUrl>();
                 int timeoutSeconds = GetParameter<int>(action, "timeout_seconds", 5);
-                int notificationGreenTimeout = GetParameter<int>(action, "notification_green_timeout_seconds", 5);
-                int notificationYellowTimeout = GetParameter<int>(action, "notification_yellow_timeout_seconds", 10);
+
+                // Deserializar configuración de notificaciones (objeto estructurado)
+                NotificationConfig notifications = null;
+                var notificationsToken = action.Parameters?["notifications"];
+                if (notificationsToken != null)
+                {
+                    notifications = notificationsToken.ToObject<NotificationConfig>();
+                }
 
                 if (urls.Count == 0)
                 {
@@ -1075,8 +1081,7 @@ namespace AlwaysPrintService.Actions
                 {
                     Urls = urls,
                     TimeoutSeconds = timeoutSeconds,
-                    NotificationGreenTimeoutSeconds = notificationGreenTimeout,
-                    NotificationYellowTimeoutSeconds = notificationYellowTimeout
+                    Notifications = notifications ?? new NotificationConfig()
                 };
 
                 // Verificar si hay callback de envío de mensajes configurado

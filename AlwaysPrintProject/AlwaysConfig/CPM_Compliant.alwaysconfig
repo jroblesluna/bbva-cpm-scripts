@@ -1,5 +1,5 @@
 {
-  "version": "10.1",
+  "version": "10.2",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -1206,8 +1206,32 @@
               { "url": "https://prodlexcloudk8s19.blob.core.windows.net", "critical": true, "function": "Cloud Print Management" }
             ],
             "timeout_seconds": 5,
-            "notification_green_timeout_seconds": 5,
-            "notification_yellow_timeout_seconds": 10
+            "notifications": {
+              "green": {
+                "enabled": false,
+                "text": "Conectividad: Todo OK",
+                "timeout_seconds": 5,
+                "color": "#E8F5E9"
+              },
+              "yellow": {
+                "enabled": true,
+                "text": "Conectividad: servicios no críticos inaccesibles",
+                "timeout_seconds": 10,
+                "color": "#FFF8E1"
+              },
+              "orange": {
+                "enabled": true,
+                "text": "Conectividad: servicios críticos inaccesibles",
+                "timeout_seconds": 0,
+                "color": "#FFF3E0"
+              },
+              "red": {
+                "enabled": true,
+                "text": "Sin conectividad a Internet",
+                "timeout_seconds": 0,
+                "color": "#FFEBEE"
+              }
+            }
           }
         }
       ]
