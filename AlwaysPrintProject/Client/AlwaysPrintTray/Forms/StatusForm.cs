@@ -67,6 +67,9 @@ namespace AlwaysPrintTray.Forms
         // ── Estado global busy ──────────────────────────────────────────────────
         private bool _isBusy;
 
+        // ── Flag de cierre graceful ─────────────────────────────────────────────
+        private bool _isClosing;
+
         // ── Timer para refrescar estados de servicios ───────────────────────────
         private Timer _refreshTimer = null!;
 
@@ -410,6 +413,8 @@ namespace AlwaysPrintTray.Forms
 
         private void LoadData()
         {
+            if (_isClosing) return;
+
             try
             {
                 // Información general
@@ -457,6 +462,9 @@ namespace AlwaysPrintTray.Forms
         /// </summary>
         private void OnRefreshTimerTick(object? sender, EventArgs e)
         {
+            // No refrescar si el form está cerrándose
+            if (_isClosing || IsDisposed) return;
+
             try
             {
                 RefreshServiceStates();
@@ -1171,11 +1179,64 @@ namespace AlwaysPrintTray.Forms
         // ── Eventos del formulario ──────────────────────────────────────────────
         // ═══════════════════════════════════════════════════════════════════════
 
-        /// <summary>Escape cierra el formulario.</summary>
+        /// <summary>
+        /// Escape se maneja via CancelButton → Close() → OnFormClosing (cierre graceful).
+        /// No hacer nada extra aquí para evitar doble cierre.
+        /// </summary>
         private void OnKeyDown(object? sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Escape)
-                Close();
+            // CancelButton = _btnClose ya maneja Escape → Click → Close() → OnFormClosing
+        }
+
+        /// <summary>
+        /// Cierre graceful: cancela el close actual, muestra estado "Cerrando...",
+        /// detiene el timer de refresco y espera un tick para que operaciones
+        /// pendientes (WMI/ServiceController) en el message pump completen.
+        /// Esto evita el freeze al abrir/cerrar rápidamente.
+        /// </summary>
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            // Si ya estamos en proceso de cierre graceful, dejar que cierre
+            if (_isClosing)
+            {
+                base.OnFormClosing(e);
+                return;
+            }
+
+            // Si está busy (ejecutando acción OnDemand), no permitir cerrar
+            if (_isBusy)
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            // Iniciar cierre graceful: cancelar el close actual, mostrar estado "Cerrando..."
+            e.Cancel = true;
+            _isClosing = true;
+
+            // Detener el timer de refresco inmediatamente para evitar más operaciones WMI
+            _refreshTimer?.Stop();
+
+            // Mostrar estado visual de cierre
+            _btnClose.Text = "Cerrando...";
+            _btnClose.Enabled = false;
+            Cursor = Cursors.WaitCursor;
+
+            // Deshabilitar todos los botones de acción
+            foreach (var btn in _allActionButtons)
+                btn.Enabled = false;
+
+            // Usar un timer de un solo disparo para dar tiempo a que cualquier operación
+            // pendiente en el message pump complete, luego cerrar definitivamente
+            var closeTimer = new Timer { Interval = 150 };
+            closeTimer.Tick += (s, args) =>
+            {
+                closeTimer.Stop();
+                closeTimer.Dispose();
+                Cursor = Cursors.Default;
+                Close(); // Ahora _isClosing = true, así que pasará al base.OnFormClosing
+            };
+            closeTimer.Start();
         }
 
         protected override void Dispose(bool disposing)
