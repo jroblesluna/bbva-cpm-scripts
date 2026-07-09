@@ -641,7 +641,7 @@ class BulkExecutionService:
                 command_message = {
                     "type": "command",
                     "command_id": str(uuid4()),
-                    "command": "execute_on_demand",
+                    "command_type": "execute_on_demand",
                     "params": {"label": label},
                 }
 
