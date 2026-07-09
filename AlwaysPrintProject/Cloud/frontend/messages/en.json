@@ -76,7 +76,8 @@
     "documentation": "Documentation",
     "map": "Map",
     "collapseSidebar": "Collapse menu",
-    "expandSidebar": "Expand menu"
+    "expandSidebar": "Expand menu",
+    "bulkActions": "Bulk Actions"
   },
   "login": {
     "title": "AlwaysPrint Cloud Manager",
@@ -1298,5 +1299,39 @@
     "wsErrorDelete": "Error deleting data",
     "wsRetryAnalysis": "Retry",
     "wsTargets": "What will be captured:"
+  },
+  "bulkActions": {
+    "title": "Bulk Actions",
+    "subtitle": "Execute OnDemand actions on all online workstations in your organization",
+    "selectAction": "Select action",
+    "noActionsAvailable": "No OnDemand actions available in the active configuration",
+    "noActiveConfig": "The organization does not have an active configuration",
+    "throttleLabel": "Delay between sends (ms)",
+    "throttleDescription": "Wait time between each send to a workstation",
+    "throttleMin": "Minimum: 50ms",
+    "throttleMax": "Maximum: 10000ms",
+    "startExecution": "Start Execution",
+    "preview": "Preview",
+    "previewTitle": "Execution summary",
+    "workstationsOnline": "Online workstations",
+    "estimatedTime": "Estimated time",
+    "confirmExecution": "Confirm Execution",
+    "cancelExecution": "Cancel Execution",
+    "executionInProgress": "Execution in progress",
+    "executionCompleted": "Execution completed",
+    "executionCancelled": "Execution cancelled",
+    "executionFailed": "Execution failed",
+    "newExecution": "New Execution",
+    "total": "Total",
+    "sent": "Sent",
+    "success": "Successful",
+    "errors": "Errors",
+    "progress": "Progress",
+    "elapsed": "Elapsed time",
+    "accessDenied": "You do not have permission to access this section",
+    "actionLabel": "Action",
+    "actionDescription": "Description",
+    "milliseconds": "ms",
+    "seconds": "s"
   }
 }

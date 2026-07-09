@@ -40,6 +40,7 @@ import {
   MapPin,
   PanelLeftClose,
   PanelLeftOpen,
+  Zap,
 } from 'lucide-react'
 
 // Definición de items de navegación
@@ -101,6 +102,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { key: 'myOrganization', href: '/dashboard/my-organization', icon: Building2, operatorOnly: true, subLabel: 'subInfrastructure' },
         { key: 'vlans', href: '/dashboard/vlans', icon: Network, subLabel: 'subInfrastructure' },
         { key: 'workstations', href: '/dashboard/workstations', icon: Monitor, subLabel: 'subInfrastructure' },
+        { key: 'bulkActions', href: '/dashboard/workstations/bulk-actions', icon: Zap, subLabel: 'subInfrastructure' },
         { key: 'pendingIps', href: '/dashboard/admin/pending-ips', icon: Globe, adminOnly: true, subLabel: 'subRequests' },
         { key: 'devices', href: '/dashboard/devices', icon: Printer, subLabel: 'subResources' },
       ],

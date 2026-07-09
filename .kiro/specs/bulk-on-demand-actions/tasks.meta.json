@@ -1,0 +1,17 @@
+{
+  "pbtResults": {
+    "1.4 Write property tests for trigger extraction and label validation": {
+      "status": "passed",
+      "lastRunTimestamp": 1783632110399
+    },
+    "3.6 Write property test for preview time estimation": {
+      "status": "passed",
+      "lastRunTimestamp": 1783632362774
+    },
+    "3.5 Write property tests for execution progress invariants and cancellation": {
+      "status": "passed",
+      "lastRunTimestamp": 1783632563590
+    }
+  },
+  "executionHistory": {}
+}

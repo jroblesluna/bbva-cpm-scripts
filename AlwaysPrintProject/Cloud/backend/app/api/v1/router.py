@@ -28,6 +28,7 @@ from app.api.v1.endpoints import (
     system_status,
     system_metrics,
     health,
+    bulk_actions,
 )
 
 # Router principal de la API v1
@@ -142,6 +143,12 @@ api_router.include_router(
 api_router.include_router(
     action_config.router,
     tags=["Configuración de Acciones"]
+)
+
+# Ejecución masiva de acciones OnDemand
+api_router.include_router(
+    bulk_actions.router,
+    tags=["Acciones Masivas"]
 )
 
 # Actualizaciones automáticas (autenticación por IP pública o workstation ID)

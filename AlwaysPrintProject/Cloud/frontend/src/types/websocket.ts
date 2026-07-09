@@ -2,6 +2,8 @@
  * Tipos relacionados con mensajes WebSocket.
  */
 
+import { BulkProgressMessage } from './bulk-actions'
+
 // ============================================================================
 // MENSAJES WORKSTATION → BACKEND
 // ============================================================================
@@ -158,6 +160,7 @@ export type OperatorMessage =
   | ConnectionStatsMessage
   | TelemetryReceivedMessage
   | ConnectivityResultReceivedMessage
+  | BulkProgressMessage
 
 // ============================================================================
 // ESTADO DE CONEXIÓN
