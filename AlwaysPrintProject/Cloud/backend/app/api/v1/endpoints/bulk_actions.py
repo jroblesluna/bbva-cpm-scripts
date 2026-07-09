@@ -131,8 +131,13 @@ async def get_session_status(
 
     Retorna métricas de progreso: total, enviados, éxitos, errores,
     workstations fallidas, y tiempo transcurrido.
+    Admin puede acceder a cualquier sesión sin restricción de org.
     """
-    org_id = _resolve_org_id(user)
+    if user.role == UserRole.READONLY:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes")
+
+    # Admin puede acceder a cualquier sesión (org_id=None omite tenant check)
+    org_id = None if user.role == UserRole.ADMIN else user.organization_id
     return await bulk_service.get_session_status(session_id, org_id)
 
 
@@ -146,6 +151,11 @@ async def cancel_session(
 
     Establece un flag de cancelación que el background task verifica
     antes de cada envío. La sesión debe estar en estado 'running'.
+    Admin puede cancelar cualquier sesión sin restricción de org.
     """
-    org_id = _resolve_org_id(user)
+    if user.role == UserRole.READONLY:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes")
+
+    # Admin puede cancelar cualquier sesión (org_id=None omite tenant check)
+    org_id = None if user.role == UserRole.ADMIN else user.organization_id
     return await bulk_service.cancel_session(session_id, org_id)

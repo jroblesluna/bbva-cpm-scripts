@@ -1334,6 +1334,7 @@
     "milliseconds": "ms",
     "seconds": "s",
     "selectOrganization": "Organización",
-    "selectOrganizationPlaceholder": "Seleccionar organización..."
+    "selectOrganizationPlaceholder": "Seleccionar organización...",
+    "noWorkstationsOnline": "No hay workstations online en la organización"
   }
 }
