@@ -951,6 +951,37 @@ export const logAnalysisApi = {
 }
 
 // ============================================================================
+// BULK ACTIONS (ACCIONES MASIVAS)
+// ============================================================================
+
+export const bulkActionsApi = {
+  /**
+   * Obtener acciones OnDemand disponibles en el alwaysconfig activo de la org.
+   */
+  getAvailableActions: () => apiClient.get('/bulk-actions/available-actions'),
+
+  /**
+   * Preview con conteo de workstations online y tiempo estimado.
+   */
+  preview: (data: { label: string; delay_ms: number }) => apiClient.post('/bulk-actions/preview', data),
+
+  /**
+   * Iniciar ejecución masiva (retorna 202).
+   */
+  start: (data: { label: string; delay_ms: number }) => apiClient.post('/bulk-actions/start', data),
+
+  /**
+   * Obtener estado actual de una sesión de ejecución masiva.
+   */
+  getStatus: (sessionId: string) => apiClient.get(`/bulk-actions/status/${sessionId}`),
+
+  /**
+   * Cancelar ejecución en curso.
+   */
+  cancel: (sessionId: string) => apiClient.post(`/bulk-actions/cancel/${sessionId}`),
+}
+
+// ============================================================================
 // HEALTH CHECK
 // ============================================================================
 

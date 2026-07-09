@@ -76,7 +76,8 @@
     "documentation": "Documentación",
     "map": "Mapa",
     "collapseSidebar": "Contraer menú",
-    "expandSidebar": "Expandir menú"
+    "expandSidebar": "Expandir menú",
+    "bulkActions": "Acciones Masivas"
   },
   "login": {
     "title": "AlwaysPrint Cloud Manager",
@@ -1298,5 +1299,39 @@
     "wsErrorDelete": "Error eliminando datos",
     "wsRetryAnalysis": "Reintentar",
     "wsTargets": "Lo que se capturará:"
+  },
+  "bulkActions": {
+    "title": "Acciones Masivas",
+    "subtitle": "Ejecuta acciones OnDemand en todas las workstations online de tu organización",
+    "selectAction": "Seleccionar acción",
+    "noActionsAvailable": "No hay acciones OnDemand disponibles en la configuración activa",
+    "noActiveConfig": "La organización no tiene una configuración activa",
+    "throttleLabel": "Delay entre envíos (ms)",
+    "throttleDescription": "Tiempo de espera entre cada envío a una workstation",
+    "throttleMin": "Mínimo: 50ms",
+    "throttleMax": "Máximo: 10000ms",
+    "startExecution": "Iniciar Ejecución",
+    "preview": "Vista Previa",
+    "previewTitle": "Resumen de ejecución",
+    "workstationsOnline": "Workstations online",
+    "estimatedTime": "Tiempo estimado",
+    "confirmExecution": "Confirmar Ejecución",
+    "cancelExecution": "Cancelar Ejecución",
+    "executionInProgress": "Ejecución en curso",
+    "executionCompleted": "Ejecución completada",
+    "executionCancelled": "Ejecución cancelada",
+    "executionFailed": "Ejecución fallida",
+    "newExecution": "Nueva Ejecución",
+    "total": "Total",
+    "sent": "Enviados",
+    "success": "Exitosos",
+    "errors": "Errores",
+    "progress": "Progreso",
+    "elapsed": "Tiempo transcurrido",
+    "accessDenied": "No tienes permisos para acceder a esta sección",
+    "actionLabel": "Acción",
+    "actionDescription": "Descripción",
+    "milliseconds": "ms",
+    "seconds": "s"
   }
 }
