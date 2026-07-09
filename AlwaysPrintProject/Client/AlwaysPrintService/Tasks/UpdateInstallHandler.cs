@@ -137,6 +137,7 @@ namespace AlwaysPrintService.Tasks
         private static string GenerateInstallScript(string msiFilePath, string trayExePath, string scriptPath, string logFilePath)
         {
             return $@"@echo off
+setlocal EnableDelayedExpansion
 REM ============================================================
 REM Script de actualización automática de AlwaysPrint
 REM Generado: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
@@ -183,9 +184,9 @@ echo %TS% [UPD] Event 1020: Restaurando Service Recovery. >> %LOG%
 sc failure {ServiceName} reset= 86400 actions= restart/5000/restart/5000/restart/5000 > nul 2>&1
 
 REM Verificar resultado
-if %INSTALL_EXIT% neq 0 (
+if !INSTALL_EXIT! neq 0 (
     call :ts
-    echo %TS% [UPD] Event 1091: ERROR - Instalacion fallida con codigo %INSTALL_EXIT%. >> %LOG%
+    echo !TS! [UPD] Event 1091: ERROR - Instalacion fallida con codigo !INSTALL_EXIT!. >> %LOG%
     goto :cleanup
 )
 
@@ -221,24 +222,24 @@ set VERIFY_OK=0
 
 :verify_loop
 set /a VERIFY_ATTEMPT+=1
-if %VERIFY_ATTEMPT% gtr 5 goto :verify_done
+if !VERIFY_ATTEMPT! gtr 5 goto :verify_done
 
 sc query {ServiceName} | findstr /i ""RUNNING"" > nul 2>&1
-if %errorlevel% equ 0 (
+if !errorlevel! equ 0 (
     call :ts
-    echo %TS% [UPD] Event 1020: Verificacion %VERIFY_ATTEMPT%/5: servicio ACTIVO. >> %LOG%
+    echo !TS! [UPD] Event 1020: Verificacion !VERIFY_ATTEMPT!/5: servicio ACTIVO. >> %LOG%
     set VERIFY_OK=1
     goto :verify_done
 )
 
 call :ts
-echo %TS% [UPD] Event 1020: Verificacion %VERIFY_ATTEMPT%/5: servicio NO activo. >> %LOG%
+echo %TS% [UPD] Event 1020: Verificacion !VERIFY_ATTEMPT!/5: servicio NO activo. >> %LOG%
 
 REM Verificar si el servicio existe (puede estar marcado para eliminación)
 sc query {ServiceName} > nul 2>&1
-if %errorlevel% equ 1060 (
+if !errorlevel! equ 1060 (
     call :ts
-    echo %TS% [UPD] Event 1091: Servicio no existe o marcado para eliminacion. Reintentando msiexec... >> %LOG%
+    echo !TS! [UPD] Event 1091: Servicio no existe o marcado para eliminacion. Reintentando msiexec... >> %LOG%
     taskkill /f /im msiexec.exe > nul 2>&1
     timeout /t 5 /nobreak > nul
     msiexec /i ""{msiFilePath}"" /quiet /norestart REINSTALLMODE=amus
@@ -247,18 +248,18 @@ if %errorlevel% equ 1060 (
 
 REM Intentar iniciar el servicio
 call :ts
-echo %TS% [UPD] Event 1020: Verificacion %VERIFY_ATTEMPT%/5: intentando iniciar servicio... >> %LOG%
+echo %TS% [UPD] Event 1020: Verificacion !VERIFY_ATTEMPT!/5: intentando iniciar servicio... >> %LOG%
 net start {ServiceName} > nul 2>&1
 timeout /t 30 /nobreak > nul
 goto :verify_loop
 
 :verify_done
-if %VERIFY_OK% equ 0 (
+if !VERIFY_OK! equ 0 (
     call :ts
-    echo %TS% [UPD] Event 1091: CRITICO - Servicio no pudo iniciarse despues de 5 intentos. Requiere intervencion manual. >> %LOG%
+    echo !TS! [UPD] Event 1091: CRITICO - Servicio no pudo iniciarse despues de 5 intentos. Requiere intervencion manual. >> %LOG%
 ) else (
     call :ts
-    echo %TS% [UPD] Event 1020: Servicio verificado activo. Actualizacion completada. >> %LOG%
+    echo !TS! [UPD] Event 1020: Servicio verificado activo. Actualizacion completada. >> %LOG%
     REM El Tray será lanzado automáticamente por el Service al iniciar (CreateProcessAsUser)
 )
 
