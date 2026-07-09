@@ -957,18 +957,30 @@ export const logAnalysisApi = {
 export const bulkActionsApi = {
   /**
    * Obtener acciones OnDemand disponibles en el alwaysconfig activo de la org.
+   * Para admins, permite especificar una organización distinta.
    */
-  getAvailableActions: () => apiClient.get('/bulk-actions/available-actions'),
+  getAvailableActions: (organizationId?: string) =>
+    apiClient.get('/bulk-actions/available-actions', {
+      params: organizationId ? { organization_id: organizationId } : undefined,
+    }),
 
   /**
    * Preview con conteo de workstations online y tiempo estimado.
+   * Para admins, permite especificar una organización distinta.
    */
-  preview: (data: { label: string; delay_ms: number }) => apiClient.post('/bulk-actions/preview', data),
+  preview: (data: { label: string; delay_ms: number }, organizationId?: string) =>
+    apiClient.post('/bulk-actions/preview', data, {
+      params: organizationId ? { organization_id: organizationId } : undefined,
+    }),
 
   /**
    * Iniciar ejecución masiva (retorna 202).
+   * Para admins, permite especificar una organización distinta.
    */
-  start: (data: { label: string; delay_ms: number }) => apiClient.post('/bulk-actions/start', data),
+  start: (data: { label: string; delay_ms: number }, organizationId?: string) =>
+    apiClient.post('/bulk-actions/start', data, {
+      params: organizationId ? { organization_id: organizationId } : undefined,
+    }),
 
   /**
    * Obtener estado actual de una sesión de ejecución masiva.

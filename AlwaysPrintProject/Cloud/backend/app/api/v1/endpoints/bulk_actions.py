@@ -9,9 +9,10 @@ vía WebSocket, y cancelación.
 
 import asyncio
 import logging
+from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -35,24 +36,26 @@ router = APIRouter(prefix="/bulk-actions", tags=["Acciones Masivas"])
 bulk_service = BulkExecutionService()
 
 
-def _get_org_id(user: User) -> UUID:
+def _resolve_org_id(user: User, organization_id: Optional[UUID] = None) -> UUID:
     """
-    Obtiene el organization_id del usuario con validación de rol.
+    Resuelve el organization_id según el rol del usuario.
 
-    - Usuarios readonly: HTTP 403 (permisos insuficientes)
-    - Operadores: retorna su organization_id asignado
-    - Admins: retorna su organization_id (si tiene)
-
-    Raises:
-        HTTPException 403: Si el usuario es readonly
+    - readonly: HTTP 403
+    - operator: siempre usa su org asignada (ignora param)
+    - admin: usa el param si se proporciona, o su org asignada como fallback
     """
     if user.role == UserRole.READONLY:
         raise HTTPException(status_code=403, detail="Permisos insuficientes")
+
+    if user.role == UserRole.ADMIN and organization_id:
+        return organization_id
+
     return user.organization_id
 
 
 @router.get("/available-actions", response_model=list[OnDemandAction])
 async def get_available_actions(
+    organization_id: Optional[UUID] = Query(None, description="ID de organización target (solo Admin)"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -61,14 +64,16 @@ async def get_available_actions(
 
     Extrae los triggers con event == "OnDemand" y label no vacío del
     alwaysconfig activo (scope=org) de la organización del usuario.
+    Para admins, permite especificar una organización distinta via query param.
     """
-    org_id = _get_org_id(user)
+    org_id = _resolve_org_id(user, organization_id)
     return bulk_service.get_available_actions(org_id, db)
 
 
 @router.post("/preview", response_model=BulkPreview)
 async def preview_bulk_execution(
     request: BulkPreviewRequest,
+    organization_id: Optional[UUID] = Query(None, description="ID de organización target (solo Admin)"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -77,14 +82,16 @@ async def preview_bulk_execution(
 
     Calcula el tiempo estimado como: (workstations_online - 1) * delay_ms.
     Valida que el label existe en el alwaysconfig activo de la organización.
+    Para admins, permite especificar una organización distinta via query param.
     """
-    org_id = _get_org_id(user)
+    org_id = _resolve_org_id(user, organization_id)
     return await bulk_service.get_preview(org_id, request.label, request.delay_ms, db)
 
 
 @router.post("/start", response_model=BulkStartResponse, status_code=202)
 async def start_bulk_execution(
     request: BulkStartRequest,
+    organization_id: Optional[UUID] = Query(None, description="ID de organización target (solo Admin)"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -93,8 +100,9 @@ async def start_bulk_execution(
 
     Crea una Bulk_Session con estado running y lanza el background task
     que itera las workstations online enviando el comando con throttling.
+    Para admins, permite especificar una organización distinta via query param.
     """
-    org_id = _get_org_id(user)
+    org_id = _resolve_org_id(user, organization_id)
     response, workstation_ids = await bulk_service.start_session(
         org_id, request.label, request.delay_ms, user.id, db
     )
@@ -124,7 +132,7 @@ async def get_session_status(
     Retorna métricas de progreso: total, enviados, éxitos, errores,
     workstations fallidas, y tiempo transcurrido.
     """
-    org_id = _get_org_id(user)
+    org_id = _resolve_org_id(user)
     return await bulk_service.get_session_status(session_id, org_id)
 
 
@@ -139,5 +147,5 @@ async def cancel_session(
     Establece un flag de cancelación que el background task verifica
     antes de cada envío. La sesión debe estar en estado 'running'.
     """
-    org_id = _get_org_id(user)
+    org_id = _resolve_org_id(user)
     return await bulk_service.cancel_session(session_id, org_id)

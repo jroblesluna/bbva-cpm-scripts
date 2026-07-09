@@ -2,6 +2,7 @@
  * Página de acciones masivas (Bulk On-Demand Actions).
  * Permite ejecutar una acción OnDemand en todas las workstations online de la organización.
  * Solo accesible para roles admin y operator.
+ * Admins pueden seleccionar la organización target.
  */
 
 'use client';
@@ -10,7 +11,7 @@ import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/hooks/useAuth';
-import { bulkActionsApi } from '@/lib/api';
+import { bulkActionsApi, organizationsApi } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,8 +25,9 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Zap, AlertCircle, Clock, Loader2, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
+import { Zap, AlertCircle, Clock, Loader2, CheckCircle2, XCircle, RotateCcw, Building2 } from 'lucide-react';
 import type { OnDemandAction, BulkPreview, BulkSessionStatus } from '@/types/bulk-actions';
+import type { Organization } from '@/types/organization';
 import { formatEstimatedTime } from '@/lib/bulk-actions-utils';
 
 // ============================================================================
@@ -179,21 +181,36 @@ export default function BulkActionsPage() {
   const [delayMs, setDelayMs] = useState<number>(500);
   const [showPreview, setShowPreview] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('');
+
+  // Determinar si el usuario es admin
+  const isAdmin = user?.role === 'admin';
+
+  // Parámetro de organización para las API calls (solo admins con org seleccionada)
+  const orgIdParam = isAdmin && selectedOrgId ? selectedOrgId : undefined;
+
+  // Obtener lista de organizaciones (solo para admins)
+  const { data: organizations } = useQuery({
+    queryKey: ['organizations-list'],
+    queryFn: () => organizationsApi.list(),
+    enabled: isAdmin,
+  });
 
   // Obtener acciones OnDemand disponibles del alwaysconfig activo
   const { data: actions, isLoading, error } = useQuery({
-    queryKey: ['bulk-actions-available'],
+    queryKey: ['bulk-actions-available', orgIdParam],
     queryFn: async () => {
-      const res = await bulkActionsApi.getAvailableActions();
+      const res = await bulkActionsApi.getAvailableActions(orgIdParam);
       return res.data as OnDemandAction[];
     },
+    enabled: !isAdmin || selectedOrgId !== '',
   });
 
   // Query de preview — se activa al abrir el diálogo de confirmación
   const { data: previewData, isLoading: isLoadingPreview } = useQuery({
-    queryKey: ['bulk-actions-preview', selectedAction, delayMs],
+    queryKey: ['bulk-actions-preview', selectedAction, delayMs, orgIdParam],
     queryFn: async () => {
-      const res = await bulkActionsApi.preview({ label: selectedAction, delay_ms: delayMs });
+      const res = await bulkActionsApi.preview({ label: selectedAction, delay_ms: delayMs }, orgIdParam);
       return res.data as BulkPreview;
     },
     enabled: showPreview && selectedAction !== '',
@@ -202,7 +219,7 @@ export default function BulkActionsPage() {
   // Mutación para iniciar la ejecución masiva
   const startMutation = useMutation({
     mutationFn: async () => {
-      const res = await bulkActionsApi.start({ label: selectedAction, delay_ms: delayMs });
+      const res = await bulkActionsApi.start({ label: selectedAction, delay_ms: delayMs }, orgIdParam);
       return res.data as BulkSessionStatus;
     },
     onSuccess: (data) => {
@@ -231,7 +248,8 @@ export default function BulkActionsPage() {
   const selectedActionObj = actions?.find((a) => a.label === selectedAction);
 
   // Puede iniciar preview si hay acción seleccionada y delay válido
-  const canPreview = selectedAction !== '' && delayMs >= 50 && delayMs <= 10000;
+  // Para admins, también requiere una organización seleccionada
+  const canPreview = selectedAction !== '' && delayMs >= 50 && delayMs <= 10000 && (!isAdmin || selectedOrgId !== '');
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -259,6 +277,33 @@ export default function BulkActionsPage() {
       {/* Contenido de configuración — se oculta cuando hay sesión activa */}
       {!sessionId && (
         <>
+          {/* Selector de organización (solo para admins) */}
+          {isAdmin && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5" />
+                  {t('selectOrganization')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <select
+                  value={selectedOrgId}
+                  onChange={(e) => {
+                    setSelectedOrgId(e.target.value);
+                    setSelectedAction('');
+                  }}
+                  className="w-full max-w-md border rounded-md p-2 text-sm"
+                >
+                  <option value="">{t('selectOrganizationPlaceholder')}</option>
+                  {organizations?.map((org: Organization) => (
+                    <option key={org.id} value={org.id}>{org.name}</option>
+                  ))}
+                </select>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Selector de acción */}
           <Card>
             <CardHeader>

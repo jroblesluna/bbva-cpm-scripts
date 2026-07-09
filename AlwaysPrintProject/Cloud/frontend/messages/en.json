@@ -1332,6 +1332,8 @@
     "actionLabel": "Action",
     "actionDescription": "Description",
     "milliseconds": "ms",
-    "seconds": "s"
+    "seconds": "s",
+    "selectOrganization": "Organization",
+    "selectOrganizationPlaceholder": "Select organization..."
   }
 }
