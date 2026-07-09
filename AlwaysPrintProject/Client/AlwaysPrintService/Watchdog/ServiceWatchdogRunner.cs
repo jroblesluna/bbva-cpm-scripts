@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.ServiceProcess;
 using System.Threading;
@@ -158,14 +159,20 @@ namespace AlwaysPrintService.Watchdog
                 return;
             }
 
-            if (status == ServiceControllerStatus.Running)
+            string? stalledFile = status == ServiceControllerStatus.Running && entry.StallCheck != null
+                ? FindStalledJobFile(entry.StallCheck)
+                : null;
+
+            if (status == ServiceControllerStatus.Running && stalledFile == null)
             {
                 // Servicio OK, nada que hacer
                 return;
             }
 
-            // Servicio NO está corriendo
-            string statusStr = status.ToString();
+            // Servicio NO está corriendo, o está corriendo pero con trabajos atascados
+            string statusStr = stalledFile != null
+                ? $"Running con trabajo atascado ({stalledFile})"
+                : status.ToString();
             AlwaysPrintLogger.WriteWarning(
                 $"ServiceWatchdog: '{entry.Name}' detectado en estado '{statusStr}'.",
                 AlwaysPrintLogger.EvtGenericWarning);
@@ -186,7 +193,15 @@ namespace AlwaysPrintService.Watchdog
                 return;
             }
 
-            // Intentar reiniciar
+            TryRestartService(entry, status, stalledButRunning: stalledFile != null);
+        }
+
+        /// <summary>
+        /// Intenta poner el servicio en estado Running. Si estaba "Running" pero atascado
+        /// (trabajos viejos en su carpeta de pre), primero lo detiene.
+        /// </summary>
+        private void TryRestartService(WatchdogServiceEntry entry, ServiceControllerStatus status, bool stalledButRunning)
+        {
             try
             {
                 using var sc = new ServiceController(entry.Name);
@@ -210,6 +225,12 @@ namespace AlwaysPrintService.Watchdog
                     }
                 }
 
+                if (stalledButRunning)
+                {
+                    sc.Stop();
+                    sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(30));
+                }
+
                 // Iniciar el servicio
                 sc.Start();
                 sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(30));
@@ -231,6 +252,44 @@ namespace AlwaysPrintService.Watchdog
                     $"ServiceWatchdog: no se pudo reiniciar '{entry.Name}': {ex.Message}",
                     AlwaysPrintLogger.EvtGenericError);
             }
+        }
+
+        /// <summary>
+        /// Busca un archivo "atascado" (sin modificarse por más de stale_after_seconds)
+        /// dentro de la carpeta de trabajos de cada usuario. Retorna la primera ruta
+        /// encontrada, o null si no hay ninguna o la config/carpetas no existen.
+        /// </summary>
+        private static string? FindStalledJobFile(StallCheckConfig cfg)
+        {
+            if (string.IsNullOrEmpty(cfg.BasePath) || !Directory.Exists(cfg.BasePath))
+                return null;
+
+            var threshold = DateTime.UtcNow.AddSeconds(-Math.Max(1, cfg.StaleAfterSeconds));
+
+            try
+            {
+                foreach (var userDir in Directory.EnumerateDirectories(cfg.BasePath))
+                {
+                    string jobsPath = Path.Combine(userDir, cfg.RelativePath);
+                    if (!Directory.Exists(jobsPath))
+                        continue;
+
+                    string? stale = Directory.EnumerateFiles(jobsPath)
+                        .FirstOrDefault(file => File.GetLastWriteTimeUtc(file) < threshold);
+                    if (stale != null)
+                        return stale;
+                }
+            }
+            catch (IOException)
+            {
+                // Carpeta en uso/removida entre el listado y la lectura — ignorar este ciclo
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Sin permisos sobre alguna subcarpeta — ignorar este ciclo
+            }
+
+            return null;
         }
 
         /// <summary>

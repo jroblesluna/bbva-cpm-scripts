@@ -226,5 +226,32 @@ namespace AlwaysPrint.Shared.Configuration
         /// </summary>
         [JsonProperty("monitor_when")]
         public string MonitorWhen { get; set; } = "always";
+
+        /// <summary>
+        /// Opcional: si está presente, además de chequear si el servicio está caído,
+        /// el watchdog revisa si hay archivos "atascados" (sin modificarse) en una carpeta
+        /// de trabajos por-usuario, y si es así reinicia el servicio igual que si estuviera down.
+        /// </summary>
+        [JsonProperty("stall_check")]
+        public StallCheckConfig? StallCheck { get; set; }
+    }
+
+    /// <summary>
+    /// Configuración para detectar trabajos atascados en una carpeta por-usuario
+    /// (ej: C:\ProgramData\LPMC\Jobs\{usuario}\CloudHybrid\pre).
+    /// </summary>
+    public class StallCheckConfig
+    {
+        /// <summary>Carpeta raíz que contiene una subcarpeta por usuario (ej: "C:\ProgramData\LPMC\Jobs").</summary>
+        [JsonProperty("base_path")]
+        public string BasePath { get; set; } = string.Empty;
+
+        /// <summary>Ruta relativa dentro de cada carpeta de usuario (ej: "CloudHybrid\pre").</summary>
+        [JsonProperty("relative_path")]
+        public string RelativePath { get; set; } = string.Empty;
+
+        /// <summary>Segundos sin modificarse para considerar un archivo "atascado" (default 60).</summary>
+        [JsonProperty("stale_after_seconds")]
+        public int StaleAfterSeconds { get; set; } = 60;
     }
 }
