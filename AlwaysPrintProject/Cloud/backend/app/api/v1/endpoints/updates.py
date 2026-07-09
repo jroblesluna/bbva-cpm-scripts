@@ -862,43 +862,13 @@ def download_update(
             detail="Error interno al descargar archivo"
         )
 
-    # DEBUG TEMPORAL: capturar metadata del objeto S3 para diagnóstico
-    s3_content_length = s3_response.get('ContentLength', 0)
-    s3_content_type = s3_response.get('ContentType', 'unknown')
-    s3_key_used = target_key or "latest/AlwaysPrint.msi"
-
-    logger.warning(
-        "DEBUG download_update: key=%s, ContentLength=%d, ContentType=%s, "
-        "workstation=%s, ip=%s, organization=%s",
-        s3_key_used, s3_content_length, s3_content_type,
-        ws_id, client_ip, account_name,
-    )
-
-    # Si el contenido es sospechosamente pequeño (<100KB), leer y loguear los primeros bytes
-    if s3_content_length < 100000:
-        body_bytes = s3_response['Body'].read()
-        first_200 = body_bytes[:200].decode('utf-8', errors='replace')
-        logger.error(
-            "DEBUG download_update: CONTENIDO SOSPECHOSO (solo %d bytes). "
-            "Primeros 200 chars: %s",
-            len(body_bytes), first_200,
-        )
-        # Aún así servir lo que recibimos (para no romper el flujo)
-        from io import BytesIO
-        return StreamingResponse(
-            BytesIO(body_bytes),
-            media_type="application/x-msi",
-            headers={
-                "Content-Disposition": "attachment; filename=AlwaysPrint.msi",
-                "Content-Length": str(len(body_bytes)),
-            },
-        )
-
     # 5. Loggear descarga exitosa y servir archivo
     logger.info(
         "Descarga de actualización autorizada: workstation_id=%s, "
-        "ip_publica=%s, organization=%s, content_length=%d, status=200",
-        ws_id, client_ip, account_name, s3_content_length,
+        "ip_publica=%s, organization=%s, status=200",
+        ws_id,
+        client_ip,
+        account_name,
     )
 
     return StreamingResponse(
@@ -906,7 +876,7 @@ def download_update(
         media_type="application/x-msi",
         headers={
             "Content-Disposition": "attachment; filename=AlwaysPrint.msi",
-            "Content-Length": str(s3_content_length),
+            "Content-Length": str(s3_response.get('ContentLength', 0)),
         },
     )
 
