@@ -563,10 +563,10 @@ class TestAuthorizacion:
     def test_readonly_user_rejected_with_403(self):
         """
         WHEN un usuario readonly intenta usar bulk actions,
-        THEN el helper _get_org_id lanza HTTP 403.
+        THEN el helper _resolve_org_id lanza HTTP 403.
         Validates: Requirement 5.3
         """
-        from app.api.v1.endpoints.bulk_actions import _get_org_id
+        from app.api.v1.endpoints.bulk_actions import _resolve_org_id
 
         # Crear usuario mock con rol readonly
         user = MagicMock(spec=User)
@@ -574,7 +574,7 @@ class TestAuthorizacion:
         user.organization_id = uuid.uuid4()
 
         with pytest.raises(HTTPException) as exc_info:
-            _get_org_id(user)
+            _resolve_org_id(user)
 
         assert exc_info.value.status_code == 403
         assert "Permisos insuficientes" in exc_info.value.detail
@@ -582,33 +582,33 @@ class TestAuthorizacion:
     def test_operator_user_returns_org_id(self):
         """
         WHEN un usuario operator usa bulk actions,
-        THEN _get_org_id retorna su organization_id.
+        THEN _resolve_org_id retorna su organization_id.
         Validates: Requirement 5.1
         """
-        from app.api.v1.endpoints.bulk_actions import _get_org_id
+        from app.api.v1.endpoints.bulk_actions import _resolve_org_id
 
         org_id = uuid.uuid4()
         user = MagicMock(spec=User)
         user.role = UserRole.OPERATOR
         user.organization_id = org_id
 
-        result = _get_org_id(user)
+        result = _resolve_org_id(user)
         assert result == org_id
 
     def test_admin_user_returns_org_id(self):
         """
         WHEN un usuario admin usa bulk actions,
-        THEN _get_org_id retorna su organization_id.
+        THEN _resolve_org_id retorna su organization_id.
         Validates: Requirement 5.1
         """
-        from app.api.v1.endpoints.bulk_actions import _get_org_id
+        from app.api.v1.endpoints.bulk_actions import _resolve_org_id
 
         org_id = uuid.uuid4()
         user = MagicMock(spec=User)
         user.role = UserRole.ADMIN
         user.organization_id = org_id
 
-        result = _get_org_id(user)
+        result = _resolve_org_id(user)
         assert result == org_id
 
 

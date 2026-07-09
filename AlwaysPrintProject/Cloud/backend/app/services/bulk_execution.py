@@ -260,6 +260,13 @@ class BulkExecutionService:
             )
             total = len(workstation_ids)
 
+            # No permitir iniciar si no hay workstations online
+            if total == 0:
+                raise HTTPException(
+                    status_code=422,
+                    detail="No hay workstations online en la organización para ejecutar la acción",
+                )
+
             # Crear sesión
             session_id = uuid4()
             started_at = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -320,14 +327,15 @@ class BulkExecutionService:
             await redis_client.aclose()
 
     async def get_session_status(
-        self, session_id: UUID, org_id: UUID
+        self, session_id: UUID, org_id: UUID = None
     ) -> BulkSessionStatus:
         """
         Obtiene el estado actual de una Bulk_Session desde Redis.
 
         Args:
             session_id: ID de la sesión a consultar
-            org_id: ID de la organización (para validación de tenant)
+            org_id: ID de la organización (para validación de tenant).
+                    Si es None, se omite la verificación (admin access).
 
         Returns:
             BulkSessionStatus con métricas actuales
@@ -348,8 +356,8 @@ class BulkExecutionService:
                     status_code=404, detail="Sesión no encontrada"
                 )
 
-            # Verificar que org_id coincide (tenant isolation)
-            if data.get("org_id") != str(org_id):
+            # Verificar tenant isolation — solo si org_id se proporciona
+            if org_id is not None and data.get("org_id") != str(org_id):
                 raise HTTPException(
                     status_code=403,
                     detail="No tienes permisos para esta organización",
@@ -382,7 +390,7 @@ class BulkExecutionService:
             await redis_client.aclose()
 
     async def cancel_session(
-        self, session_id: UUID, org_id: UUID
+        self, session_id: UUID, org_id: UUID = None
     ) -> BulkSessionStatus:
         """
         Cancela una sesión de ejecución masiva en curso.
@@ -393,7 +401,8 @@ class BulkExecutionService:
 
         Args:
             session_id: ID de la sesión a cancelar
-            org_id: ID de la organización (tenant isolation)
+            org_id: ID de la organización (tenant isolation).
+                    Si es None, se omite la verificación (admin access).
 
         Returns:
             BulkSessionStatus con el estado actual de la sesión
@@ -415,8 +424,8 @@ class BulkExecutionService:
                     status_code=404, detail="Sesión no encontrada"
                 )
 
-            # Verificar tenant isolation (org_id coincide)
-            if data.get("org_id") != str(org_id):
+            # Verificar tenant isolation — solo si org_id se proporciona
+            if org_id is not None and data.get("org_id") != str(org_id):
                 raise HTTPException(
                     status_code=403,
                     detail="No tienes permisos para esta organización",
