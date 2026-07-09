@@ -190,8 +190,8 @@ class BulkExecutionService:
         # Contar workstations online de la organización
         from app.services.websocket_manager import connection_manager
 
-        workstations_online = self._count_online_workstations(
-            org_id, connection_manager
+        workstations_online = await self._count_online_workstations(
+            org_id, connection_manager, db
         )
 
         # Calcular tiempo estimado: (workstations_online - 1) * delay_ms
@@ -255,8 +255,8 @@ class BulkExecutionService:
             # Obtener IDs de workstations online de la organización
             from app.services.websocket_manager import connection_manager
 
-            workstation_ids = self._get_online_workstation_ids(
-                org_id, connection_manager
+            workstation_ids = await self._get_online_workstation_ids(
+                org_id, connection_manager, db
             )
             total = len(workstation_ids)
 
@@ -497,53 +497,78 @@ class BulkExecutionService:
         return aioredis.from_url(settings.REDIS_URL, decode_responses=True)
 
     @staticmethod
-    def _count_online_workstations(org_id: UUID, connection_manager) -> int:
+    async def _count_online_workstations(org_id: UUID, connection_manager, db: Session = None) -> int:
         """
-        Cuenta workstations online de una organización usando el ConnectionManager.
+        Cuenta workstations online de una organización (cross-worker).
 
-        Itera el mapping org_ids del connection_manager y cuenta las que
-        pertenecen a la organización indicada y tienen conexión activa.
+        Usa get_global_online_snapshot_async() para obtener todas las WS online
+        de todos los workers, luego filtra por organización consultando la BD.
 
         Args:
             org_id: ID de la organización
             connection_manager: Instancia del ConnectionManager/RedisConnectionManager
+            db: Sesión de BD para filtrar por org (opcional, usa query si disponible)
 
         Returns:
             Cantidad de workstations online de la organización
         """
-        count = 0
+        # Obtener snapshot global de WS online (todos los workers)
+        all_online = await connection_manager.get_global_online_snapshot_async()
+
+        if not all_online:
+            return 0
+
+        # Filtrar por organización usando la BD
+        if db:
+            from app.models.workstation import Workstation
+            count = db.query(Workstation).filter(
+                Workstation.organization_id == org_id,
+                Workstation.id.in_(list(all_online)),
+            ).count()
+            return count
+
+        # Fallback: usar org_ids local (puede ser incompleto en multi-worker)
         org_id_str = str(org_id)
-        for ws_id, ws_org_id in connection_manager.org_ids.items():
-            if (
-                ws_org_id == org_id_str
-                and ws_id in connection_manager.workstation_connections
-            ):
+        count = 0
+        for ws_id in all_online:
+            if connection_manager.org_ids.get(ws_id) == org_id_str:
                 count += 1
         return count
 
     @staticmethod
-    def _get_online_workstation_ids(
-        org_id: UUID, connection_manager
-    ) -> list[str]:
+    async def _get_online_workstation_ids(org_id: UUID, connection_manager, db: Session = None) -> list[str]:
         """
-        Obtiene IDs de workstations online de una organización.
+        Obtiene IDs de workstations online de una organización (cross-worker).
+
+        Usa get_global_online_snapshot_async() para obtener todas las WS online
+        de todos los workers, luego filtra por organización consultando la BD.
 
         Args:
             org_id: ID de la organización
             connection_manager: Instancia del ConnectionManager/RedisConnectionManager
+            db: Sesión de BD para filtrar por org
 
         Returns:
             Lista de workstation_ids online de la organización
         """
-        ids = []
+        # Obtener snapshot global de WS online (todos los workers)
+        all_online = await connection_manager.get_global_online_snapshot_async()
+
+        if not all_online:
+            return []
+
+        # Filtrar por organización usando la BD
+        if db:
+            from app.models.workstation import Workstation
+            rows = db.query(Workstation.id).filter(
+                Workstation.organization_id == org_id,
+                Workstation.id.in_(list(all_online)),
+            ).all()
+            return [str(row[0]) for row in rows]
+
+        # Fallback: usar org_ids local (puede ser incompleto en multi-worker)
         org_id_str = str(org_id)
-        for ws_id, ws_org_id in connection_manager.org_ids.items():
-            if (
-                ws_org_id == org_id_str
-                and ws_id in connection_manager.workstation_connections
-            ):
-                ids.append(ws_id)
-        return ids
+        return [ws_id for ws_id in all_online if connection_manager.org_ids.get(ws_id) == org_id_str]
 
     # =========================================================================
     # BACKGROUND TASK DE EJECUCIÓN THROTTLED (Task 3.2)
