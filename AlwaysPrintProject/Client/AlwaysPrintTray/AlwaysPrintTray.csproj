@@ -38,7 +38,6 @@
     <EmbeddedResource Include="..\logo-dev.ico" Link="Resources\logo.ico" Condition="'$(Environment)' == 'dev'" />
     <EmbeddedResource Include="..\logo-dev.png" Link="Resources\logo.png" Condition="'$(Environment)' == 'dev'" />
     <!-- Icono offline (versión grayscale/desaturada) para modo sin conexión -->
-    <!-- TODO: Agregar logo_offline_dev.ico con lógica condicional Environment=dev (igual que logo.ico/logo-dev.ico) -->
     <EmbeddedResource Include="Resources\logo_offline.ico" />
     <!-- Logo Robles.AI para la pantalla About -->
     <EmbeddedResource Include="Resources\robles_logo.png" />
