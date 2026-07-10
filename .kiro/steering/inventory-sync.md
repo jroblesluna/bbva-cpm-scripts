@@ -37,17 +37,23 @@ If the user specifies environment, organization, and CSV explicitly, skip confir
 Todos los pasos se ejecutan en UN SOLO script Python. Solo se procesan items que necesitan cambio.
 
 ### Step 1: Build VLAN map + Rename + Create missing (NO duplicates)
-- Construir mapa `code → VLAN` extrayendo el código del nombre: `name.split(" - ")[0].strip().zfill(3)`
-- Si una VLAN existente ya matchea el código → renombrar si el nombre difiere del esperado
-- Código de agencia de workstations = `hostname[3:6]` (0-indexed, ej: W10**277**01P04 → `277`)
-- Formato esperado: `{code_3dig} - Ag. {name}` (reemplazar "Agencia " con "Ag.")
-- **Crear VLANs SOLO si el código NO existe ya en el mapa** (evitar duplicados)
+- Construir mapa `code → VLAN` con DOS métodos de matching (OR):
+  1. Extraer código del nombre: `name.split(" - ")[0].strip().zfill(3)` si es numérico
+  2. Buscar match por CIDRs: si una VLAN existente tiene un CIDR en su lista que coincide con el calculado del CSV → es la misma agencia
+- El código de agencia del CSV es `CENTRO_DE_COSTO` zero-padded a 3 dígitos
+- Si una VLAN existente ya matchea el código (por nombre O por CIDR) → usar esa, renombrar si el nombre difiere del esperado
+- Formato esperado del nombre: `{code_3dig} - Ag. {name}` (reemplazar "Agencia " con "Ag.")
+- **NUNCA crear una VLAN si ya existe otra con el mismo código numérico en el nombre** — verificar exhaustivamente antes de crear
+- **Crear VLANs SOLO si:**
+  1. No existe ninguna VLAN cuyo nombre empiece con el código numérico seguido de " - "
+  2. No existe ninguna VLAN cuyo nombre contenga el mismo nombre de agencia (fuzzy: sin prefijo "Agencia"/"Ag.")
 - Si hay duplicados existentes (mismo código, múltiples VLANs): **mergear** antes de continuar:
-  - Conservar la VLAN con más workstations
+  - Conservar la VLAN con más workstations (o más devices si WS es igual)
   - Reasignar WS, dispositivos, y action_configs de las duplicadas a la keeper
-  - Consolidar `cidr_ranges` (unión de sets)
+  - Consolidar `cidr_ranges` (unión de sets, eliminar vacíos)
   - Copiar address/image si keeper no tiene
   - Eliminar las duplicadas
+- **Importante**: El CIDR calculado del CSV (derivado de la IP del device) puede diferir del CIDR operativo de la VLAN. Un código numérico idéntico en el nombre es la fuente de verdad para el match.
 
 ### Step 2: Reassign workstations + CIDRs
 - Para cada workstation: extraer código de agencia de `hostname[3:6]`
