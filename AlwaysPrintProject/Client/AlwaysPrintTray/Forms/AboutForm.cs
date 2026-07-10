@@ -8,7 +8,7 @@ namespace AlwaysPrintTray.Forms
 {
     /// <summary>
     /// Formulario "Acerca de" con estilo corporativo AlwaysPrint.
-    /// Se cierra automáticamente: 5s si es startup, 30s si es manual.
+    /// Se cierra automáticamente: 10s si es startup, 30s si es manual.
     /// </summary>
     public sealed class AboutForm : Form
     {
@@ -154,8 +154,8 @@ namespace AlwaysPrintTray.Forms
             AcceptButton = btnClose;
             CancelButton = btnClose;
 
-            // ── Auto-cierre: 5 segundos si es startup, 30 si es manual ──────
-            _autoCloseTimer = new Timer { Interval = isStartup ? 5_000 : 30_000 };
+            // ── Auto-cierre: 10 segundos si es startup, 30 si es manual ─────
+            _autoCloseTimer = new Timer { Interval = isStartup ? 10_000 : 30_000 };
             _autoCloseTimer.Tick += (s, e) => Close();
             _autoCloseTimer.Start();
         }

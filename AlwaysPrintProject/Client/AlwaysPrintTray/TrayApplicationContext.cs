@@ -90,8 +90,15 @@ namespace AlwaysPrintTray
             // Loop de monitoreo para mantener el Tray activo.
             new Thread(MonitoringLoop) { IsBackground = true, Name = "AlwaysPrint-TrayMonitor" }.Start();
 
-            // Mostrar el About automáticamente al iniciar (se cierra solo después de 5 segundos)
-            _uiContext.Post(_ => ShowAboutStartup(), null);
+            // Mostrar el About automáticamente al iniciar, con delay para esperar al message loop
+            var startupAboutTimer = new System.Windows.Forms.Timer { Interval = 500 };
+            startupAboutTimer.Tick += (s, e) =>
+            {
+                startupAboutTimer.Stop();
+                startupAboutTimer.Dispose();
+                ShowAboutStartup();
+            };
+            startupAboutTimer.Start();
         }
 
         private NotifyIcon BuildTrayIcon()
