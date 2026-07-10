@@ -142,7 +142,7 @@ namespace AlwaysPrintTray.Forms
             };
             body.Controls.Add(lblWeb);
 
-            // Email con botón copiar
+            // Email
             var lblEmail = new Label
             {
                 Text      = "\u2709  info@iol.pe",
@@ -154,27 +154,7 @@ namespace AlwaysPrintTray.Forms
             };
             body.Controls.Add(lblEmail);
 
-            var btnCopyEmail = new Button
-            {
-                Text      = "\ud83d\udccb",
-                Font      = new Font("Segoe UI", 8f),
-                Size      = new Size(28, 22),
-                Location  = new Point(170, 136),
-                FlatStyle = FlatStyle.Flat,
-                Cursor    = Cursors.Hand
-            };
-            btnCopyEmail.FlatAppearance.BorderSize = 0;
-            btnCopyEmail.Click += (s, e) =>
-            {
-                Clipboard.SetText("info@iol.pe");
-                btnCopyEmail.Text = "\u2713";
-                var t = new Timer { Interval = 1500 };
-                t.Tick += (_, __) => { btnCopyEmail.Text = "\ud83d\udccb"; t.Stop(); t.Dispose(); };
-                t.Start();
-            };
-            body.Controls.Add(btnCopyEmail);
-
-            // Teléfono con botón copiar
+            // Teléfono
             var lblPhone = new Label
             {
                 Text      = "\ud83d\udcde  +1(408)590-0153",
@@ -185,26 +165,6 @@ namespace AlwaysPrintTray.Forms
                 TextAlign = ContentAlignment.MiddleLeft
             };
             body.Controls.Add(lblPhone);
-
-            var btnCopyPhone = new Button
-            {
-                Text      = "\ud83d\udccb",
-                Font      = new Font("Segoe UI", 8f),
-                Size      = new Size(28, 22),
-                Location  = new Point(200, 164),
-                FlatStyle = FlatStyle.Flat,
-                Cursor    = Cursors.Hand
-            };
-            btnCopyPhone.FlatAppearance.BorderSize = 0;
-            btnCopyPhone.Click += (s, e) =>
-            {
-                Clipboard.SetText("+14085900153");
-                btnCopyPhone.Text = "\u2713";
-                var t = new Timer { Interval = 1500 };
-                t.Tick += (_, __) => { btnCopyPhone.Text = "\ud83d\udccb"; t.Stop(); t.Dispose(); };
-                t.Start();
-            };
-            body.Controls.Add(btnCopyPhone);
 
             // ── Footer ──────────────────────────────────────────────────────
             var footer = new Panel
