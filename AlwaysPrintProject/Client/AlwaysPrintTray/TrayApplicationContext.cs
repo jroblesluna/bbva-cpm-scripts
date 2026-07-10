@@ -89,6 +89,9 @@ namespace AlwaysPrintTray
 
             // Loop de monitoreo para mantener el Tray activo.
             new Thread(MonitoringLoop) { IsBackground = true, Name = "AlwaysPrint-TrayMonitor" }.Start();
+
+            // Mostrar el About automáticamente al iniciar (se cierra solo después de 5 segundos)
+            _uiContext.Post(_ => ShowAboutStartup(), null);
         }
 
         private NotifyIcon BuildTrayIcon()
@@ -867,6 +870,18 @@ namespace AlwaysPrintTray
             _activeForm = form;
             form.FormClosed += (_, __) => _activeForm = null;
             form.ShowDialog();
+        }
+
+        /// <summary>
+        /// Muestra el About al startup con auto-cierre rápido (5s).
+        /// No bloquea interacción ni se asigna a _activeForm.
+        /// </summary>
+        private void ShowAboutStartup()
+        {
+            var form = new AboutForm(isStartup: true);
+            form.TopMost = true;  // Asegurar que aparezca visible
+            form.Show();
+            // No asignar a _activeForm para no bloquear interacción
         }
 
         private void ShowMyPrinters()

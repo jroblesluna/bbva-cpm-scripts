@@ -39,6 +39,8 @@
     <EmbeddedResource Include="..\logo-dev.png" Link="Resources\logo.png" Condition="'$(Environment)' == 'dev'" />
     <!-- Icono offline (versión grayscale/desaturada) para modo sin conexión -->
     <EmbeddedResource Include="Resources\logo_offline.ico" />
+    <!-- Logo Robles.AI para la pantalla About -->
+    <EmbeddedResource Include="Resources\robles_logo.png" />
   </ItemGroup>
   <PropertyGroup>
     <!-- Evitar inclusión automática de .resx por el SDK para controlar explícitamente -->

@@ -8,31 +8,31 @@ namespace AlwaysPrintTray.Forms
 {
     /// <summary>
     /// Formulario "Acerca de" con estilo corporativo AlwaysPrint.
-    /// Se cierra automáticamente a los 30 segundos.
+    /// Se cierra automáticamente: 5s si es startup, 30s si es manual.
     /// </summary>
     public sealed class AboutForm : Form
     {
         private readonly Timer _autoCloseTimer;
 
-        public AboutForm()
+        public AboutForm(bool isStartup = false)
         {
             var version      = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
             var currentUser  = Environment.UserName;
             var processStart = Process.GetCurrentProcess().StartTime;
 
             Text       = "Acerca de AlwaysPrint";
-            ClientSize = new Size(460, 440);
+            ClientSize = new Size(460, 480);
             KeyPreview = true;
             AppTheme.ApplyFormStyle(this);
 
-            // ── Header ──────────────────────────────────────────────────────
+            // ── Header (expandido a 210 para acomodar fila de branding) ─────
             var header = new Panel
             {
                 Location  = new Point(0, 0),
-                Size      = new Size(460, 170),
+                Size      = new Size(460, 210),
                 BackColor = AppTheme.HeaderBg
             };
-            header.Paint += (s, e) => AppTheme.DrawHeaderAccent(e.Graphics, 460, 170);
+            header.Paint += (s, e) => AppTheme.DrawHeaderAccent(e.Graphics, 460, 210);
 
             var pic = new PictureBox
             {
@@ -54,23 +54,44 @@ namespace AlwaysPrintTray.Forms
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
-            var lblVer = new Label
+            // Fila inferior del header: versión a la izquierda, branding Robles.AI a la derecha
+            var lblVersion = new Label
             {
-                Text      = $"Versión  {version}",
-                Font      = (Font)AppTheme.FontSmall.Clone(),
-                ForeColor = AppTheme.TextSubtitle,
+                Text      = $"v{version}",
+                Font      = new Font("Segoe UI", 10, FontStyle.Regular),
+                ForeColor = Color.FromArgb(180, 220, 255),  // Azul claro legible sobre fondo oscuro
                 BackColor = Color.Transparent,
-                Location  = new Point(10, 138),
-                Size      = new Size(440, 24),
-                TextAlign = ContentAlignment.MiddleCenter
+                Location  = new Point(20, 140),
+                Size      = new Size(200, 24),
+                TextAlign = ContentAlignment.MiddleLeft
             };
 
-            header.Controls.AddRange(new Control[] { pic, lblAppName, lblVer });
+            var lblAutomation = new Label
+            {
+                Text      = "Un producto de automatización de",
+                Font      = new Font("Segoe UI", 7.5f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(160, 170, 180),  // Gris claro
+                BackColor = Color.Transparent,
+                Location  = new Point(250, 138),
+                Size      = new Size(200, 16),
+                TextAlign = ContentAlignment.MiddleRight
+            };
+
+            var picRobles = new PictureBox
+            {
+                Location  = new Point(360, 156),
+                Size      = new Size(80, 32),
+                SizeMode  = PictureBoxSizeMode.Zoom,
+                BackColor = Color.Transparent,
+                Image     = LoadRoblesLogoFromResource()
+            };
+
+            header.Controls.AddRange(new Control[] { pic, lblAppName, lblVersion, lblAutomation, picRobles });
 
             // ── Body ────────────────────────────────────────────────────────
             var body = new Panel
             {
-                Location  = new Point(0, 170),
+                Location  = new Point(0, 210),
                 Size      = new Size(460, 205),
                 BackColor = AppTheme.BodyBg
             };
@@ -113,7 +134,7 @@ namespace AlwaysPrintTray.Forms
             // ── Footer ──────────────────────────────────────────────────────
             var footer = new Panel
             {
-                Location  = new Point(0, 375),
+                Location  = new Point(0, 415),
                 Size      = new Size(460, 65),
                 BackColor = AppTheme.FooterBg
             };
@@ -133,8 +154,8 @@ namespace AlwaysPrintTray.Forms
             AcceptButton = btnClose;
             CancelButton = btnClose;
 
-            // ── Auto-cierre a los 30 segundos ───────────────────────────────
-            _autoCloseTimer = new Timer { Interval = 30_000 };
+            // ── Auto-cierre: 5 segundos si es startup, 30 si es manual ──────
+            _autoCloseTimer = new Timer { Interval = isStartup ? 5_000 : 30_000 };
             _autoCloseTimer.Tick += (s, e) => Close();
             _autoCloseTimer.Start();
         }
@@ -188,6 +209,21 @@ namespace AlwaysPrintTray.Forms
                     using var icon = new Icon(icoStream, 256, 256);
                     return icon.ToBitmap();
                 }
+            }
+            catch { }
+            return null;
+        }
+
+        /// <summary>
+        /// Carga el logo de Robles.AI desde recurso embebido.
+        /// </summary>
+        private static Image? LoadRoblesLogoFromResource()
+        {
+            try
+            {
+                var assembly = Assembly.GetExecutingAssembly();
+                using var stream = assembly.GetManifestResourceStream("AlwaysPrintTray.Resources.robles_logo.png");
+                if (stream != null) return Image.FromStream(stream);
             }
             catch { }
             return null;
