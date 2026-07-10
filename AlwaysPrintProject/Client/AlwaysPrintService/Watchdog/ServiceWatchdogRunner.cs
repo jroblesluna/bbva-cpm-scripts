@@ -31,6 +31,10 @@ namespace AlwaysPrintService.Watchdog
         // Contadores de reinicios por servicio: {service_name: lista de timestamps de reinicios}
         private readonly ConcurrentDictionary<string, List<DateTime>> _restartHistory = new();
 
+        // Servicios con un reinicio en curso ahora mismo (evita que dos ticks del timer
+        // se pisen si un reinicio tarda más que el intervalo configurado).
+        private readonly ConcurrentDictionary<string, byte> _restartInProgress = new();
+
         /// <summary>
         /// Inicia el watchdog con la configuración proporcionada.
         /// Si ya estaba corriendo, lo detiene primero.
@@ -193,7 +197,22 @@ namespace AlwaysPrintService.Watchdog
                 return;
             }
 
-            TryRestartService(entry, status, stalledButRunning: stalledFile != null);
+            // Evitar que dos ticks intenten reiniciar el mismo servicio a la vez
+            if (!_restartInProgress.TryAdd(entry.Name, 0))
+            {
+                AlwaysPrintLogger.WriteInfo(
+                    $"ServiceWatchdog: '{entry.Name}' ya tiene un reinicio en curso. Se omite este tick.");
+                return;
+            }
+
+            try
+            {
+                TryRestartService(entry, status, stalledButRunning: stalledFile != null);
+            }
+            finally
+            {
+                _restartInProgress.TryRemove(entry.Name, out _);
+            }
         }
 
         /// <summary>
