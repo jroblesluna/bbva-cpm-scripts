@@ -140,9 +140,12 @@ namespace AlwaysPrintTray.Forms
             Controls.Add(_chkCloudEnabled);
             y += 34;
 
-            // URL Cloud
+            // URL Cloud (solo lectura — se configura por instalación/registro)
             Controls.Add(Lbl("URL del servidor Cloud (APCM):"));
             _txtCloudApiUrl = Txt();
+            _txtCloudApiUrl.ReadOnly = true;
+            _txtCloudApiUrl.BackColor = System.Drawing.Color.FromArgb(240, 240, 240);
+            _txtCloudApiUrl.ForeColor = AppTheme.TextMuted;
             Controls.Add(_txtCloudApiUrl);
             y += 34;
 
