@@ -1132,6 +1132,10 @@ class RedisConnectionManager:
         Loop que renueva el TTL del WorkerRegistry periódicamente.
         Se ejecuta cada TTL/2 segundos para evitar expiración accidental.
         También actualiza el snapshot global de workstations online (para consultas sync).
+
+        Cada ciclo verifica consistencia: si el SET de Redis tiene menos miembros
+        que las conexiones locales (por expiración previa del SET o pérdida de SADD),
+        ejecuta un re-register completo para restaurar la consistencia.
         """
         interval = settings.WORKER_REGISTRY_TTL // 2
         while True:
@@ -1139,6 +1143,10 @@ class RedisConnectionManager:
                 await asyncio.sleep(interval)
                 if self._worker_registry and self._redis_available:
                     await self._worker_registry.heartbeat()
+
+                    # Verificar consistencia: SET de Redis vs conexiones locales.
+                    # Si el SET expiró o se perdió, re-registrar todas las WS.
+                    await self._ensure_registry_consistency()
 
                     # Actualizar snapshot global de WS online (lectura de todos los workers)
                     await self._refresh_online_snapshot()
@@ -1166,6 +1174,71 @@ class RedisConnectionManager:
                 break
             except Exception as e:
                 logger.warning("worker.heartbeat_error", error=str(e))
+
+    async def _ensure_registry_consistency(self) -> None:
+        """
+        Verifica que el SET de Redis del worker contenga todas las WS conectadas localmente.
+
+        Si el SET expiró (SCARD=0 o key no existe) o tiene significativamente menos
+        miembros que las conexiones locales (drift > 10%), ejecuta un re-register
+        completo usando pipeline batch para restaurar la consistencia.
+
+        Esto cubre el escenario donde:
+        - El heartbeat perdió un ciclo y el SET expiró completamente
+        - El batch flush de un connect anterior falló silenciosamente
+        - Redis se reinició y perdió datos en memoria
+
+        Costo: O(N) SADD en pipeline, pero solo se ejecuta cuando hay drift.
+        Con 800 WS = <10ms en pipeline batch.
+        """
+        try:
+            local_count = len(self.workstation_connections)
+            if local_count == 0:
+                return
+
+            ws_key = self._worker_registry._workstations_key
+            redis_count = await self._redis.scard(ws_key)
+
+            # Si Redis tiene menos del 90% de las conexiones locales, hay drift
+            drift_threshold = max(local_count * 0.9, local_count - 50)
+            if redis_count >= drift_threshold:
+                return
+
+            # Drift detectado: re-registrar todas las conexiones locales
+            logger.warning(
+                "worker.registry_drift_detected",
+                local_count=local_count,
+                redis_count=redis_count,
+                drift_pct=round((1 - redis_count / local_count) * 100, 1) if local_count > 0 else 0,
+                msg="Re-registrando todas las WS en Redis",
+            )
+
+            # Pipeline batch: DELETE key + SADD de todas + EXPIRE
+            local_ws_ids = list(self.workstation_connections.keys())
+            pipe = self._redis.pipeline()
+            pipe.delete(ws_key)
+            # SADD en batches de 500 para evitar comandos enormes
+            for i in range(0, len(local_ws_ids), 500):
+                batch = local_ws_ids[i:i + 500]
+                pipe.sadd(ws_key, *batch)
+            pipe.expire(ws_key, self._worker_registry._ttl)
+            pipe.set(self._worker_registry._heartbeat_key, "alive", ex=self._worker_registry._ttl)
+            await pipe.execute()
+
+            logger.info(
+                "worker.registry_consistency_restored",
+                registered=len(local_ws_ids),
+            )
+        except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
+            logger.warning(
+                "worker.registry_consistency_error",
+                error=str(e),
+            )
+        except Exception as e:
+            logger.warning(
+                "worker.registry_consistency_error",
+                error=str(e),
+            )
 
     async def _refresh_online_snapshot(self) -> None:
         """
