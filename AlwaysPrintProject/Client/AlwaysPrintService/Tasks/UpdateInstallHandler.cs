@@ -441,8 +441,9 @@ call :ts
 echo !TS! [UPD] Event 1020: [PASO 6b] Verificando version post-instalacion del Service EXE... >> %LOG%
 
 REM Leer versión del archivo instalado via PowerShell (usar variable batch para evitar
-REM problemas de parsing con paréntesis en rutas como "Program Files (x86)")
-for /f ""delims="" %%v in ('powershell -NoProfile -Command ""try {{ (Get-Item -LiteralPath $env:SERVICE_EXE).VersionInfo.FileVersion }} catch {{ 'error' }}""') do set POST_VERSION=%%v
+REM problemas de parsing con paréntesis en rutas como ""Program Files (x86)"")
+set ""PS_CMD=try {{ (Get-Item -LiteralPath $env:SERVICE_EXE).VersionInfo.FileVersion }} catch {{ 'error' }}""
+for /f ""delims="" %%v in ('powershell -NoProfile -Command !PS_CMD!') do set POST_VERSION=%%v
 call :ts
 echo !TS! [UPD] Event 1020: [PASO 6b] Version pre=!PRE_VERSION! post=!POST_VERSION! >> %LOG%
 
