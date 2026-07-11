@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { useAuth } from '@/hooks/useAuth';
 import { bulkActionsApi, organizationsApi } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,10 +25,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Zap, AlertCircle, Clock, Loader2, CheckCircle2, XCircle, RotateCcw, Building2 } from 'lucide-react';
-import type { OnDemandAction, BulkPreview, BulkSessionStatus } from '@/types/bulk-actions';
+import { Zap, AlertCircle, Clock, Loader2, CheckCircle2, XCircle, RotateCcw, Building2, ChevronDown } from 'lucide-react';
+import type { OnDemandAction, BulkPreview, BulkSessionStatus, ActiveSessionInfo } from '@/types/bulk-actions';
 import type { Organization } from '@/types/organization';
-import { formatEstimatedTime } from '@/lib/bulk-actions-utils';
+import { formatEstimatedTime, calcRemainingMs, formatRemainingTime, calcETA } from '@/lib/bulk-actions-utils';
 
 // ============================================================================
 // COMPONENTE: Stat — Muestra un contador individual con label y color
@@ -57,6 +57,10 @@ function ExecutionProgressSection({
   t: ReturnType<typeof useTranslations>;
   onReset: () => void;
 }) {
+  const [showFailedDetails, setShowFailedDetails] = useState(false);
+
+  const locale = useLocale();
+
   // Polling de estado — se detiene cuando la sesión ya no está running
   const { data: statusData } = useQuery({
     queryKey: ['bulk-session-status', sessionId],
@@ -142,6 +146,62 @@ function ExecutionProgressSection({
           </p>
         )}
 
+        {/* Estimación de tiempo restante (solo durante running) */}
+        {isRunning && statusData && (
+          <div className="text-center space-y-1">
+            {statusData.sent === 0 ? (
+              <p className="text-sm text-gray-500 italic">{t('calculating')}</p>
+            ) : (
+              <>
+                <p className="text-sm text-blue-600 font-medium">
+                  {t('remainingTime', {
+                    time: formatRemainingTime(calcRemainingMs(statusData.total, statusData.sent, statusData.elapsed_ms ?? 0) ?? 0)
+                  })}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {t('eta', {
+                    time: new Intl.DateTimeFormat(locale, {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                    }).format(calcETA(calcRemainingMs(statusData.total, statusData.sent, statusData.elapsed_ms ?? 0) ?? 0))
+                  })}
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Lista de workstations fallidas (expandible) */}
+        {statusData?.failed_workstation_details && statusData.failed_workstation_details.length > 0 && (
+          <div className="border rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowFailedDetails(!showFailedDetails)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-red-50 hover:bg-red-100 transition-colors text-left"
+            >
+              <span className="text-sm font-medium text-red-800">
+                {t('failedWorkstations')} ({statusData.failed_workstation_details.length})
+              </span>
+              <ChevronDown className={`w-4 h-4 text-red-600 transition-transform ${showFailedDetails ? 'rotate-180' : ''}`} />
+            </button>
+            {showFailedDetails && (
+              <div className="divide-y divide-gray-100 max-h-48 overflow-y-auto">
+                {statusData.failed_workstation_details.map((ws) => (
+                  <div key={ws.id} className="flex items-center justify-between px-4 py-2 text-sm">
+                    <span className="font-mono text-gray-700">
+                      {ws.hostname || ws.id.substring(0, 8)}
+                    </span>
+                    <span className="text-gray-500">
+                      {ws.ip_private === 'unknown' ? t('unknownIp') : ws.ip_private}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Botón de cancelación (solo cuando está running) */}
         {isRunning && (
           <div className="flex justify-center pt-2">
@@ -168,6 +228,58 @@ function ExecutionProgressSection({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ============================================================================
+// COMPONENTE: ActiveSessionAlert — Alerta de sesión activa al cargar la página
+// Llama a GET /bulk-actions/active y muestra un banner si hay sesión en curso.
+// ============================================================================
+function ActiveSessionAlert({
+  t,
+  onViewProgress,
+}: {
+  t: ReturnType<typeof useTranslations>;
+  onViewProgress: (sessionId: string) => void;
+}) {
+  const { data: activeSession } = useQuery({
+    queryKey: ['bulk-active-session'],
+    queryFn: async () => {
+      const res = await bulkActionsApi.getActive();
+      return res.data as ActiveSessionInfo;
+    },
+  });
+
+  if (!activeSession?.is_active || !activeSession.session_id) {
+    return null;
+  }
+
+  return (
+    <Alert className="border-blue-200 bg-blue-50">
+      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+      <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="space-y-1">
+          <p className="font-medium text-blue-900">{t('activeSessionAlert')}</p>
+          {activeSession.org_name && (
+            <p className="text-sm text-blue-700">{t('activeSessionOrg', { org: activeSession.org_name })}</p>
+          )}
+          {activeSession.label && (
+            <p className="text-sm text-blue-700">{t('activeSessionAction', { label: activeSession.label })}</p>
+          )}
+          {activeSession.total != null && activeSession.sent != null && (
+            <p className="text-sm text-blue-700">{t('activeSessionProgress', { sent: activeSession.sent, total: activeSession.total })}</p>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0 border-blue-300 text-blue-700 hover:bg-blue-100"
+          onClick={() => onViewProgress(activeSession.session_id!)}
+        >
+          {t('viewProgress')}
+        </Button>
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -261,6 +373,14 @@ export default function BulkActionsPage() {
         </div>
         <Zap className="w-8 h-8 md:w-12 md:h-12 text-yellow-500 hidden sm:block" />
       </div>
+
+      {/* Alerta de sesión activa (solo cuando no hay sessionId local ya seleccionado) */}
+      {!sessionId && (
+        <ActiveSessionAlert
+          t={t}
+          onViewProgress={(id) => setSessionId(id)}
+        />
+      )}
 
       {/* Panel de progreso — se muestra cuando hay sesión activa */}
       {sessionId && (

@@ -83,6 +83,14 @@ class BulkPreview(BaseModel):
     }
 
 
+class FailedWorkstationDetail(BaseModel):
+    """Detalle enriquecido de una workstation donde falló el envío."""
+
+    id: str = Field(..., description="UUID de la workstation")
+    hostname: Optional[str] = Field(default=None, description="Hostname de la workstation (null si no existe en BD)")
+    ip_private: str = Field(default="unknown", description="IP privada de la workstation")
+
+
 class BulkSessionStatus(BaseModel):
     """Estado de una Bulk_Session con métricas de progreso."""
 
@@ -95,6 +103,10 @@ class BulkSessionStatus(BaseModel):
     failed_workstations: list[str] = Field(default=[], description="IDs de workstations donde falló el envío")
     started_at: datetime = Field(..., description="Timestamp de inicio de la sesión")
     elapsed_ms: Optional[int] = Field(default=None, description="Tiempo transcurrido en milisegundos")
+    failed_workstation_details: list[FailedWorkstationDetail] = Field(
+        default=[], description="Detalles enriquecidos de workstations fallidas"
+    )
+    delay_ms: Optional[int] = Field(default=None, description="Delay configurado entre envíos (ms)")
 
     model_config = {
         "from_attributes": True,
@@ -130,3 +142,19 @@ class BulkStartResponse(BaseModel):
             }]
         }
     }
+
+
+# === SCHEMAS DE ENRIQUECIMIENTO Y SESIÓN ===
+
+
+class ActiveSessionInfo(BaseModel):
+    """Información de sesión activa detectada."""
+
+    is_active: bool = Field(..., description="Si hay una sesión bulk activa")
+    session_id: Optional[str] = Field(default=None, description="ID de la sesión activa")
+    org_id: Optional[str] = Field(default=None, description="ID de la organización con sesión activa")
+    org_name: Optional[str] = Field(default=None, description="Nombre de la organización")
+    label: Optional[str] = Field(default=None, description="Label de la acción en ejecución")
+    started_at: Optional[datetime] = Field(default=None, description="Timestamp de inicio")
+    total: Optional[int] = Field(default=None, description="Total de workstations target")
+    sent: Optional[int] = Field(default=None, description="Envíos completados")

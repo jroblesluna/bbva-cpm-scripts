@@ -31,9 +31,11 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.audit import ActionType
 from app.schemas.bulk_actions import (
+    ActiveSessionInfo,
     BulkPreview,
     BulkSessionStatus,
     BulkStartResponse,
+    FailedWorkstationDetail,
     OnDemandAction,
 )
 from app.services.action_config import ActionConfigService
@@ -372,6 +374,16 @@ class BulkExecutionService:
                 * 1000
             )
 
+            # Enriquecer failed_workstations con hostname e ip_private
+            failed_ws_ids = json.loads(data.get("failed_workstations", "[]"))
+            failed_details = []
+            if failed_ws_ids:
+                try:
+                    failed_details = self._enrich_failed_workstations(failed_ws_ids)
+                except Exception as e:
+                    logger.warning(f"Error enriqueciendo workstations fallidas en get_session_status: {e}")
+                    failed_details = []
+
             return BulkSessionStatus(
                 session_id=session_id,
                 status=data["status"],
@@ -379,15 +391,113 @@ class BulkExecutionService:
                 sent=int(data["sent"]),
                 success=int(data["success"]),
                 errors=int(data["errors"]),
-                failed_workstations=json.loads(
-                    data.get("failed_workstations", "[]")
-                ),
+                failed_workstations=failed_ws_ids,
                 started_at=started_at,
                 elapsed_ms=elapsed_ms,
+                failed_workstation_details=failed_details,
+                delay_ms=int(data.get("delay_ms", "0")) or None,
             )
 
         finally:
             await redis_client.aclose()
+
+    async def get_active_session(self, user) -> "ActiveSessionInfo":
+        """
+        Detecta si hay una sesión bulk activa.
+
+        - Operator: solo verifica su propia organización.
+        - Admin: escanea todas las organizaciones con SCAN.
+
+        Args:
+            user: Usuario autenticado (con atributos role y organization_id)
+
+        Returns:
+            ActiveSessionInfo indicando si hay sesión activa y sus detalles
+
+        Raises:
+            HTTPException 503: Si Redis no está disponible
+        """
+        redis_client = self._get_redis_client()
+
+        try:
+            if user.role == "operator":
+                # Solo verificar la organización del operador
+                mutex_key = f"bulk:running:{user.organization_id}"
+                session_id_str = await redis_client.get(mutex_key)
+                if not session_id_str:
+                    return ActiveSessionInfo(is_active=False)
+                return await self._build_active_info(redis_client, session_id_str)
+
+            elif user.role == "admin":
+                # Escanear todas las organizaciones
+                cursor = 0
+                while True:
+                    cursor, keys = await redis_client.scan(
+                        cursor, match="bulk:running:*", count=100
+                    )
+                    for key in keys:
+                        session_id_str = await redis_client.get(key)
+                        if session_id_str:
+                            return await self._build_active_info(
+                                redis_client, session_id_str
+                            )
+                    if cursor == 0:
+                        break
+
+                return ActiveSessionInfo(is_active=False)
+            else:
+                # Rol no soportado (readonly debería ser rechazado en el endpoint)
+                return ActiveSessionInfo(is_active=False)
+
+        finally:
+            await redis_client.aclose()
+
+    @staticmethod
+    async def _build_active_info(redis_client, session_id_str: str) -> "ActiveSessionInfo":
+        """
+        Construye ActiveSessionInfo a partir del hash de sesión en Redis.
+
+        Args:
+            redis_client: Cliente Redis activo
+            session_id_str: ID de la sesión como string
+
+        Returns:
+            ActiveSessionInfo con datos de la sesión
+        """
+        session_key = f"bulk:session:{session_id_str}"
+        data = await redis_client.hgetall(session_key)
+
+        if not data or data.get("status") != "running":
+            return ActiveSessionInfo(is_active=False)
+
+        # Intentar resolver org_name desde la BD
+        org_name = None
+        org_id = data.get("org_id")
+        if org_id:
+            try:
+                db = SessionLocal()
+                try:
+                    from app.models.organization import Organization
+                    org = db.query(Organization.name).filter(
+                        Organization.id == org_id
+                    ).first()
+                    if org:
+                        org_name = org.name
+                finally:
+                    db.close()
+            except Exception:
+                pass  # Graceful degradation — no bloqueamos si falla
+
+        return ActiveSessionInfo(
+            is_active=True,
+            session_id=session_id_str,
+            org_id=org_id,
+            org_name=org_name,
+            label=data.get("label"),
+            started_at=data.get("started_at"),
+            total=int(data["total"]) if data.get("total") else None,
+            sent=int(data["sent"]) if data.get("sent") else None,
+        )
 
     async def cancel_session(
         self, session_id: UUID, org_id: UUID = None
@@ -570,6 +680,58 @@ class BulkExecutionService:
         org_id_str = str(org_id)
         return [ws_id for ws_id in all_online if connection_manager.org_ids.get(ws_id) == org_id_str]
 
+    @staticmethod
+    def _enrich_failed_workstations(ws_ids: list[str]) -> list["FailedWorkstationDetail"]:
+        """
+        Enriquece la lista de IDs de workstations fallidas con hostname e ip_private.
+
+        Consulta la tabla workstations para obtener hostname e ip_private.
+        Si un ID no existe en BD, retorna hostname=None, ip_private="unknown".
+        Preserva el orden de la lista de entrada.
+
+        Args:
+            ws_ids: Lista de UUIDs de workstations fallidas
+
+        Returns:
+            Lista de FailedWorkstationDetail con datos enriquecidos
+        """
+        from app.models.workstation import Workstation
+        from app.schemas.bulk_actions import FailedWorkstationDetail
+
+        if not ws_ids:
+            return []
+
+        db = SessionLocal()
+        try:
+            rows = db.query(
+                Workstation.id, Workstation.hostname, Workstation.ip_private
+            ).filter(Workstation.id.in_(ws_ids)).all()
+
+            # Mapear resultados por ID para lookup rápido
+            found = {str(row.id): row for row in rows}
+
+            details = []
+            for ws_id in ws_ids:
+                if ws_id in found:
+                    row = found[ws_id]
+                    details.append(FailedWorkstationDetail(
+                        id=ws_id,
+                        hostname=row.hostname,
+                        ip_private=row.ip_private or "unknown",
+                    ))
+                else:
+                    details.append(FailedWorkstationDetail(
+                        id=ws_id,
+                        hostname=None,
+                        ip_private="unknown",
+                    ))
+            return details
+        except Exception as e:
+            logger.warning(f"Error enriqueciendo workstations fallidas: {e}")
+            return []
+        finally:
+            db.close()
+
     # =========================================================================
     # BACKGROUND TASK DE EJECUCIÓN THROTTLED (Task 3.2)
     # =========================================================================
@@ -676,6 +838,14 @@ class BulkExecutionService:
                 )
 
                 # --- Enviar progress report vía WebSocket a operadores ---
+                # Enriquecer failed_workstations solo si hay errores
+                failed_details_ws = []
+                if failed_ws:
+                    try:
+                        failed_details_ws = self._enrich_failed_workstations(failed_ws)
+                    except Exception:
+                        pass  # Graceful degradation
+
                 progress_report = {
                     "type": "bulk_progress",
                     "session_id": str(session_id),
@@ -686,6 +856,7 @@ class BulkExecutionService:
                     "errors": errors,
                     "failed_workstations": failed_ws,
                     "elapsed_ms": elapsed_ms,
+                    "failed_workstation_details": [d.model_dump() for d in failed_details_ws],
                 }
                 await connection_manager.broadcast_to_organization(
                     str(org_id), progress_report
@@ -718,6 +889,14 @@ class BulkExecutionService:
             await redis_client.delete(mutex_key)
 
             # Enviar progress report final
+            # Enriquecer para el reporte final
+            failed_details_final = []
+            if failed_ws:
+                try:
+                    failed_details_final = self._enrich_failed_workstations(failed_ws)
+                except Exception:
+                    pass
+
             final_report = {
                 "type": "bulk_progress",
                 "session_id": str(session_id),
@@ -728,6 +907,7 @@ class BulkExecutionService:
                 "errors": errors,
                 "failed_workstations": failed_ws,
                 "elapsed_ms": elapsed_ms,
+                "failed_workstation_details": [d.model_dump() for d in failed_details_final],
             }
             await connection_manager.broadcast_to_organization(
                 str(org_id), final_report

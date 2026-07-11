@@ -1335,6 +1335,18 @@
     "seconds": "s",
     "selectOrganization": "Organization",
     "selectOrganizationPlaceholder": "Select organization...",
-    "noWorkstationsOnline": "No online workstations in the organization"
+    "noWorkstationsOnline": "No online workstations in the organization",
+    "activeSessionAlert": "There is a bulk execution in progress",
+    "activeSessionOrg": "Organization: {org}",
+    "activeSessionAction": "Action: {label}",
+    "activeSessionProgress": "Progress: {sent}/{total}",
+    "viewProgress": "View Progress",
+    "remainingTime": "Remaining time: {time}",
+    "eta": "Estimated time: {time}",
+    "calculating": "Calculating...",
+    "failedWorkstations": "Failed workstations",
+    "hostname": "Hostname",
+    "ipPrivate": "Private IP",
+    "unknownIp": "Unknown"
   }
 }

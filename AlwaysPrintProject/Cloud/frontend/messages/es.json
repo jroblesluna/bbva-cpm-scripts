@@ -1335,6 +1335,18 @@
     "seconds": "s",
     "selectOrganization": "Organización",
     "selectOrganizationPlaceholder": "Seleccionar organización...",
-    "noWorkstationsOnline": "No hay workstations online en la organización"
+    "noWorkstationsOnline": "No hay workstations online en la organización",
+    "activeSessionAlert": "Hay una ejecución masiva en curso",
+    "activeSessionOrg": "Organización: {org}",
+    "activeSessionAction": "Acción: {label}",
+    "activeSessionProgress": "Progreso: {sent}/{total}",
+    "viewProgress": "Ver Progreso",
+    "remainingTime": "Tiempo restante: {time}",
+    "eta": "Hora estimada: {time}",
+    "calculating": "Calculando...",
+    "failedWorkstations": "Workstations fallidas",
+    "hostname": "Hostname",
+    "ipPrivate": "IP Privada",
+    "unknownIp": "Desconocida"
   }
 }

@@ -69,3 +69,49 @@ export function shouldShowCancelButton(status: BulkSessionStatus['status']): boo
 export function hasPermissionForBulkActions(role: string | undefined | null): boolean {
   return role === 'admin' || role === 'operator';
 }
+
+// ============================================================================
+// ESTIMACIÓN DE TIEMPO RESTANTE Y ETA
+// ============================================================================
+
+/**
+ * Calcula el tiempo restante estimado en milisegundos.
+ * Fórmula: ((total - sent) / sent) * elapsedMs
+ * Retorna null si sent === 0 (no hay datos para estimar).
+ *
+ * @param total - Total de workstations target
+ * @param sent - Cantidad de envíos completados
+ * @param elapsedMs - Tiempo transcurrido en milisegundos
+ * @returns Tiempo restante estimado en ms, o null si no se puede calcular
+ */
+export function calcRemainingMs(total: number, sent: number, elapsedMs: number): number | null {
+  if (sent === 0) return null
+  return Math.round(((total - sent) / sent) * elapsedMs)
+}
+
+/**
+ * Formatea milisegundos de tiempo restante a texto legible.
+ * - Menos de 60s: "~45s"
+ * - 60s o más: "~2m 30s"
+ *
+ * @param ms - Tiempo restante en milisegundos
+ * @returns Texto formateado
+ */
+export function formatRemainingTime(ms: number): string {
+  if (ms < 60000) {
+    return `~${Math.round(ms / 1000)}s`
+  }
+  const min = Math.floor(ms / 60000)
+  const sec = Math.round((ms % 60000) / 1000)
+  return `~${min}m ${sec}s`
+}
+
+/**
+ * Calcula la hora estimada de finalización (ETA).
+ *
+ * @param remainingMs - Tiempo restante estimado en milisegundos
+ * @returns Date con la hora estimada de finalización
+ */
+export function calcETA(remainingMs: number): Date {
+  return new Date(Date.now() + remainingMs)
+}

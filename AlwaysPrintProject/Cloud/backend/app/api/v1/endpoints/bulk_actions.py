@@ -19,6 +19,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User, UserRole
 from app.schemas.bulk_actions import (
+    ActiveSessionInfo,
     BulkPreview,
     BulkPreviewRequest,
     BulkSessionStatus,
@@ -119,6 +120,22 @@ async def start_bulk_execution(
     )
 
     return response
+
+
+@router.get("/active", response_model=ActiveSessionInfo)
+async def get_active_session(
+    user: User = Depends(get_current_user),
+):
+    """
+    Detecta si hay una sesión bulk activa para el usuario/organización.
+
+    - Operator: solo ve sesiones de su propia organización
+    - Admin: ve sesiones de cualquier organización
+    - Readonly: rechazado con HTTP 403
+    """
+    if user.role == UserRole.READONLY:
+        raise HTTPException(status_code=403, detail="Permisos insuficientes")
+    return await bulk_service.get_active_session(user)
 
 
 @router.get("/status/{session_id}", response_model=BulkSessionStatus)

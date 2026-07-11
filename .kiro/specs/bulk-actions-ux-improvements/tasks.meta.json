@@ -1,0 +1,420 @@
+{
+  "pbtResults": {
+    "9.1 Write property test: Failed workstation enrichment correctness": {
+      "status": "passed",
+      "lastRunTimestamp": 1783725488619
+    },
+    "9.4 Write property test: Remaining time calculation": {
+      "status": "passed",
+      "lastRunTimestamp": 1783725505589
+    },
+    "9.2 Write property test: Backward compatibility of failed workstations response": {
+      "status": "passed",
+      "lastRunTimestamp": 1783726913016
+    },
+    "9.5 Write property test: ETA calculation": {
+      "status": "passed",
+      "lastRunTimestamp": 1783726992139
+    },
+    "9.6 Write property test: Time formatting threshold": {
+      "status": "passed",
+      "lastRunTimestamp": 1783727008914
+    },
+    "9.3 Write property test: Active session tenant isolation": {
+      "status": "passed",
+      "lastRunTimestamp": 1783727112450
+    }
+  },
+  "executionHistory": {
+    "1.1 Agregar `FailedWorkstationDetail` y `ActiveSessionInfo` schemas en `app/schemas/bulk_actions.py`": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715399995
+      },
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715409351
+      },
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715572254
+      }
+    ],
+    "1.2 Modificar `BulkSessionStatus` schema para agregar campos enriquecidos": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400174
+      },
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715576698
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724676750
+      }
+    ],
+    "2.1 Implementar método `_enrich_failed_workstations` en `BulkExecutionService`": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400226
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724682285
+      }
+    ],
+    "2.2 Modificar `get_session_status` para incluir `failed_workstation_details` y `delay_ms`": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400262
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724690305
+      }
+    ],
+    "2.3 Implementar método `get_active_session` en `BulkExecutionService`": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400297
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724683300
+      }
+    ],
+    "2.4 Modificar `_execute_bulk` para incluir `failed_workstation_details` en mensajes WebSocket": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400400
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724691183
+      }
+    ],
+    "3.1 Implementar endpoint `GET /bulk-actions/active` en `app/api/v1/endpoints/bulk_actions.py`": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400429
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724692117
+      }
+    ],
+    "4. Checkpoint - Verificar backend": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400457
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724696642
+      }
+    ],
+    "5.1 Agregar interfaces `FailedWorkstationDetail` y `ActiveSessionInfo` en `src/types/bulk-actions.ts`": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400495
+      },
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715577524
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724681077
+      }
+    ],
+    "5.2 Implementar funciones de estimación de tiempo en `src/lib/bulk-actions-utils.ts`": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400534
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724684618
+      }
+    ],
+    "5.3 Agregar método `getActive()` al API client en `src/lib/api.ts`": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400574
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724685836
+      }
+    ],
+    "6.1 Implementar componente `ActiveSessionAlert` en la página de bulk-actions": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400609
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724701021
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783725057145
+      }
+    ],
+    "6.2 Implementar sección `FailedWorkstationsList` en `ExecutionProgressSection`": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400643
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724701942
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783725058049
+      }
+    ],
+    "6.3 Implementar visualización de estimación de tiempo en `ExecutionProgressSection`": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400674
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724702740
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783725058823
+      }
+    ],
+    "7.1 Agregar keys de traducción en `messages/es.json` y `messages/en.json`": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400715
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724703632
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783725059732
+      }
+    ],
+    "8. Checkpoint - Verificar integración frontend": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400753
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783725064685
+      }
+    ],
+    "9.1 Write property test: Failed workstation enrichment correctness": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400794
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783725069191
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783726926495
+      }
+    ],
+    "9.2 Write property test: Backward compatibility of failed workstations response": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400832
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783725069984
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783726927253
+      }
+    ],
+    "9.3 Write property test: Active session tenant isolation": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400883
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783725070749
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783727125937
+      }
+    ],
+    "9.4 Write property test: Remaining time calculation": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400911
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783725071563
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783726928064
+      }
+    ],
+    "9.5 Write property test: ETA calculation": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400944
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783725072306
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783727124288
+      }
+    ],
+    "9.6 Write property test: Time formatting threshold": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715400976
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783726932353
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783727125063
+      }
+    ],
+    "10. Final checkpoint - Verificar todo": [
+      {
+        "executionId": "d3647b5b-772a-49f7-9593-d055bd224bc6",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783715401026
+      },
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783727130436
+      }
+    ],
+    "1. Backend schemas y modelo de datos": [
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724676786
+      }
+    ],
+    "5. Frontend types y utilidades": [
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724685861
+      }
+    ],
+    "2. Backend service: enriquecimiento y sesión activa": [
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724691209
+      }
+    ],
+    "3. Backend endpoint: sesión activa": [
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783724692149
+      }
+    ],
+    "6. Frontend UI components": [
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783725058857
+      }
+    ],
+    "7. Traducciones i18n": [
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783725059759
+      }
+    ],
+    "9. Property tests y unit tests": [
+      {
+        "executionId": "12a9a5e5-75d3-4fb6-b2d1-eeebca0bb426",
+        "chatSessionId": "sess_b7cd328c-9d48-412a-b01b-cf0970cf32ee",
+        "timestamp": 1783727125975
+      }
+    ]
+  }
+}

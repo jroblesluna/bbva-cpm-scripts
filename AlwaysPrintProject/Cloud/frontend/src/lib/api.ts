@@ -965,6 +965,11 @@ export const bulkActionsApi = {
     }),
 
   /**
+   * Detectar si hay una sesión bulk activa para la organización/usuario actual.
+   */
+  getActive: () => apiClient.get('/bulk-actions/active'),
+
+  /**
    * Preview con conteo de workstations online y tiempo estimado.
    * Para admins, permite especificar una organización distinta.
    */
