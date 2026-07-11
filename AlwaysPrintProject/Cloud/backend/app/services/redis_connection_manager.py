@@ -1771,6 +1771,73 @@ class RedisConnectionManager:
         """Obtiene lista de operadores online."""
         return list(self.operator_connections.keys())
 
+    async def get_worker_ids_for_workstations(self, workstation_ids: List[str]) -> Dict[str, str]:
+        """
+        Retorna un mapeo {workstation_id: worker_id} para una lista de WS.
+
+        Para las WS conectadas a ESTE worker, retorna self._worker_id directamente.
+        Para las WS en OTROS workers, consulta Redis con SISMEMBER en pipeline
+        contra los SETs de cada worker activo.
+
+        Args:
+            workstation_ids: Lista de workstation_ids a resolver
+
+        Returns:
+            Dict {ws_id: "worker_XX"} para las WS encontradas. Las no encontradas no aparecen.
+        """
+        result: Dict[str, str] = {}
+        remote_ids: List[str] = []
+
+        # 1. Resolver locales (O(1) por WS)
+        for ws_id in workstation_ids:
+            if ws_id in self.workstation_connections:
+                result[ws_id] = self._worker_id
+            else:
+                remote_ids.append(ws_id)
+
+        if not remote_ids or not self._redis_available or not self._redis:
+            return result
+
+        # 2. Resolver remotas consultando Redis SETs de otros workers
+        try:
+            # Encontrar todos los workers activos
+            worker_keys: List[str] = []
+            async for key in self._redis.scan_iter(match="workers:*:workstations"):
+                key_str = key.decode("utf-8") if isinstance(key, bytes) else key
+                # Excluir nuestro propio SET (ya resuelto arriba)
+                if f"workers:{self._worker_id}:workstations" != key_str:
+                    worker_keys.append(key_str)
+
+            # Para cada worker remoto, verificar si tiene las WS pendientes
+            for wk in worker_keys:
+                if not remote_ids:
+                    break
+                # Extraer worker_id de la key "workers:{worker_id}:workstations"
+                parts = wk.split(":")
+                if len(parts) < 3:
+                    continue
+                other_worker_id = parts[1]
+
+                # Pipeline SISMEMBER para todas las WS pendientes
+                pipe = self._redis.pipeline()
+                for ws_id in remote_ids:
+                    pipe.sismember(wk, ws_id)
+                results = await pipe.execute()
+
+                # Marcar las encontradas
+                still_remote = []
+                for ws_id, is_member in zip(remote_ids, results):
+                    if is_member:
+                        result[ws_id] = other_worker_id
+                    else:
+                        still_remote.append(ws_id)
+                remote_ids = still_remote
+
+        except Exception as e:
+            logger.debug("worker.get_worker_ids_error", error=str(e))
+
+        return result
+
     def is_workstation_online(self, workstation_id: str) -> bool:
         """
         Verifica si una workstation está online (local o en otro worker).

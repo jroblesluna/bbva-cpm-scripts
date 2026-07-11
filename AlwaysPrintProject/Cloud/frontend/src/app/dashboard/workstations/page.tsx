@@ -1409,6 +1409,11 @@ function WorkstationCard({
             <Badge variant={workstation.is_online ? 'default' : 'secondary'}>
               {workstation.is_online ? t('online') : t('offline')}
             </Badge>
+            {workstation.is_online && workstation.worker_id && (
+              <Badge variant="outline" className="text-xs font-mono border-blue-200 text-blue-600 bg-blue-50">
+                {workstation.worker_id.replace('worker_', 'w')}
+              </Badge>
+            )}
             {(workstation.contingency_active || workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency) && (
               <Badge variant="destructive">
                 {t('contingency')}
@@ -1811,6 +1816,11 @@ function WorkstationTable({
                       <span
                         className={`w-2.5 h-2.5 rounded-full shrink-0 ${ws.is_online ? 'bg-green-500' : 'bg-gray-400'}`}
                       />
+                      {ws.is_online && ws.worker_id && (
+                        <span className="text-[10px] font-mono text-blue-500">
+                          {ws.worker_id.replace('worker_', 'w')}
+                        </span>
+                      )}
                       {(ws.contingency_active || ws.forced_contingency || ws.vlan?.forced_contingency || ws.organization?.forced_contingency) && (
                         <Badge variant="destructive" className="text-[10px] px-1 py-0">
                           C

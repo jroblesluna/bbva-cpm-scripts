@@ -102,6 +102,7 @@ class WorkstationResponse(BaseModel):
     contingency_active: bool
     forced_contingency: bool = False
     action_config_mandatory: bool = False
+    worker_id: Optional[str] = Field(None, description="ID del worker que tiene la conexión WebSocket activa (ej: worker_25)")
     last_connection: Optional[datetime] = None
     first_seen: datetime
     created_at: datetime

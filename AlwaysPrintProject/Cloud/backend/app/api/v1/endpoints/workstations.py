@@ -967,11 +967,17 @@ async def list_workstations(
     )
     
     # Enriquecer is_online con snapshot global (para items de esta página).
+    # También obtener worker_id para cada WS online.
+    ws_id_strs = [str(ws.id) for ws in workstations]
+    worker_map = await connection_manager.get_worker_ids_for_workstations(ws_id_strs)
+
     for ws in workstations:
         ws_id_str = str(ws.id)
         real_online = ws_id_str in global_online
         if real_online != ws.is_online:
             ws.is_online = real_online
+        # Inyectar worker_id como atributo transitorio para el response schema
+        ws.worker_id = worker_map.get(ws_id_str)
 
     # Stats inline: conteo exacto basado en métricas de workers (len(workstation_connections))
     # Esto es más preciso que contar IDs del SUNIONSTORE que puede tener micro-gap del batch.

@@ -628,7 +628,20 @@ class ConnectionManager:
             Lista de user_ids
         """
         return list(self.operator_connections.keys())
-    
+
+    async def get_worker_ids_for_workstations(self, workstation_ids: list) -> dict:
+        """
+        Retorna mapeo {ws_id: worker_id} (single-worker: todas las locales usan PID).
+        Interfaz compatible con RedisConnectionManager.
+        """
+        import os
+        worker_id = f"worker_{os.getpid()}"
+        return {
+            ws_id: worker_id
+            for ws_id in workstation_ids
+            if ws_id in self.workstation_connections
+        }
+
     def is_workstation_online(self, workstation_id: str) -> bool:
         """
         Verifica si una workstation está online.

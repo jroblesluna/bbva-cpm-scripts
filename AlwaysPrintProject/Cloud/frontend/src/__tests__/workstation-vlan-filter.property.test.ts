@@ -35,6 +35,7 @@ const workstationArb: fc.Arbitrary<Workstation> = fc.record({
   is_online: fc.boolean(),
   contingency_active: fc.boolean(),
   forced_contingency: fc.boolean(),
+  worker_id: fc.option(fc.constant('worker_25'), { nil: null }),
   last_connection: fc.constant(null),
   first_seen: fc.constant('2024-01-01T00:00:00Z'),
   created_at: fc.constant('2024-01-01T00:00:00Z'),

@@ -15,6 +15,7 @@ export interface Workstation {
   is_online: boolean
   contingency_active: boolean
   forced_contingency: boolean
+  worker_id: string | null
   last_connection: string | null
   first_seen: string
   created_at: string
