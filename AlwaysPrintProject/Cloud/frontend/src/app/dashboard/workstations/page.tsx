@@ -327,7 +327,10 @@ export default function WorkstationsPage() {
       case 'last_connection':
         return dir * (a.last_connection ?? '').localeCompare(b.last_connection ?? '');
       case 'is_online':
-        return dir * (Number(a.is_online) - Number(b.is_online));
+        // Primario: online/offline. Secundario: worker_id (para agrupar por worker cuando todos tienen mismo estado)
+        const onlineDiff = Number(a.is_online) - Number(b.is_online);
+        if (onlineDiff !== 0) return dir * onlineDiff;
+        return dir * (a.worker_id ?? '').localeCompare(b.worker_id ?? '');
       default:
         return 0;
     }
