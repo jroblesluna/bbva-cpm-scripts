@@ -10,16 +10,24 @@ namespace AlwaysPrintTray.Cloud
 {
     /// <summary>
     /// Descarga el MSI de actualización de forma asíncrona y no bloqueante.
-    /// Guarda el archivo en %TEMP%\AlwaysPrint\Updates\ y verifica su integridad por tamaño.
+    /// Guarda el archivo en C:\ProgramData\AlwaysPrint\Updates\ (accesible por SYSTEM
+    /// ya que el script de instalación corre como LocalSystem) y verifica su integridad por tamaño.
     /// </summary>
     public class UpdateDownloader
     {
         private readonly string _cloudApiUrl;
         private readonly HttpClient _httpClient;
 
-        /// <summary>Directorio temporal donde se guardan las actualizaciones descargadas.</summary>
+        /// <summary>
+        /// Directorio donde se guardan las actualizaciones descargadas.
+        /// Usa ProgramData (no %TEMP% del usuario) porque el script de instalación
+        /// se ejecuta como SYSTEM y necesita acceso al MSI. En entornos corporativos
+        /// con políticas restrictivas, SYSTEM no puede acceder a carpetas de perfil de usuario.
+        /// </summary>
         private static readonly string UpdatesDir =
-            Path.Combine(Path.GetTempPath(), "AlwaysPrint", "Updates");
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "AlwaysPrint", "Updates");
 
         /// <summary>Nombre del archivo MSI descargado.</summary>
         private const string MsiFileName = "AlwaysPrint_update.msi";
