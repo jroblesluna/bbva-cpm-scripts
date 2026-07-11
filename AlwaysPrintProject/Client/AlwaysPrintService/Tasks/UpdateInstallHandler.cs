@@ -290,77 +290,108 @@ REM ============================================================
 set LOG=""{logFilePath}""
 set LOCKFILE=""{LockFilePath}""
 
-REM Crear lockfile
-echo %date% %time% > %LOCKFILE%
+REM Funcion para timestamp ISO (sin dependencia de locale ni PowerShell)
+REM Usa wmic que retorna formato fijo: 20260711132828.123456-300
+call :getTS
 
-echo [%date% %time%] [UPD] Event 1020: Iniciando script de actualizacion. MSI={msiFilePath} >> %LOG%
+REM Crear lockfile
+echo %TS% > %LOCKFILE%
+
+echo [%TS%] [UPD] Event 1020: Iniciando script de actualizacion. MSI={msiFilePath} >> %LOG%
 
 REM Verificar que el MSI existe
 if not exist ""{msiFilePath}"" (
-    echo [%date% %time%] [UPD] Event 1091: ERROR - MSI no encontrado. Abortando. >> %LOG%
+    call :getTS
+    echo [%TS%] [UPD] Event 1091: ERROR - MSI no encontrado. Abortando. >> %LOG%
     goto :cleanup
 )
 
-echo [%date% %time%] [UPD] Event 1020: Esperando 3s para que el Service responda al Tray... >> %LOG%
+call :getTS
+echo [%TS%] [UPD] Event 1020: Esperando 3s para que el Service responda al Tray... >> %LOG%
 timeout /t 3 /nobreak > nul
 
-echo [%date% %time%] [UPD] Event 1020: [PASO 1] Matando procesos {TrayProcessName}.exe... >> %LOG%
+call :getTS
+echo [%TS%] [UPD] Event 1020: [PASO 1] Matando procesos {TrayProcessName}.exe... >> %LOG%
 taskkill /f /im {TrayProcessName}.exe >> %LOG% 2>&1
-echo [%date% %time%] [UPD] Event 1020: [PASO 1] taskkill exitcode=%errorlevel% >> %LOG%
+call :getTS
+echo [%TS%] [UPD] Event 1020: [PASO 1] taskkill exitcode=%errorlevel% >> %LOG%
 timeout /t 2 /nobreak > nul
 
-echo [%date% %time%] [UPD] Event 1020: [PASO 2] Deshabilitando Service Recovery... >> %LOG%
+call :getTS
+echo [%TS%] [UPD] Event 1020: [PASO 2] Deshabilitando Service Recovery... >> %LOG%
 sc failure {ServiceName} reset= 0 actions= """"/""""/"""" > nul 2>&1
-echo [%date% %time%] [UPD] Event 1020: [PASO 2] sc failure exitcode=%errorlevel% >> %LOG%
+call :getTS
+echo [%TS%] [UPD] Event 1020: [PASO 2] sc failure exitcode=%errorlevel% >> %LOG%
 
-echo [%date% %time%] [UPD] Event 1020: [PASO 3] Deteniendo servicio {ServiceName}... >> %LOG%
+call :getTS
+echo [%TS%] [UPD] Event 1020: [PASO 3] Deteniendo servicio {ServiceName}... >> %LOG%
 net stop {ServiceName} >> %LOG% 2>&1
-echo [%date% %time%] [UPD] Event 1020: [PASO 3] net stop exitcode=%errorlevel% >> %LOG%
+call :getTS
+echo [%TS%] [UPD] Event 1020: [PASO 3] net stop exitcode=%errorlevel% >> %LOG%
 timeout /t 3 /nobreak > nul
 
-echo [%date% %time%] [UPD] Event 1020: [PASO 4] Ejecutando msiexec /i (silencioso)... >> %LOG%
+call :getTS
+echo [%TS%] [UPD] Event 1020: [PASO 4] Ejecutando msiexec /i (silencioso)... >> %LOG%
 msiexec /i ""{msiFilePath}"" /quiet /norestart REINSTALLMODE=amus /l*v ""{msiFilePath}.msiexec.log""
 set MSIRESULT=%errorlevel%
-echo [%date% %time%] [UPD] Event 1020: [PASO 4] msiexec finalizado. ExitCode=%MSIRESULT% >> %LOG%
+call :getTS
+echo [%TS%] [UPD] Event 1020: [PASO 4] msiexec finalizado. ExitCode=%MSIRESULT% >> %LOG%
 
-echo [%date% %time%] [UPD] Event 1020: [PASO 5] Restaurando Service Recovery... >> %LOG%
+call :getTS
+echo [%TS%] [UPD] Event 1020: [PASO 5] Restaurando Service Recovery... >> %LOG%
 sc failure {ServiceName} reset= 86400 actions= restart/5000/restart/5000/restart/5000 > nul 2>&1
 
 if %MSIRESULT% neq 0 (
-    echo [%date% %time%] [UPD] Event 1091: ERROR - msiexec fallo con codigo %MSIRESULT%. >> %LOG%
+    call :getTS
+    echo [%TS%] [UPD] Event 1091: ERROR - msiexec fallo con codigo %MSIRESULT%. >> %LOG%
     net start {ServiceName} > nul 2>&1
     goto :cleanup
 )
 
-echo [%date% %time%] [UPD] Event 1020: [PASO 6] Instalacion exitosa. Iniciando servicio... >> %LOG%
+call :getTS
+echo [%TS%] [UPD] Event 1020: [PASO 6] Instalacion exitosa. Iniciando servicio... >> %LOG%
 net start {ServiceName} >> %LOG% 2>&1
-echo [%date% %time%] [UPD] Event 1020: [PASO 6] net start exitcode=%errorlevel% >> %LOG%
+call :getTS
+echo [%TS%] [UPD] Event 1020: [PASO 6] net start exitcode=%errorlevel% >> %LOG%
 timeout /t 3 /nobreak > nul
 
 REM Verificar servicio activo
-echo [%date% %time%] [UPD] Event 1020: [PASO 7] Verificando servicio... >> %LOG%
+call :getTS
+echo [%TS%] [UPD] Event 1020: [PASO 7] Verificando servicio... >> %LOG%
 sc query {ServiceName} | findstr /i ""RUNNING"" > nul 2>&1
 if %errorlevel% equ 0 (
-    echo [%date% %time%] [UPD] Event 1020: Servicio ACTIVO. Actualizacion completada. >> %LOG%
+    call :getTS
+    echo [%TS%] [UPD] Event 1020: Servicio ACTIVO. Actualizacion completada. >> %LOG%
 ) else (
-    echo [%date% %time%] [UPD] Event 1091: WARN - Servicio no activo. Reintentando... >> %LOG%
+    call :getTS
+    echo [%TS%] [UPD] Event 1091: WARN - Servicio no activo. Reintentando... >> %LOG%
     timeout /t 10 /nobreak > nul
     net start {ServiceName} > nul 2>&1
     timeout /t 5 /nobreak > nul
     sc query {ServiceName} | findstr /i ""RUNNING"" > nul 2>&1
     if %errorlevel% equ 0 (
-        echo [%date% %time%] [UPD] Event 1020: Servicio ACTIVO tras reintento. >> %LOG%
+        call :getTS
+        echo [%TS%] [UPD] Event 1020: Servicio ACTIVO tras reintento. >> %LOG%
     ) else (
-        echo [%date% %time%] [UPD] Event 1091: CRITICO - Servicio no pudo iniciarse. >> %LOG%
+        call :getTS
+        echo [%TS%] [UPD] Event 1091: CRITICO - Servicio no pudo iniciarse. >> %LOG%
     )
 )
 
 :cleanup
-echo [%date% %time%] [UPD] Event 1020: Eliminando lockfile y MSI... >> %LOG%
+call :getTS
+echo [%TS%] [UPD] Event 1020: Eliminando lockfile y MSI... >> %LOG%
 del /f /q %LOCKFILE% > nul 2>&1
 del /f /q ""{msiFilePath}"" > nul 2>&1
-echo [%date% %time%] [UPD] Event 1020: Script finalizado. >> %LOG%
+call :getTS
+echo [%TS%] [UPD] Event 1020: Script finalizado. >> %LOG%
 (goto) 2>nul & del /f /q ""{scriptPath}""
+exit /b
+
+:getTS
+for /f ""tokens=2 delims=="" %%a in ('wmic os get localdatetime /format:list 2^>nul') do set DT=%%a
+set TS=%DT:~0,4%-%DT:~4,2%-%DT:~6,2% %DT:~8,2%:%DT:~10,2%:%DT:~12,2%
+goto :eof
 ";
         }
     }
