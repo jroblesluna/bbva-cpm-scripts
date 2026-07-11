@@ -748,7 +748,7 @@ def register_workstation(
 async def list_workstations(
     page: int = Query(1, ge=1, description="Número de página"),
     page_size: int = Query(50, ge=1, le=1000, description="Tamaño de página"),
-    vlan_id: Optional[UUID] = Query(None, description="Filtrar por VLAN"),
+    vlan_id: Optional[str] = Query(None, description="Filtrar por VLAN (UUID o 'none' para sin VLAN)"),
     organization_id: Optional[UUID] = Query(None, description="Filtrar por organización"),
     is_online: Optional[bool] = Query(None, description="Filtrar por estado online"),
     contingency_active: Optional[bool] = Query(None, description="Filtrar por contingencia activa"),
@@ -806,7 +806,20 @@ async def list_workstations(
     
     # Filtrar por VLAN si se proporciona
     if vlan_id:
-        base_query = base_query.filter(Workstation.vlan_id == vlan_id)
+        if vlan_id.lower() == 'none':
+            # Filtrar workstations que NO tienen VLAN asignada
+            base_query = base_query.filter(Workstation.vlan_id.is_(None))
+        else:
+            # Filtrar por VLAN específica (UUID)
+            try:
+                from uuid import UUID as PyUUID_vlan
+                vlan_uuid = PyUUID_vlan(vlan_id)
+                base_query = base_query.filter(Workstation.vlan_id == vlan_uuid)
+            except (ValueError, AttributeError):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"vlan_id inválido: '{vlan_id}'. Debe ser un UUID válido o 'none'."
+                )
     
     # Obtener snapshot global de WS online (lectura fresca de Redis, cross-worker).
     from app.services.websocket_manager import connection_manager

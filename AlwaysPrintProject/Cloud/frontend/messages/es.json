@@ -187,6 +187,7 @@
     "allStatuses": "Todos los estados",
     "allAccounts": "Todas las organizaciones",
     "allVlans": "Todas las VLANs",
+    "noVlan": "Sin VLAN asignada",
     "allVersions": "Todas las versiones",
     "versionCurrent": "Vigente",
     "versionOutdated": "Desactualizada",

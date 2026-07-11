@@ -583,6 +583,7 @@ export default function WorkstationsPage() {
                   className="w-full px-3 py-2 border rounded-md"
                 >
                   <option value="all">{t('allVlans')}</option>
+                  <option value="none">{t('noVlan')}</option>
                   {Array.isArray(vlans) &&
                     vlans.map((vlan) => (
                       <option key={vlan.id} value={vlan.id}>

@@ -37,6 +37,25 @@ If the user specifies environment, organization, and CSV explicitly, skip confir
 Todos los pasos se ejecutan en UN SOLO script Python. Solo se procesan items que necesitan cambio.
 
 ### Step 1: Build VLAN map + Rename + Create missing (NO duplicates)
+
+#### Tipos de VLAN
+
+Existen DOS tipos de VLAN en el sistema:
+
+1. **VLANs de agencia** (formato obligatorio: `{code_3dig} - Ag. {name}`)
+   - Representan agencias/oficinas reales
+   - Se crean/renombran según el CSV
+   - Reciben workstations cuya IP empieza con `118.`
+   
+2. **VLANs especiales de red privada** (formato: `VLAN_{prefix}` donde prefix = `10`, `192`, `172`)
+   - Agrupan workstations/CIDRs con IPs de redes privadas (10.x.x.x, 192.x.x.x, 172.x.x.x)
+   - **NUNCA crear** nuevas VLANs con formato `VLAN_x.x.x.x` (con IP completa)
+   - Solo se crean como `VLAN_10`, `VLAN_192`, `VLAN_172` si no existen
+   - Si ya existe una VLAN con nombre que empiece con `VLAN_10` o `VLAN_192` o `VLAN_172`, reutilizarla
+
+#### Reglas de creación de VLANs de agencia
+
+- **NUNCA crear una VLAN con formato `VLAN_x.x.x.x`** (IP completa) — esto está PROHIBIDO
 - Construir mapa `code → VLAN` con DOS métodos de matching (OR):
   1. Extraer código del nombre: `name.split(" - ")[0].strip().zfill(3)` si es numérico
   2. Buscar match por CIDRs: si una VLAN existente tiene un CIDR en su lista que coincide con el calculado del CSV → es la misma agencia
@@ -44,7 +63,7 @@ Todos los pasos se ejecutan en UN SOLO script Python. Solo se procesan items que
 - Si una VLAN existente ya matchea el código (por nombre O por CIDR) → usar esa, renombrar si el nombre difiere del esperado
 - Formato esperado del nombre: `{code_3dig} - Ag. {name}` (reemplazar "Agencia " con "Ag.")
 - **NUNCA crear una VLAN si ya existe otra con el mismo código numérico en el nombre** — verificar exhaustivamente antes de crear
-- **Crear VLANs SOLO si:**
+- **Crear VLANs de agencia SOLO si:**
   1. No existe ninguna VLAN cuyo nombre empiece con el código numérico seguido de " - "
   2. No existe ninguna VLAN cuyo nombre contenga el mismo nombre de agencia (fuzzy: sin prefijo "Agencia"/"Ag.")
 - Si hay duplicados existentes (mismo código, múltiples VLANs): **mergear** antes de continuar:
@@ -56,11 +75,35 @@ Todos los pasos se ejecutan en UN SOLO script Python. Solo se procesan items que
 - **Importante**: El CIDR calculado del CSV (derivado de la IP del device) puede diferir del CIDR operativo de la VLAN. Un código numérico idéntico en el nombre es la fuente de verdad para el match.
 
 ### Step 2: Reassign workstations + CIDRs
-- Para cada workstation: extraer código de agencia de `hostname[3:6]`
-- Si `vlan_id` actual ≠ VLAN del código → reasignar
-- Asegurar que el CIDR de la WS esté en `cidr_ranges` de la VLAN target
-- Remover ese CIDR de cualquier otra VLAN que lo tenga (sin duplicados)
-- **Hostname es source of truth**, no el CIDR
+
+#### Regla de asignación por IP
+
+La asignación de workstations a VLANs depende del **prefijo de su IP**:
+
+| Prefijo IP | Asignación | VLAN Target |
+|------------|-----------|-------------|
+| `118.` | Por hostname (código agencia en posiciones 3:6) | VLAN de agencia (`{code} - Ag. XXX`) |
+| `10.` | Por IP (red privada) | `VLAN_10` (o existente que empiece con `VLAN_10`) |
+| `192.` | Por IP (red privada) | `VLAN_192` (o existente que empiece con `VLAN_192`) |
+| `172.` | Por IP (red privada) | `VLAN_172` (o existente que empiece con `VLAN_172`) |
+| Otro | No reasignar | Mantener VLAN actual |
+
+#### Lógica de ejecución
+
+- **Para WS con IP que empieza con `118.`:**
+  - Extraer código de agencia de `hostname[3:6]`
+  - Si `vlan_id` actual ≠ VLAN del código → reasignar
+  - Asegurar que el CIDR de la WS esté en `cidr_ranges` de la VLAN target
+  - **TODAS las WS con IP 118.x deben estar asignadas** a una VLAN de agencia según su hostname
+
+- **Para WS con IP que empieza con `10.`, `192.`, `172.`:**
+  - Asignar a la VLAN especial correspondiente (`VLAN_10`, `VLAN_192`, `VLAN_172`)
+  - NO usar el hostname para determinar agencia
+  - El CIDR de la WS se asigna a la VLAN especial correspondiente
+
+- **CIDRs**: Se asignan a VLANs especiales si corresponden a redes privadas (10.0.0.0/8, 192.168.0.0/16, 172.16.0.0/12). Los CIDRs con prefijo 118. van a la VLAN de agencia que les corresponde.
+
+- Remover CIDRs de cualquier otra VLAN que los tenga (sin duplicados entre VLANs)
 
 ### Step 3: Upsert devices (printers) from CSV
 - Match por IP dentro de la organización

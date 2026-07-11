@@ -142,80 +142,185 @@ REM ============================================================
 REM Script de actualización automática de AlwaysPrint
 REM Generado: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
 REM MSI: {msiFilePath}
+REM Script: {scriptPath}
 REM Log: {logFilePath}
 REM ============================================================
 
 set LOG=""{logFilePath}""
+set SCRIPT_PID=%~0
 
 call :ts
-echo %TS% [UPD] Event 1020: Iniciando script de actualizacion. MSI={msiFilePath} >> %LOG%
+echo %TS% [UPD] Event 1020: Iniciando script de actualizacion. MSI={msiFilePath}, ScriptPID=%%SCRIPT_PID%% >> %LOG%
 
-REM Esperar 3 segundos para que el Service termine de responder
+REM Verificar que el MSI existe antes de continuar
+if not exist ""{msiFilePath}"" (
+    call :ts
+    echo !TS! [UPD] Event 1091: ERROR - MSI no encontrado en {msiFilePath}. Abortando. >> %LOG%
+    goto :script_end
+)
+
+REM Loggear tamaño del MSI
+for %%A in (""{msiFilePath}"") do set MSI_SIZE=%%~zA
+call :ts
+echo %TS% [UPD] Event 1020: MSI verificado. Tamanio=%MSI_SIZE% bytes. >> %LOG%
+
+REM Esperar 3 segundos para que el Service termine de responder al Tray
+call :ts
+echo %TS% [UPD] Event 1020: Esperando 3s para que el Service responda al Tray... >> %LOG%
 timeout /t 3 /nobreak > nul
 
-REM Matar procesos del Tray
+REM ============================================================
+REM PASO 1: Matar procesos del Tray
+REM ============================================================
 call :ts
-echo %TS% [UPD] Event 1020: Deteniendo procesos AlwaysPrintTray... >> %LOG%
-taskkill /f /im {TrayProcessName}.exe > nul 2>&1
+echo %TS% [UPD] Event 1020: [PASO 1] Matando procesos {TrayProcessName}.exe... >> %LOG%
+taskkill /f /im {TrayProcessName}.exe 2>&1 | findstr /v ""^$"" >> %LOG%
+set TK_EXIT=!errorlevel!
+call :ts
+echo %TS% [UPD] Event 1020: [PASO 1] taskkill {TrayProcessName}.exe resultado: exitcode=!TK_EXIT! >> %LOG%
 
-REM Deshabilitar Service Recovery temporalmente para evitar que SCM reinicie
-REM el servicio antes de que msiexec complete la instalación
-call :ts
-echo %TS% [UPD] Event 1020: Deshabilitando Service Recovery temporalmente. >> %LOG%
-sc failure {ServiceName} reset= 0 actions= """"/""""/"""" > nul 2>&1
+REM Verificar que el Tray realmente murió
+timeout /t 1 /nobreak > nul
+tasklist /fi ""imagename eq {TrayProcessName}.exe"" 2>nul | findstr /i ""{TrayProcessName}"" > nul 2>&1
+if !errorlevel! equ 0 (
+    call :ts
+    echo !TS! [UPD] Event 1091: WARN - {TrayProcessName}.exe aun activo despues de taskkill. Reintentando... >> %LOG%
+    taskkill /f /im {TrayProcessName}.exe > nul 2>&1
+    timeout /t 2 /nobreak > nul
+)
 
-REM Detener el servicio
+REM ============================================================
+REM PASO 2: Deshabilitar Service Recovery temporalmente
+REM ============================================================
 call :ts
-echo %TS% [UPD] Event 1020: Deteniendo servicio {ServiceName}... >> %LOG%
-net stop {ServiceName} > nul 2>&1
+echo %TS% [UPD] Event 1020: [PASO 2] Deshabilitando Service Recovery temporalmente. >> %LOG%
+sc failure {ServiceName} reset= 0 actions= """"/""""/"""" 2>&1 | findstr /v ""^$"" >> %LOG%
+call :ts
+echo %TS% [UPD] Event 1020: [PASO 2] sc failure (deshabilitar) exitcode=!errorlevel! >> %LOG%
+
+REM ============================================================
+REM PASO 3: Detener el servicio
+REM ============================================================
+call :ts
+echo %TS% [UPD] Event 1020: [PASO 3] Deteniendo servicio {ServiceName}... >> %LOG%
+net stop {ServiceName} 2>&1 | findstr /v ""^$"" >> %LOG%
+set STOP_EXIT=!errorlevel!
+call :ts
+echo %TS% [UPD] Event 1020: [PASO 3] net stop {ServiceName} exitcode=!STOP_EXIT! >> %LOG%
+
+REM Esperar a que el servicio se detenga completamente
 timeout /t 2 /nobreak > nul
+sc query {ServiceName} 2>&1 | findstr /i ""STATE"" >> %LOG%
 
-REM Ejecutar instalación silenciosa
+REM ============================================================
+REM PASO 4: Verificar que no hay otro msiexec corriendo
+REM ============================================================
 call :ts
-echo %TS% [UPD] Event 1020: Ejecutando msiexec /i (silencioso)... >> %LOG%
+echo %TS% [UPD] Event 1020: [PASO 4] Verificando procesos msiexec existentes... >> %LOG%
+tasklist /fi ""imagename eq msiexec.exe"" 2>nul | findstr /i ""msiexec"" > nul 2>&1
+if !errorlevel! equ 0 (
+    call :ts
+    echo !TS! [UPD] Event 1091: WARN - msiexec.exe ya en ejecucion. Esperando 10s antes de continuar... >> %LOG%
+    tasklist /fi ""imagename eq msiexec.exe"" 2>nul >> %LOG%
+    timeout /t 10 /nobreak > nul
+    REM Verificar de nuevo
+    tasklist /fi ""imagename eq msiexec.exe"" 2>nul | findstr /i ""msiexec"" > nul 2>&1
+    if !errorlevel! equ 0 (
+        call :ts
+        echo !TS! [UPD] Event 1091: WARN - msiexec.exe sigue activo despues de 10s. Continuando de todas formas. >> %LOG%
+    ) else (
+        call :ts
+        echo !TS! [UPD] Event 1020: [PASO 4] msiexec.exe ya no esta activo. Continuando. >> %LOG%
+    )
+) else (
+    call :ts
+    echo %TS% [UPD] Event 1020: [PASO 4] No hay msiexec.exe activo. OK. >> %LOG%
+)
+
+REM ============================================================
+REM PASO 5: Ejecutar instalación silenciosa
+REM ============================================================
+call :ts
+echo %TS% [UPD] Event 1020: [PASO 5] Ejecutando msiexec /i (silencioso). MSI={msiFilePath} >> %LOG%
+echo %TS% [UPD] Event 1020: [PASO 5] Comando: msiexec /i ""{msiFilePath}"" /quiet /norestart REINSTALLMODE=amus /l*v ""{msiFilePath}.msiexec.log"" >> %LOG%
 msiexec /i ""{msiFilePath}"" /quiet /norestart REINSTALLMODE=amus /l*v ""{msiFilePath}.msiexec.log""
-set INSTALL_EXIT=%errorlevel%
+set INSTALL_EXIT=!errorlevel!
 call :ts
-echo %TS% [UPD] Event 1020: msiexec finalizado con codigo de salida: %INSTALL_EXIT% >> %LOG%
+echo %TS% [UPD] Event 1020: [PASO 5] msiexec finalizado. ExitCode=!INSTALL_EXIT! >> %LOG%
 
-REM Restaurar Service Recovery (reiniciar en 5s ante fallo, reset counter cada 86400s)
+REM Interpretar exit code de msiexec para diagnóstico
+if !INSTALL_EXIT! equ 0 (
+    echo %TS% [UPD] Event 1020: [PASO 5] msiexec: EXITO (0) - Instalacion completada correctamente. >> %LOG%
+) else if !INSTALL_EXIT! equ 1603 (
+    echo %TS% [UPD] Event 1091: [PASO 5] msiexec: ERROR FATAL (1603) - Error durante instalacion. Ver msiexec.log. >> %LOG%
+) else if !INSTALL_EXIT! equ 1618 (
+    echo %TS% [UPD] Event 1091: [PASO 5] msiexec: ERROR (1618) - Otra instalacion ya en progreso. >> %LOG%
+) else if !INSTALL_EXIT! equ 1602 (
+    echo %TS% [UPD] Event 1091: [PASO 5] msiexec: ERROR (1602) - Cancelado por usuario. >> %LOG%
+) else if !INSTALL_EXIT! equ 1619 (
+    echo %TS% [UPD] Event 1091: [PASO 5] msiexec: ERROR (1619) - No se pudo abrir paquete MSI. >> %LOG%
+) else if !INSTALL_EXIT! equ 1620 (
+    echo %TS% [UPD] Event 1091: [PASO 5] msiexec: ERROR (1620) - Paquete MSI invalido. >> %LOG%
+) else if !INSTALL_EXIT! equ 1638 (
+    echo %TS% [UPD] Event 1020: [PASO 5] msiexec: INFO (1638) - Otra version del producto ya instalada. >> %LOG%
+) else (
+    echo %TS% [UPD] Event 1091: [PASO 5] msiexec: CODIGO NO ESPERADO (!INSTALL_EXIT!). Ver msiexec.log. >> %LOG%
+)
+
+REM ============================================================
+REM PASO 6: Restaurar Service Recovery
+REM ============================================================
 call :ts
-echo %TS% [UPD] Event 1020: Restaurando Service Recovery. >> %LOG%
-sc failure {ServiceName} reset= 86400 actions= restart/5000/restart/5000/restart/5000 > nul 2>&1
+echo %TS% [UPD] Event 1020: [PASO 6] Restaurando Service Recovery. >> %LOG%
+sc failure {ServiceName} reset= 86400 actions= restart/5000/restart/5000/restart/5000 2>&1 | findstr /v ""^$"" >> %LOG%
+call :ts
+echo %TS% [UPD] Event 1020: [PASO 6] sc failure (restaurar) exitcode=!errorlevel! >> %LOG%
 
-REM Verificar resultado
+REM Verificar resultado de la instalación
 if !INSTALL_EXIT! neq 0 (
     call :ts
-    echo !TS! [UPD] Event 1091: ERROR - Instalacion fallida con codigo !INSTALL_EXIT!. >> %LOG%
+    echo !TS! [UPD] Event 1091: ERROR - Instalacion fallida con codigo !INSTALL_EXIT!. Saltando a verificacion. >> %LOG%
     goto :cleanup
 )
 
+REM ============================================================
+REM PASO 7: Iniciar el servicio actualizado
+REM ============================================================
 call :ts
-echo %TS% [UPD] Event 1020: Instalacion exitosa. Iniciando servicio actualizado... >> %LOG%
-
-REM Iniciar el servicio actualizado
-net start {ServiceName} > nul 2>&1
+echo %TS% [UPD] Event 1020: [PASO 7] Instalacion exitosa. Iniciando servicio {ServiceName}... >> %LOG%
+net start {ServiceName} 2>&1 | findstr /v ""^$"" >> %LOG%
+set START_EXIT=!errorlevel!
+call :ts
+echo %TS% [UPD] Event 1020: [PASO 7] net start {ServiceName} exitcode=!START_EXIT! >> %LOG%
 timeout /t 3 /nobreak > nul
+
+REM Verificar que el servicio arrancó
+sc query {ServiceName} 2>&1 | findstr /i ""STATE"" >> %LOG%
 
 REM El Tray será lanzado automáticamente por el Service (CreateProcessAsUser en sesión del usuario)
 
 :cleanup
 REM ============================================================
-REM Esperar 30 segundos antes de verificar (dar tiempo al servicio para estabilizarse)
+REM PASO 8: Verificación post-instalación
 REM ============================================================
 call :ts
-echo %TS% [UPD] Event 1020: Esperando 30 segundos antes de verificacion post-instalacion... >> %LOG%
+echo %TS% [UPD] Event 1020: [PASO 8] Esperando 30 segundos antes de verificacion post-instalacion... >> %LOG%
 timeout /t 30 /nobreak > nul
 
-REM Matar procesos msiexec que puedan estar colgados (libera lock del servicio)
-taskkill /f /im msiexec.exe > nul 2>&1
+REM Verificar si msiexec sigue colgado
+tasklist /fi ""imagename eq msiexec.exe"" 2>nul | findstr /i ""msiexec"" > nul 2>&1
+if !errorlevel! equ 0 (
+    call :ts
+    echo !TS! [UPD] Event 1091: WARN - msiexec.exe sigue activo post-instalacion. Matando... >> %LOG%
+    taskkill /f /im msiexec.exe 2>&1 | findstr /v ""^$"" >> %LOG%
+)
 
 REM ============================================================
-REM Verificación final: asegurar que el servicio está corriendo
+REM PASO 9: Verificación final del servicio
 REM Intenta hasta 5 veces con 30s entre intentos (total max ~2.5 min)
 REM ============================================================
 call :ts
-echo %TS% [UPD] Event 1020: Verificacion final - asegurando que el servicio esta activo... >> %LOG%
+echo %TS% [UPD] Event 1020: [PASO 9] Verificacion final - asegurando que el servicio esta activo... >> %LOG%
 
 set VERIFY_ATTEMPT=0
 set VERIFY_OK=0
@@ -227,29 +332,35 @@ if !VERIFY_ATTEMPT! gtr 5 goto :verify_done
 sc query {ServiceName} | findstr /i ""RUNNING"" > nul 2>&1
 if !errorlevel! equ 0 (
     call :ts
-    echo !TS! [UPD] Event 1020: Verificacion !VERIFY_ATTEMPT!/5: servicio ACTIVO. >> %LOG%
+    echo !TS! [UPD] Event 1020: [PASO 9] Verificacion !VERIFY_ATTEMPT!/5: servicio ACTIVO. >> %LOG%
     set VERIFY_OK=1
     goto :verify_done
 )
 
 call :ts
-echo %TS% [UPD] Event 1020: Verificacion !VERIFY_ATTEMPT!/5: servicio NO activo. >> %LOG%
+echo %TS% [UPD] Event 1020: [PASO 9] Verificacion !VERIFY_ATTEMPT!/5: servicio NO activo. >> %LOG%
+sc query {ServiceName} 2>&1 | findstr /i ""STATE"" >> %LOG%
 
-REM Verificar si el servicio existe (puede estar marcado para eliminación)
+REM Verificar si el servicio existe (puede estar marcado para eliminación por msiexec)
 sc query {ServiceName} > nul 2>&1
 if !errorlevel! equ 1060 (
     call :ts
-    echo !TS! [UPD] Event 1091: Servicio no existe o marcado para eliminacion. Reintentando msiexec... >> %LOG%
+    echo !TS! [UPD] Event 1091: [PASO 9] Servicio no existe o marcado para eliminacion (sc error 1060). Reintentando msiexec... >> %LOG%
     taskkill /f /im msiexec.exe > nul 2>&1
     timeout /t 5 /nobreak > nul
     msiexec /i ""{msiFilePath}"" /quiet /norestart REINSTALLMODE=amus
+    set RETRY_EXIT=!errorlevel!
+    call :ts
+    echo !TS! [UPD] Event 1020: [PASO 9] msiexec reintento exitcode=!RETRY_EXIT! >> %LOG%
     timeout /t 10 /nobreak > nul
 )
 
 REM Intentar iniciar el servicio
 call :ts
-echo %TS% [UPD] Event 1020: Verificacion !VERIFY_ATTEMPT!/5: intentando iniciar servicio... >> %LOG%
-net start {ServiceName} > nul 2>&1
+echo %TS% [UPD] Event 1020: [PASO 9] Verificacion !VERIFY_ATTEMPT!/5: intentando iniciar servicio... >> %LOG%
+net start {ServiceName} 2>&1 | findstr /v ""^$"" >> %LOG%
+call :ts
+echo %TS% [UPD] Event 1020: [PASO 9] net start exitcode=!errorlevel! >> %LOG%
 timeout /t 30 /nobreak > nul
 goto :verify_loop
 
@@ -263,8 +374,16 @@ if !VERIFY_OK! equ 0 (
     REM El Tray será lanzado automáticamente por el Service al iniciar (CreateProcessAsUser)
 )
 
+:script_end
 REM Eliminar MSI temporal (después de verificación para permitir reinstalación si fue necesaria)
+call :ts
+echo %TS% [UPD] Event 1020: Eliminando MSI temporal... >> %LOG%
 del /f /q ""{msiFilePath}"" > nul 2>&1
+if exist ""{msiFilePath}"" (
+    echo %TS% [UPD] Event 1091: WARN - No se pudo eliminar MSI (puede estar en uso). >> %LOG%
+) else (
+    echo %TS% [UPD] Event 1020: MSI temporal eliminado correctamente. >> %LOG%
+)
 
 call :ts
 echo %TS% [UPD] Event 1020: Script de actualizacion finalizado. >> %LOG%
