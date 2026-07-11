@@ -82,7 +82,6 @@ namespace AlwaysPrintService.Tasks
                 string serviceDir = Path.GetDirectoryName(
                     Process.GetCurrentProcess().MainModule!.FileName)!;
                 string trayExePath = Path.Combine(serviceDir, "AlwaysPrintTray.exe");
-                string serviceExePath = Path.Combine(serviceDir, "AlwaysPrintService.exe");
 
                 // 4. Generar script de instalación temporal en ProgramData (accesible por SYSTEM)
                 string scriptDir = Path.Combine(
@@ -102,7 +101,7 @@ namespace AlwaysPrintService.Tasks
                 Directory.CreateDirectory(logDir);
 
                 string scriptContent = GenerateInstallScript(
-                    msiFilePath, trayExePath, serviceExePath, scriptPath, logFilePath);
+                    msiFilePath, trayExePath, scriptPath, logFilePath);
                 File.WriteAllText(scriptPath, scriptContent);
 
                 AlwaysPrintLogger.WriteInfo(
@@ -263,7 +262,7 @@ namespace AlwaysPrintService.Tasks
         /// 9. Se auto-elimina
         /// </summary>
         private static string GenerateInstallScript(
-            string msiFilePath, string trayExePath, string serviceExePath,
+            string msiFilePath, string trayExePath,
             string scriptPath, string logFilePath)
         {
             // Obtener versión actual antes de la actualización (para comparación post-install)
@@ -282,7 +281,6 @@ REM ============================================================
 REM Script de actualización automática de AlwaysPrint
 REM Generado: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
 REM MSI: {msiFilePath}
-REM Service EXE: {serviceExePath}
 REM Versión pre-instalación: {currentVersion}
 REM Script: {scriptPath}
 REM Log: {logFilePath}
@@ -290,8 +288,6 @@ REM ============================================================
 
 set LOG=""{logFilePath}""
 set LOCKFILE=""{LockFilePath}""
-set ""SERVICE_EXE={serviceExePath}""
-set PRE_VERSION={currentVersion}
 
 REM ============================================================
 REM PASO 0: Crear lockfile (prevenir ejecución concurrente)
@@ -311,7 +307,7 @@ if not exist ""{msiFilePath}"" (
 REM Loggear tamaño del MSI
 for %%A in (""{msiFilePath}"") do set MSI_SIZE=%%~zA
 call :ts
-echo !TS! [UPD] Event 1020: MSI verificado. Tamanio=!MSI_SIZE! bytes. Version pre-instalacion=!PRE_VERSION! >> %LOG%
+echo !TS! [UPD] Event 1020: MSI verificado. Tamanio=!MSI_SIZE! bytes. Version pre-instalacion={currentVersion} >> %LOG%
 
 REM Esperar 3 segundos para que el Service termine de responder al Tray
 call :ts
@@ -432,29 +428,6 @@ if !INSTALL_EXIT! neq 0 (
     call :ts
     echo !TS! [UPD] Event 1091: ERROR - Instalacion fallida con codigo !INSTALL_EXIT!. Saltando a verificacion. >> %LOG%
     goto :cleanup
-)
-
-REM ============================================================
-REM PASO 6b: Verificar que la versión realmente cambió
-REM ============================================================
-call :ts
-echo !TS! [UPD] Event 1020: [PASO 6b] Verificando version post-instalacion del Service EXE... >> %LOG%
-
-REM Leer versión del archivo instalado via PowerShell (usar variable batch para evitar
-REM problemas de parsing con paréntesis en rutas como ""Program Files (x86)"")
-set ""PS_CMD=try {{ (Get-Item -LiteralPath $env:SERVICE_EXE).VersionInfo.FileVersion }} catch {{ 'error' }}""
-for /f ""delims="" %%v in ('powershell -NoProfile -Command !PS_CMD!') do set POST_VERSION=%%v
-call :ts
-echo !TS! [UPD] Event 1020: [PASO 6b] Version pre=!PRE_VERSION! post=!POST_VERSION! >> %LOG%
-
-if /i ""!POST_VERSION!""==""!PRE_VERSION!"" (
-    call :ts
-    echo !TS! [UPD] Event 1091: ERROR - Version NO cambio despues de msiexec exitoso. pre=!PRE_VERSION! post=!POST_VERSION!. MSI posiblemente no aplicado. >> %LOG%
-    echo !TS! [UPD] Event 1091: Posibles causas: archivos bloqueados, permisos, MSI con misma version. >> %LOG%
-)
-if ""!POST_VERSION!""==""error"" (
-    call :ts
-    echo !TS! [UPD] Event 1091: WARN - No se pudo leer version del Service EXE post-instalacion. >> %LOG%
 )
 
 REM ============================================================
