@@ -2036,9 +2036,33 @@ function WorkstationForm({
     os_serial: workstation.os_serial || undefined,
     current_user: workstation.current_user || undefined,
     organization_id: workstation.organization_id || undefined,
+    vlan_id: workstation.vlan_id || undefined,
     default_printer_id: workstation.default_printer_id || undefined,
   });
   const [availablePrinters, setAvailablePrinters] = useState<Array<{ id: string; name: string; ip_address: string }>>([]);
+  const [availableVlans, setAvailableVlans] = useState<Array<{ id: string; name: string; cidr_ranges: string[] }>>([]);
+  const [vlanChangeConfirm, setVlanChangeConfirm] = useState<{
+    newVlanId: string | null;
+    newVlanName: string;
+  } | null>(null);
+
+  // Cargar VLANs disponibles en la organización de la workstation
+  useEffect(() => {
+    const orgId = formData.organization_id || workstation.organization_id;
+    if (!orgId) {
+      setAvailableVlans([]);
+      return;
+    }
+    const loadVlans = async () => {
+      try {
+        const response = await vlansApi.list({ organization_id: orgId });
+        setAvailableVlans(response.map(v => ({ id: v.id, name: v.name, cidr_ranges: v.cidr_ranges })));
+      } catch (err) {
+        console.error('Error cargando VLANs:', err);
+      }
+    };
+    loadVlans();
+  }, [formData.organization_id, workstation.organization_id]);
 
   // Cargar impresoras disponibles en la VLAN de la workstation
   useEffect(() => {
@@ -2131,6 +2155,86 @@ function WorkstationForm({
           </select>
         </div>
       </div>
+      {/* Selector de agencia (VLAN) con modal de confirmación */}
+      {(formData.organization_id || workstation.organization_id) && (
+        <div className="space-y-2">
+          <Label htmlFor="vlan_id">{t('vlanAgency')}</Label>
+          <p className="text-xs text-gray-500">{t('vlanAgencyHelper')}</p>
+          <select
+            id="vlan_id"
+            value={formData.vlan_id || ''}
+            onChange={(e) => {
+              const newValue = e.target.value || null;
+              const currentVlanId = workstation.vlan_id || null;
+              // Si el valor es diferente al original, mostrar confirmación
+              if (newValue !== currentVlanId) {
+                const selectedVlan = availableVlans.find(v => v.id === newValue);
+                setVlanChangeConfirm({
+                  newVlanId: newValue,
+                  newVlanName: selectedVlan ? selectedVlan.name : t('unassigned'),
+                });
+              } else {
+                // Revertir al valor original sin confirmación
+                setFormData({ ...formData, vlan_id: newValue || undefined });
+              }
+            }}
+            disabled={isLoading}
+            className="w-full px-3 py-2 border rounded-md"
+          >
+            <option value="">{t('noVlanAssigned')}</option>
+            {availableVlans.map((vlan) => (
+              <option key={vlan.id} value={vlan.id}>
+                {vlan.name} {vlan.cidr_ranges.length > 0 ? `(${vlan.cidr_ranges[0]})` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {/* Modal de confirmación de cambio de agencia */}
+      {vlanChangeConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{ zIndex: 1050 }}>
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <CardTitle className="text-base">{t('vlanChangeTitle')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-600">{t('vlanChangeDescription')}</p>
+              <div className="rounded-lg border border-gray-200 divide-y divide-gray-200">
+                <div className="flex items-center justify-between px-4 py-3">
+                  <span className="text-xs font-medium text-gray-500 uppercase">{t('vlanChangeCurrent')}</span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {workstation.vlan?.name || t('noVlanAssigned')}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between px-4 py-3 bg-blue-50">
+                  <span className="text-xs font-medium text-blue-600 uppercase">{t('vlanChangeDestination')}</span>
+                  <span className="text-sm font-semibold text-blue-900">
+                    {vlanChangeConfirm.newVlanName}
+                  </span>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVlanChangeConfirm(null)}
+                >
+                  {tCommon('cancel')}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setFormData({ ...formData, vlan_id: vlanChangeConfirm.newVlanId || undefined });
+                    setVlanChangeConfirm(null);
+                  }}
+                >
+                  {t('vlanChangeConfirm')}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       {/* Selector de impresora predeterminada (solo si la workstation tiene VLAN) */}
       {workstation.vlan_id && (
         <div className="space-y-2">
