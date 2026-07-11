@@ -40,16 +40,7 @@ jobs:
         shell: pwsh
         run: |
           $now = [DateTime]::UtcNow
-          # Formato: 1.YY.BUILD.REVISION
-          # BUILD = día del año × 100 + hora UTC (max: 36623 < 65535)
-          # REVISION = minuto × 100 + segundo (max: 5959 < 65535)
-          # Esto garantiza que builds del mismo día a distinta hora tengan
-          # versiones MSI con 3er campo distinto. MSI solo compara los primeros
-          # 3 campos para MajorUpgrade — si Build es igual, trata ambas como
-          # "misma versión" y no reemplaza archivos.
-          $build = [int]$now.DayOfYear * 100 + [int]$now.Hour
-          $revision = [int]$now.Minute * 100 + [int]$now.Second
-          $version = "1.$([int]$now.ToString('yy')).$build.$revision"
+          $version = "1.$([int]$now.ToString('yy')).$([int]$now.ToString('MMdd')).$([int]$now.ToString('HHmm'))"
           Write-Host "Version: $version"
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
 

@@ -44,10 +44,7 @@ jobs:
         shell: pwsh
         run: |
           $now = [DateTime]::UtcNow
-          # Formato: 1.YY.BUILD.REVISION — ver build-client-prod.yml para explicación
-          $build = [int]$now.DayOfYear * 100 + [int]$now.Hour
-          $revision = [int]$now.Minute * 100 + [int]$now.Second
-          $version = "1.$([int]$now.ToString('yy')).$build.$revision"
+          $version = "1.$([int]$now.ToString('yy')).$([int]$now.ToString('MMdd')).$([int]$now.ToString('HHmm'))"
           Write-Host "Version: $version"
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
 
