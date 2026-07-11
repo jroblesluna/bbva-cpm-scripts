@@ -339,7 +339,7 @@ REM PASO 2: Deshabilitar Service Recovery temporalmente
 REM ============================================================
 call :ts
 echo !TS! [UPD] Event 1020: [PASO 2] Deshabilitando Service Recovery temporalmente. >> %LOG%
-sc failure {ServiceName} reset= 0 actions= """"/""""/"""" 2>&1 | findstr /v ""^$"" >> %LOG%
+sc failure {ServiceName} reset= 0 actions= ///  2>&1 | findstr /v ""^$"" >> %LOG%
 call :ts
 echo !TS! [UPD] Event 1020: [PASO 2] sc failure (deshabilitar) exitcode=!errorlevel! >> %LOG%
 
