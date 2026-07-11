@@ -290,7 +290,7 @@ REM ============================================================
 
 set LOG=""{logFilePath}""
 set LOCKFILE=""{LockFilePath}""
-set SERVICE_EXE=""{serviceExePath}""
+set ""SERVICE_EXE={serviceExePath}""
 set PRE_VERSION={currentVersion}
 
 REM ============================================================
@@ -440,12 +440,13 @@ REM ============================================================
 call :ts
 echo !TS! [UPD] Event 1020: [PASO 6b] Verificando version post-instalacion del Service EXE... >> %LOG%
 
-REM Leer versión del archivo instalado via PowerShell
-for /f ""delims="" %%v in ('powershell -NoProfile -Command ""try {{ (Get-Item '%serviceExePath%').VersionInfo.FileVersion }} catch {{ 'error' }}""') do set POST_VERSION=%%v
+REM Leer versión del archivo instalado via PowerShell (usar variable batch para evitar
+REM problemas de parsing con paréntesis en rutas como "Program Files (x86)")
+for /f ""delims="" %%v in ('powershell -NoProfile -Command ""try {{ (Get-Item -LiteralPath $env:SERVICE_EXE).VersionInfo.FileVersion }} catch {{ 'error' }}""') do set POST_VERSION=%%v
 call :ts
 echo !TS! [UPD] Event 1020: [PASO 6b] Version pre=!PRE_VERSION! post=!POST_VERSION! >> %LOG%
 
-if ""!POST_VERSION!""==""!PRE_VERSION!"" (
+if /i ""!POST_VERSION!""==""!PRE_VERSION!"" (
     call :ts
     echo !TS! [UPD] Event 1091: ERROR - Version NO cambio despues de msiexec exitoso. pre=!PRE_VERSION! post=!POST_VERSION!. MSI posiblemente no aplicado. >> %LOG%
     echo !TS! [UPD] Event 1091: Posibles causas: archivos bloqueados, permisos, MSI con misma version. >> %LOG%
