@@ -58,6 +58,13 @@ namespace AlwaysPrintService.Tasks
                     };
                 }
 
+                // 1b. Si el MSI está en un perfil de usuario (%TEMP% del Tray), copiarlo a
+                // ProgramData para que el script (que corre como SYSTEM) pueda accederlo.
+                // En entornos corporativos con ACLs restrictivas, SYSTEM no puede leer
+                // carpetas de perfil de usuario. Este paso resuelve el problema de bootstrap
+                // donde versiones antiguas del Tray descargan en %TEMP% del usuario.
+                msiFilePath = EnsureMsiAccessibleBySystem(msiFilePath);
+
                 // 2. Verificar que no haya otra actualización en progreso (lockfile)
                 if (IsUpdateInProgress())
                 {
@@ -187,6 +194,58 @@ namespace AlwaysPrintService.Tasks
                 AlwaysPrintLogger.WriteWarning(
                     $"InstallUpdate: error verificando lockfile: {ex.Message}. Asumiendo sin lock.");
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Si el MSI está en un perfil de usuario (ej: C:\Users\...\AppData\Local\Temp\),
+        /// lo copia a C:\ProgramData\AlwaysPrint\Updates\ donde SYSTEM siempre tiene acceso.
+        /// 
+        /// Esto resuelve el problema de bootstrap donde versiones antiguas del Tray
+        /// (pre-fix) descargan el MSI en %TEMP% del usuario, pero el script de instalación
+        /// corre como SYSTEM y no puede leer la carpeta del perfil en entornos corporativos
+        /// con ACLs restrictivas.
+        /// 
+        /// Si el MSI ya está en ProgramData (versión nueva del Tray), retorna el path sin cambios.
+        /// </summary>
+        /// <param name="originalPath">Ruta original del MSI (posiblemente en perfil de usuario).</param>
+        /// <returns>Ruta del MSI accesible por SYSTEM (puede ser la misma o una copia).</returns>
+        private static string EnsureMsiAccessibleBySystem(string originalPath)
+        {
+            string programDataUpdates = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "AlwaysPrint", "Updates");
+
+            // Si ya está en ProgramData, no necesita copia
+            if (originalPath.StartsWith(programDataUpdates, StringComparison.OrdinalIgnoreCase))
+            {
+                return originalPath;
+            }
+
+            // Está en un perfil de usuario u otra ubicación → copiar a ProgramData
+            try
+            {
+                Directory.CreateDirectory(programDataUpdates);
+                string destPath = Path.Combine(programDataUpdates, "AlwaysPrint_update.msi");
+
+                File.Copy(originalPath, destPath, overwrite: true);
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"InstallUpdate: MSI copiado de perfil de usuario a ProgramData para acceso SYSTEM. " +
+                    $"Origen: {originalPath}, Destino: {destPath}");
+
+                // Eliminar el original (best effort, no bloquear si falla)
+                try { File.Delete(originalPath); } catch { /* el script lo eliminará después */ }
+
+                return destPath;
+            }
+            catch (Exception ex)
+            {
+                // Si la copia falla, intentar con el path original (puede funcionar si SYSTEM tiene acceso)
+                AlwaysPrintLogger.WriteWarning(
+                    $"InstallUpdate: no se pudo copiar MSI a ProgramData ({ex.Message}). " +
+                    $"Usando path original: {originalPath}");
+                return originalPath;
             }
         }
 
