@@ -26,6 +26,7 @@ Uso:
 import asyncio
 import json
 import os
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -115,6 +116,7 @@ class RedisConnectionManager:
 
         # Worker identity
         self._worker_id: str = f"worker_{os.getpid()}"
+        self._start_time: float = time.time()
 
         # Worker registry (se inicializa en initialize())
         self._worker_registry: Optional[WorkerRegistry] = None
@@ -1164,6 +1166,7 @@ class RedisConnectionManager:
                         "baseline_mb": baseline_mb,
                         "fd": fd_count,
                         "pool_out": pool_checked_out,
+                        "uptime": int(time.time() - self._start_time),
                     })
                     await self._redis.set(
                         f"workers:{self._worker_id}:metrics",
