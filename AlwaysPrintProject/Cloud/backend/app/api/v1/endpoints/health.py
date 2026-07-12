@@ -323,22 +323,29 @@ async def health_workers_infrastructure():
 @router.post("/health/workers/restart-backend", tags=["Sistema"])
 async def restart_backend():
     """
-    Reinicia el container backend completo (docker compose restart backend).
-    Ejecuta el comando en un subproceso. La respuesta se envía antes del reinicio.
+    Reinicia el backend matando el proceso master de uvicorn.
+    Docker restart policy (unless-stopped) reinicia el container automáticamente.
+    Alternativa: usa el Docker socket montado para reiniciar vía API de Docker.
     """
     import subprocess
     import asyncio
+    import signal
 
     async def _do_restart():
         await asyncio.sleep(2)  # Dar tiempo a que la response se envíe
-        subprocess.Popen(
-            ["docker", "compose", "-f", "/opt/alwaysprint/docker-compose.yml", "restart", "backend"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        # Opción 1: Docker socket (montado como volume)
+        try:
+            subprocess.run(
+                ["docker", "restart", "alwaysprint-backend-1"],
+                timeout=5,
+                capture_output=True,
+            )
+        except Exception:
+            # Opción 2: matar el master (PID 1 del container) — Docker reinicia
+            os.kill(1, signal.SIGTERM)
 
     asyncio.create_task(_do_restart())
-    return {"status": "restarting", "message": "Backend se reiniciará en 2 segundos"}
+    return {"status": "restarting", "message": "Backend se reiniciará en 2 segundos. Las WS reconectarán con jitter."}
 
 
 @router.post("/health/workers/{worker_id}/reset-heartbeat", tags=["Sistema"])
