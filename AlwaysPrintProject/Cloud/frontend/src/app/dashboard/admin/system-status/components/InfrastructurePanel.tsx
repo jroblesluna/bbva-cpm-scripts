@@ -78,7 +78,7 @@ export default function InfrastructurePanel() {
   const [loading, setLoading] = useState(false);
   const [actionPending, setActionPending] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
-    action: 'restart' | 'kill' | 'reset';
+    action: 'restart' | 'kill' | 'forceKill' | 'reset';
     workerId?: string;
   } | null>(null);
 
@@ -139,14 +139,13 @@ export default function InfrastructurePanel() {
     }
   };
 
-  const handleKill = async (workerId: string) => {
+  const handleKill = async (workerId: string, force: boolean = false) => {
     setConfirmDialog(null);
     setActionPending(`kill-${workerId}`);
     try {
       const headers = getAuthHeaders();
-      const res = await fetch(`${baseUrl}/api/v1/health/workers/${workerId}/kill`, {
-        method: 'POST', headers,
-      });
+      const url = `${baseUrl}/api/v1/health/workers/${workerId}/kill${force ? '?force=true' : ''}`;
+      const res = await fetch(url, { method: 'POST', headers });
       const json = await res.json();
       toast({ title: t('infraKillTitle'), description: json.message });
     } catch {
@@ -267,12 +266,22 @@ export default function InfrastructurePanel() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                            title={t('infraKillWorker')}
+                            className="h-6 w-6 p-0 text-orange-500 hover:text-orange-700"
+                            title="SIGTERM (graceful)"
                             disabled={!!actionPending}
                             onClick={() => setConfirmDialog({ action: 'kill', workerId: proc.worker_id! })}
                           >
                             <Power className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                            title="SIGKILL (force)"
+                            disabled={!!actionPending}
+                            onClick={() => setConfirmDialog({ action: 'forceKill', workerId: proc.worker_id! })}
+                          >
+                            <XCircle className="w-3 h-3" />
                           </Button>
                         </div>
                       )}
@@ -293,11 +302,13 @@ export default function InfrastructurePanel() {
               <AlertTriangle className="w-5 h-5 text-orange-500" />
               {confirmDialog?.action === 'restart' && t('infraRestartConfirmTitle')}
               {confirmDialog?.action === 'kill' && t('infraKillConfirmTitle')}
+              {confirmDialog?.action === 'forceKill' && t('infraForceKillConfirmTitle')}
               {confirmDialog?.action === 'reset' && t('infraResetConfirmTitle')}
             </DialogTitle>
             <DialogDescription>
               {confirmDialog?.action === 'restart' && t('infraRestartConfirmDesc')}
               {confirmDialog?.action === 'kill' && t('infraKillConfirmDesc', { worker: confirmDialog.workerId })}
+              {confirmDialog?.action === 'forceKill' && t('infraForceKillConfirmDesc', { worker: confirmDialog.workerId })}
               {confirmDialog?.action === 'reset' && t('infraResetConfirmDesc', { worker: confirmDialog.workerId })}
             </DialogDescription>
           </DialogHeader>
@@ -309,7 +320,8 @@ export default function InfrastructurePanel() {
               variant="destructive"
               onClick={() => {
                 if (confirmDialog?.action === 'restart') handleRestart();
-                else if (confirmDialog?.action === 'kill' && confirmDialog.workerId) handleKill(confirmDialog.workerId);
+                else if (confirmDialog?.action === 'kill' && confirmDialog.workerId) handleKill(confirmDialog.workerId, false);
+                else if (confirmDialog?.action === 'forceKill' && confirmDialog.workerId) handleKill(confirmDialog.workerId, true);
                 else if (confirmDialog?.action === 'reset' && confirmDialog.workerId) handleResetHeartbeat(confirmDialog.workerId);
               }}
             >

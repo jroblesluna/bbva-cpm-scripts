@@ -1107,6 +1107,8 @@
     "infraKillFailed": "Failed to kill worker",
     "infraKillConfirmTitle": "Kill worker?",
     "infraKillConfirmDesc": "Will send SIGTERM to {worker}. The master will respawn it automatically.",
+    "infraForceKillConfirmTitle": "Force kill worker?",
+    "infraForceKillConfirmDesc": "Will send SIGKILL to {worker}. Process will be terminated immediately without cleanup.",
     "cancel": "Cancel",
     "confirm": "Confirm"
   },

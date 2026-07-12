@@ -381,10 +381,11 @@ async def reset_worker_heartbeat(worker_id: str):
 
 
 @router.post("/health/workers/{worker_id}/kill", tags=["Sistema"])
-async def kill_worker(worker_id: str):
+async def kill_worker(worker_id: str, force: bool = False):
     """
-    Envía SIGHUP al worker para que uvicorn master lo respawnee.
-    Solo afecta al worker indicado; el otro sigue operando sin interrupción.
+    Envía señal a un worker para detenerlo.
+    - force=False (default): SIGTERM (graceful, uvicorn master respawnea)
+    - force=True: SIGKILL (fuerza bruta, para zombies que ignoran SIGTERM)
     """
     import signal
 
@@ -394,28 +395,30 @@ async def kill_worker(worker_id: str):
     except ValueError:
         return {"status": "error", "message": f"worker_id inválido: {worker_id}"}
 
+    sig = signal.SIGKILL if force else signal.SIGTERM
+    sig_name = "SIGKILL" if force else "SIGTERM"
     local_pid = os.getpid()
+
     if pid == local_pid:
-        # No se puede matar a sí mismo de forma confiable, usar SIGTERM
-        # que uvicorn master detectará y respawneará
         import asyncio
 
         async def _self_kill():
             await asyncio.sleep(1)
-            os.kill(pid, signal.SIGTERM)
+            os.kill(pid, sig)
 
         asyncio.create_task(_self_kill())
         return {
             "status": "killing",
-            "message": f"Worker {worker_id} (PID {pid}) se detendrá en 1s. El master lo respawneará.",
+            "message": f"{sig_name} a {worker_id} (PID {pid}) en 1s. El master lo respawneará.",
         }
 
     # Matar otro worker
     try:
-        os.kill(pid, signal.SIGKILL)
+        os.kill(pid, sig)
         return {
             "status": "ok",
-            "message": f"SIGKILL enviado a {worker_id} (PID {pid}). El master lo respawneará si es necesario.",
+            "message": f"{sig_name} enviado a {worker_id} (PID {pid}). "
+                       + ("Proceso eliminado forzosamente." if force else "El master lo respawneará."),
         }
     except ProcessLookupError:
         return {"status": "error", "message": f"PID {pid} no encontrado"}

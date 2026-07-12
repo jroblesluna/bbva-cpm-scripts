@@ -1107,6 +1107,8 @@
     "infraKillFailed": "Error al matar worker",
     "infraKillConfirmTitle": "¿Matar worker?",
     "infraKillConfirmDesc": "Se enviará SIGTERM a {worker}. El master lo respawneará automáticamente.",
+    "infraForceKillConfirmTitle": "¿Matar worker (fuerza)?",
+    "infraForceKillConfirmDesc": "Se enviará SIGKILL a {worker}. El proceso se eliminará inmediatamente sin limpieza.",
     "cancel": "Cancelar",
     "confirm": "Confirmar"
   },
