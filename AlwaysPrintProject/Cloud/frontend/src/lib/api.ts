@@ -605,10 +605,12 @@ export const workstationsApi = {
   getOsCommands: async (id: string): Promise<{
     commands: Array<{ label: string; command: string; description: string }>;
     files: Array<{ label: string; path: string; description: string }>;
+    editable_files: Array<{ label: string; path: string; description: string }>;
   }> => {
     const response = await apiClient.get<{
       commands: Array<{ label: string; command: string; description: string }>;
       files: Array<{ label: string; path: string; description: string }>;
+      editable_files: Array<{ label: string; path: string; description: string }>;
     }>(`/workstations/${id}/os-commands`)
     return response.data
   },

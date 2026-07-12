@@ -1,16 +1,10 @@
 /**
  * Sección de Comandos de Sistema Operativo.
  *
- * Permite ejecutar comandos predefinidos en el alwaysconfig y descargar archivos
- * declarados en la configuración. Los comandos son solo los que el administrador
- * definió en remote_commands del alwaysconfig; no se permite entrada libre.
- *
- * A) Ejecutar comandos: muestra lista de comandos definidos, al ejecutar envía
- *    al backend que lo redirige vía WebSocket al cliente, el resultado (stdout)
- *    se muestra en un dialog.
- *
- * B) Descargar archivos: muestra lista de archivos declarados en downloadable_files,
- *    al hacer click inicia descarga comprimida en ZIP (mismo mecanismo que log).
+ * Permite:
+ * A) Ejecutar comandos remotos definidos en remote_commands del alwaysconfig.
+ * B) Descargar archivos declarados en downloadable_files del alwaysconfig.
+ * C) Editar archivos declarados en editable_files del alwaysconfig.
  */
 
 'use client';
@@ -23,10 +17,10 @@ import {
   Play,
   Loader2,
   WifiOff,
-  FileDown,
   Download,
   Copy,
-  X,
+  FileEdit,
+  Save,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -60,6 +54,12 @@ interface DownloadableFile {
   description: string;
 }
 
+interface EditableFile {
+  label: string;
+  path: string;
+  description: string;
+}
+
 interface OsCommandsSectionProps {
   workstationId: string;
   isOnline: boolean;
@@ -74,11 +74,15 @@ export function OsCommandsSection({ workstationId, isOnline }: OsCommandsSection
 
   const [commandOutput, setCommandOutput] = useState<{ label: string; stdout: string } | null>(null);
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
+  const [editingFile, setEditingFile] = useState<{ label: string; path: string; content: string } | null>(null);
+  const [editedContent, setEditedContent] = useState('');
+  const [loadingEditFile, setLoadingEditFile] = useState<string | null>(null);
 
-  // Obtener comandos y archivos disponibles desde el config efectivo
+  // Obtener comandos, archivos y editables desde el config efectivo
   const { data, isLoading } = useQuery<{
     commands: RemoteCommand[];
     files: DownloadableFile[];
+    editable_files: EditableFile[];
   }>({
     queryKey: ['os-commands', workstationId],
     queryFn: async () => {
@@ -101,7 +105,7 @@ export function OsCommandsSection({ workstationId, isOnline }: OsCommandsSection
       const stdout = (data as unknown as { stdout?: string })?.stdout || t('osCommandsNoOutput');
       setCommandOutput({ label: command.label, stdout });
     },
-    onError: (error: { detail?: string; status?: number }, command) => {
+    onError: (error: { detail?: string; status?: number }) => {
       if (error.status === 409) {
         toast({ variant: 'destructive', title: t('osCommandsFailed'), description: t('wsOfflineTooltip') });
       } else if (error.status === 408 || error.status === 504) {
@@ -121,7 +125,6 @@ export function OsCommandsSection({ workstationId, isOnline }: OsCommandsSection
         'download_file' as 'execute_on_demand',
         { label: file.label, path: file.path }
       );
-      // El backend retorna el archivo como descarga — necesitamos el blob
       const downloadUrl = (result as unknown as { download_url?: string })?.download_url;
       if (downloadUrl) {
         const link = document.createElement('a');
@@ -139,6 +142,46 @@ export function OsCommandsSection({ workstationId, isOnline }: OsCommandsSection
       setDownloadingFile(null);
     }
   };
+
+  // Handler para abrir archivo editable
+  const handleOpenEditFile = async (file: EditableFile) => {
+    setLoadingEditFile(file.label);
+    try {
+      const result = await workstationsApi.sendCommand(
+        workstationId,
+        'get_file_content' as 'execute_on_demand',
+        { label: file.label, path: file.path }
+      );
+      const content = (result as unknown as { content?: string })?.content || '';
+      setEditingFile({ label: file.label, path: file.path, content });
+      setEditedContent(content);
+    } catch (error: unknown) {
+      const err = error as { detail?: string };
+      toast({ variant: 'destructive', title: t('osEditFailed'), description: err?.detail ?? t('osEditLoadError') });
+    } finally {
+      setLoadingEditFile(null);
+    }
+  };
+
+  // Mutación para guardar archivo editado
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingFile) return;
+      const result = await workstationsApi.sendCommand(
+        workstationId,
+        'save_file_content' as 'execute_on_demand',
+        { label: editingFile.label, path: editingFile.path, content: editedContent }
+      );
+      return result;
+    },
+    onSuccess: () => {
+      toast({ title: t('osEditSaved'), description: editingFile?.label });
+      setEditingFile(null);
+    },
+    onError: (error: { detail?: string; status?: number }) => {
+      toast({ variant: 'destructive', title: t('osEditSaveFailed'), description: error.detail ?? t('osEditSaveError') });
+    },
+  });
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -165,9 +208,10 @@ export function OsCommandsSection({ workstationId, isOnline }: OsCommandsSection
 
   const commands = data?.commands ?? [];
   const files = data?.files ?? [];
+  const editableFiles = data?.editable_files ?? [];
 
-  // Sin comandos ni archivos
-  if (commands.length === 0 && files.length === 0) {
+  // Sin nada disponible
+  if (commands.length === 0 && files.length === 0 && editableFiles.length === 0) {
     return null;
   }
 
@@ -276,6 +320,54 @@ export function OsCommandsSection({ workstationId, isOnline }: OsCommandsSection
         </div>
       )}
 
+      {/* Archivos editables */}
+      {editableFiles.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs text-gray-500 font-medium">{t('osEditSubtitle')}</p>
+          {editableFiles.map((file) => (
+            <div
+              key={file.label}
+              className="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-lg"
+            >
+              <div className="flex-1 min-w-0 mr-3">
+                <p className="text-sm font-medium text-gray-900 truncate">{file.label}</p>
+                <p className="text-xs text-gray-500 font-mono truncate">{file.path}</p>
+              </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!isOnline || loadingEditFile === file.label}
+                        onClick={() => handleOpenEditFile(file)}
+                        className="shrink-0"
+                      >
+                        {loadingEditFile === file.label ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <FileEdit className="w-3.5 h-3.5 mr-1.5" />
+                        )}
+                        {t('osEditOpen')}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {!isOnline && (
+                    <TooltipContent>
+                      <div className="flex items-center gap-1.5">
+                        <WifiOff className="w-3.5 h-3.5" />
+                        {t('wsOfflineTooltip')}
+                      </div>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Dialog de resultado de comando */}
       <Dialog open={!!commandOutput} onOpenChange={(open) => !open && setCommandOutput(null)}>
         <DialogContent className="max-w-2xl max-h-[80vh]">
@@ -303,6 +395,48 @@ export function OsCommandsSection({ workstationId, isOnline }: OsCommandsSection
           <DialogFooter>
             <Button variant="outline" onClick={() => setCommandOutput(null)}>
               {tCommon('close')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de edición de archivo */}
+      <Dialog open={!!editingFile} onOpenChange={(open) => !open && setEditingFile(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileEdit className="w-4 h-4" />
+              {editingFile?.label}
+            </DialogTitle>
+            <DialogDescription className="font-mono text-xs">
+              {editingFile?.path}
+            </DialogDescription>
+          </DialogHeader>
+          <textarea
+            value={editedContent}
+            onChange={(e) => setEditedContent(e.target.value)}
+            className="w-full h-[50vh] font-mono text-xs p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+            spellCheck={false}
+          />
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditingFile(null)} disabled={saveMutation.isPending}>
+              {tCommon('cancel')}
+            </Button>
+            <Button
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending || editedContent === editingFile?.content}
+            >
+              {saveMutation.isPending ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {t('osEditSaving')}
+                </span>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-1.5" />
+                  {t('osEditSave')}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,5 +1,5 @@
 {
-  "version": "10.11",
+  "version": "10.12",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -64,20 +64,27 @@
     },
     {
       "label": "Verificar cola de impresión",
-      "command": "wmic printer where name=\"LexmarkBBVA\" get name,portname,drivername,printerstatus",
-      "description": "Estado de la cola corporativa LexmarkBBVA"
+      "command": "wmic printer where name=\"{{corporate_queue_name}}\" get name,portname,drivername,printerstatus",
+      "description": "Estado de la cola corporativa"
     }
   ],
   "downloadable_files": [
     {
       "label": "Log de Lexmark CPM",
-      "path": "C:\\ProgramData\\LPMC\\Logs\\lpmc_service.log",
+      "path": "C:\\ProgramData\\LPMC\\Logs\\lpmc.log",
       "description": "Log del servicio Lexmark Print Management Client"
     },
     {
       "label": "Configuración CPM activa",
-      "path": "C:\\ProgramData\\LPMC\\config.json",
+      "path": "C:\\ProgramData\\LPMC\\configuration.json",
       "description": "Archivo de configuración actual del cliente CPM"
+    }
+  ],
+  "editable_files": [
+    {
+      "label": "Configuración CPM",
+      "path": "C:\\ProgramData\\LPMC\\configuration.json",
+      "description": "Editar configuración del cliente Lexmark CPM"
     }
   ],
   "triggers": [

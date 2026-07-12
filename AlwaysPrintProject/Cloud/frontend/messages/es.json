@@ -287,7 +287,16 @@
     "osFilesDownload": "Descargar",
     "osFilesDownloading": "Descarga iniciada",
     "osFilesFailed": "Error al descargar archivo",
-    "osFilesError": "Error inesperado al descargar archivo"
+    "osFilesError": "Error inesperado al descargar archivo",
+    "osEditSubtitle": "Edición de archivos",
+    "osEditOpen": "Editar",
+    "osEditSave": "Guardar",
+    "osEditSaving": "Guardando…",
+    "osEditSaved": "Archivo guardado exitosamente",
+    "osEditFailed": "Error al abrir archivo",
+    "osEditLoadError": "No se pudo leer el archivo de la workstation",
+    "osEditSaveFailed": "Error al guardar archivo",
+    "osEditSaveError": "No se pudo escribir el archivo en la workstation"
   },
   "vlans": {
     "title": "VLANs",

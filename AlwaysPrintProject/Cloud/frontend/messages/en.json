@@ -287,7 +287,16 @@
     "osFilesDownload": "Download",
     "osFilesDownloading": "Download started",
     "osFilesFailed": "File download failed",
-    "osFilesError": "Unexpected error downloading file"
+    "osFilesError": "Unexpected error downloading file",
+    "osEditSubtitle": "File editing",
+    "osEditOpen": "Edit",
+    "osEditSave": "Save",
+    "osEditSaving": "Saving…",
+    "osEditSaved": "File saved successfully",
+    "osEditFailed": "Failed to open file",
+    "osEditLoadError": "Could not read file from workstation",
+    "osEditSaveFailed": "Failed to save file",
+    "osEditSaveError": "Could not write file to workstation"
   },
   "vlans": {
     "title": "VLANs",

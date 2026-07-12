@@ -204,7 +204,15 @@ def get_os_commands(
             "description": f.get("description", ""),
         })
 
-    return {"commands": commands, "files": files}
+    editable_files = []
+    for f in config_data.get("editable_files", []):
+        editable_files.append({
+            "label": f.get("label", ""),
+            "path": f.get("path", ""),
+            "description": f.get("description", ""),
+        })
+
+    return {"commands": commands, "files": files, "editable_files": editable_files}
 
 
 # === ENDPOINT DE COMANDOS REMOTOS ===
@@ -273,7 +281,8 @@ async def send_command(
         )
     
     # Validar tipo de comando
-    valid_commands = ["restart_service", "restart_tray", "check_update", "execute_on_demand"]
+    valid_commands = ["restart_service", "restart_tray", "check_update", "execute_on_demand",
+                      "execute_remote_command", "download_file", "get_file_content", "save_file_content"]
     if command_data.command_type not in valid_commands:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

@@ -1415,6 +1415,27 @@ namespace AlwaysPrintTray.Cloud
                         HandleExecuteOnDemandCommand(commandId, execParams);
                         break;
 
+                    // Comandos OS remotos: ejecutar comando, descargar/editar archivos
+                    case "execute_remote_command":
+                        var cmdParams = obj["params"] as JObject;
+                        HandleExecuteRemoteCommand(commandId, cmdParams);
+                        break;
+
+                    case "download_file":
+                        var dlParams = obj["params"] as JObject;
+                        HandleDownloadFileCommand(commandId, dlParams);
+                        break;
+
+                    case "get_file_content":
+                        var getParams = obj["params"] as JObject;
+                        HandleGetFileContentCommand(commandId, getParams);
+                        break;
+
+                    case "save_file_content":
+                        var saveParams = obj["params"] as JObject;
+                        HandleSaveFileContentCommand(commandId, saveParams);
+                        break;
+
                     // Comandos de debugging: delegados al DebuggingCommandHandler
                     case "start_debugging":
                     case "stop_debugging":
@@ -1864,6 +1885,256 @@ namespace AlwaysPrintTray.Cloud
                 AlwaysPrintLogger.WriteTrayError(
                     $"CloudManager: error ejecutando acción OnDemand '{label}': {ex.Message}");
                 SendCommandResult(commandId, false, $"Error: {ex.Message}", stopwatch.ElapsedMilliseconds);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // COMANDOS OS REMOTOS (execute_remote_command, download_file, get/save_file_content)
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Ejecuta un comando del sistema operativo definido en el alwaysconfig (remote_commands).
+        /// Corre cmd.exe /c con el comando, captura stdout+stderr, y envía el resultado.
+        /// Timeout: 30 segundos.
+        /// </summary>
+        private void HandleExecuteRemoteCommand(string commandId, JObject? paramsObj)
+        {
+            string? command = paramsObj?["command"]?.ToString();
+            string? label = paramsObj?["label"]?.ToString() ?? "comando";
+
+            if (string.IsNullOrEmpty(command))
+            {
+                SendCommandResult(commandId, false, "Parámetro 'command' no proporcionado");
+                return;
+            }
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"CloudManager: ejecutando comando remoto. label={label}, command={command}");
+
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c {command}",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System)
+                };
+
+                using (var process = System.Diagnostics.Process.Start(psi))
+                {
+                    if (process == null)
+                    {
+                        SendCommandResult(commandId, false, "No se pudo iniciar el proceso cmd.exe");
+                        return;
+                    }
+
+                    string stdout = process.StandardOutput.ReadToEnd();
+                    string stderr = process.StandardError.ReadToEnd();
+                    process.WaitForExit(30000);
+
+                    if (!process.HasExited)
+                    {
+                        try { process.Kill(); } catch { }
+                        SendCommandResult(commandId, false, "Timeout: el comando excedió 30 segundos");
+                        return;
+                    }
+
+                    string output = stdout;
+                    if (!string.IsNullOrEmpty(stderr))
+                    {
+                        output += (string.IsNullOrEmpty(output) ? "" : "\n") + stderr;
+                    }
+
+                    // Enviar resultado con campo stdout para que el frontend lo muestre
+                    var payload = new JObject
+                    {
+                        ["command_id"] = commandId,
+                        ["success"] = true,
+                        ["output"] = $"ExitCode={process.ExitCode}",
+                        ["stdout"] = output
+                    };
+                    _wsClient!.Send("command_result", payload);
+
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: comando remoto completado. label={label}, exitCode={process.ExitCode}, outputLen={output.Length}");
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error ejecutando comando remoto '{label}': {ex.Message}");
+                SendCommandResult(commandId, false, $"Error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Lee un archivo de la workstation, lo comprime en ZIP, lo envía como base64 al Cloud
+        /// para que el frontend lo descargue. Definido en downloadable_files del alwaysconfig.
+        /// </summary>
+        private void HandleDownloadFileCommand(string commandId, JObject? paramsObj)
+        {
+            string? filePath = paramsObj?["path"]?.ToString();
+            string? label = paramsObj?["label"]?.ToString() ?? "archivo";
+
+            if (string.IsNullOrEmpty(filePath))
+            {
+                SendCommandResult(commandId, false, "Parámetro 'path' no proporcionado");
+                return;
+            }
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"CloudManager: descargando archivo remoto. label={label}, path={filePath}");
+
+            try
+            {
+                if (!System.IO.File.Exists(filePath))
+                {
+                    SendCommandResult(commandId, false, $"Archivo no encontrado: {filePath}");
+                    return;
+                }
+
+                // Leer archivo y comprimir en ZIP en memoria
+                byte[] fileContent = System.IO.File.ReadAllBytes(filePath);
+                string fileName = System.IO.Path.GetFileName(filePath);
+
+                using (var memStream = new System.IO.MemoryStream())
+                {
+                    using (var archive = new System.IO.Compression.ZipArchive(memStream, System.IO.Compression.ZipArchiveMode.Create, true))
+                    {
+                        var entry = archive.CreateEntry(fileName, System.IO.Compression.CompressionLevel.Optimal);
+                        using (var entryStream = entry.Open())
+                        {
+                            entryStream.Write(fileContent, 0, fileContent.Length);
+                        }
+                    }
+
+                    // Enviar como base64
+                    string base64Zip = Convert.ToBase64String(memStream.ToArray());
+
+                    var payload = new JObject
+                    {
+                        ["command_id"] = commandId,
+                        ["success"] = true,
+                        ["output"] = $"Archivo comprimido: {fileName} ({fileContent.Length} bytes)",
+                        ["file_data"] = base64Zip,
+                        ["file_name"] = $"{label.Replace(" ", "_")}.zip"
+                    };
+                    _wsClient!.Send("command_result", payload);
+
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: archivo enviado. label={label}, size={fileContent.Length}, zipSize={memStream.Length}");
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error descargando archivo '{label}': {ex.Message}");
+                SendCommandResult(commandId, false, $"Error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Lee el contenido de un archivo de texto de la workstation y lo envía como string.
+        /// Definido en editable_files del alwaysconfig.
+        /// </summary>
+        private void HandleGetFileContentCommand(string commandId, JObject? paramsObj)
+        {
+            string? filePath = paramsObj?["path"]?.ToString();
+            string? label = paramsObj?["label"]?.ToString() ?? "archivo";
+
+            if (string.IsNullOrEmpty(filePath))
+            {
+                SendCommandResult(commandId, false, "Parámetro 'path' no proporcionado");
+                return;
+            }
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"CloudManager: leyendo contenido de archivo. label={label}, path={filePath}");
+
+            try
+            {
+                if (!System.IO.File.Exists(filePath))
+                {
+                    SendCommandResult(commandId, false, $"Archivo no encontrado: {filePath}");
+                    return;
+                }
+
+                string content = System.IO.File.ReadAllText(filePath, System.Text.Encoding.UTF8);
+
+                var payload = new JObject
+                {
+                    ["command_id"] = commandId,
+                    ["success"] = true,
+                    ["output"] = $"Archivo leído: {filePath} ({content.Length} caracteres)",
+                    ["content"] = content
+                };
+                _wsClient!.Send("command_result", payload);
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: contenido de archivo enviado. label={label}, chars={content.Length}");
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error leyendo archivo '{label}': {ex.Message}");
+                SendCommandResult(commandId, false, $"Error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Escribe contenido recibido del Cloud en un archivo de la workstation.
+        /// Definido en editable_files del alwaysconfig. Escritura atómica (tmp + rename).
+        /// </summary>
+        private void HandleSaveFileContentCommand(string commandId, JObject? paramsObj)
+        {
+            string? filePath = paramsObj?["path"]?.ToString();
+            string? content = paramsObj?["content"]?.ToString();
+            string? label = paramsObj?["label"]?.ToString() ?? "archivo";
+
+            if (string.IsNullOrEmpty(filePath))
+            {
+                SendCommandResult(commandId, false, "Parámetro 'path' no proporcionado");
+                return;
+            }
+            if (content == null)
+            {
+                SendCommandResult(commandId, false, "Parámetro 'content' no proporcionado");
+                return;
+            }
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"CloudManager: guardando archivo remoto. label={label}, path={filePath}, chars={content.Length}");
+
+            try
+            {
+                // Escritura atómica: escribir en .tmp y renombrar
+                string tempPath = filePath + ".tmp";
+                string? dir = System.IO.Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
+                {
+                    System.IO.Directory.CreateDirectory(dir);
+                }
+
+                System.IO.File.WriteAllText(tempPath, content, System.Text.Encoding.UTF8);
+
+                if (System.IO.File.Exists(filePath))
+                    System.IO.File.Delete(filePath);
+                System.IO.File.Move(tempPath, filePath);
+
+                SendCommandResult(commandId, true, $"Archivo guardado: {filePath} ({content.Length} caracteres)");
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: archivo guardado exitosamente. label={label}, path={filePath}");
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error guardando archivo '{label}': {ex.Message}");
+                SendCommandResult(commandId, false, $"Error: {ex.Message}");
             }
         }
 
