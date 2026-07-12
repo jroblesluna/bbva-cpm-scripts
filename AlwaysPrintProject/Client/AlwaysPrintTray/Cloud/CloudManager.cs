@@ -1893,9 +1893,8 @@ namespace AlwaysPrintTray.Cloud
         // ═══════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Ejecuta un comando del sistema operativo definido en el alwaysconfig (remote_commands).
-        /// Corre cmd.exe /c con el comando, captura stdout+stderr, y envía el resultado.
-        /// Timeout: 30 segundos.
+        /// Ejecuta un comando del sistema operativo vía Service (SYSTEM privileges).
+        /// Delega al Service via Named Pipe para tener acceso completo al filesystem.
         /// </summary>
         private void HandleExecuteRemoteCommand(string commandId, JObject? paramsObj)
         {
@@ -1910,60 +1909,42 @@ namespace AlwaysPrintTray.Cloud
 
             try
             {
-                // Resolver variables de template antes de ejecutar
+                // Resolver templates antes de enviar al Service
                 command = ResolveCommandTemplates(command);
 
                 AlwaysPrintLogger.WriteTrayInfo(
                     $"CloudManager: ejecutando comando remoto. label={label}, command={command}");
 
-                var psi = new System.Diagnostics.ProcessStartInfo
+                var payload = new ExecuteRemoteCommandPayload { Command = command, Label = label };
+                var pipeMessage = PipeMessage.Create(MessageType.ExecuteRemoteCommand, payload);
+                var response = _pipe.Send(pipeMessage);
+
+                if (response == null)
                 {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c {command}",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System)
-                };
+                    SendCommandResult(commandId, false, "No se recibió respuesta del Service (timeout)");
+                    return;
+                }
 
-                using (var process = System.Diagnostics.Process.Start(psi))
+                // Intentar parsear como ExecuteRemoteCommandResponsePayload
+                var cmdResult = response.GetPayload<ExecuteRemoteCommandResponsePayload>();
+                if (cmdResult != null && cmdResult.Success)
                 {
-                    if (process == null)
-                    {
-                        SendCommandResult(commandId, false, "No se pudo iniciar el proceso cmd.exe");
-                        return;
-                    }
-
-                    string stdout = process.StandardOutput.ReadToEnd();
-                    string stderr = process.StandardError.ReadToEnd();
-                    process.WaitForExit(30000);
-
-                    if (!process.HasExited)
-                    {
-                        try { process.Kill(); } catch { }
-                        SendCommandResult(commandId, false, "Timeout: el comando excedió 30 segundos");
-                        return;
-                    }
-
-                    string output = stdout;
-                    if (!string.IsNullOrEmpty(stderr))
-                    {
-                        output += (string.IsNullOrEmpty(output) ? "" : "\n") + stderr;
-                    }
-
-                    // Enviar resultado con campo stdout para que el frontend lo muestre
-                    var payload = new JObject
+                    var resultPayload = new JObject
                     {
                         ["command_id"] = commandId,
                         ["success"] = true,
-                        ["output"] = $"ExitCode={process.ExitCode}",
-                        ["stdout"] = output
+                        ["output"] = cmdResult.Message ?? $"ExitCode={cmdResult.ExitCode}",
+                        ["stdout"] = cmdResult.Stdout
                     };
-                    _wsClient!.Send("command_result", payload);
+                    _wsClient!.Send("command_result", resultPayload);
 
                     AlwaysPrintLogger.WriteTrayInfo(
-                        $"CloudManager: comando remoto completado. label={label}, exitCode={process.ExitCode}, outputLen={output.Length}");
+                        $"CloudManager: comando remoto completado. label={label}, exitCode={cmdResult.ExitCode}, outputLen={cmdResult.Stdout?.Length ?? 0}");
+                }
+                else
+                {
+                    var ack = response.GetPayload<AckPayload>();
+                    SendCommandResult(commandId, false, ack?.Message ?? "Error del Service");
                 }
             }
             catch (Exception ex)
@@ -1975,8 +1956,7 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
-        /// Lee un archivo de la workstation, lo comprime en ZIP, lo envía como base64 al Cloud
-        /// para que el frontend lo descargue. Definido en downloadable_files del alwaysconfig.
+        /// Descarga un archivo vía Service (SYSTEM), lo comprime en ZIP y envía como base64.
         /// </summary>
         private void HandleDownloadFileCommand(string commandId, JObject? paramsObj)
         {
@@ -1989,49 +1969,43 @@ namespace AlwaysPrintTray.Cloud
                 return;
             }
 
-            AlwaysPrintLogger.WriteTrayInfo(
-                $"CloudManager: descargando archivo remoto. label={label}, path={filePath}");
-
             try
             {
                 filePath = ResolveCommandTemplates(filePath);
 
-                if (!System.IO.File.Exists(filePath))
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: descargando archivo remoto. label={label}, path={filePath}");
+
+                var payload = new FileOperationPayload { Path = filePath, Label = label };
+                var pipeMessage = PipeMessage.Create(MessageType.DownloadFile, payload);
+                var response = _pipe.Send(pipeMessage);
+
+                if (response == null)
                 {
-                    SendCommandResult(commandId, false, $"Archivo no encontrado: {filePath}");
+                    SendCommandResult(commandId, false, "No se recibió respuesta del Service (timeout)");
                     return;
                 }
 
-                // Leer archivo y comprimir en ZIP en memoria
-                byte[] fileContent = System.IO.File.ReadAllBytes(filePath);
-                string fileName = System.IO.Path.GetFileName(filePath);
-
-                using (var memStream = new System.IO.MemoryStream())
+                var dlResult = response.GetPayload<DownloadFileResponsePayload>();
+                if (dlResult != null && dlResult.Success)
                 {
-                    using (var archive = new System.IO.Compression.ZipArchive(memStream, System.IO.Compression.ZipArchiveMode.Create, true))
-                    {
-                        var entry = archive.CreateEntry(fileName, System.IO.Compression.CompressionLevel.Optimal);
-                        using (var entryStream = entry.Open())
-                        {
-                            entryStream.Write(fileContent, 0, fileContent.Length);
-                        }
-                    }
-
-                    // Enviar como base64
-                    string base64Zip = Convert.ToBase64String(memStream.ToArray());
-
-                    var payload = new JObject
+                    var resultPayload = new JObject
                     {
                         ["command_id"] = commandId,
                         ["success"] = true,
-                        ["output"] = $"Archivo comprimido: {fileName} ({fileContent.Length} bytes)",
-                        ["file_data"] = base64Zip,
-                        ["file_name"] = $"{label.Replace(" ", "_")}.zip"
+                        ["output"] = dlResult.Message,
+                        ["file_data"] = dlResult.FileData,
+                        ["file_name"] = dlResult.FileName
                     };
-                    _wsClient!.Send("command_result", payload);
+                    _wsClient!.Send("command_result", resultPayload);
 
                     AlwaysPrintLogger.WriteTrayInfo(
-                        $"CloudManager: archivo enviado. label={label}, size={fileContent.Length}, zipSize={memStream.Length}");
+                        $"CloudManager: archivo enviado. label={label}");
+                }
+                else
+                {
+                    var ack = response.GetPayload<AckPayload>();
+                    SendCommandResult(commandId, false, ack?.Message ?? "Error del Service");
                 }
             }
             catch (Exception ex)
@@ -2043,8 +2017,7 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
-        /// Lee el contenido de un archivo de texto de la workstation y lo envía como string.
-        /// Definido en editable_files del alwaysconfig.
+        /// Lee contenido de un archivo de texto vía Service (SYSTEM).
         /// </summary>
         private void HandleGetFileContentCommand(string commandId, JObject? paramsObj)
         {
@@ -2057,32 +2030,43 @@ namespace AlwaysPrintTray.Cloud
                 return;
             }
 
-            AlwaysPrintLogger.WriteTrayInfo(
-                $"CloudManager: leyendo contenido de archivo. label={label}, path={filePath}");
-
             try
             {
                 filePath = ResolveCommandTemplates(filePath);
 
-                if (!System.IO.File.Exists(filePath))
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: leyendo contenido de archivo. label={label}, path={filePath}");
+
+                var payload = new FileOperationPayload { Path = filePath, Label = label };
+                var pipeMessage = PipeMessage.Create(MessageType.GetFileContent, payload);
+                var response = _pipe.Send(pipeMessage);
+
+                if (response == null)
                 {
-                    SendCommandResult(commandId, false, $"Archivo no encontrado: {filePath}");
+                    SendCommandResult(commandId, false, "No se recibió respuesta del Service (timeout)");
                     return;
                 }
 
-                string content = System.IO.File.ReadAllText(filePath, System.Text.Encoding.UTF8);
-
-                var payload = new JObject
+                var getResult = response.GetPayload<GetFileContentResponsePayload>();
+                if (getResult != null && getResult.Success)
                 {
-                    ["command_id"] = commandId,
-                    ["success"] = true,
-                    ["output"] = $"Archivo leído: {filePath} ({content.Length} caracteres)",
-                    ["content"] = content
-                };
-                _wsClient!.Send("command_result", payload);
+                    var resultPayload = new JObject
+                    {
+                        ["command_id"] = commandId,
+                        ["success"] = true,
+                        ["output"] = getResult.Message,
+                        ["content"] = getResult.Content
+                    };
+                    _wsClient!.Send("command_result", resultPayload);
 
-                AlwaysPrintLogger.WriteTrayInfo(
-                    $"CloudManager: contenido de archivo enviado. label={label}, chars={content.Length}");
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: contenido de archivo enviado. label={label}, chars={getResult.Content?.Length ?? 0}");
+                }
+                else
+                {
+                    var ack = response.GetPayload<AckPayload>();
+                    SendCommandResult(commandId, false, ack?.Message ?? "Error del Service");
+                }
             }
             catch (Exception ex)
             {
@@ -2093,8 +2077,7 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
-        /// Escribe contenido recibido del Cloud en un archivo de la workstation.
-        /// Definido en editable_files del alwaysconfig. Escritura atómica (tmp + rename).
+        /// Guarda contenido en un archivo vía Service (SYSTEM). Escritura atómica.
         /// </summary>
         private void HandleSaveFileContentCommand(string commandId, JObject? paramsObj)
         {
@@ -2113,31 +2096,31 @@ namespace AlwaysPrintTray.Cloud
                 return;
             }
 
-            AlwaysPrintLogger.WriteTrayInfo(
-                $"CloudManager: guardando archivo remoto. label={label}, path={filePath}, chars={content.Length}");
-
             try
             {
                 filePath = ResolveCommandTemplates(filePath);
 
-                // Escritura atómica: escribir en .tmp y renombrar
-                string tempPath = filePath + ".tmp";
-                string? dir = System.IO.Path.GetDirectoryName(filePath);
-                if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: guardando archivo remoto. label={label}, path={filePath}, chars={content.Length}");
+
+                var payload = new SaveFileContentPayload { Path = filePath, Label = label, Content = content };
+                var pipeMessage = PipeMessage.Create(MessageType.SaveFileContent, payload);
+                var response = _pipe.Send(pipeMessage);
+
+                if (response == null)
                 {
-                    System.IO.Directory.CreateDirectory(dir);
+                    SendCommandResult(commandId, false, "No se recibió respuesta del Service (timeout)");
+                    return;
                 }
 
-                System.IO.File.WriteAllText(tempPath, content, System.Text.Encoding.UTF8);
+                var ack = response.GetPayload<AckPayload>();
+                SendCommandResult(commandId, ack?.Success == true, ack?.Message ?? "Sin respuesta");
 
-                if (System.IO.File.Exists(filePath))
-                    System.IO.File.Delete(filePath);
-                System.IO.File.Move(tempPath, filePath);
-
-                SendCommandResult(commandId, true, $"Archivo guardado: {filePath} ({content.Length} caracteres)");
-
-                AlwaysPrintLogger.WriteTrayInfo(
-                    $"CloudManager: archivo guardado exitosamente. label={label}, path={filePath}");
+                if (ack?.Success == true)
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: archivo guardado exitosamente. label={label}");
+                }
             }
             catch (Exception ex)
             {

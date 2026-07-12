@@ -125,16 +125,28 @@ export function OsCommandsSection({ workstationId, isOnline }: OsCommandsSection
         'download_file' as 'execute_on_demand',
         { label: file.label, path: file.path }
       );
-      const downloadUrl = (result as unknown as { download_url?: string })?.download_url;
-      if (downloadUrl) {
+      const responseData = result as unknown as { file_data?: string; file_name?: string };
+      if (responseData.file_data) {
+        // Decodificar base64 y disparar descarga
+        const byteCharacters = atob(responseData.file_data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/zip' });
+        const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = `${file.label.replace(/[^a-zA-Z0-9]/g, '_')}.zip`;
+        link.href = url;
+        link.download = responseData.file_name || `${file.label.replace(/[^a-zA-Z0-9]/g, '_')}.zip`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        toast({ title: t('osFilesDownloading'), description: file.label });
+      } else {
+        toast({ variant: 'destructive', title: t('osFilesFailed'), description: t('osFilesError') });
       }
-      toast({ title: t('osFilesDownloading'), description: file.label });
     } catch (error: unknown) {
       const err = error as { detail?: string };
       toast({ variant: 'destructive', title: t('osFilesFailed'), description: err?.detail ?? t('osFilesError') });

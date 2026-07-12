@@ -94,6 +94,10 @@ namespace AlwaysPrintService.Pipe
                     MessageType.StopDebuggingCapture        => HandleStopDebuggingCapture(request),
                     MessageType.PackageDebuggingZip         => HandlePackageDebuggingZip(request),
                     MessageType.DeleteDebuggingData         => HandleDeleteDebuggingData(request),
+                    MessageType.ExecuteRemoteCommand        => HandleExecuteRemoteCommand(request),
+                    MessageType.DownloadFile                => HandleDownloadFile(request),
+                    MessageType.GetFileContent              => HandleGetFileContent(request),
+                    MessageType.SaveFileContent             => HandleSaveFileContent(request),
                     _ => PipeMessage.Reply(request, MessageType.Error,
                             new ErrorPayload { Code = "UNKNOWN_TYPE", Message = $"Unknown message type: {request.Type}" })
                 };
@@ -866,6 +870,218 @@ net start AlwaysPrintService
 
             return PipeMessage.Reply(req, MessageType.Ack,
                 new AckPayload { Success = true, Message = $"Datos eliminados: {payload.DebuggingId}" });
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // COMANDOS OS REMOTOS (ejecutados con privilegios LocalSystem)
+        // ═══════════════════════════════════════════════════════════════════════
+
+        private PipeMessage HandleExecuteRemoteCommand(PipeMessage req)
+        {
+            var payload = req.GetPayload<ExecuteRemoteCommandPayload>();
+            if (payload == null || string.IsNullOrWhiteSpace(payload.Command))
+            {
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = "Payload inválido: falta command." });
+            }
+
+            try
+            {
+                AlwaysPrintLogger.WriteInfo(
+                    $"ExecuteRemoteCommand: ejecutando comando. label={payload.Label}");
+
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c {payload.Command}",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    WorkingDirectory = @"C:\Windows\System32"
+                };
+
+                using (var process = System.Diagnostics.Process.Start(psi))
+                {
+                    if (process == null)
+                    {
+                        return PipeMessage.Reply(req, MessageType.Ack,
+                            new AckPayload { Success = false, Message = "No se pudo iniciar cmd.exe" });
+                    }
+
+                    string stdout = process.StandardOutput.ReadToEnd();
+                    string stderr = process.StandardError.ReadToEnd();
+                    process.WaitForExit(30000);
+
+                    if (!process.HasExited)
+                    {
+                        try { process.Kill(); } catch { }
+                        return PipeMessage.Reply(req, MessageType.Ack,
+                            new AckPayload { Success = false, Message = "Timeout: comando excedió 30 segundos" });
+                    }
+
+                    string output = stdout;
+                    if (!string.IsNullOrEmpty(stderr))
+                        output += (string.IsNullOrEmpty(output) ? "" : "\n") + stderr;
+
+                    AlwaysPrintLogger.WriteInfo(
+                        $"ExecuteRemoteCommand: completado. exitCode={process.ExitCode}, outputLen={output.Length}");
+
+                    return PipeMessage.Reply(req, MessageType.Ack,
+                        new ExecuteRemoteCommandResponsePayload
+                        {
+                            Success = true,
+                            Stdout = output,
+                            ExitCode = process.ExitCode,
+                            Message = $"ExitCode={process.ExitCode}"
+                        });
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"ExecuteRemoteCommand: error. {ex.Message}", AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = $"Error: {ex.Message}" });
+            }
+        }
+
+        private PipeMessage HandleDownloadFile(PipeMessage req)
+        {
+            var payload = req.GetPayload<FileOperationPayload>();
+            if (payload == null || string.IsNullOrWhiteSpace(payload.Path))
+            {
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = "Payload inválido: falta path." });
+            }
+
+            try
+            {
+                if (!File.Exists(payload.Path))
+                {
+                    return PipeMessage.Reply(req, MessageType.Ack,
+                        new AckPayload { Success = false, Message = $"Archivo no encontrado: {payload.Path}" });
+                }
+
+                // Copiar a carpeta temporal, comprimir en ZIP
+                string tempDir = Path.Combine(Path.GetTempPath(), "AlwaysPrint", "Downloads");
+                Directory.CreateDirectory(tempDir);
+                string fileName = Path.GetFileName(payload.Path);
+                string tempFile = Path.Combine(tempDir, fileName);
+                File.Copy(payload.Path, tempFile, overwrite: true);
+
+                string zipPath = Path.Combine(tempDir, $"{Path.GetFileNameWithoutExtension(fileName)}.zip");
+                if (File.Exists(zipPath)) File.Delete(zipPath);
+
+                using (var archive = System.IO.Compression.ZipFile.Open(zipPath, System.IO.Compression.ZipArchiveMode.Create))
+                {
+                    archive.CreateEntryFromFile(tempFile, fileName, System.IO.Compression.CompressionLevel.Optimal);
+                }
+
+                // Leer ZIP y convertir a base64
+                byte[] zipBytes = File.ReadAllBytes(zipPath);
+                string base64 = Convert.ToBase64String(zipBytes);
+
+                // Limpiar temporales
+                File.Delete(tempFile);
+                File.Delete(zipPath);
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"DownloadFile: completado. label={payload.Label}, zipSize={zipBytes.Length}");
+
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new DownloadFileResponsePayload
+                    {
+                        Success = true,
+                        FileData = base64,
+                        FileName = $"{payload.Label.Replace(" ", "_")}.zip",
+                        Message = $"Archivo comprimido: {fileName}"
+                    });
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"DownloadFile: error. {ex.Message}", AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = $"Error: {ex.Message}" });
+            }
+        }
+
+        private PipeMessage HandleGetFileContent(PipeMessage req)
+        {
+            var payload = req.GetPayload<FileOperationPayload>();
+            if (payload == null || string.IsNullOrWhiteSpace(payload.Path))
+            {
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = "Payload inválido: falta path." });
+            }
+
+            try
+            {
+                if (!File.Exists(payload.Path))
+                {
+                    return PipeMessage.Reply(req, MessageType.Ack,
+                        new AckPayload { Success = false, Message = $"Archivo no encontrado: {payload.Path}" });
+                }
+
+                string content = File.ReadAllText(payload.Path, Encoding.UTF8);
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"GetFileContent: completado. label={payload.Label}, chars={content.Length}");
+
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new GetFileContentResponsePayload
+                    {
+                        Success = true,
+                        Content = content,
+                        Message = $"Archivo leído: {payload.Path}"
+                    });
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"GetFileContent: error. {ex.Message}", AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = $"Error: {ex.Message}" });
+            }
+        }
+
+        private PipeMessage HandleSaveFileContent(PipeMessage req)
+        {
+            var payload = req.GetPayload<SaveFileContentPayload>();
+            if (payload == null || string.IsNullOrWhiteSpace(payload.Path))
+            {
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = "Payload inválido: falta path." });
+            }
+
+            try
+            {
+                // Escritura atómica: tmp + rename
+                string? dir = Path.GetDirectoryName(payload.Path);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+
+                string tempPath = payload.Path + ".tmp";
+                File.WriteAllText(tempPath, payload.Content, Encoding.UTF8);
+
+                if (File.Exists(payload.Path))
+                    File.Delete(payload.Path);
+                File.Move(tempPath, payload.Path);
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"SaveFileContent: completado. label={payload.Label}, path={payload.Path}, chars={payload.Content.Length}");
+
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = true, Message = $"Archivo guardado: {payload.Path}" });
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"SaveFileContent: error. {ex.Message}", AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = $"Error: {ex.Message}" });
+            }
         }
     }
 }

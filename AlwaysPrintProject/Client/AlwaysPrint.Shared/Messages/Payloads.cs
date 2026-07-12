@@ -556,3 +556,98 @@ namespace AlwaysPrint.Shared.Messages
         [JsonProperty("durationMs")]
         public long DurationMs { get; set; }
     }
+
+    // ── Comandos OS remotos (ejecutados por Service con privilegios SYSTEM) ──────
+
+    /// <summary>
+    /// Payload para ejecutar un comando del sistema operativo.
+    /// Tray → Service. El Service ejecuta cmd.exe /c y retorna stdout.
+    /// </summary>
+    public class ExecuteRemoteCommandPayload
+    {
+        [JsonProperty("command")]
+        public string Command { get; set; } = string.Empty;
+
+        [JsonProperty("label")]
+        public string Label { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Respuesta del Service tras ejecutar un comando remoto.
+    /// </summary>
+    public class ExecuteRemoteCommandResponsePayload
+    {
+        [JsonProperty("success")]
+        public bool Success { get; set; }
+
+        [JsonProperty("stdout")]
+        public string Stdout { get; set; } = string.Empty;
+
+        [JsonProperty("exitCode")]
+        public int ExitCode { get; set; }
+
+        [JsonProperty("message")]
+        public string? Message { get; set; }
+    }
+
+    /// <summary>
+    /// Payload para leer/descargar un archivo del filesystem.
+    /// Tray → Service. Usado por download_file y get_file_content.
+    /// </summary>
+    public class FileOperationPayload
+    {
+        [JsonProperty("path")]
+        public string Path { get; set; } = string.Empty;
+
+        [JsonProperty("label")]
+        public string Label { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Respuesta del Service al leer un archivo (get_file_content).
+    /// </summary>
+    public class GetFileContentResponsePayload
+    {
+        [JsonProperty("success")]
+        public bool Success { get; set; }
+
+        [JsonProperty("content")]
+        public string Content { get; set; } = string.Empty;
+
+        [JsonProperty("message")]
+        public string? Message { get; set; }
+    }
+
+    /// <summary>
+    /// Respuesta del Service al leer y comprimir un archivo (download_file).
+    /// </summary>
+    public class DownloadFileResponsePayload
+    {
+        [JsonProperty("success")]
+        public bool Success { get; set; }
+
+        [JsonProperty("fileData")]
+        public string FileData { get; set; } = string.Empty;
+
+        [JsonProperty("fileName")]
+        public string FileName { get; set; } = string.Empty;
+
+        [JsonProperty("message")]
+        public string? Message { get; set; }
+    }
+
+    /// <summary>
+    /// Payload para guardar contenido en un archivo.
+    /// Tray → Service.
+    /// </summary>
+    public class SaveFileContentPayload
+    {
+        [JsonProperty("path")]
+        public string Path { get; set; } = string.Empty;
+
+        [JsonProperty("label")]
+        public string Label { get; set; } = string.Empty;
+
+        [JsonProperty("content")]
+        public string Content { get; set; } = string.Empty;
+    }

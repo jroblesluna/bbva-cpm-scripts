@@ -65,5 +65,11 @@ namespace AlwaysPrint.Shared.Messages
         // Connectivity Check
         ConnectivityCheck,           // Service → Tray: ejecutar check de URLs
         ConnectivityCheckResult,     // Tray → Service: resultado (opcional, para log del Service)
+
+        // Comandos OS remotos (Tray → Service, ejecutados con privilegios SYSTEM)
+        ExecuteRemoteCommand,        // Tray → Service: ejecutar comando cmd.exe /c
+        DownloadFile,                // Tray → Service: leer archivo y comprimir en ZIP
+        GetFileContent,              // Tray → Service: leer contenido de archivo texto
+        SaveFileContent,             // Tray → Service: escribir contenido en archivo
     }
 }
