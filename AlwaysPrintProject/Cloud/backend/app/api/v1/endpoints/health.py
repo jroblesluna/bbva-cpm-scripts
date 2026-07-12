@@ -325,28 +325,20 @@ async def health_workers_infrastructure():
 @router.post("/health/workers/restart-backend", tags=["Sistema"])
 async def restart_backend():
     """
-    Reinicia el container backend usando la Docker Engine API via Unix socket.
+    Reinicia el container backend usando el Docker SDK via Unix socket.
     El socket /var/run/docker.sock está montado como volume en el container.
     """
     import asyncio
-    import socket as sock_mod
 
     async def _do_restart():
         await asyncio.sleep(2)  # Dar tiempo a que la response HTTP se envíe
         try:
-            # POST /containers/alwaysprint-backend-1/restart via Unix socket
-            s = sock_mod.socket(sock_mod.AF_UNIX, sock_mod.SOCK_STREAM)
-            s.connect("/var/run/docker.sock")
-            request = (
-                "POST /v1.46/containers/alwaysprint-backend-1/restart?t=10 HTTP/1.1\r\n"
-                "Host: localhost\r\n"
-                "Content-Length: 0\r\n"
-                "\r\n"
-            )
-            s.sendall(request.encode())
-            s.close()
+            import docker
+            client = docker.from_env()
+            container = client.containers.get("alwaysprint-backend-1")
+            container.restart(timeout=10)
         except Exception as e:
-            logger.error("restart_backend.docker_api_failed", error=str(e))
+            logger.error("restart_backend.failed", error=str(e))
 
     asyncio.create_task(_do_restart())
     return {"status": "restarting", "message": "Backend se reiniciará en 2 segundos vía Docker API. Las WS reconectarán con jitter."}
