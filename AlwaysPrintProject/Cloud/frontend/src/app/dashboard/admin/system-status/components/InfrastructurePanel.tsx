@@ -172,8 +172,6 @@ export default function InfrastructurePanel() {
       setTimeout(() => setRestartModal(false), 5000);
     }
   };
-    }
-  };
 
   const handleResetHeartbeat = async (workerId: string) => {
     setConfirmDialog(null);
