@@ -412,10 +412,10 @@ async def kill_worker(worker_id: str):
 
     # Matar otro worker
     try:
-        os.kill(pid, signal.SIGTERM)
+        os.kill(pid, signal.SIGKILL)
         return {
             "status": "ok",
-            "message": f"SIGTERM enviado a {worker_id} (PID {pid}). El master lo respawneará.",
+            "message": f"SIGKILL enviado a {worker_id} (PID {pid}). El master lo respawneará si es necesario.",
         }
     except ProcessLookupError:
         return {"status": "error", "message": f"PID {pid} no encontrado"}
