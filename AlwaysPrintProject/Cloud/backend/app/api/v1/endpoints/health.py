@@ -225,6 +225,204 @@ async def health_workers():
     return workers
 
 
+@router.get("/health/workers/infrastructure", tags=["Sistema"])
+async def health_workers_infrastructure():
+    """
+    Información detallada de infraestructura de workers: PIDs, tipos, heartbeat status.
+    Consulta procesos del sistema + Redis para dar una vista completa.
+    """
+    import json as json_mod
+    import signal
+    from app.services.websocket_manager import connection_manager
+
+    master_pid = None
+    worker_pids = []
+    local_pid = os.getpid()
+    local_worker_id = f"worker_{local_pid}"
+
+    # Detectar master PID (padre de este worker)
+    try:
+        master_pid = os.getppid()
+    except Exception:
+        pass
+
+    # Listar procesos Python en /proc (solo funciona en Linux/container)
+    processes = []
+    try:
+        for entry in os.listdir("/proc"):
+            if not entry.isdigit():
+                continue
+            pid = int(entry)
+            try:
+                exe_link = os.readlink(f"/proc/{pid}/exe")
+                if "python" in exe_link:
+                    proc_type = "master" if pid == master_pid else "worker"
+                    worker_id = f"worker_{pid}" if proc_type == "worker" else None
+                    processes.append({
+                        "pid": pid,
+                        "type": proc_type,
+                        "worker_id": worker_id,
+                        "exe": exe_link,
+                    })
+            except (OSError, PermissionError):
+                continue
+    except Exception:
+        # Fallback: solo reportar el proceso actual
+        processes.append({
+            "pid": local_pid,
+            "type": "worker",
+            "worker_id": local_worker_id,
+            "exe": "python3.12",
+        })
+
+    # Consultar Redis: heartbeat TTL + SCARD de cada worker
+    redis_status = {}
+    redis_client = getattr(connection_manager, "_redis", None)
+    redis_available = getattr(connection_manager, "_redis_available", False)
+
+    if redis_client and redis_available:
+        try:
+            async for key in redis_client.scan_iter(match="workers:*:heartbeat"):
+                key_str = key.decode("utf-8") if isinstance(key, bytes) else key
+                wid = key_str.split(":")[1]
+
+                ttl = await redis_client.ttl(f"workers:{wid}:heartbeat")
+                scard = await redis_client.scard(f"workers:{wid}:workstations")
+                has_metrics = await redis_client.exists(f"workers:{wid}:metrics")
+
+                redis_status[wid] = {
+                    "heartbeat_ttl": ttl,
+                    "workstations_registered": scard,
+                    "has_metrics": bool(has_metrics),
+                    "heartbeat_healthy": ttl > 10,
+                }
+        except Exception as e:
+            logger.warning("health.infrastructure_redis_error", error=str(e))
+
+    # Enriquecer procesos con estado Redis
+    for proc in processes:
+        wid = proc.get("worker_id")
+        if wid and wid in redis_status:
+            proc["redis"] = redis_status[wid]
+        elif wid:
+            proc["redis"] = {
+                "heartbeat_ttl": -1,
+                "workstations_registered": 0,
+                "has_metrics": False,
+                "heartbeat_healthy": False,
+            }
+
+    return {
+        "master_pid": master_pid,
+        "processes": sorted(processes, key=lambda p: p["pid"]),
+        "redis_keys": redis_status,
+        "local_worker_id": local_worker_id,
+    }
+
+
+@router.post("/health/workers/restart-backend", tags=["Sistema"])
+async def restart_backend():
+    """
+    Reinicia el container backend completo (docker compose restart backend).
+    Ejecuta el comando en un subproceso. La respuesta se envía antes del reinicio.
+    """
+    import subprocess
+    import asyncio
+
+    async def _do_restart():
+        await asyncio.sleep(2)  # Dar tiempo a que la response se envíe
+        subprocess.Popen(
+            ["docker", "compose", "-f", "/opt/alwaysprint/docker-compose.yml", "restart", "backend"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    asyncio.create_task(_do_restart())
+    return {"status": "restarting", "message": "Backend se reiniciará en 2 segundos"}
+
+
+@router.post("/health/workers/{worker_id}/reset-heartbeat", tags=["Sistema"])
+async def reset_worker_heartbeat(worker_id: str):
+    """
+    Fuerza re-registro del heartbeat y workstations de un worker en Redis.
+    Solo funciona si el request cae en el worker indicado (por limitación de arquitectura).
+    Si cae en otro worker, retorna instrucciones.
+    """
+    from app.services.websocket_manager import connection_manager
+
+    local_worker_id = f"worker_{os.getpid()}"
+
+    if worker_id != local_worker_id:
+        return {
+            "status": "skipped",
+            "message": f"Este request fue procesado por {local_worker_id}, no por {worker_id}. "
+                       f"Reintenta varias veces hasta que caiga en el worker correcto, "
+                       f"o usa 'Reiniciar Backend' para resolver ambos.",
+            "processed_by": local_worker_id,
+        }
+
+    # Forzar re-registro
+    redis_mgr = connection_manager
+    if hasattr(redis_mgr, '_ensure_registry_consistency'):
+        try:
+            await redis_mgr._ensure_registry_consistency()
+            # También forzar heartbeat
+            if redis_mgr._worker_registry:
+                await redis_mgr._worker_registry.heartbeat()
+            return {
+                "status": "ok",
+                "message": f"Heartbeat y registry de {worker_id} reseteados exitosamente",
+                "workstations_local": len(redis_mgr.workstation_connections),
+            }
+        except Exception as e:
+            return {"status": "error", "message": f"Error reseteando: {str(e)}"}
+
+    return {"status": "error", "message": "Connection manager no soporta reset de heartbeat"}
+
+
+@router.post("/health/workers/{worker_id}/kill", tags=["Sistema"])
+async def kill_worker(worker_id: str):
+    """
+    Envía SIGHUP al worker para que uvicorn master lo respawnee.
+    Solo afecta al worker indicado; el otro sigue operando sin interrupción.
+    """
+    import signal
+
+    # Extraer PID del worker_id (formato: worker_XX)
+    try:
+        pid = int(worker_id.replace("worker_", ""))
+    except ValueError:
+        return {"status": "error", "message": f"worker_id inválido: {worker_id}"}
+
+    local_pid = os.getpid()
+    if pid == local_pid:
+        # No se puede matar a sí mismo de forma confiable, usar SIGTERM
+        # que uvicorn master detectará y respawneará
+        import asyncio
+
+        async def _self_kill():
+            await asyncio.sleep(1)
+            os.kill(pid, signal.SIGTERM)
+
+        asyncio.create_task(_self_kill())
+        return {
+            "status": "killing",
+            "message": f"Worker {worker_id} (PID {pid}) se detendrá en 1s. El master lo respawneará.",
+        }
+
+    # Matar otro worker
+    try:
+        os.kill(pid, signal.SIGTERM)
+        return {
+            "status": "ok",
+            "message": f"SIGTERM enviado a {worker_id} (PID {pid}). El master lo respawneará.",
+        }
+    except ProcessLookupError:
+        return {"status": "error", "message": f"PID {pid} no encontrado"}
+    except PermissionError:
+        return {"status": "error", "message": f"Sin permisos para matar PID {pid}"}
+
+
 async def _check_redis(connection_manager) -> dict:
     """
     Verifica conectividad Redis y mide latencia con PING.

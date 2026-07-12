@@ -29,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import InfrastructurePanel from './InfrastructurePanel';
 
 // === TIPOS ===
 
@@ -119,6 +120,9 @@ export default function WorkersTab() {
 
   return (
     <div className="space-y-4">
+      {/* Panel de infraestructura */}
+      <InfrastructurePanel />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
