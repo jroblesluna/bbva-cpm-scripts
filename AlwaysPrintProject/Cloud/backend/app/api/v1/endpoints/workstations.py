@@ -344,6 +344,10 @@ async def send_command(
     # Para execute_on_demand: registrar waiter antes de enviar para esperar respuesta
     if command_data.command_type == "execute_on_demand":
         connection_manager.register_command_waiter(command_id)
+
+    # Para comandos OS remotos: también registrar waiter para esperar respuesta
+    if command_data.command_type in ("execute_remote_command", "download_file", "get_file_content", "save_file_content"):
+        connection_manager.register_command_waiter(command_id)
     
     sent = await connection_manager.send_to_workstation(workstation_id_str, message)
     
