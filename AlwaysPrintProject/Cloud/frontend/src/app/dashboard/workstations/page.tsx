@@ -78,7 +78,7 @@ export default function WorkstationsPage() {
   const tActions = useTranslations('actionConfigs');
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearch = useDebounce(searchTerm, 400);
-  const [filterOnline, setFilterOnline] = useState<boolean | undefined>(undefined);
+  const [filterOnline, setFilterOnline] = useState<boolean | undefined>(true);
   const [filterContingency, setFilterContingency] = useState<boolean | undefined>(undefined);
   const [filterOrgId, setFilterOrgId] = useState<string | undefined>(() => searchParams.get('org_id') || undefined);
   const [filterVlanId, setFilterVlanId] = useState<string | undefined>(() => searchParams.get('vlan_id') || undefined);
@@ -92,7 +92,7 @@ export default function WorkstationsPage() {
   const [restartTarget, setRestartTarget] = useState<{ workstation: Workstation; commandType: 'restart_service' | 'restart_tray' } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Workstation | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [sortField, setSortField] = useState<SortField>('ip_private');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [page, setPage] = useState(1);
