@@ -1197,14 +1197,22 @@ class RedisConnectionManager:
         try:
             local_count = len(self.workstation_connections)
             if local_count == 0:
+                # Si no hay conexiones locales pero Redis tiene IDs, limpiar
+                ws_key = self._worker_registry._workstations_key
+                redis_count = await self._redis.scard(ws_key)
+                if redis_count > 0:
+                    await self._redis.delete(ws_key)
+                    logger.info("worker.registry_cleaned_empty", redis_count=redis_count)
                 return
 
             ws_key = self._worker_registry._workstations_key
             redis_count = await self._redis.scard(ws_key)
 
-            # Si Redis tiene menos del 90% de las conexiones locales, hay drift
-            drift_threshold = max(local_count * 0.9, local_count - 50)
-            if redis_count >= drift_threshold:
+            # Drift: Redis tiene menos (WS no registradas) O más (IDs stale) que local
+            drift_down = redis_count < local_count * 0.9  # Redis falta >10%
+            drift_up = redis_count > local_count * 1.1    # Redis sobra >10%
+
+            if not drift_down and not drift_up:
                 return
 
             # Drift detectado: re-registrar todas las conexiones locales
