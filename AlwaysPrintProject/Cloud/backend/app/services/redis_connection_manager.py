@@ -1166,7 +1166,7 @@ class RedisConnectionManager:
                         "baseline_mb": baseline_mb,
                         "fd": fd_count,
                         "pool_out": pool_checked_out,
-                        "uptime": int(time.time() - self._start_time),
+                        "start_time": self._start_time,
                     })
                     await self._redis.set(
                         f"workers:{self._worker_id}:metrics",

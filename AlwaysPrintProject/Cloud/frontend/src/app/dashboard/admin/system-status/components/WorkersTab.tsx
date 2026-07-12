@@ -55,12 +55,15 @@ interface WorkerInfo {
     total_last_minute: number;
   };
   memory_mb: number;
-  uptime_seconds: number;
+  start_time: number;
 }
 
 // === UTILIDADES ===
 
-function formatUptime(seconds: number): string {
+function formatUptime(startTime: number): string {
+  if (!startTime) return '—';
+  const seconds = Math.floor(Date.now() / 1000 - startTime);
+  if (seconds < 0) return '—';
   if (seconds < 60) return `${seconds}s`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
   if (seconds < 86400) {
@@ -289,7 +292,7 @@ export default function WorkersTab() {
                       <TableCell className="text-right text-xs">
                         <span className="flex items-center justify-end gap-1">
                           <Clock className="h-3 w-3" />
-                          {formatUptime(w.uptime_seconds)}
+                          {formatUptime(w.start_time)}
                         </span>
                       </TableCell>
                       <TableCell>

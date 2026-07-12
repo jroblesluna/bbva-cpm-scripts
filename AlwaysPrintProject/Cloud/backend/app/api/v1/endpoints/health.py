@@ -175,8 +175,9 @@ async def health_workers():
 
                 # Leer uptime de las métricas (publicado cada heartbeat)
                 uptime = 0
+                start_time = 0.0
                 if metrics_str:
-                    uptime = json_mod.loads(metrics_str).get("uptime", 0)
+                    start_time = json_mod.loads(metrics_str).get("start_time", 0.0)
 
                 # Ping Redis para latencia (una sola vez, aplicar a todos)
                 redis_latency = 0.0
@@ -202,7 +203,7 @@ async def health_workers():
                     "cache": {"hits_last_minute": 0, "misses_last_minute": 0, "hit_ratio_pct": 0},
                     "registration": {"p95_latency_ms": 0, "total_last_minute": 0},
                     "memory_mb": rss_mb,
-                    "uptime_seconds": uptime,
+                    "start_time": start_time,
                 })
 
         except Exception as e:
@@ -212,7 +213,6 @@ async def health_workers():
     if not workers:
         counts = connection_manager.get_connection_count()
         memory_mb = _get_process_memory_mb()
-        uptime = int(time.time() - _process_start_time)
         workers.append({
             "worker_id": local_worker_id,
             "status": "healthy",
@@ -221,7 +221,7 @@ async def health_workers():
             "cache": {"hits_last_minute": 0, "misses_last_minute": 0, "hit_ratio_pct": 0},
             "registration": {"p95_latency_ms": 0, "total_last_minute": 0},
             "memory_mb": memory_mb,
-            "uptime_seconds": uptime,
+            "start_time": _process_start_time,
         })
 
     return workers
