@@ -339,8 +339,8 @@ export default function WorkersTab() {
                       <TableRow key={proc.pid} className={proc.type === 'master' ? 'bg-gray-50' : ''}>
                         <TableCell className="font-mono text-xs">{proc.pid}</TableCell>
                         <TableCell>
-                          <Badge variant={proc.type === 'master' ? 'secondary' : 'default'} className="text-[10px]">
-                            {proc.type}
+                          <Badge variant={proc.type === 'master' ? 'secondary' : (metricsMap.has(proc.worker_id ?? '') ? 'default' : 'outline')} className={`text-[10px] ${proc.type === 'worker' && !metricsMap.has(proc.worker_id ?? '') ? 'border-orange-300 text-orange-700 bg-orange-50' : ''}`}>
+                            {proc.type === 'master' ? 'master' : (metricsMap.has(proc.worker_id ?? '') ? 'worker' : 'orphan')}
                           </Badge>
                         </TableCell>
                         <TableCell className="font-mono text-xs">{proc.worker_id ?? '—'}</TableCell>
