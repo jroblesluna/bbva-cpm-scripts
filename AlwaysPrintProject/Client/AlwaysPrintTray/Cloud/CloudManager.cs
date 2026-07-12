@@ -1913,6 +1913,9 @@ namespace AlwaysPrintTray.Cloud
 
             try
             {
+                // Resolver variables de template antes de ejecutar
+                command = ResolveCommandTemplates(command);
+
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = "cmd.exe",
@@ -1991,6 +1994,8 @@ namespace AlwaysPrintTray.Cloud
 
             try
             {
+                filePath = ResolveCommandTemplates(filePath);
+
                 if (!System.IO.File.Exists(filePath))
                 {
                     SendCommandResult(commandId, false, $"Archivo no encontrado: {filePath}");
@@ -2057,6 +2062,8 @@ namespace AlwaysPrintTray.Cloud
 
             try
             {
+                filePath = ResolveCommandTemplates(filePath);
+
                 if (!System.IO.File.Exists(filePath))
                 {
                     SendCommandResult(commandId, false, $"Archivo no encontrado: {filePath}");
@@ -2111,6 +2118,8 @@ namespace AlwaysPrintTray.Cloud
 
             try
             {
+                filePath = ResolveCommandTemplates(filePath);
+
                 // Escritura atómica: escribir en .tmp y renombrar
                 string tempPath = filePath + ".tmp";
                 string? dir = System.IO.Path.GetDirectoryName(filePath);
@@ -2136,6 +2145,33 @@ namespace AlwaysPrintTray.Cloud
                     $"CloudManager: error guardando archivo '{label}': {ex.Message}");
                 SendCommandResult(commandId, false, $"Error: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Resuelve variables de template {{variable}} en comandos y rutas.
+        /// Variables disponibles:
+        /// - current_user: usuario de Windows actualmente logueado
+        /// - hostname: nombre del equipo
+        /// - corporate_queue_name: nombre de la cola corporativa (del registro)
+        /// </summary>
+        private string ResolveCommandTemplates(string template)
+        {
+            if (string.IsNullOrEmpty(template) || !template.Contains("{{"))
+                return template;
+
+            template = template.Replace("{{current_user}}", Environment.UserName);
+            template = template.Replace("{{hostname}}", Environment.MachineName);
+
+            // Resolver variables del registro (corporate_queue_name, etc.)
+            try
+            {
+                var cfg = _registry.Load();
+                if (!string.IsNullOrEmpty(cfg.CorporateQueueName))
+                    template = template.Replace("{{corporate_queue_name}}", cfg.CorporateQueueName);
+            }
+            catch { /* si falla lectura de registro, dejar sin reemplazar */ }
+
+            return template;
         }
 
         /// <summary>
