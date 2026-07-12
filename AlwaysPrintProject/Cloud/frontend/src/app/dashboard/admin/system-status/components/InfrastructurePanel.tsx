@@ -118,16 +118,38 @@ export default function InfrastructurePanel() {
       });
       if (!res.ok) throw new Error('Request failed');
 
-      // Fase: esperando que el backend se detenga
+      // Fase: esperando que el backend se detenga (confirmar que deja de responder)
       setRestartPhase('stopping');
       setRestartMessage(t('infraRestartPhaseStopping'));
-      await new Promise(r => setTimeout(r, 3000));
 
-      // Fase: esperando que vuelva a estar disponible
+      // Esperar a que el backend DEJE de responder (confirma que el restart inició)
+      let downDetected = false;
+      for (let i = 0; i < 15; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        try {
+          const probe = await fetch(`${baseUrl}/api/v1/health`, {
+            signal: AbortSignal.timeout(2000),
+          });
+          if (!probe.ok) { downDetected = true; break; }
+        } catch {
+          downDetected = true;
+          break;
+        }
+      }
+
+      if (!downDetected) {
+        // El backend nunca se cayó — el restart puede no haber funcionado
+        setRestartPhase('error');
+        setRestartMessage(t('infraRestartPhaseNotStopped'));
+        setTimeout(() => setRestartModal(false), 5000);
+        return;
+      }
+
+      // Fase: backend confirmado caído, esperando que vuelva
       setRestartPhase('waiting');
       setRestartMessage(t('infraRestartPhaseWaiting'));
 
-      // Polling hasta que el health responda
+      // Polling hasta que el health responda OK
       let attempts = 0;
       const maxAttempts = 30;
       while (attempts < maxAttempts) {

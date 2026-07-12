@@ -1100,6 +1100,7 @@
     "infraRestartCompleteTitle": "Backend Restarted",
     "infraRestartPhaseSending": "Sending restart signal...",
     "infraRestartPhaseStopping": "Backend is shutting down...",
+    "infraRestartPhaseNotStopped": "Backend did not stop after 15 seconds. Restart may not have worked.",
     "infraRestartPhaseWaiting": "Waiting for backend to become available...",
     "infraRestartPhaseWaitingAttempt": "Checking availability... ({attempt}/{max})",
     "infraRestartPhaseVerifying": "Backend responding. Verifying status...",
