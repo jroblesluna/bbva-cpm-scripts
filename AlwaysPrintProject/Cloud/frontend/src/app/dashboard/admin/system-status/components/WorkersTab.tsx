@@ -377,7 +377,9 @@ export default function WorkersTab() {
                               {m.status}
                             </Badge>
                           ) : proc.type === 'worker' ? (
-                            <Badge variant="secondary" className="text-xs">zombie</Badge>
+                            <Badge variant="secondary" className="text-xs text-orange-700 border-orange-300 bg-orange-50">
+                              heartbeat lost
+                            </Badge>
                           ) : '—'}
                         </TableCell>
                         <TableCell>
