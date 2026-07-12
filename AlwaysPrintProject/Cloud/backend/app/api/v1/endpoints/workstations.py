@@ -429,7 +429,9 @@ async def send_command(
             )
 
         # Retornar la respuesta completa (incluye stdout, content, file_data según el tipo)
-        return response_data
+        # Usar JSONResponse para bypass de response_model (que solo permite command_id y status)
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content=response_data)
 
     return CommandResponse(command_id=command_id, status="sent")
 
