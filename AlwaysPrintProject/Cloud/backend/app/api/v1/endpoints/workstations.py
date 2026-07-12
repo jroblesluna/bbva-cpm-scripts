@@ -139,6 +139,74 @@ def get_ondemand_actions(
     return actions
 
 
+# === ENDPOINT DE COMANDOS OS (remote_commands + downloadable_files) ===
+
+@router.get("/{workstation_id}/os-commands")
+def get_os_commands(
+    workstation_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtener comandos remotos y archivos descargables definidos en el config efectivo.
+
+    Extrae los campos `remote_commands` y `downloadable_files` del alwaysconfig
+    de la workstation (con herencia organizacional).
+
+    Returns:
+        Dict con commands: [{label, command, description}] y files: [{label, path, description}]
+    """
+    import json
+
+    # Verificar que la workstation existe
+    workstation = db.query(Workstation).filter(Workstation.id == workstation_id).first()
+    if not workstation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workstation no encontrada"
+        )
+
+    # Tenant isolation
+    if current_user.role != UserRole.ADMIN:
+        if current_user.organization_id != workstation.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Sin permiso para ver esta workstation"
+            )
+
+    # Resolver config efectivo
+    from app.services.action_config import ActionConfigService
+    config = ActionConfigService.resolve_effective_config(db, workstation.id)
+
+    if not config:
+        return {"commands": [], "files": []}
+
+    # Parsear config_json
+    try:
+        config_data = json.loads(config.config_json)
+    except json.JSONDecodeError:
+        return {"commands": [], "files": []}
+
+    # Extraer remote_commands y downloadable_files
+    commands = []
+    for cmd in config_data.get("remote_commands", []):
+        commands.append({
+            "label": cmd.get("label", ""),
+            "command": cmd.get("command", ""),
+            "description": cmd.get("description", ""),
+        })
+
+    files = []
+    for f in config_data.get("downloadable_files", []):
+        files.append({
+            "label": f.get("label", ""),
+            "path": f.get("path", ""),
+            "description": f.get("description", ""),
+        })
+
+    return {"commands": commands, "files": files}
+
+
 # === ENDPOINT DE COMANDOS REMOTOS ===
 
 @router.post("/{workstation_id}/command",

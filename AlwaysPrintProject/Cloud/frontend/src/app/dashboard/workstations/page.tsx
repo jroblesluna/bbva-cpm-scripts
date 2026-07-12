@@ -60,6 +60,7 @@ import { ActionConfigSection } from '@/components/config/ActionConfigSection';
 import { LogAnalysisHistory } from '@/components/workstations/LogAnalysisHistory';
 import { LogAnalysisButton } from '@/components/workstations/LogAnalysisButton';
 import { OnDemandActionsSection } from '@/components/workstations/OnDemandActionsSection';
+import { OsCommandsSection } from '@/components/workstations/OsCommandsSection';
 import { WorkstationDebuggingSection } from '@/components/debugging/WorkstationDebuggingSection';
 
 type ViewMode = 'cards' | 'table';
@@ -2366,7 +2367,7 @@ function WorkstationDetailModal({
           </div>
           <div>
             <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">{t('networkInfo')}</h3>
-            <dl className="grid grid-cols-2 gap-3 text-sm">
+            <dl className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
               <div>
                 <dt className="text-gray-600">{t('privateIp')}</dt>
                 <dd className="font-mono font-medium">{workstation.ip_private}</dd>
@@ -2385,7 +2386,7 @@ function WorkstationDetailModal({
           </div>
           <div>
             <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">{t('systemInfo')}</h3>
-            <dl className="grid grid-cols-2 gap-3 text-sm">
+            <dl className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
               {workstation.hostname && (
                 <div>
                   <dt className="text-gray-600">{t('hostname')}</dt>
@@ -2463,9 +2464,21 @@ function WorkstationDetailModal({
             <code className="text-xs bg-gray-100 px-2 py-1 rounded">{workstation.id}</code>
           </div>
 
-          {/* Botón de análisis de log */}
+          {/* Sección de acciones OnDemand */}
+          <OnDemandActionsSection
+            workstationId={workstation.id}
+            isOnline={workstation.is_online}
+          />
+
+          {/* Sección de Comandos de Sistema Operativo */}
+          <OsCommandsSection
+            workstationId={workstation.id}
+            isOnline={workstation.is_online}
+          />
+
+          {/* Análisis de Log de AlwaysPrint */}
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Análisis de Log</h3>
+            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide">{t('logAnalysisTitle')}</h3>
             <LogAnalysisButton
               workstationId={workstation.id}
               workstationName={workstation.hostname || workstation.ip_private}
@@ -2478,12 +2491,6 @@ function WorkstationDetailModal({
 
           {/* Historial de análisis de logs */}
           <LogAnalysisHistory workstationId={workstation.id} />
-
-          {/* Sección de acciones OnDemand */}
-          <OnDemandActionsSection
-            workstationId={workstation.id}
-            isOnline={workstation.is_online}
-          />
 
           {/* Sección de Debugging */}
           <WorkstationDebuggingSection

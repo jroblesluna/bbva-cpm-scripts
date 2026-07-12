@@ -597,6 +597,21 @@ export const workstationsApi = {
     )
     return response.data
   },
+
+  /**
+   * Obtener comandos remotos y archivos descargables disponibles para una workstation.
+   * Se extraen del config efectivo (campos remote_commands y downloadable_files).
+   */
+  getOsCommands: async (id: string): Promise<{
+    commands: Array<{ label: string; command: string; description: string }>;
+    files: Array<{ label: string; path: string; description: string }>;
+  }> => {
+    const response = await apiClient.get<{
+      commands: Array<{ label: string; command: string; description: string }>;
+      files: Array<{ label: string; path: string; description: string }>;
+    }>(`/workstations/${id}/os-commands`)
+    return response.data
+  },
 }
 
 // ============================================================================
