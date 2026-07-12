@@ -399,11 +399,11 @@ async def workstation_websocket(
                 success = data.get("success")
                 output = data.get("output")
                 
-                response_data = {
-                    "command_id": command_id,
-                    "success": success,
-                    "output": output
-                }
+                # Pasar TODOS los campos del resultado (stdout, content, file_data, file_name, duration_ms)
+                response_data = dict(data)
+                response_data["command_id"] = command_id
+                response_data["success"] = success
+                response_data["output"] = output
                 
                 # Resolver waiter local o publicar cross-worker
                 resolved_locally = connection_manager.resolve_command_response(command_id, response_data)

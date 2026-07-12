@@ -404,7 +404,29 @@ async def send_command(
             )
         
         return CommandResponse(command_id=command_id, status="completed")
-    
+
+    # Para comandos OS remotos: esperar respuesta con timeout y retornar stdout/content
+    if command_data.command_type in ("execute_remote_command", "download_file", "get_file_content", "save_file_content"):
+        response_data = await connection_manager.wait_for_command_response(
+            command_id, timeout=45.0
+        )
+
+        if response_data is None:
+            raise HTTPException(
+                status_code=status.HTTP_408_REQUEST_TIMEOUT,
+                detail="Timeout esperando respuesta de la workstation (45s)."
+            )
+
+        success = response_data.get("success", False)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=response_data.get("output", "Error en la workstation")
+            )
+
+        # Retornar la respuesta completa (incluye stdout, content, file_data según el tipo)
+        return response_data
+
     return CommandResponse(command_id=command_id, status="sent")
 
 
