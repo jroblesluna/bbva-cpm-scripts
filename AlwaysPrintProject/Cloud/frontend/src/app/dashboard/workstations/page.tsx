@@ -2478,7 +2478,12 @@ function WorkstationDetailModal({
 
           {/* Análisis de Log de AlwaysPrint */}
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide">{t('logAnalysisTitle')}</h3>
+            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                {t('logAnalysisTitle')}
+              </span>
+            </h3>
             <LogAnalysisButton
               workstationId={workstation.id}
               workstationName={workstation.hostname || workstation.ip_private}

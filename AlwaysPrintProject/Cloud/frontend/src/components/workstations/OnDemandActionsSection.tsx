@@ -89,6 +89,11 @@ export function OnDemandActionsSection({ workstationId, isOnline }: OnDemandActi
     },
   });
 
+  // No mostrar sección si la workstation está offline
+  if (!isOnline) {
+    return null;
+  }
+
   // Loading state
   if (isLoading) {
     return (

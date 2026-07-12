@@ -188,6 +188,11 @@ export function OsCommandsSection({ workstationId, isOnline }: OsCommandsSection
     toast({ title: t('osCommandsCopied') });
   };
 
+  // No mostrar sección si la workstation está offline
+  if (!isOnline) {
+    return null;
+  }
+
   // Loading state
   if (isLoading) {
     return (
