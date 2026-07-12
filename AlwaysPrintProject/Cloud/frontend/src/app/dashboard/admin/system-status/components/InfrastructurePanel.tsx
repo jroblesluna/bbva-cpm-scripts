@@ -100,20 +100,78 @@ export default function InfrastructurePanel() {
     }
   }, [getAuthHeaders, baseUrl, t, toast]);
 
+  // === Estado del modal de reinicio ===
+  const [restartModal, setRestartModal] = useState(false);
+  const [restartPhase, setRestartPhase] = useState<'sending' | 'stopping' | 'waiting' | 'verifying' | 'done' | 'error'>('sending');
+  const [restartMessage, setRestartMessage] = useState('');
+
   const handleRestart = async () => {
     setConfirmDialog(null);
-    setActionPending('restart');
+    setRestartModal(true);
+    setRestartPhase('sending');
+    setRestartMessage(t('infraRestartPhaseSending'));
+
     try {
       const headers = getAuthHeaders();
       const res = await fetch(`${baseUrl}/api/v1/health/workers/restart-backend`, {
         method: 'POST', headers,
       });
-      const json = await res.json();
-      toast({ title: t('infraRestartTitle'), description: json.message });
+      if (!res.ok) throw new Error('Request failed');
+
+      // Fase: esperando que el backend se detenga
+      setRestartPhase('stopping');
+      setRestartMessage(t('infraRestartPhaseStopping'));
+      await new Promise(r => setTimeout(r, 3000));
+
+      // Fase: esperando que vuelva a estar disponible
+      setRestartPhase('waiting');
+      setRestartMessage(t('infraRestartPhaseWaiting'));
+
+      // Polling hasta que el health responda
+      let attempts = 0;
+      const maxAttempts = 30;
+      while (attempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, 2000));
+        attempts++;
+        setRestartMessage(t('infraRestartPhaseWaitingAttempt', { attempt: String(attempts), max: String(maxAttempts) }));
+        try {
+          const healthRes = await fetch(`${baseUrl}/api/v1/health`, {
+            signal: AbortSignal.timeout(3000),
+          });
+          if (healthRes.ok) {
+            break;
+          }
+        } catch {
+          // Backend aún no responde, continuar polling
+        }
+      }
+
+      if (attempts >= maxAttempts) {
+        setRestartPhase('error');
+        setRestartMessage(t('infraRestartPhaseTimeout'));
+        setTimeout(() => setRestartModal(false), 5000);
+        return;
+      }
+
+      // Fase: verificando
+      setRestartPhase('verifying');
+      setRestartMessage(t('infraRestartPhaseVerifying'));
+      await new Promise(r => setTimeout(r, 2000));
+
+      // Completado
+      setRestartPhase('done');
+      setRestartMessage(t('infraRestartPhaseDone'));
+      setTimeout(() => {
+        setRestartModal(false);
+        fetchInfrastructure();
+      }, 3000);
+
     } catch {
-      toast({ variant: 'destructive', title: t('infraRestartFailed') });
-    } finally {
-      setActionPending(null);
+      setRestartPhase('error');
+      setRestartMessage(t('infraRestartFailed'));
+      setTimeout(() => setRestartModal(false), 5000);
+    }
+  };
     }
   };
 
@@ -330,6 +388,30 @@ export default function InfrastructurePanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de progreso de reinicio */}
+      {restartModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-8 max-w-md w-full mx-4 text-center space-y-4">
+            {restartPhase !== 'done' && restartPhase !== 'error' && (
+              <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto" />
+            )}
+            {restartPhase === 'done' && (
+              <CheckCircle className="w-12 h-12 text-green-600 mx-auto" />
+            )}
+            {restartPhase === 'error' && (
+              <XCircle className="w-12 h-12 text-red-600 mx-auto" />
+            )}
+            <h3 className="text-lg font-semibold">
+              {restartPhase === 'done' ? t('infraRestartCompleteTitle') : t('infraRestartInProgressTitle')}
+            </h3>
+            <p className="text-sm text-gray-600">{restartMessage}</p>
+            {restartPhase === 'done' && (
+              <p className="text-xs text-gray-400">{t('infraRestartAutoClose')}</p>
+            )}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
