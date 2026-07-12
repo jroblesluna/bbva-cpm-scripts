@@ -85,28 +85,13 @@ export default function WorkersTab() {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
       const headers = getAuthHeaders();
-      const discoveredWorkers = new Map<string, WorkerInfo>();
 
-      // Hacer 10 requests para descubrir todos los workers vía round-robin
-      const requests = Array.from({ length: 10 }, () =>
-        fetch(`${baseUrl}/api/v1/health/detailed`, { headers })
-          .then((res) => (res.ok ? res.json() : null))
-          .catch(() => null)
-      );
+      // Un solo request que retorna todos los workers desde Redis
+      const response = await fetch(`${baseUrl}/api/v1/health/workers`, { headers });
+      if (!response.ok) throw new Error('Failed to fetch workers');
 
-      const results = await Promise.all(requests);
-
-      for (const data of results) {
-        if (data && data.worker_id) {
-          discoveredWorkers.set(data.worker_id, data);
-        }
-      }
-
-      setWorkers(
-        Array.from(discoveredWorkers.values()).sort((a, b) =>
-          a.worker_id.localeCompare(b.worker_id)
-        )
-      );
+      const data: WorkerInfo[] = await response.json();
+      setWorkers(data.sort((a, b) => a.worker_id.localeCompare(b.worker_id)));
       setLastRefresh(new Date());
     } catch {
       setError(t('workersError'));

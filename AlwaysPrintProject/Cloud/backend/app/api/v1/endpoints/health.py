@@ -140,6 +140,91 @@ async def health_detailed():
     }
 
 
+@router.get("/health/workers", tags=["Sistema"])
+async def health_workers():
+    """
+    Retorna métricas de TODOS los workers activos consultando Redis.
+    No depende de round-robin — un solo request retorna info de todos.
+    """
+    import json as json_mod
+    from app.services.websocket_manager import connection_manager
+
+    local_worker_id = f"worker_{os.getpid()}"
+    workers = []
+
+    # Intentar obtener métricas globales de Redis
+    redis_client = getattr(connection_manager, "_redis", None)
+    redis_available = getattr(connection_manager, "_redis_available", False)
+
+    if redis_client and redis_available:
+        try:
+            # Buscar todos los workers con heartbeat activo
+            async for key in redis_client.scan_iter(match="workers:*:heartbeat"):
+                key_str = key.decode("utf-8") if isinstance(key, bytes) else key
+                wid = key_str.split(":")[1]
+
+                # Leer métricas del worker
+                metrics_str = await redis_client.get(f"workers:{wid}:metrics")
+                ws_count = 0
+                rss_mb = 0.0
+
+                if metrics_str:
+                    metrics = json_mod.loads(metrics_str)
+                    ws_count = metrics.get("ws", 0)
+                    rss_mb = metrics.get("rss_mb", 0.0)
+
+                # Leer TTL del heartbeat para estimar uptime
+                ttl = await redis_client.ttl(f"workers:{wid}:heartbeat")
+
+                # Ping Redis para latencia (una sola vez, aplicar a todos)
+                redis_latency = 0.0
+                try:
+                    start = time.time()
+                    await redis_client.ping()
+                    redis_latency = round((time.time() - start) * 1000, 2)
+                except Exception:
+                    pass
+
+                workers.append({
+                    "worker_id": wid,
+                    "status": "healthy",
+                    "redis": {
+                        "connected": True,
+                        "latency_ms": redis_latency,
+                        "subscriptions": ws_count,
+                    },
+                    "connections": {
+                        "workstations": ws_count,
+                        "operators": 0,
+                    },
+                    "cache": {"hits_last_minute": 0, "misses_last_minute": 0, "hit_ratio_pct": 0},
+                    "registration": {"p95_latency_ms": 0, "total_last_minute": 0},
+                    "memory_mb": rss_mb,
+                    "uptime_seconds": max(0, 60 - ttl + 60) if ttl > 0 else 0,
+                })
+
+        except Exception as e:
+            logger.warning("health.workers_redis_error", error=str(e))
+
+    # Fallback: si no se encontró nada de Redis, retornar el worker local
+    if not workers:
+        counts = connection_manager.get_connection_count()
+        memory_mb = _get_process_memory_mb()
+        uptime = int(time.time() - _process_start_time)
+        workers.append({
+            "worker_id": local_worker_id,
+            "status": "healthy",
+            "redis": {"connected": redis_available, "latency_ms": 0, "subscriptions": 0},
+            "connections": {"workstations": counts["workstations"], "operators": counts["operators"]},
+            "cache": {"hits_last_minute": 0, "misses_last_minute": 0, "hit_ratio_pct": 0},
+            "registration": {"p95_latency_ms": 0, "total_last_minute": 0},
+            "memory_mb": memory_mb,
+            "uptime_seconds": uptime,
+        })
+
+    return workers
+
+
 async def _check_redis(connection_manager) -> dict:
     """
     Verifica conectividad Redis y mide latencia con PING.
