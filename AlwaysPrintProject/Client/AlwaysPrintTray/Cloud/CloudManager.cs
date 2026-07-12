@@ -1908,13 +1908,13 @@ namespace AlwaysPrintTray.Cloud
                 return;
             }
 
-            AlwaysPrintLogger.WriteTrayInfo(
-                $"CloudManager: ejecutando comando remoto. label={label}, command={command}");
-
             try
             {
                 // Resolver variables de template antes de ejecutar
                 command = ResolveCommandTemplates(command);
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: ejecutando comando remoto. label={label}, command={command}");
 
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
