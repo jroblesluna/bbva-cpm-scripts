@@ -973,9 +973,15 @@ net start AlwaysPrintService
                 string zipPath = Path.Combine(tempDir, $"{Path.GetFileNameWithoutExtension(fileName)}.zip");
                 if (File.Exists(zipPath)) File.Delete(zipPath);
 
-                using (var archive = System.IO.Compression.ZipFile.Open(zipPath, System.IO.Compression.ZipArchiveMode.Create))
+                using (var zipStream = new FileStream(zipPath, FileMode.Create))
+                using (var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Create))
                 {
-                    archive.CreateEntryFromFile(tempFile, fileName, System.IO.Compression.CompressionLevel.Optimal);
+                    var entry = archive.CreateEntry(fileName, System.IO.Compression.CompressionLevel.Optimal);
+                    using (var entryStream = entry.Open())
+                    using (var fileStream = new FileStream(tempFile, FileMode.Open, FileAccess.Read))
+                    {
+                        fileStream.CopyTo(entryStream);
+                    }
                 }
 
                 // Leer ZIP y convertir a base64
