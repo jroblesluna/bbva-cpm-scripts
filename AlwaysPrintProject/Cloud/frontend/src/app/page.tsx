@@ -15,35 +15,40 @@ export default function Home() {
 
   useEffect(() => {
     const checkSetupStatus = async () => {
-      try {
-        const status = await setupApi.getStatus()
-        
-        if (status.needs_setup) {
-          // Si necesita setup, redirigir a /setup
-          router.push('/setup')
-        } else {
-          // Si ya está configurado, redirigir a /dashboard
-          router.push('/dashboard')
-        }
-      } catch (error: unknown) {
-        console.error('Error al verificar estado de setup:', error)
-        // Distinguir entre error de red (backend caído) y respuesta del backend
-        const isNetworkError =
-          error instanceof Error &&
-          ('code' in error || error.message === 'Network Error' || error.message.includes('ECONNREFUSED'))
-        const responseStatus = (error as { response?: { status?: number } })?.response?.status
-
-        if (isNetworkError || !responseStatus) {
-          // Backend no disponible: mostrar error, NO redirigir a setup
-          setBackendError(true)
-          setIsChecking(false)
+      // Reintentar hasta 3 veces con 2s entre intentos antes de declarar backend caído.
+      // Evita redirecciones falsas a /maintenance por blips transitorios (502, timeout).
+      let lastError: unknown = null
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const status = await setupApi.getStatus()
+          
+          if (status.needs_setup) {
+            router.push('/setup')
+          } else {
+            router.push('/dashboard')
+          }
           return
+        } catch (error: unknown) {
+          lastError = error
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 2000))
+          }
         }
-        // Si el backend respondió con error (ej: 500), también es error de backend
-        setBackendError(true)
-      } finally {
-        setIsChecking(false)
       }
+
+      // 3 intentos fallidos — ahora sí es un problema real
+      console.error('Backend no disponible después de 3 intentos:', lastError)
+      const isNetworkError =
+        lastError instanceof Error &&
+        ('code' in lastError || lastError.message === 'Network Error' || lastError.message.includes('ECONNREFUSED'))
+      const responseStatus = (lastError as { response?: { status?: number } })?.response?.status
+
+      if (isNetworkError || !responseStatus) {
+        setBackendError(true)
+      } else {
+        setBackendError(true)
+      }
+      setIsChecking(false)
     }
 
     checkSetupStatus()
