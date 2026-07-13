@@ -327,6 +327,62 @@ Cuando está habilitado:
 - Buscar sesiones `pending_consent` donde `started_at < NOW() - 35s` (30s consent + 5s grace)
 - Marcar como `rejected` con reason `user_timeout`
 
+## Endpoint: Status de Sesión Activa
+
+```
+GET /workstations/{id}/remote-view/status
+
+Response (200):
+{
+  "active": true,
+  "session_id": "uuid",
+  "user_id": "uuid",
+  "user_name": "Javier Robles",
+  "user_email": "antonio@robles.ai",
+  "mode": "stream",
+  "started_at": "2026-07-12T15:30:00Z",
+  "monitor_index": 0,
+  "resolution": "720p"
+}
+
+Response (200, no session):
+{
+  "active": false
+}
+```
+
+Este endpoint se consulta al hacer click en "Ver Pantalla" para verificar exclusividad, y también puede usarse para mostrar el indicador de "ojo" en la lista de workstations (Req 10).
+
+## Audit Trail: Action Types
+
+| action_type | Cuándo | Campos en new_values |
+|-------------|--------|---------------------|
+| `REMOTE_VIEW_START` | Sesión inicia (status → active) | mode, consent_given, monitor_index |
+| `REMOTE_VIEW_STOP` | Sesión termina | duration_seconds, end_reason |
+| `REMOTE_VIEW_MODE_CHANGE` | Admin cambia de modo durante sesión | old_mode, new_mode |
+
+## Backpressure: Implementación en el Tray
+
+```
+Cada frame enviado, el Tray verifica el estado del buffer de envío WebSocket:
+
+IF pending_bytes_in_buffer > 1 MB:
+  - Reducir FPS a la mitad (ej: 5→2, 3→1)
+  - Reducir quality un nivel
+  - Log: "Backpressure detectado, reduciendo calidad"
+  - Esperar 3 segundos antes de re-evaluar
+
+IF pending_bytes_in_buffer < 256 KB (durante 5 frames consecutivos):
+  - Restaurar FPS y quality al valor configurado
+  - Log: "Buffer drenado, restaurando calidad"
+
+IF pending_bytes_in_buffer > 3 MB:
+  - Pausar captura completamente por 5 segundos
+  - Log: "Buffer crítico, pausando captura"
+```
+
+En C# (.NET 4.8), el buffer se monitorea con `ClientWebSocket.SendAsync` — si el await tarda más de 500ms, es señal de backpressure.
+
 ## Seguridad
 
 | Control | Implementación |
