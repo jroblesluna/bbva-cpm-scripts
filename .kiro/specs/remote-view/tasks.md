@@ -2,182 +2,305 @@
 
 ## Overview
 
-Implementación incremental en 4 fases. Cada fase es funcional de forma independiente. Fase 1 (Screenshot) es el MVP mínimo, las fases 2-4 agregan capacidades progresivamente.
+Implementación incremental en 5 bloques. Cada fase es funcional de forma independiente. El bloque 1 establece infraestructura base. Las fases 2-4 implementan los 3 modos progresivamente. La fase 5 pule la experiencia y agrega tests.
 
 ## Tasks
 
-- [ ] 1. Infraestructura base (modelo, config, endpoints)
+- [ ] 1. Infraestructura base (modelo, config, sesiones, endpoints)
   - [ ] 1.1 Agregar campo `remote_view` (JSONB) al modelo Organization
-    - Migración Alembic para agregar columna con default `{"enabled": false}`
-    - Schema Pydantic para validación del JSON
-    - _Requirements: 1.1, 1.2_
+    - Migración Alembic: columna `remote_view` JSONB con default `{"enabled": false}`
+    - Schema Pydantic `RemoteViewConfig` con los 13 campos y validación de rangos
+    - Endpoint PATCH de org actualiza el campo
+    - _Requirements: 1.1, 1.2, 12.7_
 
   - [ ] 1.2 Crear modelo SQLAlchemy RemoteViewSession
-    - Tabla `remote_view_sessions` con campos del diseño
-    - Índices para workstation_id+status y user_id+status
+    - Tabla `remote_view_sessions` con todos los campos del design (id, workstation_id, user_id, organization_id, mode, status, started_at, ended_at, last_activity_at, monitor_index, resolution, end_reason, consent_given)
+    - Índices parciales: `ix_rv_sessions_ws_status` (WHERE status IN pending_consent, active), `ix_rv_sessions_user_status` (WHERE status = active)
     - Migración Alembic
-    - _Requirements: 7.1, 10.1_
+    - _Requirements: 7.1, 10.1, 11.1_
 
   - [ ] 1.3 Crear SessionManager service
-    - `start_session()`: verifica exclusividad, crea registro, retorna session_id
-    - `end_session()`: actualiza status, end_reason, ended_at
-    - `get_active_session()`: busca sesión activa por workstation_id
-    - `check_timeout()`: verifica last_activity_at vs timeout config
-    - `cleanup_expired()`: task periódico para limpiar sesiones expiradas
-    - _Requirements: 2.2, 2.3, 7.1, 7.4, 7.5_
+    - `create_session(workstation_id, user_id, org_id, mode)` → session_id o error (exclusividad)
+    - `end_session(session_id, end_reason)` → actualiza status, ended_at
+    - `get_active_for_workstation(workstation_id)` → sesión activa o None (para exclusividad y visibilidad)
+    - `get_active_for_user(user_id)` → lista de sesiones activas (para límite concurrente)
+    - `update_activity(session_id)` → actualiza last_activity_at
+    - `update_mode(session_id, new_mode)` → actualiza mode
+    - `cleanup_expired()` → busca sesiones expiradas por timeout y consent timeout, cierra
+    - _Requirements: 2.2, 2.3, 2.6, 2.9, 7.1, 7.4, 7.5, 7.6, 10.1_
 
   - [ ] 1.4 Crear endpoints REST para remote view
-    - POST `/workstations/{id}/remote-view/start` — inicia sesión
-    - POST `/workstations/{id}/remote-view/stop` — termina sesión
-    - GET `/workstations/{id}/remote-view/status` — estado actual
-    - Validaciones: online, permisos, exclusividad, org config
-    - _Requirements: 2.1, 2.2, 2.3, 2.5, 2.6, 11.1, 11.2_
+    - POST `/workstations/{id}/remote-view/start` — verifica permisos, org config enabled, WS online, exclusividad, límite sesiones → crea sesión → envía remote_view_start via WS
+    - POST `/workstations/{id}/remote-view/stop` — valida ownership de sesión → envía remote_view_stop → end_session
+    - GET `/workstations/{id}/remote-view/status` — retorna {active, user_name, user_email, started_at, mode} o {active: false}
+    - _Requirements: 2.1, 2.2, 2.3, 2.7, 2.8, 2.9, 10.1, 10.2, 12.1, 12.2_
 
-  - [ ] 1.5 Agregar configuración de Remote View en frontend (Org settings)
-    - Sección en la página de edición de organización
-    - Toggles para enabled, modes, consent, control, clipboard
-    - Inputs numéricos para max_sessions, timeout, fps
-    - _Requirements: 1.3, 1.4_
+  - [ ] 1.5 Implementar cleanup periódico
+    - APScheduler job cada 60s que llama `SessionManager.cleanup_expired()`
+    - Cierra sesiones active con `last_activity_at < NOW() - timeout`
+    - Cierra sesiones pending_consent con `started_at < NOW() - 35s`
+    - Envía remote_view_stop a WS afectadas
+    - _Requirements: 7.1, 7.4_
 
-- [ ] 2. Fase 1: Screenshot Mode
-  - [ ] 2.1 Implementar ScreenCapturer en C# (Tray)
-    - `CaptureScreen(int monitorIndex, int quality, string resolution)` → byte[] JPEG
-    - Usar `Graphics.CopyFromScreen()` con scaling a resolución target
-    - Enumerar monitores con `Screen.AllScreens`
-    - _Requirements: 4.1, 4.2, 4.6, 8.1_
+  - [ ] 1.6 Implementar audit trail para remote view
+    - AuditService.log_action con REMOTE_VIEW_START al crear sesión activa
+    - AuditService.log_action con REMOTE_VIEW_STOP al cerrar sesión
+    - AuditService.log_action con REMOTE_VIEW_MODE_CHANGE al cambiar modo
+    - Incluir campos: mode, consent_given, duration_seconds, end_reason, old_mode, new_mode
+    - _Requirements: 11.1, 11.2, 11.3, 11.4_
 
-  - [ ] 2.2 Implementar handler de remote_view_start en CloudManager
-    - Recibir comando WebSocket `remote_view_start`
-    - Si consent requerido: mostrar popup, esperar respuesta (30s timeout)
-    - Si acepta: enviar `remote_view_accepted` con lista de monitores
-    - Si rechaza: enviar `remote_view_rejected`
-    - Almacenar sesión activa en memoria del Tray
-    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
+  - [ ] 1.7 Agregar configuración de Remote View en frontend (Org settings)
+    - Sección colapsable "Vista Remota" en la página de edición de organización
+    - Toggle master `enabled`
+    - Multi-select `modes_allowed`
+    - Toggles: `remote_control_enabled`, `clipboard_sharing_enabled`, `require_user_consent`, `viewport_adaptive_downscale`
+    - Inputs numéricos: `max_concurrent_sessions`, `session_timeout_minutes`, `stream_max_fps`, `compression_quality`
+    - Select: `quality_mode` (auto/manual), `default_mode`, `capture_resolution`
+    - Condicional: ocultar `capture_resolution` y `compression_quality` cuando `quality_mode=auto`
+    - _Requirements: 1.3, 1.4, 1.5, 1.6_
 
-  - [ ] 2.3 Implementar captura bajo demanda
-    - Handler de `rv_request_frame` → captura screenshot → envía `rv_frame`
-    - Mostrar indicador visual de "siendo monitoreado" en Tray
-    - Handler de `remote_view_stop` → limpiar sesión
-    - _Requirements: 4.3, 4.4, 3.7_
+- [ ] 2. Fase 1: Screenshot Mode (MVP)
+  - [ ] 2.1 Implementar RemoteViewSession en C# (Tray)
+    - Clase que gestiona estado de una sesión activa en el Tray
+    - Handler de `remote_view_start` recibido por WebSocket
+    - Almacena session_id, mode, resolution, quality, monitor, viewport
+    - Handler de `remote_view_stop` → limpia estado, quita indicador
+    - Handler de `remote_view_config` → actualiza parámetros en vivo
+    - Handler de `remote_view_pause` / `remote_view_resume`
+    - _Requirements: 4.1, 5.8, 5.9, 5.10, 7.4, 9.4, 9.5_
 
-  - [ ] 2.4 Implementar relay en backend (WebSocket)
-    - Rutear `rv_frame` de WS worker → operador WS session
-    - Rutear `rv_request_frame` de operador → WS worker
-    - Usar session_id para mapear admin↔workstation
-    - _Requirements: 4.3_
+  - [ ] 2.2 Implementar ConsentPopup en C# (Tray)
+    - WinForms dialog modal con nombre del admin, botones Permitir/Rechazar
+    - Countdown visual de 30s ("Respuesta automática en Xs: Rechazar")
+    - Si timeout → auto-reject → envía remote_view_rejected reason=user_timeout
+    - Si Permitir → envía remote_view_accepted con lista de monitores
+    - Si Rechazar → envía remote_view_rejected reason=user_declined
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
 
-  - [ ] 2.5 Implementar ScreenshotViewer en frontend
-    - Componente que muestra imagen JPEG base64
-    - Botón "Refresh" para solicitar nuevo frame
-    - Toggle "Auto-refresh" (cada 2s)
-    - _Requirements: 4.4, 4.5_
+  - [ ] 2.3 Implementar indicador visual de monitoreo en Tray
+    - Icono overlay o cambio de icono del Tray cuando sesión activa
+    - Tooltip diferente para view-only ("Pantalla monitoreada") vs interactive ("Control remoto activo")
+    - NO ocultable por ningún medio
+    - Se quita al recibir remote_view_stop o al perder conexión WS
+    - _Requirements: 3.9, 6.8, 12.5_
 
-  - [ ] 2.6 Crear página /dashboard/remote-view con tabs
-    - Layout de tabs horizontales
-    - SessionHeader con controles (monitor, resolution, mode, timer, close)
-    - Integración con ScreenshotViewer
-    - Lógica de timeout (warning 60s antes)
-    - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 7.2, 7.3_
+  - [ ] 2.4 Implementar ScreenCapturer + MonitorEnumerator
+    - `MonitorEnumerator.GetMonitors()` → lista de {index, name, width, height, primary, x, y}
+    - `ScreenCapturer.Capture(monitorIndex, targetWidth, targetHeight)` → Bitmap escalado
+    - Usa `Graphics.CopyFromScreen()` con el bounds del monitor seleccionado
+    - Escala al target resolution ANTES de retornar (Req 4.2)
+    - _Requirements: 4.1, 4.2, 8.1, 8.4_
 
-  - [ ] 2.7 Agregar botón "Ver Pantalla" en workstation detail
-    - Dentro del ícono Ojo (Ver Detalles)
+  - [ ] 2.5 Implementar JpegEncoder
+    - `Encode(Bitmap, quality)` → byte[] JPEG
+    - Aplica viewport-adaptive downscale si viewport < capture resolution (Req 4.4)
+    - Calidad configurable 1-100%
+    - _Requirements: 4.3, 4.4_
+
+  - [ ] 2.6 Implementar handler de rv_request_frame
+    - Recibe solicitud → ScreenCapturer.Capture → JpegEncoder.Encode → envía rv_frame (base64 JSON)
+    - Incluye width, height en el mensaje para que frontend conozca dimensiones
+    - _Requirements: 4.5_
+
+  - [ ] 2.7 Implementar relay en backend (WebSocket)
+    - En websocket/operator.py: handler de `rv_request_frame` → relay a WS vía send_to_workstation
+    - En websocket/workstation.py: handler de `rv_frame` → relay a admin vía Redis pub/sub canal dedicado
+    - Registrar mapping session_id → {ws_worker_id, admin_worker_id} para cross-worker relay
+    - _Requirements: 13.1, 13.5_
+
+  - [ ] 2.8 Crear página /dashboard/remote-view con tabs
+    - Route `/dashboard/remote-view?session={id}&ws={workstation_id}`
+    - Layout: tabs horizontales + contenido del tab activo
+    - Cada tab label: "IP — Hostname"
+    - Tab activo envía frames/input; tabs inactivos envían rv_pause
+    - Al volver a un tab: rv_resume → esperar keyframe
+    - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
+
+  - [ ] 2.9 Implementar SessionHeader
+    - Connection indicator (● verde/rojo)
+    - IP — Hostname
+    - Monitor dropdown (oculto si solo 1 monitor)
+    - Resolution/quality selector: Alta/Media/Baja/Mínima/Auto (o manual si org config)
+    - Mode selector: solo modos en modes_allowed
+    - Timer MM:SS (counting up desde started_at)
+    - Botón cerrar (✕)
+    - _Requirements: 9.6, 9.7, 9.8, 8.2, 8.5_
+
+  - [ ] 2.10 Implementar ScreenshotViewer
+    - Componente que recibe base64 JPEG y muestra en `<img>` con object-fit: contain
+    - Botón "Refresh" (envía rv_request_frame)
+    - Toggle "Auto-refresh" (cada 2s dispara rv_request_frame)
+    - _Requirements: 4.6, 4.7, 4.8_
+
+  - [ ] 2.11 Implementar ConsentPending component
+    - Muestra "Esperando aprobación del usuario..." con spinner
+    - Si recibe remote_view_rejected: muestra "El usuario rechazó" + botón "Reintentar"
+    - Si recibe remote_view_accepted: transiciona a ScreenshotViewer/StreamViewer
+    - _Requirements: 2.5, 3.6, 3.7_
+
+  - [ ] 2.12 Implementar TimeoutWarning overlay
+    - Se muestra cuando faltan 60s para timeout
+    - Mensaje: "La sesión se cerrará por inactividad en {X}s"
+    - Botón "Mantener activa" (resets activity timer)
+    - Si timeout alcanzado: muestra "Sesión expirada" permanentemente en el tab
+    - _Requirements: 7.2, 7.3, 7.4_
+
+  - [ ] 2.13 Implementar auto-adjust RTT (quality_mode=auto)
+    - Frontend mide RTT de cada frame (timestamp envío request → timestamp recepción frame)
+    - Cada 5 frames: calcula avg RTT
+    - Si avg > 2000ms → envía remote_view_config con nivel inferior
+    - Si avg < 500ms → envía remote_view_config con nivel superior
+    - 4 niveles: 1080p/80%, 720p/70%, 480p/60%, 360p/50%
+    - _Requirements: 4.9_
+
+  - [ ] 2.14 Agregar botón "Ver Pantalla" en workstation detail
+    - Dentro del modal del Ojo (Ver Detalles)
     - Solo visible si remote_view.enabled y WS online
-    - Navega a /dashboard/remote-view con parámetros
-    - Verificar exclusividad antes de navegar
-    - _Requirements: 2.1, 2.2, 2.3, 2.4_
+    - Al click: GET /remote-view/status → si active muestra quién + desde cuándo → si no, POST /start → navega a /remote-view
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 10.1, 10.2_
 
-  - [ ] 2.8 Implementar audit trail
-    - Log REMOTE_VIEW_START y REMOTE_VIEW_STOP en audit_log
-    - Incluir mode, duration, end_reason, consent_given
-    - _Requirements: 10.1, 10.2, 10.3, 10.4_
+  - [ ] 2.15 Implementar detección de WS offline durante sesión
+    - Backend detecta disconnect del WS de la workstation
+    - Envía mensaje al admin "Workstation desconectada"
+    - Timer 30s → si no reconecta → end_session(ws_disconnected)
+    - _Requirements: 7.7_
+
+  - [ ] 2.16 Implementar invalidación de sesiones al logout/JWT expiry
+    - En el logout handler: buscar sesiones activas del user → end_session(admin_logout) para cada una
+    - En el WebSocket operator disconnect handler: misma lógica
+    - _Requirements: 7.5, 12.3_
 
 - [ ] 3. Fase 2: Stream Mode (H.264/WebSocket)
-  - [ ] 3.1 Implementar captura continua con Desktop Duplication API
-    - Clase `DesktopDuplicator` que captura frames delta-only
-    - Fallback a GDI+ si Desktop Duplication no disponible
-    - Loop de captura con FPS configurable (1-5)
+  - [ ] 3.1 Implementar captura con Desktop Duplication API
+    - Clase `DesktopDuplicator` que usa DXGI Output Duplication
+    - Fallback a `Graphics.CopyFromScreen()` si DDA no disponible (Windows 7, VM sin GPU)
+    - Retorna frame como Bitmap o byte[] sin encode
     - _Requirements: 5.1_
 
   - [ ] 3.2 Implementar H264Encoder con Media Foundation
-    - Encoder hardware-accelerated (GPU) con fallback a software
-    - Output: NAL units raw (sin container MP4)
-    - Keyframe forzado cada 2 segundos
-    - Resolución dinámica (cambiable sin reiniciar encoder)
-    - _Requirements: 5.2, 5.3, 5.5, 5.7_
+    - Inicializa MFT H.264 encoder (hardware → software fallback)
+    - H.264 Baseline Profile para máxima compatibilidad
+    - Output: raw NAL units (sin MP4 container)
+    - Forzar keyframe (IDR) cada 2 segundos
+    - Resolución y bitrate cambiables en runtime sin recrear encoder
+    - _Requirements: 5.2, 5.3, 5.5, 5.7, 5.10_
 
-  - [ ] 3.3 Implementar envío continuo de frames por WebSocket
-    - Enviar NAL units como binary WebSocket frames
-    - Header compacto: session_hash(4B) + flags(1B) + payload
-    - Throttle basado en FPS config
-    - Detectar backpressure (si el WS buffer crece, bajar calidad)
-    - _Requirements: 5.3, 5.6_
+  - [ ] 3.3 Implementar FrameStreamer (loop de captura continua)
+    - Loop async: captura → encode → envía a FPS configurado
+    - Throttle con timer preciso (no Task.Delay que driftea)
+    - Respeta pause/resume (deja de capturar en pause)
+    - Monitorea buffer de WebSocket para backpressure
+    - _Requirements: 5.6, 9.4, 13.4_
 
-  - [ ] 3.4 Implementar StreamViewer en frontend con MSE
-    - Crear MediaSource + SourceBuffer para H.264
-    - Append NAL units al SourceBuffer
-    - Manejar buffering, seek-to-live, buffer overflow
-    - Mostrar en `<video>` element sin controles nativos
+  - [ ] 3.4 Implementar backpressure en FrameStreamer
+    - Monitorear pending bytes en el WebSocket send buffer
+    - >1 MB: reducir FPS a la mitad + bajar calidad 1 nivel
+    - <256 KB por 5 frames: restaurar configuración original
+    - >3 MB: pausar captura 5 segundos
+    - Log cada cambio de estado
+    - _Requirements: 13.4_
+
+  - [ ] 3.5 Implementar envío binario de frames H.264
+    - Construir header de 9 bytes: session_hash(4B) + flags(1B) + width(2B) + height(2B)
+    - Enviar como binary WebSocket frame (no text/JSON)
+    - _Requirements: 5.3_
+
+  - [ ] 3.6 Implementar StreamViewer en frontend con MSE
+    - Crear MediaSource + SourceBuffer('video/mp4; codecs="avc1.42E01E"')
+    - Parsear header de 9 bytes para identificar sesión y keyframe flag
+    - Append NAL units al SourceBuffer (wrapped en MP4 fragment via mux.js o manual)
+    - Manejar buffer overflow (remove old segments si buffered > 5s)
+    - Mostrar en `<video autoplay muted>` sin controles nativos
     - _Requirements: 5.4_
 
-  - [ ] 3.5 Implementar cambio de monitor y resolución en vivo
-    - Enviar `remote_view_config` al cambiar dropdown
-    - Tray reconfigura encoder sin detener sesión
-    - Frontend maneja codec change con nuevo keyframe
-    - _Requirements: 5.7, 5.8, 8.2, 8.3_
+  - [ ] 3.7 Implementar cambio de monitor y resolución en vivo (Stream)
+    - Enviar `remote_view_config` con nuevos parámetros
+    - Tray: reconfigura DesktopDuplicator (nuevo monitor) + H264Encoder (nueva resolución)
+    - Forzar keyframe inmediato después del cambio
+    - Frontend: detecta cambio de resolución en header → reset SourceBuffer
+    - _Requirements: 5.8, 5.9, 5.10, 8.3_
+
+  - [ ] 3.8 Implementar viewport-adaptive downscale para Stream
+    - Frontend envía viewport_width/height al iniciar y al resize (1s debounce)
+    - Tray: si viewport < capture_res → escala antes de encode
+    - Nunca upscale
+    - _Requirements: 5.8_
 
 - [ ] 4. Fase 3: Interactive Mode (Control Remoto)
   - [ ] 4.1 Implementar InputInjector en C# (Tray)
-    - `InjectMouseMove(x, y)`, `InjectClick(button, x, y)`, `InjectScroll(delta)`
-    - `InjectKeyDown(vkey, modifiers)`, `InjectKeyUp(vkey)`
-    - Usar Windows `SendInput()` API
-    - Mapeo de coordenadas escaladas (resolución real vs resolución del stream)
-    - _Requirements: 6.1, 6.2, 6.3_
+    - `InjectMouseMove(normalizedX, normalizedY)` → convierte a coordenadas de monitor real
+    - `InjectMouseDown/Up(button, x, y)` → SendInput con MOUSEEVENTF flags
+    - `InjectWheel(delta)` → SendInput con MOUSEEVENTF_WHEEL
+    - `InjectKeyDown/Up(virtualKey, modifiers)` → SendInput con KEYEVENTF flags
+    - `InjectSAS()` → Ctrl+Alt+Del via `SendSAS()` API (requiere privilegios)
+    - Mapeo: coordenadas normalizadas (0.0-1.0) × monitor_resolution = posición real
+    - _Requirements: 6.2, 6.3, 6.4, 6.5, 6.6_
 
-  - [ ] 4.2 Implementar captura de input en frontend
-    - Capturar mouse events en canvas/video (move, click, scroll)
-    - Capturar keyboard events (keydown, keyup) cuando canvas tiene focus
-    - Enviar como `rv_input` messages por WebSocket
-    - Botón "Ctrl+Alt+Del" en toolbar
+  - [ ] 4.2 Implementar handler de rv_input en Tray
+    - Recibe mensajes rv_input del WebSocket
+    - Parsea event type (mousemove, mousedown, mouseup, wheel, keydown, keyup, sas)
+    - Delega a InputInjector con conversión de coordenadas
+    - Solo activo si mode=interactive en la sesión actual
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-  - [ ] 4.3 Implementar ClipboardBridge
-    - Tray monitorea clipboard con `AddClipboardFormatListener`
-    - Al cambiar: envía `rv_clipboard` al admin
-    - Al recibir clipboard del admin: `Clipboard.SetText()`
-    - Solo activo si `clipboard_sharing_enabled`
-    - _Requirements: 6.5_
+  - [ ] 4.3 Implementar captura de input en frontend (InteractiveViewer)
+    - Extiende StreamViewer con event listeners en el `<video>` element
+    - onMouseMove/Down/Up/Wheel: normaliza coordenadas (offsetX/video.width) → envía rv_input
+    - onKeyDown/Up (cuando video tiene focus): envía rv_input con code + modifiers
+    - Botón "Ctrl+Alt+Del" en toolbar: envía rv_input event=sas
+    - Cursor: muestra cursor personalizado sobre el video (indica que input está activo)
+    - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.6_
 
-  - [ ] 4.4 Indicador visual de control remoto
-    - Badge distinto en Tray cuando Interactive está activo (vs view-only)
-    - Texto "Control remoto activo" en tooltip
-    - _Requirements: 6.6_
+  - [ ] 4.4 Implementar ClipboardBridge en Tray
+    - Usa `AddClipboardFormatListener` para detectar cambios en clipboard local
+    - Al detectar cambio: lee `Clipboard.GetText()` → envía rv_clipboard direction=to_admin
+    - Al recibir rv_clipboard direction=to_ws: `Clipboard.SetText(text)`
+    - Solo activo si clipboard_sharing_enabled=true en la sesión
+    - _Requirements: 6.7_
 
-- [ ] 5. Fase 4: Pulido y configuración
-  - [ ] 5.1 Implementar pausa de tabs inactivos
-    - Tab no-activo envía `rv_pause` → Tray deja de capturar
-    - Tab re-activado envía `rv_resume` → Tray reanuda
-    - _Requirements: 9.4_
+  - [ ] 4.5 Implementar clipboard sync en frontend
+    - Al recibir rv_clipboard direction=to_admin: `navigator.clipboard.writeText(text)`
+    - Botón "Pegar desde mi clipboard" → `navigator.clipboard.readText()` → envía rv_clipboard to_ws
+    - Nota: Clipboard API del browser requiere user gesture para readText()
+    - _Requirements: 6.7_
 
-  - [ ] 5.2 Implementar mode switching sin reiniciar sesión
-    - Dropdown de modo en SessionHeader
-    - Enviar `remote_view_config` con nuevo mode
-    - Tray cambia de JPEG a H.264 o activa/desactiva input
-    - _Requirements: 9.7_
+  - [ ] 4.6 Implementar relay de rv_input y rv_clipboard en backend
+    - operator.py: handler de rv_input → relay a WS (mismo patrón que rv_request_frame)
+    - operator.py: handler de rv_clipboard direction=to_ws → relay a WS
+    - workstation.py: handler de rv_clipboard direction=to_admin → relay a admin
+    - _Requirements: 6.2, 6.7, 13.1_
 
-  - [ ] 5.3 Implementar detección de WS offline durante sesión
-    - Backend detecta disconnect del WebSocket de la workstation
-    - Envía "Workstation desconectada" al admin
-    - Auto-close después de 30s si no reconecta
-    - _Requirements: 7.6_
+- [ ] 5. Fase 4: Pulido, visibilidad, i18n, tests
+  - [ ] 5.1 Implementar mode switching seamless
+    - Dropdown de modo en SessionHeader envía remote_view_config con nuevo mode
+    - Tray: cambia behavior sin recrear sesión (Screenshot→Stream: inicia loop; Stream→Interactive: activa InputInjector; Interactive→Stream: desactiva input; etc.)
+    - Frontend: cambia viewer component (ScreenshotViewer ↔ StreamViewer ↔ InteractiveViewer)
+    - Log audit REMOTE_VIEW_MODE_CHANGE
+    - _Requirements: 9.9, 11.4, 3.11_
+
+  - [ ] 5.2 Implementar indicador de sesión activa en lista de workstations
+    - GET /remote-view/status incluido en la query de workstations (o campo calculado)
+    - Icono pequeño de "ojo" en la fila/card cuando hay sesión activa
+    - Admin ve siempre; Operador solo su org
+    - _Requirements: 10.3, 10.4_
+
+  - [ ] 5.3 Implementar visibilidad detallada de sesión activa
+    - Al intentar conectar a WS con sesión activa: mostrar nombre completo + email + hora inicio
+    - Formato: "Monitoreada por Javier Robles (antonio@robles.ai) desde las 15:30"
+    - _Requirements: 10.1, 10.2_
 
   - [ ] 5.4 Textos i18n para toda la feature
     - Namespace `remoteView` en messages/es.json y messages/en.json
-    - Todos los labels, tooltips, mensajes de error, confirmaciones
+    - Todos los labels, tooltips, mensajes de error, estados de sesión, confirmaciones
+    - Namespace `orgSettings` extender con sección de remote_view
     - _Requirements: todos (UI)_
 
   - [ ] 5.5 Tests de integración
-    - Test: inicio/fin de sesión con exclusividad
-    - Test: timeout por inactividad
-    - Test: consentimiento accept/reject/timeout
-    - Test: tenant isolation (operador no accede a otra org)
-    - _Requirements: 2.2, 7.1, 3.4, 11.2_
+    - Test: start session → verify exclusivity (second start returns 409)
+    - Test: session timeout (simulate inactivity → verify status=expired)
+    - Test: consent flow (accept, reject, timeout)
+    - Test: max_concurrent_sessions enforcement
+    - Test: tenant isolation (operator can't start on other org's WS)
+    - Test: mode change logs audit entry
+    - Test: WS disconnect → session closes after 30s
+    - _Requirements: 2.2, 2.9, 3.4, 3.5, 7.1, 7.7, 11.4, 12.2_
