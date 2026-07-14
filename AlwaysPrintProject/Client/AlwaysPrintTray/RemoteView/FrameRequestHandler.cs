@@ -152,10 +152,10 @@ namespace AlwaysPrintTray.RemoteView
 
                 _sendMessage("rv_frame", payload);
 
-                AlwaysPrintLogger.WriteTrayInfo(
-                    $"FrameRequestHandler: frame enviado. session_id={_session.SessionId}, " +
-                    $"dimensions={frameWidth}x{frameHeight}, size={jpegData.Length} bytes, " +
-                    $"base64={base64Data.Length} chars");
+                // VERBOSE: AlwaysPrintLogger.WriteTrayInfo(
+                //     $"FrameRequestHandler: frame enviado. session_id={_session.SessionId}, " +
+                //     $"dimensions={frameWidth}x{frameHeight}, size={jpegData.Length} bytes, " +
+                //     $"base64={base64Data.Length} chars");
             }
             catch (Exception ex)
             {

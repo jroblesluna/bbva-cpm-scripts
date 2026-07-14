@@ -57,9 +57,9 @@ namespace AlwaysPrintTray.RemoteView
 
                     var result = stream.ToArray();
 
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        $"JpegEncoder: codificado {bitmap.Width}x{bitmap.Height} " +
-                        $"quality={quality}%, size={result.Length} bytes");
+                    // VERBOSE: AlwaysPrintLogger.WriteTrayInfo(
+                    //     $"JpegEncoder: codificado {bitmap.Width}x{bitmap.Height} " +
+                    //     $"quality={quality}%, size={result.Length} bytes");
 
                     return result;
                 }
@@ -98,9 +98,9 @@ namespace AlwaysPrintTray.RemoteView
             // Nunca upscale: si viewport >= bitmap en ambas dimensiones, encodear sin escalar
             if (viewportWidth >= bitmap.Width && viewportHeight >= bitmap.Height)
             {
-                AlwaysPrintLogger.WriteTrayInfo(
-                    $"JpegEncoder: viewport ({viewportWidth}x{viewportHeight}) >= bitmap " +
-                    $"({bitmap.Width}x{bitmap.Height}), sin downscale.");
+                // VERBOSE: AlwaysPrintLogger.WriteTrayInfo(
+                //     $"JpegEncoder: viewport ({viewportWidth}x{viewportHeight}) >= bitmap " +
+                //     $"({bitmap.Width}x{bitmap.Height}), sin downscale.");
                 return Encode(bitmap, quality);
             }
 
@@ -120,9 +120,9 @@ namespace AlwaysPrintTray.RemoteView
             {
                 scaledBitmap = ScaleBitmap(bitmap, targetWidth, targetHeight);
 
-                AlwaysPrintLogger.WriteTrayInfo(
-                    $"JpegEncoder: viewport-adaptive downscale de {bitmap.Width}x{bitmap.Height} " +
-                    $"a {targetWidth}x{targetHeight} (viewport={viewportWidth}x{viewportHeight})");
+                // VERBOSE: AlwaysPrintLogger.WriteTrayInfo(
+                //     $"JpegEncoder: viewport-adaptive downscale de {bitmap.Width}x{bitmap.Height} " +
+                //     $"a {targetWidth}x{targetHeight} (viewport={viewportWidth}x{viewportHeight})");
 
                 return Encode(scaledBitmap, quality);
             }

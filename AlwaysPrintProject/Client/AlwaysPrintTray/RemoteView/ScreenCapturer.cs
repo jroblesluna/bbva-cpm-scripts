@@ -34,18 +34,18 @@ namespace AlwaysPrintTray.RemoteView
             // Si no se solicita escalado, retornar captura nativa
             if (targetWidth <= 0 || targetHeight <= 0)
             {
-                AlwaysPrintLogger.WriteTrayInfo(
-                    $"ScreenCapturer: captura nativa monitor={monitorIndex}, " +
-                    $"resolución={bounds.Width}x{bounds.Height}");
+                // VERBOSE: AlwaysPrintLogger.WriteTrayInfo(
+                //     $"ScreenCapturer: captura nativa monitor={monitorIndex}, " +
+                //     $"resolución={bounds.Width}x{bounds.Height}");
                 return nativeBitmap;
             }
 
             // Nunca hacer upscale: si target > nativo, usar nativo
             if (targetWidth >= bounds.Width && targetHeight >= bounds.Height)
             {
-                AlwaysPrintLogger.WriteTrayInfo(
-                    $"ScreenCapturer: target ({targetWidth}x{targetHeight}) >= nativo " +
-                    $"({bounds.Width}x{bounds.Height}), retornando sin escalar.");
+                // VERBOSE: AlwaysPrintLogger.WriteTrayInfo(
+                //     $"ScreenCapturer: target ({targetWidth}x{targetHeight}) >= nativo " +
+                //     $"({bounds.Width}x{bounds.Height}), retornando sin escalar.");
                 return nativeBitmap;
             }
 
@@ -59,9 +59,9 @@ namespace AlwaysPrintTray.RemoteView
             {
                 scaledBitmap = ScaleBitmap(nativeBitmap, finalWidth, finalHeight);
 
-                AlwaysPrintLogger.WriteTrayInfo(
-                    $"ScreenCapturer: captura escalada monitor={monitorIndex}, " +
-                    $"nativo={bounds.Width}x{bounds.Height}, target={finalWidth}x{finalHeight}");
+                // VERBOSE: AlwaysPrintLogger.WriteTrayInfo(
+                //     $"ScreenCapturer: captura escalada monitor={monitorIndex}, " +
+                //     $"nativo={bounds.Width}x{bounds.Height}, target={finalWidth}x{finalHeight}");
 
                 return scaledBitmap;
             }
