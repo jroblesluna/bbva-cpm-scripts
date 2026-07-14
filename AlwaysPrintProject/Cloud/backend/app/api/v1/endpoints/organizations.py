@@ -1948,3 +1948,61 @@ def toggle_signature_pause(
             "paused_until": None,
             "message": "Firma ECDSA restaurada. Todas las configs se sirven firmadas.",
         }
+
+
+# === ENDPOINTS DE VISTA REMOTA ===
+
+@router.get("/{org_id}/remote-view")
+def get_remote_view_config(
+    org_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Obtener la configuración de vista remota de una organización."""
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail=f"Organización con ID {org_id} no encontrada")
+
+    # Verificar acceso: admin ve todo, operator solo su org
+    if current_user.role == UserRole.OPERATOR and str(current_user.organization_id) != str(org_id):
+        raise HTTPException(status_code=403, detail="No tiene acceso a esta organización")
+
+    # Retornar la configuración remote_view (o defaults si es None)
+    default_config = {
+        "enabled": False,
+        "modes_allowed": ["screenshot"],
+        "default_mode": "screenshot",
+        "remote_control_enabled": False,
+        "clipboard_sharing_enabled": False,
+        "require_user_consent": True,
+        "max_concurrent_sessions": 5,
+        "session_timeout_minutes": 15,
+        "quality_mode": "auto",
+        "capture_resolution": "1280x720",
+        "compression_quality": 75,
+        "viewport_adaptive_downscale": True,
+        "stream_max_fps": 5,
+    }
+
+    config = org.remote_view if org.remote_view else default_config
+    return config
+
+
+@router.patch("/{org_id}/remote-view")
+def update_remote_view_config(
+    org_id: UUID,
+    config: dict,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Actualizar la configuración de vista remota de una organización."""
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail=f"Organización con ID {org_id} no encontrada")
+
+    # Actualizar el campo JSONB
+    org.remote_view = config
+    db.commit()
+    db.refresh(org)
+
+    return org.remote_view

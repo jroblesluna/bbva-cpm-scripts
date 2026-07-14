@@ -8,7 +8,7 @@ Este módulo define:
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Text, TypeDecorator
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Text, TypeDecorator, JSON
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
 
@@ -128,6 +128,11 @@ class Organization(Base):
     # Pausa temporal de firma: si no es NULL y > now(), el endpoint sirve config sin firma
     # Permite que workstations legacy descarguen configs y se actualicen. Auto-expira.
     signature_paused_until = Column(DateTime, nullable=True)
+
+    # === CONFIGURACIÓN DE VISTA REMOTA ===
+    # JSON con la configuración completa de remote view para esta organización
+    # Default: {"enabled": false} — se parsea al cargar y se persiste como JSON
+    remote_view = Column(JSON, nullable=True, server_default='{"enabled": false}')
 
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
