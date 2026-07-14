@@ -25,14 +25,15 @@ import { LocaleSelector } from '@/components/LocaleSelector'
 import { ActionConfigSection } from '@/components/config/ActionConfigSection'
 import { CertificateSection } from '@/components/config/CertificateSection'
 import { DebuggingProfilesSection } from '@/components/config/DebuggingProfilesSection'
+import { RemoteViewSection } from '@/components/config/RemoteViewSection'
 import {
   ArrowLeft, Save, RotateCcw, Building2, Printer, Network, Wifi,
-  Download, Cog, Globe, Plus, X, Trash2, Info, AlertCircle, Pin, ShieldCheck, Bug,
+  Download, Cog, Globe, Plus, X, Trash2, Info, AlertCircle, Pin, ShieldCheck, Bug, Eye,
 } from 'lucide-react'
 import type { Organization, OrganizationUpdate, PublicIPCreate } from '@/types'
 import type { GlobalConfig, GlobalConfigUpdate, SearchTargets, ConnectivityCheck } from '@/types/config'
 
-type TabKey = 'general' | 'printing' | 'network' | 'connectivity' | 'updates' | 'actions' | 'ips' | 'certificate' | 'debugging'
+type TabKey = 'general' | 'printing' | 'network' | 'connectivity' | 'updates' | 'actions' | 'ips' | 'certificate' | 'debugging' | 'remoteView'
 
 interface TabDef {
   key: TabKey
@@ -50,6 +51,7 @@ const TABS: TabDef[] = [
   { key: 'ips', labelKey: 'tabIps', icon: Globe },
   { key: 'certificate', labelKey: 'tabCertificate', icon: ShieldCheck },
   { key: 'debugging', labelKey: 'tabDebugging', icon: Bug },
+  { key: 'remoteView', labelKey: 'tabRemoteView', icon: Eye },
 ]
 
 export default function EditOrganizationPage() {
@@ -662,6 +664,11 @@ export default function EditOrganizationPage() {
             organizationId={orgId}
             llmEnabled={!!(llmModelId || openaiApiKey)}
           />
+        )}
+
+        {/* === TAB: REMOTE VIEW === */}
+        {activeTab === 'remoteView' && (
+          <RemoteViewSection organizationId={orgId} />
         )}
 
         {/* === TAB: IPS === */}

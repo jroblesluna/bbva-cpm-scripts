@@ -973,6 +973,7 @@
     "googleMapsApiKeyHelper": "Required for VLAN geolocation. Get your key from",
     "tabCertificate": "Certificate",
     "tabDebugging": "Debugging",
+    "tabRemoteView": "Remote View",
     "certificateTitle": "Digital Certificate",
     "certificateStatus": "Status",
     "certificateGenerated": "Generated",

@@ -973,6 +973,7 @@
     "googleMapsApiKeyHelper": "Requerida para geolocalización de VLANs. Obtenga su key en",
     "tabCertificate": "Certificado",
     "tabDebugging": "Debugging",
+    "tabRemoteView": "Vista Remota",
     "certificateTitle": "Certificado Digital",
     "certificateStatus": "Estado",
     "certificateGenerated": "Generado",
