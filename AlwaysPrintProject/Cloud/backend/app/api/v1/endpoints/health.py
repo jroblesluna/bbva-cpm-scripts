@@ -429,6 +429,42 @@ async def kill_worker(worker_id: str, force: bool = False):
         return {"status": "error", "message": f"Sin permisos para matar PID {pid}"}
 
 
+@router.get("/health/state-map", tags=["Sistema"])
+async def health_state_map():
+    """
+    Retorna el state map en memoria del worker que procesa este request.
+
+    Útil para diagnosticar divergencias entre workers cuando una estación
+    reporta 403 al descargar configs desde S3. Llamar N veces para recoger
+    de cada worker (round-robin) y comparar.
+    """
+    from app.services.push_services import get_state_map_service
+    from dataclasses import asdict
+
+    state_map = get_state_map_service()
+    worker_id = f"worker_{os.getpid()}"
+
+    # Serializar el state map completo
+    state_data = {}
+    for org_id, org_state in state_map._state.items():
+        org_dict = asdict(org_state)
+        # Convertir loaded_at a ISO string para legibilidad
+        loaded_at = org_dict.get("loaded_at", 0)
+        if loaded_at:
+            from datetime import datetime, timezone
+            org_dict["loaded_at_iso"] = datetime.fromtimestamp(
+                loaded_at, tz=timezone.utc
+            ).isoformat()
+        state_data[org_id] = org_dict
+
+    return {
+        "worker_id": worker_id,
+        "pid": os.getpid(),
+        "org_count": len(state_data),
+        "state_map": state_data,
+    }
+
+
 async def _check_redis(connection_manager) -> dict:
     """
     Verifica conectividad Redis y mide latencia con PING.

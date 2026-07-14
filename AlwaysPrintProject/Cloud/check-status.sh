@@ -852,6 +852,87 @@ else
 fi
 
 # =============================================================================
+# 5.5 CONSISTENCIA DEL STATE MAP (ENTRE WORKERS)
+# =============================================================================
+print_header "5.5 CONSISTENCIA DEL STATE MAP"
+
+if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ] && [ "$BACKEND_STATUS" = "running" ]; then
+    echo -e "  ${CYAN}Consultando state-map de cada worker (20 requests round-robin)...${NC}"
+
+    STATE_MAP_RAW=$(ssm_exec "$INSTANCE_ID" '["RESULTS=\"\"; for i in $(seq 1 20); do R=$(curl -s http://localhost:8000/api/v1/health/state-map 2>/dev/null); [ -n \"$R\" ] && RESULTS=\"${RESULTS}\n${R}\"; done; echo -e \"$RESULTS\" | grep worker_id | sort -u"]' 15)
+
+    if [ -n "$STATE_MAP_RAW" ] && ! echo "$STATE_MAP_RAW" | grep -q "FAIL\|Traceback"; then
+        # Parsear con python3: extraer worker_id + config_hash + config_s3_url por worker
+        STATE_PARSED=$(echo "$STATE_MAP_RAW" | python3 -c "
+import sys, json
+
+workers = {}
+for line in sys.stdin:
+    line = line.strip()
+    if not line or not line.startswith('{'):
+        continue
+    try:
+        d = json.loads(line)
+        wid = d.get('worker_id', '?')
+        sm = d.get('state_map', {})
+        # Tomar la primera org (normalmente solo hay una)
+        for org_id, state in sm.items():
+            workers[wid] = {
+                'org_id': org_id[:8],
+                'config_hash': state.get('config_hash', 'null'),
+                'config_s3_url': (state.get('config_s3_url') or 'null')[-40:],
+                'cert_version': state.get('cert_version', 0),
+                'msi_version': state.get('msi_version', 'null'),
+                'loaded_at_iso': state.get('loaded_at_iso', '?'),
+            }
+            break
+    except (json.JSONDecodeError, TypeError):
+        continue
+
+if not workers:
+    print('SM_STATUS=empty')
+else:
+    # Verificar consistencia: todos los config_hash iguales?
+    hashes = set(w['config_hash'] for w in workers.values())
+    urls = set(w['config_s3_url'] for w in workers.values())
+    consistent = len(hashes) <= 1 and len(urls) <= 1
+    print(f'SM_STATUS={\"consistent\" if consistent else \"divergent\"}')
+    print(f'SM_WORKERS={len(workers)}')
+    print(f'SM_HASHES={len(hashes)}')
+    for wid, info in sorted(workers.items()):
+        print(f'SM_DETAIL_{wid}=config={info[\"config_hash\"]} cert=v{info[\"cert_version\"]} msi={info[\"msi_version\"]} loaded={info[\"loaded_at_iso\"]}')
+" 2>/dev/null)
+
+        if [ -n "$STATE_PARSED" ]; then
+            eval "$STATE_PARSED"
+
+            echo ""
+            if [ "$SM_STATUS" = "consistent" ]; then
+                check_ok "State map consistente entre $SM_WORKERS workers (config_hash coincide)"
+            elif [ "$SM_STATUS" = "divergent" ]; then
+                check_fail "State map DIVERGENTE entre workers ($SM_HASHES hashes distintos)"
+                recommend "State map divergente entre workers. Reiniciar backend: docker restart alwaysprint-backend-1"
+            elif [ "$SM_STATUS" = "empty" ]; then
+                check_warn "State map vacío (¿backend recién iniciado?)"
+            fi
+
+            # Mostrar detalle por worker
+            env | grep "^SM_DETAIL_" | sort | while IFS= read -r detail_line; do
+                WID=$(echo "$detail_line" | sed 's/SM_DETAIL_//' | cut -d= -f1)
+                INFO=$(echo "$detail_line" | cut -d= -f2-)
+                echo -e "  ${NC}    ${WID}: ${INFO}"
+            done
+        else
+            check_warn "No se pudo parsear state-map (endpoint posiblemente no desplegado)"
+        fi
+    else
+        check_warn "No se pudo obtener state-map (endpoint no disponible o error SSM)"
+    fi
+else
+    check_warn "No se puede consultar state-map (backend no disponible)"
+fi
+
+# =============================================================================
 # 6. VALIDACIÓN DE VARIABLES DE ENTORNO
 # =============================================================================
 print_header "6. VALIDACIÓN DE VARIABLES DE ENTORNO"
@@ -947,22 +1028,24 @@ if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
         fi
         
         echo -e "\n  ${BLUE}Kernel TCP:${NC}"
+        echo -e "  ${NC}  (Nota: estos valores se aplican via user_data.sh.tpl solo en primera creación de EC2."
+        echo -e "  ${NC}   Si difieren, aplicar manualmente via SSM. No afecta con <3000 WS.)${NC}"
         if [ "$ACTUAL_SOMAXCONN" = "$EXPECTED_SOMAXCONN" ]; then
             check_ok "net.core.somaxconn = $ACTUAL_SOMAXCONN"
         else
-            check_fail "net.core.somaxconn = $ACTUAL_SOMAXCONN (esperado: $EXPECTED_SOMAXCONN)"
+            check_warn "net.core.somaxconn = $ACTUAL_SOMAXCONN (deseado: $EXPECTED_SOMAXCONN, no crítico <3000 WS)"
         fi
         
         if [ "$ACTUAL_TCP_BACKLOG" = "$EXPECTED_TCP_BACKLOG" ]; then
             check_ok "net.ipv4.tcp_max_syn_backlog = $ACTUAL_TCP_BACKLOG"
         else
-            check_fail "net.ipv4.tcp_max_syn_backlog = $ACTUAL_TCP_BACKLOG (esperado: $EXPECTED_TCP_BACKLOG)"
+            check_warn "net.ipv4.tcp_max_syn_backlog = $ACTUAL_TCP_BACKLOG (deseado: $EXPECTED_TCP_BACKLOG, no crítico <3000 WS)"
         fi
         
         if [ "$ACTUAL_NETDEV" = "$EXPECTED_NETDEV" ]; then
             check_ok "net.core.netdev_max_backlog = $ACTUAL_NETDEV"
         else
-            check_fail "net.core.netdev_max_backlog = $ACTUAL_NETDEV (esperado: $EXPECTED_NETDEV)"
+            check_warn "net.core.netdev_max_backlog = $ACTUAL_NETDEV (deseado: $EXPECTED_NETDEV, no crítico <3000 WS)"
         fi
     else
         check_warn "No se pudo obtener configuración de tuning"
