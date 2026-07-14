@@ -213,6 +213,17 @@ async def start_remote_view(
             detail="No se pudo crear la sesión. Ya existe una sesión activa para esta workstation.",
         )
 
+    # Si no se requiere consentimiento, activar la sesión inmediatamente
+    if not rv_config.require_user_consent:
+        _session_manager.accept_session(db, str(session.id))
+        # Registrar en relay para routing de frames
+        from app.services.remote_view_relay import remote_view_relay
+        remote_view_relay.register_session(
+            session_id=str(session.id),
+            workstation_id=workstation_id_str,
+            user_id=str(current_user.id),
+        )
+
     logger.info(
         "Sesión de vista remota iniciada: session_id=%s, workstation=%s, user=%s, mode=%s",
         session.id, workstation_id_str, current_user.email, mode,
@@ -254,7 +265,7 @@ async def start_remote_view(
 
     return RemoteViewStartResponse(
         session_id=str(session.id),
-        status="pending_consent",
+        status="active" if not rv_config.require_user_consent else "pending_consent",
     )
 
 

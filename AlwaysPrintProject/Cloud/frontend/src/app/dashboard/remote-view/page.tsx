@@ -105,9 +105,41 @@ export default function RemoteViewPage() {
   const searchParams = useSearchParams()
   const [state, dispatch] = useReducer(remoteViewReducer, { tabs: [], activeTabId: null })
   const previousActiveRef = useRef<string | null>(null)
+  const hydratedRef = useRef(false)
 
   // Conexión WebSocket para recibir mensajes del backend
   const { isConnected, addMessageHandler } = useWebSocket({ autoConnect: true })
+
+  // Hidratar tabs desde sessionStorage al montar (persistir estado al navegar)
+  useEffect(() => {
+    if (hydratedRef.current) return
+    hydratedRef.current = true
+
+    if (typeof window === 'undefined') return
+    try {
+      const savedTabs = sessionStorage.getItem('rv_tabs')
+      const savedActive = sessionStorage.getItem('rv_activeTab')
+      if (savedTabs) {
+        const tabs = JSON.parse(savedTabs) as RemoteViewTab[]
+        tabs.forEach(tab => dispatch({ type: 'ADD_TAB', tab }))
+        if (savedActive) {
+          dispatch({ type: 'SET_ACTIVE', sessionId: savedActive })
+        }
+      }
+    } catch { /* ignorar errores de parse */ }
+  }, [])
+
+  // Persistir tabs en sessionStorage para no perder estado al navegar
+  useEffect(() => {
+    if (!hydratedRef.current) return
+    if (state.tabs.length > 0) {
+      sessionStorage.setItem('rv_tabs', JSON.stringify(state.tabs))
+      sessionStorage.setItem('rv_activeTab', state.activeTabId || '')
+    } else {
+      sessionStorage.removeItem('rv_tabs')
+      sessionStorage.removeItem('rv_activeTab')
+    }
+  }, [state.tabs, state.activeTabId])
 
   // Leer query params para abrir sesión inicial
   useEffect(() => {
@@ -126,7 +158,7 @@ export default function RemoteViewPage() {
           ip,
           hostname,
           mode,
-          status: 'pending_consent',
+          status: (searchParams.get('status') as RemoteViewStatus) || 'pending_consent',
           monitors: [],
           selectedMonitor: 0,
           startedAt: new Date().toISOString(),

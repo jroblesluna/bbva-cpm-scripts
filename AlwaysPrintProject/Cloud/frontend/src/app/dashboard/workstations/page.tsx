@@ -2359,6 +2359,7 @@ function WorkstationDetailModal({
         ws: workstation.id,
         ip: workstation.ip_private,
         hostname: workstation.hostname || '',
+        status: result.status,
       });
       router.push(`/dashboard/remote-view?${params.toString()}`);
     } catch (error: unknown) {
