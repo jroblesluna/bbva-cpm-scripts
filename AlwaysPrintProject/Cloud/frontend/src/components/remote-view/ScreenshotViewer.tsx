@@ -30,6 +30,7 @@ interface ScreenshotViewerProps {
   frameWidth: number
   frameHeight: number
   onRequestFrame: () => void // callback para enviar rv_request_frame
+  defaultAutoRefresh?: boolean // iniciar con auto-refresh activado (para stream/interactive)
 }
 
 // ============================================================================
@@ -49,9 +50,10 @@ export function ScreenshotViewer({
   frameWidth,
   frameHeight,
   onRequestFrame,
+  defaultAutoRefresh = false,
 }: ScreenshotViewerProps) {
   const t = useTranslations('remoteView')
-  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [autoRefresh, setAutoRefresh] = useState(defaultAutoRefresh)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Solicitar primer frame al montar

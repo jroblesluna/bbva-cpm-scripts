@@ -15,8 +15,9 @@ import { useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { SessionHeader } from './SessionHeader'
 import { ScreenshotViewer } from './ScreenshotViewer'
-import { StreamViewer } from './StreamViewer'
-import { InteractiveViewer } from './InteractiveViewer'
+// TODO: Restaurar cuando H.264 esté implementado en el Tray
+// import { StreamViewer } from './StreamViewer'
+// import { InteractiveViewer } from './InteractiveViewer'
 import { ConsentPending } from './ConsentPending'
 import { TimeoutWarning } from './TimeoutWarning'
 import { ClipboardSync } from './ClipboardSync'
@@ -118,42 +119,25 @@ export function SessionTab({
 
   /**
    * Renderiza el viewer correcto según el modo actual del tab.
-   * - screenshot → ScreenshotViewer
-   * - stream → StreamViewer
-   * - interactive → InteractiveViewer
+   * Todos los modos usan ScreenshotViewer como fallback funcional
+   * hasta que el Tray implemente H.264 streaming (FrameStreamer).
+   * - screenshot → ScreenshotViewer (auto-refresh OFF por defecto)
+   * - stream → ScreenshotViewer con auto-refresh ON
+   * - interactive → ScreenshotViewer con auto-refresh ON
+   *
+   * TODO: Restaurar StreamViewer/InteractiveViewer cuando H.264 esté implementado en el Tray
    */
   const renderViewer = () => {
-    switch (tab.mode) {
-      case 'screenshot':
-        return (
-          <ScreenshotViewer
-            sessionId={tab.sessionId}
-            frameData={frameData}
-            frameWidth={frameWidth}
-            frameHeight={frameHeight}
-            onRequestFrame={onRequestFrame}
-          />
-        )
-      case 'stream':
-        return (
-          <StreamViewer
-            sessionId={tab.sessionId}
-            latestFrame={latestFrame}
-            isActive={isActive}
-          />
-        )
-      case 'interactive':
-        return (
-          <InteractiveViewer
-            sessionId={tab.sessionId}
-            latestFrame={latestFrame}
-            isActive={isActive}
-            onSendInput={onSendInput}
-          />
-        )
-      default:
-        return null
-    }
+    return (
+      <ScreenshotViewer
+        sessionId={tab.sessionId}
+        frameData={frameData}
+        frameWidth={frameWidth}
+        frameHeight={frameHeight}
+        onRequestFrame={onRequestFrame}
+        defaultAutoRefresh={tab.mode === 'stream' || tab.mode === 'interactive'}
+      />
+    )
   }
 
   // ============================================================================
