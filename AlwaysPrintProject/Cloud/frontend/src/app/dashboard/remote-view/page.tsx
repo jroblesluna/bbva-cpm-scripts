@@ -204,19 +204,25 @@ export default function RemoteViewPage() {
         const frameMsg = msg as unknown as {
           type: string
           session_id: string
-          format: string
+          frame_type?: string  // "keyframe" | "delta" | undefined (legacy)
+          format?: string
           width: number
           height: number
-          data: string
+          data?: string         // Presente en keyframe y legacy
+          tiles?: unknown[]     // Presente en delta frames
         }
-        // Guardar frame data en ref (no causa re-render por sí mismo)
-        frameDataRef.current[frameMsg.session_id] = {
-          data: frameMsg.data,
-          width: frameMsg.width,
-          height: frameMsg.height,
+
+        // Solo procesar keyframes y frames legacy (que tienen 'data')
+        // Los delta frames (tiles) se procesarán cuando el DeltaStreamViewer esté listo
+        if (frameMsg.data) {
+          frameDataRef.current[frameMsg.session_id] = {
+            data: frameMsg.data,
+            width: frameMsg.width,
+            height: frameMsg.height,
+          }
+          setFrameVersion(v => v + 1)
         }
-        // Trigger re-render para que el viewer se actualice
-        setFrameVersion(v => v + 1)
+        // Delta frames sin 'data' se ignoran por ahora (keyframe cada 5s actualiza la vista)
       }
     },
     []
