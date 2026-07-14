@@ -9,7 +9,7 @@
 
 'use client'
 
-import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { X, Monitor } from 'lucide-react'
@@ -107,6 +107,10 @@ export default function RemoteViewPage() {
   const previousActiveRef = useRef<string | null>(null)
   const hydratedRef = useRef(false)
 
+  // Estado de frames por sesión (useRef para evitar re-renders en cada frame)
+  const frameDataRef = useRef<Record<string, { data: string; width: number; height: number }>>({})
+  const [frameVersion, setFrameVersion] = useState(0)
+
   // Conexión WebSocket para recibir mensajes del backend
   const { isConnected, addMessageHandler, send: wsSend } = useWebSocket({ autoConnect: true })
 
@@ -194,6 +198,25 @@ export default function RemoteViewPage() {
           sessionId: msg.session_id,
           status: 'disconnected',
         })
+      }
+
+      if (msg.type === 'rv_frame' && msg.session_id) {
+        const frameMsg = msg as unknown as {
+          type: string
+          session_id: string
+          format: string
+          width: number
+          height: number
+          data: string
+        }
+        // Guardar frame data en ref (no causa re-render por sí mismo)
+        frameDataRef.current[frameMsg.session_id] = {
+          data: frameMsg.data,
+          width: frameMsg.width,
+          height: frameMsg.height,
+        }
+        // Trigger re-render para que el viewer se actualice
+        setFrameVersion(v => v + 1)
       }
     },
     []
@@ -421,7 +444,7 @@ export default function RemoteViewPage() {
       )}
 
       {/* Contenido del tab activo */}
-      <div className="flex-1 bg-gray-900 relative overflow-hidden">
+      <div className="flex-1 bg-gray-900 relative overflow-hidden" data-frame-version={frameVersion}>
         {activeTab ? (
           <SessionTab
             tab={activeTab}
@@ -432,9 +455,9 @@ export default function RemoteViewPage() {
             onMonitorChange={(idx) => handleMonitorChange(activeTab.sessionId, idx)}
             onResolutionChange={(res) => handleResolutionChange(activeTab.sessionId, res)}
             latestFrame={null}
-            frameData={null}
-            frameWidth={0}
-            frameHeight={0}
+            frameData={frameDataRef.current[activeTab.sessionId]?.data ?? null}
+            frameWidth={frameDataRef.current[activeTab.sessionId]?.width ?? 0}
+            frameHeight={frameDataRef.current[activeTab.sessionId]?.height ?? 0}
             onRequestFrame={() => handleRequestFrame(activeTab.sessionId)}
             onSendInput={handleSendInput}
             onSendClipboard={(text) => handleSendClipboard(activeTab.sessionId, text)}
