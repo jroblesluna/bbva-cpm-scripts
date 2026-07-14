@@ -78,7 +78,8 @@
     "map": "Mapa",
     "collapseSidebar": "Contraer menú",
     "expandSidebar": "Expandir menú",
-    "bulkActions": "Acciones Masivas"
+    "bulkActions": "Acciones Masivas",
+    "remoteView": "Vista Remota"
   },
   "login": {
     "title": "AlwaysPrint Cloud Manager",

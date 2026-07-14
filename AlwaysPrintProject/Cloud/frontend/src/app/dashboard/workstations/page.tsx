@@ -2346,6 +2346,18 @@ function WorkstationDetailModal({
           title: t('viewScreen'),
           description: t('alreadyMonitored', { user: userName, email: userEmail, time: startedTime }),
         });
+
+        // Navegar a la página de remote view con la sesión existente
+        if (status.session_id) {
+          const params = new URLSearchParams({
+            session: status.session_id,
+            ws: workstation.id,
+            ip: workstation.ip_private,
+            hostname: workstation.hostname || '',
+            status: 'active',
+          });
+          router.push(`/dashboard/remote-view?${params.toString()}`);
+        }
         return;
       }
 

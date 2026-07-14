@@ -41,6 +41,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Zap,
+  Eye,
 } from 'lucide-react'
 
 // Definición de items de navegación
@@ -114,6 +115,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { key: 'telemetry', href: '/dashboard/telemetry', icon: Activity },
         { key: 'map', href: '/dashboard/map', icon: MapPin },
         { key: 'connectivity', href: '/dashboard/connectivity', icon: Wifi },
+        { key: 'remoteView', href: '/dashboard/remote-view', icon: Eye },
         { key: 'audit', href: '/dashboard/audit', icon: FileText },
         { key: 'messages', href: '/dashboard/messages', icon: MessageSquare },
       ],
