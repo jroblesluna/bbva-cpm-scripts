@@ -18,6 +18,7 @@ using AlwaysPrint.Shared.Network;
 using AlwaysPrint.Shared.Security;
 using AlwaysPrintTray.Localization;
 using AlwaysPrintTray.Pipe;
+using AlwaysPrintTray.RemoteView;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -113,6 +114,7 @@ namespace AlwaysPrintTray.Cloud
         private ConnectivityMonitor? _connectivityMonitor;
         private OfflineStateManager? _offlineState;
         private DebuggingCommandHandler? _debuggingHandler;
+        private RemoteViewController? _remoteView;
         private bool _noConfigWarningShown;
         private bool _disposed;
 
@@ -172,6 +174,10 @@ namespace AlwaysPrintTray.Cloud
             _pushMessageHandler = new PushMessageHandler(
                 _configManager, _updateDownloader, _pipe, _config.CloudApiUrl, _wsClient.HttpClient);
             AlwaysPrintLogger.WriteTrayInfo("CloudManager: PushMessageHandler inicializado.");
+
+            // Inicializar RemoteViewController para gestión de vista remota (Screenshot mode)
+            _remoteView = new RemoteViewController(_wsClient);
+            AlwaysPrintLogger.WriteTrayInfo("CloudManager: RemoteViewController inicializado.");
 
             // Detectar condición sin configuración cacheada + offline al inicio
             var cachedConfig = _configSync.LoadFromCache();
@@ -325,6 +331,14 @@ namespace AlwaysPrintTray.Cloud
             // Registrar evento de desconexión en TelemetryReporter
             _telemetryReporter?.RecordDisconnection(DateTime.UtcNow);
 
+            // Finalizar sesión de vista remota si estaba activa (pérdida de conexión)
+            if (_remoteView != null && _remoteView.HasActiveSession)
+            {
+                _remoteView.EndSession();
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "CloudManager: sesión de vista remota finalizada por desconexión WebSocket.");
+            }
+
             NotifyServiceCloudStatus(connected: false);
         }
 
@@ -366,6 +380,15 @@ namespace AlwaysPrintTray.Cloud
                 case "check_update":
                     // Mensaje push directo de actualización de MSI — enrutar al PushMessageHandler
                     RouteToPushHandler("check_update", json);
+                    break;
+                case "remote_view_start":
+                case "remote_view_stop":
+                case "remote_view_config":
+                case "remote_view_pause":
+                case "remote_view_resume":
+                case "rv_request_frame":
+                case "rv_input":
+                    _remoteView?.HandleMessage(type, json);
                     break;
                 default:
                     AlwaysPrintLogger.WriteTrayInfo(
