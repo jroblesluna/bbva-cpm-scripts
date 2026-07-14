@@ -45,6 +45,19 @@ export interface RemoteViewTab {
 }
 
 // ============================================================================
+// DELTA TILES (Canvas-based streaming)
+// ============================================================================
+
+/** Tile individual dentro de un delta frame (TileStreamEngine) */
+export interface DeltaTile {
+  x: number
+  y: number
+  w: number
+  h: number
+  data: string // base64 JPEG
+}
+
+// ============================================================================
 // MENSAJES WEBSOCKET (Remote View)
 // ============================================================================
 

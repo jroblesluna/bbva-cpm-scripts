@@ -22,6 +22,7 @@ import type {
   RemoteViewMode,
   RemoteViewMonitor,
   RvInputMessage,
+  DeltaTile,
 } from '@/types/remote-view'
 import type { OperatorMessage } from '@/types'
 
@@ -109,6 +110,7 @@ export default function RemoteViewPage() {
 
   // Estado de frames por sesión (useRef para evitar re-renders en cada frame)
   const frameDataRef = useRef<Record<string, { data: string; width: number; height: number }>>({})
+  const deltaDataRef = useRef<Record<string, { tiles: DeltaTile[]; width: number; height: number }>>({})
   const [frameVersion, setFrameVersion] = useState(0)
 
   // Conexión WebSocket para recibir mensajes del backend
@@ -209,20 +211,28 @@ export default function RemoteViewPage() {
           width: number
           height: number
           data?: string         // Presente en keyframe y legacy
-          tiles?: unknown[]     // Presente en delta frames
+          tiles?: DeltaTile[]   // Presente en delta frames
         }
 
-        // Solo procesar keyframes y frames legacy (que tienen 'data')
-        // Los delta frames (tiles) se procesarán cuando el DeltaStreamViewer esté listo
         if (frameMsg.data) {
+          // Keyframe o frame legacy — imagen JPEG completa
           frameDataRef.current[frameMsg.session_id] = {
             data: frameMsg.data,
             width: frameMsg.width,
             height: frameMsg.height,
           }
+          // Limpiar delta cuando llega un keyframe (el canvas se redibuja completo)
+          delete deltaDataRef.current[frameMsg.session_id]
+          setFrameVersion(v => v + 1)
+        } else if (frameMsg.tiles && Array.isArray(frameMsg.tiles)) {
+          // Delta frame — array de tiles que cambiaron
+          deltaDataRef.current[frameMsg.session_id] = {
+            tiles: frameMsg.tiles,
+            width: frameMsg.width,
+            height: frameMsg.height,
+          }
           setFrameVersion(v => v + 1)
         }
-        // Delta frames sin 'data' se ignoran por ahora (keyframe cada 5s actualiza la vista)
       }
     },
     []
@@ -464,6 +474,7 @@ export default function RemoteViewPage() {
             frameData={frameDataRef.current[activeTab.sessionId]?.data ?? null}
             frameWidth={frameDataRef.current[activeTab.sessionId]?.width ?? 0}
             frameHeight={frameDataRef.current[activeTab.sessionId]?.height ?? 0}
+            latestDelta={deltaDataRef.current[activeTab.sessionId] ?? null}
             onRequestFrame={() => handleRequestFrame(activeTab.sessionId)}
             onSendInput={handleSendInput}
             onSendClipboard={(text) => handleSendClipboard(activeTab.sessionId, text)}

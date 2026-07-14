@@ -15,13 +15,11 @@ import { useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { SessionHeader } from './SessionHeader'
 import { ScreenshotViewer } from './ScreenshotViewer'
-// TODO: Restaurar cuando H.264 esté implementado en el Tray
-// import { StreamViewer } from './StreamViewer'
-// import { InteractiveViewer } from './InteractiveViewer'
+import { DeltaStreamViewer } from './DeltaStreamViewer'
 import { ConsentPending } from './ConsentPending'
 import { TimeoutWarning } from './TimeoutWarning'
 import { ClipboardSync } from './ClipboardSync'
-import type { RemoteViewTab, RemoteViewMode, RvInputMessage } from '@/types/remote-view'
+import type { RemoteViewTab, RemoteViewMode, RvInputMessage, DeltaTile } from '@/types/remote-view'
 
 // ============================================================================
 // TIPOS
@@ -50,6 +48,8 @@ interface SessionTabProps {
   frameWidth: number
   /** Alto del frame actual */
   frameHeight: number
+  /** Último delta frame (tiles que cambiaron, Canvas streaming) */
+  latestDelta: { tiles: DeltaTile[]; width: number; height: number } | null
   /** Solicitar un frame (Screenshot mode: rv_request_frame) */
   onRequestFrame: () => void
   /** Enviar evento de input (Interactive mode: rv_input) */
@@ -88,6 +88,7 @@ export function SessionTab({
   frameData,
   frameWidth,
   frameHeight,
+  latestDelta,
   onRequestFrame,
   onSendInput,
   onSendClipboard,
@@ -119,23 +120,30 @@ export function SessionTab({
 
   /**
    * Renderiza el viewer correcto según el modo actual del tab.
-   * Todos los modos usan ScreenshotViewer como fallback funcional
-   * hasta que el Tray implemente H.264 streaming (FrameStreamer).
-   * - screenshot → ScreenshotViewer (auto-refresh OFF por defecto)
-   * - stream → ScreenshotViewer con auto-refresh ON
-   * - interactive → ScreenshotViewer con auto-refresh ON
-   *
-   * TODO: Restaurar StreamViewer/InteractiveViewer cuando H.264 esté implementado en el Tray
+   * - screenshot → ScreenshotViewer (request/response, auto-refresh)
+   * - stream → DeltaStreamViewer (canvas, keyframe + delta tiles)
+   * - interactive → DeltaStreamViewer (canvas, con input capturado por InteractiveViewer en el futuro)
    */
   const renderViewer = () => {
+    if (tab.mode === 'screenshot') {
+      return (
+        <ScreenshotViewer
+          sessionId={tab.sessionId}
+          frameData={frameData}
+          frameWidth={frameWidth}
+          frameHeight={frameHeight}
+          onRequestFrame={onRequestFrame}
+        />
+      )
+    }
+
+    // Stream e Interactive: usar DeltaStreamViewer (canvas-based, composición incremental)
     return (
-      <ScreenshotViewer
+      <DeltaStreamViewer
         sessionId={tab.sessionId}
-        frameData={frameData}
-        frameWidth={frameWidth}
-        frameHeight={frameHeight}
-        onRequestFrame={onRequestFrame}
-        defaultAutoRefresh={tab.mode === 'stream' || tab.mode === 'interactive'}
+        isActive={isActive}
+        latestKeyframe={frameData ? { data: frameData, width: frameWidth, height: frameHeight } : null}
+        latestDelta={latestDelta}
       />
     )
   }
