@@ -1,0 +1,558 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "2.1 Implementar RemoteViewSession en C# (Tray)": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964667809
+      },
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964684105
+      }
+    ],
+    "2.2 Implementar ConsentPopup en C# (Tray)": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964667937
+      },
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964886777
+      }
+    ],
+    "2.3 Implementar indicador visual de monitoreo en Tray": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964667982
+      },
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783965050380
+      }
+    ],
+    "2.4 Implementar ScreenCapturer + MonitorEnumerator": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668020
+      },
+      {
+        "executionId": "589e8394-e536-4682-9ebd-7956053e04c5",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783969336480
+      }
+    ],
+    "2.5 Implementar JpegEncoder": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668046
+      },
+      {
+        "executionId": "589e8394-e536-4682-9ebd-7956053e04c5",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783969496835
+      }
+    ],
+    "2.6 Implementar handler de rv_request_frame": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668097
+      },
+      {
+        "executionId": "589e8394-e536-4682-9ebd-7956053e04c5",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783969678365
+      }
+    ],
+    "2.7 Implementar relay en backend (WebSocket)": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668138
+      },
+      {
+        "executionId": "c8ad06ab-d4c9-45d4-980f-db54075bc1e1",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783977084641
+      }
+    ],
+    "2.8 Crear página /dashboard/remote-view con tabs": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668170
+      },
+      {
+        "executionId": "c8ad06ab-d4c9-45d4-980f-db54075bc1e1",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783977391498
+      }
+    ],
+    "2.9 Implementar SessionHeader": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668197
+      },
+      {
+        "executionId": "c8ad06ab-d4c9-45d4-980f-db54075bc1e1",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783977726086
+      }
+    ],
+    "2.10 Implementar ScreenshotViewer": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668224
+      },
+      {
+        "executionId": "c8ad06ab-d4c9-45d4-980f-db54075bc1e1",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783977936195
+      }
+    ],
+    "2.11 Implementar ConsentPending component": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668255
+      },
+      {
+        "executionId": "c8ad06ab-d4c9-45d4-980f-db54075bc1e1",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783978104939
+      }
+    ],
+    "2.12 Implementar TimeoutWarning overlay": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668280
+      },
+      {
+        "executionId": "c8ad06ab-d4c9-45d4-980f-db54075bc1e1",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783978273691
+      }
+    ],
+    "2.13 Implementar auto-adjust RTT (quality_mode=auto)": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668307
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783979335804
+      }
+    ],
+    "2.14 Agregar botón \"Ver Pantalla\" en workstation detail": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668340
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783979780389
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784002891891
+      }
+    ],
+    "2.15 Implementar detección de WS offline durante sesión": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668372
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784002895848
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784003299023
+      }
+    ],
+    "2.16 Implementar invalidación de sesiones al logout/JWT expiry": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668421
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784003302849
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784003484680
+      }
+    ],
+    "3.1 Implementar captura con Desktop Duplication API": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668448
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784003493018
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784003621316
+      }
+    ],
+    "3.2 Implementar H264Encoder con Media Foundation": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668480
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784003625193
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784003824465
+      }
+    ],
+    "3.3 Implementar FrameStreamer (loop de captura continua)": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668506
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784003828720
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784004000017
+      }
+    ],
+    "3.4 Implementar backpressure en FrameStreamer": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668537
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784004005595
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784004009547
+      }
+    ],
+    "3.5 Implementar envío binario de frames H.264": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668567
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784004013666
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784004113439
+      }
+    ],
+    "3.6 Implementar StreamViewer en frontend con MSE": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668598
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784004118289
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784004659112
+      }
+    ],
+    "3.7 Implementar cambio de monitor y resolución en vivo (Stream)": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668629
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784004669025
+      }
+    ],
+    "3.8 Implementar viewport-adaptive downscale para Stream": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668656
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784004945171
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784005160883
+      }
+    ],
+    "4.1 Implementar InputInjector en C# (Tray)": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668688
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784005170026
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784005384505
+      }
+    ],
+    "4.2 Implementar handler de rv_input en Tray": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668716
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784005388495
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784005526507
+      }
+    ],
+    "4.3 Implementar captura de input en frontend (InteractiveViewer)": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668748
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784005535104
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784005733085
+      }
+    ],
+    "4.4 Implementar ClipboardBridge en Tray": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668779
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784005737431
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784005863952
+      }
+    ],
+    "4.5 Implementar clipboard sync en frontend": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668806
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784005868289
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784006019227
+      }
+    ],
+    "4.6 Implementar relay de rv_input y rv_clipboard en backend": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668839
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784005869404
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784005875354
+      }
+    ],
+    "5.1 Implementar mode switching seamless": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668870
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784006029260
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784006466252
+      }
+    ],
+    "5.2 Implementar indicador de sesión activa en lista de workstations": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668898
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784006471154
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784007076942
+      }
+    ],
+    "5.3 Implementar visibilidad detallada de sesión activa": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668930
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784006472099
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784007077945
+      }
+    ],
+    "5.4 Textos i18n para toda la feature": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668957
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784006472983
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784007078806
+      }
+    ],
+    "5.5 Tests de integración": [
+      {
+        "executionId": "bf48f826-1ac9-44ae-9196-61c3e0d3d383",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1783964668989
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784006473795
+      },
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784007079611
+      }
+    ],
+    "2. Fase 1: Screenshot Mode (MVP)": [
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784003484705
+      }
+    ],
+    "3. Fase 2: Stream Mode (H.264/WebSocket)": [
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784005160918
+      }
+    ],
+    "4. Fase 3: Interactive Mode (Control Remoto)": [
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784006019287
+      }
+    ],
+    "5. Fase 4: Pulido, visibilidad, i18n, tests": [
+      {
+        "executionId": "e0f422cc-31ca-4d72-b913-0972f0e4ce80",
+        "chatSessionId": "sess_cfab28e6-2346-4aeb-967c-e4128ac865f1",
+        "timestamp": 1784007079631
+      }
+    ]
+  }
+}

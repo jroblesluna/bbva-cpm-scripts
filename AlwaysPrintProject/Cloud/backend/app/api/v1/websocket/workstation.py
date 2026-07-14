@@ -48,6 +48,7 @@ async def _safe_close(websocket: WebSocket, code: int, reason: str) -> None:
     except Exception:
         pass
 from app.services.connectivity import ConnectivityService
+from app.services.remote_view_relay import remote_view_relay
 
 
 logger = logging.getLogger(__name__)
@@ -189,6 +190,9 @@ async def workstation_websocket(
             vlan_id=str(workstation.vlan_id) if workstation.vlan_id else None
         )
         print(f"[WS] Conectado al manager", flush=True)
+        
+        # Cancelar timer de desconexión de Remote View si la WS reconectó (Req 7.7)
+        await remote_view_relay.handle_workstation_reconnect(workstation_id)
         
         # Enviar configuración efectiva
         config = config_service.get_effective_config(db, workstation_id)
@@ -655,6 +659,9 @@ async def workstation_websocket(
                     db=cleanup_db,
                     websocket=websocket
                 )
+                # Detectar si hay sesión de Remote View activa (Req 7.7)
+                # Notifica al admin y programa cierre en 30s si no reconecta
+                await remote_view_relay.handle_workstation_disconnect(workstation_id)
             finally:
                 cleanup_db.close()
 

@@ -1016,6 +1016,62 @@ export const bulkActionsApi = {
 }
 
 // ============================================================================
+// REMOTE VIEW (Vista Remota)
+// ============================================================================
+
+/** Respuesta del endpoint GET /workstations/{id}/remote-view/status */
+export interface RemoteViewStatusResponse {
+  active: boolean
+  session_id?: string | null
+  user_id?: string | null
+  user_name?: string | null
+  user_email?: string | null
+  mode?: string | null
+  started_at?: string | null
+  monitor_index?: number | null
+  resolution?: string | null
+}
+
+/** Respuesta del endpoint POST /workstations/{id}/remote-view/start */
+export interface RemoteViewStartResponse {
+  session_id: string
+  status: string
+}
+
+export const remoteViewApi = {
+  /**
+   * Consultar estado de vista remota de una workstation.
+   */
+  getStatus: async (workstationId: string): Promise<RemoteViewStatusResponse> => {
+    const response = await apiClient.get<RemoteViewStatusResponse>(
+      `/workstations/${workstationId}/remote-view/status`
+    )
+    return response.data
+  },
+
+  /**
+   * Iniciar sesión de vista remota.
+   */
+  start: async (workstationId: string, mode?: string): Promise<RemoteViewStartResponse> => {
+    const response = await apiClient.post<RemoteViewStartResponse>(
+      `/workstations/${workstationId}/remote-view/start`,
+      { mode: mode || null }
+    )
+    return response.data
+  },
+
+  /**
+   * Detener sesión de vista remota.
+   */
+  stop: async (workstationId: string): Promise<{ session_id: string; status: string }> => {
+    const response = await apiClient.post<{ session_id: string; status: string }>(
+      `/workstations/${workstationId}/remote-view/stop`
+    )
+    return response.data
+  },
+}
+
+// ============================================================================
 // HEALTH CHECK
 // ============================================================================
 

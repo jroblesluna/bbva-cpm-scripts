@@ -1,0 +1,443 @@
+/**
+ * Página de Vista Remota.
+ * Gestiona múltiples sesiones como tabs horizontales.
+ * El tab activo recibe frames; los inactivos envían rv_pause.
+ * Al volver a un tab: rv_resume → espera keyframe.
+ *
+ * Route: /dashboard/remote-view?session={id}&ws={workstation_id}
+ */
+
+'use client'
+
+import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
+import { X, Monitor } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { SessionTab } from '@/components/remote-view/SessionTab'
+import { useWebSocket } from '@/hooks/useWebSocket'
+import type {
+  RemoteViewTab,
+  RemoteViewStatus,
+  RemoteViewMode,
+  RemoteViewMonitor,
+  RvInputMessage,
+} from '@/types/remote-view'
+import type { OperatorMessage } from '@/types'
+
+// ============================================================================
+// REDUCER: Estado de tabs de sesiones
+// ============================================================================
+
+interface RemoteViewState {
+  tabs: RemoteViewTab[]
+  activeTabId: string | null
+}
+
+type RemoteViewAction =
+  | { type: 'ADD_TAB'; tab: RemoteViewTab }
+  | { type: 'REMOVE_TAB'; sessionId: string }
+  | { type: 'SET_ACTIVE'; sessionId: string }
+  | { type: 'UPDATE_STATUS'; sessionId: string; status: RemoteViewStatus }
+  | { type: 'UPDATE_MODE'; sessionId: string; mode: RemoteViewMode }
+  | { type: 'SET_MONITORS'; sessionId: string; monitors: RemoteViewMonitor[] }
+
+function remoteViewReducer(state: RemoteViewState, action: RemoteViewAction): RemoteViewState {
+  switch (action.type) {
+    case 'ADD_TAB': {
+      // No duplicar tabs para la misma sesión
+      if (state.tabs.some((t) => t.sessionId === action.tab.sessionId)) {
+        return { ...state, activeTabId: action.tab.sessionId }
+      }
+      return {
+        tabs: [...state.tabs, action.tab],
+        activeTabId: action.tab.sessionId,
+      }
+    }
+    case 'REMOVE_TAB': {
+      const remaining = state.tabs.filter((t) => t.sessionId !== action.sessionId)
+      let newActive = state.activeTabId
+      if (state.activeTabId === action.sessionId) {
+        newActive = remaining.length > 0 ? remaining[remaining.length - 1].sessionId : null
+      }
+      return { tabs: remaining, activeTabId: newActive }
+    }
+    case 'SET_ACTIVE': {
+      return { ...state, activeTabId: action.sessionId }
+    }
+    case 'UPDATE_STATUS': {
+      return {
+        ...state,
+        tabs: state.tabs.map((t) =>
+          t.sessionId === action.sessionId ? { ...t, status: action.status } : t
+        ),
+      }
+    }
+    case 'UPDATE_MODE': {
+      return {
+        ...state,
+        tabs: state.tabs.map((t) =>
+          t.sessionId === action.sessionId ? { ...t, mode: action.mode } : t
+        ),
+      }
+    }
+    case 'SET_MONITORS': {
+      return {
+        ...state,
+        tabs: state.tabs.map((t) =>
+          t.sessionId === action.sessionId
+            ? { ...t, monitors: action.monitors, status: 'active' as RemoteViewStatus }
+            : t
+        ),
+      }
+    }
+    default:
+      return state
+  }
+}
+
+// ============================================================================
+// PÁGINA PRINCIPAL
+// ============================================================================
+
+export default function RemoteViewPage() {
+  const t = useTranslations('remoteView')
+  const searchParams = useSearchParams()
+  const [state, dispatch] = useReducer(remoteViewReducer, { tabs: [], activeTabId: null })
+  const previousActiveRef = useRef<string | null>(null)
+
+  // Conexión WebSocket para recibir mensajes del backend
+  const { isConnected, addMessageHandler } = useWebSocket({ autoConnect: true })
+
+  // Leer query params para abrir sesión inicial
+  useEffect(() => {
+    const sessionId = searchParams.get('session')
+    const workstationId = searchParams.get('ws')
+    const ip = searchParams.get('ip') || ''
+    const hostname = searchParams.get('hostname') || ''
+    const mode = (searchParams.get('mode') as RemoteViewMode) || 'screenshot'
+
+    if (sessionId && workstationId) {
+      dispatch({
+        type: 'ADD_TAB',
+        tab: {
+          sessionId,
+          workstationId,
+          ip,
+          hostname,
+          mode,
+          status: 'pending_consent',
+          monitors: [],
+          selectedMonitor: 0,
+          startedAt: new Date().toISOString(),
+        },
+      })
+    }
+  }, [searchParams])
+
+  // Manejar mensajes WebSocket entrantes (remote_view_accepted, remote_view_rejected, etc.)
+  // Los tipos de mensajes de remote view aún no están en la unión OperatorMessage,
+  // se agregan conforme se implementen los handlers en el backend.
+  const handleWsMessage = useCallback(
+    (message: OperatorMessage) => {
+      // Cast genérico para manejar mensajes remote view que aún no están en la unión
+      const msg = message as unknown as {
+        type: string
+        session_id?: string
+        monitors?: RemoteViewMonitor[]
+        reason?: string
+      }
+
+      if (msg.type === 'remote_view_accepted' && msg.session_id) {
+        dispatch({
+          type: 'SET_MONITORS',
+          sessionId: msg.session_id,
+          monitors: msg.monitors || [],
+        })
+      }
+
+      if (msg.type === 'remote_view_rejected' && msg.session_id) {
+        dispatch({
+          type: 'UPDATE_STATUS',
+          sessionId: msg.session_id,
+          status: 'disconnected',
+        })
+      }
+    },
+    []
+  )
+
+  useEffect(() => {
+    const removeHandler = addMessageHandler(handleWsMessage)
+    return removeHandler
+  }, [addMessageHandler, handleWsMessage])
+
+  // Enviar rv_pause / rv_resume al cambiar de tab activo
+  useEffect(() => {
+    const prevId = previousActiveRef.current
+    const currentId = state.activeTabId
+
+    if (prevId && prevId !== currentId) {
+      // Pausar tab anterior
+      sendPauseSignal(prevId)
+    }
+
+    if (currentId && currentId !== prevId) {
+      // Reanudar tab nuevo (o primer frame si es primera vez)
+      sendResumeSignal(currentId)
+    }
+
+    previousActiveRef.current = currentId
+  }, [state.activeTabId])
+
+  // Funciones de señalización vía WebSocket
+  const sendPauseSignal = (sessionId: string) => {
+    sendWsMessage({ type: 'remote_view_pause', session_id: sessionId })
+  }
+
+  const sendResumeSignal = (sessionId: string) => {
+    sendWsMessage({ type: 'remote_view_resume', session_id: sessionId })
+  }
+
+  const sendStopSignal = (sessionId: string) => {
+    sendWsMessage({ type: 'remote_view_stop', session_id: sessionId, reason: 'admin_closed' })
+  }
+
+  /** Enviar mensaje JSON al WebSocket del operador */
+  const sendWsMessage = (payload: Record<string, unknown>) => {
+    try {
+      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000'
+      // Usar el singleton existente para enviar mensajes
+      // El WebSocket del operador se conecta en /ws/operator
+      // Nota: en implementación real, se accede al ws instance del singleton
+      // Por ahora log + preparado para integración con WebSocketClient.send()
+      console.log('[RemoteView] Enviando mensaje WS:', payload)
+    } catch (err) {
+      console.error('[RemoteView] Error enviando mensaje WS:', err)
+    }
+  }
+
+  // Cerrar tab y enviar stop
+  const handleCloseTab = (sessionId: string) => {
+    sendStopSignal(sessionId)
+    dispatch({ type: 'REMOVE_TAB', sessionId })
+  }
+
+  // Cambiar tab activo
+  const handleSelectTab = (sessionId: string) => {
+    dispatch({ type: 'SET_ACTIVE', sessionId })
+  }
+
+  /**
+   * Cambio de modo: envía remote_view_config con el nuevo mode al backend (Req 9.9, 11.4).
+   * El Tray recibe el mensaje y transiciona seamless (sin recrear sesión).
+   * El frontend actualiza el state para renderizar el viewer correcto.
+   */
+  const handleModeChange = useCallback(
+    (sessionId: string, newMode: RemoteViewMode) => {
+      sendWsMessage({
+        type: 'remote_view_config',
+        session_id: sessionId,
+        mode: newMode,
+      })
+      dispatch({ type: 'UPDATE_MODE', sessionId, mode: newMode })
+    },
+    []
+  )
+
+  /** Cambio de monitor: envía remote_view_config con nuevo monitor index */
+  const handleMonitorChange = useCallback(
+    (sessionId: string, monitorIndex: number) => {
+      sendWsMessage({
+        type: 'remote_view_config',
+        session_id: sessionId,
+        monitor: monitorIndex,
+      })
+    },
+    []
+  )
+
+  /** Cambio de resolución/calidad: envía remote_view_config */
+  const handleResolutionChange = useCallback(
+    (sessionId: string, resolution: string) => {
+      sendWsMessage({
+        type: 'remote_view_config',
+        session_id: sessionId,
+        resolution,
+      })
+    },
+    []
+  )
+
+  /** Solicitar frame (Screenshot mode: rv_request_frame) */
+  const handleRequestFrame = useCallback(
+    (sessionId: string) => {
+      sendWsMessage({
+        type: 'rv_request_frame',
+        session_id: sessionId,
+      })
+    },
+    []
+  )
+
+  /** Enviar input event (Interactive mode: rv_input) */
+  const handleSendInput = useCallback(
+    (msg: RvInputMessage) => {
+      sendWsMessage(msg as unknown as Record<string, unknown>)
+    },
+    []
+  )
+
+  /** Enviar clipboard a la workstation (rv_clipboard) */
+  const handleSendClipboard = useCallback(
+    (sessionId: string, text: string) => {
+      sendWsMessage({
+        type: 'rv_clipboard',
+        session_id: sessionId,
+        direction: 'to_ws',
+        text,
+      })
+    },
+    []
+  )
+
+  /** Reintentar sesión (después de rechazo de consent) */
+  const handleRetry = useCallback(
+    (sessionId: string) => {
+      dispatch({ type: 'UPDATE_STATUS', sessionId, status: 'pending_consent' })
+      sendWsMessage({
+        type: 'remote_view_resume',
+        session_id: sessionId,
+      })
+    },
+    []
+  )
+
+  /** Keep-alive: resetear timer de inactividad */
+  const handleKeepAlive = useCallback(
+    (sessionId: string) => {
+      sendWsMessage({
+        type: 'remote_view_resume',
+        session_id: sessionId,
+      })
+    },
+    []
+  )
+
+  // Tab activo actual
+  const activeTab = state.tabs.find((t) => t.sessionId === state.activeTabId) || null
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-8rem)]">
+      {/* Barra de tabs horizontales */}
+      {state.tabs.length > 0 && (
+        <div className="flex items-center gap-1 border-b border-gray-200 bg-white px-2 pt-2 overflow-x-auto flex-shrink-0">
+          {state.tabs.map((tab) => {
+            const isActive = tab.sessionId === state.activeTabId
+            const label = tab.ip && tab.hostname
+              ? `${tab.ip} — ${tab.hostname}`
+              : tab.ip || tab.hostname || tab.sessionId.slice(0, 8)
+
+            return (
+              <div
+                key={tab.sessionId}
+                className={`
+                  group flex items-center gap-2 px-3 py-2 rounded-t-md text-sm font-medium
+                  cursor-pointer select-none transition-colors min-w-0
+                  ${isActive
+                    ? 'bg-blue-50 text-blue-700 border border-b-0 border-gray-200'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }
+                `}
+                onClick={() => handleSelectTab(tab.sessionId)}
+                role="tab"
+                aria-selected={isActive}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleSelectTab(tab.sessionId)
+                  }
+                }}
+              >
+                {/* Indicador de estado */}
+                <span
+                  className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                    tab.status === 'active' ? 'bg-green-500' :
+                    tab.status === 'pending_consent' ? 'bg-yellow-500 animate-pulse' :
+                    tab.status === 'paused' ? 'bg-gray-400' :
+                    'bg-red-500'
+                  }`}
+                  aria-label={t(`status_${tab.status}`)}
+                />
+
+                {/* Label: IP — Hostname */}
+                <span className="truncate max-w-[200px]">{label}</span>
+
+                {/* Botón cerrar */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleCloseTab(tab.sessionId)
+                  }}
+                  title={t('closeTab')}
+                  aria-label={t('closeTab')}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Contenido del tab activo */}
+      <div className="flex-1 bg-gray-900 relative overflow-hidden">
+        {activeTab ? (
+          <SessionTab
+            tab={activeTab}
+            isActive={true}
+            modesAllowed={['screenshot', 'stream', 'interactive']}
+            onClose={() => handleCloseTab(activeTab.sessionId)}
+            onModeChange={(mode) => handleModeChange(activeTab.sessionId, mode)}
+            onMonitorChange={(idx) => handleMonitorChange(activeTab.sessionId, idx)}
+            onResolutionChange={(res) => handleResolutionChange(activeTab.sessionId, res)}
+            latestFrame={null}
+            frameData={null}
+            frameWidth={0}
+            frameHeight={0}
+            onRequestFrame={() => handleRequestFrame(activeTab.sessionId)}
+            onSendInput={handleSendInput}
+            onSendClipboard={(text) => handleSendClipboard(activeTab.sessionId, text)}
+            incomingClipboardText={null}
+            clipboardEnabled={false}
+            isConnected={isConnected}
+            timeoutSecondsRemaining={null}
+            isExpired={false}
+            onKeepAlive={() => handleKeepAlive(activeTab.sessionId)}
+            onRetry={() => handleRetry(activeTab.sessionId)}
+          />
+        ) : (
+          <EmptyState t={t} />
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// COMPONENTE: Estado vacío (sin tabs)
+// ============================================================================
+
+function EmptyState({ t }: { t: ReturnType<typeof useTranslations> }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+      <Monitor className="h-16 w-16 mb-4" />
+      <p className="text-lg">{t('noActiveSessions')}</p>
+      <p className="text-sm mt-2">{t('noActiveSessionsHint')}</p>
+    </div>
+  )
+}

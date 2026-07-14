@@ -6,9 +6,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { workstationsApi, organizationsApi, vlansApi, devicesApi } from '@/lib/api';
+import { workstationsApi, organizationsApi, vlansApi, devicesApi, remoteViewApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useTranslations } from 'next-intl';
@@ -51,6 +51,7 @@ import {
   Cog,
   Eye,
   Power,
+  MonitorPlay,
 } from 'lucide-react';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
@@ -62,6 +63,7 @@ import { LogAnalysisButton } from '@/components/workstations/LogAnalysisButton';
 import { OnDemandActionsSection } from '@/components/workstations/OnDemandActionsSection';
 import { OsCommandsSection } from '@/components/workstations/OsCommandsSection';
 import { WorkstationDebuggingSection } from '@/components/debugging/WorkstationDebuggingSection';
+import { RemoteViewIndicator } from '@/components/remote-view/RemoteViewIndicator';
 
 type ViewMode = 'cards' | 'table';
 type SortField = 'ip_private' | 'hostname' | 'current_user' | 'organization' | 'tray_version' | 'action_config' | 'last_connection' | 'is_online';
@@ -1444,6 +1446,10 @@ function WorkstationCard({
                 {t('contingencyLevelOrg')}
               </Badge>
             )}
+            {/* Indicador de sesión de vista remota activa */}
+            {workstation.remote_view_active && (
+              <RemoteViewIndicator size={14} />
+            )}
           </div>
 
           {/* Acciones: visibles en desktop en la misma fila */}
@@ -1844,6 +1850,10 @@ function WorkstationTable({
                         <Badge variant="outline" className="text-[10px] px-1 py-0 border-orange-300 text-orange-700 bg-orange-50">
                           {t('contingencyLevelOrg')}
                         </Badge>
+                      )}
+                      {/* Indicador de sesión de vista remota activa */}
+                      {ws.remote_view_active && (
+                        <RemoteViewIndicator size={12} />
                       )}
                     </div>
                   </td>
@@ -2309,6 +2319,66 @@ function WorkstationDetailModal({
   const t = useTranslations('workstations');
   const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const { toast } = useToast();
+  const [remoteViewLoading, setRemoteViewLoading] = useState(false);
+
+  /**
+   * Handler del botón "Ver Pantalla".
+   * 1. Consulta estado de sesión activa para esta WS
+   * 2. Si ya hay sesión activa → muestra quién la tiene
+   * 3. Si no → inicia sesión y navega a /dashboard/remote-view
+   */
+  const handleViewScreen = async () => {
+    setRemoteViewLoading(true);
+    try {
+      // Consultar si hay sesión activa
+      const status = await remoteViewApi.getStatus(workstation.id);
+
+      if (status.active) {
+        // Ya está siendo monitoreada → mostrar nombre completo + email + hora inicio
+        const startedTime = status.started_at
+          ? formatDateWithTimezone(status.started_at, userTimezone)
+          : '';
+        const userName = status.user_name || '';
+        const userEmail = status.user_email || '';
+        toast({
+          title: t('viewScreen'),
+          description: t('alreadyMonitored', { user: userName, email: userEmail, time: startedTime }),
+        });
+        return;
+      }
+
+      // No hay sesión activa → iniciar nueva sesión
+      toast({ title: t('viewScreen'), description: t('startingSession') });
+      const result = await remoteViewApi.start(workstation.id);
+
+      // Navegar a la página de remote view con los parámetros de la sesión
+      const params = new URLSearchParams({
+        session: result.session_id,
+        ws: workstation.id,
+        ip: workstation.ip_private,
+        hostname: workstation.hostname || '',
+      });
+      router.push(`/dashboard/remote-view?${params.toString()}`);
+    } catch (error: unknown) {
+      const err = error as { response?: { status?: number; data?: { detail?: string } } };
+      const httpStatus = err?.response?.status;
+      const detail = err?.response?.data?.detail;
+
+      if (httpStatus === 403) {
+        toast({ variant: 'destructive', title: t('viewScreen'), description: t('remoteViewDisabled') });
+      } else if (httpStatus === 409) {
+        toast({ variant: 'destructive', title: t('viewScreen'), description: detail || t('alreadyMonitored', { user: '', email: '', time: '' }) });
+      } else if (httpStatus === 429) {
+        toast({ variant: 'destructive', title: t('viewScreen'), description: t('sessionLimitReached') });
+      } else {
+        toast({ variant: 'destructive', title: t('viewScreen'), description: detail || t('errorStarting') });
+      }
+    } finally {
+      setRemoteViewLoading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -2365,6 +2435,23 @@ function WorkstationDetailModal({
               )}
             </div>
           </div>
+
+          {/* Botón "Ver Pantalla" — solo visible si WS online */}
+          {workstation.is_online && (
+            <div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleViewScreen}
+                disabled={remoteViewLoading}
+                className="gap-2"
+              >
+                <MonitorPlay className="w-4 h-4" />
+                {remoteViewLoading ? t('startingSession') : t('viewScreen')}
+              </Button>
+            </div>
+          )}
+
           <div>
             <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">{t('networkInfo')}</h3>
             <dl className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">

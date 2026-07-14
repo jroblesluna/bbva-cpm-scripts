@@ -26,6 +26,8 @@ export interface Workstation {
   action_config_hash: string | null
   action_config_version: string | null
   default_printer_id: string | null
+  /** Indica si hay una sesión de vista remota activa en esta workstation (campo calculado, puede no existir) */
+  remote_view_active?: boolean
   organization?: Organization
   vlan?: VLANBasic | null
 }

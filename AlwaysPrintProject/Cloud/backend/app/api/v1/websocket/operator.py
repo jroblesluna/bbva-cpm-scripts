@@ -105,6 +105,27 @@ async def operator_websocket(
                     "events": events
                 })
             
+            # === Remote View: relay de mensajes del operador a la workstation ===
+            elif message_type in (
+                "remote_view_config",
+                "remote_view_pause",
+                "remote_view_resume",
+                "remote_view_stop",
+                "rv_request_frame",
+                "rv_input",
+                "rv_clipboard",
+            ):
+                from app.services.remote_view_relay import remote_view_relay
+                session_id = data.get("session_id")
+                if session_id:
+                    # Si es cambio de modo, registrar en audit trail (Req 11.4)
+                    if message_type == "remote_view_config" and "mode" in data:
+                        await _handle_mode_change_audit(
+                            db, session_id, data["mode"], user_id
+                        )
+                    # Relay del mensaje a la workstation
+                    await remote_view_relay.relay_to_workstation(session_id, data)
+            
             else:
                 # Tipo de mensaje desconocido
                 await websocket.send_json({
@@ -128,6 +149,63 @@ async def operator_websocket(
                 websocket=websocket
             )
 
+            # Invalidar sesiones de Remote View activas del usuario (Req 7.5, 12.3)
+            # Cubre: cierre de pestaña, navegación, logout explícito, JWT expirado
+            try:
+                from app.services.remote_view_relay import remote_view_relay
+                await remote_view_relay.handle_operator_disconnect(user_id)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(
+                    "[WS_OPERATOR] Error al invalidar sesiones RV en desconexión: "
+                    "user_id=%s, error=%s",
+                    user_id, e,
+                )
+
 
 from datetime import datetime, timezone
+
+
+async def _handle_mode_change_audit(
+    db: Session,
+    session_id: str,
+    new_mode: str,
+    user_id: str,
+) -> None:
+    """
+    Actualiza el modo de la sesión en BD y registra REMOTE_VIEW_MODE_CHANGE en audit trail.
+    Requirements: 11.4, 9.9
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        from app.services.remote_view_session import session_manager
+        updated = session_manager.update_mode(db, session_id, new_mode)
+        if updated:
+            old_mode = getattr(updated, "_old_mode", None)
+            # Registrar en audit trail
+            from app.services.audit import audit_service
+            audit_service.log_action(
+                db=db,
+                action_type="REMOTE_VIEW_MODE_CHANGE",
+                entity_type="RemoteViewSession",
+                entity_id=session_id,
+                user_id=user_id,
+                workstation_id=str(updated.workstation_id),
+                organization_id=str(updated.organization_id),
+                new_values={
+                    "session_id": session_id,
+                    "old_mode": old_mode,
+                    "new_mode": new_mode,
+                },
+            )
+            logger.info(
+                "[WS_OPERATOR] Modo cambiado: session_id=%s, %s → %s",
+                session_id, old_mode, new_mode,
+            )
+    except Exception as e:
+        logger.error(
+            "[WS_OPERATOR] Error registrando cambio de modo: session_id=%s, error=%s",
+            session_id, e,
+        )
 
