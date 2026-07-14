@@ -331,6 +331,22 @@ namespace AlwaysPrintTray.RemoteView
         }
 
         /// <summary>
+        /// Fuerza el popup al frente de todas las ventanas (incluidas las maximizadas)
+        /// en cuanto se muestra, usando la API nativa SetForegroundWindow.
+        /// </summary>
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            // Forzar que el popup aparezca al frente de todas las ventanas
+            this.BringToFront();
+            this.Activate();
+            this.Focus();
+            // En Windows, SetForegroundWindow requiere que el proceso tenga foco de input
+            // Usamos ShowWindow para asegurar que se muestre sobre ventanas maximizadas
+            NativeMethods.SetForegroundWindow(this.Handle);
+        }
+
+        /// <summary>
         /// Libera recursos del timer al cerrar el formulario.
         /// </summary>
         protected override void OnFormClosing(FormClosingEventArgs e)
@@ -351,6 +367,16 @@ namespace AlwaysPrintTray.RemoteView
                 _result = ConsentResult.Rejected;
             }
             base.OnFormClosed(e);
+        }
+
+        /// <summary>
+        /// P/Invoke para forzar la ventana al frente del escritorio de Windows.
+        /// </summary>
+        private static class NativeMethods
+        {
+            [System.Runtime.InteropServices.DllImport("user32.dll")]
+            [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+            public static extern bool SetForegroundWindow(IntPtr hWnd);
         }
     }
 }

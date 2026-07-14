@@ -196,10 +196,14 @@ export default function RemoteViewPage() {
       }
 
       if (msg.type === 'remote_view_rejected' && msg.session_id) {
+        const rejectedMsg = msg as unknown as { type: string; session_id: string; reason?: string }
+        // Mapear el motivo de rechazo al estado de display apropiado
+        const rejectionStatus: RemoteViewStatus =
+          rejectedMsg.reason === 'user_timeout' ? 'expired' : 'disconnected'
         dispatch({
           type: 'UPDATE_STATUS',
-          sessionId: msg.session_id,
-          status: 'disconnected',
+          sessionId: rejectedMsg.session_id,
+          status: rejectionStatus,
         })
       }
 
@@ -258,6 +262,13 @@ export default function RemoteViewPage() {
           const status = await remoteViewApi.getStatus(tab.workstationId)
           if (status.active && status.session_id === tab.sessionId) {
             dispatch({ type: 'UPDATE_STATUS', sessionId: tab.sessionId, status: 'active' })
+          } else if (!status.active && !status.session_id) {
+            // Sin sesión activa — puede que fue rechazada. Revisar edad de la sesión.
+            // Si pasaron más de 35s (timeout de consent), marcar como disconnected.
+            const sessionAge = Date.now() - new Date(tab.startedAt).getTime()
+            if (sessionAge > 35000) {
+              dispatch({ type: 'UPDATE_STATUS', sessionId: tab.sessionId, status: 'disconnected' })
+            }
           }
         } catch { /* ignorar — el WS handler se encargará eventualmente */ }
       }

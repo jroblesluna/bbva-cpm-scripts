@@ -167,13 +167,18 @@ export function SessionTab({
 
       {/* Contenido principal: viewer o estado de consent */}
       <div className="flex-1 relative overflow-hidden">
-        {/* ConsentPending: mientras esperamos aprobación */}
-        {tab.status === 'pending_consent' && (
+        {/* ConsentPending: mientras esperamos aprobación o sesión fue rechazada/expirada */}
+        {(tab.status === 'pending_consent' || tab.status === 'disconnected' || tab.status === 'expired') && (
           <ConsentPending
             sessionId={tab.sessionId}
             workstationIp={tab.ip}
             workstationHostname={tab.hostname}
-            status="pending_consent"
+            status={
+              tab.status === 'pending_consent' ? 'pending_consent' :
+              tab.status === 'expired' ? 'timed_out' :
+              'rejected'
+            }
+            rejectionReason={tab.status === 'expired' ? 'user_timeout' : 'user_declined'}
             onRetry={onRetry}
           />
         )}
