@@ -1,6 +1,6 @@
 """Crear tabla remote_view_sessions.
 
-Revision ID: 030_create_remote_view_sessions
+Revision ID: 030_create_rv_sessions
 Revises: 029_add_remote_view_orgs
 Create Date: 2026-07-13
 
@@ -15,7 +15,7 @@ from typing import Union, Sequence
 
 
 # Identificadores de revisión
-revision: str = '030_create_remote_view_sessions'
+revision: str = '030_create_rv_sessions'
 down_revision: Union[str, None] = '029_add_remote_view_orgs'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

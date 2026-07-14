@@ -1,7 +1,7 @@
 """Agregar acciones de auditoría para remote view.
 
-Revision ID: 031_add_remote_view_audit_actions
-Revises: 030_create_remote_view_sessions
+Revision ID: 031_add_rv_audit_actions
+Revises: 030_create_rv_sessions
 Create Date: 2026-07-13
 
 Agrega 3 nuevos valores al enum PostgreSQL 'actiontype':
@@ -12,8 +12,8 @@ Agrega 3 nuevos valores al enum PostgreSQL 'actiontype':
 from typing import Sequence, Union
 from alembic import op
 
-revision: str = '031_add_remote_view_audit_actions'
-down_revision: Union[str, None] = '030_create_remote_view_sessions'
+revision: str = '031_add_rv_audit_actions'
+down_revision: Union[str, None] = '030_create_rv_sessions'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
