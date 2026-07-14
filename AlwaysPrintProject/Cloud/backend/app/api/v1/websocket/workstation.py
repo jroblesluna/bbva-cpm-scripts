@@ -463,6 +463,23 @@ async def workstation_websocket(
                 )
                 continue
             
+            # === Remote View: relay de mensajes de la workstation al operador ===
+            # Mensajes como rv_frame, remote_view_accepted, remote_view_rejected,
+            # rv_clipboard (direction=to_admin). No necesitan BD.
+            if message_type in (
+                "rv_frame",
+                "remote_view_accepted",
+                "remote_view_rejected",
+                "rv_clipboard",
+            ):
+                session_id = data.get("session_id")
+                if session_id:
+                    # Lazy register: si este worker no tiene el mapping (cross-worker issue)
+                    if not remote_view_relay.get_session(session_id):
+                        _lazy_register_rv_session(session_id)
+                    await remote_view_relay.relay_to_operator(session_id, data)
+                continue
+            
             if message_type == "status_update":
                 # La workstation fue validada al conectar (handshake).
                 # No re-verificar existencia en cada status_update — causaba pool exhaustion
@@ -1001,3 +1018,41 @@ async def _handle_debugging_message(
         )
     finally:
         temp_db.close()
+
+
+def _lazy_register_rv_session(session_id: str) -> None:
+    """
+    Registra una sesión RV en el relay local si existe en BD (cross-worker lazy load).
+
+    Con 2 workers, la sesión se registra en el relay del worker que maneja POST /start,
+    pero el WS del operador puede estar en otro worker. Este lazy load resuelve esa
+    discrepancia consultando BD una sola vez; mensajes posteriores usan el mapping en memoria.
+    """
+    from app.models.remote_view import RemoteViewSession
+    rv_db = SessionLocal()
+    try:
+        db_session = rv_db.query(RemoteViewSession).filter(
+            RemoteViewSession.id == session_id,
+            RemoteViewSession.status.in_(("pending_consent", "active")),
+        ).first()
+        if db_session:
+            remote_view_relay.register_session(
+                session_id=str(db_session.id),
+                workstation_id=str(db_session.workstation_id),
+                user_id=str(db_session.user_id),
+            )
+            logger.info(
+                "[RV] Lazy register exitoso (workstation): session_id=%s, ws=%s",
+                session_id, db_session.workstation_id,
+            )
+        else:
+            logger.warning(
+                "[RV] Lazy register: sesión %s no encontrada en BD (inactiva o inexistente)",
+                session_id,
+            )
+    except Exception as e:
+        logger.warning(
+            "[RV] Error en lazy register de sesión %s: %s", session_id, e
+        )
+    finally:
+        rv_db.close()

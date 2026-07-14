@@ -118,6 +118,10 @@ async def operator_websocket(
                 from app.services.remote_view_relay import remote_view_relay
                 session_id = data.get("session_id")
                 if session_id:
+                    # Lazy register: si la sesión no está en el relay local
+                    # (cross-worker issue), cargarla de BD y registrarla.
+                    if not remote_view_relay.get_session(session_id):
+                        _lazy_register_rv_session(session_id)
                     # Si es cambio de modo, registrar en audit trail (Req 11.4)
                     if message_type == "remote_view_config" and "mode" in data:
                         await _handle_mode_change_audit(
@@ -209,3 +213,46 @@ async def _handle_mode_change_audit(
             session_id, e,
         )
 
+
+def _lazy_register_rv_session(session_id: str) -> None:
+    """
+    Registra una sesión RV en el relay local si existe en BD (cross-worker lazy load).
+
+    Con 2 workers, la sesión se registra en el relay del worker que maneja POST /start,
+    pero el WS del operador puede estar en otro worker. Este lazy load resuelve esa
+    discrepancia consultando BD una sola vez; mensajes posteriores usan el mapping en memoria.
+    """
+    import logging
+    _logger = logging.getLogger(__name__)
+    try:
+        from app.models.remote_view import RemoteViewSession
+        from app.services.remote_view_relay import remote_view_relay
+        from app.core.database import SessionLocal
+
+        rv_db = SessionLocal()
+        try:
+            db_session = rv_db.query(RemoteViewSession).filter(
+                RemoteViewSession.id == session_id,
+                RemoteViewSession.status.in_(("pending_consent", "active")),
+            ).first()
+            if db_session:
+                remote_view_relay.register_session(
+                    session_id=str(db_session.id),
+                    workstation_id=str(db_session.workstation_id),
+                    user_id=str(db_session.user_id),
+                )
+                _logger.info(
+                    "[RV] Lazy register exitoso (operator): session_id=%s, ws=%s",
+                    session_id, db_session.workstation_id,
+                )
+            else:
+                _logger.warning(
+                    "[RV] Lazy register: sesión %s no encontrada en BD (inactiva o inexistente)",
+                    session_id,
+                )
+        finally:
+            rv_db.close()
+    except Exception as e:
+        _logger.warning(
+            "[RV] Error en lazy register de sesión %s: %s", session_id, e
+        )
