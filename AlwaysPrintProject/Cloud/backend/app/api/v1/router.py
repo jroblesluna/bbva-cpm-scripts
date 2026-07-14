@@ -29,6 +29,7 @@ from app.api.v1.endpoints import (
     system_metrics,
     health,
     bulk_actions,
+    remote_view,
 )
 
 # Router principal de la API v1
@@ -84,6 +85,13 @@ api_router.include_router(
     log_analysis.router,
     prefix="/workstations",
     tags=["Análisis de Logs"]
+)
+
+# Vista remota de workstations (start, stop, status)
+api_router.include_router(
+    remote_view.router,
+    prefix="/workstations",
+    tags=["Vista Remota"]
 )
 
 # Modelos LLM (separado para evitar conflicto con /workstations/{workstation_id})
