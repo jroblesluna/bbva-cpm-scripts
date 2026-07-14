@@ -65,6 +65,9 @@ class ActionType(str, enum.Enum):
     CERT_GENERATED = "cert_generated"
     CERT_ROTATED = "cert_rotated"
     ONDEMAND_EXECUTED = "ondemand_executed"
+    REMOTE_VIEW_START = "REMOTE_VIEW_START"
+    REMOTE_VIEW_STOP = "REMOTE_VIEW_STOP"
+    REMOTE_VIEW_MODE_CHANGE = "REMOTE_VIEW_MODE_CHANGE"
 
 
 class AuditLog(Base):
