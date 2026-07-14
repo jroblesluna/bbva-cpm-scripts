@@ -244,6 +244,7 @@ async def start_remote_view(
         "user_name": current_user.full_name,
         "viewport_width": request_body.viewport_width,
         "viewport_height": request_body.viewport_height,
+        "require_consent": rv_config.require_user_consent,
     }
 
     await connection_manager.send_to_workstation(workstation_id_str, ws_message)

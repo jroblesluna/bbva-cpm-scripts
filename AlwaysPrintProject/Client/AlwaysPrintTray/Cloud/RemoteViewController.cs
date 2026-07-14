@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using System.Threading;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrintTray.RemoteView;
 
@@ -54,6 +56,7 @@ namespace AlwaysPrintTray.Cloud
             _session.OnSessionEnded += OnSessionEnded;
             _session.OnConfigChanged += OnConfigChanged;
             _session.OnPauseChanged += OnPauseChanged;
+            _session.OnConsentRequired += OnConsentRequired;
 
             AlwaysPrintLogger.WriteTrayInfo(
                 "RemoteViewController: inicializado. Screenshot + TileStream modes listo.");
@@ -218,6 +221,80 @@ namespace AlwaysPrintTray.Cloud
                     _tileEngine.Resume();
                 }
             }
+        }
+
+        /// <summary>
+        /// Handler del evento OnConsentRequired de la sesión.
+        /// Muestra el ConsentPopup en un hilo STA dedicado y envía la respuesta al backend.
+        /// </summary>
+        private void OnConsentRequired()
+        {
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"RemoteViewController: mostrando popup de consentimiento. user={_session.UserName}");
+
+            // ConsentPopup es WinForms y requiere hilo STA
+            var consentThread = new Thread(() =>
+            {
+                try
+                {
+                    var response = ConsentPopup.Show(
+                        _session.UserName ?? "Admin",
+                        _session.SessionId ?? "");
+
+                    if (response.Result == ConsentResult.Accepted)
+                    {
+                        // Transicionar a Active
+                        _session.AcceptConsent();
+
+                        // Enviar remote_view_accepted con monitores
+                        var monitors = response.Monitors.Select(m => new
+                        {
+                            index = m.Index,
+                            name = m.Name,
+                            width = m.Width,
+                            height = m.Height,
+                            primary = m.Primary
+                        }).ToArray();
+
+                        _wsClient.Send("remote_view_accepted", new
+                        {
+                            session_id = _session.SessionId,
+                            monitors = monitors
+                        });
+
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"RemoteViewController: consentimiento ACEPTADO. monitores={monitors.Length}");
+                    }
+                    else
+                    {
+                        // Rechazado o timeout
+                        string reason = response.Result == ConsentResult.TimedOut
+                            ? "user_timeout"
+                            : "user_declined";
+
+                        _wsClient.Send("remote_view_rejected", new
+                        {
+                            session_id = _session.SessionId,
+                            reason = reason
+                        });
+
+                        _session.End();
+
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"RemoteViewController: consentimiento RECHAZADO. razón={reason}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        $"RemoteViewController: error en flujo de consentimiento. {ex.Message}");
+                    _session.End();
+                }
+            });
+            consentThread.SetApartmentState(ApartmentState.STA);
+            consentThread.IsBackground = true;
+            consentThread.Name = "RemoteView_ConsentPopup";
+            consentThread.Start();
         }
 
         /// <summary>

@@ -31,6 +31,9 @@ namespace AlwaysPrintTray.RemoteView
         /// <summary>Se dispara cuando la sesión inicia (tras aceptar o auto-aceptar).</summary>
         public event Action? OnSessionStarted;
 
+        /// <summary>Se dispara cuando se requiere consentimiento del usuario.</summary>
+        public event Action? OnConsentRequired;
+
         /// <summary>Se dispara cuando la sesión termina por cualquier razón.</summary>
         public event Action? OnSessionEnded;
 
@@ -105,7 +108,17 @@ namespace AlwaysPrintTray.RemoteView
                     ViewportHeight = data["viewport_height"]?.Value<int?>() ?? 0;
                     Fps = data["fps"]?.Value<int?>() ?? 5;
 
-                    _state = RemoteViewSessionState.Active;
+                    // Si require_consent está ausente, asumir true por seguridad
+                    bool requireConsent = data["require_consent"]?.Value<bool?>() ?? true;
+
+                    if (requireConsent)
+                    {
+                        _state = RemoteViewSessionState.PendingConsent;
+                    }
+                    else
+                    {
+                        _state = RemoteViewSessionState.Active;
+                    }
                 }
 
                 AlwaysPrintLogger.WriteTrayInfo(
@@ -113,7 +126,19 @@ namespace AlwaysPrintTray.RemoteView
                     $"resolution={Resolution}, quality={Quality}, monitor={MonitorIndex}, " +
                     $"viewport={ViewportWidth}x{ViewportHeight}, user={UserName}");
 
-                OnSessionStarted?.Invoke();
+                // Determinar si se requiere consentimiento fuera del lock
+                bool consentRequired = _state == RemoteViewSessionState.PendingConsent;
+
+                if (consentRequired)
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"RemoteViewSession: esperando consentimiento del usuario. session_id={SessionId}");
+                    OnConsentRequired?.Invoke();
+                }
+                else
+                {
+                    OnSessionStarted?.Invoke();
+                }
             }
             catch (Exception ex)
             {
@@ -293,6 +318,22 @@ namespace AlwaysPrintTray.RemoteView
 
             OnSessionEnded?.Invoke();
             ClearState();
+        }
+
+        /// <summary>
+        /// Acepta el consentimiento del usuario y transiciona de PendingConsent a Active.
+        /// Solo tiene efecto si el estado actual es PendingConsent.
+        /// </summary>
+        public void AcceptConsent()
+        {
+            lock (_lock)
+            {
+                if (_state != RemoteViewSessionState.PendingConsent) return;
+                _state = RemoteViewSessionState.Active;
+            }
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"RemoteViewSession: consentimiento aceptado. session_id={SessionId}");
+            OnSessionStarted?.Invoke();
         }
 
         /// <summary>
