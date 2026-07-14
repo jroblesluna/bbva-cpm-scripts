@@ -16,6 +16,7 @@ import { X, Monitor } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SessionTab } from '@/components/remote-view/SessionTab'
 import { useWebSocket } from '@/hooks/useWebSocket'
+import { remoteViewApi } from '@/lib/api'
 import type {
   RemoteViewTab,
   RemoteViewStatus,
@@ -242,6 +243,28 @@ export default function RemoteViewPage() {
     const removeHandler = addMessageHandler(handleWsMessage)
     return removeHandler
   }, [addMessageHandler, handleWsMessage])
+
+  // Catch-up: verificar sesiones pending_consent cuando WS conecta
+  // (el remote_view_accepted pudo haber llegado antes de que el WS estuviera listo)
+  useEffect(() => {
+    if (!isConnected) return
+
+    const pendingTabs = state.tabs.filter(t => t.status === 'pending_consent')
+    if (pendingTabs.length === 0) return
+
+    const timer = setTimeout(async () => {
+      for (const tab of pendingTabs) {
+        try {
+          const status = await remoteViewApi.getStatus(tab.workstationId)
+          if (status.active && status.session_id === tab.sessionId) {
+            dispatch({ type: 'UPDATE_STATUS', sessionId: tab.sessionId, status: 'active' })
+          }
+        } catch { /* ignorar — el WS handler se encargará eventualmente */ }
+      }
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [isConnected, state.tabs])
 
   // Enviar rv_pause / rv_resume al cambiar de tab activo
   useEffect(() => {
