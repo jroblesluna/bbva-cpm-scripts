@@ -108,7 +108,7 @@ export default function RemoteViewPage() {
   const hydratedRef = useRef(false)
 
   // Conexión WebSocket para recibir mensajes del backend
-  const { isConnected, addMessageHandler } = useWebSocket({ autoConnect: true })
+  const { isConnected, addMessageHandler, send: wsSend } = useWebSocket({ autoConnect: true })
 
   // Hidratar tabs desde sessionStorage al montar (persistir estado al navegar)
   useEffect(() => {
@@ -236,18 +236,12 @@ export default function RemoteViewPage() {
   }
 
   /** Enviar mensaje JSON al WebSocket del operador */
-  const sendWsMessage = (payload: Record<string, unknown>) => {
-    try {
-      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000'
-      // Usar el singleton existente para enviar mensajes
-      // El WebSocket del operador se conecta en /ws/operator
-      // Nota: en implementación real, se accede al ws instance del singleton
-      // Por ahora log + preparado para integración con WebSocketClient.send()
-      console.log('[RemoteView] Enviando mensaje WS:', payload)
-    } catch (err) {
-      console.error('[RemoteView] Error enviando mensaje WS:', err)
+  const sendWsMessage = useCallback((payload: Record<string, unknown>) => {
+    const sent = wsSend(payload)
+    if (!sent) {
+      console.warn('[RemoteView] No se pudo enviar mensaje WS (desconectado):', payload.type)
     }
-  }
+  }, [wsSend])
 
   // Cerrar tab y enviar stop
   const handleCloseTab = (sessionId: string) => {
@@ -274,7 +268,7 @@ export default function RemoteViewPage() {
       })
       dispatch({ type: 'UPDATE_MODE', sessionId, mode: newMode })
     },
-    []
+    [sendWsMessage]
   )
 
   /** Cambio de monitor: envía remote_view_config con nuevo monitor index */
@@ -286,7 +280,7 @@ export default function RemoteViewPage() {
         monitor: monitorIndex,
       })
     },
-    []
+    [sendWsMessage]
   )
 
   /** Cambio de resolución/calidad: envía remote_view_config */
@@ -298,7 +292,7 @@ export default function RemoteViewPage() {
         resolution,
       })
     },
-    []
+    [sendWsMessage]
   )
 
   /** Solicitar frame (Screenshot mode: rv_request_frame) */
@@ -309,7 +303,7 @@ export default function RemoteViewPage() {
         session_id: sessionId,
       })
     },
-    []
+    [sendWsMessage]
   )
 
   /** Enviar input event (Interactive mode: rv_input) */
@@ -317,7 +311,7 @@ export default function RemoteViewPage() {
     (msg: RvInputMessage) => {
       sendWsMessage(msg as unknown as Record<string, unknown>)
     },
-    []
+    [sendWsMessage]
   )
 
   /** Enviar clipboard a la workstation (rv_clipboard) */
@@ -330,7 +324,7 @@ export default function RemoteViewPage() {
         text,
       })
     },
-    []
+    [sendWsMessage]
   )
 
   /** Reintentar sesión (después de rechazo de consent) */
@@ -342,7 +336,7 @@ export default function RemoteViewPage() {
         session_id: sessionId,
       })
     },
-    []
+    [sendWsMessage]
   )
 
   /** Keep-alive: resetear timer de inactividad */
@@ -353,7 +347,7 @@ export default function RemoteViewPage() {
         session_id: sessionId,
       })
     },
-    []
+    [sendWsMessage]
   )
 
   // Tab activo actual

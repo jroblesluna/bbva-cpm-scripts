@@ -150,6 +150,25 @@ export class WebSocketClient {
     return this.status === WebSocketStatus.CONNECTED;
   }
 
+  /**
+   * Enviar un mensaje JSON al servidor.
+   * Solo envía si la conexión está abierta.
+   */
+  send(message: Record<string, unknown>): boolean {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn('[WebSocket] No se puede enviar: conexión no abierta');
+      return false;
+    }
+
+    try {
+      this.ws.send(JSON.stringify(message));
+      return true;
+    } catch (error) {
+      console.error('[WebSocket] Error enviando mensaje:', error);
+      return false;
+    }
+  }
+
   // ==========================================================================
   // HANDLERS PRIVADOS
   // ==========================================================================

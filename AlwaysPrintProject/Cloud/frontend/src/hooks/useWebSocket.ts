@@ -62,6 +62,13 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   }, [])
 
   /**
+   * Enviar mensaje al WebSocket.
+   */
+  const send = useCallback((message: Record<string, unknown>): boolean => {
+    return wsClientRef.current.send(message)
+  }, [])
+
+  /**
    * Auto-conectar al montar si autoConnect es true.
    * Delay de 100ms para evitar race condition con React Strict Mode (doble mount en dev).
    */
@@ -98,5 +105,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     connect,
     disconnect,
     addMessageHandler,
+    send,
   }
 }
