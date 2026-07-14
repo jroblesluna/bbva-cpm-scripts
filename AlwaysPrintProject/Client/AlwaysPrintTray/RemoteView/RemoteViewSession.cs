@@ -98,12 +98,12 @@ namespace AlwaysPrintTray.RemoteView
                     SessionId = data["session_id"]?.ToString();
                     Mode = data["mode"]?.ToString() ?? "screenshot";
                     Resolution = data["resolution"]?.ToString() ?? "720p";
-                    Quality = data["quality"]?.ToObject<int>() ?? 70;
-                    MonitorIndex = data["monitor"]?.ToObject<int>() ?? 0;
+                    Quality = data["quality"]?.Value<int?>() ?? 70;
+                    MonitorIndex = data["monitor"]?.Value<int?>() ?? 0;
                     UserName = data["user_name"]?.ToString();
-                    ViewportWidth = data["viewport_width"]?.ToObject<int>() ?? 0;
-                    ViewportHeight = data["viewport_height"]?.ToObject<int>() ?? 0;
-                    Fps = data["fps"]?.ToObject<int>() ?? 5;
+                    ViewportWidth = data["viewport_width"]?.Value<int?>() ?? 0;
+                    ViewportHeight = data["viewport_height"]?.Value<int?>() ?? 0;
+                    Fps = data["fps"]?.Value<int?>() ?? 5;
 
                     _state = RemoteViewSessionState.Active;
                 }
@@ -195,19 +195,20 @@ namespace AlwaysPrintTray.RemoteView
                     }
 
                     // Actualizar solo los campos presentes en el mensaje (partial update)
-                    if (data["resolution"] != null)
+                    // Usar Value<T?>() para manejar JTokenType.Null correctamente
+                    if (data["resolution"] != null && data["resolution"].Type != JTokenType.Null)
                         Resolution = data["resolution"].ToString();
-                    if (data["quality"] != null)
-                        Quality = data["quality"].ToObject<int>();
-                    if (data["monitor"] != null)
-                        MonitorIndex = data["monitor"].ToObject<int>();
-                    if (data["fps"] != null)
-                        Fps = data["fps"].ToObject<int>();
-                    if (data["viewport_width"] != null)
-                        ViewportWidth = data["viewport_width"].ToObject<int>();
-                    if (data["viewport_height"] != null)
-                        ViewportHeight = data["viewport_height"].ToObject<int>();
-                    if (data["mode"] != null)
+                    if (data["quality"] != null && data["quality"].Type != JTokenType.Null)
+                        Quality = data["quality"].Value<int?>() ?? Quality;
+                    if (data["monitor"] != null && data["monitor"].Type != JTokenType.Null)
+                        MonitorIndex = data["monitor"].Value<int?>() ?? MonitorIndex;
+                    if (data["fps"] != null && data["fps"].Type != JTokenType.Null)
+                        Fps = data["fps"].Value<int?>() ?? Fps;
+                    if (data["viewport_width"] != null && data["viewport_width"].Type != JTokenType.Null)
+                        ViewportWidth = data["viewport_width"].Value<int?>() ?? ViewportWidth;
+                    if (data["viewport_height"] != null && data["viewport_height"].Type != JTokenType.Null)
+                        ViewportHeight = data["viewport_height"].Value<int?>() ?? ViewportHeight;
+                    if (data["mode"] != null && data["mode"].Type != JTokenType.Null)
                         Mode = data["mode"].ToString();
                 }
 
