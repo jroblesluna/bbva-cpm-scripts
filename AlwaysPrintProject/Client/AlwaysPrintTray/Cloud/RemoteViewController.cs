@@ -9,8 +9,10 @@ namespace AlwaysPrintTray.Cloud
     /// Instancia y gestiona los componentes de captura y manejo de sesión,
     /// recibiendo mensajes del WebSocket y delegando al handler apropiado.
     /// 
-    /// Solo implementa Screenshot mode (rv_request_frame → rv_frame).
-    /// Stream (H.264) e Interactive (input injection) se gestionan por StreamController.
+    /// Modos soportados:
+    /// - Screenshot: rv_request_frame → FrameRequestHandler → rv_frame (bajo demanda)
+    /// - Stream/Interactive: TileStreamEngine envía delta frames continuamente
+    ///   (tiles que cambiaron + keyframe periódico cada 5s)
     /// </summary>
     public sealed class RemoteViewController
     {
@@ -21,9 +23,14 @@ namespace AlwaysPrintTray.Cloud
         private readonly FrameRequestHandler _frameHandler;
         private readonly InputHandler _inputHandler;
 
+        // === TileStreamEngine para modos stream/interactive ===
+        private TileStreamEngine? _tileEngine;
+        private readonly object _engineLock = new object();
+
         /// <summary>
         /// Crea una nueva instancia del controller de vista remota.
         /// Inicializa todos los componentes necesarios para Screenshot mode.
+        /// TileStreamEngine se crea/inicia bajo demanda al entrar en stream/interactive.
         /// </summary>
         /// <param name="wsClient">Cliente WebSocket para enviar respuestas (rv_frame).</param>
         public RemoteViewController(CloudWebSocketClient wsClient)
@@ -42,12 +49,14 @@ namespace AlwaysPrintTray.Cloud
 
             _inputHandler = new InputHandler(_session);
 
-            // Suscribirse a eventos de sesión para logging
+            // Suscribirse a eventos de sesión para gestión del ciclo de vida
             _session.OnSessionStarted += OnSessionStarted;
             _session.OnSessionEnded += OnSessionEnded;
+            _session.OnConfigChanged += OnConfigChanged;
+            _session.OnPauseChanged += OnPauseChanged;
 
             AlwaysPrintLogger.WriteTrayInfo(
-                "RemoteViewController: inicializado. Screenshot mode listo.");
+                "RemoteViewController: inicializado. Screenshot + TileStream modes listo.");
         }
 
         /// <summary>
@@ -125,16 +134,148 @@ namespace AlwaysPrintTray.Cloud
         /// </summary>
         public bool HasActiveSession => _session.IsActive;
 
+        // =====================================================================
+        // Gestión del TileStreamEngine según el modo de la sesión
+        // =====================================================================
+
         private void OnSessionStarted()
         {
             AlwaysPrintLogger.WriteTrayInfo(
                 $"RemoteViewController: sesión iniciada. session_id={_session.SessionId}, mode={_session.Mode}");
+
+            // Si el modo es stream o interactive, iniciar TileStreamEngine
+            if (IsStreamingMode(_session.Mode))
+            {
+                StartTileEngine();
+            }
         }
 
         private void OnSessionEnded()
         {
             AlwaysPrintLogger.WriteTrayInfo(
-                $"RemoteViewController: sesión finalizada.");
+                "RemoteViewController: sesión finalizada.");
+
+            // Detener TileStreamEngine si estaba corriendo
+            StopTileEngine();
+        }
+
+        private void OnConfigChanged()
+        {
+            // Detectar cambio de modo
+            string? currentMode = _session.Mode;
+            bool engineRunning;
+
+            lock (_engineLock)
+            {
+                engineRunning = _tileEngine != null && _tileEngine.IsRunning;
+            }
+
+            if (IsStreamingMode(currentMode) && !engineRunning)
+            {
+                // Cambio a modo stream/interactive: iniciar engine
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"RemoteViewController: modo cambió a '{currentMode}', iniciando TileStreamEngine.");
+                StartTileEngine();
+            }
+            else if (!IsStreamingMode(currentMode) && engineRunning)
+            {
+                // Cambio a modo screenshot: detener engine
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"RemoteViewController: modo cambió a '{currentMode}', deteniendo TileStreamEngine.");
+                StopTileEngine();
+            }
+            else if (engineRunning)
+            {
+                // Engine corriendo y sigue en streaming mode: aplicar cambios de config
+                lock (_engineLock)
+                {
+                    if (_tileEngine != null)
+                    {
+                        // Actualizar FPS si cambió
+                        if (_session.Fps > 0)
+                            _tileEngine.UpdateFps(_session.Fps);
+
+                        // Forzar keyframe si cambió monitor o resolución
+                        _tileEngine.ForceKeyframe();
+                    }
+                }
+            }
+        }
+
+        private void OnPauseChanged()
+        {
+            lock (_engineLock)
+            {
+                if (_tileEngine == null || !_tileEngine.IsRunning)
+                    return;
+
+                if (_session.IsPaused)
+                {
+                    _tileEngine.Pause();
+                }
+                else
+                {
+                    _tileEngine.Resume();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Crea e inicia el TileStreamEngine.
+        /// </summary>
+        private void StartTileEngine()
+        {
+            lock (_engineLock)
+            {
+                // Limpiar engine anterior si existe
+                if (_tileEngine != null)
+                {
+                    try { _tileEngine.Stop(); }
+                    catch { /* Ignorar */ }
+                    _tileEngine.Dispose();
+                    _tileEngine = null;
+                }
+
+                _tileEngine = new TileStreamEngine(
+                    _session,
+                    _capturer,
+                    _encoder,
+                    (type, payload) => _wsClient.Send(type, payload));
+
+                _tileEngine.Start();
+            }
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                "RemoteViewController: TileStreamEngine iniciado para modo streaming.");
+        }
+
+        /// <summary>
+        /// Detiene y libera el TileStreamEngine.
+        /// </summary>
+        private void StopTileEngine()
+        {
+            lock (_engineLock)
+            {
+                if (_tileEngine == null)
+                    return;
+
+                try { _tileEngine.Stop(); }
+                catch { /* Ignorar */ }
+
+                _tileEngine.Dispose();
+                _tileEngine = null;
+            }
+
+            AlwaysPrintLogger.WriteTrayInfo(
+                "RemoteViewController: TileStreamEngine detenido.");
+        }
+
+        /// <summary>
+        /// Determina si un modo requiere streaming continuo (TileStreamEngine).
+        /// </summary>
+        private static bool IsStreamingMode(string? mode)
+        {
+            return mode == "stream" || mode == "interactive";
         }
     }
 }
