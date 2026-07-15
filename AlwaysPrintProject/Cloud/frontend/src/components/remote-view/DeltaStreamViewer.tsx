@@ -78,9 +78,10 @@ export function DeltaStreamViewer({
         frameCountSinceLastFps.current = 0
         lastFpsTimeRef.current = now
 
-        // Detectar si no llegan frames por más de 7s (polling es cada 5s + ~1s respuesta)
+        // Detectar si no llegan frames por más de 12s (2x poll interval + margen)
+        // Así solo se muestra "Reconnecting" si fallan 2 polls consecutivos
         const timeSinceLastFrame = now - lastFrameReceivedRef.current
-        setIsStale(canvasReady && timeSinceLastFrame > 7000)
+        setIsStale(canvasReady && timeSinceLastFrame > 12000)
       }
     }, 1000)
     return () => clearInterval(interval)
@@ -205,8 +206,10 @@ export function DeltaStreamViewer({
 
         <div className="w-px h-5 bg-gray-600" />
 
-        {/* Indicador de FPS */}
-        <span className="text-xs text-gray-400 tabular-nums">{fps} FPS</span>
+        {/* Indicador de actividad */}
+        <span className="text-xs text-gray-400 tabular-nums">
+          {fps > 0 ? `${fps} FPS` : !isStale ? `1/${5}s` : '—'}
+        </span>
 
         <div className="flex-1" />
 
