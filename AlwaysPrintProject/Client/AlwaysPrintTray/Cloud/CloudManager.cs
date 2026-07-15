@@ -388,6 +388,7 @@ namespace AlwaysPrintTray.Cloud
                 case "remote_view_resume":
                 case "rv_request_frame":
                 case "rv_input":
+                case "rv_viewer_alive":
                     _remoteView?.HandleMessage(type, json);
                     break;
                 default:

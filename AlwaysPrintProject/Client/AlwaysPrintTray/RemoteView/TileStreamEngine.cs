@@ -70,6 +70,12 @@ namespace AlwaysPrintTray.RemoteView
         private long _totalDeltaFramesSent;
         private long _totalSkippedFrames;
 
+        // === Viewer alive tracking ===
+        private DateTime _lastViewerAliveAt = DateTime.UtcNow;
+        private const int VIEWER_PAUSE_TIMEOUT_SECONDS = 10;
+        private const int VIEWER_END_TIMEOUT_SECONDS = 60;
+        private bool _viewerPaused; // true = streaming pausado porque viewer no envió heartbeat
+
         /// <summary>Indica si el engine está corriendo.</summary>
         public bool IsRunning => _isRunning;
 
@@ -136,6 +142,8 @@ namespace AlwaysPrintTray.RemoteView
                 _totalKeyframesSent = 0;
                 _totalDeltaFramesSent = 0;
                 _totalSkippedFrames = 0;
+                _lastViewerAliveAt = DateTime.UtcNow;
+                _viewerPaused = false;
                 _keyframeTimer = Stopwatch.StartNew();
                 _pauseGate.Set();
 
@@ -268,6 +276,24 @@ namespace AlwaysPrintTray.RemoteView
         }
 
         /// <summary>
+        /// Registra que el frontend viewer está activo (recibió rv_viewer_alive).
+        /// Si el streaming estaba pausado por falta de heartbeat, lo reanuda.
+        /// </summary>
+        public void RecordViewerAlive()
+        {
+            _lastViewerAliveAt = DateTime.UtcNow;
+
+            if (_viewerPaused)
+            {
+                _viewerPaused = false;
+                _pauseGate.Set(); // Reanudar si estaba pausado por viewer timeout
+                _forceNextKeyframe = true; // Enviar keyframe al reanudar
+                AlwaysPrintLogger.WriteTrayInfo(
+                    "TileStreamEngine: viewer reconectado, reanudando streaming.");
+            }
+        }
+
+        /// <summary>
         /// Loop principal de captura con tile-based delta encoding.
         /// </summary>
         private void CaptureLoop()
@@ -286,6 +312,28 @@ namespace AlwaysPrintTray.RemoteView
 
                     if (token.IsCancellationRequested)
                         break;
+
+                    // Verificar si el viewer sigue activo (heartbeat)
+                    var secondsSinceViewerAlive = (DateTime.UtcNow - _lastViewerAliveAt).TotalSeconds;
+
+                    if (secondsSinceViewerAlive > VIEWER_END_TIMEOUT_SECONDS)
+                    {
+                        // 60s sin heartbeat — cerrar sesión
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            "TileStreamEngine: 60s sin heartbeat del viewer. Cerrando sesión.");
+                        _session.End();
+                        break; // Salir del loop
+                    }
+
+                    if (secondsSinceViewerAlive > VIEWER_PAUSE_TIMEOUT_SECONDS && !_viewerPaused)
+                    {
+                        // 10s sin heartbeat — pausar streaming
+                        _viewerPaused = true;
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            "TileStreamEngine: 10s sin heartbeat del viewer. Pausando streaming.");
+                        _pauseGate.Reset(); // Bloquear el hilo hasta que llegue viewer_alive
+                        continue; // Volver al inicio del loop (se bloqueará en el pauseGate.Wait)
+                    }
 
                     frameStopwatch.Restart();
 

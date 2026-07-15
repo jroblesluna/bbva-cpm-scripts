@@ -100,6 +100,10 @@ namespace AlwaysPrintTray.Cloud
                     _inputHandler.HandleRvInput(json);
                     break;
 
+                case "rv_viewer_alive":
+                    HandleViewerAlive();
+                    break;
+
                 default:
                     AlwaysPrintLogger.WriteTrayWarning(
                         $"RemoteViewController: tipo de mensaje no reconocido '{type}'. Ignorando.");
@@ -121,7 +125,8 @@ namespace AlwaysPrintTray.Cloud
                 || type == "remote_view_pause"
                 || type == "remote_view_resume"
                 || type == "rv_request_frame"
-                || type == "rv_input";
+                || type == "rv_input"
+                || type == "rv_viewer_alive";
         }
 
         /// <summary>
@@ -295,6 +300,23 @@ namespace AlwaysPrintTray.Cloud
             consentThread.IsBackground = true;
             consentThread.Name = "RemoteView_ConsentPopup";
             consentThread.Start();
+        }
+
+        /// <summary>
+        /// Procesa rv_viewer_alive del frontend: registra que el viewer está activo.
+        /// Si el TileStreamEngine estaba pausado por falta de heartbeat, lo reanuda.
+        /// </summary>
+        private void HandleViewerAlive()
+        {
+            lock (_engineLock)
+            {
+                if (_tileEngine != null)
+                {
+                    _tileEngine.RecordViewerAlive();
+                }
+            }
+            // También actualizar la sesión para que el FrameRequestHandler sepa que hay viewer activo
+            _session.RecordViewerAlive();
         }
 
         /// <summary>

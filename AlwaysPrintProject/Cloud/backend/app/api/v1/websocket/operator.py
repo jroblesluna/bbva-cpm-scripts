@@ -121,6 +121,7 @@ async def operator_websocket(
                 "rv_request_frame",
                 "rv_input",
                 "rv_clipboard",
+                "rv_viewer_alive",
             ):
                 from app.services.remote_view_relay import remote_view_relay
                 session_id = data.get("session_id")

@@ -336,6 +336,17 @@ namespace AlwaysPrintTray.RemoteView
             OnSessionStarted?.Invoke();
         }
 
+        /// <summary>Último timestamp de viewer_alive recibido.</summary>
+        public DateTime LastViewerAliveAt { get; private set; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// Registra que el frontend viewer está activo.
+        /// </summary>
+        public void RecordViewerAlive()
+        {
+            LastViewerAliveAt = DateTime.UtcNow;
+        }
+
         /// <summary>
         /// Limpia todos los campos de estado de la sesión.
         /// </summary>

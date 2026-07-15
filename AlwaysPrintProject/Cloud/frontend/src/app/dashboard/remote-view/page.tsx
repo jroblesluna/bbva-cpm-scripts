@@ -374,6 +374,29 @@ export default function RemoteViewPage() {
     return () => clearTimeout(timer)
   }, [isConnected, state.activeTabId, sendWsMessage])
 
+  // Heartbeat "viewer_alive": indica al Tray que el frontend está activamente mostrando frames.
+  // Si el Tray no recibe este heartbeat en 10s, pausa el streaming (ahorra CPU/bandwidth).
+  // Si no recibe en 60s, cierra la sesión completamente.
+  useEffect(() => {
+    if (!isConnected || !state.activeTabId) return
+
+    const activeTab = tabsRef.current.find(t => t.sessionId === state.activeTabId)
+    if (!activeTab || activeTab.status !== 'active') return
+
+    // Enviar heartbeat inmediatamente y cada 3s
+    const sendHeartbeat = () => {
+      sendWsMessage({
+        type: 'rv_viewer_alive',
+        session_id: state.activeTabId!,
+      })
+    }
+
+    sendHeartbeat() // Inmediato al conectar/activar
+    const interval = setInterval(sendHeartbeat, 3000)
+
+    return () => clearInterval(interval)
+  }, [isConnected, state.activeTabId, sendWsMessage])
+
   // Auto-retry: si no llegan frames en 5s después de conectar, re-solicitar
   // Esto fuerza el lazy-register en el worker correcto y restablece el flujo
   useEffect(() => {
