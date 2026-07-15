@@ -56,11 +56,8 @@ export function ScreenshotViewer({
   const [autoRefresh, setAutoRefresh] = useState(defaultAutoRefresh)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Solicitar primer frame al montar
-  useEffect(() => {
-    onRequestFrame()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // Primer frame se solicita desde la página (después de WS connect) — no aquí.
+  // El auto-refresh (cada 2s) se encarga de los siguientes.
 
   // Gestión del intervalo de auto-refresh (Req 4.8)
   useEffect(() => {

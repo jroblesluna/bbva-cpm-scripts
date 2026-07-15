@@ -353,6 +353,27 @@ export default function RemoteViewPage() {
     }
   }, [wsSend])
 
+  // Enviar primer rv_request_frame cuando WS conecta (no antes)
+  // Esto reemplaza el request-on-mount del ScreenshotViewer que siempre se pierde
+  // porque el WS tarda 100-500ms en conectar y el mount ocurre antes.
+  useEffect(() => {
+    if (!isConnected) return
+    if (!state.activeTabId) return
+
+    const activeTab = tabsRef.current.find(t => t.sessionId === state.activeTabId)
+    if (!activeTab || activeTab.status !== 'active') return
+
+    // Enviar request 500ms después de conectar (dar tiempo al backend para registrar el operator WS)
+    const timer = setTimeout(() => {
+      sendWsMessage({
+        type: 'rv_request_frame',
+        session_id: state.activeTabId!,
+      })
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [isConnected, state.activeTabId, sendWsMessage])
+
   // Auto-retry: si no llegan frames en 5s después de conectar, re-solicitar
   // Esto fuerza el lazy-register en el worker correcto y restablece el flujo
   useEffect(() => {

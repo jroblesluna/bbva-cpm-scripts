@@ -86,14 +86,8 @@ export function DeltaStreamViewer({
     return () => clearInterval(interval)
   }, [canvasReady])
 
-  // Solicitar un frame al montar para obtener imagen base inmediata
-  // (el TileStreamEngine pudo haber enviado su keyframe antes de que este componente montara)
-  useEffect(() => {
-    if (onRequestFrame && isActive) {
-      onRequestFrame()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // Primer frame se solicita desde la página (después de WS connect) — no aquí.
+  // El polling adaptativo (cada 5s) se encarga de los siguientes si no llegan push frames.
 
   // Polling adaptativo: solo solicitar frame si no llegan push frames en >5s
   // Esto evita gastar bandwidth cuando el TileStreamEngine push funciona.
