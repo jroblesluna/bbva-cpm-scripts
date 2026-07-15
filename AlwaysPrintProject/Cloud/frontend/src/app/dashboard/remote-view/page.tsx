@@ -108,6 +108,7 @@ export default function RemoteViewPage() {
   const [state, dispatch] = useReducer(remoteViewReducer, { tabs: [], activeTabId: null })
   const previousActiveRef = useRef<string | null>(null)
   const hydratedRef = useRef(false)
+  const mountTimeRef = useRef(Date.now())
 
   // Estado de frames por sesión (useRef para evitar re-renders en cada frame)
   const frameDataRef = useRef<Record<string, { data: string; width: number; height: number }>>({})
@@ -118,6 +119,7 @@ export default function RemoteViewPage() {
   const { isConnected, addMessageHandler, send: wsSend } = useWebSocket({ autoConnect: true })
 
   // Hidratar tabs desde sessionStorage al montar (persistir estado al navegar)
+  // Solo restaurar tabs de menos de 2 minutos (sesiones probablemente aún activas)
   useEffect(() => {
     if (hydratedRef.current) return
     hydratedRef.current = true
@@ -128,8 +130,15 @@ export default function RemoteViewPage() {
       const savedActive = sessionStorage.getItem('rv_activeTab')
       if (savedTabs) {
         const tabs = JSON.parse(savedTabs) as RemoteViewTab[]
-        tabs.forEach(tab => dispatch({ type: 'ADD_TAB', tab }))
-        if (savedActive) {
+        const now = Date.now()
+        // Filtrar tabs stale (> 2 min): al recargar la página, tabs antiguos
+        // ya no tienen sesión activa y sus señales interfieren con sesiones nuevas
+        const freshTabs = tabs.filter(tab => {
+          const age = now - new Date(tab.startedAt).getTime()
+          return age < 120000 // 2 minutos
+        })
+        freshTabs.forEach(tab => dispatch({ type: 'ADD_TAB', tab }))
+        if (savedActive && freshTabs.some(t => t.sessionId === savedActive)) {
           dispatch({ type: 'SET_ACTIVE', sessionId: savedActive })
         }
       }
@@ -278,9 +287,17 @@ export default function RemoteViewPage() {
   }, [isConnected, state.tabs])
 
   // Enviar rv_pause / rv_resume al cambiar de tab activo
+  // No enviar señales en los primeros 2s después del mount para evitar
+  // que tabs hidratados desde sessionStorage interfieran con sesiones nuevas
+  // que se crean desde query params o WS connect
   useEffect(() => {
     const prevId = previousActiveRef.current
     const currentId = state.activeTabId
+
+    if (Date.now() - mountTimeRef.current < 2000) {
+      previousActiveRef.current = currentId
+      return
+    }
 
     if (prevId && prevId !== currentId) {
       // Pausar tab anterior
