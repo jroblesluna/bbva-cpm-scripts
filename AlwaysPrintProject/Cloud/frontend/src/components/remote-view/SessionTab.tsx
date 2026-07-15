@@ -144,6 +144,7 @@ export function SessionTab({
         isActive={isActive}
         latestKeyframe={frameData ? { data: frameData, width: frameWidth, height: frameHeight } : null}
         latestDelta={latestDelta}
+        onRequestFrame={onRequestFrame}
       />
     )
   }

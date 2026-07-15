@@ -42,6 +42,8 @@ interface DeltaStreamViewerProps {
   latestKeyframe: { data: string; width: number; height: number } | null
   /** Último delta frame recibido (array de tiles cambiados) — null si no hay */
   latestDelta: { tiles: DeltaTile[]; width: number; height: number } | null
+  /** Solicitar un frame al montar para obtener imagen base inmediata */
+  onRequestFrame?: () => void
 }
 
 // ============================================================================
@@ -53,6 +55,7 @@ export function DeltaStreamViewer({
   isActive,
   latestKeyframe,
   latestDelta,
+  onRequestFrame,
 }: DeltaStreamViewerProps) {
   const t = useTranslations('remoteView')
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -75,6 +78,15 @@ export function DeltaStreamViewer({
       }
     }, 1000)
     return () => clearInterval(interval)
+  }, [])
+
+  // Solicitar un frame al montar para obtener imagen base inmediata
+  // (el TileStreamEngine pudo haber enviado su keyframe antes de que este componente montara)
+  useEffect(() => {
+    if (onRequestFrame && isActive) {
+      onRequestFrame()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Dibujar keyframe en el canvas
