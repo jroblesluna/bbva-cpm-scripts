@@ -38,7 +38,7 @@ class RemoteViewRelay:
         # Si la WS reconecta dentro del grace period (30s), la tarea se cancela.
         self._pending_disconnects: dict[str, asyncio.Task] = {}
         # Tareas pendientes de desconexión de operador: user_id → asyncio.Task
-        # Si el operador reconecta dentro del grace period (15s), la tarea se cancela.
+        # Si el operador reconecta dentro del grace period (30s), la tarea se cancela.
         # Cubre el caso de page reload (reconexión en 1-2s).
         self._pending_operator_disconnects: dict[str, asyncio.Task] = {}
 
@@ -321,9 +321,9 @@ class RemoteViewRelay:
 
     async def handle_operator_disconnect(self, user_id: str) -> None:
         """
-        Maneja la desconexión del operador con grace period de 15s.
+        Maneja la desconexión del operador con grace period de 30s.
 
-        Si el operador reconecta dentro de 15s (page reload), no se cierran las sesiones.
+        Si el operador reconecta dentro de 30s (page reload), no se cierran las sesiones.
         Esto evita que un simple F5 mate sesiones activas de Remote View.
 
         Si el grace period expira sin reconexión (cierre real de pestaña, logout, etc.),
@@ -343,7 +343,7 @@ class RemoteViewRelay:
 
         logger.info(
             "[RV_RELAY] Operador desconectado con %d sesiones activas. "
-            "Iniciando grace period 15s. user_id=%s",
+            "Iniciando grace period 30s. user_id=%s",
             len(user_sessions), user_id,
         )
 
@@ -352,7 +352,7 @@ class RemoteViewRelay:
         if existing_task and not existing_task.done():
             existing_task.cancel()
 
-        # Iniciar timer de 15s para cierre definitivo
+        # Iniciar timer de 30s para cierre definitivo
         task = asyncio.create_task(
             self._operator_disconnect_cleanup(user_id, user_sessions)
         )
@@ -362,7 +362,7 @@ class RemoteViewRelay:
         """
         Cancela el timer de desconexión si el operador reconectó (page reload).
 
-        Se invoca al conectar un operador WS. Si hay un timer pendiente de 15s,
+        Se invoca al conectar un operador WS. Si hay un timer pendiente de 30s,
         se cancela y las sesiones RV siguen activas sin interrupción.
 
         Args:
@@ -379,7 +379,7 @@ class RemoteViewRelay:
 
     async def _operator_disconnect_cleanup(self, user_id: str, session_ids: list[str]) -> None:
         """
-        Espera 15s y cierra sesiones si el operador no reconectó.
+        Espera 30s y cierra sesiones si el operador no reconectó.
 
         Se ejecuta como asyncio.Task y puede ser cancelada por handle_operator_reconnect.
 
@@ -388,14 +388,14 @@ class RemoteViewRelay:
             session_ids: Lista de session_ids que estaban activos al desconectarse
         """
         try:
-            await asyncio.sleep(15)
+            await asyncio.sleep(30)
         except asyncio.CancelledError:
             # El operador reconectó y se canceló este timer
             return
 
         # Grace period expirado — cerrar sesiones
         logger.warning(
-            "[RV_RELAY] Grace period de operador expirado (15s). "
+            "[RV_RELAY] Grace period de operador expirado (30s). "
             "Cerrando %d sesiones. user_id=%s",
             len(session_ids), user_id,
         )
