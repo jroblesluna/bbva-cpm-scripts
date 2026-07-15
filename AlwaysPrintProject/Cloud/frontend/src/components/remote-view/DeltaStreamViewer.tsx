@@ -62,11 +62,13 @@ export function DeltaStreamViewer({
   const [canvasReady, setCanvasReady] = useState(false)
   const [frameCount, setFrameCount] = useState(0)
   const [fps, setFps] = useState(0)
+  const [isStale, setIsStale] = useState(false)
   const lastFpsTimeRef = useRef(performance.now())
   const frameCountSinceLastFps = useRef(0)
+  const lastFrameReceivedRef = useRef(performance.now())
   const canvasDimensionsRef = useRef({ width: 0, height: 0 })
 
-  // Contador de FPS (actualiza cada segundo)
+  // Contador de FPS + detección de stale (actualiza cada segundo)
   useEffect(() => {
     const interval = setInterval(() => {
       const now = performance.now()
@@ -75,10 +77,14 @@ export function DeltaStreamViewer({
         setFps(Math.round(frameCountSinceLastFps.current / elapsed))
         frameCountSinceLastFps.current = 0
         lastFpsTimeRef.current = now
+
+        // Detectar si no llegan frames por más de 3s
+        const timeSinceLastFrame = now - lastFrameReceivedRef.current
+        setIsStale(canvasReady && timeSinceLastFrame > 3000)
       }
     }, 1000)
     return () => clearInterval(interval)
-  }, [])
+  }, [canvasReady])
 
   // Solicitar un frame al montar para obtener imagen base inmediata
   // (el TileStreamEngine pudo haber enviado su keyframe antes de que este componente montara)
@@ -110,6 +116,7 @@ export function DeltaStreamViewer({
       setCanvasReady(true)
       setFrameCount((c) => c + 1)
       frameCountSinceLastFps.current++
+      lastFrameReceivedRef.current = performance.now()
     }
     img.src = `data:image/jpeg;base64,${latestKeyframe.data}`
   }, [latestKeyframe, isActive])
@@ -134,6 +141,7 @@ export function DeltaStreamViewer({
         if (tilesDrawn === totalTiles) {
           setFrameCount((c) => c + 1)
           frameCountSinceLastFps.current++
+          lastFrameReceivedRef.current = performance.now()
         }
       }
       tileImg.src = `data:image/jpeg;base64,${tile.data}`
@@ -157,20 +165,32 @@ export function DeltaStreamViewer({
   return (
     <div className="flex flex-col flex-1 bg-gray-900 overflow-hidden">
       {/* Área del canvas */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden p-2">
+      <div className="flex-1 flex items-center justify-center overflow-hidden p-2 relative">
         <canvas
           ref={canvasRef}
           className="max-w-full max-h-full object-contain"
           style={{ imageRendering: 'auto' }}
           aria-label={t('streamVideoLabel')}
         />
+
+        {/* Overlay de reconexión cuando no llegan frames */}
+        {isStale && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-10">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-amber-300 font-medium">{t('streamReconnecting')}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Barra de estado inferior */}
       <div className="flex items-center gap-3 px-4 h-10 bg-gray-800 border-t border-gray-700 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <Video className="w-3.5 h-3.5 text-green-400" />
-          <span className="text-xs text-green-400">{t('streamActive')}</span>
+          <Video className={`w-3.5 h-3.5 ${isStale ? 'text-amber-400' : 'text-green-400'}`} />
+          <span className={`text-xs ${isStale ? 'text-amber-400' : 'text-green-400'}`}>
+            {isStale ? t('streamReconnecting') : t('streamActive')}
+          </span>
         </div>
 
         <div className="w-px h-5 bg-gray-600" />
