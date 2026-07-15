@@ -121,12 +121,39 @@ REM ============================================================
 REM Script de reinicio de servicio AlwaysPrint (fallback)
 REM Generado: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
 REM ============================================================
+
+REM === Variables ===
+set ""LOGFILE=%TEMP%\AlwaysPrint\Commands\restart_service.log""
+
+REM === Subrutina de log ===
+goto :main
+
+:log
+set ""MSG=%~1""
+echo [RST] %date:~6,4%-%date:~3,2%-%date:~0,2% %time:~0,8% - %MSG% >> ""%LOGFILE%""
+goto :eof
+
+:main
+call :log ""Inicio de script de reinicio""
+
+call :log ""Esperando 3s antes de taskkill...""
 timeout /t 3 /nobreak > nul
+
 taskkill /f /im {TrayProcessName}.exe > nul 2>&1
+call :log ""taskkill /f /im {TrayProcessName}.exe - errorlevel=%errorlevel%""
+
+call :log ""Ejecutando net stop {ServiceName}...""
 net stop {ServiceName} > nul 2>&1
+call :log ""net stop {ServiceName} - errorlevel=%errorlevel%""
+
+call :log ""Esperando 3s antes de net start...""
 timeout /t 3 /nobreak > nul
+
+call :log ""Ejecutando net start {ServiceName}...""
 net start {ServiceName} > nul 2>&1
-(goto) 2>nul & del /f /q ""{scriptPath}""
+call :log ""net start {ServiceName} - errorlevel=%errorlevel%""
+
+call :log ""Script de reinicio completado""
 ";
         }
     }

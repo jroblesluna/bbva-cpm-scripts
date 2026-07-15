@@ -20,8 +20,12 @@ namespace AlwaysPrintService
         // 'new' suprime CS0108 — la constante oculta intencionalmente ServiceBase.ServiceName
         // para que el nombre sea accesible en tiempo de compilación sin instanciar el servicio.
         public new const string ServiceName = "AlwaysPrintService";
-        private const int TrayTimeoutSeconds = 1800;   // 30 minutos
-        private const int UserPollSeconds    = 60;
+        private const int TrayTimeoutSeconds      = 1800;  // 30 minutos (backward compat)
+        private const int TrayInitTimeoutSeconds   = 60;    // Timeout real por intento de Tray
+        private const int TrayMaxRetries           = 3;     // Máximo de reintentos de lanzamiento
+        private const int TrayRetryDelaySeconds    = 10;    // Espera entre reintentos
+        private const int TrayRetryBackoffSeconds  = 300;   // Espera larga tras agotar reintentos (5 min)
+        private const int UserPollSeconds          = 60;
 
         // ── Componentes ──────────────────────────────────────────────────────────
         private readonly ServiceStateMachine   _state     = new ServiceStateMachine();
@@ -314,6 +318,7 @@ namespace AlwaysPrintService
         /// <summary>
         /// Bucle que gestiona el ciclo completo de sesión de usuario:
         /// WaitingUser → TrayStarting → TrayStarted → Running → (logoff) → WaitingUser → …
+        /// Incluye mecanismo de reintento para el lanzamiento del Tray.
         /// </summary>
         private void RunSessionLoop()
         {
@@ -324,23 +329,56 @@ namespace AlwaysPrintService
                 WaitForUser();
                 if (_cts.IsCancellationRequested) return;
 
-                // ── Lanzar Tray en la sesión del usuario ────────────────────────
-                _trayInitGate.Reset();
-                _state.Transition(ServiceState.TrayStarting);
-                LaunchTray();
+                // ── Lanzar Tray con reintentos ──────────────────────────────────
+                bool trayStarted = false;
+                for (int attempt = 1; attempt <= TrayMaxRetries; attempt++)
+                {
+                    _trayInitGate.Reset();
+                    _state.Transition(ServiceState.TrayStarting);
+                    LaunchTray();
 
-                // ── Esperar handshake del Tray ───────────────────────────────────
-                bool trayOk = _trayInitGate.Wait(TimeSpan.FromSeconds(TrayTimeoutSeconds), _cts.Token);
-                if (_cts.IsCancellationRequested) return;
+                    // Esperar handshake del Tray
+                    bool trayOk = _trayInitGate.Wait(TimeSpan.FromSeconds(TrayInitTimeoutSeconds), _cts.Token);
+                    if (_cts.IsCancellationRequested) return;
 
-                if (!trayOk)
+                    if (trayOk)
+                    {
+                        trayStarted = true;
+                        break;
+                    }
+
+                    // Tray no respondió en el tiempo esperado
+                    AlwaysPrintLogger.WriteWarning(
+                        $"Tray no respondió en {TrayInitTimeoutSeconds}s (intento {attempt}/{TrayMaxRetries}).",
+                        AlwaysPrintLogger.EvtTrayError);
+                    KillExistingTray();
+
+                    if (attempt < TrayMaxRetries)
+                    {
+                        AlwaysPrintLogger.WriteInfo(
+                            $"Reintentando lanzamiento del Tray en {TrayRetryDelaySeconds}s...");
+                        // Espera cancelable entre reintentos
+                        int waitResult = WaitHandle.WaitAny(
+                            new[] { _cts.Token.WaitHandle },
+                            TimeSpan.FromSeconds(TrayRetryDelaySeconds));
+                        if (_cts.IsCancellationRequested) return;
+                    }
+                }
+
+                // ── Si todos los reintentos fallaron → backoff largo y reintentar ciclo ──
+                if (!trayStarted)
                 {
                     _state.Transition(ServiceState.TrayError);
                     AlwaysPrintLogger.WriteError(
-                        $"El Tray no confirmó la inicialización en el tiempo límite ({TrayTimeoutSeconds}s). Deteniendo el servicio.",
+                        $"Tray no inicializó después de {TrayMaxRetries} intentos. Reintentando en {TrayRetryBackoffSeconds}s.",
                         AlwaysPrintLogger.EvtTrayError);
-                    Stop();
-                    return;
+                    // NO llamar Stop() — esperar y reintentar
+                    int backoffResult = WaitHandle.WaitAny(
+                        new[] { _cts.Token.WaitHandle },
+                        TimeSpan.FromSeconds(TrayRetryBackoffSeconds));
+                    if (_cts.IsCancellationRequested) return;
+                    // Volver al while: WaitForUser pasará directo si el usuario sigue logueado
+                    continue;
                 }
 
                 _state.Transition(ServiceState.TrayStarted);
