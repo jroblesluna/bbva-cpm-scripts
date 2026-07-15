@@ -34,9 +34,13 @@ class RemoteViewRelay:
     def __init__(self):
         # Mapping: session_id → {"workstation_id": str, "user_id": str}
         self._sessions: dict[str, dict] = {}
-        # Tareas pendientes de desconexión: workstation_id → asyncio.Task
+        # Tareas pendientes de desconexión de workstation: workstation_id → asyncio.Task
         # Si la WS reconecta dentro del grace period (30s), la tarea se cancela.
         self._pending_disconnects: dict[str, asyncio.Task] = {}
+        # Tareas pendientes de desconexión de operador: user_id → asyncio.Task
+        # Si el operador reconecta dentro del grace period (15s), la tarea se cancela.
+        # Cubre el caso de page reload (reconexión en 1-2s).
+        self._pending_operator_disconnects: dict[str, asyncio.Task] = {}
 
     def register_session(self, session_id: str, workstation_id: str, user_id: str) -> None:
         """
@@ -317,72 +321,124 @@ class RemoteViewRelay:
 
     async def handle_operator_disconnect(self, user_id: str) -> None:
         """
-        Maneja la desconexión del operador (admin) — cierra todas sus sesiones activas.
+        Maneja la desconexión del operador con grace period de 15s.
 
-        Se invoca desde el finally del WebSocket del operador cuando éste se desconecta
-        (cierre de pestaña, navegación, logout, JWT expirado).
+        Si el operador reconecta dentro de 15s (page reload), no se cierran las sesiones.
+        Esto evita que un simple F5 mate sesiones activas de Remote View.
 
-        Para cada sesión activa/pendiente del usuario:
-        1. Cierra la sesión en BD con razón "admin_logout"
-        2. Notifica a la workstation con remote_view_stop
-        3. Elimina la sesión del mapping de relay
+        Si el grace period expira sin reconexión (cierre real de pestaña, logout, etc.),
+        se cierran todas las sesiones con razón "admin_logout".
 
         Args:
             user_id: UUID del admin/operador que se desconectó
         """
         # Buscar sesiones activas de este usuario en el mapping del relay
-        sessions_to_close = [
-            (session_id, info)
-            for session_id, info in self._sessions.items()
+        user_sessions = [
+            sid for sid, info in self._sessions.items()
             if info["user_id"] == user_id
         ]
 
-        if not sessions_to_close:
+        if not user_sessions:
             return
 
         logger.info(
-            "[RV_RELAY] Operador desconectado: user_id=%s. "
-            "Cerrando %d sesión(es) activa(s).",
-            user_id, len(sessions_to_close),
+            "[RV_RELAY] Operador desconectado con %d sesiones activas. "
+            "Iniciando grace period 15s. user_id=%s",
+            len(user_sessions), user_id,
         )
 
-        # Obtener sesión de BD para cerrar sesiones
+        # Cancelar tarea previa si existía (disconnect rápido repetido)
+        existing_task = self._pending_operator_disconnects.pop(user_id, None)
+        if existing_task and not existing_task.done():
+            existing_task.cancel()
+
+        # Iniciar timer de 15s para cierre definitivo
+        task = asyncio.create_task(
+            self._operator_disconnect_cleanup(user_id, user_sessions)
+        )
+        self._pending_operator_disconnects[user_id] = task
+
+    async def handle_operator_reconnect(self, user_id: str) -> None:
+        """
+        Cancela el timer de desconexión si el operador reconectó (page reload).
+
+        Se invoca al conectar un operador WS. Si hay un timer pendiente de 15s,
+        se cancela y las sesiones RV siguen activas sin interrupción.
+
+        Args:
+            user_id: UUID del admin/operador que se reconectó
+        """
+        task = self._pending_operator_disconnects.pop(user_id, None)
+        if task and not task.done():
+            task.cancel()
+            logger.info(
+                "[RV_RELAY] Operador reconectado dentro del grace period. "
+                "Timer cancelado. user_id=%s",
+                user_id,
+            )
+
+    async def _operator_disconnect_cleanup(self, user_id: str, session_ids: list[str]) -> None:
+        """
+        Espera 15s y cierra sesiones si el operador no reconectó.
+
+        Se ejecuta como asyncio.Task y puede ser cancelada por handle_operator_reconnect.
+
+        Args:
+            user_id: UUID del admin/operador
+            session_ids: Lista de session_ids que estaban activos al desconectarse
+        """
+        try:
+            await asyncio.sleep(15)
+        except asyncio.CancelledError:
+            # El operador reconectó y se canceló este timer
+            return
+
+        # Grace period expirado — cerrar sesiones
+        logger.warning(
+            "[RV_RELAY] Grace period de operador expirado (15s). "
+            "Cerrando %d sesiones. user_id=%s",
+            len(session_ids), user_id,
+        )
+
+        # Limpiar referencia de la tarea
+        self._pending_operator_disconnects.pop(user_id, None)
+
         from app.core.database import SessionLocal
         from app.services.remote_view_session import SessionManager
 
         session_manager = SessionManager()
         db = SessionLocal()
         try:
-            for session_id, info in sessions_to_close:
+            for session_id in session_ids:
                 try:
                     # Cerrar sesión en BD
                     ended = session_manager.end_session(db, session_id, "admin_logout")
                     if ended:
                         logger.info(
                             "[RV_RELAY] Sesión cerrada por admin_logout: "
-                            "session_id=%s, ws=%s",
-                            session_id, info["workstation_id"],
+                            "session_id=%s",
+                            session_id,
                         )
 
                     # Notificar a la workstation que la sesión terminó
-                    await self.relay_to_workstation(session_id, {
-                        "type": "remote_view_stop",
-                        "session_id": session_id,
-                        "reason": "admin_logout",
-                    })
+                    ws_id = self.get_workstation_id(session_id)
+                    if ws_id:
+                        await connection_manager.send_to_workstation(ws_id, {
+                            "type": "remote_view_stop",
+                            "session_id": session_id,
+                            "reason": "admin_logout",
+                        })
+
+                    # Eliminar sesión del mapping de relay
+                    self.unregister_session(session_id)
 
                 except Exception as e:
                     logger.error(
-                        "[RV_RELAY] Error al cerrar sesión por desconexión de operador: "
-                        "session_id=%s, error=%s",
+                        "[RV_RELAY] Error cerrando sesión %s por operator disconnect: %s",
                         session_id, e,
                     )
         finally:
             db.close()
-
-        # Eliminar sesiones del mapping de relay (fuera del try/finally de BD)
-        for session_id, _ in sessions_to_close:
-            self.unregister_session(session_id)
 
 
 # Singleton — instanciar a nivel de módulo (mismo patrón que connection_manager)

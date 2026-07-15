@@ -72,6 +72,13 @@ async def operator_websocket(
             websocket=websocket
         )
         
+        # Cancelar timer de desconexión RV si el operador reconectó (page reload)
+        try:
+            from app.services.remote_view_relay import remote_view_relay
+            await remote_view_relay.handle_operator_reconnect(user_id)
+        except Exception:
+            pass
+        
         # Enviar confirmación de conexión
         await websocket.send_json({
             "type": "connected",
