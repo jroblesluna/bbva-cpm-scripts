@@ -318,7 +318,17 @@ export default function RemoteViewPage() {
 
   // Cerrar tab y enviar stop
   const handleCloseTab = (sessionId: string) => {
+    // Enviar stop vía WS (best-effort, puede fallar por cross-worker)
     sendStopSignal(sessionId)
+
+    // También cerrar vía REST directamente (garantiza cierre en BD)
+    const tab = state.tabs.find(t => t.sessionId === sessionId)
+    if (tab) {
+      remoteViewApi.stop(tab.workstationId).catch(() => {
+        // Ignorar error — la sesión podría ya estar cerrada
+      })
+    }
+
     dispatch({ type: 'REMOVE_TAB', sessionId })
   }
 
