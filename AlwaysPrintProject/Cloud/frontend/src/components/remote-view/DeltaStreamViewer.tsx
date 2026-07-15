@@ -78,9 +78,9 @@ export function DeltaStreamViewer({
         frameCountSinceLastFps.current = 0
         lastFpsTimeRef.current = now
 
-        // Detectar si no llegan frames por más de 3s
+        // Detectar si no llegan frames por más de 7s (polling es cada 5s + ~1s respuesta)
         const timeSinceLastFrame = now - lastFrameReceivedRef.current
-        setIsStale(canvasReady && timeSinceLastFrame > 3000)
+        setIsStale(canvasReady && timeSinceLastFrame > 7000)
       }
     }, 1000)
     return () => clearInterval(interval)
