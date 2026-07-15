@@ -50,6 +50,7 @@ namespace AlwaysPrintTray
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 
             AlwaysPrintLogger.EnsureSourceExists();
+            AlwaysPrintLogger.WriteTrayInfo("Tray: proceso iniciado, CLR activo.", AlwaysPrintLogger.EvtTrayStarting);
 
             // Protección: si el Tray fue lanzado como SYSTEM (session 0), salir inmediatamente.
             // Esto puede ocurrir si CreateProcessAsUser falla silenciosamente o si el proceso
