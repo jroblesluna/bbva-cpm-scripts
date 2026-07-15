@@ -95,15 +95,18 @@ export function DeltaStreamViewer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Polling periódico: solicitar frame cada 1s como fallback confiable.
-  // El push (TileStreamEngine via Redis pub/sub) puede fallar por cross-worker routing.
-  // El request/response (rv_request_frame → rv_frame) funciona siempre.
+  // Polling adaptativo: solo solicitar frame si no llegan push frames en >5s
+  // Esto evita gastar bandwidth cuando el TileStreamEngine push funciona.
+  // Se activa automáticamente como fallback cuando el relay cross-worker falla.
   useEffect(() => {
     if (!onRequestFrame || !isActive) return
 
     const pollInterval = setInterval(() => {
-      onRequestFrame()
-    }, 1000)
+      const timeSinceLastFrame = performance.now() - lastFrameReceivedRef.current
+      if (timeSinceLastFrame > 5000) {
+        onRequestFrame()
+      }
+    }, 5000)
 
     return () => clearInterval(pollInterval)
   }, [onRequestFrame, isActive])
