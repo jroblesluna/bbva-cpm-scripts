@@ -95,6 +95,19 @@ export function DeltaStreamViewer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Polling periódico: solicitar frame cada 1s como fallback confiable.
+  // El push (TileStreamEngine via Redis pub/sub) puede fallar por cross-worker routing.
+  // El request/response (rv_request_frame → rv_frame) funciona siempre.
+  useEffect(() => {
+    if (!onRequestFrame || !isActive) return
+
+    const pollInterval = setInterval(() => {
+      onRequestFrame()
+    }, 1000)
+
+    return () => clearInterval(pollInterval)
+  }, [onRequestFrame, isActive])
+
   // Dibujar keyframe en el canvas
   useEffect(() => {
     if (!latestKeyframe || !isActive) return
