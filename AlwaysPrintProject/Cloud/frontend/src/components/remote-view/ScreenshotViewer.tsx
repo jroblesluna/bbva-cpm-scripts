@@ -50,7 +50,7 @@ export function ScreenshotViewer({
   frameWidth,
   frameHeight,
   onRequestFrame,
-  defaultAutoRefresh = false,
+  defaultAutoRefresh = true,
 }: ScreenshotViewerProps) {
   const t = useTranslations('remoteView')
   const [autoRefresh, setAutoRefresh] = useState(defaultAutoRefresh)

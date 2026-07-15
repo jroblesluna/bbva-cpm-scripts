@@ -134,13 +134,8 @@ export default function RemoteViewPage() {
       const savedActive = sessionStorage.getItem('rv_activeTab')
       if (savedTabs) {
         const tabs = JSON.parse(savedTabs) as RemoteViewTab[]
-        const now = Date.now()
-        // Filtrar tabs stale (> 2 min): al recargar la página, tabs antiguos
-        // ya no tienen sesión activa y sus señales interfieren con sesiones nuevas
-        const freshTabs = tabs.filter(tab => {
-          const age = now - new Date(tab.startedAt).getTime()
-          return age < 120000 // 2 minutos
-        })
+        // No filtrar por edad — el check periódico cada 15s cerrará tabs muertos
+        const freshTabs = tabs
         freshTabs.forEach(tab => dispatch({ type: 'ADD_TAB', tab }))
         if (savedActive && freshTabs.some(t => t.sessionId === savedActive)) {
           dispatch({ type: 'SET_ACTIVE', sessionId: savedActive })
