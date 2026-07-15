@@ -109,6 +109,8 @@ export default function RemoteViewPage() {
   const previousActiveRef = useRef<string | null>(null)
   const hydratedRef = useRef(false)
   const mountTimeRef = useRef(Date.now())
+  const tabsRef = useRef(state.tabs)
+  tabsRef.current = state.tabs
 
   // Estado de frames por sesión (useRef para evitar re-renders en cada frame)
   const frameDataRef = useRef<Record<string, { data: string; width: number; height: number }>>({})
@@ -257,34 +259,53 @@ export default function RemoteViewPage() {
     return removeHandler
   }, [addMessageHandler, handleWsMessage])
 
-  // Catch-up: verificar sesiones pending_consent cuando WS conecta
-  // (el remote_view_accepted pudo haber llegado antes de que el WS estuviera listo)
+  // Verificar estado de sesiones al conectar WS y periódicamente:
+  // - pending_consent: verificar si ya fue aceptada o rechazada
+  // - active: verificar si la sesión sigue existiendo (pudo expirar o cerrarse en backend)
+  // Usa tabsRef para leer tabs frescos sin re-disparar el effect en cada cambio de state.tabs
   useEffect(() => {
     if (!isConnected) return
 
-    const pendingTabs = state.tabs.filter(t => t.status === 'pending_consent')
-    if (pendingTabs.length === 0) return
-
-    const timer = setTimeout(async () => {
-      for (const tab of pendingTabs) {
+    const checkSessions = async () => {
+      const tabs = tabsRef.current
+      for (const tab of tabs) {
+        if (tab.status !== 'pending_consent' && tab.status !== 'active') continue
         try {
           const status = await remoteViewApi.getStatus(tab.workstationId)
-          if (status.active && status.session_id === tab.sessionId) {
-            dispatch({ type: 'UPDATE_STATUS', sessionId: tab.sessionId, status: 'active' })
-          } else if (!status.active && !status.session_id) {
-            // Sin sesión activa — puede que fue rechazada. Revisar edad de la sesión.
-            // Si pasaron más de 35s (timeout de consent), marcar como disconnected.
-            const sessionAge = Date.now() - new Date(tab.startedAt).getTime()
-            if (sessionAge > 35000) {
-              dispatch({ type: 'UPDATE_STATUS', sessionId: tab.sessionId, status: 'disconnected' })
+
+          if (tab.status === 'pending_consent') {
+            if (status.active && status.session_id === tab.sessionId) {
+              // Sesión aceptada — transicionar a active
+              dispatch({ type: 'UPDATE_STATUS', sessionId: tab.sessionId, status: 'active' })
+            } else if (!status.active) {
+              // Sesión ya no existe — fue rechazada o expiró
+              const sessionAge = Date.now() - new Date(tab.startedAt).getTime()
+              if (sessionAge > 35000) {
+                dispatch({ type: 'REMOVE_TAB', sessionId: tab.sessionId })
+              }
+            }
+          } else if (tab.status === 'active') {
+            // Verificar si la sesión sigue activa en el backend
+            if (!status.active || status.session_id !== tab.sessionId) {
+              // Sesión muerta en el backend — cerrar tab automáticamente
+              dispatch({ type: 'REMOVE_TAB', sessionId: tab.sessionId })
             }
           }
-        } catch { /* ignorar — el WS handler se encargará eventualmente */ }
+        } catch { /* Error de red — no cerrar el tab, reintentar después */ }
       }
-    }, 1000)
+    }
 
-    return () => clearTimeout(timer)
-  }, [isConnected, state.tabs])
+    // Verificar 2s después de conectar (catch-up inicial)
+    const initialTimer = setTimeout(checkSessions, 2000)
+
+    // Verificar periódicamente cada 15s (detectar sesiones que murieron)
+    const periodicTimer = setInterval(checkSessions, 15000)
+
+    return () => {
+      clearTimeout(initialTimer)
+      clearInterval(periodicTimer)
+    }
+  }, [isConnected])
 
   // Enviar rv_pause / rv_resume al cambiar de tab activo
   // No enviar señales en los primeros 2s después del mount para evitar
