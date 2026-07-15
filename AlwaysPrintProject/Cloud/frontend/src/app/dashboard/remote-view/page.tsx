@@ -116,6 +116,8 @@ export default function RemoteViewPage() {
   const frameDataRef = useRef<Record<string, { data: string; width: number; height: number }>>({})
   const deltaDataRef = useRef<Record<string, { tiles: DeltaTile[]; width: number; height: number }>>({})
   const [frameVersion, setFrameVersion] = useState(0)
+  // Timestamp del último frame recibido (para retry automático)
+  const lastFrameTimeRef = useRef<number>(0)
 
   // Conexión WebSocket para recibir mensajes del backend
   const { isConnected, addMessageHandler, send: wsSend } = useWebSocket({ autoConnect: true })
@@ -239,6 +241,7 @@ export default function RemoteViewPage() {
           }
           // Limpiar delta cuando llega un keyframe (el canvas se redibuja completo)
           delete deltaDataRef.current[frameMsg.session_id]
+          lastFrameTimeRef.current = Date.now()
           setFrameVersion(v => v + 1)
         } else if (frameMsg.tiles && Array.isArray(frameMsg.tiles)) {
           // Delta frame — array de tiles que cambiaron
@@ -247,6 +250,7 @@ export default function RemoteViewPage() {
             width: frameMsg.width,
             height: frameMsg.height,
           }
+          lastFrameTimeRef.current = Date.now()
           setFrameVersion(v => v + 1)
         }
       }
@@ -353,6 +357,28 @@ export default function RemoteViewPage() {
       console.warn('[RemoteView] No se pudo enviar mensaje WS (desconectado):', payload.type)
     }
   }, [wsSend])
+
+  // Auto-retry: si no llegan frames en 5s después de conectar, re-solicitar
+  // Esto fuerza el lazy-register en el worker correcto y restablece el flujo
+  useEffect(() => {
+    if (!isConnected || !state.activeTabId) return
+
+    const activeTab = state.tabs.find(t => t.sessionId === state.activeTabId)
+    if (!activeTab || activeTab.status !== 'active') return
+
+    const retryTimer = setInterval(() => {
+      const timeSinceLastFrame = Date.now() - lastFrameTimeRef.current
+      // Si han pasado más de 5s sin recibir frame y hay una sesión activa, reintentar
+      if (timeSinceLastFrame > 5000) {
+        sendWsMessage({
+          type: 'rv_request_frame',
+          session_id: state.activeTabId!,
+        })
+      }
+    }, 5000)
+
+    return () => clearInterval(retryTimer)
+  }, [isConnected, state.activeTabId, state.tabs, sendWsMessage])
 
   // Cerrar tab y enviar stop
   const handleCloseTab = (sessionId: string) => {
