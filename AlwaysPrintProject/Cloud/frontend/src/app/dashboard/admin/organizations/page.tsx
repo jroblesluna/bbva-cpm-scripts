@@ -43,6 +43,8 @@ import {
   Download,
   Terminal,
   Clock,
+  LayoutGrid,
+  List,
 } from 'lucide-react'
 import type { Organization, OrganizationCreate, OrganizationUpdate, PublicIPCreate } from '@/types'
 import { ActionConfigSection } from '@/components/config/ActionConfigSection'
@@ -70,6 +72,7 @@ export default function AccountsPage() {
   const [orgToDelete, setOrgToDelete] = useState<{ id: string; name: string } | null>(null)
   const [deleteConfirmName, setDeleteConfirmName] = useState('')
   const [page, setPage] = useState(1)
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
   const pageSize = 10
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 
@@ -271,15 +274,25 @@ export default function AccountsPage() {
       {/* Barra de búsqueda */}
       <Card className="mb-6">
         <CardContent className="p-4">
-          <div className="flex items-center">
-            <Search className="w-5 h-5 text-gray-400 mr-3" />
-            <Input
-              type="text"
-              placeholder={t('searchPlaceholder')}
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setPage(1) }}
-              className="flex-1"
-            />
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex items-center flex-1">
+              <Search className="w-5 h-5 text-gray-400 mr-3" />
+              <Input
+                type="text"
+                placeholder={t('searchPlaceholder')}
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setPage(1) }}
+                className="flex-1"
+              />
+            </div>
+            <div className="flex items-center gap-1 border rounded-md p-0.5">
+              <Button variant={viewMode === 'cards' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('cards')} className="h-8 w-8 p-0">
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+              <Button variant={viewMode === 'table' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('table')} className="h-8 w-8 p-0">
+                <List className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -548,160 +561,148 @@ export default function AccountsPage() {
       })()}
 
       {/* Lista de cuentas */}
-      <div className="space-y-4">
-        {filteredAccounts && filteredAccounts.length > 0 ? (
-          paginatedAccounts.map((account) => (
-            <Card key={account.id} className="hover:shadow-md transition">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                  <div className="flex items-start flex-1 min-w-0">
-                    <div className="bg-blue-100 rounded-full p-3 mr-3 sm:mr-4 shrink-0">
-                      <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+      {filteredAccounts && filteredAccounts.length > 0 ? (
+        viewMode === 'cards' ? (
+          <div className="space-y-4">
+            {paginatedAccounts.map((account) => (
+              <Card key={account.id} className="hover:shadow-md transition">
+                <CardContent className="p-4 md:p-6">
+                  {/* Info principal */}
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="bg-blue-100 rounded-full p-2.5 shrink-0">
+                      <Building2 className="w-5 h-5 text-blue-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
-                          {account.name}
-                        </h3>
-                        <Badge variant={account.is_active ? 'default' : 'secondary'}>
+                      {/* Título + badges */}
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <h3 className="text-base font-semibold text-gray-900">{account.name}</h3>
+                        <Badge variant={account.is_active ? 'default' : 'secondary'} className="text-xs">
                           {account.is_active ? tCommon('active') : tCommon('inactive')}
                         </Badge>
+                        {account.forced_contingency && (
+                          <Badge variant="destructive" className="text-xs">{t('forcedContingencyOn')}</Badge>
+                        )}
                       </div>
-                      
+                      {/* Descripción */}
                       {account.description && (
-                        <p className="text-gray-600 mb-3">{account.description}</p>
+                        <p className="text-sm text-gray-500 mb-2 truncate">{account.description}</p>
                       )}
-
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-500">
-                        <div className="flex items-center">
-                          <Globe className="w-4 h-4 mr-1 shrink-0" />
-                          <span>{account.public_ips?.length || 0} {t('publicIps')}</span>
-                        </div>
-                        <div className="flex items-center">
-                          <Clock className="w-4 h-4 mr-1 shrink-0" />
-                          <span>{t('offlineTimeoutValue', { minutes: account.offline_timeout_minutes ?? 10 })}</span>
-                        </div>
-                        <div className="flex items-center">
-                          <CheckCircle className="w-4 h-4 mr-1 shrink-0" />
-                          <span>{t('createdLabel', { date: formatDateWithTimezone(account.created_at, userTimezone) })}</span>
-                        </div>
+                      {/* Detalles secundarios */}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600 mb-2">
+                        <span className="flex items-center gap-1"><Globe className="w-3.5 h-3.5" />{account.public_ips?.length || 0} {t('publicIps')}</span>
+                        <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{t('offlineTimeoutValue', { minutes: account.offline_timeout_minutes ?? 10 })}</span>
+                        <span className="flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" />{formatDateWithTimezone(account.created_at, userTimezone)}</span>
                       </div>
-
-                      {/* IPs públicas */}
+                      {/* IP badges */}
                       {account.public_ips && account.public_ips.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-1">
                           {account.public_ips.slice(0, 5).map((ip) => (
-                            <Badge key={ip.id} variant="outline" className="text-xs">
-                              {ip.ip_address}
-                            </Badge>
+                            <Badge key={ip.id} variant="outline" className="text-xs font-mono">{ip.ip_address}</Badge>
                           ))}
                           {account.public_ips.length > 5 && (
-                            <Badge variant="outline" className="text-xs text-gray-400">
-                              {t('moreIps', { count: account.public_ips.length - 5 })}
-                            </Badge>
+                            <Badge variant="outline" className="text-xs text-gray-400">+{account.public_ips.length - 5}</Badge>
                           )}
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 sm:ml-4 shrink-0 self-end sm:self-start flex-wrap justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setBulkCommandTarget({ org: account, commandType: 'restart_service' })}
-                      title={tCommon('bulkRestartServiceTooltip')}
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setBulkCommandTarget({ org: account, commandType: 'restart_tray' })}
-                      title={tCommon('bulkRestartTrayTooltip')}
-                    >
-                      <Terminal className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setBulkCommandTarget({ org: account, commandType: 'check_update' })}
-                      title={tCommon('bulkCheckUpdateTooltip')}
-                    >
-                      <Download className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant={account.forced_contingency ? 'destructive' : 'outline'}
-                      size="sm"
-                      onClick={() => {
-                        setContingencyTarget(account)
-                        setDeactivateForceAll(false)
-                        setShowVlansWithoutDevicesList(false)
-                        setVlansWithoutDevices(null)
-                        if (!account.forced_contingency) {
-                          setLoadingVlansCheck(true)
-                          organizationsApi.getVlansWithoutDevices(account.id)
-                            .then(data => setVlansWithoutDevices(data.vlans))
-                            .catch(() => setVlansWithoutDevices([]))
-                            .finally(() => setLoadingVlansCheck(false))
-                        }
-                      }}
-                      disabled={forcedContingencyMutation.isPending}
-                      title={account.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}
-                      className={account.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}
-                    >
-                      <ShieldAlert className="w-4 h-4 mr-1" />
-                      <span className="hidden sm:inline">{account.forced_contingency ? t('forcedContingencyOn') : t('forcedContingencyOff')}</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setManagingIPsOrg(account)}
-                      title={t('manageIps')}
-                    >
-                      <Network className="w-4 h-4 mr-1" />
-                      <span className="hidden sm:inline">{t('manageIps')}</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/dashboard/admin/organizations/${account.id}/edit`)}
-                      title={t('editAccount')}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => { setOrgToDelete({ id: account.id, name: account.name }); setDeleteConfirmName('') }}
-                      disabled={deleteMutation.isPending}
-                      title={t('deleteAccount')}
-                    >
-                      <Trash2 className="w-4 h-4 text-red-400" />
-                    </Button>
+                  {/* Acciones — desktop inline, mobile con borde */}
+                  <div className="hidden md:flex items-center flex-wrap gap-1 mt-3 pt-3 border-t border-gray-100">
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setBulkCommandTarget({ org: account, commandType: 'restart_service' })} title={tCommon('bulkRestartServiceTooltip')}><RotateCcw className="w-4 h-4" /></Button>
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setBulkCommandTarget({ org: account, commandType: 'restart_tray' })} title={tCommon('bulkRestartTrayTooltip')}><Terminal className="w-4 h-4" /></Button>
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setBulkCommandTarget({ org: account, commandType: 'check_update' })} title={tCommon('bulkCheckUpdateTooltip')}><Download className="w-4 h-4" /></Button>
+                    <Button variant={account.forced_contingency ? 'destructive' : 'outline'} size="sm" className={`h-8 w-8 p-0 ${account.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}`} onClick={() => { setContingencyTarget(account); setDeactivateForceAll(false); setShowVlansWithoutDevicesList(false); setVlansWithoutDevices(null); if (!account.forced_contingency) { setLoadingVlansCheck(true); organizationsApi.getVlansWithoutDevices(account.id).then(data => setVlansWithoutDevices(data.vlans)).catch(() => setVlansWithoutDevices([])).finally(() => setLoadingVlansCheck(false)) } }} disabled={forcedContingencyMutation.isPending} title={account.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}><ShieldAlert className="w-4 h-4" /></Button>
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setManagingIPsOrg(account)} title={t('manageIps')}><Network className="w-4 h-4" /></Button>
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => router.push(`/dashboard/admin/organizations/${account.id}/edit`)} title={t('editAccount')}><Edit className="w-4 h-4" /></Button>
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => { setOrgToDelete({ id: account.id, name: account.name }); setDeleteConfirmName('') }} disabled={deleteMutation.isPending} title={t('deleteAccount')}><Trash2 className="w-4 h-4 text-red-400" /></Button>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                  <div className="flex md:hidden flex-wrap gap-1 mt-3 pt-3 border-t border-gray-100">
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setBulkCommandTarget({ org: account, commandType: 'restart_service' })} title={tCommon('bulkRestartServiceTooltip')}><RotateCcw className="w-4 h-4" /></Button>
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setBulkCommandTarget({ org: account, commandType: 'restart_tray' })} title={tCommon('bulkRestartTrayTooltip')}><Terminal className="w-4 h-4" /></Button>
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setBulkCommandTarget({ org: account, commandType: 'check_update' })} title={tCommon('bulkCheckUpdateTooltip')}><Download className="w-4 h-4" /></Button>
+                    <Button variant={account.forced_contingency ? 'destructive' : 'outline'} size="sm" className={`h-8 w-8 p-0 ${account.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''}`} onClick={() => { setContingencyTarget(account); if (!account.forced_contingency) { setLoadingVlansCheck(true); organizationsApi.getVlansWithoutDevices(account.id).then(data => setVlansWithoutDevices(data.vlans)).catch(() => setVlansWithoutDevices([])).finally(() => setLoadingVlansCheck(false)) } }} title={account.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}><ShieldAlert className="w-4 h-4" /></Button>
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setManagingIPsOrg(account)} title={t('manageIps')}><Network className="w-4 h-4" /></Button>
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => router.push(`/dashboard/admin/organizations/${account.id}/edit`)} title={t('editAccount')}><Edit className="w-4 h-4" /></Button>
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => { setOrgToDelete({ id: account.id, name: account.name }); setDeleteConfirmName('') }} disabled={deleteMutation.isPending} title={t('deleteAccount')}><Trash2 className="w-4 h-4 text-red-400" /></Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         ) : (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">{t('emptyTitle')}</h3>
-              <p className="text-gray-600 mb-4">
-                {searchTerm ? t('emptyFilter') : t('emptyCreate')}
-              </p>
-              {!searchTerm && (
-                <Button onClick={() => setShowCreateForm(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  {t('new')}
-                </Button>
-              )}
-            </CardContent>
+          /* Vista tabla */
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('nameLabel')}</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">{tCommon('status')}</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('publicIps')}</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Timeout</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">{tCommon('createdAt')}</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">{tCommon('actions')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {paginatedAccounts.map((account) => (
+                    <tr key={account.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-blue-500 shrink-0" />
+                          <div>
+                            <div className="font-medium text-gray-900">{account.name}</div>
+                            {account.description && <div className="text-xs text-gray-400 truncate max-w-[200px]">{account.description}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <Badge variant={account.is_active ? 'default' : 'secondary'} className="text-xs">
+                            {account.is_active ? tCommon('active') : tCommon('inactive')}
+                          </Badge>
+                          {account.forced_contingency && <Badge variant="destructive" className="text-xs">{t('forcedContingencyOn')}</Badge>}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-gray-600">{account.public_ips?.length || 0}</td>
+                      <td className="px-3 py-3 whitespace-nowrap text-gray-600">{account.offline_timeout_minutes ?? 10} min</td>
+                      <td className="px-3 py-3 whitespace-nowrap text-gray-500 text-xs">{formatDateWithTimezone(account.created_at, userTimezone)}</td>
+                      <td className="px-3 py-3 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setBulkCommandTarget({ org: account, commandType: 'restart_service' })} title={tCommon('bulkRestartServiceTooltip')}><RotateCcw className="w-3.5 h-3.5" /></Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setBulkCommandTarget({ org: account, commandType: 'restart_tray' })} title={tCommon('bulkRestartTrayTooltip')}><Terminal className="w-3.5 h-3.5" /></Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setBulkCommandTarget({ org: account, commandType: 'check_update' })} title={tCommon('bulkCheckUpdateTooltip')}><Download className="w-3.5 h-3.5" /></Button>
+                          <Button variant="ghost" size="sm" className={`h-7 w-7 p-0 ${account.forced_contingency ? 'text-orange-600' : ''}`} onClick={() => { setContingencyTarget(account); setDeactivateForceAll(false); setShowVlansWithoutDevicesList(false); setVlansWithoutDevices(null); if (!account.forced_contingency) { setLoadingVlansCheck(true); organizationsApi.getVlansWithoutDevices(account.id).then(data => setVlansWithoutDevices(data.vlans)).catch(() => setVlansWithoutDevices([])).finally(() => setLoadingVlansCheck(false)) } }} title={account.forced_contingency ? t('forcedContingencyDeactivate') : t('forcedContingencyActivate')}><ShieldAlert className="w-3.5 h-3.5" /></Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setManagingIPsOrg(account)} title={t('manageIps')}><Network className="w-3.5 h-3.5" /></Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => router.push(`/dashboard/admin/organizations/${account.id}/edit`)} title={t('editAccount')}><Edit className="w-3.5 h-3.5" /></Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setOrgToDelete({ id: account.id, name: account.name }); setDeleteConfirmName('') }} title={t('deleteAccount')}><Trash2 className="w-3.5 h-3.5 text-red-400" /></Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </Card>
-        )}
-      </div>
+        )
+      ) : (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">{t('emptyTitle')}</h3>
+            <p className="text-gray-600 mb-4">
+              {searchTerm ? t('emptyFilter') : t('emptyCreate')}
+            </p>
+            {!searchTerm && (
+              <Button onClick={() => setShowCreateForm(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                {t('new')}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Paginación */}
       {totalFiltered > 0 && totalPages > 1 && (
