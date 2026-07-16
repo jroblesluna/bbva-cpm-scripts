@@ -266,7 +266,7 @@ namespace AlwaysPrintTray.RemoteView
             ThrowIfDisposed();
 
             if (fps < 1) fps = 1;
-            if (fps > 10) fps = 10;
+            if (fps > 30) fps = 30;
 
             _targetFps = fps;
             _targetIntervalTicks = Stopwatch.Frequency / fps;

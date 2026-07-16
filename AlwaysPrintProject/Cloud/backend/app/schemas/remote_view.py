@@ -105,12 +105,12 @@ class RemoteViewConfig(BaseModel):
         description="Reducir resolución al tamaño del viewport del admin"
     )
 
-    # 13. FPS máximo para Stream/Interactive mode (1-10)
+    # 13. FPS máximo para Stream/Interactive mode (1-30)
     stream_max_fps: int = Field(
         default=5,
         ge=1,
-        le=10,
-        description="FPS máximo para Stream/Interactive mode (1-10)"
+        le=30,
+        description="FPS máximo para Stream/Interactive mode (1-30)"
     )
 
     @field_validator("modes_allowed")
@@ -193,7 +193,7 @@ class RemoteViewConfigUpdate(BaseModel):
     capture_resolution: Optional[str] = None
     compression_quality: Optional[int] = Field(default=None, ge=1, le=100)
     viewport_adaptive_downscale: Optional[bool] = None
-    stream_max_fps: Optional[int] = Field(default=None, ge=1, le=10)
+    stream_max_fps: Optional[int] = Field(default=None, ge=1, le=30)
 
     @field_validator("modes_allowed")
     @classmethod

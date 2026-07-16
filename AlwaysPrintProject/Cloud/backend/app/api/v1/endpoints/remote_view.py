@@ -242,6 +242,7 @@ async def start_remote_view(
         "mode": mode,
         "resolution": resolution,
         "quality": quality,
+        "fps": rv_config.stream_max_fps,
         "monitor": request_body.monitor,
         "user_name": current_user.full_name,
         "viewport_width": request_body.viewport_width,
