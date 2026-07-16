@@ -184,15 +184,22 @@ export function DeltaStreamViewer({
               setStreamConnected(true)
               setConnectedWorkerId(msg.worker_id)
               setAffinityAttempts(0)
+              // Enviar heartbeat + request frame inmediatamente para despertar el TileStreamEngine
+              ws?.send(JSON.stringify({ type: 'rv_viewer_alive', session_id: sessionId }))
+              ws?.send(JSON.stringify({ type: 'rv_request_frame', session_id: sessionId }))
+              console.log('[RV-Stream] Affinity OK — heartbeat + request_frame enviados')
             } else {
               // Worker incorrecto
               setAffinityAttempts((prev) => {
                 const next = prev + 1
                 if (next >= 5) {
                   // Máximo de intentos alcanzado — aceptar este worker
-                  // Los frames llegarán via polling (no push directo)
                   setStreamConnected(true)
                   setConnectedWorkerId(msg.worker_id)
+                  // Enviar heartbeat + request frame para despertar el TileStreamEngine
+                  ws?.send(JSON.stringify({ type: 'rv_viewer_alive', session_id: sessionId }))
+                  ws?.send(JSON.stringify({ type: 'rv_request_frame', session_id: sessionId }))
+                  console.log('[RV-Stream] Max attempts — heartbeat + request_frame enviados')
                   return 0
                 }
                 // Reintentar en otro worker
