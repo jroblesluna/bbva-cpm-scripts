@@ -239,8 +239,8 @@ export default function DevicesPage() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-white rounded-lg shadow p-4 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <Input
@@ -251,21 +251,6 @@ export default function DevicesPage() {
               className="pl-10"
             />
           </div>
-          {user?.role === 'admin' && (
-            <select
-              value={filterOrgId || 'all'}
-              onChange={(e) => {
-                setFilterOrgId(e.target.value === 'all' ? undefined : e.target.value)
-                setFilterVlanId(undefined)
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">{t('allOrganizations')}</option>
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>{account.name}</option>
-              ))}
-            </select>
-          )}
           <SearchableSelect
             value={filterVlanId}
             onChange={(val) => setFilterVlanId(val)}
@@ -278,32 +263,51 @@ export default function DevicesPage() {
             pageSize={5}
             className="w-full"
           />
-          <select
-            value={filterActive}
-            onChange={(e) => setFilterActive(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">{t('allStatuses')}</option>
-            <option value="true">{t('statusActive')}</option>
-            <option value="false">{t('statusInactive')}</option>
-          </select>
         </div>
-        <div className="flex items-center justify-between mt-4">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={filterWithVlan}
-              onChange={(e) => { setFilterWithVlan(e.target.checked); setPage(1) }}
-              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span className="text-sm text-gray-700">{t('filterWithVlan')}</span>
-          </label>
-          {(searchTerm || filterOrgId || filterVlanId || filterActive !== 'all' || filterWithVlan) && (
-            <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterOrgId(undefined); setFilterVlanId(undefined); setFilterActive('all'); setFilterWithVlan(false); setPage(1) }}>
-              <X className="mr-2 h-4 w-4" />
-              {tCommon('clearFilters')}
-            </Button>
-          )}
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div className={`grid grid-cols-1 gap-4 flex-1 ${user?.role === 'admin' ? 'sm:grid-cols-2' : ''}`}>
+            {user?.role === 'admin' && (
+              <select
+                value={filterOrgId || 'all'}
+                onChange={(e) => {
+                  setFilterOrgId(e.target.value === 'all' ? undefined : e.target.value)
+                  setFilterVlanId(undefined)
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">{t('allOrganizations')}</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>{account.name}</option>
+                ))}
+              </select>
+            )}
+            <select
+              value={filterActive}
+              onChange={(e) => setFilterActive(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">{t('allStatuses')}</option>
+              <option value="true">{t('statusActive')}</option>
+              <option value="false">{t('statusInactive')}</option>
+            </select>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <label className="flex items-center gap-2 cursor-pointer select-none whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={filterWithVlan}
+                onChange={(e) => { setFilterWithVlan(e.target.checked); setPage(1) }}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">{t('filterWithVlan')}</span>
+            </label>
+            {(searchTerm || filterOrgId || filterVlanId || filterActive !== 'all' || filterWithVlan) && (
+              <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setFilterOrgId(undefined); setFilterVlanId(undefined); setFilterActive('all'); setFilterWithVlan(false); setPage(1) }}>
+                <X className="mr-2 h-4 w-4" />
+                {tCommon('clearFilters')}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

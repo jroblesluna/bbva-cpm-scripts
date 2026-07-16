@@ -235,14 +235,14 @@ export function SearchableSelect({
     )
   }
 
-  // Modo normal: select nativo + botón de búsqueda
+  // Modo normal: select nativo + botón de búsqueda, agrupados visualmente como un solo control
   return (
-    <div className={`flex gap-1 ${className}`}>
+    <div className={`flex ${className}`}>
       <select
         value={value || 'all'}
         onChange={(e) => onChange(e.target.value === 'all' ? undefined : e.target.value)}
         disabled={disabled || simpleLoading}
-        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        className="flex-1 min-w-0 h-[38px] px-3 border border-gray-300 rounded-l-md rounded-r-none border-r-0 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:z-10 text-sm"
       >
         <option value="all">{placeholder}</option>
         {simpleOptions.map((option) => (
@@ -255,7 +255,7 @@ export function SearchableSelect({
         size="sm"
         onClick={() => setSearchMode(true)}
         disabled={disabled}
-        className="h-[38px] w-9 p-0 shrink-0"
+        className="h-[38px] w-9 p-0 shrink-0 rounded-l-none focus:z-10"
         title={searchButtonTitle}
       >
         <Search className="h-4 w-4" />
