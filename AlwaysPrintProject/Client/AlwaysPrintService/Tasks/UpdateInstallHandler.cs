@@ -265,6 +265,9 @@ namespace AlwaysPrintService.Tasks
             string msiFilePath, string trayExePath,
             string scriptPath, string logFilePath)
         {
+            // Fecha fija generada en C# para evitar wmic (deprecated en Windows nuevos)
+            string datePrefix = DateTime.Now.ToString("yyyy-MM-dd");
+
             // Obtener versión actual antes de la actualización
             string currentVersion = "desconocida";
             try
@@ -290,8 +293,7 @@ REM ============================================================
 set LOG=""{logFilePath}""
 set LOCKFILE=""{LockFilePath}""
 
-REM Funcion para timestamp ISO (sin dependencia de locale ni PowerShell)
-REM Usa wmic que retorna formato fijo: 20260711132828.123456-300
+REM Funcion para timestamp (fecha fija desde C#, hora desde %time%)
 call :getTS
 
 REM Crear lockfile
@@ -389,8 +391,7 @@ echo [%TS%] [UPD] Event 1020: Script finalizado. >> %LOG%
 exit /b
 
 :getTS
-for /f ""tokens=2 delims=="" %%a in ('wmic os get localdatetime /format:list 2^>nul') do set DT=%%a
-set TS=%DT:~0,4%-%DT:~4,2%-%DT:~6,2% %DT:~8,2%:%DT:~10,2%:%DT:~12,2%
+set TS={datePrefix} %time:~0,8%
 goto :eof
 ";
         }
