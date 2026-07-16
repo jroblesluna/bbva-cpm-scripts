@@ -175,14 +175,24 @@ export function DeltaStreamViewer({
           if (msg.type === 'rv_stream_connected') {
             // Verificar worker affinity
             if (msg.worker_id === targetWorkerId) {
-              // Estamos en el worker correcto
+              // Estamos en el worker correcto — entrega directa de frames
               setStreamConnected(true)
               setAffinityAttempts(0)
             } else {
-              // Worker incorrecto — cerrar y reintentar
-              setAffinityAttempts((a) => a + 1)
-              ws?.close()
-              reconnectTimerRef.current = setTimeout(connect, 200)
+              // Worker incorrecto
+              setAffinityAttempts((prev) => {
+                const next = prev + 1
+                if (next >= 5) {
+                  // Máximo de intentos alcanzado — aceptar este worker
+                  // Los frames llegarán via polling (no push directo)
+                  setStreamConnected(true)
+                  return 0
+                }
+                // Reintentar en otro worker
+                ws?.close()
+                reconnectTimerRef.current = setTimeout(connect, 500)
+                return next
+              })
             }
             return
           }
