@@ -65,6 +65,9 @@ import { OsCommandsSection } from '@/components/workstations/OsCommandsSection';
 import { WorkstationDebuggingSection } from '@/components/debugging/WorkstationDebuggingSection';
 import { RemoteViewIndicator } from '@/components/remote-view/RemoteViewIndicator';
 
+// ponytail: feature flag temporal para desactivar "Ver Pantalla" en todas las estaciones, cambiar a true para reactivar
+const REMOTE_VIEW_ENABLED = false;
+
 type ViewMode = 'cards' | 'table';
 type SortField = 'ip_private' | 'hostname' | 'current_user' | 'organization' | 'tray_version' | 'action_config' | 'last_connection' | 'is_online';
 type SortDirection = 'asc' | 'desc';
@@ -2454,8 +2457,8 @@ function WorkstationDetailModal({
             </div>
           </div>
 
-          {/* Botón "Ver Pantalla" — solo visible si WS online */}
-          {workstation.is_online && (
+          {/* Botón "Ver Pantalla" — deshabilitado temporalmente, reactivar cambiando REMOTE_VIEW_ENABLED a true */}
+          {REMOTE_VIEW_ENABLED && workstation.is_online && (
             <div>
               <Button
                 variant="outline"
