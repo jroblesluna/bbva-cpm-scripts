@@ -174,35 +174,44 @@ export function DeltaStreamViewer({
           const msg = JSON.parse(event.data)
 
           if (msg.type === 'rv_stream_connected') {
-            // Log de debug para cada intento de affinity
             console.log(
               `[RV-Stream] Worker respondió: ${msg.worker_id} | Target: ${targetWorkerId} | ${msg.worker_id === targetWorkerId ? '✓ MATCH' : '✗ MISMATCH'}`
             )
-            // Verificar worker affinity
-            if (msg.worker_id === targetWorkerId) {
-              // Estamos en el worker correcto — entrega directa de frames
+
+            const isMatch = msg.worker_id === targetWorkerId
+
+            if (isMatch) {
+              // Worker correcto — entrega directa de frames
               setStreamConnected(true)
               setConnectedWorkerId(msg.worker_id)
               setAffinityAttempts(0)
-              // Enviar heartbeat + request frame inmediatamente para despertar el TileStreamEngine
-              ws?.send(JSON.stringify({ type: 'rv_viewer_alive', session_id: sessionId }))
-              ws?.send(JSON.stringify({ type: 'rv_request_frame', session_id: sessionId }))
+              // Enviar heartbeat + request frame para despertar el TileStreamEngine
+              if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'rv_viewer_alive', session_id: sessionId }))
+                ws.send(JSON.stringify({ type: 'rv_request_frame', session_id: sessionId }))
+              }
               console.log('[RV-Stream] Affinity OK — heartbeat + request_frame enviados')
             } else {
-              // Worker incorrecto
+              // Worker incorrecto — verificar si ya agotamos intentos
               setAffinityAttempts((prev) => {
                 const next = prev + 1
                 if (next >= 5) {
-                  // Máximo de intentos alcanzado — aceptar este worker
+                  // Máximo de intentos alcanzado — aceptar este worker como fallback
+                  // NO cerrar el WS, usarlo tal cual
                   setStreamConnected(true)
                   setConnectedWorkerId(msg.worker_id)
-                  // Enviar heartbeat + request frame para despertar el TileStreamEngine
-                  ws?.send(JSON.stringify({ type: 'rv_viewer_alive', session_id: sessionId }))
-                  ws?.send(JSON.stringify({ type: 'rv_request_frame', session_id: sessionId }))
-                  console.log('[RV-Stream] Max attempts — heartbeat + request_frame enviados')
+                  // Programar envío de heartbeat para el próximo tick (evitar stale ref de ws)
+                  setTimeout(() => {
+                    const currentWs = streamWsRef.current
+                    if (currentWs && currentWs.readyState === WebSocket.OPEN) {
+                      currentWs.send(JSON.stringify({ type: 'rv_viewer_alive', session_id: sessionId }))
+                      currentWs.send(JSON.stringify({ type: 'rv_request_frame', session_id: sessionId }))
+                      console.log('[RV-Stream] Max attempts — aceptando worker, heartbeat enviado')
+                    }
+                  }, 0)
                   return 0
                 }
-                // Reintentar en otro worker
+                // Reintentar — cerrar y reconectar en otro worker
                 ws?.close()
                 reconnectTimerRef.current = setTimeout(connect, 500)
                 return next
