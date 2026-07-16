@@ -636,14 +636,69 @@ namespace AlwaysPrintService.Pipe
                 string scriptPath = Path.Combine(scriptDir,
                     $"self_restart_{DateTime.Now:yyyyMMdd_HHmmss}.cmd");
 
+                string datePrefix = DateTime.Now.ToString("yyyy-MM-dd");
+                string logDate = DateTime.Now.ToString("yyyyMMdd");
+                string logFile = $@"C:\ProgramData\AlwaysPrint\logs\AlwaysPrint_{logDate}.log";
+
                 string scriptContent = $@"@echo off
-REM Script de auto-reinicio de AlwaysPrintService (ejecutado como SYSTEM)
+REM ============================================================
+REM Script de auto-reinicio de AlwaysPrintService (SYSTEM)
 REM Generado: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
+REM ============================================================
+
+set ""LOGFILE={logFile}""
+set ""DATEPREFIX={datePrefix}""
+
+goto :main
+
+:log
+set ""MSG=%~1""
+echo [%DATEPREFIX% %time:~0,8%] [RST] Event 1090: %MSG% >> ""%LOGFILE%""
+goto :eof
+
+:main
+call :log ""Auto-reinicio iniciado (SYSTEM via pipe)""
+
+call :log ""Esperando 2s...""
 timeout /t 2 /nobreak > nul
-net stop AlwaysPrintService
+
+call :log ""Ejecutando net stop AlwaysPrintService...""
+net stop AlwaysPrintService > nul 2>&1
+call :log ""net stop AlwaysPrintService - errorlevel=%errorlevel%""
+
+call :log ""Verificando estado del servicio...""
+sc query AlwaysPrintService | find ""STOPPED"" > nul 2>&1
+if %errorlevel%==0 (
+    call :log ""Estado verificado: STOPPED""
+) else (
+    call :log ""Estado NO es STOPPED, esperando 5s adicionales...""
+    timeout /t 5 /nobreak > nul
+    sc query AlwaysPrintService | find ""STOPPED"" > nul 2>&1
+    if %errorlevel%==0 (
+        call :log ""Estado verificado tras espera: STOPPED""
+    ) else (
+        call :log ""ADVERTENCIA: servicio no confirmó STOPPED""
+        for /f ""tokens=*"" %%i in ('sc query AlwaysPrintService ^| find ""STATE""') do call :log ""  %%i""
+    )
+)
+
+call :log ""Esperando 3s antes de net start...""
 timeout /t 3 /nobreak > nul
-net start AlwaysPrintService
-(goto) 2>nul & del /f /q ""{scriptPath}""
+
+call :log ""Ejecutando net start AlwaysPrintService...""
+net start AlwaysPrintService > nul 2>&1
+call :log ""net start AlwaysPrintService - errorlevel=%errorlevel%""
+
+call :log ""Verificando estado post-inicio...""
+sc query AlwaysPrintService | find ""RUNNING"" > nul 2>&1
+if %errorlevel%==0 (
+    call :log ""Estado verificado: RUNNING""
+) else (
+    call :log ""ADVERTENCIA: servicio no confirmó RUNNING""
+    for /f ""tokens=*"" %%i in ('sc query AlwaysPrintService ^| find ""STATE""') do call :log ""  %%i""
+)
+
+call :log ""Script de auto-reinicio completado""
 ";
                 File.WriteAllText(scriptPath, scriptContent);
 

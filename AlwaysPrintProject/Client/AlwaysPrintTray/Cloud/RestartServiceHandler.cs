@@ -32,8 +32,9 @@ namespace AlwaysPrintTray.Cloud
             {
                 try
                 {
+                    // Incluir ServiceName para que HandleServiceAction no lo rechace por null/empty
                     var msg = PipeMessage.Create(MessageType.ServiceAction,
-                        new ServiceActionPayload { Action = "restart" });
+                        new ServiceActionPayload { Action = "restart", ServiceName = "AlwaysPrintService" });
                     var response = pipe.Send(msg);
 
                     if (response?.Type == MessageType.Ack)
