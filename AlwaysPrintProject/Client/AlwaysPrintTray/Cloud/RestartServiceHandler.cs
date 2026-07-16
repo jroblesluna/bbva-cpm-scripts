@@ -116,21 +116,25 @@ namespace AlwaysPrintTray.Cloud
 
         private static string GenerateRestartScript(string scriptPath)
         {
+            // Ruta del log principal de AlwaysPrint (fecha fija al generar el script)
+            string logDate = DateTime.Now.ToString("yyyyMMdd");
+            string logFile = $@"C:\ProgramData\AlwaysPrint\logs\AlwaysPrint_{logDate}.log";
+            string datePrefix = DateTime.Now.ToString("yyyy-MM-dd");
+
             return $@"@echo off
 REM ============================================================
-REM Script de reinicio de servicio AlwaysPrint (fallback)
+REM Script de reinicio de servicio AlwaysPrint
 REM Generado: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
 REM ============================================================
 
-REM === Variables ===
-set ""LOGFILE=%TEMP%\AlwaysPrint\Commands\restart_service.log""
+set ""LOGFILE={logFile}""
+set ""DATEPREFIX={datePrefix}""
 
-REM === Subrutina de log ===
 goto :main
 
 :log
 set ""MSG=%~1""
-echo [RST] %date:~6,4%-%date:~3,2%-%date:~0,2% %time:~0,8% - %MSG% >> ""%LOGFILE%""
+echo [%DATEPREFIX% %time:~0,8%] [RST] Event 1090: %MSG% >> ""%LOGFILE%""
 goto :eof
 
 :main
