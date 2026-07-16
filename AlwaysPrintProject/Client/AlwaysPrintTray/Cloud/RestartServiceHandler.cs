@@ -140,22 +140,53 @@ goto :eof
 :main
 call :log ""Inicio de script de reinicio""
 
-call :log ""Esperando 3s antes de taskkill...""
+call :log ""Esperando 3s...""
 timeout /t 3 /nobreak > nul
 
-taskkill /f /im {TrayProcessName}.exe > nul 2>&1
-call :log ""taskkill /f /im {TrayProcessName}.exe - errorlevel=%errorlevel%""
-
+REM === 1. Detener el servicio (esto también mata el Tray internamente via OnStop) ===
 call :log ""Ejecutando net stop {ServiceName}...""
 net stop {ServiceName} > nul 2>&1
 call :log ""net stop {ServiceName} - errorlevel=%errorlevel%""
 
+REM === 2. Verificar que el servicio está detenido ===
+call :log ""Verificando estado del servicio...""
+sc query {ServiceName} | find ""STOPPED"" > nul 2>&1
+if %errorlevel%==0 (
+    call :log ""Estado verificado: STOPPED""
+) else (
+    call :log ""Estado NO es STOPPED, esperando 5s adicionales...""
+    timeout /t 5 /nobreak > nul
+    sc query {ServiceName} | find ""STOPPED"" > nul 2>&1
+    if %errorlevel%==0 (
+        call :log ""Estado verificado tras espera: STOPPED""
+    ) else (
+        call :log ""ADVERTENCIA: servicio no confirmó STOPPED. Estado actual:""
+        for /f ""tokens=*"" %%i in ('sc query {ServiceName} ^| find ""STATE""') do call :log ""  %%i""
+        call :log ""Forzando taskkill como fallback...""
+        taskkill /f /im {TrayProcessName}.exe > nul 2>&1
+        call :log ""taskkill {TrayProcessName}.exe - errorlevel=%errorlevel%""
+        timeout /t 3 /nobreak > nul
+    )
+)
+
+REM === 3. Espera de seguridad antes de iniciar ===
 call :log ""Esperando 3s antes de net start...""
 timeout /t 3 /nobreak > nul
 
+REM === 4. Iniciar el servicio ===
 call :log ""Ejecutando net start {ServiceName}...""
 net start {ServiceName} > nul 2>&1
 call :log ""net start {ServiceName} - errorlevel=%errorlevel%""
+
+REM === 5. Verificar que inició correctamente ===
+call :log ""Verificando estado post-inicio...""
+sc query {ServiceName} | find ""RUNNING"" > nul 2>&1
+if %errorlevel%==0 (
+    call :log ""Estado verificado: RUNNING""
+) else (
+    call :log ""ADVERTENCIA: servicio no confirmó RUNNING tras net start""
+    for /f ""tokens=*"" %%i in ('sc query {ServiceName} ^| find ""STATE""') do call :log ""  %%i""
+)
 
 call :log ""Script de reinicio completado""
 ";
