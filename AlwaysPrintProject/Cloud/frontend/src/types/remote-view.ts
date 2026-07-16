@@ -42,6 +42,7 @@ export interface RemoteViewTab {
   selectedMonitor: number
   startedAt: string
   resolution?: string
+  targetWorkerId?: string  // Worker donde está la workstation (para stream affinity)
 }
 
 // ============================================================================

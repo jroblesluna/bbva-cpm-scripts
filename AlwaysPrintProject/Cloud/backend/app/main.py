@@ -16,7 +16,7 @@ from app.services.scalability_metrics import scalability_collector
 from app.services.status_batch_writer import status_batch_writer
 from app.services.push_services import get_state_map_service
 from app.api.v1.router import api_router
-from app.api.v1.websocket import workstation, operator
+from app.api.v1.websocket import workstation, operator, rv_stream
 from app.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
 
 
@@ -116,6 +116,7 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 # Incluir routers WebSocket
 app.include_router(workstation.router, tags=["WebSocket - Workstations"])
 app.include_router(operator.router, tags=["WebSocket - Operators"])
+app.include_router(rv_stream.router, tags=["WebSocket - RV Stream"])
 
 
 @app.get("/")

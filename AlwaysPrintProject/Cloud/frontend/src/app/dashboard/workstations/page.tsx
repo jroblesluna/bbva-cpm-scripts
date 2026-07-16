@@ -2355,6 +2355,7 @@ function WorkstationDetailModal({
             ip: workstation.ip_private,
             hostname: workstation.hostname || '',
             status: 'active',
+            mode: status.mode || 'screenshot',
           });
           router.push(`/dashboard/remote-view?${params.toString()}`);
         }
@@ -2372,7 +2373,11 @@ function WorkstationDetailModal({
         ip: workstation.ip_private,
         hostname: workstation.hostname || '',
         status: result.status,
+        mode: result.mode,
       });
+      if (result.target_worker_id) {
+        params.set('target_worker', result.target_worker_id);
+      }
       router.push(`/dashboard/remote-view?${params.toString()}`);
     } catch (error: unknown) {
       const err = error as { response?: { status?: number; data?: { detail?: string } } };

@@ -65,7 +65,9 @@ class RemoteViewStartRequest(BaseModel):
 class RemoteViewStartResponse(BaseModel):
     """Schema de respuesta al iniciar sesión."""
     session_id: str = Field(..., description="UUID de la sesión creada")
-    status: str = Field(..., description="Estado inicial: pending_consent")
+    status: str = Field(..., description="Estado inicial: pending_consent o active")
+    mode: str = Field(..., description="Modo efectivo de la sesión (default_mode de org o override)")
+    target_worker_id: Optional[str] = Field(default=None, description="Worker donde está conectada la workstation (para affinity)")
 
 
 class RemoteViewStopResponse(BaseModel):
@@ -264,9 +266,19 @@ async def start_remote_view(
             new_values={"mode": mode, "consent_given": None},
         )
 
+    # Obtener worker_id donde está la workstation (para stream affinity)
+    target_worker_id = None
+    try:
+        if hasattr(connection_manager, '_worker_registry') and connection_manager._worker_registry:
+            target_worker_id = await connection_manager._worker_registry.find_worker_for_workstation(workstation_id_str)
+    except Exception:
+        pass  # Si falla, el frontend usará polling como fallback
+
     return RemoteViewStartResponse(
         session_id=str(session.id),
         status="active" if not rv_config.require_user_consent else "pending_consent",
+        mode=mode,
+        target_worker_id=target_worker_id,
     )
 
 

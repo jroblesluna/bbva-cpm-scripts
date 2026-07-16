@@ -70,6 +70,8 @@ interface SessionTabProps {
   onKeepAlive: () => void
   /** Reintentar conexión (cuando consent fue rechazado) */
   onRetry: () => void
+  /** Worker ID objetivo para stream affinity (WebSocket dedicado) */
+  targetWorkerId?: string
 }
 
 // ============================================================================
@@ -99,6 +101,7 @@ export function SessionTab({
   isExpired,
   onKeepAlive,
   onRetry,
+  targetWorkerId,
 }: SessionTabProps) {
   const t = useTranslations('remoteView')
 
@@ -145,6 +148,7 @@ export function SessionTab({
         latestKeyframe={frameData ? { data: frameData, width: frameWidth, height: frameHeight } : null}
         latestDelta={latestDelta}
         onRequestFrame={onRequestFrame}
+        targetWorkerId={targetWorkerId}
       />
     )
   }

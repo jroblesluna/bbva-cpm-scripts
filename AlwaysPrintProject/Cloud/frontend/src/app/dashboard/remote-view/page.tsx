@@ -163,6 +163,7 @@ export default function RemoteViewPage() {
     const ip = searchParams.get('ip') || ''
     const hostname = searchParams.get('hostname') || ''
     const mode = (searchParams.get('mode') as RemoteViewMode) || 'screenshot'
+    const targetWorkerId = searchParams.get('target_worker') || undefined
 
     if (sessionId && workstationId) {
       dispatch({
@@ -177,6 +178,7 @@ export default function RemoteViewPage() {
           monitors: [],
           selectedMonitor: 0,
           startedAt: new Date().toISOString(),
+          targetWorkerId,
         },
       })
     }
@@ -632,6 +634,7 @@ export default function RemoteViewPage() {
             isExpired={false}
             onKeepAlive={() => handleKeepAlive(activeTab.sessionId)}
             onRetry={() => handleRetry(activeTab.sessionId)}
+            targetWorkerId={activeTab.targetWorkerId}
           />
         ) : (
           <EmptyState t={t} />

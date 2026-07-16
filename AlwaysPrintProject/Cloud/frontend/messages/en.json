@@ -1447,6 +1447,8 @@
     "timeoutWarning": "Session will close due to inactivity in {seconds}s",
     "keepAlive": "Keep alive",
     "streamActive": "Stream active",
+    "streamDirect": "Direct",
+    "streamConnectingWorker": "Connecting to worker...",
     "streamReconnecting": "Reconnecting...",
     "streamPaused": "Stream paused",
     "streamUnsupported": "Your browser doesn't support H.264 streaming",

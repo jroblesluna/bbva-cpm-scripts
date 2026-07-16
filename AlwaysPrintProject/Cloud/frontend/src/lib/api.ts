@@ -1036,6 +1036,8 @@ export interface RemoteViewStatusResponse {
 export interface RemoteViewStartResponse {
   session_id: string
   status: string
+  mode: string
+  target_worker_id: string | null
 }
 
 export const remoteViewApi = {

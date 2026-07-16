@@ -474,30 +474,27 @@ async def workstation_websocket(
             ):
                 session_id = data.get("session_id")
 
-                # --- DEBUG TEMPORAL: diagnosticar rv_frame relay ---
-                if message_type == "rv_frame":
-                    frame_type = data.get("frame_type", "legacy")
-                    data_size = len(data.get("data", "")) if "data" in data else 0
-                    tiles_count = len(data.get("tiles", [])) if "tiles" in data else 0
-                    logger.info(
-                        "[RV_FRAME] Recibido del Tray: session_id=%s, frame_type=%s, "
-                        "data_size=%d, tiles=%d, ws=%s",
-                        session_id, frame_type, data_size, tiles_count, workstation_id,
-                    )
-                # --- FIN DEBUG TEMPORAL ---
+                # Para rv_frame: intentar entrega directa al stream viewer local (same-worker)
+                if message_type == "rv_frame" and session_id:
+                    from app.api.v1.websocket.rv_stream import get_stream_viewer
+                    stream_ws = get_stream_viewer(session_id)
+                    if stream_ws:
+                        try:
+                            await stream_ws.send_json(data)
+                            continue  # Entregado directamente, no relay
+                        except Exception:
+                            pass  # Viewer desconectado, fall through a relay normal
 
+                # Lazy register y relay normal para otros mensajes o fallback
                 if session_id:
-                    # Lazy register: si este worker no tiene el mapping (cross-worker issue)
                     if not remote_view_relay.get_session(session_id):
                         _lazy_register_rv_session(session_id)
                     sent = await remote_view_relay.relay_to_operator(session_id, data)
-                    # --- DEBUG TEMPORAL: resultado del relay ---
                     if message_type == "rv_frame" and not sent:
                         logger.warning(
                             "[RV_FRAME] relay_to_operator FALLÓ: session_id=%s, ws=%s",
                             session_id, workstation_id,
                         )
-                    # --- FIN DEBUG TEMPORAL ---
                 continue
             
             if message_type == "status_update":

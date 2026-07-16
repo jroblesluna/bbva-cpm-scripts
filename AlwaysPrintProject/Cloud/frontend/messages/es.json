@@ -1447,6 +1447,8 @@
     "timeoutWarning": "La sesión se cerrará por inactividad en {seconds}s",
     "keepAlive": "Mantener activa",
     "streamActive": "Transmisión activa",
+    "streamDirect": "Directo",
+    "streamConnectingWorker": "Conectando al worker...",
     "streamReconnecting": "Reconectando...",
     "streamPaused": "Transmisión pausada",
     "streamUnsupported": "Tu navegador no soporta transmisión H.264",
