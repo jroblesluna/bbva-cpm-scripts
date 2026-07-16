@@ -1414,6 +1414,7 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   const { getAuthHeaders, user, isAdmin } = useAuth()
   const t = useTranslations('vlans')
   const tCommon = useTranslations('common')
+  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string; forced_contingency: boolean }>>([])
   const [formData, setFormData] = useState<VLANCreate>({
@@ -1463,9 +1464,22 @@ function CreateVLANModal({ onClose, onSuccess }: { onClose: () => void; onSucces
       await apiClient.post('/vlans/', { ...formData, cidr_ranges: validCidrs })
       onSuccess()
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : 'Error desconocido'
-      console.error('Error:', error)
-      alert(msg)
+      // El interceptor de apiClient transforma errores a {detail, status}
+      let msg = 'Error desconocido'
+      if (error && typeof error === 'object') {
+        const apiErr = error as { detail?: string; status?: number }
+        if (apiErr.detail) {
+          msg = apiErr.detail
+        } else if (error instanceof Error) {
+          msg = error.message
+        }
+      }
+      console.warn('Error:', error)
+      toast({
+        title: 'Error al crear VLAN',
+        description: msg,
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
