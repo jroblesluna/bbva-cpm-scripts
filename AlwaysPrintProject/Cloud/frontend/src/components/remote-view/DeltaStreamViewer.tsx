@@ -59,6 +59,7 @@ export function DeltaStreamViewer({
   const [fps, setFps] = useState(0)
   const [isStale, setIsStale] = useState(false)
   const [streamConnected, setStreamConnected] = useState(false)
+  const [connectedWorkerId, setConnectedWorkerId] = useState<string | null>(null)
   const [affinityAttempts, setAffinityAttempts] = useState(0)
   const lastFpsTimeRef = useRef(performance.now())
   const frameCountSinceLastFps = useRef(0)
@@ -163,7 +164,7 @@ export function DeltaStreamViewer({
       streamWsRef.current = ws
 
       ws.onopen = () => {
-        // Esperamos el mensaje rv_stream_connected con worker_id
+        console.log(`[RV-Stream] WS abierto, esperando worker_id...`)
       }
 
       ws.onmessage = (event) => {
@@ -173,10 +174,15 @@ export function DeltaStreamViewer({
           const msg = JSON.parse(event.data)
 
           if (msg.type === 'rv_stream_connected') {
+            // Log de debug para cada intento de affinity
+            console.log(
+              `[RV-Stream] Worker respondió: ${msg.worker_id} | Target: ${targetWorkerId} | ${msg.worker_id === targetWorkerId ? '✓ MATCH' : '✗ MISMATCH'}`
+            )
             // Verificar worker affinity
             if (msg.worker_id === targetWorkerId) {
               // Estamos en el worker correcto — entrega directa de frames
               setStreamConnected(true)
+              setConnectedWorkerId(msg.worker_id)
               setAffinityAttempts(0)
             } else {
               // Worker incorrecto
@@ -186,6 +192,7 @@ export function DeltaStreamViewer({
                   // Máximo de intentos alcanzado — aceptar este worker
                   // Los frames llegarán via polling (no push directo)
                   setStreamConnected(true)
+                  setConnectedWorkerId(msg.worker_id)
                   return 0
                 }
                 // Reintentar en otro worker
@@ -219,6 +226,7 @@ export function DeltaStreamViewer({
       }
 
       ws.onclose = () => {
+        console.log(`[RV-Stream] WS cerrado`)
         streamWsRef.current = null
         setStreamConnected(false)
 
@@ -324,7 +332,7 @@ export function DeltaStreamViewer({
         <Video className="w-8 h-8 text-gray-500 animate-pulse" />
         <span className="text-sm text-gray-400">
           {targetWorkerId && !streamConnected
-            ? `${t('streamConnectingWorker')}${affinityAttempts > 0 ? ` (${affinityAttempts})` : ''}`
+            ? `${t('streamConnectingWorker')} ${targetWorkerId || ''} ${affinityAttempts > 0 ? `(${affinityAttempts}/5)` : ''}`
             : t('streamWaitingData')}
         </span>
       </div>
@@ -361,7 +369,7 @@ export function DeltaStreamViewer({
           )}
           <span className={`text-xs ${streamConnected ? 'text-green-400' : isStale ? 'text-amber-400' : 'text-gray-400'}`}>
             {streamConnected
-              ? t('streamDirect')
+              ? `${t('streamDirect')} (${connectedWorkerId || '?'})`
               : isStale
                 ? t('streamReconnecting')
                 : t('streamActive')}
