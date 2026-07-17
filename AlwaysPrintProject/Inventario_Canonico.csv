@@ -1,0 +1,656 @@
+VLAN_CODE,VLAN_NAME,IP,MODELO,SERIE,UBICACION,DIRECCION,DISTRITO,PROVINCIA,DEPARTAMENTO,TIPO
+010,010 - Ag. Andahuaylas,118.205.68.68,MX722adhe,7464939022R0V,Operaciones,av Peru 342,Andahuaylas,Andahuaylas,Apurimac,Contrato 2021
+010,010 - Ag. Andahuaylas,118.205.68.69,MX722adhe,7464939022R32,Gerencia,av Peru 342,Andahuaylas,Andahuaylas,Apurimac,Contrato 2021
+013,013 - Ag. Paseo la Castellana,118.205.70.68,MX722adhe,7464111124764,Gerencia,av Paseo la Castellana 103,Santiago de Surco,Lima,Lima,Contrato 2021
+013,013 - Ag. Paseo la Castellana,118.205.70.69,MX722adhe,746411112475N,Plataforma,av Paseo la Castellana 103,Santiago de Surco,Lima,Lima,Contrato 2021
+023,023 - Ag. Ovalo Quiñonez,118.205.74.70,MX522adhe,701701130LPDW,Territorial,av Guardia Civil 787,San Borja,Lima,Lima,Contrato 2021
+023,023 - Ag. Ovalo Quiñonez,118.205.74.68,MX722adhe,746411112476N,Plataforma,av Guardia Civil 787,San Borja,Lima,Lima,Contrato 2021
+023,023 - Ag. Ovalo Quiñonez,118.205.74.69,MX722adhe,746411112475C,Sala Prime,av Guardia Civil 787,San Borja,Lima,Lima,Contrato 2021
+030,030 - Ag. Ovalo Larco Trujillo,118.205.76.68,MX722adhe,746410202415W,Sub Gerencia,Jr America del Sur 4040,Trujillo,Trujillo,La Libertad,Contrato 2021
+030,030 - Ag. Ovalo Larco Trujillo,118.205.76.69,MX722adhe,74641050242T4,Plataforma,Jr America del Sur 4040,Trujillo,Trujillo,La Libertad,Contrato 2021
+038,038 - Ag. Mantas,118.207.250.69,MX722adhe,74641101246L0,Sub Gerencia,Calle Portal  N 130 Mantas,Cusco,Cusco,Cusco,Contrato 2021
+048,048 - Ag. Mega Exp VES,118.205.78.68,MX722adhe,7464111124759,Plataforma,av Lima 2500,Villa el Salvador,Lima,Lima,Contrato 2021
+048,048 - Ag. Mega Exp VES,118.205.78.69,MX722adhe,7464111124752,Plataforma,av Lima 2500,Villa el Salvador,Lima,Lima,Contrato 2021
+060,060 - Ag. AEP Urubamba,118.206.226.68,MX722adhe,74641101246L5,Sub Gerencia,Jr Sucre 348,Urubamba,Urubamba,Cusco,Contrato 2021
+081,081 - Ag. Bagua Grande,118.205.90.68,MX722adhe,7464939022R4B,Sub Gerencia,av Chachapoyas 2044 Sector Visalot,Bagua Grande,Utcubamba,Amazonas,Contrato 2021
+081,081 - Ag. Bagua Grande,118.205.90.69,MX722adhe,7464939022P66,Plataforma,av Chachapoyas 2044 Sector Visalot,Bagua Grande,Utcubamba,Amazonas,Contrato 2021
+083,083 - Ag. Real Plaza Cusco,118.205.92.68,MX722adhe,7464939022PCF,Operaciones,av Collasuyo 2964,Cusco,Cusco,Cusco,Contrato 2021
+083,083 - Ag. Real Plaza Cusco,118.205.92.69,MX722adhe,7464939022R0C,Operaciones,av Collasuyo 2964,Cusco,Cusco,Cusco,Contrato 2021
+091,091 - Ag. Banca Privada Pardo y Aliaga,118.205.4.70,CX625adhe,75299291450T4,Ejecutivos,av Pardo y Aliaga 652 2 P,San Isidro,Lima,Lima,Contrato 2021
+091,091 - Ag. Banca Privada Pardo y Aliaga,118.205.4.68,MX722adhe,746410202417B,Sub Gerencia,av Pardo y Aliaga 652 2 P,San Isidro,Lima,Lima,Contrato 2021
+091,091 - Ag. Banca Privada Pardo y Aliaga,118.205.4.69,MX722adhe,746410202416N,Recepcion,av Pardo y Aliaga 652 2 P,San Isidro,Lima,Lima,Contrato 2021
+094,094 - Ag. Real Plaza Salaverry,118.205.98.68,MX722adhe,746410202418N,Sub Gerencia,av Salaverry 2370,Jesus Maria,Lima,Lima,Contrato 2021
+094,094 - Ag. Real Plaza Salaverry,118.205.98.69,MX722adhe,74641020241CW,Banca Comercial,av Salaverry 2370,Jesus Maria,Lima,Lima,Contrato 2021
+101,101 - Ag. Camana,118.205.100.68,MX722adhe,74641030241ZF,Plataforma,av Emancipacion 200,Lima,Lima,Lima,Contrato 2021
+101,101 - Ag. Camana,118.205.100.69,MX722adhe,746410302421R,Plataforma,av Emancipacion 200,Lima,Lima,Lima,Contrato 2021
+102,102 - Ag. Callao,118.205.102.68,MX722adhe,74641101246C3,Plataforma,av Saenz Pena 323,Callao,Callao,Lima,Contrato 2021
+102,102 - Ag. Callao,118.205.102.69,MX722adhe,746411112478D,Plataforma,av Saenz Pena 323,Callao,Callao,Lima,Contrato 2021
+103,103 - Ag. Capon,118.205.104.68,MX722adhe,7464049023WWK,Plataforma,Jr Ucayali 735,La Victoria,Lima,Lima,Contrato 2021
+103,103 - Ag. Capon,118.205.104.69,MX722adhe,7464049023WWL,Plataforma,Jr Ucayali 735,La Victoria,Lima,Lima,Contrato 2021
+106,106 - Ag. El Remanso,118.205.108.69,MX432adwe,701941340M407,Sala Prime,av Raul Ferrero 1292 Urb el Remanso,La Molina,Lima,Lima,Contrato 2021
+106,106 - Ag. El Remanso,118.205.108.68,MX722adhe,746410202417H,Sub Gerencia,av Raul Ferrero 1292 Urb el Remanso,La Molina,Lima,Lima,Contrato 2021
+106,106 - Ag. El Remanso,118.205.108.70,MX722adhe,7464102024187,Banca Negocio,av Raul Ferrero 1292 Urb el Remanso,La Molina,Lima,Lima,Contrato 2021
+107,107 - Ag. Faucett,118.205.110.68,MX722adhe,746410202418D,Sub Gerencia,av Faucett 216,San Miguel,Lima,Lima,Contrato 2021
+107,107 - Ag. Faucett,118.205.110.69,MX722adhe,746410202419D,Comercial,av Faucett 216,San Miguel,Lima,Lima,Contrato 2021
+108,108 - Ag. Brena,118.205.112.68,MX722adhe,74641101246D8,Sub Gerencia,Jr Huaraz 1600,Breña,Lima,Lima,Contrato 2021
+108,108 - Ag. Brena,118.205.112.69,MX722adhe,746411112476Y,Ventanilla,Jr Huaraz 1600,Breña,Lima,Lima,Adenda 5
+109,109 - Ag. La Molina,118.205.114.68,MX722adhe,7464111124777,Sub Gerencia,av la Molina 746,La Molina,Lima,Lima,Contrato 2021
+109,109 - Ag. La Molina,118.205.114.69,MX722adhe,74641101246KT,Ventanilla,av la Molina 746,La Molina,Lima,Lima,Adenda 5
+111,111 - Ag. Los Olivos,118.205.118.68,MX722adhe,7464049023WXG,Sub Gerencia,Alfredo Mendiola 3685,Los Olivos,Lima,Lima,Adenda 5
+111,111 - Ag. Los Olivos,118.205.118.69,MX722adhe,7464049023WXX,Plataforma,Alfredo Mendiola 3685,Los Olivos,Lima,Lima,Contrato 2021
+112,112 - Ag. México,118.205.120.68,MX722adhe,746410302420V,Plataforma,av Mexico 568,La Victoria,Lima,Lima,Contrato 2021
+112,112 - Ag. México,118.205.120.69,MX722adhe,74641030241ZC,Plataforma,av Mexico 568,La Victoria,Lima,Lima,Contrato 2021
+113,113 - Ag. Ingenieria,118.205.122.68,MX722adhe,74641101246DX,Sub Gerencia,Alfredo Mendiola 300,San Martin de Porres,Lima,Lima,Contrato 2021
+113,113 - Ag. Ingenieria,118.205.122.69,MX722adhe,746411112474K,Plataforma,Alfredo Mendiola 300,San Martin de Porres,Lima,Lima,Adenda 5
+114,114 - Ag. Barranco,118.205.124.70,MX522adhe,701701030LHZL,Banca Personal,av Grau 414,Barranco,Lima,Lima,Adenda 5
+114,114 - Ag. Barranco,118.205.124.68,MX722adhe,74641101246BY,Sub Gerencia,av Grau 414,Barranco,Lima,Lima,Adenda 5
+114,114 - Ag. Barranco,118.205.124.69,MX722adhe,74641101246LX,Banca Personal,av Grau 414,Barranco,Lima,Lima,Contrato 2021
+115,115 - Ag. La Victoria,118.205.126.68,MX722adhe,7464103024211,Sub Gerencia,av Manco Capac 300,La Victoria,Lima,Lima,Adenda 5
+115,115 - Ag. La Victoria,118.205.126.70,MX722adhe,74641020241CV,Jefe de Atencion al cliente,av Manco Capac 300,La Victoria,Lima,Lima,Adenda 5
+116,116 - Ag. Comas,118.205.128.68,MS826de,40649370197T8,Sub Gerencia,AV TUPAC AMARU 1175,Comas,Lima,Lima,Contrato 2021
+116,116 - Ag. Comas,118.205.128.69,MX722adhe,74641020241CB,Banca Negocio,AV TUPAC AMARU 1175,Comas,Lima,Lima,Adenda 5
+117,117 - Ag. Larco Tarata,118.205.6.70,MX432adwe,701941340M3ZY,Sala Prime,av Larco 631,Miraflores,Lima,Lima,Contrato 2021
+117,117 - Ag. Larco Tarata,118.205.6.68,MX722adhe,7464049023WWD,Plataforma,av Larco 631,Miraflores,Lima,Lima,Adenda 5
+117,117 - Ag. Larco Tarata,118.205.6.69,MX722adhe,7464049023WVF,Plataforma,av Larco 631,Miraflores,Lima,Lima,Contrato 2021
+118,118 - Ag. Bolivar,118.205.130.69,MX522adhe,701701130LPNX,Sala Prime,Av Bolivar 1188 1190,Pueblo Libre,Lima,Lima,Adenda 5
+118,118 - Ag. Bolivar,118.205.130.68,MX722adhe,74641111247BX,Sub Gerencia,Av Bolivar 1188 1190,Pueblo Libre,Lima,Lima,Adenda 5
+119,119 - Ag. San Antonio,118.205.132.68,MX722adhe,7464049023WVZ,Sub Gerencia,av 28 de Julio 1297,Miraflores,Lima,Lima,Adenda 5
+119,119 - Ag. San Antonio,118.205.132.69,MX722adhe,7464049023WX4,Comercial,av 28 de Julio 1297,Miraflores,Lima,Lima,Contrato 2021
+120,120 - Ag. Universidad Catolica,118.205.134.69,MX522adhe,701701130LPBV,Sala Prime,Av Universitaria Cdra 18,San Miguel,Lima,Lima,Adenda 5
+120,120 - Ag. Universidad Catolica,118.205.134.68,MX722adhe,7464049023X2M,Sub Gerencia,Av Universitaria Cdra 18,San Miguel,Lima,Lima,Adenda 5
+120,120 - Ag. Universidad Catolica,118.205.134.70,MX722adhe,74641030241YP,Sala Prime,Av Universitaria Cdra 18,San Miguel,Lima,Lima,Adenda 5
+121,121 - Ag. Club Regatas Lima,118.205.136.68,MX722adhe,74641020241CD,Plataforma,Av Chachi Dibos,Chorrillos,Lima,Lima,Adenda 5
+121,121 - Ag. Club Regatas Lima,118.205.136.69,MX722adhe,74641020241D7,Plataforma,Av Chachi Dibos,Chorrillos,Lima,Lima,Adenda 5
+122,122 - Ag. Magdalena,118.205.138.68,MX722adhe,74641101246HX,Sub Gerencia,JR FRANCISCO BOLOGNESI 399,Magdalena,Lima,Lima,Adenda 5
+122,122 - Ag. Magdalena,118.205.138.69,MX722adhe,746411112475B,Plataforma,JR FRANCISCO BOLOGNESI 399,Magdalena,Lima,Lima,Adenda 5
+123,123 - Ag. Camino Real,118.205.140.70,MX522adhe,701701030LK93,Sala Prime,av Camino Real 355,San Isidro,Lima,Lima,Adenda 5
+123,123 - Ag. Camino Real,118.205.140.68,MX722adhe,7464049023WWC,Plataforma,av Camino Real 355,San Isidro,Lima,Lima,Contrato 2021
+123,123 - Ag. Camino Real,118.205.140.69,MX722adhe,7464049023WY0,Gerencia,av Camino Real 355,San Isidro,Lima,Lima,Adenda 5
+126,126 - Ag. Colmena,118.205.8.68,MX722adhe,7464102024162,Sub Gerencia,av Nicolas de Pierola 649,Lima,Lima,Lima,Contrato 2021
+126,126 - Ag. Colmena,118.205.8.69,MX722adhe,74641020241CC,Plataforma,av Nicolas de Pierola 649,Lima,Lima,Lima,Adenda 5
+127,127 - Ag. Minka,118.205.146.68,MX722adhe,74641101246L8,Sub Gerencia,Pabellon 4,Callao,Callao,Lima,Contrato 2021
+127,127 - Ag. Minka,118.205.146.69,MX722adhe,7464111124799,Gerencia,Pabellon 4,Callao,Callao,Lima,Contrato 2021
+128,128 - Ag. Las Flores,118.205.148.68,MX722adhe,74641020241D8,Comercial,av Proceres de la Independ 1643,San Juan de Lurigancho,Lima,Lima,Contrato 2021
+128,128 - Ag. Las Flores,118.205.148.69,MX722adhe,74641050242R8,Comercial,av Proceres de la Independ 1643,San Juan de Lurigancho,Lima,Lima,Contrato 2021
+129,129 - Ag. Vitarte,118.205.150.68,MX722adhe,74641101246HR,Comercial,Jr Progreso 102,Ate,Lima,Lima,Contrato 2021
+129,129 - Ag. Vitarte,118.205.150.69,MX722adhe,74641101246CH,Gerencia,Jr Progreso 102,Ate,Lima,Lima,Contrato 2021
+130,130 - Ag. Lima,118.205.152.68,MX722adhe,746410202416V,Sub Gerencia,Jr Carabaya 841,Lima,Lima,Lima,Adenda 5
+130,130 - Ag. Lima,118.205.152.69,MX722adhe,7464049023WY4,Plataforma,Jr Carabaya 841,Lima,Lima,Lima,Contrato 2021
+130,130 - Ag. Lima,118.205.152.70,MX722adhe,7464049023WXP,Plataforma,Jr Carabaya 841,Lima,Lima,Lima,Contrato 2021
+131,131 - Ag. Nicolas Arriola 1,118.205.154.68,MX722adhe,74641050242WC,Plataforma,av Nicolas Arriola 607,La Victoria,Lima,Lima,Adenda 5
+131,131 - Ag. Nicolas Arriola 1,118.205.154.69,MX722adhe,746410202415H,Plataforma,av Nicolas Arriola 607,La Victoria,Lima,Lima,Contrato 2021
+133,133 - Ag. Villa Maria de Triunfo,118.205.158.68,MX722adhe,74641101246CL,Sub Gerencia,av Pachacutec 2101,Villa Maria del Triunfo,Lima,Lima,Contrato 2021
+133,133 - Ag. Villa Maria de Triunfo,118.205.158.69,MX722adhe,74641101246BV,Plataforma,av Pachacutec 2101,Villa Maria del Triunfo,Lima,Lima,Adenda 5
+135,135 - Ag. San Juan de Miraflores,118.205.160.68,MX722adhe,746411112474V,Plataforma,av de los Heroes 502,San Juan de Miraflores,Lima,Lima,Adenda 5
+135,135 - Ag. San Juan de Miraflores,118.205.160.69,MX722adhe,7464111124756,Comercial,av de los Heroes 502,San Juan de Miraflores,Lima,Lima,Adenda 5
+136,136 - Ag. Salamanca,118.205.162.68,MX722adhe,74641111247BR,Sub Gerencia,Av Paracas 203 Urb Salamanca,Ate,Lima,Lima,Contrato 2021
+136,136 - Ag. Salamanca,118.205.162.69,MX722adhe,746411112479Z,Banca Negocio,Av Paracas 203 Urb Salamanca,Ate,Lima,Lima,Contrato 2021
+137,137 - Ag. Villa Marina,118.205.164.68,MX722adhe,74641030241ZK,Plataforma,av Guardia Civil 152 156,Chorrillos,Lima,Lima,Contrato 2021
+137,137 - Ag. Villa Marina,118.205.164.69,MX722adhe,746410302420C,Gerencia,av Guardia Civil 152 156,Chorrillos,Lima,Lima,Contrato 2021
+138,138 - Ag. CC Aurora,118.205.166.70,MX432adwe,701941340M406,Sala Prime,c Luis Arias Schereiber 215 217,Miraflores,Lima,Lima,Contrato 2021
+138,138 - Ag. CC Aurora,118.205.166.68,MX722adhe,7464049023X1V,Plataforma,c Luis Arias Schereiber 215 217,Miraflores,Lima,Lima,Contrato 2021
+138,138 - Ag. CC Aurora,118.205.166.69,MX722adhe,74641020241CR,Plataforma,c Luis Arias Schereiber 215 217,Miraflores,Lima,Lima,Contrato 2021
+139,139 - Ag. Zarate,118.205.168.68,MX722adhe,7464049023X0D,Plataforma,av Gran Chimu 399 Urb Zarate,San Juan de Lurigancho,Lima,Lima,Contrato 2021
+139,139 - Ag. Zarate,118.205.168.69,MX722adhe,7464049023X0T,Sub Gerencia,av Gran Chimu 399 Urb Zarate,San Juan de Lurigancho,Lima,Lima,Contrato 2021
+140,140 - Ag. Jesus Maria,118.205.170.68,MX722adhe,746410202415X,Plataforma,av Republica Dominicana 355 359,Jesus Maria,Lima,Lima,Contrato 2021
+140,140 - Ag. Jesus Maria,118.205.170.69,MX722adhe,74641050242T0,Sub Gerencia,av Republica Dominicana 355 359,Jesus Maria,Lima,Lima,Contrato 2021
+141,141 - Ag. Avenida Peru,118.205.172.68,MX722adhe,746411112477W,Sub Gerencia,av Peru 3442-3444,San Martin de Porres,Lima,Lima,Contrato 2021
+141,141 - Ag. Avenida Peru,118.205.172.69,MX722adhe,7464111124786,Plataforma,av Peru 3442-3444,San Martin de Porres,Lima,Lima,Contrato 2021
+142,142 - Ag. CC San Isidro,118.205.174.68,MX722adhe,74641050242TR,Sub Gerencia,av Rivera Navarrete 815,San Isidro,Lima,Lima,Contrato 2021
+142,142 - Ag. CC San Isidro,118.205.174.69,MX722adhe,74641030241Z1,Plataforma,av Rivera Navarrete 815,San Isidro,Lima,Lima,Contrato 2021
+143,143 - Ag. Victor A Belaunde,118.205.176.68,MX722adhe,7464102024192,Plataforma,AV TUPAC AMARU 3046,Comas,Lima,Lima,Contrato 2021
+143,143 - Ag. Victor A Belaunde,118.205.176.69,MX722adhe,7464102024194,Gerencia,AV TUPAC AMARU 3046,Comas,Lima,Lima,Contrato 2021
+144,144 - Ag. Gamarra,118.205.178.68,MX722adhe,74641050242RH,Plataforma,Prolong Unanue 1599,La Victoria,Lima,Lima,Contrato 2021
+144,144 - Ag. Gamarra,118.205.178.69,MX722adhe,74641020241BD,Plataforma,Prolong Unanue 1599,La Victoria,Lima,Lima,Contrato 2021
+145,145 - Ag. Rinconada,118.205.180.68,MX722adhe,746411112477K,Ventanilla,av la Universidad 1810,La Molina,Lima,Lima,Contrato 2021
+145,145 - Ag. Rinconada,118.205.180.69,MX722adhe,746411112475L,Comercial,av la Universidad 1810,La Molina,Lima,Lima,Contrato 2021
+146,146 - Ag. Puruchuco,118.205.182.68,MX722adhe,746411112479R,Sub Gerencia,av Nicolas Ayllon 4770,Ate,Lima,Lima,Contrato 2021
+146,146 - Ag. Puruchuco,118.205.182.69,MX722adhe,746411112477P,Gerencia,av Nicolas Ayllon 4770,Ate,Lima,Lima,Contrato 2021
+147,147 - Ag. Arenales,118.205.184.69,MX522adhe,701701030LK91,Sala Prime,av Arenales 701,Lima,Lima,Lima,Contrato 2021
+147,147 - Ag. Arenales,118.205.184.71,MX522adhe,701701030LHZ4,Territorial,av Arenales 701,Lima,Lima,Lima,Contrato 2021
+147,147 - Ag. Arenales,118.205.184.68,MX722adhe,74641020241D2,Sub Gerencia,av Arenales 701,Lima,Lima,Lima,Contrato 2021
+147,147 - Ag. Arenales,118.205.184.70,MX722adhe,74641050242T3,Sala Prime,av Arenales 701,Lima,Lima,Lima,Contrato 2021
+148,148 - Ag. CC Sucre,118.205.186.68,MX722adhe,74641101246FH,Sub Gerencia,JR LEGUIA Y MELENDEZ 998,Pueblo Libre,Lima,Lima,Contrato 2021
+148,148 - Ag. CC Sucre,118.205.186.69,MX722adhe,74641101246FK,Plataforma,JR LEGUIA Y MELENDEZ 998,Pueblo Libre,Lima,Lima,Contrato 2021
+150,150 - Ag. CC Higuereta,118.205.190.68,MX722adhe,74641020241B2,Sub Gerencia,av Benavides 3501,Santiago de Surco,Lima,Lima,Contrato 2021
+150,150 - Ag. CC Higuereta,118.205.190.69,MX722adhe,746410202417L,Gerencia,av Benavides 3501,Santiago de Surco,Lima,Lima,Contrato 2021
+151,151 - Ag. Maranga,118.205.192.68,MX722adhe,746410302420B,Sub Gerencia,av la Marina 2671,San Miguel,Lima,Lima,Contrato 2021
+151,151 - Ag. Maranga,118.205.192.69,MX722adhe,74641050242T2,Plataforma,av la Marina 2671,San Miguel,Lima,Lima,Contrato 2021
+152,152 - Ag. San Borja,118.205.194.69,MX522adhe,701701030LK70,Sala Prime,av Aviacion 2465 2467,San Borja,Lima,Lima,Contrato 2021
+152,152 - Ag. San Borja,118.205.194.68,MX722adhe,7464111124783,Sub Gerencia,av Aviacion 2465 2467,San Borja,Lima,Lima,Contrato 2021
+152,152 - Ag. San Borja,118.205.194.70,MX722adhe,7464111124744,Plataforma,av Aviacion 2465 2467,San Borja,Lima,Lima,Contrato 2021
+153,153 - Ag. CC Risso,118.205.196.68,MX722adhe,746410202419M,Plataforma,av Arequipa Esq Jr Risso,Lince,Lima,Lima,Contrato 2021
+153,153 - Ag. CC Risso,118.205.196.69,MX722adhe,74641050242W5,Gerencia,av Arequipa Esq Jr Risso,Lince,Lima,Lima,Contrato 2021
+156,156 - Ag. Pardo,118.205.200.68,MX722adhe,7464049023X2D,Plataforma,av Pardo 791,Miraflores,Lima,Lima,Contrato 2021
+156,156 - Ag. Pardo,118.205.200.69,MX722adhe,7464049023X0F,Plataforma,av Pardo 791,Miraflores,Lima,Lima,Contrato 2021
+157,157 - Ag. Las Gardenias,118.205.202.68,MX722adhe,746410302420G,Plataforma,av Benavides 5096,Santiago de Surco,Lima,Lima,Contrato 2021
+157,157 - Ag. Las Gardenias,118.205.202.69,MX722adhe,74641030241ZD,Plataforma,av Benavides 5096,Santiago de Surco,Lima,Lima,Contrato 2021
+159,159 - Ag. Hunter,118.206.254.68,MX722adhe,74641101246K9,Ventanilla,av las americas N 117,Jacobo Hunter,Arequipa,Arequipa,Contrato 2021
+159,159 - Ag. Hunter,118.206.254.69,MX722adhe,74641050242VB,Sub Gerencia,av las americas N 117,Jacobo Hunter,Arequipa,Arequipa,Contrato 2021
+160,160 - Ag. CC Monterrico,118.205.204.68,MX722adhe,74641050242VG,Sub Gerencia,av la Encalada 615 CC Monterrico,Santiago de Surco,Lima,Lima,Contrato 2021
+160,160 - Ag. CC Monterrico,118.205.204.69,MX722adhe,74641050242VM,Operaciones,av la Encalada 615 CC Monterrico,Santiago de Surco,Lima,Lima,Contrato 2021
+162,162 - Ag. Aeropuerto,118.205.208.68,MX722adhe,746411112475M,Sub Gerencia,CENTRO AÉREO COMERCIAL,Callao,Callao,Lima,Contrato 2021
+162,162 - Ag. Aeropuerto,118.205.208.69,MX722adhe,74641101246D6,Ventanilla,CENTRO AÉREO COMERCIAL,Callao,Callao,Lima,Contrato 2021
+163,163 - Ag. Apolo,118.205.210.68,MX722adhe,74641030241ZL,Sub Gerencia,av Mexico 1700,La Victoria,Lima,Lima,Contrato 2021
+163,163 - Ag. Apolo,118.205.210.69,MX722adhe,7464103024203,Plataforma,av Mexico 1700,La Victoria,Lima,Lima,Contrato 2021
+164,164 - Ag. Venezuela 3,118.205.212.68,MX722adhe,74641101246K4,Sub Gerencia,av Venezuela 1254,Breña,Lima,Lima,Contrato 2021
+164,164 - Ag. Venezuela 3,118.205.212.69,MX722adhe,74641101246F5,Plataforma,av Venezuela 1254,Breña,Lima,Lima,Contrato 2021
+165,165 - Ag. Base Naval,118.205.214.68,MX722adhe,746411112479X,Sub Gerencia,av Contralmirante  Mora SN,Callao,Callao,Lima,Contrato 2021
+165,165 - Ag. Base Naval,118.205.214.69,MX722adhe,746411112475F,Plataforma,av Contralmirante  Mora SN,Callao,Callao,Lima,Contrato 2021
+166,166 - Ag. Colonial,118.205.10.68,MX722adhe,746411112479L,Sub Gerencia,c Omega 149,Callao,Callao,Lima,Contrato 2021
+166,166 - Ag. Colonial,118.205.10.69,MX722adhe,74641101246CT,Plataforma,c Omega 149,Callao,Callao,Lima,Contrato 2021
+169,169 - Ag. Comandante Espinar,118.205.220.68,MX722adhe,7464102024180,Sub Gerencia,av Comandante Espinar 372 388,Miraflores,Lima,Lima,Contrato 2021
+170,170 - Ag. Avenida Sucre,118.205.222.68,MX722adhe,746411112476M,Sub Gerencia,AV SUCRE 970,Pueblo Libre,Lima,Lima,Contrato 2021
+170,170 - Ag. Avenida Sucre,118.205.222.69,MX722adhe,746411112477L,Plataforma,AV SUCRE 970,Pueblo Libre,Lima,Lima,Contrato 2021
+172,172 - Ag. CC Fiori,118.205.226.69,MX532adwe,702025210043D,Sala Prime,Prolong 499 G Tomas Valle,San Martin de Porres,Lima,Lima,Contrato 2021
+172,172 - Ag. CC Fiori,118.205.226.68,MX722adhe,74641101246K6,Sub Gerencia,Prolong 499 G Tomas Valle,San Martin de Porres,Lima,Lima,Contrato 2021
+174,174 - Ag. Megaplaza,118.205.12.68,MX722adhe,746410202417P,Sub Gerencia,av Alfredo Mendiola 3698,Independencia,Lima,Lima,Contrato 2021
+174,174 - Ag. Megaplaza,118.205.12.69,MX722adhe,746410202416Y,Ventanilla,av Alfredo Mendiola 3698,Independencia,Lima,Lima,Contrato 2021
+175,175 - Ag. Real Plaza Centro Civico,118.205.228.69,MX532adwe,7020252100440,Sala Prime,pz Cc Real Centro Civico,Lima,Lima,Lima,Contrato 2021
+175,175 - Ag. Real Plaza Centro Civico,118.205.228.70,MX722adhe,7464049023WYP,Sub Gerencia,pz Cc Real Centro Civico,Lima,Lima,Lima,Contrato 2021
+175,175 - Ag. Real Plaza Centro Civico,118.205.228.68,MX722adhe,7464049023WZG,Ejecutivo EBP,pz Cc Real Centro Civico,Lima,Lima,Lima,Contrato 2021
+176,176 - Ag. El Trebol,118.205.230.68,MX722adhe,746411112478X,Comercial,Av Gamarra Km 14 5 c Panam Norte,Los Olivos,Lima,Lima,Contrato 2021
+176,176 - Ag. El Trebol,118.205.230.69,MX722adhe,746411112475K,Sub Gerencia,Av Gamarra Km 14 5 c Panam Norte,Los Olivos,Lima,Lima,Contrato 2021
+177,177 - Ag. Alcazar,118.205.232.68,MX722adhe,746411112475W,Sub Gerencia,av Amancaes 192 194,Rimac,Lima,Lima,Contrato 2021
+177,177 - Ag. Alcazar,118.205.232.69,MX722adhe,74641101246F4,Banca Empresa,av Amancaes 192 194,Rimac,Lima,Lima,Contrato 2021
+178,178 - Ag. Camacho,118.205.234.69,MX432adwe,701941340M403,Sala Prime,av Prolong Javier Prado este 4921,La Molina,Lima,Lima,Contrato 2021
+178,178 - Ag. Camacho,118.205.234.68,MX722adhe,74641101246KZ,Gerencia,av Prolong Javier Prado este 4921,La Molina,Lima,Lima,Contrato 2021
+179,179 - Ag. Cavenecia,118.205.236.70,MX522adhe,701704330NNY8,Sala Prime,c Esq Jr Cavenecia Con Tudela y Varela,San Isidro,Lima,Lima,Contrato 2021
+179,179 - Ag. Cavenecia,118.205.236.68,MX722adhe,7464049023WWG,Banca Comercial,c Esq Jr Cavenecia Con Tudela y Varela,San Isidro,Lima,Lima,Contrato 2021
+179,179 - Ag. Cavenecia,118.205.236.69,MX722adhe,7464049023X1G,Sub Gerencia,c Esq Jr Cavenecia Con Tudela y Varela,San Isidro,Lima,Lima,Contrato 2021
+182,182 - Ag. Santa Monica,118.205.242.68,MX722adhe,7464102024177,Sub Gerencia,av Juan Pezet 1425,San Isidro,Lima,Lima,Contrato 2021
+182,182 - Ag. Santa Monica,118.205.242.69,MX722adhe,74641050242R7,Gerencia,av Juan Pezet 1425,San Isidro,Lima,Lima,Contrato 2021
+183,183 - Ag. Santa Anita,118.205.14.68,MX722adhe,74641101246DL,Sub Gerencia,c las Alondras 257,Santa Anita,Lima,Lima,Contrato 2021
+183,183 - Ag. Santa Anita,118.205.14.69,MX722adhe,74641101246KY,Plataforma,c las Alondras 257,Santa Anita,Lima,Lima,Contrato 2021
+184,184 - Ag. San Felipe,118.205.244.68,MX722adhe,7464049023WXW,Sub Gerencia,Residencial San Felipe Tda 23,Jesus Maria,Lima,Lima,Contrato 2021
+184,184 - Ag. San Felipe,118.205.244.69,MX722adhe,746410202418K,Plataforma,Residencial San Felipe Tda 23,Jesus Maria,Lima,Lima,Contrato 2021
+186,186 - Ag. La Rambla,118.205.248.68,MX722adhe,74641141248H6,Gerencia,av Javier Prado este 2010,San Borja,Lima,Lima,Contrato 2021
+186,186 - Ag. La Rambla,118.205.248.69,MX722adhe,746411112475Z,Plataforma,av Javier Prado este 2010,San Borja,Lima,Lima,Contrato 2021
+187,187 - Ag. Aramburu,118.205.250.68,MX722adhe,74641020241C4,Plataforma,av Aramburu 154,Miraflores,Lima,Lima,Contrato 2021
+187,187 - Ag. Aramburu,118.205.250.69,MX722adhe,74641020241BC,Plataforma,av Aramburu 154,Miraflores,Lima,Lima,Contrato 2021
+189,189 - Ag. Dos de Mayo,118.205.254.68,MX722adhe,7464049023WYF,Sub Gerencia,c los Laureles 214,San Isidro,Lima,Lima,Contrato 2021
+189,189 - Ag. Dos de Mayo,118.205.254.69,MX722adhe,7464049023WYK,Ventanilla,c los Laureles 214,San Isidro,Lima,Lima,Contrato 2021
+190,190 - Ag. CC San Miguel,118.206.0.68,MX722adhe,746410202416M,Sub Gerencia,CC Plaza San Miguel  Piso 3,San Miguel,Lima,Lima,Contrato 2021
+190,190 - Ag. CC San Miguel,118.206.0.69,MX722adhe,746410202419L,Plataforma,CC Plaza San Miguel  Piso 3,San Miguel,Lima,Lima,Contrato 2021
+190,190 - Ag. CC San Miguel,118.206.0.70,MX722adhe,74641050242T6,Sala Prime,CC Plaza San Miguel  Piso 3,San Miguel,Lima,Lima,Contrato 2021
+194,194 - Ag. Chacarilla,118.205.18.68,MX722adhe,74641020241BP,Plataforma,av Primavera 1054 Urb Chacarilla,Santiago de Surco,Lima,Lima,Contrato 2021
+194,194 - Ag. Chacarilla,118.205.18.69,MX722adhe,746410202418C,Sub Gerencia,av Primavera 1054 Urb Chacarilla,Santiago de Surco,Lima,Lima,Contrato 2021
+194,194 - Ag. Chacarilla,118.205.18.73,MX522adhe,701701130LPF1,Coworking,av Primavera 1054 Urb Chacarilla,Santiago de Surco,Lima,Lima,Contrato 2021
+195,195 - Ag. Cuartel Gral Ejercito,118.206.6.70,MX432adwe,701941340M3RP,Sala Prime,Interior Ctel Gral del Ejercito,San Borja,Lima,Lima,Contrato 2021
+195,195 - Ag. Cuartel Gral Ejercito,118.206.6.68,MX722adhe,746411112476P,Sub Gerencia,Interior Ctel Gral del Ejercito,San Borja,Lima,Lima,Contrato 2021
+195,195 - Ag. Cuartel Gral Ejercito,118.206.6.69,MX722adhe,7464111124768,Plataforma,Interior Ctel Gral del Ejercito,San Borja,Lima,Lima,Contrato 2021
+196,196 - Ag. San Martin de Porres,118.206.8.68,MX722adhe,74641111247BW,Sub Gerencia,av Peru 2254,San Martin de Porres,Lima,Lima,Contrato 2021
+196,196 - Ag. San Martin de Porres,118.206.8.69,MX722adhe,746411112478N,Banca Negocio,av Peru 2254,San Martin de Porres,Lima,Lima,Contrato 2021
+197,197 - Ag. Nicolas Arriola 2,118.206.10.68,MX722adhe,7464103024204,Plataforma,av Nicolas Arriola 1799,La Victoria,Lima,Lima,Contrato 2021
+197,197 - Ag. Nicolas Arriola 2,118.206.10.69,MX722adhe,74641030241ZR,Plataforma,av Nicolas Arriola 1799,La Victoria,Lima,Lima,Contrato 2021
+200,200 - Ag. Cusco,118.205.20.71,MX522adhe,701701030LK02,Centro de Negocios,av el Sol 366,Cusco,Cusco,Cusco,Contrato 2021
+200,200 - Ag. Cusco,118.205.20.68,MX722adhe,7464939022PW3,Atencion al Cliente,av el Sol 366,Cusco,Cusco,Cusco,Contrato 2021
+200,200 - Ag. Cusco,118.205.20.70,MX722adhe,7464939022R4K,Plataforma,av el Sol 366,Cusco,Cusco,Cusco,Contrato 2021
+200,200 - Ag. Cusco,118.205.20.72,MX722adhe,7464939022PWC,Plataforma,av el Sol 366,Cusco,Cusco,Cusco,Contrato 2021
+201,201 - Ag. Wanchaq,118.206.12.68,MX722adhe,7464939022PWZ,Sub Gerencia,av Garcilazo 300,Wanchaq,Cusco,Cusco,Contrato 2021
+201,201 - Ag. Wanchaq,118.206.12.69,MX722adhe,7464939022R12,Plataforma,av Garcilazo 300,Wanchaq,Cusco,Cusco,Contrato 2021
+202,202 - Ag. Ayacucho,118.206.14.68,MX722adhe,7464939022R37,Plataforma,c Portal Union 24,Ayacucho,Huamanga,Ayacucho,Contrato 2021
+202,202 - Ag. Ayacucho,118.206.14.69,MX722adhe,7464939022R03,Plataforma,c Portal Union 24,Ayacucho,Huamanga,Ayacucho,Contrato 2021
+203,203 - Ag. San Martin,118.206.16.70,MX432adwe,701934240K201,Sala Prime,av San Martin 1144 Urb San Isidro,Ica,Ica,Ica,Contrato 2021
+203,203 - Ag. San Martin,118.206.16.68,MX722adhe,74641050242W9,Sub Gerencia,av San Martin 1144 Urb San Isidro,Ica,Ica,Ica,Contrato 2021
+203,203 - Ag. San Martin,118.206.16.69,MX722adhe,74641020241C1,Comercial,av San Martin 1144 Urb San Isidro,Ica,Ica,Ica,Contrato 2021
+204,204 - Ag. Banca Empresa Cusco,118.205.20.73,MX722adhe,7464939022PCK,Banca Empresa,av el Sol 366,Cusco,Cusco,Cusco,Contrato 2021
+204,204 - Ag. Banca Empresa Cusco,118.205.20.74,MX722adhe,7464939022PDD,Banca Empresa,av el Sol 366,Cusco,Cusco,Cusco,Contrato 2021
+205,205 - Ag. Tintaya,118.207.248.68,MX722adhe,7464049023X1X,Gerencia,Av San Martin 331,Espinar,Espinar,Cusco,Contrato 2021
+205,205 - Ag. Tintaya,118.245.45.11,MX722adhe,7464939022R43,Gerencia,Av San Martin 331,Espinar,Espinar,Cusco,Contrato 2021
+208,208 - Ag. Huayruropata,118.206.4.68,MX722adhe,7464102024189,Plataforma,Av Huayruropata N 1024,Wanchaq,Cusco,Cusco,Contrato 2021
+208,208 - Ag. Huayruropata,118.206.4.69,MX722adhe,74641101246H9,Sub Gerencia,Av Huayruropata N 1024,Wanchaq,Cusco,Cusco,Contrato 2021
+210,210 - Ag. Huanuco,118.206.20.68,MX722adhe,746410302421L,Atencion al Cliente,Jr Independencia 1601 1799,Huanuco,Huanuco,Huanuco,Contrato 2021
+210,210 - Ag. Huanuco,118.206.20.69,MX722adhe,746410202419B,Gerencia,Jr Independencia 1601 1799,Huanuco,Huanuco,Huanuco,Contrato 2021
+211,211 - Ag. Canete,118.206.22.68,MX722adhe,74641101246K3,Operaciones,av Dos de Mayo 434  438,San Vicente de Cañete,Cañete,Lima,Contrato 2021
+211,211 - Ag. Canete,118.206.22.69,MX722adhe,7464111124753,Comercial,av Dos de Mayo 434  438,San Vicente de Cañete,Cañete,Lima,Contrato 2021
+215,215 - Ag. Chincha,118.205.22.68,MX722adhe,746410202415B,Operaciones,Mariscal Benavides 117 125,Chincha Alta,Chincha,Ica,Contrato 2021
+215,215 - Ag. Chincha,118.205.22.69,MX722adhe,746410202418L,Comercial,Mariscal Benavides 117 125,Chincha Alta,Chincha,Ica,Contrato 2021
+218,218 - Ag. Quillabamba,118.206.28.68,MX722adhe,7464939022PT5,Sub Gerencia,av Bolognesi 155-157,Santa Ana,La Convencion,Cusco,Contrato 2021
+218,218 - Ag. Quillabamba,118.206.28.69,MX722adhe,7464939022P9Y,Plataforma,av Bolognesi 155-157,Santa Ana,La Convencion,Cusco,Contrato 2021
+220,220 - Ag. Arequipa,118.205.0.69,MX522adhe,701701130LPBH,Centro de Negocios,c San Francisco 108,Arequipa,Arequipa,Arequipa,Contrato 2021
+220,220 - Ag. Arequipa,118.205.0.70,MX532adwe,702025210043W,Sala Prime,c San Francisco 108,Arequipa,Arequipa,Arequipa,Contrato 2021
+220,220 - Ag. Arequipa,118.205.0.68,MX722adhe,7464939022PDZ,Operaciones,c San Francisco 108,Arequipa,Arequipa,Arequipa,Contrato 2021
+220,220 - Ag. Arequipa,118.205.0.71,MX722adhe,7464939022P9P,Gerencia,c San Francisco 108,Arequipa,Arequipa,Arequipa,Contrato 2021
+220,220 - Ag. Arequipa,118.205.0.72,MX722adhe,7464939022PY7,Banca Negocio,c San Francisco 108,Arequipa,Arequipa,Arequipa,Contrato 2021
+221,221 - Ag. San Camilo,118.206.30.68,MX722adhe,7464939022R1T,Sub Gerencia,c Peru 324,Arequipa,Arequipa,Arequipa,Contrato 2021
+221,221 - Ag. San Camilo,118.206.30.69,MX722adhe,7464939022R4M,Plataforma,c Peru 324,Arequipa,Arequipa,Arequipa,Contrato 2021
+222,222 - Ag. Miraflores (Arequipa),118.206.32.68,MX722adhe,7464049023X0B,Plataforma,Cc la Negrita Tda 2,Miraflores,Arequipa,Arequipa,Contrato 2021
+222,222 - Ag. Miraflores (Arequipa),118.206.32.69,MX722adhe,7464939022R5H,Plataforma,Cc la Negrita Tda 2,Miraflores,Arequipa,Arequipa,Contrato 2021
+223,223 - Ag. Cayma,118.206.34.70,MS826de,40649370194TH,Plataforma,av Ejercito 710,Yanahuara,Arequipa,Arequipa,Contrato 2021
+223,223 - Ag. Cayma,118.206.34.72,MX432adwe,701934240K206,Sala Prime,av Ejercito 710,Yanahuara,Arequipa,Arequipa,Contrato 2021
+223,223 - Ag. Cayma,118.206.34.68,MX722adhe,7464939022R0R,Caja,av Ejercito 710,Yanahuara,Arequipa,Arequipa,Contrato 2021
+223,223 - Ag. Cayma,118.206.34.69,MX722adhe,7464939022P60,Caja,av Ejercito 710,Yanahuara,Arequipa,Arequipa,Contrato 2021
+224,224 - Ag. Magisterio,118.205.246.68,MX722adhe,74641030241Z8,Ventanilla,av de la Cultura N 2109,Cusco,Cusco,Cusco,Contrato 2021
+224,224 - Ag. Magisterio,118.205.246.69,MX722adhe,74641020241BV,Sub Gerencia,av de la Cultura N 2109,Cusco,Cusco,Cusco,Contrato 2021
+225,225 - Ag. Camana (Arequipa),118.206.36.68,MX722adhe,7464939022PZR,Operaciones,Jr 28 De Julio 405,Camana,Camana,Arequipa,Contrato 2021
+225,225 - Ag. Camana (Arequipa),118.206.36.69,MX722adhe,7464939022R2G,Operaciones,Jr 28 De Julio 405,Camana,Camana,Arequipa,Contrato 2021
+226,226 - Ag. Parque Industrial,118.206.38.68,MX722adhe,7464939022PBV,Sub Gerencia,av Jacinto Ibanez 521,Arequipa,Arequipa,Arequipa,Contrato 2021
+226,226 - Ag. Parque Industrial,118.206.38.69,MX722adhe,7464939022R5X,Atencion al Cliente,av Jacinto Ibanez 521,Arequipa,Arequipa,Arequipa,Contrato 2021
+228,228 - Ag. Juliaca,118.205.24.68,MX722adhe,74641050242TW,Operaciones,Jr San Roman 441,Juliaca,San Roman,Puno,Contrato 2021
+228,228 - Ag. Juliaca,118.205.24.69,MX722adhe,74641050242VR,Comercial,Jr San Roman 441,Juliaca,San Roman,Puno,Contrato 2021
+228,228 - Ag. Juliaca,118.205.24.70,MX722adhe,74641050242V3,Creditos,Jr San Roman 441,Juliaca,San Roman,Puno,Contrato 2021
+229,229 - Ag. Puno,118.206.40.68,MX722adhe,74641050242VD,Atencion al Cliente,Jr Lima 400,Puno,Puno,Puno,Contrato 2021
+229,229 - Ag. Puno,118.206.40.69,MX722adhe,74641020241CN,Atencion al Cliente,Jr Lima 400,Puno,Puno,Puno,Contrato 2021
+231,231 - Ag. Ilo,118.206.42.68,MX722adhe,746410202418Z,Plataforma,Psje Malatesta 103,Ilo,Ilo,Moquegua,Contrato 2021
+231,231 - Ag. Ilo,118.206.42.69,MX722adhe,7464102024195,Plataforma,Psje Malatesta 103,Ilo,Ilo,Moquegua,Contrato 2021
+232,232 - Ag. Tacna,118.205.26.72,MX432adwe,701934240K1ZR,Sala Prime,av San Martin 665,Tacna,Tacna,Tacna,Contrato 2021
+232,232 - Ag. Tacna,118.205.26.68,MX722adhe,746410202418P,Sub Gerencia,av San Martin 665,Tacna,Tacna,Tacna,Contrato 2021
+232,232 - Ag. Tacna,118.205.26.69,MX722adhe,746410202419H,Banca Personal,av San Martin 665,Tacna,Tacna,Tacna,Contrato 2021
+232,232 - Ag. Tacna,118.205.26.70,MX722adhe,74641050242WH,Banca Personal,av San Martin 665,Tacna,Tacna,Tacna,Contrato 2021
+232,232 - Ag. Tacna,118.205.26.71,MX722adhe,74641050242TH,Atencion al Cliente,av San Martin 665,Tacna,Tacna,Tacna,Contrato 2021
+233,233 - Ag. 7 de Junio,118.206.44.68,MX722adhe,74641050242T9,Sub Gerencia,Jr 7 Junio 201,Calleria,Coronel Portillo,Ucayali,Contrato 2021
+233,233 - Ag. 7 de Junio,118.206.44.69,MX722adhe,74641050242R0,Plataforma,Jr 7 Junio 201,Calleria,Coronel Portillo,Ucayali,Contrato 2021
+234,234 - Ag. Pque Industrial VES,118.206.46.68,MX722adhe,74641101246FT,Sub Gerencia,Pqe Industrial Cono Sur,Villa El Salvador,Lima,Lima,Contrato 2021
+234,234 - Ag. Pque Industrial VES,118.206.46.69,MX722adhe,74641101246CB,Gerencia,Pqe Industrial Cono Sur,Villa El Salvador,Lima,Lima,Contrato 2021
+235,235 - Ag. Huancayo,118.205.28.72,MX432adwe,701934240K203,Sala Prime,c Real 631 639,Huancayo,Huancayo,Junin,Contrato 2021
+235,235 - Ag. Huancayo,118.205.28.73,MX522adhe,701701030LHZV,Gerencia Territorial,c Real 631 639,Huancayo,Huancayo,Junin,Contrato 2021
+235,235 - Ag. Huancayo,118.205.28.68,MX722adhe,7464102024191,Sub Gerencia,c Real 631 639,Huancayo,Huancayo,Junin,Contrato 2021
+235,235 - Ag. Huancayo,118.205.28.69,MX722adhe,746410202416P,Gerencia,c Real 631 639,Huancayo,Huancayo,Junin,Contrato 2021
+235,235 - Ag. Huancayo,118.205.28.70,MX722adhe,746410202416H,Gerencia,c Real 631 639,Huancayo,Huancayo,Junin,Contrato 2021
+236,236 - Ag. La Oroya,118.206.48.68,MX722adhe,746410302420Y,Operaciones,av Horacio Zevallos 406,La Oroya,Yauli,Junin,Contrato 2021
+236,236 - Ag. La Oroya,118.206.48.69,MX722adhe,746410302421C,Banca Empresa,av Horacio Zevallos 406,La Oroya,Yauli,Junin,Contrato 2021
+237,237 - Ag. El Tambo,118.206.50.68,MX722adhe,7464102024178,Operaciones,av Mariscal Castilla 1610,El Tambo,Huancayo,Junin,Contrato 2021
+237,237 - Ag. El Tambo,118.206.50.69,MX722adhe,746410202415V,Analista,av Mariscal Castilla 1610,El Tambo,Huancayo,Junin,Contrato 2021
+238,238 - Ag. La Merced,118.206.52.68,MX722adhe,74641050242RB,Operaciones,Jr Tarma 444 La Merced,Chanchamayo,Chanchamayo,Junin,Contrato 2021
+238,238 - Ag. La Merced,118.206.52.69,MX722adhe,74641050242T1,Banca Empresa,Jr Tarma 444 La Merced,Chanchamayo,Chanchamayo,Junin,Contrato 2021
+239,239 - Ag. Banca Empresa Arequipa,118.205.0.73,MX722adhe,7464939022R1C,Banca Empresa,San Francisco 108 2 P,Arequipa,Arequipa,Arequipa,Contrato 2021
+239,239 - Ag. Banca Empresa Arequipa,118.205.0.74,MX722adhe,7464049023WZK,Banca Empresa,San Francisco 108 2 P,Arequipa,Arequipa,Arequipa,Contrato 2021
+240,240 - Ag. Ica,118.206.54.68,MX722adhe,74641111247C1,Plataforma,Jr Libertad 141 165,Ica,Ica,Ica,Contrato 2021
+240,240 - Ag. Ica,118.206.54.70,MX722adhe,74641020241BH,Comercial,Jr Libertad 141 165,Ica,Ica,Ica,Contrato 2021
+240,240 - Ag. Ica,118.206.54.69,MX722adhe,74641050242V1,Comercial,Jr Libertad 141 165,Ica,Ica,Ica,Contrato 2021
+241,241 - Ag. Pisco,118.206.56.68,MX722adhe,746410202419W,Operaciones,c Perez Figuerola 194,Pisco,Pisco,Ica,Contrato 2021
+241,241 - Ag. Pisco,118.206.56.69,MX722adhe,746410202419X,Plataforma,c Perez Figuerola 194,Pisco,Pisco,Ica,Contrato 2021
+242,242 - Ag. Damero Gamarra,118.206.58.68,MX722adhe,74641050242RW,Ventanilla,av 28 de Julio 2498,La Victoria,Lima,Lima,Contrato 2021
+242,242 - Ag. Damero Gamarra,118.206.58.69,MX722adhe,74641030241ZB,Plataforma,av 28 de Julio 2498,La Victoria,Lima,Lima,Contrato 2021
+244,244 - Ag. Hipolito Unanue,118.206.60.68,MX722adhe,746410202416X,Plataforma,Jr Hipolito Unanue 1616 1620,La Victoria,Lima,Lima,Contrato 2021
+244,244 - Ag. Hipolito Unanue,118.206.60.69,MX722adhe,74641050242W1,Sub Gerencia,Jr Hipolito Unanue 1616 1620,La Victoria,Lima,Lima,Contrato 2021
+245,245 - Ag. Miraflores ( Piura ),118.206.62.70,MX432adwe,701934240K209,Sala Prime,Av Ramon Mujica 108A,Piura,Piura,Piura,Contrato 2021
+245,245 - Ag. Miraflores ( Piura ),118.206.62.68,MX722adhe,74641050242R3,Sub Gerencia,Av Ramon Mujica 108A,Piura,Piura,Piura,Contrato 2021
+245,245 - Ag. Miraflores ( Piura ),118.206.62.69,MX722adhe,74641050242R4,Plataforma,Av Ramon Mujica 108A,Piura,Piura,Piura,Contrato 2021
+246,246 - Ag. Husares de Junin,118.206.64.70,MX432adwe,701941340M40D,Sala Prime,av Husares de Junin 896,Trujillo,Trujillo,La Libertad,Contrato 2021
+246,246 - Ag. Husares de Junin,118.206.64.68,MX722adhe,746410302421V,Atencion Al Cliente,av Husares de Junin 896,Trujillo,Trujillo,La Libertad,Contrato 2021
+246,246 - Ag. Husares de Junin,118.206.64.69,MX722adhe,746410302420X,Atencion Al Cliente,av Husares de Junin 896,Trujillo,Trujillo,La Libertad,Contrato 2021
+247,247 - Ag. Chepen,118.206.66.68,MX722adhe,746410202416B,Atencion al Cliente,c San Pedro 101,Chepen,Chepen,La Libertad,Contrato 2021
+247,247 - Ag. Chepen,118.206.66.69,MX722adhe,746410202417X,Atencion al Cliente,c San Pedro 101,Chepen,Chepen,La Libertad,Contrato 2021
+248,248 - Ag. CC El Quinde Cajamarca,118.206.68.68,MX722adhe,74641020241C0,Sub Gerencia,Jr Sor Manuela Gil 151,Cajamarca,Cajamarca,Cajamarca,Contrato 2021
+248,248 - Ag. CC El Quinde Cajamarca,118.206.68.69,MX722adhe,746410202418H,Plataforma,Jr Sor Manuela Gil 151,Cajamarca,Cajamarca,Cajamarca,Contrato 2021
+249,249 - Ag. Trujillo,118.205.2.72,MX432adwe,701941340M3ZP,Sala Prime,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Contrato 2021
+249,249 - Ag. Trujillo,118.205.2.68,MX722adhe,7464103024219,Atencion al Cliente,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Contrato 2021
+249,249 - Ag. Trujillo,118.205.2.69,MX722adhe,74641030241Z3,Atencion Al Cliente,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Contrato 2021
+249,249 - Ag. Trujillo,118.205.2.70,MX722adhe,746410302420R,Atencion al Cliente,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Contrato 2021
+249,249 - Ag. Trujillo,118.205.2.71,MX722adhe,7464102024176,Atencion al Cliente,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Contrato 2021
+249,249 - Ag. Trujillo,118.205.224.68,MX522adhe,701701130LPCZ,Fundo Camposol Viru,Jr Francisco Pizarro 620,Viru,Trujillo,La Libertad,Contrato 2021
+250,250 - Ag. Primavera,118.206.70.68,MX722adhe,746410202415D,Plataforma,av Nicolas de Pierola 766,Trujillo,Trujillo,La Libertad,Contrato 2021
+250,250 - Ag. Primavera,118.206.70.69,MX722adhe,74641020241CL,Plataforma,av Nicolas de Pierola 766,Trujillo,Trujillo,La Libertad,Contrato 2021
+251,251 - Ag. Mcdo Mayorista,118.206.72.68,MX722adhe,746410302420M,Atencion Al Cliente,av Vallejo 268,Trujillo,Trujillo,La Libertad,Contrato 2021
+251,251 - Ag. Mcdo Mayorista,118.206.72.69,MX722adhe,746410302421F,Atencion Al Cliente,av Vallejo 268,Trujillo,Trujillo,La Libertad,Contrato 2021
+252,252 - Ag. Mall Aventura Plaza,118.206.74.68,MX722adhe,74641101246DB,Sub Gerencia,Av Oscar R Benavides 3866,Bellavista,Callao,Callao,Contrato 2021
+252,252 - Ag. Mall Aventura Plaza,118.206.74.69,MX722adhe,746411112474T,Plataforma,Av Oscar R Benavides 3866,Bellavista,Callao,Callao,Contrato 2021
+253,253 - Ag. Real Plaza Pro,118.206.76.68,MX722adhe,746410202416C,Plataforma,av Alfredo Mendiola 7058,San Martin De Porres,Lima,Lima,Contrato 2021
+254,254 - Ag. Larco Trujillo,118.206.78.68,MX722adhe,74641030241ZX,Sub Gerencia,av Larco 261,Trujillo,Trujillo,La Libertad,Contrato 2021
+254,254 - Ag. Larco Trujillo,118.206.78.69,MX722adhe,746410302421K,Atencion al Cliente,av Larco 261,Trujillo,Trujillo,La Libertad,Contrato 2021
+256,256 - Ag. El Muro,118.206.80.68,MX722adhe,746411112476C,Sub Gerencia,Av Wiesse Tienda Programa,San Juan de Lurigancho,Lima,Lima,Contrato 2021
+256,256 - Ag. El Muro,118.206.80.69,MX722adhe,746411112477Y,Banca Negocio,Av Wiesse Tienda Programa,San Juan de Lurigancho,Lima,Lima,Contrato 2021
+257,257 - Ag. Gran Chimu,118.206.82.69,MX432adwe,701934240K1YC,Sala Prime,av Gran Chimu 789 Urb Zarate,San Juan de Lurigancho,Lima,Lima,Contrato 2021
+257,257 - Ag. Gran Chimu,118.206.82.68,MX722adhe,74641050242TD,Sub Gerencia,av Gran Chimu 789 Urb Zarate,San Juan de Lurigancho,Lima,Lima,Contrato 2021
+258,258 - Ag. Larapa,118.206.84.68,MX722adhe,7464939022P45,Atencion al Cliente,URB CACHIMAYO C 21 A SAN SEBASTIAN,San Jeronimo,Cusco,Cusco,Contrato 2021
+258,258 - Ag. Larapa,118.206.84.69,MX722adhe,7464939022PTR,Atencion al Cliente,URB CACHIMAYO C 21 A SAN SEBASTIAN,San Jeronimo,Cusco,Cusco,Contrato 2021
+259,259 - Ag. CC Canta Callao,118.206.86.68,MX722adhe,746411112478W,Sub Gerencia,av Canta Callao Esq Bertello,Callao,Callao,Lima,Contrato 2021
+259,259 - Ag. CC Canta Callao,118.206.86.69,MX722adhe,746411112476Z,Plataforma,av Canta Callao Esq Bertello,Callao,Callao,Lima,Contrato 2021
+260,260 - Ag. Huaraz,118.206.88.68,MX722adhe,7464049023WX0,Operaciones,c 2 Esq Jr Jose Sucre,Huaraz,Huaraz,Ancash,Contrato 2021
+260,260 - Ag. Huaraz,118.206.88.69,MX722adhe,7464939022PCH,Comercial,c 2 Esq Jr Jose Sucre,Huaraz,Huaraz,Ancash,Contrato 2021
+261,261 - Ag. CC Mall del Sur,118.206.90.68,MX722adhe,7464049023X24,Sub Gerencia,av Los Lirios 301,San Juan de Miraflores,Lima,Lima,Contrato 2021
+261,261 - Ag. CC Mall del Sur,118.206.90.69,MX722adhe,74641141248L8,Plataforma,av Los Lirios 301,San Juan de Miraflores,Lima,Lima,Contrato 2021
+262,262 - Ag. La Planicie,118.206.92.68,MX722adhe,74641020241CX,Sub Gerencia,av Ricardo Elias Aparicio 675,La Molina,Lima,Lima,Contrato 2021
+262,262 - Ag. La Planicie,118.206.92.69,MX722adhe,7464049023X0V,Operaciones,av Ricardo Elias Aparicio 675,La Molina,Lima,Lima,Contrato 2021
+263,263 - Ag. Puerto Maldonado,118.206.94.68,MX722adhe,74641050242VC,Operaciones,Jr Arequipa 245 249,Tambopata,Tambopata,Madre De Dios,Contrato 2021
+263,263 - Ag. Puerto Maldonado,118.206.94.69,MX722adhe,74641050242TT,Operaciones,Jr Arequipa 245 249,Tambopata,Tambopata,Madre De Dios,Contrato 2021
+264,264 - Ag. Chancay,118.206.96.68,MX722adhe,74641030241ZZ,Sub Gerencia,c Diego Lopez de Zuniga 262,Chancay,Huaral,Lima,Contrato 2021
+264,264 - Ag. Chancay,118.206.96.69,MX722adhe,74641030241YY,Ventanilla,c Diego Lopez de Zuniga 262,Chancay,Huaral,Lima,Contrato 2021
+265,265 - Ag. Tumbes,118.206.98.68,MX722adhe,74641050242V4,Sub Gerencia,paseo los Libertadores 237,Tumbes,Tumbes,Tumbes,Contrato 2021
+265,265 - Ag. Tumbes,118.206.98.69,MX722adhe,74641050242R9,Plataforma,paseo los Libertadores 237,Tumbes,Tumbes,Tumbes,Contrato 2021
+266,266 - Ag. Real Plaza Huancayo,118.206.100.68,MX722adhe,74641050242VZ,Operaciones,ESTACION FERROVIARIA HUANCAYO S/N,Huancayo,Huancayo,Junin,Contrato 2021
+266,266 - Ag. Real Plaza Huancayo,118.206.100.69,MX722adhe,7464049023WYC,Ventanilla,Estacion Ferroviaria Huancayo S/N,Huancayo,Huancayo,Junin,Contrato 2021
+267,267 - Ag. Piura,118.205.30.68,MX722adhe,746410302421W,Sub Gerencia,c Tacna 598 Ayacucho 440,Piura,Piura,Piura,Contrato 2021
+267,267 - Ag. Piura,118.205.30.69,MX722adhe,74641050242TK,Plataforma,c Tacna 598 Ayacucho 440,Piura,Piura,Piura,Contrato 2021
+267,267 - Ag. Piura,118.205.30.70,MX722adhe,7464103024220,Ventanilla,c Tacna 598 Ayacucho 440,Piura,Piura,Piura,Contrato 2021
+267,267 - Ag. Piura,118.205.30.71,MX722adhe,74641050242RR,Banqueros,c Tacna 598 Ayacucho 440,Piura,Piura,Piura,Contrato 2021
+268,268 - Ag. Mcdo Modelo Piura,118.206.102.68,MX722adhe,7464102024161,Atencion al Cliente,av Sanchez Cerro 1234,Piura,Piura,Piura,Contrato 2021
+268,268 - Ag. Mcdo Modelo Piura,118.206.102.69,MX722adhe,74641020241DC,Atencion al Cliente,av Sanchez Cerro 1234,Piura,Piura,Piura,Contrato 2021
+269,269 - Ag. El Agustino,118.206.104.68,MX722adhe,746410202417W,Plataforma,av Riva Aguero 1400,El Agustino,Lima,Lima,Contrato 2021
+269,269 - Ag. El Agustino,118.206.104.69,MX722adhe,746410202418X,Gerencia,av Riva Aguero 1400,El Agustino,Lima,Lima,Contrato 2021
+270,270 - Ag. Talara,118.206.106.68,MX722adhe,7464102024168,Sub Gerencia,Centro Civico 159,Pariñas,Talara,Piura,Contrato 2021
+270,270 - Ag. Talara,118.206.106.69,MX722adhe,74641050242RV,Plataforma,Centro Civico 159,Pariñas,Talara,Piura,Contrato 2021
+271,271 - Ag. Paita Piura,118.206.108.68,MX722adhe,746410202415R,Plataforma,Jr Junin 263,Paita,Paita,Piura,Contrato 2021
+271,271 - Ag. Paita Piura,118.206.108.69,MX722adhe,746410202415L,Plataforma,Jr Junin 263,Paita,Paita,Piura,Contrato 2021
+272,272 - Ag. Nuevo Chimbote,118.206.110.68,MX722adhe,7464111124770,Operaciones,Prog Vivienda 1era Etapa Unid U1,Nuevo Chimbote,Santa,Ancash,Contrato 2021
+272,272 - Ag. Nuevo Chimbote,118.206.110.69,MX722adhe,7464049023WXR,Gerencia,Prog Vivienda 1era Etapa Unid U1,Nuevo Chimbote,Santa,Ancash,Contrato 2021
+273,273 - Ag. Huaral,118.206.112.68,MX722adhe,7464103024213,Ventanilla,c Derecha 370,Huaral,Huaral,Lima,Contrato 2021
+273,273 - Ag. Huaral,118.206.112.69,MX722adhe,74641030241ZG,Comercial,c Derecha 370,Huaral,Huaral,Lima,Contrato 2021
+274,274 - Ag. Sullana,118.206.114.68,MX722adhe,74641050242TL,Atencion al Cliente,Jr San Martin 900,Sullana,Sullana,Piura,Contrato 2021
+274,274 - Ag. Sullana,118.206.114.69,MX722adhe,74641050242TC,Atencion al Cliente,Jr San Martin 900,Sullana,Sullana,Piura,Contrato 2021
+275,275 - Ag. Huacho,118.206.116.68,MX722adhe,74641030241Z7,Sub Gerencia,av 28 de Julio 391,Huacho,Huaura,Lima,Contrato 2021
+275,275 - Ag. Huacho,118.206.116.69,MX722adhe,74641050242W6,Plataforma,av 28 de Julio 391,Huacho,Huaura,Lima,Contrato 2021
+276,276 - Ag. Barranca,118.206.118.68,MX722adhe,74641101246DP,Plataforma,av Jose Galvez 285,Barranca,Barranca,Lima,Contrato 2021
+276,276 - Ag. Barranca,118.206.118.69,MX722adhe,74641101246FV,Banca Negocio,av Jose Galvez 285,Barranca,Barranca,Lima,Contrato 2021
+277,277 - Ag. Cajamarca,118.206.120.68,MX722adhe,746410202417R,Banca Negocio,Jr Tarapaca 719 721,Cajamarca,Cajamarca,Cajamarca,Contrato 2021
+277,277 - Ag. Cajamarca,118.206.120.69,MX722adhe,746410202419C,Banca Personal,Jr Tarapaca 719 721,Cajamarca,Cajamarca,Cajamarca,Contrato 2021
+278,278 - Ag. Banca Empresa Piura,118.205.30.72,MX722adhe,7464103024228,Plataforma,c Tacna 598 Ayacucho 440 2 P,Piura,Piura,Piura,Contrato 2021
+278,278 - Ag. Banca Empresa Piura,118.205.30.73,MX722adhe,746410202418W,Sub Gerencia,c Tacna 598 Ayacucho 440 2 P,Piura,Piura,Piura,Contrato 2021
+279,279 - Ag. Banca Empresa Chiclayo,118.205.32.73,MX722adhe,74641050242W4,Atencion al Cliente,av Balta 651 2 P,Chiclayo,Chiclayo,Lambayeque,Contrato 2021
+280,280 - Ag. Banca Empresa Trujillo,118.205.2.75,MS826de,4064939019DLV,Banca Empresa,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Contrato 2021
+280,280 - Ag. Banca Empresa Trujillo,118.205.2.73,MX722adhe,7464103024212,Banca Empresa,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Contrato 2021
+280,280 - Ag. Banca Empresa Trujillo,118.205.2.74,MX722adhe,746410302421N,Banca Empresa,Jr Francisco Pizarro 620,Trujillo,Trujillo,La Libertad,Contrato 2021
+281,281 - Ag. Jaen,118.206.122.68,MX722adhe,746410302421H,Sub Gerencia,c San Martin 1499,Jaen,Jaen,Cajamarca,Contrato 2021
+281,281 - Ag. Jaen,118.206.122.69,MX722adhe,746410302420T,Banca Empresa,c San Martin 1499,Jaen,Jaen,Cajamarca,Contrato 2021
+281,281 - Ag. Jaen,118.206.122.70,MX722adhe,7464049023WZH,Plataforma,c San Martin 1499,Jaen,Lima,Cajamarca,Contrato 2021
+284,284 - Ag. Plaza Lima Norte,118.206.126.68,MX722adhe,746410202419T,Sub Gerencia,av Cruce Tomas Valle,Independencia,Lima,Lima,Contrato 2021
+284,284 - Ag. Plaza Lima Norte,118.206.126.69,MX722adhe,746410202419V,Caja,av Cruce Tomas Valle,Independencia,Lima,Lima,Contrato 2021
+285,285 - Ag. Chiclayo,118.205.32.74,MX722adhe,74641050242RC,Working Subdivisión,av Balta 651 2 P,Chiclayo,Chiclayo,Lambayeque,Contrato 2021
+285,285 - Ag. Chiclayo,118.205.32.72,MX432adwe,701934240K204,Sala Prime,av Balta 651,Chiclayo,Chiclayo,Lambayeque,Contrato 2021
+285,285 - Ag. Chiclayo,118.205.32.68,MX722adhe,74641050242WK,Atencion al Cliente,av Balta 651,Chiclayo,Chiclayo,Lambayeque,Contrato 2021
+285,285 - Ag. Chiclayo,118.205.32.69,MX722adhe,74641050242V5,Atencion al Cliente,av Balta 651,Chiclayo,Chiclayo,Lambayeque,Contrato 2021
+285,285 - Ag. Chiclayo,118.205.32.70,MX722adhe,74641050242RD,Atencion al Cliente,av Balta 651,Chiclayo,Chiclayo,Lambayeque,Contrato 2021
+286,286 - Ag. Los Alamos,118.206.128.69,MX432adwe,701941340M400,Sala Prime,av Primavera 2180 2190,Santiago de Surco,Lima,Lima,Contrato 2021
+286,286 - Ag. Los Alamos,118.206.128.68,MX722adhe,74641020241D9,Plataforma,av Primavera 2180 2190,Santiago de Surco,Lima,Lima,Contrato 2021
+287,287 - Ag. Mcdo Modelo,118.206.130.68,MX722adhe,7464102024174,Atencion al Cliente,av Arica 1030-1032,Chiclayo,Chiclayo,Lambayeque,Contrato 2021
+287,287 - Ag. Mcdo Modelo,118.206.130.69,MX722adhe,7464102024179,Atencion al Cliente,av Arica 1030-1032,Chiclayo,Chiclayo,Lambayeque,Contrato 2021
+288,288 - Ag. Moshoqueque,118.206.132.68,MX722adhe,74641020241BL,Sub Gerencia,Av El Dorado 1209,Jose Leonardo Ortiz,Chiclayo,Lambayeque,Contrato 2021
+288,288 - Ag. Moshoqueque,118.206.132.69,MX722adhe,746410202418T,Ventanilla,Av El Dorado 1209,Jose Leonardo Ortiz,Chiclayo,Lambayeque,Contrato 2021
+291,291 - Ag. Pacasmayo,118.206.134.68,MX722adhe,746410302420D,Area Ejecutiva,c Dos de Mayo 9,Pacasmayo,Pacasmayo,La Libertad,Contrato 2021
+291,291 - Ag. Pacasmayo,118.206.134.69,MX722adhe,746410302421B,Sub Gerencia,c Dos de Mayo 9,Pacasmayo,Pacasmayo,La Libertad,Contrato 2021
+295,295 - Ag. Chimbote,118.205.34.71,MX432adwe,701934240K1ZM,Sala Prime,av Francisco Bolognesi 696,Chimbote,Santa,Ancash,Contrato 2021
+295,295 - Ag. Chimbote,118.205.34.68,MX722adhe,7464939022PVF,Operaciones,av Francisco Bolognesi 696,Chimbote,Santa,Ancash,Contrato 2021
+295,295 - Ag. Chimbote,118.205.34.69,MX722adhe,7464939022R51,Sub Gerencia,av Francisco Bolognesi 696,Chimbote,Santa,Ancash,Contrato 2021
+295,295 - Ag. Chimbote,118.205.34.70,MX722adhe,7464939022P7N,Comercial,av Francisco Bolognesi 696,Chimbote,Santa,Ancash,Contrato 2021
+297,297 - Ag. Mercado Mod Chimbote,118.205.36.68,MX722adhe,7464939022PTT,Gerencia,Ca Espinar 600 JR ELÍAS AGUIRRE 498,Chimbote,Santa,Ancash,Contrato 2021
+297,297 - Ag. Mercado Mod Chimbote,118.205.36.69,MX722adhe,7464939022PBR,Gerencia,Ca Espinar 600 JR ELÍAS AGUIRRE 498,Chimbote,Santa,Ancash,Contrato 2021
+299,299 - Ag. Bellavista San Martin,118.206.136.68,MX722adhe,746410202417Y,Sub Gerencia,Jr Augus B Leguia Esq Jr San Martin,Bellavista,Bellavista,San Martin,Contrato 2021
+299,299 - Ag. Bellavista San Martin,118.206.136.69,MX722adhe,7464102024182,Operaciones,Jr Augus B Leguia Esq Jr San Martin,Bellavista,Bellavista,San Martin,Contrato 2021
+300,300 - Ag. Global Wealth,118.206.34.71,CX625adhe,7529902141TT5,Operaciones,av Ejercito 710 2 P,Yanahuara,Arequipa,Arequipa,Contrato 2021
+301,301 - Ag. Iquitos,118.205.38.70,MX432adwe,701934240K1Z1,Sala Prime,Sargento Lores 171,Iquitos,Maynas,Loreto,Contrato 2021
+301,301 - Ag. Iquitos,118.205.38.68,MX722adhe,74641101246HV,Plataforma,Sargento Lores 171,Iquitos,Maynas,Loreto,Contrato 2021
+301,301 - Ag. Iquitos,118.205.38.69,MX722adhe,746411112474N,Atencion al Cliente,Sargento Lores 171,Iquitos,Maynas,Loreto,Contrato 2021
+301,301 - Ag. Iquitos,118.205.38.71,MX722adhe,74641101246H4,Sub Gerencia,Sargento Lores 171,Iquitos,Maynas,Loreto,Contrato 2021
+304,304 - Ag. Belen,118.205.40.68,MX722adhe,74641101246CF,Sub Gerencia,Jr Prospero 1171,Iquitos,Maynas,Loreto,Contrato 2021
+304,304 - Ag. Belen,118.205.40.69,MX722adhe,74641101246KG,Plataforma,Jr Prospero 1171,Iquitos,Maynas,Loreto,Contrato 2021
+306,306 - Ag. Pucallpa,118.205.42.72,MX432adwe,701934240K1Z3,Sala Prime,Ucayali Esq Raymondi 699,Calleria,Coronel Portillo,Ucayali,Contrato 2021
+306,306 - Ag. Pucallpa,118.205.42.68,MX722adhe,74641050242TG,Plataforma,Ucayali Esq Raymondi 699,Calleria,Coronel Portillo,Ucayali,Contrato 2021
+306,306 - Ag. Pucallpa,118.205.42.69,MX722adhe,74641050242TF,Banca Empresa,Ucayali Esq Raymondi 699,Calleria,Coronel Portillo,Ucayali,Contrato 2021
+306,306 - Ag. Pucallpa,118.205.42.70,MX722adhe,7464102024175,Banca Ejecutiva,Ucayali Esq Raymondi 699,Calleria,Coronel Portillo,Ucayali,Contrato 2021
+306,306 - Ag. Pucallpa,118.205.42.71,MX722adhe,746410202416F,Banca Ejecutiva,Ucayali Esq Raymondi 699,Calleria,Coronel Portillo,Ucayali,Contrato 2021
+307,307 - Ag. Banca Empresa Lima Norte,118.206.138.68,MX722adhe,7464049023WW2,Sub Gerencia,av Industrial 3515 3517,Independencia,Lima,Lima,Contrato 2021
+307,307 - Ag. Banca Empresa Lima Norte,118.206.138.69,MX722adhe,746410202419Y,Plataforma,av Industrial 3515 3517,Independencia,Lima,Lima,Contrato 2021
+310,310 - Ag. Tarapoto,118.205.44.70,MS826de,40649380198KY,Pymes,Jr Ramirez Hurtado 149,Tarapoto,San Martin,San Martin,Contrato 2021
+310,310 - Ag. Tarapoto,118.205.44.71,MX432adwe,701934240K1ZG,Sala Prime,Jr Ramirez Hurtado 149,Tarapoto,San Martin,San Martin,Contrato 2021
+310,310 - Ag. Tarapoto,118.205.44.74,MX522adhe,701701030LHZ8,Staf Territorial Oriente,Jr Ramirez Hurtado 149,Tarapoto,San Martin,San Martin,Contrato 2021
+310,310 - Ag. Tarapoto,118.205.44.68,MX722adhe,74641050242RN,Sub Gerencia,Jr Ramirez Hurtado 149,Tarapoto,San Martin,San Martin,Contrato 2021
+310,310 - Ag. Tarapoto,118.205.44.72,MX722adhe,746410202415K,Atencion al Cliente,Jr Ramirez Hurtado 149,Tarapoto,San Martin,San Martin,Contrato 2021
+310,310 - Ag. Tarapoto,118.205.44.73,MX722adhe,746410202416L,Atencion Al Cliente,Jr Ramirez Hurtado 149,Tarapoto,San Martin,San Martin,Contrato 2021
+310,310 - Ag. Tarapoto,118.205.44.69,MX722adhe,74641050242RP,Plataforma,Jr Ramirez Hurtado 149,Tarapoto,San Martin,San Martin,Contrato 2021
+311,311 - Ag. Banca Empresa Chincha,118.205.22.70,MX722adhe,746410202416D,Banca Empresa,MCAL  BENAVIDES 117 125  2 PISO,Chincha Alta,Chincha,Ica,Contrato 2021
+311,311 - Ag. Banca Empresa Chincha,118.205.22.71,MX722adhe,746410202417G,Banca Empresa,MCAL  BENAVIDES 117 125  2 PISO,Chincha Alta,Chincha,Ica,Contrato 2021
+312,312 - Ag. Pro,118.206.142.68,MX722adhe,746410202417V,Sub Gerencia,av Alfredo Mendiola 7859,Los Olivos,Lima,Lima,Contrato 2021
+312,312 - Ag. Pro,118.206.142.69,MX722adhe,74641020241B9,Banca Negocio,av Alfredo Mendiola 7859,Los Olivos,Lima,Lima,Contrato 2021
+314,314 - Ag. Moyobamba,118.206.144.68,MX722adhe,7464103024217,Operaciones,Jr San Martin 490 494,Moyobamba,Moyobamba,San Martin,Contrato 2021
+314,314 - Ag. Moyobamba,118.206.144.69,MX722adhe,7464103024224,Gerencia,Jr San Martin 490 494,Moyobamba,Moyobamba,San Martin,Contrato 2021
+315,315 - Ag. Backus,118.206.146.68,MX722adhe,74641111247B3,Sub Gerencia,av Nicolas Ayllon 3986 Plant Backus,Ate,Lima,Lima,Contrato 2021
+316,316 - Ag. Puente Piedra,118.206.148.68,MX722adhe,7464111124774,Banca Empresarial,Urb Santo Domingo Mz C Lote 4,Puente Piedra,Lima,Lima,Contrato 2021
+316,316 - Ag. Puente Piedra,118.206.148.69,MX722adhe,746411112476T,Banca Empresarial,Urb Santo Domingo Mz C Lote 4,Puente Piedra,Lima,Lima,Contrato 2021
+317,317 - Ag. Plaza Lima Sur,118.206.150.68,MX722adhe,746410202416W,Proyecto Aurora,Pz CC Lima Sur Urb Matellini,Chorrillos,Lima,Lima,Contrato 2021
+317,317 - Ag. Plaza Lima Sur,118.206.150.69,MX722adhe,74641020241B3,Proyecto Aurora,Pz CC Lima Sur Urb Matellini,Chorrillos,Lima,Lima,Contrato 2021
+318,318 - Ag. Tingo Maria,118.206.152.68,MX722adhe,74641050242W2,Atencion al Cliente,av Raymondi 543,Rupa-Rupa,Leoncio Prado,Huanuco,Contrato 2021
+318,318 - Ag. Tingo Maria,118.206.152.69,MX722adhe,74641050242W3,Atencion al Cliente,av Raymondi 543,Rupa-Rupa,Leoncio Prado,Huanuco,Contrato 2021
+319,319 - Ag. Izaguirre,118.206.154.68,MX722adhe,7464111124758,Sub Gerencia,av Carlos Izaguirre 929,Los Olivos,Lima,Lima,Contrato 2021
+319,319 - Ag. Izaguirre,118.206.154.69,MX722adhe,746411112477F,Banca Negocio,av Carlos Izaguirre 929,Los Olivos,Lima,Lima,Contrato 2021
+320,320 - Ag. Essalud,118.207.146.68,MX522adhe,701701130LPPM,Sala Prime,av Arenales 1302,Jesus Maria,Lima,Lima,Contrato 2021
+320,320 - Ag. Essalud,118.206.156.68,MX722adhe,7464049023WVL,Sub Gerencia,av Arenales 1302,Jesus Maria,Lima,Lima,Contrato 2021
+320,320 - Ag. Essalud,118.206.156.69,MX722adhe,746410202417N,Plataforma,av Arenales 1302,Jesus Maria,Lima,Lima,Contrato 2021
+321,321 - Ag. Cerro de Pasco,118.206.158.68,MX722adhe,746410302420N,Plataforma,JR SAN MARTIN SECTOR 2,Yanacancha,Pasco,Pasco,Contrato 2021
+321,321 - Ag. Cerro de Pasco,118.206.158.69,MX722adhe,74641030241YX,Banca Negocio,JR SAN MARTIN SECTOR 2,Yanacancha,Pasco,Pasco,Contrato 2021
+322,322 - Ag. Canto Grande,118.206.160.68,MX722adhe,7464049023X11,Plataforma,Av Canto Grande 2309,San Juan de Lurigancho,Lima,Lima,Contrato 2021
+322,322 - Ag. Canto Grande,118.206.160.69,MX722adhe,7464049023WW5,Banca Negocio,Av Canto Grande 2309,San Juan de Lurigancho,Lima,Lima,Contrato 2021
+323,323 - Ag. Villa El Salvador,118.205.46.68,MX722adhe,7464111124775,Sub Gerencia,Av Revolucion Mz G Lt 17 Sector 2,Villa El Salvador,Lima,Lima,Contrato 2021
+323,323 - Ag. Villa El Salvador,118.205.46.69,MX722adhe,746411112476X,Ventanilla,Av Revolucion Mz G Lt 17 Sector 2,Villa El Salvador,Lima,Lima,Contrato 2021
+324,324 - Ag. Yurimaguas,118.206.162.68,MX722adhe,74641030241Z5,Sub Gerencia,Carlle Sargento Lores 132,Yurimaguas,Alto Amazonas,Loreto,Contrato 2021
+324,324 - Ag. Yurimaguas,118.206.162.69,MX722adhe,746410302420F,Plataforma,Carlle Sargento Lores 132,Yurimaguas,Alto Amazonas,Loreto,Contrato 2021
+327,327 - Ag. Juanjui,118.206.164.68,MX722adhe,746410202416R,Sub Gerencia,Jr Huallaga 597,Juanjui,Mariscal Caceres,San Martin,Contrato 2021
+327,327 - Ag. Juanjui,118.206.164.69,MX722adhe,7464102024164,Gerencia,Jr Huallaga 597,Juanjui,Mariscal Caceres,San Martin,Contrato 2021
+331,331 - Ag. Hosp Almenara,118.206.166.68,MX722adhe,7464049023X1T,Sub Gerencia,Jr Cangallo 180,La Victoria,Lima,Lima,Contrato 2021
+332,332 - Ag. Mercado Productores Santa Anita,118.206.168.68,MX722adhe,74641101246DZ,Banca Negocio,av la Cultura 701,Santa Anita,Lima,Lima,Contrato 2021
+332,332 - Ag. Mercado Productores Santa Anita,118.206.168.69,MX722adhe,746411112477N,Sub Gerencia,av la Cultura 701,Santa Anita,Lima,Lima,Contrato 2021
+333,333 - Ag. Miraflores,118.205.50.69,MX532adwe,7020252100441,Sala Prime,av Larco 1204,Miraflores,Lima,Lima,Contrato 2021
+333,333 - Ag. Miraflores,118.205.50.68,MX722adhe,746410202419N,Sub Gerencia,av Larco 1204,Miraflores,Lima,Lima,Contrato 2021
+333,333 - Ag. Miraflores,118.205.50.70,MX722adhe,7464049023WYD,Banca Negocio,av Larco 1204,Miraflores,Lima,Lima,Contrato 2021
+335,335 - Ag. El Pino,118.206.170.68,MX722adhe,74641101246FD,Plataforma,av Circunvalacion 1999 Urb el Pino,San Luis,Lima,Lima,Contrato 2021
+335,335 - Ag. El Pino,118.206.170.69,MX722adhe,74641101246KL,Plataforma,av Circunvalacion 1999 Urb el Pino,San Luis,Lima,Lima,Contrato 2021
+339,339 - Ag. Ventanilla,118.206.176.68,MX722adhe,74641101246F3,Sub Gerencia,MZ C3 LOTE 19 MLCON A A CACERES,Ventanilla,Callao,Lima,Contrato 2021
+339,339 - Ag. Ventanilla,118.206.176.69,MX722adhe,7464111124750,Plataforma,MZ C3 LOTE 19 MLCON A A CACERES,Ventanilla,Callao,Lima,Contrato 2021
+340,340 - Ag. 28 de Julio,118.206.178.68,MX722adhe,74641050242R5,Sub Gerencia,av 28 de Julio 775,Lima,Lima,Lima,Contrato 2021
+340,340 - Ag. 28 de Julio,118.206.178.69,MX722adhe,74641050242PZ,Gerencia,av 28 de Julio 775,Lima,Lima,Lima,Contrato 2021
+341,341 - Ag. Canada la Rosa Toro,118.206.180.68,MX722adhe,74641111247C3,Ventanilla,av la Rosa Toro 998,San Luis,Lima,Lima,Contrato 2021
+341,341 - Ag. Canada la Rosa Toro,118.206.180.69,MX722adhe,746411112476R,Plataforma,av la Rosa Toro 998,San Luis,Lima,Lima,Contrato 2021
+342,342 - Ag. Multiplaza,118.206.182.68,MX722adhe,7464049023X22,Sub Gerencia,av Carlos Izaguirre 275,Los Olivos,Lima,Lima,Contrato 2021
+342,342 - Ag. Multiplaza,118.206.182.69,MX722adhe,74641020241BB,Plataforma,av Carlos Izaguirre 275,Los Olivos,Lima,Lima,Contrato 2021
+344,344 - Ag. Bienestar de la Marina,118.206.184.68,MX722adhe,74641050242VX,Plataforma,av Venezuela Cdra 34,San Miguel,Lima,Lima,Contrato 2021
+345,345 - Ag. Chosica,118.206.186.68,MX722adhe,74641111247B8,Plataforma,av 28 de Julio 160 164 168,San Juan De Lurigancho,Lima,Lima,Contrato 2021
+345,345 - Ag. Chosica,118.206.186.69,MX722adhe,746411112478K,Plataforma,av 28 de Julio 160 164 168,San Juan De Lurigancho,Lima,Lima,Contrato 2021
+346,346 - Ag. Paruro,118.206.188.68,MX722adhe,7464049023X13,Plataforma,Jr Paruro 875  877,Lima,Lima,Lima,Contrato 2021
+346,346 - Ag. Paruro,118.206.188.69,MX722adhe,7464049023WZ7,Plataforma,Jr Paruro 875  877,Lima,Lima,Lima,Contrato 2021
+347,347 - Ag. Banca Empresa la Molina,118.205.56.71,MX722adhe,746411112477C,Plataforma,av la Molina 540 2 P,La Molina,Lima,Lima,Contrato 2021
+347,347 - Ag. Banca Empresa la Molina,118.205.56.72,MX722adhe,746411112479K,Banca Empresa,av la Molina 540 2 P,La Molina,Lima,Lima,Contrato 2021
+348,348 - Ag. Real Plaza Chiclayo,118.206.190.68,MX722adhe,74641020241D5,Sub Gerencia,Jr Miguel de Cervantes 300 CC Real Chiclayo,Chiclayo,Chiclayo,Lambayeque,Contrato 2021
+348,348 - Ag. Real Plaza Chiclayo,118.206.190.69,MX722adhe,746410202418G,Gerencia,Jr Miguel de Cervantes 300 CC Real Chiclayo,Chiclayo,Chiclayo,Lambayeque,Contrato 2021
+349,349 - Ag. Banca Empresa Lima,118.205.8.70,MS826de,40649370194LW,Banca Empresarial,AV NICOLAS DE PIEROLA 649 2 PISO,Lima,Lima,Lima,Contrato 2021
+349,349 - Ag. Banca Empresa Lima,118.205.8.72,MX722adhe,74641020241C8,Banca Empresarial,AV NICOLAS DE PIEROLA 649 2 PISO,Lima,Lima,Lima,Contrato 2021
+350,350 - Ag. Banca Empresa Callao,118.207.230.68,MX722adhe,74641101246DR,Sub Gerencia,Av Juan de Aliaga 425 piso 9,Magdalena del Mar,Lima,Lima,Contrato 2021
+352,352 - Ag. Las Tiendas,118.206.192.68,MX722adhe,74641111247C4,Sub Gerencia,av las Tiendas 209,Surquillo,Lima,Lima,Contrato 2021
+353,353 - Ag. Domingo Cueto,118.206.194.68,MX722adhe,746411112479P,Plataforma,Jr Domingo Cueto 150,Lince,Lima,Lima,Contrato 2021
+353,353 - Ag. Domingo Cueto,118.206.194.69,MX722adhe,746411112474Z,Plataforma,Jr Domingo Cueto 150,Lince,Lima,Lima,Contrato 2021
+354,354 - Ag. Las Begonias,118.206.196.70,MX522adhe,701701130LPDC,Sala Prime,av las Begonias 425  429,San Isidro,Lima,Lima,Contrato 2021
+354,354 - Ag. Las Begonias,118.206.196.68,MX722adhe,746410202417M,Plataforma,av las Begonias 425  429,San Isidro,Lima,Lima,Contrato 2021
+354,354 - Ag. Las Begonias,118.206.196.69,MX722adhe,74641020241BZ,Comercial,av las Begonias 425  429,San Isidro,Lima,Lima,Contrato 2021
+355,355 - Ag. Aviacion,118.206.198.68,MX722adhe,7464102024167,Sub Gerencia,av Aviacion 2801 2805,San Borja,Lima,Lima,Contrato 2021
+355,355 - Ag. Aviacion,118.206.198.69,MX722adhe,74641111247BT,Banca Ejecutiva,av Aviacion 2801 2805,San Borja,Lima,Lima,Contrato 2021
+358,358 - Ag. San Luis,118.206.204.69,MX522adhe,701701130LPT6,Sub Gerencia,av Javier Prado Este  2884 SAN B,San Borja,Lima,Lima,Contrato 2021
+358,358 - Ag. San Luis,118.206.204.68,MX722adhe,746411112474H,Sala Prime,av Javier Prado Este  2884 SAN B,San Borja,Lima,Lima,Contrato 2021
+359,359 - Ag. Avenida Central,118.206.206.69,MX522adhe,701701130LPDB,Sala Prime,Av Jorge Basadre 133,San Isidro,Lima,Lima,Contrato 2021
+359,359 - Ag. Avenida Central,118.206.206.68,MX722adhe,7464049023WZN,Comercial,Av Jorge Basadre 133,San Isidro,Lima,Lima,Contrato 2021
+359,359 - Ag. Avenida Central,118.206.206.70,MX722adhe,7464049023X25,Solucion Miraflores,Av Jorge Basadre 133 piso 2,San Isidro,Lima,Lima,Contrato 2021
+360,360 - Ag. CC Jockey Plaza,118.206.208.68,MX722adhe,74641020241CG,Sub Gerencia,av Javier Prado este 4200,Santiago de Surco,Lima,Lima,Contrato 2021
+360,360 - Ag. CC Jockey Plaza,118.206.208.69,MX722adhe,74641020241D6,Gerencia,av Javier Prado este 4200,Santiago de Surco,Lima,Lima,Contrato 2021
+361,361 - Ag. Abancay Congreso,118.206.210.68,MX722adhe,74641050242VN,Plataforma,av Abancay 260 262,Lima,Lima,Lima,Contrato 2021
+361,361 - Ag. Abancay Congreso,118.206.210.69,MX722adhe,74641050242T7,Sub Gerencia,av Abancay 260 262,Lima,Lima,Lima,Contrato 2021
+362,362 - Ag. Banca Empresa Colonial,118.207.230.69,MX722adhe,74641101246HP,Recepcion,Av Juan de Aliaga 425 piso 9,Magdalena del Mar,Lima,Lima,Contrato 2021
+362,362 - Ag. Banca Empresa Colonial,118.207.230.70,MX722adhe,7464111124769,Recepcion,Av Juan de Aliaga 425 piso 9,Magdalena del Mar,Lima,Lima,Contrato 2021
+365,365 - Ag. Abancay Apurimac,118.205.142.68,MX722adhe,74641050242TY,Ventanilla,Av. Nuñez c/ Av. Diaz Barcena,Abancay,Abancay,Apurimac,Contrato 2021
+365,365 - Ag. Abancay Apurimac,118.205.142.69,MX722adhe,746411112474L,Sub Gerencia,Av. Nuñez c/ Av. Diaz Barcena,Abancay,Abancay,Apurimac,Contrato 2021
+368,368 - Ag. Ricardo Palma,118.206.218.68,MX722adhe,74641020241D1,Sub Gerencia,av Ricardo Palma 296 298,Miraflores,Lima,Lima,Contrato 2021
+368,368 - Ag. Ricardo Palma,118.206.218.69,MX722adhe,7464102024186,Gerencia,av Ricardo Palma 296 298,Miraflores,Lima,Lima,Contrato 2021
+370,370 - Ag. Limatambo,118.206.222.68,MX722adhe,74641101246DY,Ventanilla,av Aviacion 3328,san borja,Lima,Lima,Contrato 2021
+370,370 - Ag. Limatambo,118.206.222.69,MX722adhe,74641101246C6,Sub Gerencia,av Aviacion 3328,san borja,Lima,Lima,Contrato 2021
+372,372 - Ag. Los Robles,118.205.52.69,MX722adhe,74641020241BR,Sub Gerencia,av Dos de Mayo 1198,San Isidro,Lima,Lima,Contrato 2021
+372,372 - Ag. Los Robles,118.205.52.68,MX722adhe,7464049023X2F,Gerencia,av Dos de Mayo 1198,San Isidro,Lima,Lima,Contrato 2021
+377,377 - Ag. Banca Empresa Santa Cruz,118.205.58.71,MX722adhe,746410202415F,Banca Empresa,av Santa Cruz 695,Miraflores,Lima,Lima,Contrato 2021
+377,377 - Ag. Banca Empresa Santa Cruz,118.205.58.72,MX722adhe,74641020241BX,Banca Empresa,av Santa Cruz 695,Miraflores,Lima,Lima,Contrato 2021
+378,378 - Ag. Banca Empresa Miraflores,118.205.50.71,MX722adhe,74641020241B5,Banca Empresa,av Larco 1204 2 P,Miraflores,Lima,Lima,Contrato 2021
+378,378 - Ag. Banca Empresa Miraflores,118.205.50.72,MX722adhe,746410202418M,Sub Gerencia,av Larco 1204 2 P,Miraflores,Lima,Lima,Contrato 2021
+380,380 - Ag. Banca Empresa Chacarilla,118.205.18.70,MS826de,406493701984V,Sub Gerencia,av Primavera 1050,Santiago de Surco,Lima,Lima,Contrato 2021
+380,380 - Ag. Banca Empresa Chacarilla,118.205.18.71,MX722adhe,74641020241D3,Atencion al Cliente,av Primavera 1050,Santiago de Surco,Lima,Lima,Contrato 2021
+380,380 - Ag. Banca Empresa Chacarilla,118.205.18.72,MX722adhe,74641020241C6,Plataforma,av Primavera 1050,Santiago de Surco,Lima,Lima,Contrato 2021
+383,383 - Ag. Faucett Metro,118.206.228.68,MX722adhe,7464049023WY5,Sub Gerencia,Av Venezuela 5414 Tda 1152  1160,San Miguel,Lima,Lima,Contrato 2021
+383,383 - Ag. Faucett Metro,118.206.228.69,MX722adhe,7464939022PD4,Ventanilla,Av Venezuela 5414 Tda 1152  1160,San Miguel,Lima,Lima,Contrato 2021
+387,387 - Ag. Canaval y Moreyra,118.206.230.68,MX722adhe,7464049023WX7,Banca Personal,av Canaval y Moreyra 243 245,San Isidro,Lima,Lima,Contrato 2021
+387,387 - Ag. Canaval y Moreyra,118.206.230.69,MX722adhe,7464049023WW3,Plataforma,av Canaval y Moreyra 243 245,San Isidro,Lima,Lima,Contrato 2021
+396,396 - Ag. Covida,118.206.234.68,MX722adhe,7464049023X06,Sub Gerencia,av Antunez de Mayolo 1402,Los Olivos,Lima,Lima,Contrato 2021
+396,396 - Ag. Covida,118.206.234.69,MX722adhe,7464103024206,Plataforma,av Antunez de Mayolo 1402,Los Olivos,Lima,Lima,Contrato 2021
+421,421 - Ag. Mall San Juan de Lurigancho,118.205.48.68,MX722adhe,7464102024197,Sub Gerencia,Avenida Lurigancho 997 - 999,San Juan de Lurigancho,Lima,Lima,Contrato 2021
+421,421 - Ag. Mall San Juan de Lurigancho,118.205.48.69,MX722adhe,74641101246D7,Plataforma,Avenida Lurigancho 997 - 999,San Juan de Lurigancho,Lima,Lima,Contrato 2021
+425,425 - Ag. AEP Nueva Cajamarca,118.72.184.56,MX522adhe,70178231026FY,Sub Gerencia,Jr Huallaga 314,Nueva Cajamarca,Rioja,San Martin,Contrato 2021
+426,426 - Ag. Avenida del Ejercito,118.206.240.68,MX722adhe,7464045023RBN,Sub Gerencia,av del Ejercito 789,Miraflores,Lima,Lima,Contrato 2021
+426,426 - Ag. Avenida del Ejercito,118.206.240.69,MX722adhe,74641020241CZ,Plataforma,av del Ejercito 789,Miraflores,Lima,Lima,Contrato 2021
+427,427 - Ag. Bolognesi,118.206.242.68,MX722adhe,74641050242W8,Sub Gerencia,av Coronel Mendoza 1337,Tacna,Tacna,Tacna,Contrato 2021
+427,427 - Ag. Bolognesi,118.206.242.69,MX722adhe,74641050242VF,Plataforma,av Coronel Mendoza 1337,Tacna,Tacna,Tacna,Contrato 2021
+441,441 - Ag. Banca Empresa Iquitos,118.205.38.72,MX722adhe,74641101246GY,Sub Gerencia,Sargento Lores 171 2 P,Iquitos,Maynas,Loreto,Contrato 2021
+441,441 - Ag. Banca Empresa Iquitos,118.205.38.73,MX722adhe,74641101246GB,Plataforma,Sargento Lores 171 2 P,Iquitos,Maynas,Loreto,Contrato 2021
+442,442 - Ag. Lambayeque,118.206.244.68,MX722adhe,7464103024225,Sub Gerencia,c Ramon Castilla 848 854,Lambayeque,Lambayeque,Lambayeque,Contrato 2021
+442,442 - Ag. Lambayeque,118.206.244.69,MX722adhe,7464103024200,Plataforma,c Ramon Castilla 848 854,Lambayeque,Lambayeque,Lambayeque,Contrato 2021
+467,467 - Ag. Guardia Chalaca,118.206.250.70,MX522adhe,701701030LK7P,Sala Prime,av la Marina 495,Callao,Callao,Lima,Contrato 2021
+467,467 - Ag. Guardia Chalaca,118.206.250.68,MX722adhe,7464111124749,Banca Negocio,av la Marina 495,Callao,Callao,Lima,Contrato 2021
+480,480 - Ag. La Marina,118.206.252.70,MX522adhe,701701130LPF6,Sala Prime,av la Marina 2355,San Miguel,Lima,Lima,Contrato 2021
+480,480 - Ag. La Marina,118.206.252.68,MX722adhe,7464102024166,Sub Gerencia,av la Marina 2355,San Miguel,Lima,Lima,Contrato 2021
+480,480 - Ag. La Marina,118.206.252.69,MX722adhe,7464102024159,Plataforma,av la Marina 2355,San Miguel,Lima,Lima,Contrato 2021
+484,484 - Ag. Huaycan,118.207.0.68,MX722adhe,74641101246CK,Sub Gerencia,av 15 de Julio Lote 33,Ate,Lima,Lima,Contrato 2021
+484,484 - Ag. Huaycan,118.207.0.69,MX722adhe,746411112475G,Banca Empresarial,av 15 de Julio Lote 33,Ate,Lima,Lima,Contrato 2021
+486,486 - Ag. San Isidro,118.205.54.71,MX522adhe,701701130LPDV,Sala Prime,av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+486,486 - Ag. San Isidro,118.205.54.68,MX722adhe,74641050242V2,Sub Gerencia,av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+486,486 - Ag. San Isidro,118.205.54.69,MX722adhe,7464939022PZD,Banca Negocio,av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+486,486 - Ag. San Isidro,118.205.54.70,MX722adhe,74641101246K2,Sala Prime,av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+508,508 - Ag. Open Plaza Angamos,118.207.2.68,MX722adhe,746411112475T,Sub Gerencia,pz Esq Angamos con Tomas Marsano,Surquillo,Lima,Lima,Contrato 2021
+508,508 - Ag. Open Plaza Angamos,118.207.2.69,MX722adhe,746411112476D,Banca Negocio,pz Esq Angamos con Tomas Marsano,Surquillo,Lima,Lima,Contrato 2021
+521,521 - Ag. Strip Center Proceres,118.207.6.68,MX722adhe,7464111124795,Plataforma,Av Proceres 1002 Urb los Proceres,Santiago de Surco,Lima,Lima,Contrato 2021
+521,521 - Ag. Strip Center Proceres,118.207.6.69,MX722adhe,74641111247BZ,Gerencia,Av Proceres 1002 Urb los Proceres,Santiago de Surco,Lima,Lima,Contrato 2021
+554,554 - Ag. Open Plaza Piura,118.207.10.68,MX722adhe,74641050242R1,Sub Gerencia,av Andrés Avelino Caceres 147,Castilla,Piura,Piura,Contrato 2021
+554,554 - Ag. Open Plaza Piura,118.207.10.69,MX722adhe,74641050242R2,Plataforma,av Andrés Avelino Caceres 147,Castilla,Piura,Piura,Contrato 2021
+564,564 - Ag. Plaza Butters,118.207.12.68,MX722adhe,746411112474C,Sub Gerencia,pz Butters 301,Barranco,Lima,Lima,Contrato 2021
+564,564 - Ag. Plaza Butters,118.207.12.69,MX722adhe,74641101246CR,Plataforma,pz Butters 301,Barranco,Lima,Lima,Contrato 2021
+566,566 - Ag. Metro Plaza Castilla,118.207.14.68,MX722adhe,74641050242V0,Sub Gerencia,av Alfonso Ugarte 279 293,Lima,Lima,Lima,Contrato 2021
+566,566 - Ag. Metro Plaza Castilla,118.207.14.69,MX722adhe,7464102024171,Plataforma,av Alfonso Ugarte 279 293,Lima,Lima,Lima,Contrato 2021
+584,584 - Ag. Real Plaza Juliaca,118.207.16.68,MX722adhe,74641050242VK,Operaciones,Jr Tumbes 499,Juliaca,San Roman,Puno,Contrato 2021
+584,584 - Ag. Real Plaza Juliaca,118.207.16.69,MX722adhe,74641050242W7,Creditos,Jr Tumbes 499,Juliaca,San Roman,Puno,Contrato 2021
+597,597 - Ag. Pichanaqui,118.207.18.68,MX722adhe,74641020241BG,Operaciones,Jr Independencia Mz R SubLte 13A,Pichanaqui,Chanchamayo,Junin,Contrato 2021
+597,597 - Ag. Pichanaqui,118.207.18.69,MX722adhe,746410202415G,Gerencia,Jr Independencia Mz R SubLte 13A,Pichanaqui,Chanchamayo,Junin,Contrato 2021
+609,609 - Ag. San Rafael,118.207.20.68,MX722adhe,74641050242VW,Sub Gerencia,av Colonial 1381,Lima,Lima,Lima,Contrato 2021
+609,609 - Ag. San Rafael,118.207.20.69,MX722adhe,7464102024185,Plataforma,av Colonial 1381,Lima,Lima,Lima,Contrato 2021
+614,614 - Ag. Separadora Industrial,118.205.56.70,MX432adwe,701941340M3ZG,Sala Prime,av la Molina 540,La Molina,Lima,Lima,Contrato 2021
+614,614 - Ag. Separadora Industrial,118.205.56.68,MX722adhe,746411112479N,Sub Gerencia,av la Molina 540,La Molina,Lima,Lima,Contrato 2021
+614,614 - Ag. Separadora Industrial,118.205.56.69,MX722adhe,74641111247B0,Plataforma,av la Molina 540,La Molina,Lima,Lima,Contrato 2021
+615,615 - Ag. San Borja Sur,118.207.22.70,MX522adhe,701701030LK7H,Sala Prime,av San Luis 2599,San Borja,Lima,Lima,Contrato 2021
+615,615 - Ag. San Borja Sur,118.207.22.68,MX722adhe,74641111247BY,Sub Gerencia,av San Luis 2599,San Borja,Lima,Lima,Contrato 2021
+615,615 - Ag. San Borja Sur,118.207.22.69,MX722adhe,74641101246GZ,Gerencia,av San Luis 2599,San Borja,Lima,Lima,Contrato 2021
+616,616 - Ag. Angamos Este,118.207.24.68,MX722adhe,7464049023WXT,Plataforma,av Angamos este 215 227,Miraflores,Lima,Lima,Contrato 2021
+616,616 - Ag. Angamos Este,118.207.24.69,MX722adhe,74641020241DK,Plataforma,av Angamos este 215 227,Miraflores,Lima,Lima,Contrato 2021
+621,621 - Ag. Moquegua,118.207.234.68,MX722adhe,7464939022R1N,Sub Gerencia,Av Circunvalacion Lt 1B Sub Lt 1,Moquegua,Mariscal Nieto,Moquegua,Contrato 2021
+621,621 - Ag. Moquegua,118.207.234.69,MX722adhe,7464939022P91,Plataforma,Av Circunvalacion Lt 1B Sub Lt 1,Moquegua,Mariscal Nieto,Moquegua,Contrato 2021
+627,627 - Ag. Contenedor Sedapal,118.207.28.68,MX722adhe,74641030241YN,Sub Gerencia,Autopista Ramiro Priale Km 1,El Agustino,Lima,Lima,Contrato 2021
+628,628 - Ag. Satipo,118.207.30.68,MX722adhe,74641030241Z9,Operaciones,Jr Manuel Prado 217,Satipo,Satipo,Junin,Contrato 2021
+628,628 - Ag. Satipo,118.207.30.69,MX722adhe,7464103024210,Banca Empresa,Jr Manuel Prado 217,Satipo,Satipo,Junin,Contrato 2021
+643,643 - Ag. Tarma,118.207.32.68,MX722adhe,7464102024188,Operaciones,Jiron Arequipa 301,Tarma,Tarma,Junin,Contrato 2021
+643,643 - Ag. Tarma,118.207.32.69,MX722adhe,7464102024160,Banca Empresa,Jiron Arequipa 301,Tarma,Tarma,Junin,Contrato 2021
+645,645 - Ag. Division Lima Oeste,118.205.52.70,MX522adhe,701701030LKB4,Sala Prime,Av. 2 De Mayo 1198 Esq. Los Robles; San Isidro(11 Javier Prado Oeste),San Isidro,Lima,Lima,Contrato 2021
+648,648 - Ag. Chota,118.207.36.68,MX722adhe,7464939022PYT,Sub Gerencia,av Anaximandro Vega 413 417,Chota,Chota,Cajamarca,Contrato 2021
+648,648 - Ag. Chota,118.207.36.69,MX722adhe,7464939022R5W,Plataforma,av Anaximandro Vega 413 417,Chota,Chota,Cajamarca,Contrato 2021
+659,659 - Ag. Sebastian Barranca,118.207.40.70,MX522adhe,701701030LK00,Sala Prime,av Iquitos 795 799,La Victoria,Lima,Lima,Contrato 2021
+659,659 - Ag. Sebastian Barranca,118.207.40.68,MX722adhe,74641020241D0,Sub Gerencia,av Iquitos 795 799,La Victoria,Lima,Lima,Contrato 2021
+659,659 - Ag. Sebastian Barranca,118.207.40.69,MX722adhe,74641020241D4,Plataforma,av Iquitos 795 799,La Victoria,Lima,Lima,Contrato 2021
+661,661 - Ag. Sede Central BBVA,118.220.54.4,MX722adhe,7464049023WVP,Banca Institucional,Av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+667,667 - Ag. Real Plaza Piura,118.207.42.68,MX722adhe,7464102024198,Sub Gerencia,av Sanchez Cerro Sub Lote N 234 239,Piura,Piura,Piura,Contrato 2021
+667,667 - Ag. Real Plaza Piura,118.207.42.69,MX722adhe,746410302421T,Plataforma,av Sanchez Cerro Sub Lote N 234 239,Piura,Piura,Piura,Contrato 2021
+668,668 - Ag. Gerencia Territorial Norte,118.205.2.76,MX722adhe,746410302421Z,Gerencia,Jr Pizarro 620 2 P,Trujillo,Trujillo,La Libertad,Contrato 2021
+668,668 - Ag. Gerencia Territorial Norte,118.205.2.77,MX722adhe,7464939022R35,Gerencia,Jr Pizarro 620 2 P,Trujillo,Trujillo,La Libertad,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.220.52.102,MS826de,4064939019DX7,Informes Juridicos,Av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.220.52.126,MS826de,4064939019DKW,Swift,Av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.220.53.166,MS826de,40649370198F9,Corona,Av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.220.23.154,MX522adhe,701701130LPBT,Enterprise Services,Av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.220.30.195,MX722adhe,74641101246CW,Open Space,Av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.220.52.76,MX722adhe,7464049023X0M,Operaciones Centralizadas,Av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.220.53.216,MX722adhe,7464049023WVD,Servicios Juridicos,Av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.225.12.12,MX722adhe,746410202415C,Site Alterno,av Larco 1204,Miraflores,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.225.12.13,MX722adhe,7464102024184,Site Alterno,av Larco 1204,Miraflores,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.225.12.14,MX722adhe,74641020241B4,Site Alterno,av Larco 1204,Miraflores,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.220.53.135,MX722adhe,746410202417C,Banca Remota,Av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.220.53.122,CX833se,7566433010NB6,Gerencia General,Av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2025
+679,679 - Ag. Sede Central BBVA,118.225.11.12,MX722adhe,74641020241B8,Site Alterno,av Larco 1204,Miraflores,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.225.11.11,MX722adhe,74641050242TN,Site Alterno,av Diego Ferrer 391,Miraflores,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,10.17.176.10,CX431adw,350025023L7WV,Gerencia General,Av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.220.53.103,CX625adhe,75299291450NW,Banca Empresas e Instituciones,Av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.220.53.26,MX522adhe,701701130LPT1,Laboratorio Casg Handling,Av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+679,679 - Ag. Sede Central BBVA,118.220.53.71,MX522adhe,701701030LKGT,Open Space,Av Republica de Panama 3055,San Isidro,Lima,Lima,Adenda 4
+679,679 - Ag. Sede Central BBVA,118.220.54.5,MX722adhe,74641030241ZW,Comercio Exterior,Av Republica de Panama 3055,San Isidro,Lima,Lima,Contrato 2021
+688,688 - Ag. Gerencia Territorial Sur,118.206.34.73,MX722adhe,7464939022PM6,Territorial,av del Ejercito 710 2 P,Yanahuara,Arequipa,Arequipa,Contrato 2021
+688,688 - Ag. Gerencia Territorial Sur,118.206.34.74,MX722adhe,7464939022PRY,Gerencia Territorial,av del Ejercito 710 2 P,Yanahuara,Arequipa,Arequipa,Contrato 2021
+712,712 - Ag. Mall Aventura Plaza Santa Anita,118.207.44.68,MX722adhe,74641101246DW,Sub Gerencia,av Carretera Central 111,Santa Anita,Lima,Lima,Contrato 2021
+712,712 - Ag. Mall Aventura Plaza Santa Anita,118.207.44.69,MX722adhe,746411112476K,Plataforma,av Carretera Central 111,Santa Anita,Lima,Lima,Contrato 2021
+713,713 - Ag. Caminos del Inca,118.207.46.68,MX722adhe,7464103024214,Sub Gerencia,av Caminos del Inca 252 256,Santiago de Surco,Lima,Lima,Contrato 2021
+713,713 - Ag. Caminos del Inca,118.207.46.69,MX722adhe,7464103024223,Gerencia,av Caminos del Inca 252 256,Santiago de Surco,Lima,Lima,Contrato 2021
+713,713 - Ag. Caminos del Inca,118.207.62.68,MX722adhe,7464049023X12,Sub Gerencia,URB LA CAMPINA PAISAJISTA SN,Arequipa,Arequipa,Arequipa,Contrato 2021
+716,716 - Ag. Santa Cruz,118.205.58.69,MX432adwe,701941340M409,Sala Prime,av Santa Cruz 695,Miraflores,Lima,Lima,Contrato 2021
+716,716 - Ag. Santa Cruz,118.205.58.68,MX722adhe,74641020241CF,Sub Gerencia,av Santa Cruz 695,Miraflores,Lima,Lima,Contrato 2021
+716,716 - Ag. Santa Cruz,118.205.58.70,MX722adhe,74641020241BT,Plataforma,av Santa Cruz 695,Miraflores,Lima,Lima,Contrato 2021
+717,717 - Ag. Bustamante y Rivero,118.207.48.68,MX722adhe,7464939022PXW,Plataforma,Coop Vvda Lanificio Mz E Sub Lt 6A,Jose Luis Bustamante y Rivero,Arequipa,Arequipa,Contrato 2021
+717,717 - Ag. Bustamante y Rivero,118.207.48.69,MX722adhe,7464939022PZF,Plataforma,Coop Vvda Lanificio Mz E Sub Lt 6A,Jose Luis Bustamante y Rivero,Arequipa,Arequipa,Contrato 2021
+732,732 - Ag. Salaverry,118.207.50.69,MX432adwe,701941340M3RC,Sala Prime,av Salaverry 3230,Magdalena del Mar,Lima,Lima,Contrato 2021
+732,732 - Ag. Salaverry,118.207.50.68,MX722adhe,74641101246K5,Sub Gerencia,av Salaverry 3230,Magdalena del Mar,Lima,Lima,Contrato 2021
+737,737 - Ag. Staff División Miraflores,118.205.6.71,MX722adhe,74641020241BM,Sub Gerencia,"Av. Larco 631, Miraflores (Shell) (Parque Keneddy)",Miraflores,Lima,Lima,Contrato 2021
+750,750 - Ag. CC Real Plaza Santa Clara,118.207.56.68,MX722adhe,74641101246DV,Sub Gerencia,av Nicolas Ayllon 8694,Ate,Lima,Lima,Contrato 2021
+750,750 - Ag. CC Real Plaza Santa Clara,118.207.56.69,MX722adhe,74641101246GX,Banca Negocio,av Nicolas Ayllon 8694,Ate,Lima,Lima,Contrato 2021
+751,751 - Ag. CC El Trigal,118.207.58.70,MX432adwe,701941340M40B,Sala Prime,c los Antares 318,Santiago de Surco,Lima,Lima,Contrato 2021
+751,751 - Ag. CC El Trigal,118.207.58.68,MX722adhe,746411112475D,Sub Gerencia,c los Antares 318,Santiago de Surco,Lima,Lima,Contrato 2021
+751,751 - Ag. CC El Trigal,118.207.58.69,MX722adhe,746411112477D,Banca Negocio,c los Antares 318,Santiago de Surco,Lima,Lima,Contrato 2021
+752,752 - Ag. San Felipe Comas,118.207.60.68,MX722adhe,746410202419R,Ventanilla,AV UNIVERSITARIA 10583 10587,Comas,Lima,Lima,Contrato 2021
+752,752 - Ag. San Felipe Comas,118.207.60.69,MX722adhe,7464049023WZP,Gerencia,AV UNIVERSITARIA 10583 10587,Comas,Lima,Lima,Contrato 2021
+760,760 - Ag. Floresta,118.207.64.68,MX722adhe,74641020241BF,Sub Gerencia,av Primavera 606,Santiago de Surco,Lima,Lima,Contrato 2021
+760,760 - Ag. Floresta,118.207.64.69,CX625adhe,7529902141TTB,Plataforma,av Primavera 606,Santiago de Surco,Lima,Lima,Contrato 2021
+763,763 - Ag. El Pedregal,118.207.66.68,MX722adhe,7464939022P89,Sub Gerencia,c Zamacola Mz G Lote 1 Urb,Majes,Caylloma,Arequipa,Contrato 2021
+763,763 - Ag. El Pedregal,118.207.66.69,MX722adhe,7464939022PBT,Atencion al Cliente,c Zamacola Mz G Lote 1 Urb,Majes,Caylloma,Arequipa,Contrato 2021
+764,764 - Ag. Mall Aventura Plaza Arequipa,118.207.68.68,MX722adhe,7464939022P9T,Sub Gerencia,av Porongoche 500,Arequipa,Arequipa,Arequipa,Contrato 2021
+764,764 - Ag. Mall Aventura Plaza Arequipa,118.207.68.69,MX722adhe,7464939022PWP,Plataforma,av Porongoche 500,Arequipa,Arequipa,Arequipa,Contrato 2021
+766,766 - Ag. Premium el Polo,118.207.70.68,CX625adhe,75299291450T3,Sub Gerencia,av el Polo 670 7 P Block C,Santiago de Surco,Lima,Lima,Contrato 2021
+766,766 - Ag. Premium el Polo,118.207.70.69,MX722adhe,7464939022PVD,Comercial,av el Polo 670 7 P Block C,Santiago de Surco,Lima,Lima,Contrato 2021
+766,766 - Ag. Premium el Polo,118.207.70.70,MX722adhe,7464939022PC4,Recepcion,av el Polo 670 7 P Block C,Santiago de Surco,Lima,Lima,Contrato 2021
+778,778 - Ag. Cerro Colorado,118.207.72.68,MX722adhe,7464939022R34,Sub Gerencia,av Aviacion 602,Cerro Colorado,Arequipa,Arequipa,Contrato 2021
+778,778 - Ag. Cerro Colorado,118.207.72.69,MX722adhe,7464939022R1P,Plataforma,av Aviacion 602,Cerro Colorado,Arequipa,Arequipa,Contrato 2021
+787,787 - Ag. Montegrande,118.207.74.68,MX722adhe,74641101246CM,Sub Gerencia,c Monte Grande 133,Santiago de Surco,Lima,Lima,Contrato 2021
+787,787 - Ag. Montegrande,118.207.74.69,MX722adhe,74641111247C2,Banca Negocio,c Monte Grande 133,Santiago de Surco,Lima,Lima,Contrato 2021
+791,791 - Ag. Rotonda,118.207.76.68,MX722adhe,74641101246C8,Sub Gerencia,Av La Fontana 371,La Molina,Lima,Lima,Contrato 2021
+791,791 - Ag. Rotonda,118.207.76.69,MX722adhe,74641101246KV,Plataforma,Av La Fontana 371,La Molina,Lima,Lima,Contrato 2021
+796,796 - Ag. Metro Santa Elena,118.207.80.68,MX722adhe,7464102024170,Sub Gerencia,av Juan Tomas Stack 250,Chiclayo,Chiclayo,Lambayeque,Contrato 2021
+796,796 - Ag. Metro Santa Elena,118.207.80.69,MX722adhe,746410302420W,Plataforma,av Juan Tomas Stack 250,Chiclayo,Chiclayo,Lambayeque,Contrato 2021
+797,797 - Ag. Barrio Comercio,118.207.82.68,MX722adhe,74641050242V9,Operaciones,Jr Tahuantinsuyo 298C2,Tarapoto,San Martin,San Martin,Contrato 2021
+797,797 - Ag. Barrio Comercio,118.207.82.69,MX722adhe,74641050242V7,Sub Gerencia,Jr Tahuantinsuyo 298C2,Tarapoto,San Martin,San Martin,Contrato 2021
+827,827 - Ag. Plaza de Armas Huanuco,118.207.84.68,MX722adhe,74641050242VH,Gerencia,Jr DOS De Mayo 1137,Huanuco,Huanuco,Huanuco,Contrato 2021
+827,827 - Ag. Plaza de Armas Huanuco,118.207.84.69,MX722adhe,746410202419G,Comercial,Jr DOS De Mayo 1137,Huanuco,Huanuco,Huanuco,Contrato 2021
+832,832 - Ag. El Sol,118.207.86.68,MX722adhe,7464103024201,Banca Negocio,av Proceres Independ 2704 2708,San Juan de Lurigancho,Lima,Lima,Contrato 2021
+832,832 - Ag. El Sol,118.207.86.69,MX722adhe,74641050242TM,Banca Negocio,av Proceres Independ 2704 2708,San Juan de Lurigancho,Lima,Lima,Contrato 2021
+841,841 - Ag. Especial Senati,118.207.88.68,MX432adwe,701941340M3MB,Sub Gerencia,av Alfredo Mendiola 3520,Independencia,Lima,Lima,Contrato 2021
+842,842 - Ag. Carabayllo,118.207.90.68,MX722adhe,746411112475X,Ventanilla,av Tupac Amaru 3368,Carabayllo,Lima,Lima,Contrato 2021
+842,842 - Ag. Carabayllo,118.207.90.69,MX722adhe,746411112477G,Plataforma,av Tupac Amaru 3368,Carabayllo,Lima,Lima,Contrato 2021
+843,843 - Ag. Ovalo Papal,118.207.92.68,MX722adhe,74641050242VV,Atencion al Cliente,Mz J Lote 01 Local 1088,Trujillo,Trujillo,La Libertad,Contrato 2021
+843,843 - Ag. Ovalo Papal,118.207.92.69,MX722adhe,74641050242RL,Atencion al Cliente,Mz J Lote 01 Local 1088,Trujillo,Trujillo,La Libertad,Contrato 2021
+847,847 - Ag. El Retablo,118.207.96.68,MX722adhe,74641020241BW,Plataforma,Av. Los Angeles 602,Comas,Lima,Lima,Contrato 2021
+847,847 - Ag. El Retablo,118.207.96.69,MX722adhe,7464102024196,Gerencia,Av. Los Angeles 602,Comas,Lima,Lima,Contrato 2021
+849,849 - Ag. Cedros de Villa,118.207.98.68,MX722adhe,746410202416Z,Sub Gerencia,Av Alameda Sur Esq Av Sn Marcos,Chorrillos,Lima,Lima,Contrato 2021
+849,849 - Ag. Cedros de Villa,118.207.98.69,MX722adhe,74641050242RK,Plataforma,Av Alameda Sur Esq Av Sn Marcos,Chorrillos,Lima,Lima,Contrato 2021
+857,857 - Ag. Valle Sharon,118.207.100.69,MX432adwe,701941340M401,Sala Prime,av Victor Castro Iglesias 790,San Juan de Miraflores,Lima,Lima,Contrato 2021
+857,857 - Ag. Valle Sharon,118.207.100.68,MX722adhe,74641101246L7,Plataforma,av Victor Castro Iglesias 790,San Juan de Miraflores,Lima,Lima,Contrato 2021
+868,868 - Ag. Mala,118.207.102.68,MX722adhe,74641020241CH,Plataforma,Jr Real 305,Mala,Cañete,Lima,Contrato 2021
+868,868 - Ag. Mala,118.207.102.69,MX722adhe,746410202419P,Plataforma,Jr Real 305,Mala,Cañete,Lima,Contrato 2021
+876,876 - Ag. Javier Prado Oeste,118.207.106.69,MX522adhe,701701030LK7L,Sala Prime,av Javier Prado ote 604,Magdalena del Mar,Lima,Lima,Contrato 2021
+876,876 - Ag. Javier Prado Oeste,118.207.106.68,MX722adhe,746411112478L,Sub Gerencia,av Javier Prado ote 604,Magdalena del Mar,Lima,Lima,Contrato 2021
+879,879 - Ag. Embajada de EE.UU.,118.207.140.69,MX522adhe,701701130LPDH,Cancilleria,Avenida La Encalada cdra 17,Santiago de Surco,Lima,Lima,Contrato 2021
+879,879 - Ag. Embajada de EE.UU.,118.207.108.68,MX722adhe,74641050242RT,Sub Gerencia,Jr. El Polo N° 759,Santiago de Surco,Lima,Lima,Contrato 2021
+879,879 - Ag. Embajada de EE.UU.,118.207.108.69,MX722adhe,74641050242RX,Plataforma,Jr. El Polo N° 759,Santiago de Surco,Lima,Lima,Contrato 2021
+879,879 - Ag. Embajada de EE.UU.,118.205.252.68,MX432adwe,701941340M3ZZ,AID,Avenida La Encalada cdra 17,Santiago de Surco,Lima,Lima,Contrato 2021
+891,891 - Ag. Express Rioja,118.207.110.68,MX722adhe,7464103024202,Operaciones,Jr 2 De Mayo 702,Rioja,Rioja,San Martin,Contrato 2021
+891,891 - Ag. Express Rioja,118.207.110.69,MX722adhe,74641020241B0,Gerencia,Jr 2 De Mayo 702,Rioja,Rioja,San Martin,Contrato 2021
+900,900 - Ag. Mall Plaza Trujillo,118.207.112.68,MX722adhe,746410202418B,Sub Gerencia,av America ote 750,Trujillo,Trujillo,La Libertad,Contrato 2021
+900,900 - Ag. Mall Plaza Trujillo,118.207.112.69,MX722adhe,746411112476W,Plataforma,av America ote 750,Trujillo,Trujillo,La Libertad,Contrato 2021
+908,908 - Ag. Yanahuara,118.207.114.68,MX722adhe,7464939022PB4,Sub Gerencia,Av Jose Ab Quinones 700,Yanahuara,Arequipa,Arequipa,Contrato 2021
+908,908 - Ag. Yanahuara,118.207.114.69,MX722adhe,7464939022R3V,Gerencia,Av Jose Ab Quinones 700,Yanahuara,Arequipa,Arequipa,Contrato 2021
+918,918 - Ag. Real Plaza Trujillo,118.207.116.68,MX722adhe,74641020241DG,Atencion Al Cliente,av Cesar Vallejo ote 1345,Trujillo,Trujillo,La Libertad,Contrato 2021
+918,918 - Ag. Real Plaza Trujillo,118.207.116.69,MX722adhe,746410202415N,Atencion Al Cliente,av Cesar Vallejo ote 1345,Trujillo,Trujillo,La Libertad,Contrato 2021
+933,933 - Ag. Lurin,118.207.120.68,MX722adhe,74641101246KM,Sub Gerencia,Urb Las Virreynas Lote 1-2,Lurin,Lima,Lima,Contrato 2021
+933,933 - Ag. Lurin,118.207.120.69,MX722adhe,74641101246LW,Operaciones,Urb Las Virreynas Lote 1-2,Lurin,Lima,Lima,Contrato 2021
+939,939 - Ag. Ovalo el Pacifico,118.207.122.68,MX722adhe,746410202417D,Sub Gerencia,av Jose Pardo 320,Miraflores,Lima,Lima,Contrato 2021
+939,939 - Ag. Ovalo el Pacifico,118.207.122.69,MX722adhe,7464049023WXD,Banca Negocio,av Jose Pardo 320,Miraflores,Lima,Lima,Contrato 2021
+960,960 - Ag. Plaza Diez Canseco,118.207.124.68,MX722adhe,74641020241B1,Plataforma,Jr Huamachuco 1301,Jesus Maria,Lima,Lima,Contrato 2021
+960,960 - Ag. Plaza Diez Canseco,118.207.124.69,MX722adhe,7464102024193,Gerencia,Jr Huamachuco 1301,Jesus Maria,Lima,Lima,Contrato 2021
+967,967 - Ag. Banca Empresa Huancayo,118.205.28.74,MX722adhe,7464102024173,Banca Empresa,c Real 631 639 2 piso,Huancayo,Huancayo,Junin,Contrato 2021
+967,967 - Ag. Banca Empresa Huancayo,118.205.28.75,MX722adhe,74641030241ZH,Banca Empresa,c Real 631 639 2 piso,Huancayo,Huancayo,Junin,Contrato 2021
+970,970 - Ag. Ovalo Naranjal,118.207.126.68,MX722adhe,746411112479M,Sub Gerencia,av Naranjal 1425,Los Olivos,Lima,Lima,Contrato 2021
+970,970 - Ag. Ovalo Naranjal,118.207.126.69,MX722adhe,746411112479W,Banca Empresarial,av Naranjal 1425,Los Olivos,Lima,Lima,Contrato 2021
+976,976 - Ag. Las Bambas,118.207.136.68,MX722adhe,7464049023WXK,Ventanilla,Plz Armas Chalhuahuacho,Challhuahuacho,Cotabambas,Apurimac,Contrato 2021
+976,976 - Ag. Las Bambas,118.207.136.69,MX722adhe,74641020241BK,Ventanilla,Plz Armas Chalhuahuacho,Challhuahuacho,Cotabambas,Apurimac,Contrato 2021
+982,982 - Ag. Open Plaza Pucallpa,118.207.130.68,MX722adhe,746410202417Z,Sub Gerencia,av Centenario 4614,Yarinacocha,Coronel Portillo,Ucayali,Contrato 2021
+982,982 - Ag. Open Plaza Pucallpa,118.207.130.69,MX722adhe,7464102024165,Plataforma,av Centenario 4614,Yarinacocha,Coronel Portillo,Ucayali,Contrato 2021
