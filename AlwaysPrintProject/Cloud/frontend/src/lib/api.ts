@@ -161,13 +161,21 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // Si el backend no responde (network error o 502/503), redirigir a página principal
-    // que ya muestra el estado de "Servicio no disponible"
+    // Si el backend no responde (network error o 502/503), redirigir a maintenance.
+    // Excepción: timeouts de requests específicas (ECONNABORTED, canceladas) no significan
+    // que el backend está caído — solo que un comando tardó demasiado.
     if (!error.response || error.response.status === 502 || error.response.status === 503) {
-      if (typeof window !== 'undefined'
-        && window.location.pathname.startsWith('/dashboard')
-        && !window.location.pathname.includes('/maintenance')) {
-        window.location.href = '/maintenance'
+      // No redirigir si fue un timeout de request (ECONNABORTED) o request cancelada
+      const isTimeout = error.code === 'ECONNABORTED' || error.code === 'ERR_CANCELED'
+      // No redirigir si fue un 408 (Request Timeout del backend)
+      const isRequestTimeout = error.response?.status === 408
+
+      if (!isTimeout && !isRequestTimeout) {
+        if (typeof window !== 'undefined'
+          && window.location.pathname.startsWith('/dashboard')
+          && !window.location.pathname.includes('/maintenance')) {
+          window.location.href = '/maintenance'
+        }
       }
     }
     

@@ -186,7 +186,7 @@ ssm_exec() {
 # =============================================================================
 print_header "0. ENTORNO: $ENV_LABEL [$ENV] — Perfil: $AWS_PROFILE"
 
-TF_DIR="$(cd "$(dirname "$0")/terraform" 2>/dev/null && pwd)"
+TF_DIR="$(cd "$(dirname "$0")/../terraform" 2>/dev/null && pwd)"
 
 if [ -d "$TF_DIR/.terraform" ]; then
     echo -e "  ${CYAN}Seleccionando workspace '$TF_WORKSPACE' y leyendo outputs...${NC}"
@@ -231,6 +231,15 @@ if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
     if [ -n "$EC2_INFO" ] && [ "$EC2_INFO" != "None" ]; then
         INSTANCE_ID=$(echo "$EC2_INFO" | awk '{print $1}')
         EC2_IP=$(echo "$EC2_INFO" | awk '{print $2}')
+    fi
+fi
+
+# Fallback para DOMAIN si Terraform no lo proporcionó
+if [ -z "$DOMAIN" ]; then
+    if [ "$ENV" = "prod" ]; then
+        DOMAIN="alwaysprint.apps.iol.pe"
+    else
+        DOMAIN="alwaysprint.dev.iol.pe"
     fi
 fi
 

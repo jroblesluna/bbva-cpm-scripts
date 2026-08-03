@@ -80,26 +80,26 @@ Existen DOS tipos de VLAN en el sistema:
 
 La asignación de workstations a VLANs depende del **prefijo de su IP**:
 
-| Prefijo IP | Asignación | VLAN Target |
-|------------|-----------|-------------|
-| `118.` | Por hostname (código agencia en posiciones 3:6) | VLAN de agencia (`{code} - Ag. XXX`) |
-| `10.` | Por IP (red privada) | `VLAN_10` (o existente que empiece con `VLAN_10`) |
-| `192.` | Por IP (red privada) | `VLAN_192` (o existente que empiece con `VLAN_192`) |
-| `172.` | Por IP (red privada) | `VLAN_172` (o existente que empiece con `VLAN_172`) |
-| Otro | No reasignar | Mantener VLAN actual |
+| Prioridad | Condición | VLAN Target |
+|-----------|-----------|-------------|
+| 1 | Hostname matchea VLAN_CODE (posiciones [3:6] numérico) | VLAN de agencia (`{code} - Ag. XXX`) |
+| 2 | IP empieza con `10.` (y hostname no matchea) | `VLAN_10` |
+| 2 | IP empieza con `192.` (y hostname no matchea) | `VLAN_192` |
+| 2 | IP empieza con `172.` (y hostname no matchea) | `VLAN_172` |
+| - | Ni hostname ni IP reconocida | No reasignar |
 
 #### Lógica de ejecución
 
-- **Para WS con IP que empieza con `118.`:**
+- **Para TODAS las WS (prioridad hostname):**
   - Extraer código de agencia de `hostname[3:6]`
-  - Si `vlan_id` actual ≠ VLAN del código → reasignar
-  - Asegurar que el CIDR de la WS esté en `cidr_ranges` de la VLAN target
-  - **TODAS las WS con IP 118.x deben estar asignadas** a una VLAN de agencia según su hostname
+  - Si el código matchea una VLAN del CSV → asignar a esa VLAN (independiente de la IP)
+  - Esto cubre WS con IP 118.x, 192.x, 10.x, o cualquier otra que tenga hostname válido
 
-- **Para WS con IP que empieza con `10.`, `192.`, `172.`:**
-  - Asignar a la VLAN especial correspondiente (`VLAN_10`, `VLAN_192`, `VLAN_172`)
-  - NO usar el hostname para determinar agencia
-  - El CIDR de la WS se asigna a la VLAN especial correspondiente
+- **Solo si hostname NO matchea:**
+  - Si IP empieza con `10.` → `VLAN_10`
+  - Si IP empieza con `192.` → `VLAN_192`
+  - Si IP empieza con `172.` → `VLAN_172`
+  - Otro → no reasignar
 
 - **CIDRs**: Se asignan a VLANs especiales si corresponden a redes privadas (10.0.0.0/8, 192.168.0.0/16, 172.16.0.0/12). Los CIDRs con prefijo 118. van a la VLAN de agencia que les corresponde.
 

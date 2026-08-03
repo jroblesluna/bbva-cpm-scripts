@@ -210,23 +210,22 @@ def step2_reassign_workstations(db: Session, org_id, code_to_id: dict[str, str],
         hostname = ws.hostname or ""
         target_vlan_id = None
         
-        if ip.startswith("118."):
-            # Extraer código de agencia del hostname
-            code = extract_vlan_code_from_hostname(hostname)
-            if code and code in code_to_id:
-                target_vlan_id = code_to_id[code]
+        # PRIORIDAD 1: Intentar asignar por hostname (independiente de IP)
+        code = extract_vlan_code_from_hostname(hostname)
+        if code and code in code_to_id:
+            target_vlan_id = code_to_id[code]
+        else:
+            # PRIORIDAD 2: Si hostname no matchea, asignar por prefijo de IP
+            if ip.startswith("10."):
+                target_vlan_id = special_vlans.get("10.")
+            elif ip.startswith("192."):
+                target_vlan_id = special_vlans.get("192.")
+            elif ip.startswith("172."):
+                target_vlan_id = special_vlans.get("172.")
             else:
+                # Ni hostname ni IP reconocida
                 no_vlan_found += 1
                 continue
-        elif ip.startswith("10."):
-            target_vlan_id = special_vlans.get("10.")
-        elif ip.startswith("192."):
-            target_vlan_id = special_vlans.get("192.")
-        elif ip.startswith("172."):
-            target_vlan_id = special_vlans.get("172.")
-        else:
-            skipped += 1
-            continue
         
         if not target_vlan_id:
             skipped += 1
@@ -254,6 +253,58 @@ def step2_reassign_workstations(db: Session, org_id, code_to_id: dict[str, str],
                 if not dry_run:
                     vlan.cidr_ranges = new_cidrs
                 cidrs_updated += 1
+    
+    # === Segundo pase: WS con IP privada y hostname NO válido → VLANs especiales ===
+    private_reassigned = 0
+    private_cidrs: dict[str, set] = defaultdict(set)
+    
+    for ws in workstations:
+        ip = ws.ip_private or ""
+        hostname = ws.hostname or ""
+        
+        # Solo WS con hostname que NO empieza con "W" (no matcheó en el primer pase)
+        if hostname.upper().startswith("W"):
+            continue
+        
+        # Solo IPs privadas
+        target_vlan_id = None
+        if ip.startswith("10."):
+            target_vlan_id = special_vlans.get("10.")
+        elif ip.startswith("192."):
+            target_vlan_id = special_vlans.get("192.")
+        elif ip.startswith("172."):
+            target_vlan_id = special_vlans.get("172.")
+        
+        if not target_vlan_id:
+            continue
+        
+        # Reasignar si difiere
+        current_vlan_id = str(ws.vlan_id) if ws.vlan_id else None
+        if current_vlan_id != target_vlan_id:
+            if not dry_run:
+                ws.vlan_id = target_vlan_id
+            private_reassigned += 1
+        
+        # Acumular CIDR
+        if ws.cidr:
+            private_cidrs[target_vlan_id].add(ws.cidr)
+    
+    # Actualizar CIDRs de VLANs especiales (sin duplicados dentro de cada VLAN)
+    private_cidrs_updated = 0
+    for vlan_id, cidrs in private_cidrs.items():
+        vlan = db.query(VLAN).filter(VLAN.id == vlan_id).first()
+        if vlan:
+            # Unir CIDRs existentes con los nuevos, eliminar duplicados
+            existing = set(vlan.cidr_ranges or [])
+            merged = existing | cidrs
+            new_cidrs = sorted(list(merged))
+            if new_cidrs != sorted(list(existing)):
+                if not dry_run:
+                    vlan.cidr_ranges = new_cidrs
+                private_cidrs_updated += 1
+    
+    print(f"    WS privadas (hostname no-W) reasignadas: {private_reassigned}")
+    print(f"    VLANs especiales con CIDRs actualizados: {private_cidrs_updated}")
     
     if not dry_run:
         db.commit()
@@ -411,6 +462,41 @@ def step4_assign_orphan_devices(db: Session, org_id, dry_run: bool):
 
 
 # ============================================================================
+# STEP 5: ELIMINAR VLANS VACÍAS
+# ============================================================================
+
+def step5_delete_empty_vlans(db: Session, org_id, dry_run: bool):
+    """
+    Elimina VLANs que no tienen ninguna workstation asignada.
+    """
+    print("\n" + "=" * 60)
+    print("STEP 5: Eliminar VLANs vacías")
+    print("=" * 60)
+    
+    # Obtener todas las VLANs de la org
+    all_vlans = db.query(VLAN).filter(VLAN.organization_id == org_id).all()
+    
+    deleted = 0
+    for vlan in all_vlans:
+        ws_count = db.query(Workstation).filter(Workstation.vlan_id == vlan.id).count()
+        if ws_count == 0:
+            # También verificar que no tenga devices
+            dev_count = db.query(Device).filter(Device.vlan_id == vlan.id).count()
+            if dev_count == 0:
+                print(f"  [DELETE] '{vlan.name}' (0 WS, 0 devices)")
+                if not dry_run:
+                    db.delete(vlan)
+                deleted += 1
+            else:
+                print(f"  [KEEP] '{vlan.name}' (0 WS, {dev_count} devices)")
+    
+    if not dry_run:
+        db.commit()
+    
+    print(f"\n  Resumen: {deleted} VLANs eliminadas")
+
+
+# ============================================================================
 # MAIN
 # ============================================================================
 
@@ -452,6 +538,7 @@ def main():
         step2_reassign_workstations(db, org_id, code_to_id, args.dry_run)
         step3_upsert_devices(db, org_id, csv_rows, code_to_id, args.dry_run)
         step4_assign_orphan_devices(db, org_id, args.dry_run)
+        step5_delete_empty_vlans(db, org_id, args.dry_run)
         
         print("\n" + "=" * 60)
         print("✅ Sincronización completada.")
