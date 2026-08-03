@@ -75,24 +75,23 @@ class PushDistributionService:
             return []
 
         if scope == "vlan":
-            # Filtrar workstations de la org que pertenecen a la VLAN (cross-worker)
+            # Filtrar workstations online de la org que pertenecen a la VLAN
+            # _ws_vlan_ids solo existe en RedisConnectionManager
             ws_vlan_ids = getattr(cm, "_ws_vlan_ids", {})
             targets = [
                 ws_id
                 for ws_id, ws_org_id in cm.org_ids.items()
                 if ws_org_id == org_id
+                and ws_id in cm.workstation_connections
                 and ws_vlan_ids.get(ws_id) == scope_id
             ]
             return targets
 
-        # scope == "org": todas las workstations online de la organización (cross-worker).
-        # No filtrar por workstation_connections (local) porque send_to_workstation()
-        # ya resuelve cross-worker via Redis pub/sub. Incluir todas las WS registradas
-        # en org_ids para garantizar que el push llegue a ambos workers.
+        # scope == "org": todas las workstations online de la organización
         targets = [
             ws_id
             for ws_id, ws_org_id in cm.org_ids.items()
-            if ws_org_id == org_id
+            if ws_org_id == org_id and ws_id in cm.workstation_connections
         ]
         return targets
 
