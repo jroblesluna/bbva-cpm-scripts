@@ -969,9 +969,43 @@ async def list_workstations(
         # Snapshot vacío (Redis no disponible): fallback a BD
         base_query = base_query.filter(Workstation.is_online.is_(is_online))
     
-    # Filtrar por contingencia activa si se proporciona
+    # Filtrar por contingencia activa si se proporciona.
+    # Usa la misma lógica que get_contingency_count: incluye contingency_active,
+    # forced_contingency a nivel WS, y forced_contingency a nivel VLAN u Org.
     if contingency_active is not None:
-        base_query = base_query.filter(Workstation.contingency_active.is_(contingency_active))
+        from sqlalchemy import or_ as _or
+        from app.models.vlan import VLAN as VLANModel
+        from app.models.organization import Organization as OrgModel
+
+        # IDs de VLANs con forced_contingency
+        _vlan_forced_ids = [
+            row.id for row in db.query(VLANModel.id).filter(VLANModel.forced_contingency.is_(True)).all()
+        ]
+        # IDs de Orgs con forced_contingency
+        _org_forced_ids = [
+            row.id for row in db.query(OrgModel.id).filter(OrgModel.forced_contingency.is_(True)).all()
+        ]
+
+        if contingency_active:
+            _conditions = [
+                Workstation.contingency_active.is_(True),
+                Workstation.forced_contingency.is_(True),
+            ]
+            if _vlan_forced_ids:
+                _conditions.append(Workstation.vlan_id.in_(_vlan_forced_ids))
+            if _org_forced_ids:
+                _conditions.append(Workstation.organization_id.in_(_org_forced_ids))
+            base_query = base_query.filter(_or(*_conditions))
+        else:
+            # Excluir cualquier condición que ponga a la WS en contingencia
+            base_query = base_query.filter(
+                Workstation.contingency_active.is_(False),
+                Workstation.forced_contingency.is_(False),
+            )
+            if _vlan_forced_ids:
+                base_query = base_query.filter(~Workstation.vlan_id.in_(_vlan_forced_ids))
+            if _org_forced_ids:
+                base_query = base_query.filter(~Workstation.organization_id.in_(_org_forced_ids))
     
     # Buscar por IP o hostname si se proporciona
     if search:
