@@ -113,8 +113,15 @@ class PushDistributionService:
             "download_url": "https://bucket.s3.amazonaws.com/configs/org/hash.signed"
         }
 
-        Zero queries a BD — config_hash y download_url provienen del caller,
-        las workstations destino se obtienen del connection_manager en memoria.
+        Para scope "org": usa publish_to_org_workstations() que publica un solo
+        mensaje al canal Redis org:{org_id} — ambos workers entregan a sus WS
+        locales. Garantiza que el 100% de workstations online reciban el push
+        sin necesidad de conocer sus IDs desde un solo worker.
+
+        Para scope "vlan"/"workstation": usa send_to_workstation individual
+        (pocas WS destino, cross-worker via WorkerRegistry).
+
+        Zero queries a BD — config_hash y download_url provienen del caller.
 
         Args:
             org_id: UUID de la organización afectada.
@@ -124,9 +131,64 @@ class PushDistributionService:
             scope_id: ID del scope (vlan_id o workstation_id). None para scope "org".
 
         Returns:
-            Número de workstations a las que se envió el mensaje.
+            Número de workstations a las que se envió el mensaje (local count para
+            scope "org", total count para otros scopes).
         """
-        # Obtener workstations destino según scope (sin queries a BD)
+        # Construir mensaje Config_Push_Message (formato plano — el cliente parsea
+        # config_hash y download_url directamente del top-level del JSON)
+        message = {
+            "type": "action_config_changed",
+            "config_hash": config_hash,
+            "download_url": download_url,
+        }
+
+        # Para scope "org": publicar al canal Redis para entrega cross-worker
+        if scope == "org":
+            cm = self._connection_manager
+
+            # Verificar si el connection_manager tiene publish_to_org_workstations
+            # (RedisConnectionManager). Si no (ConnectionManager básico), fallback local.
+            if hasattr(cm, "publish_to_org_workstations"):
+                enviados = await cm.publish_to_org_workstations(org_id, message)
+                logger.info(
+                    "push.config_enviado_crossworker",
+                    org_id=org_id,
+                    scope=scope,
+                    config_hash=config_hash,
+                    enviados_local=enviados,
+                    msg="Publicado a canal org para entrega cross-worker",
+                )
+                return enviados
+            else:
+                # Fallback: ConnectionManager sin Redis (dev/test)
+                target_ws_ids = self._get_target_workstations(org_id, scope, scope_id)
+                if not target_ws_ids:
+                    logger.info(
+                        "push.config_sin_destinos",
+                        org_id=org_id,
+                        scope=scope,
+                        scope_id=scope_id,
+                        config_hash=config_hash,
+                        msg="No hay workstations online para este scope",
+                    )
+                    return 0
+
+                enviados = 0
+                for ws_id in target_ws_ids:
+                    try:
+                        sent = await cm.send_to_workstation(ws_id, message)
+                        if sent:
+                            enviados += 1
+                    except Exception as e:
+                        logger.warning(
+                            "push.config_envio_fallido",
+                            workstation_id=ws_id,
+                            org_id=org_id,
+                            error=str(e),
+                        )
+                return enviados
+
+        # Para scope "vlan" y "workstation": obtener destinos específicos y enviar uno a uno
         target_ws_ids = self._get_target_workstations(org_id, scope, scope_id)
 
         if not target_ws_ids:
@@ -139,14 +201,6 @@ class PushDistributionService:
                 msg="No hay workstations online para este scope",
             )
             return 0
-
-        # Construir mensaje Config_Push_Message (formato plano — el cliente parsea
-        # config_hash y download_url directamente del top-level del JSON)
-        message = {
-            "type": "action_config_changed",
-            "config_hash": config_hash,
-            "download_url": download_url,
-        }
 
         # Enviar a cada workstation destino (fire-and-forget)
         enviados = 0

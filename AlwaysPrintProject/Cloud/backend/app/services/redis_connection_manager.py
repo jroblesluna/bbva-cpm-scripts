@@ -655,6 +655,80 @@ class RedisConnectionManager:
                 org_id=organization_id,
             )
 
+    async def publish_to_org_workstations(
+        self,
+        organization_id: str,
+        message: dict,
+    ) -> int:
+        """
+        Envía mensaje a TODAS las workstations de una organización (cross-worker).
+
+        A diferencia de broadcast_to_organization (que es solo para operadores/frontend),
+        este método entrega a workstations conectadas:
+        1. Entrega directamente a las workstations LOCALES de la org
+        2. Publica en org:{organization_id} con _target="workstations" para que
+           otros workers entreguen a sus workstations locales de la misma org
+
+        NO usa send_to_workstation individual (que requiere conocer cada ws_id).
+        Un solo publish → todos los workers entregan a sus locales.
+
+        Args:
+            organization_id: UUID de la organización
+            message: Mensaje a enviar a las workstations (ej: action_config_changed)
+
+        Returns:
+            Número de workstations locales a las que se entregó exitosamente.
+        """
+        # 1. Entregar a workstations LOCALES de esta org
+        local_ws_ids = [
+            ws_id for ws_id, org_id in self.org_ids.items()
+            if org_id == organization_id
+        ]
+
+        enviados_local = 0
+        for ws_id in local_ws_ids:
+            ws = self.workstation_connections.get(ws_id)
+            if ws:
+                try:
+                    await ws.send_json(message)
+                    enviados_local += 1
+                except Exception:
+                    pass  # Conexión muerta — será limpiada por Death Ping
+
+        # 2. Publicar en Redis para que otros workers entreguen a sus locales
+        if self._redis_available and self._redis:
+            try:
+                pub_message = {
+                    **message,
+                    "_origin_worker": self._worker_id,
+                    "_target": "workstations",
+                    "organization_id": organization_id,
+                }
+                payload = json.dumps(pub_message, default=str)
+                await self._redis.publish(f"org:{organization_id}", payload)
+                logger.info(
+                    "push.org_workstations_published",
+                    org_id=organization_id,
+                    local_delivered=enviados_local,
+                    local_total=len(local_ws_ids),
+                    message_type=message.get("type", "unknown"),
+                )
+            except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
+                logger.warning(
+                    "push.org_workstations_publish_failed",
+                    org_id=organization_id,
+                    error=str(e),
+                )
+        else:
+            logger.info(
+                "push.org_workstations_local_only",
+                org_id=organization_id,
+                local_delivered=enviados_local,
+                msg="Redis no disponible — solo entrega local",
+            )
+
+        return enviados_local
+
     # =========================================================================
     # OPERADORES
     # =========================================================================
@@ -832,11 +906,29 @@ class RedisConnectionManager:
                     origin = payload.pop("_origin_worker", None) if isinstance(payload, dict) else None
                     if origin == self._worker_id:
                         continue
-                    # Entregar a operadores locales (broadcasts son para frontend, no WS)
-                    async with self._lock:
-                        user_ids = list(self.operator_connections.keys())
-                    for user_id in user_ids:
-                        await self.send_to_operator(user_id, payload)
+
+                    # Determinar target: workstations o operadores
+                    target = payload.pop("_target", None) if isinstance(payload, dict) else None
+
+                    if target == "workstations":
+                        # Entrega a workstations locales de esta org (cross-worker config push)
+                        org_id_from_channel = channel.split(":", 1)[1] if ":" in channel else None
+                        org_id_from_payload = payload.get("organization_id") if isinstance(payload, dict) else None
+                        target_org_id = org_id_from_payload or org_id_from_channel
+
+                        if target_org_id:
+                            # Limpiar campos internos antes de entregar a WS
+                            clean_payload = {
+                                k: v for k, v in payload.items()
+                                if not k.startswith("_") and k != "organization_id"
+                            }
+                            await self._deliver_to_local_org_workstations(target_org_id, clean_payload)
+                    else:
+                        # Comportamiento original: entregar a operadores locales (frontend)
+                        async with self._lock:
+                            user_ids = list(self.operator_connections.keys())
+                        for user_id in user_ids:
+                            await self.send_to_operator(user_id, payload)
                 elif channel == "global:broadcast":
                     await self._deliver_global_broadcast(payload)
 
