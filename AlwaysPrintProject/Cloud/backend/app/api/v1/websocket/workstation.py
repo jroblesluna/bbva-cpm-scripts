@@ -396,6 +396,18 @@ async def workstation_websocket(
                 await connection_manager.update_last_activity(workstation_id)
                 continue
             
+            # ACK de comando: la workstation confirma que recibió el comando y está procesando
+            if message_type == "cmd_ack":
+                command_id = data.get("command_id")
+                if command_id:
+                    logger.info(
+                        "[CMD_ACK] Workstation confirmó recepción: "
+                        "command_id=%s, status=%s, file_size=%s",
+                        command_id, data.get("status"), data.get("file_size"),
+                    )
+                # No resolver el waiter — solo logging. El waiter se resuelve con cmd_response.
+                continue
+
             # command_result NO necesita BD — solo routing/broadcast en memoria/Redis.
             # Evitar crear sesión innecesaria para reducir presión sobre el pool.
             if message_type == "command_result":

@@ -586,9 +586,9 @@ async def download_latest_log(
         f"[LOGS] Comando enviado (sent=True), esperando respuesta: command_id={command_id}"
     )
     
-    # Esperar respuesta con timeout de 30 segundos
+    # Esperar respuesta con timeout de 90 segundos (logs grandes con proxy pueden tardar)
     response_data = await connection_manager.wait_for_command_response(
-        command_id, timeout=30.0
+        command_id, timeout=90.0
     )
     
     if response_data is None:
@@ -619,17 +619,22 @@ async def download_latest_log(
     
     # El output puede ser el contenido en base64 o un JSON con filename y content
     try:
-        # Intentar parsear como JSON (formato: {"filename": "...", "content": "base64..."})
         import json as json_module
         output_data = json_module.loads(output)
         if isinstance(output_data, dict):
             filename = output_data.get("filename", filename)
             content_b64 = output_data.get("content", "")
+            is_compressed = output_data.get("compressed", False)
+            compress_format = output_data.get("format", "")
+            original_size = output_data.get("original_size", 0)
+            compressed_size = output_data.get("compressed_size", 0)
             file_content = base64.b64decode(content_b64)
         else:
+            is_compressed = False
             file_content = base64.b64decode(output)
     except (json_module.JSONDecodeError, ValueError):
-        # Si no es JSON, asumir que es base64 directo
+        # Si no es JSON, asumir que es base64 directo (Tray viejo)
+        is_compressed = False
         try:
             file_content = base64.b64decode(output)
         except Exception:
@@ -638,18 +643,33 @@ async def download_latest_log(
                 detail="Error decodificando el contenido del log recibido."
             )
     
-    logger.info(
-        f"[LOGS] Log descargado: workstation_id={workstation_id}, "
-        f"filename={filename}, size={len(file_content)} bytes, "
-        f"solicitado_por={current_user.email}"
-    )
+    # Determinar tipo de respuesta según compresión
+    if is_compressed and compress_format == "zip":
+        # Tray nuevo: respuesta comprimida en ZIP → entregar como .zip
+        download_filename = filename.rsplit(".", 1)[0] + ".zip" if "." in filename else filename + ".zip"
+        media_type = "application/zip"
+        logger.info(
+            f"[LOGS] Log descargado (ZIP): workstation_id={workstation_id}, "
+            f"filename={download_filename}, original={original_size} bytes, "
+            f"comprimido={len(file_content)} bytes, "
+            f"solicitado_por={current_user.email}"
+        )
+    else:
+        # Tray viejo: respuesta sin comprimir → entregar como .log
+        download_filename = filename
+        media_type = "application/octet-stream"
+        logger.info(
+            f"[LOGS] Log descargado (texto): workstation_id={workstation_id}, "
+            f"filename={download_filename}, size={len(file_content)} bytes, "
+            f"solicitado_por={current_user.email}"
+        )
     
     # Retornar como descarga de archivo
     return Response(
         content=file_content,
-        media_type="application/octet-stream",
+        media_type=media_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": f'attachment; filename="{download_filename}"',
             "Content-Length": str(len(file_content))
         }
     )

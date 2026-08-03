@@ -1653,8 +1653,9 @@ namespace AlwaysPrintTray.Cloud
         }
 
         /// <summary>
-        /// Ejecuta el comando get_latest_log: lee el último archivo de log de la carpeta
-        /// C:\ProgramData\AlwaysPrint\logs y envía su contenido codificado en base64.
+        /// Ejecuta el comando get_latest_log: lee el último archivo de log,
+        /// lo comprime en ZIP y envía codificado en base64.
+        /// Envía un ACK inmediato antes de procesar para evitar timeouts.
         /// </summary>
         private void HandleGetLatestLogCommand(string commandId)
         {
@@ -1686,16 +1687,19 @@ namespace AlwaysPrintTray.Cloud
 
                 var latestFile = logFiles[0];
 
-                // Limitar tamaño a 5 MB para evitar problemas de memoria/WebSocket
-                const long maxSize = 5 * 1024 * 1024;
+                // Limitar tamaño a 10 MB (el ZIP reducirá significativamente)
+                const long maxSize = 10 * 1024 * 1024;
                 if (latestFile.Length > maxSize)
                 {
                     SendCommandResult(commandId, false,
-                        $"El archivo de log es demasiado grande ({latestFile.Length / 1024 / 1024} MB). Máximo: 5 MB.");
+                        $"El archivo de log es demasiado grande ({latestFile.Length / 1024 / 1024} MB). Máximo: 10 MB.");
                     AlwaysPrintLogger.WriteTrayWarning(
                         $"CloudManager: comando get_latest_log - archivo demasiado grande: {latestFile.Length} bytes.");
                     return;
                 }
+
+                // Enviar ACK inmediato para que el backend sepa que estamos procesando
+                SendCommandAck(commandId, latestFile.Length);
 
                 // Leer archivo con FileShare.ReadWrite para no bloquear escrituras activas
                 byte[] fileContent;
@@ -1709,24 +1713,77 @@ namespace AlwaysPrintTray.Cloud
                     fs.Read(fileContent, 0, fileContent.Length);
                 }
 
-                // Codificar en base64 y enviar como JSON con nombre de archivo
-                string base64Content = Convert.ToBase64String(fileContent);
+                // Comprimir en ZIP en memoria
+                byte[] zipContent;
+                using (var zipStream = new System.IO.MemoryStream())
+                {
+                    using (var archive = new System.IO.Compression.ZipArchive(
+                        zipStream, System.IO.Compression.ZipArchiveMode.Create, true))
+                    {
+                        var entry = archive.CreateEntry(latestFile.Name,
+                            System.IO.Compression.CompressionLevel.Optimal);
+                        using (var entryStream = entry.Open())
+                        {
+                            entryStream.Write(fileContent, 0, fileContent.Length);
+                        }
+                    }
+                    zipContent = zipStream.ToArray();
+                }
+
+                // Codificar ZIP en base64 y enviar
+                string base64Content = Convert.ToBase64String(zipContent);
                 var resultJson = new JObject
                 {
                     ["filename"] = latestFile.Name,
-                    ["content"] = base64Content
+                    ["content"] = base64Content,
+                    ["compressed"] = true,
+                    ["format"] = "zip",
+                    ["original_size"] = fileContent.Length,
+                    ["compressed_size"] = zipContent.Length
                 };
 
                 SendCommandResult(commandId, true, resultJson.ToString(Formatting.None));
+
+                int compressionRatio = fileContent.Length > 0
+                    ? (int)(100 - (zipContent.Length * 100.0 / fileContent.Length))
+                    : 0;
+
                 AlwaysPrintLogger.WriteTrayInfo(
-                    $"CloudManager: comando get_latest_log ejecutado. Archivo: {latestFile.Name}, " +
-                    $"tamaño: {latestFile.Length} bytes.");
+                    $"CloudManager: comando get_latest_log ejecutado. " +
+                    $"Archivo: {latestFile.Name}, " +
+                    $"tamaño original: {fileContent.Length} bytes, " +
+                    $"comprimido: {zipContent.Length} bytes ({compressionRatio}% reducción).");
             }
             catch (Exception ex)
             {
-                SendCommandResult(commandId, false, $"Error leyendo archivo de log: {ex.Message}");
+                SendCommandResult(commandId, false, $"Error: {ex.Message}");
                 AlwaysPrintLogger.WriteTrayError(
-                    $"CloudManager: error ejecutando comando get_latest_log. {ex.Message}");
+                    $"CloudManager: error en get_latest_log: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+            }
+        }
+
+        /// <summary>
+        /// Envía un ACK inmediato al backend indicando que el comando fue recibido
+        /// y se está procesando. Esto permite al backend extender el timeout.
+        /// </summary>
+        private void SendCommandAck(string commandId, long fileSize)
+        {
+            try
+            {
+                var ackMessage = new JObject
+                {
+                    ["type"] = "cmd_ack",
+                    ["command_id"] = commandId,
+                    ["status"] = "processing",
+                    ["file_size"] = fileSize
+                };
+                _wsClient?.Send("cmd_ack", ackMessage);
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"CloudManager: error enviando cmd_ack para {commandId}: {ex.Message}");
             }
         }
 
