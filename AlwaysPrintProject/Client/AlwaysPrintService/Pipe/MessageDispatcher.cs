@@ -327,7 +327,7 @@ namespace AlwaysPrintService.Pipe
 
                 // Escritura atómica: escribir en .tmp y luego renombrar
                 string tempPath = configFilePath + ".tmp";
-                File.WriteAllText(tempPath, payload.ConfigJson, Encoding.UTF8);
+                File.WriteAllText(tempPath, payload.ConfigJson, new UTF8Encoding(false));
 
                 // Reemplazar archivo activo
                 if (File.Exists(configFilePath))
@@ -808,7 +808,7 @@ call :log ""Script de auto-reinicio completado""
 
                 // Escritura atómica: tmp + rename
                 string tempPath = resourcesPath + ".tmp";
-                File.WriteAllText(tempPath, payload.ResourcesJson, Encoding.UTF8);
+                File.WriteAllText(tempPath, payload.ResourcesJson, new UTF8Encoding(false));
 
                 if (File.Exists(resourcesPath))
                     File.Delete(resourcesPath);
@@ -1124,7 +1124,7 @@ call :log ""Script de auto-reinicio completado""
                     Directory.CreateDirectory(dir);
 
                 string tempPath = payload.Path + ".tmp";
-                File.WriteAllText(tempPath, payload.Content, Encoding.UTF8);
+                File.WriteAllText(tempPath, payload.Content, new UTF8Encoding(false));
 
                 if (File.Exists(payload.Path))
                     File.Delete(payload.Path);

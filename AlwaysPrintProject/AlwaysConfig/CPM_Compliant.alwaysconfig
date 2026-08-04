@@ -1,5 +1,5 @@
 {
-  "version": "11.8",
+  "version": "12.0",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -66,6 +66,11 @@
       "label": "Verificar cola de impresión",
       "command": "powershell -NoProfile -Command \"Get-Printer -Name '{{corporate_queue_name}}' | Select-Object Name,PortName,DriverName,PrinterStatus | Format-List\"",
       "description": "Estado de la cola corporativa"
+    },
+    {
+      "label": "Listar jobs en post (pendientes de release)",
+      "command": "dir C:\\ProgramData\\LPMC\\Jobs\\{{current_user}}\\CloudHybrid\\post",
+      "description": "Mostrar archivos .prn listos para release en la carpeta post del usuario activo"
     }
   ],
   "downloadable_files": [
@@ -1198,6 +1203,24 @@
             "arguments": "failure AlwaysPrintService reset= 86400 actions= restart/5000/restart/5000/restart/5000",
             "timeout_seconds": 10,
             "window_style": "Hidden"
+          }
+        }
+      ]
+    },
+    {
+      "event": "OnDemand",
+      "label": "Imprimir Página de Prueba",
+      "description": "Genera una página de prueba de Windows usando los permisos del usuario logueado (no SYSTEM). Útil para verificar que el flujo de impresión funciona end-to-end.",
+      "actions": [
+        {
+          "type": "RunProcess",
+          "description": "Enviar página de prueba a la cola corporativa como usuario logueado",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+            "arguments": "-NoProfile -Command \"$q = '{{corporate_queue_name}}'; $p = Get-WmiObject -Class Win32_Printer | Where-Object { $_.Name -eq $q }; if ($p) { $p.PrintTestPage() | Out-Null; Write-Output \\\"Pagina de prueba enviada a '$q' como usuario $env:USERNAME\\\" } else { Write-Output \\\"ERROR: Cola '$q' no encontrada.\\\"; exit 1 }\"",
+            "timeout_seconds": 30,
+            "window_style": "Hidden",
+            "run_as_logged_in_user": true
           }
         }
       ]
