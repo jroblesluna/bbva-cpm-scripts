@@ -30,6 +30,7 @@ from app.api.v1.endpoints import (
     health,
     bulk_actions,
     remote_view,
+    knowledge_articles,
     profile_knowledge_articles,
 )
 
@@ -185,6 +186,12 @@ api_router.include_router(
     debugging.router,
     prefix="/debugging",
     tags=["Debugging"]
+)
+
+# Artículos de conocimiento (CRUD)
+api_router.include_router(
+    knowledge_articles.router,
+    tags=["Knowledge Base"]
 )
 
 # Asociaciones artículos de conocimiento ↔ perfiles de debugging
