@@ -28,12 +28,15 @@ interface KnowledgeArticleSelectorProps {
   onChange: (articleIds: string[]) => void
   /** Texto de label opcional (se sobreescribe con i18n si no se pasa) */
   label?: string
+  /** ID de organización para filtrar artículos (requerido para Admin) */
+  organizationId?: string
 }
 
 export function KnowledgeArticleSelector({
   selectedArticleIds,
   onChange,
   label,
+  organizationId,
 }: KnowledgeArticleSelectorProps) {
   const t = useTranslations('knowledgeBase')
 
@@ -48,7 +51,7 @@ export function KnowledgeArticleSelector({
     async function fetchArticles() {
       setLoading(true)
       try {
-        const data = await getKnowledgeArticles()
+        const data = await getKnowledgeArticles(organizationId)
         if (!cancelled) {
           setArticles(data)
         }
@@ -64,7 +67,7 @@ export function KnowledgeArticleSelector({
 
     fetchArticles()
     return () => { cancelled = true }
-  }, [])
+  }, [organizationId])
 
   // Filtrar artículos por término de búsqueda (por título)
   const filteredArticles = useMemo(() => {

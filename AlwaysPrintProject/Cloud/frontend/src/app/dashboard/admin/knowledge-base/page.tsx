@@ -11,6 +11,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
+import { useAuth } from '@/hooks/useAuth';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -83,6 +84,8 @@ export default function KnowledgeBasePage() {
   const tCommon = useTranslations('common');
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const organizationId = user?.organization_id || undefined;
 
   // Estado de vista
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
@@ -102,16 +105,16 @@ export default function KnowledgeBasePage() {
     data: articles,
     isLoading,
   } = useQuery({
-    queryKey: ['knowledge-articles'],
-    queryFn: getKnowledgeArticles,
+    queryKey: ['knowledge-articles', organizationId],
+    queryFn: () => getKnowledgeArticles(organizationId),
   });
 
   // === MUTATIONS ===
 
   const createMutation = useMutation({
-    mutationFn: (data: KnowledgeArticleCreate) => createKnowledgeArticle(data),
+    mutationFn: (data: KnowledgeArticleCreate) => createKnowledgeArticle(data, organizationId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['knowledge-articles'] });
+      queryClient.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] });
       toast({ title: t('created') });
       closeFormDialog();
     },
@@ -122,9 +125,9 @@ export default function KnowledgeBasePage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: KnowledgeArticleUpdate }) =>
-      updateKnowledgeArticle(id, data),
+      updateKnowledgeArticle(id, data, organizationId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['knowledge-articles'] });
+      queryClient.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] });
       toast({ title: t('updated') });
       closeFormDialog();
     },
@@ -134,9 +137,9 @@ export default function KnowledgeBasePage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteKnowledgeArticle(id),
+    mutationFn: (id: string) => deleteKnowledgeArticle(id, organizationId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['knowledge-articles'] });
+      queryClient.invalidateQueries({ queryKey: ['knowledge-articles', organizationId] });
       toast({ title: t('deleted') });
       setDeleteDialogOpen(false);
       setDeletingArticle(null);
@@ -162,7 +165,7 @@ export default function KnowledgeBasePage() {
 
   const handleEdit = useCallback(async (article: KnowledgeArticleListItem) => {
     try {
-      const full: KnowledgeArticle = await getKnowledgeArticle(article.id);
+      const full: KnowledgeArticle = await getKnowledgeArticle(article.id, organizationId);
       setEditingArticleId(full.id);
       setFormData({
         title: full.title,
@@ -173,7 +176,7 @@ export default function KnowledgeBasePage() {
     } catch {
       toast({ title: t('loadError'), variant: 'destructive' });
     }
-  }, [t, toast]);
+  }, [t, toast, organizationId]);
 
   const handleDeleteClick = useCallback((article: KnowledgeArticleListItem) => {
     setDeletingArticle(article);

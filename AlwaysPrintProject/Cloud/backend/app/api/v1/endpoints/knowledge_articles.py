@@ -6,15 +6,15 @@ como contexto adicional en el prompt del LLM durante el análisis de debugging.
 """
 
 import logging
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.knowledge_article import (
     KnowledgeArticleCreate,
     KnowledgeArticleUpdate,
@@ -31,6 +31,26 @@ router = APIRouter()
 kb_service = KnowledgeArticleService()
 
 
+def _resolve_org_id(current_user: User, explicit_org_id: Optional[UUID] = None) -> UUID:
+    """
+    Resuelve la organización del usuario:
+    - Admin con org_id explícito → usa el explícito
+    - Operador con organization_id asignado → usa el propio
+    - Sin organización determinable → HTTP 400
+    """
+    if explicit_org_id and current_user.role == UserRole.ADMIN:
+        return explicit_org_id
+    elif current_user.organization_id:
+        return current_user.organization_id
+    elif explicit_org_id:
+        return explicit_org_id
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se pudo determinar la organización. Proporcione organization_id.",
+        )
+
+
 @router.post(
     "/knowledge-articles",
     response_model=KnowledgeArticleResponse,
@@ -39,15 +59,16 @@ kb_service = KnowledgeArticleService()
 )
 def create_article(
     data: KnowledgeArticleCreate,
+    organization_id: Optional[UUID] = Query(None, description="ID de la organización (requerido para Admin)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
-    Crea un nuevo artículo de conocimiento para la organización del usuario.
+    Crea un nuevo artículo de conocimiento para la organización.
 
     Retorna HTTP 409 si se alcanzó el límite de artículos por organización.
     """
-    org_id = current_user.organization_id
+    org_id = _resolve_org_id(current_user, organization_id)
     try:
         article = kb_service.create_article(
             db=db,
@@ -57,7 +78,6 @@ def create_article(
             content=data.content,
         )
     except ValueError as e:
-        # Límite de artículos por organización alcanzado
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(e),
@@ -71,16 +91,17 @@ def create_article(
     summary="Listar artículos de conocimiento",
 )
 def list_articles(
+    organization_id: Optional[UUID] = Query(None, description="ID de la organización (requerido para Admin)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
-    Lista todos los artículos de conocimiento de la organización del usuario.
+    Lista todos los artículos de conocimiento de la organización.
 
     Retorna una lista resumida (sin contenido completo) ordenada por fecha
     de actualización descendente.
     """
-    org_id = current_user.organization_id
+    org_id = _resolve_org_id(current_user, organization_id)
     articles = kb_service.list_articles(db=db, org_id=org_id)
     return articles
 
@@ -92,6 +113,7 @@ def list_articles(
 )
 def get_article(
     article_id: UUID,
+    organization_id: Optional[UUID] = Query(None, description="ID de la organización (requerido para Admin)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -100,7 +122,7 @@ def get_article(
 
     Retorna HTTP 404 si el artículo no existe o pertenece a otra organización.
     """
-    org_id = current_user.organization_id
+    org_id = _resolve_org_id(current_user, organization_id)
     article = kb_service.get_article(db=db, article_id=article_id, org_id=org_id)
     if article is None:
         raise HTTPException(
@@ -118,6 +140,7 @@ def get_article(
 def update_article(
     article_id: UUID,
     data: KnowledgeArticleUpdate,
+    organization_id: Optional[UUID] = Query(None, description="ID de la organización (requerido para Admin)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -127,7 +150,7 @@ def update_article(
     Solo se actualizan los campos proporcionados (actualización parcial).
     Retorna HTTP 404 si el artículo no existe o pertenece a otra organización.
     """
-    org_id = current_user.organization_id
+    org_id = _resolve_org_id(current_user, organization_id)
     article = kb_service.get_article(db=db, article_id=article_id, org_id=org_id)
     if article is None:
         raise HTTPException(
@@ -151,6 +174,7 @@ def update_article(
 )
 def delete_article(
     article_id: UUID,
+    organization_id: Optional[UUID] = Query(None, description="ID de la organización (requerido para Admin)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -159,7 +183,7 @@ def delete_article(
 
     Retorna HTTP 404 si el artículo no existe o pertenece a otra organización.
     """
-    org_id = current_user.organization_id
+    org_id = _resolve_org_id(current_user, organization_id)
     article = kb_service.get_article(db=db, article_id=article_id, org_id=org_id)
     if article is None:
         raise HTTPException(

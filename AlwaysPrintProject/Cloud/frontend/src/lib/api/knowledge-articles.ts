@@ -18,9 +18,10 @@ import type {
 /**
  * Obtener listado de artículos de conocimiento de la organización.
  */
-export async function getKnowledgeArticles(): Promise<KnowledgeArticleListItem[]> {
+export async function getKnowledgeArticles(organizationId?: string): Promise<KnowledgeArticleListItem[]> {
   const response = await apiClient.get<KnowledgeArticleListItem[]>(
-    '/knowledge-articles'
+    '/knowledge-articles',
+    { params: organizationId ? { organization_id: organizationId } : undefined }
   );
   return response.data;
 }
@@ -28,9 +29,10 @@ export async function getKnowledgeArticles(): Promise<KnowledgeArticleListItem[]
 /**
  * Obtener un artículo de conocimiento por su ID (incluye contenido completo).
  */
-export async function getKnowledgeArticle(id: string): Promise<KnowledgeArticle> {
+export async function getKnowledgeArticle(id: string, organizationId?: string): Promise<KnowledgeArticle> {
   const response = await apiClient.get<KnowledgeArticle>(
-    `/knowledge-articles/${id}`
+    `/knowledge-articles/${id}`,
+    { params: organizationId ? { organization_id: organizationId } : undefined }
   );
   return response.data;
 }
@@ -39,11 +41,13 @@ export async function getKnowledgeArticle(id: string): Promise<KnowledgeArticle>
  * Crear un nuevo artículo de conocimiento.
  */
 export async function createKnowledgeArticle(
-  data: KnowledgeArticleCreate
+  data: KnowledgeArticleCreate,
+  organizationId?: string
 ): Promise<KnowledgeArticle> {
   const response = await apiClient.post<KnowledgeArticle>(
     '/knowledge-articles',
-    data
+    data,
+    { params: organizationId ? { organization_id: organizationId } : undefined }
   );
   return response.data;
 }
@@ -54,11 +58,13 @@ export async function createKnowledgeArticle(
  */
 export async function updateKnowledgeArticle(
   id: string,
-  data: KnowledgeArticleUpdate
+  data: KnowledgeArticleUpdate,
+  organizationId?: string
 ): Promise<KnowledgeArticle> {
   const response = await apiClient.put<KnowledgeArticle>(
     `/knowledge-articles/${id}`,
-    data
+    data,
+    { params: organizationId ? { organization_id: organizationId } : undefined }
   );
   return response.data;
 }
@@ -67,8 +73,10 @@ export async function updateKnowledgeArticle(
  * Eliminar un artículo de conocimiento.
  * Elimina también las asociaciones con perfiles (cascade).
  */
-export async function deleteKnowledgeArticle(id: string): Promise<void> {
-  await apiClient.delete(`/knowledge-articles/${id}`);
+export async function deleteKnowledgeArticle(id: string, organizationId?: string): Promise<void> {
+  await apiClient.delete(`/knowledge-articles/${id}`, {
+    params: organizationId ? { organization_id: organizationId } : undefined
+  });
 }
 
 // === ASOCIACIONES CON PERFILES DE DEBUGGING ===
