@@ -79,7 +79,8 @@
     "collapseSidebar": "Contraer menú",
     "expandSidebar": "Expandir menú",
     "bulkActions": "Acciones Masivas",
-    "remoteView": "Vista Remota"
+    "remoteView": "Vista Remota",
+    "knowledgeBase": "Base de Conocimiento"
   },
   "login": {
     "title": "AlwaysPrint Cloud Manager",

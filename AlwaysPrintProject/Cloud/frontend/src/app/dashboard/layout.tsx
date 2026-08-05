@@ -37,6 +37,7 @@ import {
   ChevronLeft,
   Server,
   BookOpen,
+  Library,
   MapPin,
   PanelLeftClose,
   PanelLeftOpen,
@@ -125,6 +126,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       items: [
         { key: 'users', href: '/dashboard/admin/users', icon: Users },
         { key: 'updates', href: '/dashboard/admin/updates', icon: Download },
+        { key: 'knowledgeBase', href: '/dashboard/admin/knowledge-base', icon: Library },
         { key: 'documentation', href: '/dashboard/documentation', icon: BookOpen },
         { key: 'config', href: '/dashboard/config', icon: Settings, adminOnly: true },
       ],
