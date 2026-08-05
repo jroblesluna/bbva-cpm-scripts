@@ -85,8 +85,33 @@ class DebuggingAnalysisService:
             # 4. Leer extractos de archivos
             extracts = self._read_extracts(temp_dir, index_data)
 
+            # 4.5. Obtener artículos de conocimiento asociados al perfil
+            knowledge_articles = []
+            if session.profile_id:
+                try:
+                    from app.services.knowledge_article import KnowledgeArticleService
+                    from app.core.database import SessionLocal
+                    kb_service = KnowledgeArticleService()
+                    # Usar una sesión independiente para no contaminar la del pipeline
+                    kb_db = SessionLocal()
+                    try:
+                        knowledge_articles = kb_service.get_articles_for_profile(
+                            db=kb_db,
+                            profile_id=session.profile_id,
+                            org_id=session.organization_id,
+                        )
+                    finally:
+                        kb_db.close()
+                except Exception as e:
+                    logger.warning(
+                        "[DEBUGGING_ANALYSIS] Error obteniendo artículos de conocimiento "
+                        "para perfil %s: %s. Continuando sin base de conocimiento.",
+                        session.profile_id, e,
+                    )
+                    knowledge_articles = []
+
             # 5. Construir prompt
-            prompt = self._build_prompt(session, index_data, diffs, extracts)
+            prompt = self._build_prompt(session, index_data, diffs, extracts, knowledge_articles)
 
             # 6. Invocar LLM
             analysis_text = await self._invoke_llm(prompt, org)
@@ -261,6 +286,7 @@ class DebuggingAnalysisService:
         index_data: dict,
         diffs: dict,
         extracts: dict,
+        knowledge_articles: list = None,  # Artículos de conocimiento asociados al perfil
     ) -> str:
         """
         Construye el prompt completo para el LLM.
@@ -409,6 +435,38 @@ class DebuggingAnalysisService:
                     description = f_info.get("description", filename)
                     break
             sections.append(f"\n## Extracto: {description}\n```\n{content}\n```")
+
+        # === INYECCIÓN DE BASE DE CONOCIMIENTO ===
+        # Si hay artículos de conocimiento asociados al perfil, se agregan como contexto
+        # adicional para que el LLM tenga referencia de dominio durante el análisis.
+        if knowledge_articles:
+            sections.append("\n## Base de Conocimiento")
+            sections.append(
+                "Los siguientes artículos técnicos proporcionan contexto de dominio "
+                "relevante para este perfil de debugging. Úsalos como referencia para "
+                "el análisis:\n"
+            )
+            # Calcular presupuesto restante para artículos
+            current_prompt_size = sum(len(s) for s in sections)
+            remaining_budget = MAX_TOTAL_PROMPT_SIZE - current_prompt_size - 2000  # Reservar espacio para solicitud final
+
+            for i, article in enumerate(knowledge_articles):
+                article_header = f"### {article.title}\n"
+                article_content = article.content
+
+                if len(article_header) + len(article_content) > remaining_budget:
+                    # Truncar este artículo si excede el presupuesto disponible
+                    truncated_content = article_content[:max(0, remaining_budget - len(article_header) - 100)]
+                    if truncated_content:
+                        sections.append(article_header + truncated_content)
+                    sections.append(
+                        f"\n[... artículo truncado por límite de prompt. "
+                        f"Se omitieron {len(knowledge_articles) - i - 1} artículos adicionales.]"
+                    )
+                    break
+                else:
+                    sections.append(article_header + article_content)
+                    remaining_budget -= len(article_header) + len(article_content)
 
         # Solicitud final
         sections.append(

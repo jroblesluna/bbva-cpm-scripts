@@ -91,6 +91,13 @@ class DebuggingProfile(Base):
     creator = relationship("User", foreign_keys=[created_by])
     sessions = relationship("DebuggingSession", back_populates="profile", cascade="all, delete-orphan")
 
+    # Artículos de conocimiento asociados a este perfil (many-to-many)
+    knowledge_articles = relationship(
+        "KnowledgeArticle",
+        secondary="profile_knowledge_articles",
+        back_populates="profiles",
+    )
+
     # Índices
     __table_args__ = (
         Index("ix_debugging_profiles_org_active", "organization_id", "is_active"),

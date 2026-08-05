@@ -44,6 +44,9 @@ export * from './system-status'
 // Scalability Metrics types
 export * from './scalability-metrics'
 
+// Knowledge Article types
+export * from './knowledge-article'
+
 // ============================================================================
 // TIPOS COMUNES
 // ============================================================================

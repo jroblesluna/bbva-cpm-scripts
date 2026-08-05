@@ -1,0 +1,465 @@
+{
+  "pbtResults": {
+    "2.2 Write property test para validación de campos (Property 2)": {
+      "status": "passed",
+      "lastRunTimestamp": 1785905520585
+    },
+    "2.4 Write property test para límite de artículos por organización (Property 6)": {
+      "status": "passed",
+      "lastRunTimestamp": 1785905654672
+    },
+    "2.5 Write property test para límite de artículos por perfil (Property 7)": {
+      "status": "passed",
+      "lastRunTimestamp": 1785905662559
+    },
+    "2.6 Write property test para idempotencia de asociaciones (Property 4)": {
+      "status": "passed",
+      "lastRunTimestamp": 1785905719507
+    },
+    "5.3 Write property test para inyección condicional en prompt (Property 8)": {
+      "status": "passed",
+      "lastRunTimestamp": 1785905956986
+    },
+    "5.4 Write property test para truncación de prompt (Property 9)": {
+      "status": "passed",
+      "lastRunTimestamp": 1785906021378
+    }
+  },
+  "executionHistory": {
+    "1.1 Crear modelo SQLAlchemy `KnowledgeArticle` y tabla de asociación": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035078
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905046329
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905307214
+      }
+    ],
+    "1.2 Agregar relación `knowledge_articles` al modelo `DebuggingProfile`": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035120
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905316764
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905534358
+      }
+    ],
+    "1.3 Crear migración Alembic para knowledge_articles y profile_knowledge_articles": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035163
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905317541
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905538017
+      }
+    ],
+    "2.1 Crear schemas Pydantic para KnowledgeArticle": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035190
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905047100
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905308040
+      }
+    ],
+    "2.2 Write property test para validación de campos (Property 2)": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035217
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905318434
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905535199
+      }
+    ],
+    "2.3 Crear service `KnowledgeArticleService`": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035244
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905319174
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905536106
+      }
+    ],
+    "2.4 Write property test para límite de artículos por organización (Property 6)": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035271
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905545913
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905735001
+      }
+    ],
+    "2.5 Write property test para límite de artículos por perfil (Property 7)": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035296
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905546793
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905735922
+      }
+    ],
+    "2.6 Write property test para idempotencia de asociaciones (Property 4)": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035322
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905547627
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905736800
+      }
+    ],
+    "3.1 Crear endpoints CRUD de Knowledge Articles": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035347
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905548383
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905738018
+      }
+    ],
+    "3.2 Crear endpoints de asociación artículo-perfil": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035373
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905549210
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905738939
+      }
+    ],
+    "3.3 Registrar router en `app/api/v1/router.py`": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035398
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905758102
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905764295
+      }
+    ],
+    "4. Checkpoint - Verificar backend compila y tests pasan": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035425
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785906048319
+      }
+    ],
+    "5.1 Modificar `DebuggingAnalysisService._build_prompt()` para inyectar artículos": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035460
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905759510
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905848235
+      }
+    ],
+    "5.2 Modificar método `analyze()` para consultar artículos antes de construir prompt": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035499
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905857586
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785906035879
+      }
+    ],
+    "5.3 Write property test para inyección condicional en prompt (Property 8)": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035523
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905858381
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785906036851
+      }
+    ],
+    "5.4 Write property test para truncación de prompt (Property 9)": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035551
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905859198
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785906037704
+      }
+    ],
+    "6. Checkpoint - Verificar inyección en prompt funciona correctamente": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035581
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785906049324
+      }
+    ],
+    "7.1 Crear tipos TypeScript para Knowledge Articles": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035609
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905047953
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905308902
+      }
+    ],
+    "7.2 Crear funciones API client para Knowledge Articles": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035637
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905319973
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905537051
+      }
+    ],
+    "7.3 Crear página de administración Knowledge Base": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035665
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785906054163
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785906340851
+      }
+    ],
+    "8.1 Crear componente `KnowledgeArticleSelector`": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035699
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785906054990
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785906341746
+      }
+    ],
+    "8.2 Integrar `KnowledgeArticleSelector` en formulario de DebuggingProfile": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035723
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785906350958
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785906489380
+      }
+    ],
+    "9. Checkpoint final - Verificar integración completa": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905035750
+      },
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785906495378
+      }
+    ],
+    "1. Modelo de datos y migración de base de datos": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905538059
+      }
+    ],
+    "2. Schemas Pydantic y service layer": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905736826
+      }
+    ],
+    "3. API endpoints CRUD y asociaciones": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785905764320
+      }
+    ],
+    "5. Inyección de artículos en prompt LLM": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785906037753
+      }
+    ],
+    "7. Frontend - Tipos, API client y página de administración": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785906340891
+      }
+    ],
+    "8. Frontend - Selector de artículos en formulario de Debugging Profile": [
+      {
+        "executionId": "0d0d4b78-9731-4b92-aa70-5244c7ad67dd",
+        "chatSessionId": "sess_f5ad243d-bd54-41e7-9a42-e0c6727af21e",
+        "timestamp": 1785906489405
+      }
+    ]
+  }
+}

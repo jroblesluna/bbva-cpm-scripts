@@ -30,6 +30,7 @@ from app.api.v1.endpoints import (
     health,
     bulk_actions,
     remote_view,
+    profile_knowledge_articles,
 )
 
 # Router principal de la API v1
@@ -184,6 +185,12 @@ api_router.include_router(
     debugging.router,
     prefix="/debugging",
     tags=["Debugging"]
+)
+
+# Asociaciones artículos de conocimiento ↔ perfiles de debugging
+api_router.include_router(
+    profile_knowledge_articles.router,
+    tags=["Knowledge Base"]
 )
 
 # Monitoreo de estado del sistema (solo Admin)

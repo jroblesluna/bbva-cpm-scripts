@@ -19,6 +19,7 @@ from app.models.device import Device
 from app.models.document import Document
 from app.models.log_analysis import LogAnalysis
 from app.models.debugging import DebuggingProfile, DebuggingSession, DebuggingSessionStatus
+from app.models.knowledge_article import KnowledgeArticle, profile_knowledge_articles
 from app.models.system_status import (
     StatusSnapshot,
     MetricRecord,
@@ -79,6 +80,10 @@ __all__ = [
     "DebuggingProfile",
     "DebuggingSession",
     "DebuggingSessionStatus",
+    
+    # Knowledge article models
+    "KnowledgeArticle",
+    "profile_knowledge_articles",
     
     # System status models
     "StatusSnapshot",

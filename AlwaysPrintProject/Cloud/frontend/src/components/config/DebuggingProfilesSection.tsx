@@ -9,6 +9,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
+import { KnowledgeArticleSelector } from '@/components/knowledge-article-selector';
+import { associateArticlesToProfile, getProfileArticles } from '@/lib/api/knowledge-articles';
 import {
   Plus,
   Bug,
@@ -81,6 +83,7 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
   const [editEventlogGroups, setEditEventlogGroups] = useState<string[]>([]);
   const [editRegistryKeys, setEditRegistryKeys] = useState<string[]>([]);
   const [editMonitoredServices, setEditMonitoredServices] = useState<string[]>([]);
+  const [editSelectedArticleIds, setEditSelectedArticleIds] = useState<string[]>([]);
 
   // Form state
   const [externalLogs, setExternalLogs] = useState<string[]>([]);
@@ -221,7 +224,16 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
         monitored_services: editMonitoredServices.filter(Boolean),
       }, { params: { organization_id: organizationId } });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Sincronizar asociaciones de artículos de conocimiento
+      if (editProfileId) {
+        try {
+          await associateArticlesToProfile(editProfileId, editSelectedArticleIds);
+        } catch (e) {
+          // No crítico: la asociación de artículos falló pero el perfil se actualizó
+          console.error('Error sincronizando asociaciones de artículos:', e);
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ['debugging-profiles'] });
       toast({ title: t('updateSuccess') });
       setEditDialogOpen(false);
@@ -231,7 +243,7 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
     },
   });
 
-  const openEditDialog = (profile: DebuggingProfile) => {
+  const openEditDialog = async (profile: DebuggingProfile) => {
     setEditProfileId(profile.id);
     setEditName(profile.name);
     setEditDescription(profile.description);
@@ -240,6 +252,15 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
     setEditEventlogGroups(profile.eventlog_groups);
     setEditRegistryKeys(profile.registry_keys.length > 0 ? profile.registry_keys : ['']);
     setEditMonitoredServices(profile.monitored_services.length > 0 ? profile.monitored_services : ['']);
+
+    // Obtener artículos de conocimiento asociados al perfil
+    try {
+      const associated = await getProfileArticles(profile.id);
+      setEditSelectedArticleIds(associated.map(a => a.id));
+    } catch {
+      setEditSelectedArticleIds([]);
+    }
+
     setEditDialogOpen(true);
   };
 
@@ -576,7 +597,7 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
       </Dialog>
 
       {/* Dialog de edición */}
-      <Dialog open={editDialogOpen} onOpenChange={(open) => { if (!open) setEditDialogOpen(false); }}>
+      <Dialog open={editDialogOpen} onOpenChange={(open) => { if (!open) { setEditSelectedArticleIds([]); setEditDialogOpen(false); } }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t('editProfile')}</DialogTitle>
@@ -696,6 +717,14 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
               <Button variant="outline" size="sm" onClick={() => setEditMonitoredServices(prev => [...prev, ''])}>
                 <Plus className="w-3 h-3 mr-1" />{t('addService')}
               </Button>
+            </div>
+
+            {/* Knowledge Base Articles */}
+            <div className="space-y-2">
+              <KnowledgeArticleSelector
+                selectedArticleIds={editSelectedArticleIds}
+                onChange={setEditSelectedArticleIds}
+              />
             </div>
           </div>
 
