@@ -203,40 +203,70 @@ namespace AlwaysPrintTray.Cloud
             // Solicitar ZIP al Service y subir en background
             Task.Run(async () =>
             {
-                try
+                const int PipeTimeoutMs = 30_000; // 30 segundos
+                const int RetryDelayMs = 5_000;   // 5 segundos entre reintentos
+                const int MaxAttempts = 2;
+
+                for (int attempt = 1; attempt <= MaxAttempts; attempt++)
                 {
-                    // Pedir al Service que empaquete el ZIP
-                    var pipeMsg = PipeMessage.Create(MessageType.PackageDebuggingZip,
-                        new PackageDebuggingZipPayload { DebuggingId = debuggingId });
-
-                    var response = _pipeClient.Send(pipeMsg);
-
-                    if (response == null)
+                    try
                     {
-                        SendDebuggingError(debuggingId, "No se pudo comunicar con el Service para empaquetar ZIP");
-                        return;
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"DebuggingCommandHandler: Solicitando ZIP al Service para {debuggingId} (intento {attempt}/{MaxAttempts})");
+
+                        // Pedir al Service que empaquete el ZIP (con timeout)
+                        var pipeMsg = PipeMessage.Create(MessageType.PackageDebuggingZip,
+                            new PackageDebuggingZipPayload { DebuggingId = debuggingId });
+
+                        var response = _pipeClient.SendWithTimeout(pipeMsg, PipeTimeoutMs);
+
+                        if (response == null)
+                        {
+                            AlwaysPrintLogger.WriteTrayWarning(
+                                $"DebuggingCommandHandler: Pipe timeout/error empaquetando ZIP (intento {attempt}/{MaxAttempts})");
+
+                            if (attempt < MaxAttempts)
+                            {
+                                // Esperar antes de reintentar (el pipe se reconecta automáticamente)
+                                await Task.Delay(RetryDelayMs);
+                                continue;
+                            }
+
+                            SendDebuggingError(debuggingId,
+                                "No se pudo comunicar con el Service para empaquetar ZIP (timeout después de reintentos)");
+                            return;
+                        }
+
+                        var zipReady = response.GetPayload<DebuggingZipReadyPayload>();
+                        string zipPath = zipReady?.ZipPath ?? "";
+
+                        if (string.IsNullOrEmpty(zipPath))
+                        {
+                            SendDebuggingError(debuggingId, "Error creando ZIP para upload (Service retornó ruta vacía)");
+                            return;
+                        }
+
+                        // Upload vía HTTP
+                        await UploadZipToBackend(debuggingId, zipPath);
+
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"DebuggingCommandHandler: ZIP subido exitosamente para {debuggingId}");
+                        return; // Éxito — salir del loop
                     }
-
-                    var zipReady = response.GetPayload<DebuggingZipReadyPayload>();
-                    string zipPath = zipReady?.ZipPath ?? "";
-
-                    if (string.IsNullOrEmpty(zipPath))
+                    catch (Exception ex)
                     {
-                        SendDebuggingError(debuggingId, "Error creando ZIP para upload (Service retornó ruta vacía)");
-                        return;
+                        AlwaysPrintLogger.WriteTrayError(
+                            $"DebuggingCommandHandler: Error en upload para {debuggingId} (intento {attempt}): {ex.Message}");
+
+                        if (attempt >= MaxAttempts)
+                        {
+                            SendDebuggingError(debuggingId, $"Error en upload: {ex.Message}");
+                        }
+                        else
+                        {
+                            await Task.Delay(RetryDelayMs);
+                        }
                     }
-
-                    // Upload vía HTTP
-                    await UploadZipToBackend(debuggingId, zipPath);
-
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        $"DebuggingCommandHandler: ZIP subido exitosamente para {debuggingId}");
-                }
-                catch (Exception ex)
-                {
-                    AlwaysPrintLogger.WriteTrayError(
-                        $"DebuggingCommandHandler: Error en upload para {debuggingId}: {ex.Message}");
-                    SendDebuggingError(debuggingId, $"Error en upload: {ex.Message}");
                 }
             });
         }

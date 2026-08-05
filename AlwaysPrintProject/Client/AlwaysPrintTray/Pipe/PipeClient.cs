@@ -109,6 +109,57 @@ namespace AlwaysPrintTray.Pipe
             }
         }
 
+        /// <summary>
+        /// Envía un request con timeout. Retorna null si excede el tiempo o si falla.
+        /// NOTA: Si se excede el timeout, la conexión al pipe se cierra para liberar el ReadLine bloqueante.
+        /// </summary>
+        public PipeMessage? SendWithTimeout(PipeMessage request, int timeoutMs)
+        {
+            PipeMessage? result = null;
+            Exception? error = null;
+
+            // Ejecutar el Send en un thread separado para poder cancelarlo
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    result = Send(request);
+                }
+                catch (Exception ex)
+                {
+                    error = ex;
+                }
+            });
+            thread.IsBackground = true;
+            thread.Name = $"PipeSend-{request.Type}";
+            thread.Start();
+
+            if (thread.Join(timeoutMs))
+            {
+                // Completó dentro del timeout
+                if (error != null)
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        $"PipeClient: SendWithTimeout error. {error.Message}");
+                    return null;
+                }
+                return result;
+            }
+            else
+            {
+                // Timeout — forzar cierre del pipe para desbloquear el ReadLine
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"PipeClient: SendWithTimeout timeout ({timeoutMs}ms) para {request.Type}. Cerrando pipe.");
+                lock (_lock)
+                {
+                    DisposeTransport();
+                }
+                // El thread terminará con una IOException cuando el pipe se cierre
+                thread.Join(5000); // Esperar hasta 5s a que termine limpiamente
+                return null;
+            }
+        }
+
         /// <summary>Envía un Ping; retorna true si el servicio está activo.</summary>
         public bool Ping()
         {
