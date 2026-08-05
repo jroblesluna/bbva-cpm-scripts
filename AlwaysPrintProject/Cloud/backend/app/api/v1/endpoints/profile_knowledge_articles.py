@@ -6,16 +6,16 @@ a un perfil de debugging específico. La validación de tenant isolation
 garantiza que tanto el perfil como los artículos pertenezcan a la misma organización.
 """
 
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.debugging import DebuggingProfile
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.knowledge_article import KnowledgeArticleListItem, ProfileArticleAssociation
 from app.services.knowledge_article import KnowledgeArticleService
 
@@ -26,6 +26,26 @@ _service = KnowledgeArticleService()
 
 
 # === HELPERS ===
+
+
+def _resolve_org_id(current_user: User, explicit_org_id: Optional[UUID] = None) -> UUID:
+    """
+    Resuelve la organización del usuario:
+    - Admin con org_id explícito → usa el explícito
+    - Operador con organization_id asignado → usa el propio
+    - Sin organización determinable → HTTP 400
+    """
+    if explicit_org_id and current_user.role == UserRole.ADMIN:
+        return explicit_org_id
+    elif current_user.organization_id:
+        return current_user.organization_id
+    elif explicit_org_id:
+        return explicit_org_id
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se pudo determinar la organización. Proporcione organization_id.",
+        )
 
 
 def _get_profile_or_404(db: Session, profile_id: UUID, org_id: UUID) -> DebuggingProfile:
@@ -53,24 +73,16 @@ def _get_profile_or_404(db: Session, profile_id: UUID, org_id: UUID) -> Debuggin
 async def associate_articles(
     profile_id: UUID,
     body: ProfileArticleAssociation,
+    organization_id: Optional[UUID] = Query(None, description="ID de la organización (requerido para Admin)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Asocia una lista de artículos de conocimiento a un perfil de debugging.
-
-    - Verifica que el perfil pertenece a la organización del usuario
-    - Verifica que todos los artículos pertenecen a la misma organización
-    - Ignora duplicados silenciosamente (no genera error)
-    - Retorna 404 si algún artículo no existe o es de otra organización
-    - Retorna 409 si se excede el límite de 10 artículos por perfil
     """
-    org_id = current_user.organization_id
-
-    # Verificar que el perfil existe y pertenece a la org del usuario
+    org_id = _resolve_org_id(current_user, organization_id)
     profile = _get_profile_or_404(db, profile_id, org_id)
 
-    # Intentar asociar artículos
     try:
         _service.associate_articles_to_profile(
             db=db,
@@ -79,10 +91,8 @@ async def associate_articles(
             org_id=org_id,
         )
     except LookupError as e:
-        # Artículo no encontrado o de otra organización
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
-        # Límite de artículos por perfil alcanzado
         raise HTTPException(status_code=409, detail=str(e))
 
     return {"message": "Artículos asociados exitosamente"}
@@ -96,23 +106,16 @@ async def associate_articles(
 async def remove_article(
     profile_id: UUID,
     article_id: UUID,
+    organization_id: Optional[UUID] = Query(None, description="ID de la organización (requerido para Admin)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Elimina la asociación entre un artículo y un perfil de debugging.
-
-    - Verifica que el perfil pertenece a la organización del usuario
-    - Si la asociación no existe, no genera error (operación idempotente)
     """
-    org_id = current_user.organization_id
-
-    # Verificar que el perfil existe y pertenece a la org del usuario
+    org_id = _resolve_org_id(current_user, organization_id)
     _get_profile_or_404(db, profile_id, org_id)
-
-    # Eliminar asociación (silencioso si no existe)
     _service.remove_article_from_profile(db=db, profile_id=profile_id, article_id=article_id)
-
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -123,21 +126,14 @@ async def remove_article(
 )
 async def list_profile_articles(
     profile_id: UUID,
+    organization_id: Optional[UUID] = Query(None, description="ID de la organización (requerido para Admin)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Retorna todos los artículos de conocimiento asociados a un perfil.
-
-    - Verifica que el perfil pertenece a la organización del usuario
-    - Retorna lista resumida (sin contenido completo) de artículos asociados
     """
-    org_id = current_user.organization_id
-
-    # Verificar que el perfil existe y pertenece a la org del usuario
+    org_id = _resolve_org_id(current_user, organization_id)
     _get_profile_or_404(db, profile_id, org_id)
-
-    # Obtener artículos asociados
     articles = _service.get_articles_for_profile(db=db, profile_id=profile_id, org_id=org_id)
-
     return articles

@@ -228,7 +228,7 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
       // Sincronizar asociaciones de artículos de conocimiento
       if (editProfileId) {
         try {
-          await associateArticlesToProfile(editProfileId, editSelectedArticleIds);
+          await associateArticlesToProfile(editProfileId, editSelectedArticleIds, organizationId);
         } catch (e) {
           // No crítico: la asociación de artículos falló pero el perfil se actualizó
           console.error('Error sincronizando asociaciones de artículos:', e);
@@ -255,7 +255,7 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
 
     // Obtener artículos de conocimiento asociados al perfil
     try {
-      const associated = await getProfileArticles(profile.id);
+      const associated = await getProfileArticles(profile.id, organizationId);
       setEditSelectedArticleIds(associated.map(a => a.id));
     } catch {
       setEditSelectedArticleIds([]);
@@ -724,6 +724,7 @@ export function DebuggingProfilesSection({ organizationId, llmEnabled }: Debuggi
               <KnowledgeArticleSelector
                 selectedArticleIds={editSelectedArticleIds}
                 onChange={setEditSelectedArticleIds}
+                organizationId={organizationId}
               />
             </div>
           </div>

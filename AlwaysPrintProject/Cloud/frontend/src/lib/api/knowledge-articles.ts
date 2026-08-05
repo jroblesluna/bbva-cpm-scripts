@@ -85,10 +85,12 @@ export async function deleteKnowledgeArticle(id: string, organizationId?: string
  * Obtener los artículos asociados a un perfil de debugging.
  */
 export async function getProfileArticles(
-  profileId: string
+  profileId: string,
+  organizationId?: string
 ): Promise<KnowledgeArticleListItem[]> {
   const response = await apiClient.get<KnowledgeArticleListItem[]>(
-    `/debugging-profiles/${profileId}/knowledge-articles`
+    `/debugging-profiles/${profileId}/knowledge-articles`,
+    { params: organizationId ? { organization_id: organizationId } : undefined }
   );
   return response.data;
 }
@@ -99,12 +101,14 @@ export async function getProfileArticles(
  */
 export async function associateArticlesToProfile(
   profileId: string,
-  articleIds: string[]
+  articleIds: string[],
+  organizationId?: string
 ): Promise<void> {
   const body: ProfileArticleAssociation = { article_ids: articleIds };
   await apiClient.post(
     `/debugging-profiles/${profileId}/knowledge-articles`,
-    body
+    body,
+    { params: organizationId ? { organization_id: organizationId } : undefined }
   );
 }
 
@@ -113,9 +117,11 @@ export async function associateArticlesToProfile(
  */
 export async function removeArticleFromProfile(
   profileId: string,
-  articleId: string
+  articleId: string,
+  organizationId?: string
 ): Promise<void> {
   await apiClient.delete(
-    `/debugging-profiles/${profileId}/knowledge-articles/${articleId}`
+    `/debugging-profiles/${profileId}/knowledge-articles/${articleId}`,
+    { params: organizationId ? { organization_id: organizationId } : undefined }
   );
 }
