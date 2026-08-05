@@ -8,10 +8,11 @@
  * Funcionalidad: listar, crear, editar, eliminar artículos con editor Markdown y preview.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/hooks/useAuth';
+import { organizationsApi } from '@/lib/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -22,7 +23,9 @@ import {
   LayoutGrid,
   List,
   Clock,
+  Building2,
 } from 'lucide-react';
+import type { Organization } from '@/types/organization';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -84,8 +87,29 @@ export default function KnowledgeBasePage() {
   const tCommon = useTranslations('common');
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const organizationId = user?.organization_id || undefined;
+  const { user, isAdmin } = useAuth();
+
+  // Organización seleccionada: admin puede cambiarla, operador usa la suya fija
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(
+    user?.organization_id ?? null
+  );
+
+  // Para admin: cargar lista de organizaciones
+  const { data: organizations } = useQuery<Organization[]>({
+    queryKey: ['organizations-list'],
+    queryFn: () => organizationsApi.list(),
+    enabled: isAdmin(),
+  });
+
+  // Auto-seleccionar primera org cuando carguen para admin
+  useEffect(() => {
+    if (isAdmin() && !selectedOrgId && organizations && organizations.length > 0) {
+      setSelectedOrgId(organizations[0].id);
+    }
+  }, [organizations, selectedOrgId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // La organización efectiva
+  const organizationId = isAdmin() ? (selectedOrgId || undefined) : (user?.organization_id || undefined);
 
   // Estado de vista
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
@@ -107,6 +131,7 @@ export default function KnowledgeBasePage() {
   } = useQuery({
     queryKey: ['knowledge-articles', organizationId],
     queryFn: () => getKnowledgeArticles(organizationId),
+    enabled: !!organizationId,
   });
 
   // === MUTATIONS ===
@@ -245,6 +270,38 @@ export default function KnowledgeBasePage() {
           {t('createArticle')}
         </Button>
       </div>
+
+      {/* Selector de organización (solo Admin) */}
+      {isAdmin() && (
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3">
+              <Building2 className="h-5 w-5 text-muted-foreground shrink-0" />
+              <div className="flex items-center gap-3 flex-1">
+                <Label htmlFor="kb-org-select" className="shrink-0 font-medium">
+                  {tCommon('organization')}:
+                </Label>
+                <select
+                  id="kb-org-select"
+                  value={selectedOrgId ?? ''}
+                  onChange={(e) => setSelectedOrgId(e.target.value || null)}
+                  className="flex-1 max-w-xs px-3 py-1.5 border rounded-md text-sm bg-background"
+                >
+                  {!organizations || organizations.length === 0 ? (
+                    <option value="">{tCommon('loading')}</option>
+                  ) : (
+                    organizations.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Barra de filtros con toggle de vista */}
       <Card>
