@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.utils import get_client_ip
+from app.models.audit import ActionType
 from app.models.user import User, UserRole
 from app.models.vlan import VLAN
 from app.schemas import (
@@ -481,6 +482,7 @@ def list_vlan_workstations(
 
 @router.patch("/{vlan_id}/forced-contingency")
 async def toggle_vlan_forced_contingency(
+    request: Request,
     vlan_id: UUID,
     enabled: bool = Query(..., description="Activar o desactivar contingencia forzada"),
     force_all: bool = Query(False, description="Si True al desactivar, afecta a TODAS las workstations de la VLAN independientemente de su estado individual"),
@@ -515,6 +517,7 @@ async def toggle_vlan_forced_contingency(
         if not active_devices:
             no_devices_warning = True
 
+    previous_forced_contingency = vlan.forced_contingency
     vlan.forced_contingency = enabled
     if not enabled and force_all:
         # Forzar desactivación total: también limpiar forced_contingency individual de workstations
@@ -538,6 +541,26 @@ async def toggle_vlan_forced_contingency(
         ).all()
     else:
         workstations = db.query(Workstation).filter(Workstation.vlan_id == vlan_id).all()
+
+    # Auditar la acción manual de contingencia en el momento del toggle API.
+    audit_service = AuditService()
+    audit_service.log_action(
+        db=db,
+        action_type=ActionType.CONTINGENCY_TOGGLE,
+        entity_type="VLAN",
+        entity_id=str(vlan.id),
+        user_id=str(current_user.id),
+        organization_id=str(vlan.organization_id),
+        old_values={"forced_contingency": previous_forced_contingency},
+        new_values={
+            "forced_contingency": enabled,
+            "scope": "vlan",
+            "source": "manual_endpoint",
+            "force_all": force_all,
+            "affected_workstations": len(workstations),
+        },
+        ip_address=get_client_ip(request),
+    )
 
     for ws in workstations:
         # Resolver printer_ip para cada workstation:

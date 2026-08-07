@@ -14,8 +14,15 @@ import {
   TrendingUp,
   ChevronRight,
   RotateCcw,
+  Eye,
+  X,
+  Monitor,
+  Mail,
+  Globe,
+  Server,
+  Clock,
 } from 'lucide-react'
-import type { AuditLog, AuditLogStats, ActionType } from '@/types/audit'
+import type { AuditLog, AuditLogDetail, AuditLogStats, ActionType } from '@/types/audit'
 import { formatDateWithTimezone } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 
@@ -39,6 +46,10 @@ export default function AuditPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterActionType, setFilterActionType] = useState<ActionType | null>(null)
   const [filterEntityType, setFilterEntityType] = useState<string>('')
+
+  const [selectedLog, setSelectedLog] = useState<AuditLogDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   const isInitialLoad = logs.length === 0 && loading
 
@@ -146,6 +157,26 @@ export default function AuditPage() {
   }
 
   const currentPageNumber = cursorHistory.length + 1
+
+  const openDetail = async (log: AuditLog) => {
+    setDetailOpen(true)
+    setDetailLoading(true)
+    setSelectedLog(null)
+    try {
+      const detail = await auditApi.get(log.id) as AuditLogDetail
+      setSelectedLog(detail)
+    } catch {
+      // Si falla el detalle, mostrar lo que tenemos del listado
+      setSelectedLog({ ...log, user_name: null, user_email: null, workstation_ip: null })
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  const closeDetail = () => {
+    setDetailOpen(false)
+    setSelectedLog(null)
+  }
 
   if (isInitialLoad) {
     return (
@@ -288,6 +319,7 @@ export default function AuditPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colEntity')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colEntityId')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colIp')}</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colDetails')}</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -318,6 +350,17 @@ export default function AuditPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {log.ip_address || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => openDetail(log)}
+                        title={t('viewDetails')}
+                      >
+                        <Eye className="h-4 w-4 text-gray-400 hover:text-blue-600" />
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -367,6 +410,145 @@ export default function AuditPage() {
           </div>
         )}
       </div>
+
+      {/* Panel lateral de detalles */}
+      {detailOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Overlay */}
+          <div className="absolute inset-0 bg-black/30" onClick={closeDetail} />
+
+          {/* Panel */}
+          <div className="relative w-full max-w-md bg-white shadow-2xl flex flex-col h-full">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">{t('detailTitle')}</h2>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={closeDetail}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+              {detailLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                </div>
+              ) : selectedLog ? (
+                <>
+                  {/* Acción */}
+                  <div>
+                    <p className="text-xs font-medium text-gray-400 uppercase mb-1">{t('colAction')}</p>
+                    <Badge className={getActionTypeBadgeColor(selectedLog.action_type)}>
+                      {getActionTypeLabel(selectedLog.action_type)}
+                    </Badge>
+                  </div>
+
+                  {/* Fecha */}
+                  <div className="flex items-start gap-3">
+                    <Clock className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-400 uppercase mb-0.5">{t('colDate')}</p>
+                      <p className="text-sm text-gray-900">{formatDateWithTimezone(selectedLog.created_at, timezone)}</p>
+                    </div>
+                  </div>
+
+                  {/* Quién lo hizo */}
+                  <div className="bg-blue-50 rounded-lg p-4 space-y-3">
+                    <p className="text-xs font-semibold text-blue-700 uppercase">{t('detailWho')}</p>
+                    <div className="flex items-start gap-3">
+                      <User className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs text-gray-500">{t('detailUserName')}</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {selectedLog.user_name || <span className="text-gray-400 italic">{t('detailSystem')}</span>}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Mail className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs text-gray-500">{t('detailUserEmail')}</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {selectedLog.user_email || <span className="text-gray-400 italic">—</span>}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Globe className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs text-gray-500">{t('detailIpAddress')}</p>
+                        <p className="text-sm font-mono text-gray-900">
+                          {selectedLog.ip_address || <span className="text-gray-400 italic">—</span>}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Entidad afectada */}
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                    <p className="text-xs font-semibold text-gray-500 uppercase">{t('detailEntity')}</p>
+                    <div className="flex items-start gap-3">
+                      <FileText className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs text-gray-500">{t('colEntity')}</p>
+                        <p className="text-sm font-medium text-gray-900">{selectedLog.entity_type}</p>
+                      </div>
+                    </div>
+                    {selectedLog.entity_name && (
+                      <div className="flex items-start gap-3">
+                        <FileText className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-500">{t('detailEntityName')}</p>
+                          <p className="text-sm font-medium text-gray-900">{selectedLog.entity_name}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedLog.workstation_ip && (
+                      <div className="flex items-start gap-3">
+                        <Monitor className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-500">{t('detailWorkstationIp')}</p>
+                          <p className="text-sm font-mono text-gray-900">{selectedLog.workstation_ip}</p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-start gap-3">
+                      <Server className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs text-gray-500">{t('detailEntityId')}</p>
+                        <p className="text-xs font-mono text-gray-500 break-all">{selectedLog.entity_id}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cambios */}
+                  {(selectedLog.old_values || selectedLog.new_values) && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-semibold text-gray-500 uppercase">{t('detailChanges')}</p>
+                      {selectedLog.old_values && (
+                        <div>
+                          <p className="text-xs font-medium text-red-500 mb-1">{t('detailOldValues')}</p>
+                          <pre className="text-xs bg-red-50 border border-red-100 rounded p-3 overflow-auto max-h-40 text-gray-700 whitespace-pre-wrap break-all">
+                            {JSON.stringify(selectedLog.old_values, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                      {selectedLog.new_values && (
+                        <div>
+                          <p className="text-xs font-medium text-green-600 mb-1">{t('detailNewValues')}</p>
+                          <pre className="text-xs bg-green-50 border border-green-100 rounded p-3 overflow-auto max-h-40 text-gray-700 whitespace-pre-wrap break-all">
+                            {JSON.stringify(selectedLog.new_values, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

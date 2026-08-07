@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.utils import get_client_ip, get_workstation_local_ip
+from app.models.audit import ActionType
 from app.models.user import User, UserRole
 from app.models.workstation import Workstation
 from app.schemas import (
@@ -1636,6 +1637,7 @@ def update_workstation_config(
 
 @router.patch("/{workstation_id}/forced-contingency")
 async def toggle_workstation_forced_contingency(
+    request: Request,
     workstation_id: UUID,
     enabled: bool = Query(..., description="Activar o desactivar contingencia forzada"),
     current_user: User = Depends(get_current_user),
@@ -1696,9 +1698,30 @@ async def toggle_workstation_forced_contingency(
             detail="No se puede activar contingencia: no hay dispositivo de impresión disponible"
         )
 
+    previous_forced_contingency = workstation.forced_contingency
     workstation.forced_contingency = enabled
     db.commit()
     db.refresh(workstation)
+
+    # Auditar la acción manual de contingencia en el momento del toggle API.
+    audit_service = AuditService()
+    audit_service.log_action(
+        db=db,
+        action_type=ActionType.CONTINGENCY_TOGGLE,
+        entity_type="Workstation",
+        entity_id=str(workstation.id),
+        user_id=str(current_user.id),
+        workstation_id=str(workstation.id),
+        organization_id=str(workstation.organization_id),
+        old_values={"forced_contingency": previous_forced_contingency},
+        new_values={
+            "forced_contingency": enabled,
+            "scope": "workstation",
+            "source": "manual_endpoint",
+            "printer_ip": printer_ip,
+        },
+        ip_address=get_client_ip(request),
+    )
 
     logger.info(
         "Contingencia forzada workstation actualizada: workstation_id=%s, enabled=%s, user_id=%s",

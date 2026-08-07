@@ -49,6 +49,17 @@ namespace AlwaysPrintService.Pipe
         /// <returns>true si se envió correctamente; false si el pipe está desconectado.</returns>
         public bool SendToClient(PipeMessage message)
         {
+            return WriteToClientLocked(message);
+        }
+
+        /// <summary>
+        /// Escribe un mensaje al cliente bajo _clientLock.
+        /// Método centralizado para TODA escritura al pipe — tanto respuestas síncronas (HandleClient)
+        /// como mensajes push (SendToClient) — garantizando que nunca haya dos hilos escribiendo
+        /// simultáneamente en el mismo StreamWriter.
+        /// </summary>
+        private bool WriteToClientLocked(PipeMessage message)
+        {
             lock (_clientLock)
             {
                 if (_activeClientWriter == null)
@@ -182,14 +193,16 @@ namespace AlwaysPrintService.Pipe
                             {
                                 var errReply = PipeMessage.Create(MessageType.Error,
                                     new ErrorPayload { Code = "PARSE_ERROR", Message = "Invalid JSON." });
-                                writer.WriteLine(errReply.Serialize());
+                                // Usar WriteToClientLocked para serializar con SendToClient y evitar interleaving
+                                WriteToClientLocked(errReply);
                                 continue;
                             }
 
                             if (request == null) continue;
 
                             var response = _dispatcher.Dispatch(request);
-                            writer.WriteLine(response.Serialize());
+                            // Usar WriteToClientLocked para serializar con SendToClient y evitar interleaving
+                            WriteToClientLocked(response);
                         }
                     }
                     catch (IOException) { /* cliente desconectado */ }

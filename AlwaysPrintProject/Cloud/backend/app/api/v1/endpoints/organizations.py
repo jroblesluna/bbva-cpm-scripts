@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user, require_admin, require_operator_or_admin
 from app.core.utils import get_client_ip
+from app.models.audit import ActionType
 from app.models.user import User, UserRole
 from app.models.organization import Organization, PublicIP
 from app.models.workstation import Workstation
@@ -1230,6 +1231,7 @@ def get_vlans_without_devices(
     )
 )
 async def toggle_forced_contingency(
+    request: Request,
     org_id: UUID,
     body: ForcedContingencyRequest,
     current_user: User = Depends(require_operator_or_admin),
@@ -1257,6 +1259,7 @@ async def toggle_forced_contingency(
     if not organization:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organización no encontrada")
 
+    previous_forced_contingency = organization.forced_contingency
     organization.forced_contingency = body.enabled
 
     # Determinar qué workstations notificar vía WebSocket
@@ -1310,6 +1313,26 @@ async def toggle_forced_contingency(
 
     db.commit()
     db.refresh(organization)
+
+    # Auditar la acción manual de contingencia en el momento del toggle API.
+    audit_service = AuditService()
+    audit_service.log_action(
+        db=db,
+        action_type=ActionType.CONTINGENCY_TOGGLE,
+        entity_type="Organization",
+        entity_id=str(organization.id),
+        user_id=str(current_user.id),
+        organization_id=str(organization.id),
+        old_values={"forced_contingency": previous_forced_contingency},
+        new_values={
+            "forced_contingency": body.enabled,
+            "scope": "organization",
+            "source": "manual_endpoint",
+            "force_all": body.force_all,
+            "affected_workstations": len(workstations_to_notify),
+        },
+        ip_address=get_client_ip(request),
+    )
 
     logger.info(
         "Contingencia org actualizada: org_id=%s, enabled=%s, force_all=%s, admin_id=%s",

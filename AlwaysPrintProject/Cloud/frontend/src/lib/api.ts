@@ -40,6 +40,7 @@ import type {
   MessageStats,
   MessageListResponse,
   AuditLog,
+  AuditLogDetail,
   AuditLogSearch,
   AuditLogListResponse,
   AuditLogStats,
@@ -907,8 +908,8 @@ export const auditApi = {
   /**
    * Obtener log de auditoría por ID.
    */
-  get: async (id: string): Promise<AuditLog> => {
-    const response = await apiClient.get<AuditLog>(`/audit/${id}`)
+  get: async (id: string): Promise<AuditLogDetail> => {
+    const response = await apiClient.get<AuditLogDetail>(`/audit/${id}`)
     return response.data
   },
 }
