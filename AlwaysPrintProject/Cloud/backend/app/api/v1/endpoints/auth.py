@@ -63,23 +63,31 @@ def login(
     user = AuthService.authenticate_user(db, credentials.email, credentials.password)
 
     if not user:
-        # Registrar intento fallido en auditoría. Si el email corresponde a un
-        # usuario existente se vincula a su id; si no, se usa un id determinístico
-        # derivado del email (no es una FK, solo referencia de auditoría).
         attempted_user = db.query(User).filter(User.email == credentials.email).first()
-        entity_id = str(attempted_user.id) if attempted_user else str(
-            uuid.uuid5(uuid.NAMESPACE_DNS, credentials.email)
-        )
-        audit_service.log_action(
-            db=db,
-            action_type=ActionType.LOGIN_FAILED,
-            entity_type="session",
-            entity_id=entity_id,
-            user_id=str(attempted_user.id) if attempted_user else None,
-            organization_id=str(attempted_user.organization_id) if attempted_user and attempted_user.organization_id else None,
-            new_values={"attempted_email": credentials.email},
-            ip_address=ip_address
-        )
+
+        # No registrar en auditoría cuando la única causa de la falla es una
+        # contraseña incorrecta para un email válido y activo (typo común).
+        # Sí se registra cuando el email no existe o la cuenta está inactiva,
+        # por ser señales más relevantes (posible enumeración o acceso indebido).
+        is_plain_wrong_password = attempted_user is not None and attempted_user.is_active
+
+        if not is_plain_wrong_password:
+            # Si el email corresponde a un usuario existente se vincula a su id;
+            # si no, se usa un id determinístico derivado del email (no es una
+            # FK, solo referencia de auditoría).
+            entity_id = str(attempted_user.id) if attempted_user else str(
+                uuid.uuid5(uuid.NAMESPACE_DNS, credentials.email)
+            )
+            audit_service.log_action(
+                db=db,
+                action_type=ActionType.LOGIN_FAILED,
+                entity_type="session",
+                entity_id=entity_id,
+                user_id=str(attempted_user.id) if attempted_user else None,
+                organization_id=str(attempted_user.organization_id) if attempted_user and attempted_user.organization_id else None,
+                new_values={"attempted_email": credentials.email},
+                ip_address=ip_address
+            )
 
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

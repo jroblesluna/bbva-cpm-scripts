@@ -532,7 +532,7 @@
     "actionTypes": "Action Types",
     "actionTypes24h": "Action Types (24h)",
     "entities24h": "Entities (24h)",
-    "viewBreakdown": "View more info",
+    "viewBreakdown": "View more",
     "breakdownTitle": "Action Breakdown (last 24h)",
     "entityBreakdownTitle": "Entity Breakdown (last 24h)",
     "viewGlobalInfo": "View global info",

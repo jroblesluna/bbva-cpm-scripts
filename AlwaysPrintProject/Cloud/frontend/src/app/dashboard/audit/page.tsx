@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { auditApi } from '@/lib/api';
 import { useTranslations } from 'next-intl';
@@ -72,6 +72,10 @@ export default function AuditPage() {
   const [actionLogs, setActionLogs] = useState<AuditLog[]>([]);
   const [actionLogsLabel, setActionLogsLabel] = useState('');
 
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [expandedLogDetail, setExpandedLogDetail] = useState<AuditLogDetail | null>(null);
+  const [expandedLogLoading, setExpandedLogLoading] = useState(false);
+
   const [selectedLog, setSelectedLog] = useState<AuditLogDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -127,11 +131,19 @@ export default function AuditPage() {
     }
   }, []);
 
+  const hasLoadedGlobalStatsRef = useRef(false);
+
   const loadGlobalStats = useCallback(async (period: '24h' | 'week') => {
-    setGlobalStatsLoading(true);
+    // Solo mostrar el spinner en la primera carga. Al cambiar de tab
+    // (24h/semana) el refresco es silencioso: el contenido anterior se
+    // mantiene visible hasta que llegan los nuevos datos, sin parpadeo.
+    if (!hasLoadedGlobalStatsRef.current) {
+      setGlobalStatsLoading(true);
+    }
     try {
       const data = await auditApi.globalStats(period);
       setGlobalStats(data);
+      hasLoadedGlobalStatsRef.current = true;
     } catch (error) {
       console.error('Error al cargar estadísticas globales:', error);
     } finally {
@@ -164,6 +176,8 @@ export default function AuditPage() {
     setActionLogsLabel(`${entityType} — ${getActionTypeLabel(actionKey as ActionType)}`);
     setActionLogsOpen(true);
     setActionLogsLoading(true);
+    setExpandedLogId(null);
+    setExpandedLogDetail(null);
     try {
       const data = await auditApi.search({
         entity_type: entityType,
@@ -177,6 +191,25 @@ export default function AuditPage() {
       setActionLogs([]);
     } finally {
       setActionLogsLoading(false);
+    }
+  };
+
+  const toggleLogExpand = async (log: AuditLog) => {
+    if (expandedLogId === log.id) {
+      setExpandedLogId(null);
+      setExpandedLogDetail(null);
+      return;
+    }
+    setExpandedLogId(log.id);
+    setExpandedLogDetail(null);
+    setExpandedLogLoading(true);
+    try {
+      const detail = (await auditApi.get(log.id)) as AuditLogDetail;
+      setExpandedLogDetail(detail);
+    } catch {
+      setExpandedLogDetail({ ...log, user_name: null, user_email: null, workstation_ip: null });
+    } finally {
+      setExpandedLogLoading(false);
     }
   };
 
@@ -527,6 +560,8 @@ export default function AuditPage() {
   const closeActionLogs = () => {
     setActionLogsOpen(false);
     setActionLogs([]);
+    setExpandedLogId(null);
+    setExpandedLogDetail(null);
   };
 
   if (isInitialLoad) {
@@ -564,17 +599,17 @@ export default function AuditPage() {
             <Button
               variant="outline"
               size="sm"
-              className="absolute top-3 right-3"
+              className="absolute top-3 right-3 h-6 px-2 text-xs"
               onClick={() => setBreakdownOpen(true)}
             >
               {t('viewBreakdown')}
             </Button>
-            <div className="flex items-center">
-              <div className="p-3 bg-green-100 rounded-lg">
+            <div className="flex items-center pr-16">
+              <div className="p-3 bg-green-100 rounded-lg shrink-0">
                 <Activity className="h-6 w-6 text-green-600" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">{t('last24h')}</p>
+              <div className="ml-4 min-w-0">
+                <p className="text-sm font-medium text-gray-600 truncate">{t('last24h')}</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {stats.recent_activity_count}
                 </p>
@@ -602,17 +637,17 @@ export default function AuditPage() {
             <Button
               variant="outline"
               size="sm"
-              className="absolute top-3 right-3"
+              className="absolute top-3 right-3 h-6 px-2 text-xs"
               onClick={() => setEntityBreakdownOpen(true)}
             >
               {t('viewBreakdown')}
             </Button>
-            <div className="flex items-center">
-              <div className="p-3 bg-purple-100 rounded-lg">
+            <div className="flex items-center pr-16">
+              <div className="p-3 bg-purple-100 rounded-lg shrink-0">
                 <Server className="h-6 w-6 text-purple-600" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">{t('entities24h')}</p>
+              <div className="ml-4 min-w-0">
+                <p className="text-sm font-medium text-gray-600 truncate">{t('entities24h')}</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {Object.keys(stats.entities_by_type_24h).length}
                 </p>
@@ -675,10 +710,14 @@ export default function AuditPage() {
         open={globalStatsOpen}
         onOpenChange={(open) => {
           setGlobalStatsOpen(open);
-          if (!open) closeActionLogs();
+          if (!open) {
+            closeActionLogs();
+            hasLoadedGlobalStatsRef.current = false;
+            setGlobalStats(null);
+          }
         }}
       >
-        <DialogContent className="max-w-2xl max-h-[85vh] p-0 overflow-hidden flex flex-col">
+        <DialogContent className="max-w-2xl h-[600px] max-h-[85vh] p-0 overflow-hidden flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-2 flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               {actionLogsOpen && (
@@ -697,29 +736,31 @@ export default function AuditPage() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex items-center justify-between gap-2 px-6 pb-4 flex-shrink-0 border-b border-gray-200">
-            <div className="flex items-center gap-2">
-              <Button
-                variant={globalStatsRange === '24h' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setGlobalStatsRange('24h')}
-              >
-                {t('rangeLast24h')}
-              </Button>
-              <Button
-                variant={globalStatsRange === 'week' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setGlobalStatsRange('week')}
-              >
-                {t('rangeLastWeek')}
-              </Button>
+          {!actionLogsOpen && (
+            <div className="flex items-center justify-between gap-2 px-6 pb-4 flex-shrink-0 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={globalStatsRange === '24h' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setGlobalStatsRange('24h')}
+                >
+                  {t('rangeLast24h')}
+                </Button>
+                <Button
+                  variant={globalStatsRange === 'week' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setGlobalStatsRange('week')}
+                >
+                  {t('rangeLastWeek')}
+                </Button>
+              </div>
+              {globalStats && (
+                <p className="text-sm text-gray-600 shrink-0">
+                  {t('globalInfoTotal', { total: globalStats.total_actions })}
+                </p>
+              )}
             </div>
-            {!actionLogsOpen && globalStats && (
-              <p className="text-sm text-gray-600 shrink-0">
-                {t('globalInfoTotal', { total: globalStats.total_actions })}
-              </p>
-            )}
-          </div>
+          )}
 
           <div className="flex-1 min-h-0 overflow-hidden">
             <div
@@ -790,24 +831,89 @@ export default function AuditPage() {
                 ) : actionLogs.length > 0 ? (
                   <div className="divide-y divide-gray-100">
                     {actionLogs.map((log) => (
-                      <div key={log.id} className="flex items-center justify-between py-3">
-                        <div className="min-w-0">
-                          <p className="text-sm text-gray-900">
-                            {formatDateWithTimezone(log.created_at, timezone)}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate">
-                            {log.entity_name || log.entity_id} · {log.ip_address || '-'}
-                          </p>
+                      <div key={log.id} className="py-3">
+                        <div className="flex items-center justify-between">
+                          <div className="min-w-0">
+                            <p className="text-sm text-gray-900">
+                              {formatDateWithTimezone(log.created_at, timezone)}
+                            </p>
+                            <p className="text-xs text-gray-500 truncate">
+                              {log.entity_name || log.entity_id} · {log.ip_address || '-'}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 shrink-0"
+                            title={t('viewDetails')}
+                            onClick={() => toggleLogExpand(log)}
+                          >
+                            <Eye
+                              className={`h-4 w-4 ${
+                                expandedLogId === log.id ? 'text-blue-600' : 'text-gray-400 hover:text-blue-600'
+                              }`}
+                            />
+                          </Button>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 shrink-0"
-                          title={t('viewDetails')}
-                          onClick={() => openDetail(log)}
-                        >
-                          <Eye className="h-4 w-4 text-gray-400 hover:text-blue-600" />
-                        </Button>
+
+                        {expandedLogId === log.id && (
+                          <div className="mt-3 bg-gray-50 rounded-lg p-3 space-y-3">
+                            {expandedLogLoading ? (
+                              <div className="flex items-center justify-center h-16">
+                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+                              </div>
+                            ) : expandedLogDetail ? (
+                              <>
+                                <div className="flex items-center justify-between">
+                                  <div className="min-w-0">
+                                    <p className="text-xs text-gray-500">{t('detailUserName')}</p>
+                                    <p className="text-sm font-medium text-gray-900 truncate">
+                                      {expandedLogDetail.user_name || (
+                                        <span className="text-gray-400 italic">{t('detailSystem')}</span>
+                                      )}
+                                    </p>
+                                  </div>
+                                  <div className="text-right min-w-0">
+                                    <p className="text-xs text-gray-500">{t('detailUserEmail')}</p>
+                                    <p className="text-sm text-gray-900 truncate">
+                                      {expandedLogDetail.user_email || '—'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-500">{t('detailEntityId')}</p>
+                                  <p className="text-xs font-mono text-gray-500 break-all">
+                                    {expandedLogDetail.entity_id}
+                                  </p>
+                                </div>
+                                {(expandedLogDetail.old_values || expandedLogDetail.new_values) && (
+                                  <div className="space-y-2">
+                                    {expandedLogDetail.old_values && (
+                                      <div>
+                                        <p className="text-xs font-medium text-red-500 mb-1">
+                                          {t('detailOldValues')}
+                                        </p>
+                                        <pre className="text-xs bg-red-50 border border-red-100 rounded p-2 overflow-auto max-h-32 text-gray-700 whitespace-pre-wrap break-all">
+                                          {JSON.stringify(expandedLogDetail.old_values, null, 2)}
+                                        </pre>
+                                      </div>
+                                    )}
+                                    {expandedLogDetail.new_values && (
+                                      <div>
+                                        <p className="text-xs font-medium text-green-600 mb-1">
+                                          {t('detailNewValues')}
+                                        </p>
+                                        <pre className="text-xs bg-green-50 border border-green-100 rounded p-2 overflow-auto max-h-32 text-gray-700 whitespace-pre-wrap break-all">
+                                          {JSON.stringify(expandedLogDetail.new_values, null, 2)}
+                                        </pre>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </>
+                            ) : null}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
