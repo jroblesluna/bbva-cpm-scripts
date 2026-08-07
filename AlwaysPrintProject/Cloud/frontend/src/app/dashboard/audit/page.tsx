@@ -1,11 +1,12 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useCallback } from 'react'
-import { auditApi } from '@/lib/api'
-import { useTranslations } from 'next-intl'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
+import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { auditApi } from '@/lib/api';
+import { useTranslations } from 'next-intl';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import {
   FileText,
   Search,
@@ -21,116 +22,200 @@ import {
   Globe,
   Server,
   Clock,
-} from 'lucide-react'
-import type { AuditLog, AuditLogDetail, AuditLogStats, ActionType } from '@/types/audit'
-import { formatDateWithTimezone } from '@/lib/dateUtils'
-import { useUserTimezone } from '@/hooks/useUserTimezone'
+} from 'lucide-react';
+import type { AuditLog, AuditLogDetail, AuditLogStats, ActionType } from '@/types/audit';
+import { formatDateWithTimezone } from '@/lib/dateUtils';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 
-const PAGE_SIZE = 15
+const PAGE_SIZE = 15;
+const SILENT_REFRESH_INTERVAL_MS = 15_000;
 
 export default function AuditPage() {
-  const timezone = useUserTimezone()
-  const t = useTranslations('audit')
-  const tCommon = useTranslations('common')
+  const timezone = useUserTimezone();
+  const t = useTranslations('audit');
+  const tCommon = useTranslations('common');
 
-  const [logs, setLogs] = useState<AuditLog[]>([])
-  const [stats, setStats] = useState<AuditLogStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [total, setTotal] = useState(0)
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [hasMore, setHasMore] = useState(false)
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [stats, setStats] = useState<AuditLogStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
 
-  const [cursorHistory, setCursorHistory] = useState<string[]>([])
-  const [currentCursor, setCurrentCursor] = useState<string | undefined>(undefined)
+  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+  const [currentCursor, setCurrentCursor] = useState<string | undefined>(undefined);
 
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterActionType, setFilterActionType] = useState<ActionType | null>(null)
-  const [filterEntityType, setFilterEntityType] = useState<string>('')
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterActionType, setFilterActionType] = useState<ActionType | null>(null);
+  const [filterEntityType, setFilterEntityType] = useState<string>('');
+  const [filterEntityName, setFilterEntityName] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
 
-  const [selectedLog, setSelectedLog] = useState<AuditLogDetail | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
-  const [detailOpen, setDetailOpen] = useState(false)
+  const [selectedLog, setSelectedLog] = useState<AuditLogDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
-  const isInitialLoad = logs.length === 0 && loading
+  const isInitialLoad = logs.length === 0 && loading;
 
-  const loadLogs = useCallback(async (cursor?: string) => {
+  const entityTypeOptions = Array.from(
+    new Set(logs.map((log) => log.entity_type).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+
+  const resolvedEntityTypeOptions =
+    filterEntityType && !entityTypeOptions.includes(filterEntityType)
+      ? [filterEntityType, ...entityTypeOptions]
+      : entityTypeOptions;
+
+  const loadLogs = useCallback(
+    async (cursor?: string, silent = false) => {
+      try {
+        const startDate = filterStartDate ? `${filterStartDate}T00:00:00` : undefined;
+        const endDate = filterEndDate ? `${filterEndDate}T23:59:59.999999` : undefined;
+
+        const data = await auditApi.search({
+          limit: PAGE_SIZE,
+          cursor,
+          ...(filterActionType ? { action_type: filterActionType } : {}),
+          ...(filterEntityType ? { entity_type: filterEntityType } : {}),
+          ...(startDate ? { start_date: startDate } : {}),
+          ...(endDate ? { end_date: endDate } : {}),
+        });
+
+        setLogs(data.logs || []);
+        setTotal(data.total || 0);
+        setNextCursor(data.next_cursor || null);
+        setHasMore(data.has_more || false);
+      } catch (error) {
+        console.error('Error al cargar logs de auditoría:', error);
+      } finally {
+        if (!silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [filterActionType, filterEntityType, filterStartDate, filterEndDate]
+  );
+
+  const loadStats = useCallback(async () => {
     try {
-      if (logs.length === 0) setLoading(true)
-
-      const data = await auditApi.search({
-        limit: PAGE_SIZE,
-        cursor,
-        ...(filterActionType ? { action_type: filterActionType } : {}),
-        ...(filterEntityType ? { entity_type: filterEntityType } : {}),
-      })
-
-      setLogs(data.logs || [])
-      setTotal(data.total || 0)
-      setNextCursor(data.next_cursor || null)
-      setHasMore(data.has_more || false)
+      const data = await auditApi.stats();
+      setStats(data);
     } catch (error) {
-      console.error('Error al cargar logs de auditoría:', error)
-    } finally {
-      setLoading(false)
+      console.error('Error al cargar estadísticas:', error);
     }
-  }, [filterActionType, filterEntityType])
-
-  const loadStats = async () => {
-    try {
-      const data = await auditApi.stats()
-      setStats(data)
-    } catch (error) {
-      console.error('Error al cargar estadísticas:', error)
-    }
-  }
+  }, []);
 
   useEffect(() => {
-    loadLogs(currentCursor)
-  }, [currentCursor, filterActionType, filterEntityType, loadLogs])
+    loadLogs(currentCursor);
+  }, [currentCursor, loadLogs]);
 
   useEffect(() => {
-    loadStats()
-  }, [])
+    loadStats();
+  }, [loadStats]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      loadLogs(currentCursor, true);
+      loadStats();
+    }, SILENT_REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [currentCursor, loadLogs, loadStats]);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+
+    const { style } = document.body;
+    const previousOverflow = style.overflow;
+
+    if (detailOpen) {
+      style.overflow = 'hidden';
+    }
+
+    return () => {
+      style.overflow = previousOverflow;
+    };
+  }, [detailOpen, isMounted]);
 
   const goToNextPage = () => {
-    if (!nextCursor) return
-    setCursorHistory(prev => [...prev, currentCursor || ''])
-    setCurrentCursor(nextCursor)
-  }
+    if (!nextCursor) return;
+    setCursorHistory((prev) => [...prev, currentCursor || '']);
+    setCurrentCursor(nextCursor);
+  };
 
   const goToPreviousPage = () => {
-    if (cursorHistory.length === 0) return
-    const history = [...cursorHistory]
-    const previousCursor = history.pop()!
-    setCursorHistory(history)
-    setCurrentCursor(previousCursor || undefined)
-  }
+    if (cursorHistory.length === 0) return;
+    const history = [...cursorHistory];
+    const previousCursor = history.pop()!;
+    setCursorHistory(history);
+    setCurrentCursor(previousCursor || undefined);
+  };
 
   const goToFirstPage = () => {
-    setCursorHistory([])
-    setCurrentCursor(undefined)
-  }
+    setCursorHistory([]);
+    setCurrentCursor(undefined);
+  };
 
   const resetFilters = () => {
-    setFilterActionType(null)
-    setFilterEntityType('')
-    setSearchTerm('')
-    setCursorHistory([])
-    setCurrentCursor(undefined)
-  }
+    setFilterActionType(null);
+    setFilterEntityType('');
+    setFilterEntityName('');
+    setFilterStartDate('');
+    setFilterEndDate('');
+    setSearchTerm('');
+    setCursorHistory([]);
+    setCurrentCursor(undefined);
+  };
 
   const filteredLogs = logs.filter((log) => {
-    const s = searchTerm.toLowerCase()
-    if (!s) return true
+    const entityNameFilter = filterEntityName.trim().toLowerCase();
+    if (
+      entityNameFilter &&
+      !(log.entity_name || '').toLowerCase().includes(entityNameFilter)
+    ) {
+      return false;
+    }
+
+    const s = searchTerm.toLowerCase();
+    if (!s) return true;
     return (
       log.entity_type.toLowerCase().includes(s) ||
       log.action_type.toLowerCase().includes(s) ||
       log.entity_id.toLowerCase().includes(s) ||
       (log.entity_name || '').toLowerCase().includes(s)
-    )
-  })
+    );
+  });
 
-  const getActionTypeLabel = (type: ActionType): string => {
+  const isLogoutEvent = (
+    log?: Pick<AuditLog, 'action_type' | 'entity_type' | 'old_values'>
+  ): boolean => {
+    if (!log) return false;
+    const action =
+      typeof log.old_values === 'object' && log.old_values
+        ? (log.old_values as Record<string, unknown>).action
+        : null;
+
+    return (
+      log.action_type === 'delete' &&
+      log.entity_type.toLowerCase() === 'session' &&
+      action === 'logout'
+    );
+  };
+
+  const getActionTypeLabel = (
+    type: ActionType,
+    log?: Pick<AuditLog, 'action_type' | 'entity_type' | 'old_values'>
+  ): string => {
+    if (isLogoutEvent(log)) {
+      return t('logout');
+    }
+
     const labels: Record<string, string> = {
       create: t('create'),
       update: t('update'),
@@ -139,9 +224,9 @@ export default function AuditPage() {
       contingency_toggle: t('contingency'),
       message_sent: t('messageSent'),
       command_sent: t('commandSent'),
-    }
-    return labels[type] || type
-  }
+    };
+    return labels[type] || type;
+  };
 
   const getActionTypeBadgeColor = (type: ActionType): string => {
     const colors: Record<string, string> = {
@@ -152,31 +237,213 @@ export default function AuditPage() {
       contingency_toggle: 'bg-orange-100 text-orange-800',
       message_sent: 'bg-indigo-100 text-indigo-800',
       command_sent: 'bg-purple-100 text-purple-800',
-    }
-    return colors[type] || 'bg-gray-100 text-gray-800'
-  }
+    };
+    return colors[type] || 'bg-gray-100 text-gray-800';
+  };
 
-  const currentPageNumber = cursorHistory.length + 1
+  const currentPageNumber = cursorHistory.length + 1;
 
   const openDetail = async (log: AuditLog) => {
-    setDetailOpen(true)
-    setDetailLoading(true)
-    setSelectedLog(null)
+    setDetailOpen(true);
+    setDetailLoading(true);
+    setSelectedLog(null);
     try {
-      const detail = await auditApi.get(log.id) as AuditLogDetail
-      setSelectedLog(detail)
+      const detail = (await auditApi.get(log.id)) as AuditLogDetail;
+      setSelectedLog(detail);
     } catch {
       // Si falla el detalle, mostrar lo que tenemos del listado
-      setSelectedLog({ ...log, user_name: null, user_email: null, workstation_ip: null })
+      setSelectedLog({ ...log, user_name: null, user_email: null, workstation_ip: null });
     } finally {
-      setDetailLoading(false)
+      setDetailLoading(false);
     }
-  }
+  };
 
   const closeDetail = () => {
-    setDetailOpen(false)
-    setSelectedLog(null)
-  }
+    setDetailOpen(false);
+    setSelectedLog(null);
+  };
+
+  const detailPanel =
+    detailOpen && isMounted
+      ? createPortal(
+          <div className="fixed inset-0 z-[9999] flex justify-end">
+            {/* Overlay */}
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/30"
+              onClick={closeDetail}
+              aria-label={tCommon('close')}
+            />
+
+            {/* Panel */}
+            <div className="relative w-full max-w-md bg-white shadow-2xl flex flex-col h-full">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">{t('detailTitle')}</h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={closeDetail}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+                {detailLoading ? (
+                  <div className="flex items-center justify-center h-32">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                  </div>
+                ) : selectedLog ? (
+                  <>
+                    {/* Acción */}
+                    <div>
+                      <p className="text-xs font-medium text-gray-400 uppercase mb-1">
+                        {t('colAction')}
+                      </p>
+                      <Badge className={getActionTypeBadgeColor(selectedLog.action_type)}>
+                        {getActionTypeLabel(selectedLog.action_type, selectedLog)}
+                      </Badge>
+                    </div>
+
+                    {/* Fecha */}
+                    <div className="flex items-start gap-3">
+                      <Clock className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs font-medium text-gray-400 uppercase mb-0.5">
+                          {t('colDate')}
+                        </p>
+                        <p className="text-sm text-gray-900">
+                          {formatDateWithTimezone(selectedLog.created_at, timezone)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Quién lo hizo */}
+                    <div className="bg-blue-50 rounded-lg p-4 space-y-3">
+                      <p className="text-xs font-semibold text-blue-700 uppercase">
+                        {t('detailWho')}
+                      </p>
+                      <div className="flex items-start gap-3">
+                        <User className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-500">{t('detailUserName')}</p>
+                          <p className="text-sm font-medium text-gray-900">
+                            {selectedLog.user_name || (
+                              <span className="text-gray-400 italic">{t('detailSystem')}</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <Mail className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-500">{t('detailUserEmail')}</p>
+                          <p className="text-sm font-medium text-gray-900">
+                            {selectedLog.user_email || (
+                              <span className="text-gray-400 italic">—</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <Globe className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-500">{t('detailIpAddress')}</p>
+                          <p className="text-sm font-mono text-gray-900">
+                            {selectedLog.ip_address || (
+                              <span className="text-gray-400 italic">—</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Entidad afectada */}
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                      <p className="text-xs font-semibold text-gray-500 uppercase">
+                        {t('detailEntity')}
+                      </p>
+                      <div className="flex items-start gap-3">
+                        <FileText className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-500">{t('colEntity')}</p>
+                          <p className="text-sm font-medium text-gray-900">
+                            {selectedLog.entity_type}
+                          </p>
+                        </div>
+                      </div>
+                      {selectedLog.entity_name && (
+                        <div className="flex items-start gap-3">
+                          <FileText className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-500">{t('detailEntityName')}</p>
+                            <p className="text-sm font-medium text-gray-900">
+                              {selectedLog.entity_name}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {selectedLog.workstation_ip && (
+                        <div className="flex items-start gap-3">
+                          <Monitor className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-500">{t('detailWorkstationIp')}</p>
+                            <p className="text-sm font-mono text-gray-900">
+                              {selectedLog.workstation_ip}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-start gap-3">
+                        <Server className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-500">{t('detailEntityId')}</p>
+                          <p className="text-xs font-mono text-gray-500 break-all">
+                            {selectedLog.entity_id}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Cambios */}
+                    {(selectedLog.old_values || selectedLog.new_values) && (
+                      <div className="space-y-3">
+                        <p className="text-xs font-semibold text-gray-500 uppercase">
+                          {t('detailChanges')}
+                        </p>
+                        {selectedLog.old_values && (
+                          <div>
+                            <p className="text-xs font-medium text-red-500 mb-1">
+                              {t('detailOldValues')}
+                            </p>
+                            <pre className="text-xs bg-red-50 border border-red-100 rounded p-3 overflow-auto max-h-40 text-gray-700 whitespace-pre-wrap break-all">
+                              {JSON.stringify(selectedLog.old_values, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                        {selectedLog.new_values && (
+                          <div>
+                            <p className="text-xs font-medium text-green-600 mb-1">
+                              {t('detailNewValues')}
+                            </p>
+                            <pre className="text-xs bg-green-50 border border-green-100 rounded p-3 overflow-auto max-h-40 text-gray-700 whitespace-pre-wrap break-all">
+                              {JSON.stringify(selectedLog.new_values, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : null}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
 
   if (isInitialLoad) {
     return (
@@ -186,7 +453,7 @@ export default function AuditPage() {
           <p className="mt-4 text-gray-600">{tCommon('loading')}</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -200,7 +467,9 @@ export default function AuditPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center">
-              <div className="p-3 bg-blue-100 rounded-lg"><FileText className="h-6 w-6 text-blue-600" /></div>
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <FileText className="h-6 w-6 text-blue-600" />
+              </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">{t('totalActions')}</p>
                 <p className="text-2xl font-bold text-gray-900">{stats.total_actions}</p>
@@ -209,28 +478,40 @@ export default function AuditPage() {
           </div>
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center">
-              <div className="p-3 bg-green-100 rounded-lg"><Activity className="h-6 w-6 text-green-600" /></div>
+              <div className="p-3 bg-green-100 rounded-lg">
+                <Activity className="h-6 w-6 text-green-600" />
+              </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">{t('last24h')}</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.recent_activity_count}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.recent_activity_count}
+                </p>
               </div>
             </div>
           </div>
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center">
-              <div className="p-3 bg-purple-100 rounded-lg"><User className="h-6 w-6 text-purple-600" /></div>
+              <div className="p-3 bg-purple-100 rounded-lg">
+                <User className="h-6 w-6 text-purple-600" />
+              </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">{t('activeUsers')}</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.most_active_users.length}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.most_active_users.length}
+                </p>
               </div>
             </div>
           </div>
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center">
-              <div className="p-3 bg-yellow-100 rounded-lg"><TrendingUp className="h-6 w-6 text-yellow-600" /></div>
+              <div className="p-3 bg-yellow-100 rounded-lg">
+                <TrendingUp className="h-6 w-6 text-yellow-600" />
+              </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">{t('actionTypes')}</p>
-                <p className="text-2xl font-bold text-gray-900">{Object.keys(stats.actions_by_type).length}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {Object.keys(stats.actions_by_type).length}
+                </p>
               </div>
             </div>
           </div>
@@ -254,7 +535,7 @@ export default function AuditPage() {
       )}
 
       <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <Input
@@ -268,9 +549,11 @@ export default function AuditPage() {
           <select
             value={filterActionType || 'all'}
             onChange={(e) => {
-              setFilterActionType(e.target.value === 'all' ? null : (e.target.value as ActionType))
-              setCursorHistory([])
-              setCurrentCursor(undefined)
+              setFilterActionType(
+                e.target.value === 'all' ? null : (e.target.value as ActionType)
+              );
+              setCursorHistory([]);
+              setCurrentCursor(undefined);
             }}
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
@@ -283,14 +566,46 @@ export default function AuditPage() {
             <option value="message_sent">{t('messageSent')}</option>
             <option value="command_sent">{t('commandSent')}</option>
           </select>
+          <select
+            value={filterEntityType || 'all'}
+            onChange={(e) => {
+              setFilterEntityType(e.target.value === 'all' ? '' : e.target.value);
+              setCursorHistory([]);
+              setCurrentCursor(undefined);
+            }}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">{t('allEntityTypes')}</option>
+            {resolvedEntityTypeOptions.map((entityType) => (
+              <option key={entityType} value={entityType}>
+                {entityType}
+              </option>
+            ))}
+          </select>
           <Input
             type="text"
-            placeholder={t('filterEntity')}
-            value={filterEntityType}
+            placeholder={t('filterEntityName')}
+            value={filterEntityName}
+            onChange={(e) => setFilterEntityName(e.target.value)}
+          />
+          <Input
+            type="date"
+            aria-label={t('filterStartDate')}
+            value={filterStartDate}
             onChange={(e) => {
-              setFilterEntityType(e.target.value)
-              setCursorHistory([])
-              setCurrentCursor(undefined)
+              setFilterStartDate(e.target.value);
+              setCursorHistory([]);
+              setCurrentCursor(undefined);
+            }}
+          />
+          <Input
+            type="date"
+            aria-label={t('filterEndDate')}
+            value={filterEndDate}
+            onChange={(e) => {
+              setFilterEndDate(e.target.value);
+              setCursorHistory([]);
+              setCurrentCursor(undefined);
             }}
           />
           <Button variant="outline" onClick={resetFilters} className="flex items-center gap-2">
@@ -306,7 +621,14 @@ export default function AuditPage() {
             <FileText className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">{t('emptyTitle')}</h3>
             <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || filterActionType || filterEntityType ? t('emptyFilterMessage') : t('emptyMessage')}
+              {searchTerm ||
+              filterActionType ||
+              filterEntityType ||
+              filterEntityName ||
+              filterStartDate ||
+              filterEndDate
+                ? t('emptyFilterMessage')
+                : t('emptyMessage')}
             </p>
           </div>
         ) : (
@@ -314,12 +636,24 @@ export default function AuditPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colDate')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colAction')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colEntity')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colEntityId')}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colIp')}</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{t('colDetails')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('colDate')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('colAction')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('colEntity')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('colEntityId')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('colIp')}
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('colDetails')}
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -330,22 +664,30 @@ export default function AuditPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <Badge className={getActionTypeBadgeColor(log.action_type)}>
-                        {getActionTypeLabel(log.action_type)}
+                        {getActionTypeLabel(log.action_type, log)}
                       </Badge>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{log.entity_type}</span>
+                        <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                          {log.entity_type}
+                        </span>
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {log.entity_name ? (
                         <div>
-                          <span className="text-sm font-medium text-gray-900">{log.entity_name}</span>
-                          <span className="block text-xs text-gray-400 font-mono">{log.entity_id.substring(0, 8)}</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {log.entity_name}
+                          </span>
+                          <span className="block text-xs text-gray-400 font-mono">
+                            {log.entity_id.substring(0, 8)}
+                          </span>
                         </div>
                       ) : (
-                        <span className="text-sm text-gray-500 font-mono">{log.entity_id.substring(0, 8)}...</span>
+                        <span className="text-sm text-gray-500 font-mono">
+                          {log.entity_id.substring(0, 8)}...
+                        </span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -396,12 +738,7 @@ export default function AuditPage() {
                 <span className="text-sm text-gray-600 px-2">
                   {t('pageNumber', { page: currentPageNumber })}
                 </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToNextPage}
-                  disabled={!hasMore}
-                >
+                <Button variant="outline" size="sm" onClick={goToNextPage} disabled={!hasMore}>
                   {tCommon('next')}
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
@@ -411,144 +748,7 @@ export default function AuditPage() {
         )}
       </div>
 
-      {/* Panel lateral de detalles */}
-      {detailOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          {/* Overlay */}
-          <div className="absolute inset-0 bg-black/30" onClick={closeDetail} />
-
-          {/* Panel */}
-          <div className="relative w-full max-w-md bg-white shadow-2xl flex flex-col h-full">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">{t('detailTitle')}</h2>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={closeDetail}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
-              {detailLoading ? (
-                <div className="flex items-center justify-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-                </div>
-              ) : selectedLog ? (
-                <>
-                  {/* Acción */}
-                  <div>
-                    <p className="text-xs font-medium text-gray-400 uppercase mb-1">{t('colAction')}</p>
-                    <Badge className={getActionTypeBadgeColor(selectedLog.action_type)}>
-                      {getActionTypeLabel(selectedLog.action_type)}
-                    </Badge>
-                  </div>
-
-                  {/* Fecha */}
-                  <div className="flex items-start gap-3">
-                    <Clock className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs font-medium text-gray-400 uppercase mb-0.5">{t('colDate')}</p>
-                      <p className="text-sm text-gray-900">{formatDateWithTimezone(selectedLog.created_at, timezone)}</p>
-                    </div>
-                  </div>
-
-                  {/* Quién lo hizo */}
-                  <div className="bg-blue-50 rounded-lg p-4 space-y-3">
-                    <p className="text-xs font-semibold text-blue-700 uppercase">{t('detailWho')}</p>
-                    <div className="flex items-start gap-3">
-                      <User className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs text-gray-500">{t('detailUserName')}</p>
-                        <p className="text-sm font-medium text-gray-900">
-                          {selectedLog.user_name || <span className="text-gray-400 italic">{t('detailSystem')}</span>}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <Mail className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs text-gray-500">{t('detailUserEmail')}</p>
-                        <p className="text-sm font-medium text-gray-900">
-                          {selectedLog.user_email || <span className="text-gray-400 italic">—</span>}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <Globe className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs text-gray-500">{t('detailIpAddress')}</p>
-                        <p className="text-sm font-mono text-gray-900">
-                          {selectedLog.ip_address || <span className="text-gray-400 italic">—</span>}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Entidad afectada */}
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                    <p className="text-xs font-semibold text-gray-500 uppercase">{t('detailEntity')}</p>
-                    <div className="flex items-start gap-3">
-                      <FileText className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs text-gray-500">{t('colEntity')}</p>
-                        <p className="text-sm font-medium text-gray-900">{selectedLog.entity_type}</p>
-                      </div>
-                    </div>
-                    {selectedLog.entity_name && (
-                      <div className="flex items-start gap-3">
-                        <FileText className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <p className="text-xs text-gray-500">{t('detailEntityName')}</p>
-                          <p className="text-sm font-medium text-gray-900">{selectedLog.entity_name}</p>
-                        </div>
-                      </div>
-                    )}
-                    {selectedLog.workstation_ip && (
-                      <div className="flex items-start gap-3">
-                        <Monitor className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <p className="text-xs text-gray-500">{t('detailWorkstationIp')}</p>
-                          <p className="text-sm font-mono text-gray-900">{selectedLog.workstation_ip}</p>
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex items-start gap-3">
-                      <Server className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs text-gray-500">{t('detailEntityId')}</p>
-                        <p className="text-xs font-mono text-gray-500 break-all">{selectedLog.entity_id}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Cambios */}
-                  {(selectedLog.old_values || selectedLog.new_values) && (
-                    <div className="space-y-3">
-                      <p className="text-xs font-semibold text-gray-500 uppercase">{t('detailChanges')}</p>
-                      {selectedLog.old_values && (
-                        <div>
-                          <p className="text-xs font-medium text-red-500 mb-1">{t('detailOldValues')}</p>
-                          <pre className="text-xs bg-red-50 border border-red-100 rounded p-3 overflow-auto max-h-40 text-gray-700 whitespace-pre-wrap break-all">
-                            {JSON.stringify(selectedLog.old_values, null, 2)}
-                          </pre>
-                        </div>
-                      )}
-                      {selectedLog.new_values && (
-                        <div>
-                          <p className="text-xs font-medium text-green-600 mb-1">{t('detailNewValues')}</p>
-                          <pre className="text-xs bg-green-50 border border-green-100 rounded p-3 overflow-auto max-h-40 text-gray-700 whitespace-pre-wrap break-all">
-                            {JSON.stringify(selectedLog.new_values, null, 2)}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      )}
+      {detailPanel}
     </div>
-  )
+  );
 }

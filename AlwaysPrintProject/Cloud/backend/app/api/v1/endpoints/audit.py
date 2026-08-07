@@ -31,6 +31,25 @@ from app.services.audit import AuditService
 router = APIRouter()
 
 
+def _get_scoped_organization_id(current_user: User) -> Optional[UUID]:
+    """
+    Devuelve la organización a la que debe quedar acotado el usuario.
+
+    - Admin: sin scope (None)
+    - No admin: obligatorio scope a su organización
+    """
+    if current_user.role == UserRole.ADMIN:
+        return None
+
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuario sin organización asignada"
+        )
+
+    return current_user.organization_id
+
+
 def _resolve_entity_names(db: Session, logs: list) -> list[dict]:
     """
     Resuelve el nombre legible de cada entidad según su tipo.
@@ -149,12 +168,11 @@ def search_audit_logs(
     - Operador: solo puede ver logs de su cuenta
     """
     audit_service = AuditService()
-    
-    # Operadores solo pueden ver logs de su cuenta
-    if current_user.role == UserRole.OPERATOR:
-        if not current_user.organization_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
-        organization_id = current_user.organization_id
+
+    # No-admin: siempre restringido a su organización (ignora organization_id enviado por cliente)
+    scoped_org_id = _get_scoped_organization_id(current_user)
+    if scoped_org_id is not None:
+        organization_id = scoped_org_id
     
     # Construir query base con filtros
     query = db.query(AuditLog)
@@ -245,12 +263,8 @@ def get_audit_stats(
     """
     audit_service = AuditService()
     
-    # Determinar organization_id según rol
-    org_id = None
-    if current_user.role == UserRole.OPERATOR:
-        if not current_user.organization_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
-        org_id = current_user.organization_id
+    # No-admin: estadísticas restringidas a su organización
+    org_id = _get_scoped_organization_id(current_user)
     
     # Obtener estadísticas
     query = db.query(AuditLog)
@@ -314,12 +328,8 @@ def get_recent_activity(
     """
     audit_service = AuditService()
     
-    # Determinar organization_id según rol
-    org_id = None
-    if current_user.role == UserRole.OPERATOR:
-        if not current_user.organization_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
-        org_id = current_user.organization_id
+    # No-admin: actividad reciente restringida a su organización
+    org_id = _get_scoped_organization_id(current_user)
     
     # Obtener actividad reciente
     if org_id:
@@ -353,10 +363,10 @@ def get_audit_log(
     if not log:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Log no encontrado")
     
-    # Verificar permisos
-    if current_user.role == UserRole.OPERATOR:
-        if log.organization_id != current_user.organization_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
+    # Verificar permisos (no-admin solo puede ver logs de su organización)
+    scoped_org_id = _get_scoped_organization_id(current_user)
+    if scoped_org_id is not None and log.organization_id != scoped_org_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos")
     
     # Agregar información adicional
     user_name = log.user.full_name if log.user else None
