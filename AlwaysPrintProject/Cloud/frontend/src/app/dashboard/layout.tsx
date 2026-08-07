@@ -385,7 +385,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         sidebarCollapsed ? 'lg:w-16' : 'lg:w-64'
       }`}>
         <div className="flex flex-col h-full bg-white border-r border-gray-200">
-          <div className="flex-shrink-0 flex h-16 items-center px-4 border-b">
+          <div className="flex-shrink-0 flex h-16 items-center justify-between px-4 border-b">
             <div className="flex items-center space-x-2">
               <Image
                 src="/alwaysprint-logo.png"
@@ -398,6 +398,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <h1 className="text-xl font-bold text-gray-900">AlwaysPrint</h1>
               )}
             </div>
+            {!sidebarCollapsed && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleSidebarCollapse}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 h-8 w-8 p-0 flex-shrink-0"
+                title={t('collapseSidebar')}
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </Button>
+            )}
           </div>
           {!sidebarCollapsed && (
             <div className="px-4 py-2 border-b border-gray-100">
@@ -456,20 +467,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </Button>
               </>
             )}
-            {/* Botón collapse/expand */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleSidebarCollapse}
-              className="w-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 h-8"
-              title={sidebarCollapsed ? t('expandSidebar') : t('collapseSidebar')}
-            >
-              {sidebarCollapsed ? (
+            {/* Botón collapse/expand (solo visible colapsado; expandido está en el header) */}
+            {sidebarCollapsed && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleSidebarCollapse}
+                className="w-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 h-8"
+                title={t('expandSidebar')}
+              >
                 <PanelLeftOpen className="h-4 w-4" />
-              ) : (
-                <PanelLeftClose className="h-4 w-4" />
-              )}
-            </Button>
+              </Button>
+            )}
           </div>
         </div>
       </div>

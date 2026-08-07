@@ -25,6 +25,7 @@ from app.schemas import (
     AuditLogSearch,
     AuditLogListResponse,
     AuditLogStatsResponse,
+    AuditLogGlobalStatsResponse,
 )
 from app.services.audit import AuditService
 
@@ -305,12 +306,112 @@ def get_audit_stats(
     recent_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=24)
     recent_query = query.filter(AuditLog.created_at >= recent_date)
     recent_activity_count = recent_query.count()
-    
+
+    # Desglose de acciones y entidades en las últimas 24 horas.
+    # Se recorren los logs en Python (en vez de agregar en SQL) porque el
+    # logout se guarda como action_type=DELETE + entity_type=session y debe
+    # contarse aparte, igual que lo distingue el frontend (ver isLogoutEvent).
+    recent_logs = recent_query.all()
+    actions_by_type_24h: dict[str, int] = {}
+    entities_by_type_24h: dict[str, int] = {}
+    for log in recent_logs:
+        action_key = log.action_type.value
+        is_logout = (
+            log.action_type == ActionType.DELETE
+            and log.entity_type.lower() == "session"
+            and isinstance(log.old_values, dict)
+            and log.old_values.get("action") == "logout"
+        )
+        if is_logout:
+            action_key = "logout"
+        actions_by_type_24h[action_key] = actions_by_type_24h.get(action_key, 0) + 1
+        entities_by_type_24h[log.entity_type] = entities_by_type_24h.get(log.entity_type, 0) + 1
+
     return AuditLogStatsResponse(
         total_actions=total_actions,
         actions_by_type=actions_by_type,
         most_active_users=most_active_users,
-        recent_activity_count=recent_activity_count
+        recent_activity_count=recent_activity_count,
+        actions_by_type_24h=actions_by_type_24h,
+        entities_by_type_24h=entities_by_type_24h
+    )
+
+
+@router.get("/stats/global", response_model=AuditLogGlobalStatsResponse)
+def get_audit_global_stats(
+    period: str = Query(
+        "24h",
+        pattern="^(24h|week)$",
+        description="'24h' = últimas 24 horas (rolling), 'week' = semana calendario actual (lunes 00:00 hasta ahora)"
+    ),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtener estadísticas globales de auditoría, agrupadas por tipo de entidad.
+
+    No aplica ningún otro filtro (tipo de acción, entidad puntual, etc.): siempre
+    muestra todas las acciones registradas dentro del período.
+
+    - Admin: todas las organizaciones
+    - Operador: solo su organización
+    """
+    org_id = _get_scoped_organization_id(current_user)
+
+    query = db.query(AuditLog)
+    if org_id:
+        query = query.filter(AuditLog.organization_id == org_id)
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if period == "week":
+        # Lunes 00:00 de la semana calendario actual (weekday(): lunes=0 ... domingo=6)
+        since_date = (now - timedelta(days=now.weekday())).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+    else:
+        since_date = now - timedelta(hours=24)
+
+    logs = query.filter(AuditLog.created_at >= since_date).all()
+
+    actions_by_type: dict[str, int] = {}
+    entities_by_type: dict[str, int] = {}
+    actions_by_entity_and_type: dict[str, dict[str, int]] = {}
+
+    for log in logs:
+        action_key = log.action_type.value
+        is_logout = (
+            log.action_type == ActionType.DELETE
+            and log.entity_type.lower() == "session"
+            and isinstance(log.old_values, dict)
+            and log.old_values.get("action") == "logout"
+        )
+        if is_logout:
+            action_key = "logout"
+
+        actions_by_type[action_key] = actions_by_type.get(action_key, 0) + 1
+        entities_by_type[log.entity_type] = entities_by_type.get(log.entity_type, 0) + 1
+
+        entity_bucket = actions_by_entity_and_type.setdefault(log.entity_type, {})
+        entity_bucket[action_key] = entity_bucket.get(action_key, 0) + 1
+
+    # Incluir todos los tipos de entidad que existen en el historial (no solo
+    # los que tuvieron actividad en la ventana de tiempo consultada), para que
+    # el desglose muestre siempre el panorama completo.
+    all_entity_types_query = db.query(AuditLog.entity_type).distinct()
+    if org_id:
+        all_entity_types_query = all_entity_types_query.filter(AuditLog.organization_id == org_id)
+    all_entity_types = {row[0] for row in all_entity_types_query.all()}
+
+    for entity_type in all_entity_types:
+        actions_by_entity_and_type.setdefault(entity_type, {})
+        entities_by_type.setdefault(entity_type, 0)
+
+    return AuditLogGlobalStatsResponse(
+        period=period,
+        total_actions=len(logs),
+        actions_by_type=actions_by_type,
+        entities_by_type=entities_by_type,
+        actions_by_entity_and_type=actions_by_entity_and_type
     )
 
 

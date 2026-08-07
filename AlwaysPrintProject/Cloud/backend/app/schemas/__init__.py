@@ -86,6 +86,7 @@ from app.schemas.audit import (
     AuditLogSearch,
     AuditLogListResponse,
     AuditLogStatsResponse,
+    AuditLogGlobalStatsResponse,
 )
 
 # === WEBSOCKET SCHEMAS ===
@@ -255,6 +256,7 @@ __all__ = [
     "AuditLogSearch",
     "AuditLogListResponse",
     "AuditLogStatsResponse",
+    "AuditLogGlobalStatsResponse",
     # WebSocket
     "RegisterMessage",
     "PongMessage",

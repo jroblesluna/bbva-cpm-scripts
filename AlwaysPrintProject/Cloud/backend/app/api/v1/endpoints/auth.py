@@ -9,6 +9,7 @@ Este módulo define los endpoints para:
 """
 
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
@@ -36,34 +37,71 @@ router = APIRouter()
 @router.post("/login", response_model=TokenResponse, status_code=status.HTTP_200_OK)
 def login(
     credentials: LoginRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
     Autenticar usuario y obtener token JWT.
-    
+
     Args:
         credentials: Email y contraseña del usuario
+        request: Objeto Request de FastAPI
         db: Sesión de base de datos
-    
+
     Returns:
         TokenResponse con access_token, token_type y expires_in
-    
+
     Raises:
         HTTPException 401: Credenciales inválidas
     """
+    from app.models.audit import ActionType
+
+    audit_service = AuditService()
+    ip_address = get_client_ip(request)
+
     # Autenticar usuario
     user = AuthService.authenticate_user(db, credentials.email, credentials.password)
-    
+
     if not user:
+        # Registrar intento fallido en auditoría. Si el email corresponde a un
+        # usuario existente se vincula a su id; si no, se usa un id determinístico
+        # derivado del email (no es una FK, solo referencia de auditoría).
+        attempted_user = db.query(User).filter(User.email == credentials.email).first()
+        entity_id = str(attempted_user.id) if attempted_user else str(
+            uuid.uuid5(uuid.NAMESPACE_DNS, credentials.email)
+        )
+        audit_service.log_action(
+            db=db,
+            action_type=ActionType.LOGIN_FAILED,
+            entity_type="session",
+            entity_id=entity_id,
+            user_id=str(attempted_user.id) if attempted_user else None,
+            organization_id=str(attempted_user.organization_id) if attempted_user and attempted_user.organization_id else None,
+            new_values={"attempted_email": credentials.email},
+            ip_address=ip_address
+        )
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email o contraseña incorrectos",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
+    # Registrar login exitoso en auditoría
+    audit_service.log_action(
+        db=db,
+        action_type=ActionType.LOGIN,
+        entity_type="session",
+        entity_id=str(user.id),
+        user_id=str(user.id),
+        organization_id=str(user.organization_id) if user.organization_id else None,
+        new_values={"email": user.email},
+        ip_address=ip_address
+    )
+
     # Crear tokens para el usuario
     tokens = AuthService.create_tokens_for_user(user)
-    
+
     return tokens
 
 

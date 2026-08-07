@@ -10,6 +10,9 @@ export type ActionType =
   | 'contingency_toggle'
   | 'message_sent'
   | 'command_sent'
+  | 'login'
+  | 'login_failed'
+  | 'logout'
 
 export interface AuditLog {
   id: string
@@ -65,4 +68,14 @@ export interface AuditLogStats {
     action_count: number
   }>
   recent_activity_count: number
+  actions_by_type_24h: Record<string, number>
+  entities_by_type_24h: Record<string, number>
+}
+
+export interface AuditLogGlobalStats {
+  period: '24h' | 'week'
+  total_actions: number
+  actions_by_type: Record<string, number>
+  entities_by_type: Record<string, number>
+  actions_by_entity_and_type: Record<string, Record<string, number>>
 }

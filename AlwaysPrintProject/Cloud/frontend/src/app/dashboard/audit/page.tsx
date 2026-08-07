@@ -8,12 +8,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   FileText,
   Search,
   User,
   Activity,
   TrendingUp,
   ChevronRight,
+  ChevronLeft,
   RotateCcw,
   Eye,
   X,
@@ -23,7 +30,7 @@ import {
   Server,
   Clock,
 } from 'lucide-react';
-import type { AuditLog, AuditLogDetail, AuditLogStats, ActionType } from '@/types/audit';
+import type { AuditLog, AuditLogDetail, AuditLogStats, AuditLogGlobalStats, ActionType } from '@/types/audit';
 import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
 
@@ -51,6 +58,19 @@ export default function AuditPage() {
   const [filterEntityName, setFilterEntityName] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
+
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
+  const [entityBreakdownOpen, setEntityBreakdownOpen] = useState(false);
+
+  const [globalStatsOpen, setGlobalStatsOpen] = useState(false);
+  const [globalStatsRange, setGlobalStatsRange] = useState<'24h' | 'week'>('24h');
+  const [globalStats, setGlobalStats] = useState<AuditLogGlobalStats | null>(null);
+  const [globalStatsLoading, setGlobalStatsLoading] = useState(false);
+
+  const [actionLogsOpen, setActionLogsOpen] = useState(false);
+  const [actionLogsLoading, setActionLogsLoading] = useState(false);
+  const [actionLogs, setActionLogs] = useState<AuditLog[]>([]);
+  const [actionLogsLabel, setActionLogsLabel] = useState('');
 
   const [selectedLog, setSelectedLog] = useState<AuditLogDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -106,6 +126,59 @@ export default function AuditPage() {
       console.error('Error al cargar estadísticas:', error);
     }
   }, []);
+
+  const loadGlobalStats = useCallback(async (period: '24h' | 'week') => {
+    setGlobalStatsLoading(true);
+    try {
+      const data = await auditApi.globalStats(period);
+      setGlobalStats(data);
+    } catch (error) {
+      console.error('Error al cargar estadísticas globales:', error);
+    } finally {
+      setGlobalStatsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (globalStatsOpen) {
+      loadGlobalStats(globalStatsRange);
+    }
+  }, [globalStatsOpen, globalStatsRange, loadGlobalStats]);
+
+  const rangeStartDate = (period: '24h' | 'week'): string => {
+    const now = new Date();
+    if (period === 'week') {
+      const daysSinceMonday = (now.getDay() + 6) % 7;
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      start.setDate(now.getDate() - daysSinceMonday);
+      return start.toISOString();
+    }
+    return new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  };
+
+  const openActionLogs = async (entityType: string, actionKey: string) => {
+    // "logout" es una clave sintética: en la BD se guarda como action_type=delete
+    const realActionType = actionKey === 'logout' ? 'delete' : actionKey;
+
+    setActionLogsLabel(`${entityType} — ${getActionTypeLabel(actionKey as ActionType)}`);
+    setActionLogsOpen(true);
+    setActionLogsLoading(true);
+    try {
+      const data = await auditApi.search({
+        entity_type: entityType,
+        action_type: realActionType as ActionType,
+        start_date: rangeStartDate(globalStatsRange),
+        limit: 100,
+      });
+      setActionLogs(data.logs || []);
+    } catch (error) {
+      console.error('Error al cargar logs de la acción:', error);
+      setActionLogs([]);
+    } finally {
+      setActionLogsLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadLogs(currentCursor);
@@ -224,6 +297,9 @@ export default function AuditPage() {
       contingency_toggle: t('contingency'),
       message_sent: t('messageSent'),
       command_sent: t('commandSent'),
+      login: t('login'),
+      login_failed: t('loginFailed'),
+      logout: t('logout'),
     };
     return labels[type] || type;
   };
@@ -237,6 +313,9 @@ export default function AuditPage() {
       contingency_toggle: 'bg-orange-100 text-orange-800',
       message_sent: 'bg-indigo-100 text-indigo-800',
       command_sent: 'bg-purple-100 text-purple-800',
+      login: 'bg-teal-100 text-teal-800',
+      login_failed: 'bg-red-100 text-red-800',
+      logout: 'bg-gray-200 text-gray-800',
     };
     return colors[type] || 'bg-gray-100 text-gray-800';
   };
@@ -445,6 +524,11 @@ export default function AuditPage() {
         )
       : null;
 
+  const closeActionLogs = () => {
+    setActionLogsOpen(false);
+    setActionLogs([]);
+  };
+
   if (isInitialLoad) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -458,25 +542,33 @@ export default function AuditPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
-        <p className="mt-2 text-gray-600">{t('subtitle')}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
+          <p className="mt-2 text-gray-600">{t('subtitle')}</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-1 shrink-0"
+          onClick={() => setGlobalStatsOpen(true)}
+        >
+          {t('viewGlobalInfo')}
+        </Button>
       </div>
 
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <FileText className="h-6 w-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">{t('totalActions')}</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total_actions}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Card 1: Acciones últimas 24h + botón de desglose */}
+          <div className="relative bg-white rounded-lg shadow p-6">
+            <Button
+              variant="outline"
+              size="sm"
+              className="absolute top-3 right-3"
+              onClick={() => setBreakdownOpen(true)}
+            >
+              {t('viewBreakdown')}
+            </Button>
             <div className="flex items-center">
               <div className="p-3 bg-green-100 rounded-lg">
                 <Activity className="h-6 w-6 text-green-600" />
@@ -489,28 +581,40 @@ export default function AuditPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <User className="h-6 w-6 text-purple-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">{t('activeUsers')}</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.most_active_users.length}
-                </p>
-              </div>
-            </div>
-          </div>
+
+          {/* Card 2: Recuento de tipos de acción en 24h */}
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="p-3 bg-yellow-100 rounded-lg">
                 <TrendingUp className="h-6 w-6 text-yellow-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">{t('actionTypes')}</p>
+                <p className="text-sm font-medium text-gray-600">{t('actionTypes24h')}</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {Object.keys(stats.actions_by_type).length}
+                  {Object.keys(stats.actions_by_type_24h).length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Recuento de entidades en 24h + botón de desglose */}
+          <div className="relative bg-white rounded-lg shadow p-6">
+            <Button
+              variant="outline"
+              size="sm"
+              className="absolute top-3 right-3"
+              onClick={() => setEntityBreakdownOpen(true)}
+            >
+              {t('viewBreakdown')}
+            </Button>
+            <div className="flex items-center">
+              <div className="p-3 bg-purple-100 rounded-lg">
+                <Server className="h-6 w-6 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">{t('entities24h')}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {Object.keys(stats.entities_by_type_24h).length}
                 </p>
               </div>
             </div>
@@ -518,21 +622,203 @@ export default function AuditPage() {
         </div>
       )}
 
-      {stats && Object.keys(stats.actions_by_type).length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">{t('distribution')}</h3>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {Object.entries(stats.actions_by_type).map(([type, count]) => (
-              <div key={type} className="text-center">
-                <Badge className={getActionTypeBadgeColor(type as ActionType)}>
-                  {getActionTypeLabel(type as ActionType)}
-                </Badge>
-                <p className="mt-2 text-2xl font-bold text-gray-900">{count}</p>
-              </div>
-            ))}
+      {/* Popup: desglose de acciones por tipo en las últimas 24h */}
+      <Dialog open={breakdownOpen} onOpenChange={setBreakdownOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('breakdownTitle')}</DialogTitle>
+          </DialogHeader>
+          {stats && Object.keys(stats.actions_by_type_24h).length > 0 ? (
+            <div className="grid grid-cols-2 gap-4">
+              {Object.entries(stats.actions_by_type_24h).map(([type, count]) => (
+                <div key={type} className="text-center">
+                  <Badge className={getActionTypeBadgeColor(type as ActionType)}>
+                    {getActionTypeLabel(type as ActionType)}
+                  </Badge>
+                  <p className="mt-2 text-2xl font-bold text-gray-900">{count}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 text-center py-4">{tCommon('noData')}</p>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Popup: desglose de acciones por tipo de entidad en las últimas 24h */}
+      <Dialog open={entityBreakdownOpen} onOpenChange={setEntityBreakdownOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('entityBreakdownTitle')}</DialogTitle>
+          </DialogHeader>
+          {stats && Object.keys(stats.entities_by_type_24h).length > 0 ? (
+            <div className="grid grid-cols-2 gap-4">
+              {Object.entries(stats.entities_by_type_24h).map(([type, count]) => (
+                <div key={type} className="text-center">
+                  <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                    {type}
+                  </span>
+                  <p className="mt-2 text-2xl font-bold text-gray-900">{count}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 text-center py-4">{tCommon('noData')}</p>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Popup: información global de auditoría, agrupada por entidad.
+          Un mismo contenedor (track) desliza horizontalmente entre la vista
+          de entidades y el listado de logs de una acción puntual. */}
+      <Dialog
+        open={globalStatsOpen}
+        onOpenChange={(open) => {
+          setGlobalStatsOpen(open);
+          if (!open) closeActionLogs();
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[85vh] p-0 overflow-hidden flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-2 flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              {actionLogsOpen && (
+                <button
+                  type="button"
+                  onClick={closeActionLogs}
+                  className="p-1 -ml-1 rounded hover:bg-gray-100"
+                  title={tCommon('back')}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              )}
+              <span className="truncate">
+                {actionLogsOpen ? actionLogsLabel : t('globalInfoTitle')}
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex items-center justify-between gap-2 px-6 pb-4 flex-shrink-0 border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <Button
+                variant={globalStatsRange === '24h' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setGlobalStatsRange('24h')}
+              >
+                {t('rangeLast24h')}
+              </Button>
+              <Button
+                variant={globalStatsRange === 'week' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setGlobalStatsRange('week')}
+              >
+                {t('rangeLastWeek')}
+              </Button>
+            </div>
+            {!actionLogsOpen && globalStats && (
+              <p className="text-sm text-gray-600 shrink-0">
+                {t('globalInfoTotal', { total: globalStats.total_actions })}
+              </p>
+            )}
           </div>
-        </div>
-      )}
+
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <div
+              className="flex h-full transition-transform duration-300 ease-in-out"
+              style={{ width: '200%', transform: actionLogsOpen ? 'translateX(-50%)' : 'translateX(0%)' }}
+            >
+              {/* Vista 1: desglose por entidad */}
+              <div className="w-1/2 px-6 pt-4 pb-6 overflow-y-auto">
+                {globalStatsLoading ? (
+                  <div className="flex items-center justify-center h-32">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                  </div>
+                ) : globalStats && Object.keys(globalStats.actions_by_entity_and_type).length > 0 ? (
+                  <div className="space-y-4">
+                    {Object.entries(globalStats.actions_by_entity_and_type)
+                      .sort(([, a], [, b]) => {
+                        const totalA = Object.values(a).reduce((sum, n) => sum + n, 0);
+                        const totalB = Object.values(b).reduce((sum, n) => sum + n, 0);
+                        return totalB - totalA;
+                      })
+                      .map(([entityType, actionCounts]) => {
+                        const entityTotal = Object.values(actionCounts).reduce((sum, n) => sum + n, 0);
+                        return (
+                          <div key={entityType} className="border border-gray-200 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-semibold text-gray-900">{entityType}</span>
+                              <span className="text-xs text-gray-500">
+                                {t('globalInfoEntityTotal', { total: entityTotal })}
+                              </span>
+                            </div>
+                            {Object.keys(actionCounts).length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {Object.entries(actionCounts).map(([type, count]) => (
+                                  <Badge
+                                    key={type}
+                                    className={`${getActionTypeBadgeColor(type as ActionType)} flex items-center gap-1.5 pr-1.5`}
+                                  >
+                                    {getActionTypeLabel(type as ActionType)}: {count}
+                                    <button
+                                      type="button"
+                                      title={t('viewActionLogs')}
+                                      onClick={() => openActionLogs(entityType, type)}
+                                      className="rounded-full hover:bg-black/10 p-0.5 -mr-0.5"
+                                    >
+                                      <Eye className="h-3 w-3" />
+                                    </button>
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-gray-400 italic">{t('globalInfoNoActivity')}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-4">{tCommon('noData')}</p>
+                )}
+              </div>
+
+              {/* Vista 2: listado de logs de la acción/entidad seleccionada */}
+              <div className="w-1/2 px-6 pt-4 pb-6 overflow-y-auto">
+                {actionLogsLoading ? (
+                  <div className="flex items-center justify-center h-32">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                  </div>
+                ) : actionLogs.length > 0 ? (
+                  <div className="divide-y divide-gray-100">
+                    {actionLogs.map((log) => (
+                      <div key={log.id} className="flex items-center justify-between py-3">
+                        <div className="min-w-0">
+                          <p className="text-sm text-gray-900">
+                            {formatDateWithTimezone(log.created_at, timezone)}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {log.entity_name || log.entity_id} · {log.ip_address || '-'}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 shrink-0"
+                          title={t('viewDetails')}
+                          onClick={() => openDetail(log)}
+                        >
+                          <Eye className="h-4 w-4 text-gray-400 hover:text-blue-600" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-4">{tCommon('noData')}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="bg-white rounded-lg shadow p-4">
         <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
@@ -565,6 +851,8 @@ export default function AuditPage() {
             <option value="contingency_toggle">{t('contingency')}</option>
             <option value="message_sent">{t('messageSent')}</option>
             <option value="command_sent">{t('commandSent')}</option>
+            <option value="login">{t('login')}</option>
+            <option value="login_failed">{t('loginFailed')}</option>
           </select>
           <select
             value={filterEntityType || 'all'}

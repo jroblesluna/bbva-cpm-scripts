@@ -24,6 +24,7 @@ import {
   List,
   Clock,
   Building2,
+  Search,
 } from 'lucide-react';
 import type { Organization } from '@/types/organization';
 
@@ -113,6 +114,9 @@ export default function KnowledgeBasePage() {
 
   // Estado de vista
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+
+  // Estado de búsqueda por título
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Estado de dialogs
   const [formDialogOpen, setFormDialogOpen] = useState(false);
@@ -242,6 +246,10 @@ export default function KnowledgeBasePage() {
 
   const isMutating = createMutation.isPending || updateMutation.isPending;
 
+  const filteredArticles = articles?.filter((article) =>
+    article.title.toLowerCase().includes(searchQuery.trim().toLowerCase())
+  );
+
   // === HELPERS ===
 
   const formatDate = (dateStr: string): string => {
@@ -303,10 +311,20 @@ export default function KnowledgeBasePage() {
         </Card>
       )}
 
-      {/* Barra de filtros con toggle de vista */}
+      {/* Barra de búsqueda */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center justify-end">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex items-center flex-1">
+              <Search className="w-5 h-5 text-gray-400 mr-3" />
+              <Input
+                type="text"
+                placeholder={t('searchPlaceholder')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1"
+              />
+            </div>
             <div className="flex items-center gap-1 border rounded-md p-0.5">
               <Button
                 variant={viewMode === 'cards' ? 'default' : 'ghost'}
@@ -344,9 +362,16 @@ export default function KnowledgeBasePage() {
             </Button>
           </CardContent>
         </Card>
+      ) : !filteredArticles || filteredArticles.length === 0 ? (
+        <Card>
+          <CardContent className="text-center py-12">
+            <Search className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">{t('noResults')}</p>
+          </CardContent>
+        </Card>
       ) : viewMode === 'cards' ? (
         <ArticleCardsView
-          articles={articles}
+          articles={filteredArticles}
           t={t}
           formatDate={formatDate}
           onEdit={handleEdit}
@@ -354,7 +379,7 @@ export default function KnowledgeBasePage() {
         />
       ) : (
         <ArticleTableView
-          articles={articles}
+          articles={filteredArticles}
           t={t}
           tCommon={tCommon}
           formatDate={formatDate}
@@ -387,6 +412,11 @@ export default function KnowledgeBasePage() {
                 maxLength={200}
                 className="mt-1"
               />
+              {formData.title.length > 0 && formData.title.length < 3 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  {t('titleTooShort', { min: 3, count: formData.title.length })}
+                </p>
+              )}
             </div>
 
             {/* Descripción */}
@@ -401,6 +431,11 @@ export default function KnowledgeBasePage() {
                 className="mt-1"
                 rows={3}
               />
+              {formData.description.length > 0 && formData.description.length < 10 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  {t('descriptionTooShort', { min: 10, count: formData.description.length })}
+                </p>
+              )}
             </div>
 
             {/* Editor de contenido con tabs */}

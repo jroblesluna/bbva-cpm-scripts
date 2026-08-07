@@ -44,6 +44,7 @@ import type {
   AuditLogSearch,
   AuditLogListResponse,
   AuditLogStats,
+  AuditLogGlobalStats,
   ApiError,
   Device,
   DeviceCreate,
@@ -892,6 +893,17 @@ export const auditApi = {
    */
   stats: async (): Promise<AuditLogStats> => {
     const response = await apiClient.get<AuditLogStats>('/audit/stats')
+    return response.data
+  },
+
+  /**
+   * Obtener estadísticas globales de auditoría, agrupadas por entidad.
+   * period: '24h' (últimas 24h, rolling) o 'week' (semana calendario actual).
+   */
+  globalStats: async (period: '24h' | 'week' = '24h'): Promise<AuditLogGlobalStats> => {
+    const response = await apiClient.get<AuditLogGlobalStats>('/audit/stats/global', {
+      params: { period },
+    })
     return response.data
   },
 

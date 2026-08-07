@@ -75,3 +75,21 @@ class AuditLogStatsResponse(BaseModel):
     actions_by_type: dict[str, int] = Field(..., description="Conteo de acciones por tipo")
     most_active_users: list[dict] = Field(..., description="Usuarios más activos (top 10)")
     recent_activity_count: int = Field(..., description="Acciones en las últimas 24 horas")
+    actions_by_type_24h: dict[str, int] = Field(
+        default_factory=dict, description="Conteo de acciones por tipo en las últimas 24 horas"
+    )
+    entities_by_type_24h: dict[str, int] = Field(
+        default_factory=dict, description="Conteo de acciones por tipo de entidad en las últimas 24 horas"
+    )
+
+
+class AuditLogGlobalStatsResponse(BaseModel):
+    """Schema de respuesta para estadísticas globales de auditoría, agrupadas por entidad."""
+    period: str = Field(..., description="Período consultado: '24h' o 'week'")
+    total_actions: int = Field(..., description="Total de acciones en la ventana de tiempo")
+    actions_by_type: dict[str, int] = Field(..., description="Conteo de acciones por tipo")
+    entities_by_type: dict[str, int] = Field(..., description="Conteo de acciones por tipo de entidad")
+    actions_by_entity_and_type: dict[str, dict[str, int]] = Field(
+        default_factory=dict,
+        description="Conteo de acciones por tipo, agrupado por tipo de entidad"
+    )
