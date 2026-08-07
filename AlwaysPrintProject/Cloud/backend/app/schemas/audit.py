@@ -49,6 +49,8 @@ class AuditLogSearch(BaseModel):
     action_type: Optional[ActionType] = Field(None, description="Filtrar por tipo de acción")
     entity_type: Optional[str] = Field(None, description="Filtrar por tipo de entidad")
     entity_id: Optional[UUID] = Field(None, description="Filtrar por ID de entidad")
+    entity_name: Optional[str] = Field(None, description="Filtrar por nombre legible de la entidad")
+    search: Optional[str] = Field(None, description="Búsqueda general (tipo, acción, ID, IP o nombre de entidad)")
     start_date: Optional[datetime] = Field(None, description="Fecha de inicio")
     end_date: Optional[datetime] = Field(None, description="Fecha de fin")
     cursor: Optional[str] = Field(None, description="Cursor para paginación (formato: timestamp|uuid)")

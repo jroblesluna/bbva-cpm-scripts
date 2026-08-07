@@ -42,6 +42,8 @@ export interface AuditLogSearch {
   action_type?: ActionType
   entity_type?: string
   entity_id?: string
+  entity_name?: string
+  search?: string
   start_date?: string
   end_date?: string
   cursor?: string

@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 import base64
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_, and_
+from sqlalchemy import func, or_, and_, cast, false, String
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_admin
@@ -140,6 +140,44 @@ def _resolve_entity_names(db: Session, logs: list) -> list[dict]:
     return result
 
 
+def _get_entity_ids_matching_name(db: Session, name: str) -> set[str]:
+    """
+    Busca IDs de entidades cuyo nombre legible coincide con `name` (ILIKE),
+    cruzando con las tablas relacionadas. Es la operación inversa de
+    _resolve_entity_names (de nombre a ID en vez de ID a nombre), necesaria
+    porque entity_name no es una columna real de audit_logs.
+    """
+    from app.models.user import User as UserModel
+    from app.models.organization import Organization
+    from app.models.workstation import Workstation
+    from app.models.vlan import VLAN
+    from app.models.message import Message
+
+    term = f"%{name}%"
+    ids: set[str] = set()
+
+    users = db.query(UserModel.id).filter(
+        or_(UserModel.full_name.ilike(term), UserModel.email.ilike(term))
+    ).all()
+    ids.update(str(row[0]) for row in users)
+
+    orgs = db.query(Organization.id).filter(Organization.name.ilike(term)).all()
+    ids.update(str(row[0]) for row in orgs)
+
+    workstations = db.query(Workstation.id).filter(
+        or_(Workstation.hostname.ilike(term), Workstation.ip_private.ilike(term))
+    ).all()
+    ids.update(str(row[0]) for row in workstations)
+
+    vlans = db.query(VLAN.id).filter(VLAN.name.ilike(term)).all()
+    ids.update(str(row[0]) for row in vlans)
+
+    messages = db.query(Message.id).filter(Message.content.ilike(term)).all()
+    ids.update(str(row[0]) for row in messages)
+
+    return ids
+
+
 @router.get("/", response_model=AuditLogListResponse)
 def search_audit_logs(
     cursor: Optional[str] = Query(None, description="Cursor para paginación (formato: timestamp|uuid)"),
@@ -152,6 +190,8 @@ def search_audit_logs(
     action_type: Optional[ActionType] = Query(None),
     entity_type: Optional[str] = Query(None),
     entity_id: Optional[UUID] = Query(None),
+    entity_name: Optional[str] = Query(None, description="Filtrar por nombre legible de la entidad"),
+    search: Optional[str] = Query(None, description="Búsqueda general (tipo, acción, ID, IP o nombre de entidad)"),
     start_date: Optional[datetime] = Query(None),
     end_date: Optional[datetime] = Query(None),
     current_user: User = Depends(get_current_user),
@@ -159,12 +199,16 @@ def search_audit_logs(
 ):
     """
     Buscar logs de auditoría con filtros y paginación por cursor.
-    
+
     La paginación por cursor usa el parámetro `cursor` (formato: ISO_timestamp|uuid).
     Si no se envía cursor, devuelve la primera página.
     El campo `next_cursor` en la respuesta indica el cursor para la siguiente página.
     El campo `has_more` indica si hay más resultados.
-    
+
+    `entity_name` y `search` resuelven el nombre legible de la entidad
+    (usuario, organización, workstation, VLAN, mensaje) cruzando con sus
+    tablas relacionadas, ya que no es una columna de `audit_logs`.
+
     - Admin: puede ver todos los logs
     - Operador: solo puede ver logs de su cuenta
     """
@@ -190,11 +234,26 @@ def search_audit_logs(
         query = query.filter(AuditLog.entity_type == entity_type)
     if entity_id:
         query = query.filter(AuditLog.entity_id == str(entity_id))
+    if entity_name:
+        name_ids = _get_entity_ids_matching_name(db, entity_name)
+        query = query.filter(AuditLog.entity_id.in_(name_ids) if name_ids else false())
+    if search:
+        search_term = f"%{search}%"
+        name_ids = _get_entity_ids_matching_name(db, search)
+        conditions = [
+            AuditLog.entity_type.ilike(search_term),
+            AuditLog.ip_address.ilike(search_term),
+            cast(AuditLog.entity_id, String).ilike(search_term),
+            cast(AuditLog.action_type, String).ilike(search_term),
+        ]
+        if name_ids:
+            conditions.append(AuditLog.entity_id.in_(name_ids))
+        query = query.filter(or_(*conditions))
     if start_date:
         query = query.filter(AuditLog.created_at >= start_date)
     if end_date:
         query = query.filter(AuditLog.created_at <= end_date)
-    
+
     # Contar total
     total = query.count()
     

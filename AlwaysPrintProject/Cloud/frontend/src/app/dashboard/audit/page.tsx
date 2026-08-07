@@ -44,7 +44,6 @@ export default function AuditPage() {
 
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [stats, setStats] = useState<AuditLogStats | null>(null);
-  const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -53,14 +52,34 @@ export default function AuditPage() {
   const [currentCursor, setCurrentCursor] = useState<string | undefined>(undefined);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [filterActionType, setFilterActionType] = useState<ActionType | null>(null);
   const [filterEntityType, setFilterEntityType] = useState<string>('');
   const [filterEntityName, setFilterEntityName] = useState('');
+  const [debouncedEntityName, setDebouncedEntityName] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
 
-  const [breakdownOpen, setBreakdownOpen] = useState(false);
-  const [entityBreakdownOpen, setEntityBreakdownOpen] = useState(false);
+  const DEBOUNCE_MS = 400;
+
+  // Debounce del texto de búsqueda: espera a que el usuario deje de escribir
+  // antes de disparar la consulta al backend.
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedEntityName(filterEntityName.trim()), DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+  }, [filterEntityName]);
+
+  // Resetear a la primera página cuando cambia el resultado del debounce
+  // (mismo comportamiento que los selects/fechas al cambiar de filtro).
+  useEffect(() => {
+    setCursorHistory([]);
+    setCurrentCursor(undefined);
+  }, [debouncedSearchTerm, debouncedEntityName]);
 
   const [globalStatsOpen, setGlobalStatsOpen] = useState(false);
   const [globalStatsRange, setGlobalStatsRange] = useState<'24h' | 'week'>('24h');
@@ -81,8 +100,6 @@ export default function AuditPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  const isInitialLoad = logs.length === 0 && loading;
-
   const entityTypeOptions = Array.from(
     new Set(logs.map((log) => log.entity_type).filter(Boolean))
   ).sort((a, b) => a.localeCompare(b));
@@ -93,7 +110,7 @@ export default function AuditPage() {
       : entityTypeOptions;
 
   const loadLogs = useCallback(
-    async (cursor?: string, silent = false) => {
+    async (cursor?: string) => {
       try {
         const startDate = filterStartDate ? `${filterStartDate}T00:00:00` : undefined;
         const endDate = filterEndDate ? `${filterEndDate}T23:59:59.999999` : undefined;
@@ -105,6 +122,8 @@ export default function AuditPage() {
           ...(filterEntityType ? { entity_type: filterEntityType } : {}),
           ...(startDate ? { start_date: startDate } : {}),
           ...(endDate ? { end_date: endDate } : {}),
+          ...(debouncedSearchTerm ? { search: debouncedSearchTerm } : {}),
+          ...(debouncedEntityName ? { entity_name: debouncedEntityName } : {}),
         });
 
         setLogs(data.logs || []);
@@ -113,13 +132,16 @@ export default function AuditPage() {
         setHasMore(data.has_more || false);
       } catch (error) {
         console.error('Error al cargar logs de auditoría:', error);
-      } finally {
-        if (!silent) {
-          setLoading(false);
-        }
       }
     },
-    [filterActionType, filterEntityType, filterStartDate, filterEndDate]
+    [
+      filterActionType,
+      filterEntityType,
+      filterStartDate,
+      filterEndDate,
+      debouncedSearchTerm,
+      debouncedEntityName,
+    ]
   );
 
   const loadStats = useCallback(async () => {
@@ -223,7 +245,7 @@ export default function AuditPage() {
 
   useEffect(() => {
     const intervalId = setInterval(() => {
-      loadLogs(currentCursor, true);
+      loadLogs(currentCursor);
       loadStats();
     }, SILENT_REFRESH_INTERVAL_MS);
 
@@ -272,31 +294,14 @@ export default function AuditPage() {
     setFilterActionType(null);
     setFilterEntityType('');
     setFilterEntityName('');
+    setDebouncedEntityName('');
     setFilterStartDate('');
     setFilterEndDate('');
     setSearchTerm('');
+    setDebouncedSearchTerm('');
     setCursorHistory([]);
     setCurrentCursor(undefined);
   };
-
-  const filteredLogs = logs.filter((log) => {
-    const entityNameFilter = filterEntityName.trim().toLowerCase();
-    if (
-      entityNameFilter &&
-      !(log.entity_name || '').toLowerCase().includes(entityNameFilter)
-    ) {
-      return false;
-    }
-
-    const s = searchTerm.toLowerCase();
-    if (!s) return true;
-    return (
-      log.entity_type.toLowerCase().includes(s) ||
-      log.action_type.toLowerCase().includes(s) ||
-      log.entity_id.toLowerCase().includes(s) ||
-      (log.entity_name || '').toLowerCase().includes(s)
-    );
-  });
 
   const isLogoutEvent = (
     log?: Pick<AuditLog, 'action_type' | 'entity_type' | 'old_values'>
@@ -564,17 +569,6 @@ export default function AuditPage() {
     setExpandedLogDetail(null);
   };
 
-  if (isInitialLoad) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">{tCommon('loading')}</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -594,17 +588,9 @@ export default function AuditPage() {
 
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Card 1: Acciones últimas 24h + botón de desglose */}
-          <div className="relative bg-white rounded-lg shadow p-6">
-            <Button
-              variant="outline"
-              size="sm"
-              className="absolute top-3 right-3 h-6 px-2 text-xs"
-              onClick={() => setBreakdownOpen(true)}
-            >
-              {t('viewBreakdown')}
-            </Button>
-            <div className="flex items-center pr-16">
+          {/* Card 1: Acciones últimas 24h */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
               <div className="p-3 bg-green-100 rounded-lg shrink-0">
                 <Activity className="h-6 w-6 text-green-600" />
               </div>
@@ -632,17 +618,9 @@ export default function AuditPage() {
             </div>
           </div>
 
-          {/* Card 3: Recuento de entidades en 24h + botón de desglose */}
-          <div className="relative bg-white rounded-lg shadow p-6">
-            <Button
-              variant="outline"
-              size="sm"
-              className="absolute top-3 right-3 h-6 px-2 text-xs"
-              onClick={() => setEntityBreakdownOpen(true)}
-            >
-              {t('viewBreakdown')}
-            </Button>
-            <div className="flex items-center pr-16">
+          {/* Card 3: Recuento de entidades en 24h */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
               <div className="p-3 bg-purple-100 rounded-lg shrink-0">
                 <Server className="h-6 w-6 text-purple-600" />
               </div>
@@ -656,52 +634,6 @@ export default function AuditPage() {
           </div>
         </div>
       )}
-
-      {/* Popup: desglose de acciones por tipo en las últimas 24h */}
-      <Dialog open={breakdownOpen} onOpenChange={setBreakdownOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('breakdownTitle')}</DialogTitle>
-          </DialogHeader>
-          {stats && Object.keys(stats.actions_by_type_24h).length > 0 ? (
-            <div className="grid grid-cols-2 gap-4">
-              {Object.entries(stats.actions_by_type_24h).map(([type, count]) => (
-                <div key={type} className="text-center">
-                  <Badge className={getActionTypeBadgeColor(type as ActionType)}>
-                    {getActionTypeLabel(type as ActionType)}
-                  </Badge>
-                  <p className="mt-2 text-2xl font-bold text-gray-900">{count}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500 text-center py-4">{tCommon('noData')}</p>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Popup: desglose de acciones por tipo de entidad en las últimas 24h */}
-      <Dialog open={entityBreakdownOpen} onOpenChange={setEntityBreakdownOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('entityBreakdownTitle')}</DialogTitle>
-          </DialogHeader>
-          {stats && Object.keys(stats.entities_by_type_24h).length > 0 ? (
-            <div className="grid grid-cols-2 gap-4">
-              {Object.entries(stats.entities_by_type_24h).map(([type, count]) => (
-                <div key={type} className="text-center">
-                  <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                    {type}
-                  </span>
-                  <p className="mt-2 text-2xl font-bold text-gray-900">{count}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500 text-center py-4">{tCommon('noData')}</p>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Popup: información global de auditoría, agrupada por entidad.
           Un mismo contenedor (track) desliza horizontalmente entre la vista
@@ -926,8 +858,9 @@ export default function AuditPage() {
         </DialogContent>
       </Dialog>
 
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+      <div className="bg-white rounded-lg shadow p-4 space-y-4">
+        {/* Fila 1: búsquedas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <Input
@@ -938,6 +871,16 @@ export default function AuditPage() {
               className="pl-10"
             />
           </div>
+          <Input
+            type="text"
+            placeholder={t('filterEntityName')}
+            value={filterEntityName}
+            onChange={(e) => setFilterEntityName(e.target.value)}
+          />
+        </div>
+
+        {/* Fila 2: resto de filtros */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <select
             value={filterActionType || 'all'}
             onChange={(e) => {
@@ -977,12 +920,6 @@ export default function AuditPage() {
             ))}
           </select>
           <Input
-            type="text"
-            placeholder={t('filterEntityName')}
-            value={filterEntityName}
-            onChange={(e) => setFilterEntityName(e.target.value)}
-          />
-          <Input
             type="date"
             aria-label={t('filterStartDate')}
             value={filterStartDate}
@@ -1010,7 +947,7 @@ export default function AuditPage() {
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        {filteredLogs.length === 0 ? (
+        {logs.length === 0 ? (
           <div className="text-center py-12">
             <FileText className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">{t('emptyTitle')}</h3>
@@ -1051,7 +988,7 @@ export default function AuditPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredLogs.map((log) => (
+                {logs.map((log) => (
                   <tr key={log.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDateWithTimezone(log.created_at, timezone)}
