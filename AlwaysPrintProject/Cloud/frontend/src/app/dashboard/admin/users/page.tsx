@@ -29,8 +29,10 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Activity,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
 import { formatDateWithTimezone, COMMON_TIMEZONES } from '@/lib/dateUtils'
 import { useUserTimezone } from '@/hooks/useUserTimezone'
 import { useAuth } from '@/hooks/useAuth'
@@ -50,6 +52,8 @@ export default function UsersPage() {
   const { user: currentUser, refreshUser } = useAuth()
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
+  const tTimeline = useTranslations('timeline')
+  const router = useRouter()
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [deletingUser, setDeletingUser] = useState<User | null>(null)
@@ -261,6 +265,14 @@ export default function UsersPage() {
                   </div>
 
                   <div className="flex items-center space-x-2 ml-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/dashboard/admin/users/${user.id}/activity`)}
+                      title={tTimeline('viewActivity')}
+                    >
+                      <Activity className="w-4 h-4" />
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"

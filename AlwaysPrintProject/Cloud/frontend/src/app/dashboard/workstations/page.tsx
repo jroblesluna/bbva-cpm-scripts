@@ -81,6 +81,7 @@ export default function WorkstationsPage() {
   const t = useTranslations('workstations');
   const tCommon = useTranslations('common');
   const tActions = useTranslations('actionConfigs');
+  const tTimeline = useTranslations('timeline');
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearch = useDebounce(searchTerm, 400);
   const [filterOnline, setFilterOnline] = useState<boolean | undefined>(true);
@@ -106,6 +107,7 @@ export default function WorkstationsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<'contingency_on' | 'contingency_off' | 'restart_tray' | 'restart_service' | 'check_update' | null>(null);
   const [bulkPending, setBulkPending] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Resetear página al cambiar vista (el pageSize cambia)
   const handleViewModeChange = (mode: ViewMode) => {
@@ -382,6 +384,21 @@ export default function WorkstationsPage() {
     loadDevices();
   }, [contingencyTarget]);
 
+  const handleExportInventory = async () => {
+    setIsExporting(true);
+    try {
+      await workstationsApi.exportInventory();
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: tTimeline('errors.exportFailed'),
+        description: tTimeline('errors.exportFailedDescription'),
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const handleRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['workstations'], refetchType: 'all' });
   }, [queryClient]);
@@ -468,6 +485,17 @@ export default function WorkstationsPage() {
           <span className="text-sm text-gray-500 hidden sm:inline">
             {t('lastUpdated', { time: formatDateWithTimezone(lastUpdated, userTimezone) })}
           </span>
+          {(currentUser?.role === 'admin' || currentUser?.role === 'operator') && (
+            <Button
+              variant="outline"
+              onClick={handleExportInventory}
+              disabled={isExporting}
+              title={tTimeline('tooltip.fullExport')}
+            >
+              <Download className={`w-4 h-4 mr-2 ${isExporting ? 'animate-spin' : ''}`} />
+              {isExporting ? tTimeline('loading') : tTimeline('exportInventory')}
+            </Button>
+          )}
           <Button
             onClick={handleRefresh}
             disabled={isFetching}

@@ -6,8 +6,8 @@ This plan implements the User Activity Timeline and Workstation Inventory Export
 
 ## Tasks
 
-- [ ] 1. Backend CSV export service and schemas
-  - [ ] 1.1 Create `app/services/export_csv.py` — shared CSV generation service
+- [x] 1. Backend CSV export service and schemas
+  - [x] 1.1 Create `app/services/export_csv.py` — shared CSV generation service
     - Implement `CSVExportService` class with static methods:
       - `utf8_bom()` → returns BOM bytes `b'\xef\xbb\xbf'`
       - `generate_activity_csv(logs, entity_names)` → yields CSV rows (header + data) for user activity export with columns: timestamp, action_type, entity_type, entity_name, old_values, new_values, ip_address
@@ -17,12 +17,12 @@ This plan implements the User Activity Timeline and Workstation Inventory Export
     - Serialize `old_values`/`new_values` JSON fields as compact JSON strings
     - _Requirements: 3.2, 4.2, 4.5_
 
-  - [ ] 1.2 Add `UserActivityExportParams` schema to `app/schemas/audit.py`
+  - [x] 1.2 Add `UserActivityExportParams` schema to `app/schemas/audit.py`
     - Add Pydantic model with optional `start_date: Optional[datetime]` and `end_date: Optional[datetime]` fields
     - _Requirements: 1.2, 1.3_
 
-- [ ] 2. Backend user activity endpoints
-  - [ ] 2.1 Create `app/api/v1/endpoints/user_activity.py` — activity timeline + export endpoints
+- [x] 2. Backend user activity endpoints
+  - [x] 2.1 Create `app/api/v1/endpoints/user_activity.py` — activity timeline + export endpoints
     - Create APIRouter with prefix for user activity
     - Implement `GET /` (paginated activity list):
       - Accept path param `user_id` (UUID), query params `start_date`, `end_date`, `cursor`, `limit` (default 15, max 100)
@@ -40,7 +40,7 @@ This plan implements the User Activity Timeline and Workstation Inventory Export
     - Handle errors: 404 if user_id not found, 403 for cross-org operator access, 422 for invalid date range
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 3.1, 3.2, 3.3, 3.5_
 
-  - [ ] 2.2 Add export endpoint to `app/api/v1/endpoints/workstations.py`
+  - [x] 2.2 Add export endpoint to `app/api/v1/endpoints/workstations.py`
     - Add `GET /export` route to existing workstations router
     - Validate auth: Admin → all workstations; Operator → only their org's workstations
     - Query workstations with JOINs to organizations and vlans tables for names
@@ -49,17 +49,17 @@ This plan implements the User Activity Timeline and Workstation Inventory Export
     - Set Content-Disposition: `attachment; filename="workstations_inventory_{YYYY-MM-DD}.csv"`
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
 
-  - [ ] 2.3 Register user_activity router in `app/api/v1/router.py`
+  - [x] 2.3 Register user_activity router in `app/api/v1/router.py`
     - Import `user_activity` router
     - Register under prefix `/users/{user_id}/activity` with appropriate tags
     - Ensure it doesn't conflict with existing user routes
     - _Requirements: 1.1_
 
-- [ ] 3. Checkpoint — Backend verification
+- [x] 3. Checkpoint — Backend verification
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 4. Property-based tests (Hypothesis)
-  - [ ]* 4.1 Create `tests/test_export_csv_service.py` — unit tests for CSV service
+- [x] 4. Property-based tests (Hypothesis)
+  - [x] 4.1 Create `tests/test_export_csv_service.py` — unit tests for CSV service
     - Test `utf8_bom()` returns correct bytes
     - Test `generate_activity_csv()` with sample data produces valid CSV with correct headers
     - Test `generate_workstation_csv()` with sample data produces valid CSV with correct headers
@@ -67,45 +67,45 @@ This plan implements the User Activity Timeline and Workstation Inventory Export
     - Test empty data produces headers-only CSV
     - _Requirements: 3.2, 4.2, 4.5_
 
-  - [ ]* 4.2 Create `tests/test_user_activity.py` — property tests for activity endpoint
+  - [x] 4.2 Create `tests/test_user_activity.py` — property tests for activity endpoint
     - **Property 1: User activity filter returns only target user's logs**
     - **Validates: Requirements 1.1**
     - Generate random audit log datasets with multiple user_ids using Hypothesis
     - Call filter logic, verify all returned logs have matching user_id and are ordered by created_at DESC
 
-  - [ ]* 4.3 Write property test for date range filtering in `tests/test_user_activity.py`
+  - [x] 4.3 Write property test for date range filtering in `tests/test_user_activity.py`
     - **Property 2: Date range filtering preserves bounds**
     - **Validates: Requirements 1.2, 1.3**
     - Generate random timestamps and date bounds using Hypothesis
     - Verify all returned logs have `created_at >= start_date` and `created_at <= end_date`
 
-  - [ ]* 4.4 Write property test for operator tenant isolation in `tests/test_user_activity.py`
+  - [x] 4.4 Write property test for operator tenant isolation in `tests/test_user_activity.py`
     - **Property 3: Operator tenant isolation**
     - **Validates: Requirements 1.4, 3.5, 4.3**
     - Generate random org assignments, verify 403 when operator accesses user from different org
 
-  - [ ]* 4.5 Write property test for action type inclusion in `tests/test_user_activity.py`
+  - [x] 4.5 Write property test for action type inclusion in `tests/test_user_activity.py`
     - **Property 5: All action types are included without filtering**
     - **Validates: Requirements 1.6**
     - Generate logs with all possible ActionType values, verify none are filtered out
 
-  - [ ]* 4.6 Write property test for activity CSV column completeness in `tests/test_user_activity.py`
+  - [x] 4.6 Write property test for activity CSV column completeness in `tests/test_user_activity.py`
     - **Property 7: Activity CSV column completeness**
     - **Validates: Requirements 3.2**
     - Generate random audit data, export via CSV service, verify every row has exactly 7 columns with correct headers
 
-  - [ ]* 4.7 Create `tests/test_workstation_export.py` — property tests for workstation export
+  - [x] 4.7 Create `tests/test_workstation_export.py` — property tests for workstation export
     - **Property 9: Workstation CSV column completeness**
     - **Validates: Requirements 4.2**
     - Generate random workstation data, export via CSV service, verify every row has exactly 9 columns with correct headers
 
-  - [ ]* 4.8 Write property test for UTF-8 BOM encoding in `tests/test_workstation_export.py`
+  - [x] 4.8 Write property test for UTF-8 BOM encoding in `tests/test_workstation_export.py`
     - **Property 10: UTF-8 BOM encoding for Excel compatibility**
     - **Validates: Requirements 4.5**
     - Generate any export (activity or workstation), verify file content begins with BOM bytes (0xEF, 0xBB, 0xBF)
 
-- [ ] 5. Frontend API extensions
-  - [ ] 5.1 Extend `src/lib/api.ts` with user activity and workstation export methods
+- [x] 5. Frontend API extensions
+  - [x] 5.1 Extend `src/lib/api.ts` with user activity and workstation export methods
     - Add to `usersApi`:
       - `activity(userId, params?)` → GET `/api/v1/users/{userId}/activity` with query params (start_date, end_date, cursor, limit), returns `AuditLogListResponse`
       - `exportActivity(userId, params?)` → GET `/api/v1/users/{userId}/activity/export`, triggers browser file download via blob URL
@@ -114,8 +114,8 @@ This plan implements the User Activity Timeline and Workstation Inventory Export
     - Use existing auth token pattern from other API methods
     - _Requirements: 2.3, 3.1, 3.3, 4.1, 5.3_
 
-- [ ] 6. Frontend pages and components
-  - [ ] 6.1 Create Timeline page at `src/app/dashboard/admin/users/[userId]/activity/page.tsx`
+- [x] 6. Frontend pages and components
+  - [x] 6.1 Create Timeline page at `src/app/dashboard/admin/users/[userId]/activity/page.tsx`
     - Display user info header (full_name, email) fetched via existing users API
     - Implement date range picker (start_date, end_date) with form validation
     - Render timeline list with audit log entries showing: action_type, entity_type, entity_name, ip_address, created_at
@@ -125,12 +125,12 @@ This plan implements the User Activity Timeline and Workstation Inventory Export
     - Use `useTranslations('timeline')` for all text
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.4_
 
-  - [ ] 6.2 Add "Ver actividad" link to Users list page (`src/app/dashboard/admin/users/page.tsx`)
+  - [x] 6.2 Add "Ver actividad" link to Users list page (`src/app/dashboard/admin/users/page.tsx`)
     - Add a link/button per user row that navigates to `/dashboard/admin/users/[userId]/activity`
     - Use translated label from `timeline` namespace
     - _Requirements: 2.5_
 
-  - [ ] 6.3 Add "Exportar inventario completo" button to Workstations page (`src/app/dashboard/workstations/page.tsx`)
+  - [x] 6.3 Add "Exportar inventario completo" button to Workstations page (`src/app/dashboard/workstations/page.tsx`)
     - Add export button in the page header area
     - Show tooltip on hover clarifying "Exporta TODAS las workstations, sin importar filtros aplicados"
     - Call `workstationsApi.exportInventory()` on click
@@ -139,14 +139,14 @@ This plan implements the User Activity Timeline and Workstation Inventory Export
     - Hide button for ReadOnly users (role check)
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6_
 
-- [ ] 7. Internationalization
-  - [ ] 7.1 Add `timeline` namespace translations to `messages/es.json` and `messages/en.json`
+- [x] 7. Internationalization
+  - [x] 7.1 Add `timeline` namespace translations to `messages/es.json` and `messages/en.json`
     - Add Spanish translations in `es.json` for: page title, user info labels, date range picker labels, export button, empty state message, error messages, tooltip text, loading states
     - Add English translations in `en.json` with equivalent keys
     - Include keys for: timeline.title, timeline.exportCsv, timeline.exportInventory, timeline.emptyState, timeline.dateRange.start, timeline.dateRange.end, timeline.tooltip.fullExport, timeline.errors.exportFailed, timeline.errors.loadFailed, timeline.loading
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 8. Final checkpoint — Ensure all tests pass
+- [x] 8. Final checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

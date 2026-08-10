@@ -32,6 +32,7 @@ from app.api.v1.endpoints import (
     remote_view,
     knowledge_articles,
     profile_knowledge_articles,
+    user_activity,
 )
 
 # Router principal de la API v1
@@ -65,6 +66,13 @@ api_router.include_router(
     users.router,
     prefix="/users",
     tags=["Usuarios"]
+)
+
+# Actividad de usuario (timeline)
+api_router.include_router(
+    user_activity.router,
+    prefix="/users/{user_id}/activity",
+    tags=["Actividad de Usuario"]
 )
 
 # Configuración efectiva de workstation (autenticación por IP pública o token Bearer)
