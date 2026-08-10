@@ -1,5 +1,5 @@
 {
-  "version": "12.2",
+  "version": "12.3",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -1177,10 +1177,20 @@
         },
         {
           "type": "RunProcess",
-          "description": "Verificar versión y descargar MSI si necesita actualización",
+          "description": "Escribir script de verificación y descarga a archivo temporal",
           "parameters": {
             "file_path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-            "arguments": "-NoProfile -ExecutionPolicy Bypass -Command \"[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $exe = 'C:\\Program Files (x86)\\Robles.AI\\AlwaysPrint\\AlwaysPrintTray.exe'; $apiUrl = '{{%SERVER_URL%}}'; $orgId = '{{%ORGANIZATION_ID%}}'; $msi = 'C:\\ProgramData\\AlwaysPrint\\Updates\\AlwaysPrint_update.msi'; $needsUpdate = $true; if (Test-Path $exe) { $current = (Get-Item $exe).VersionInfo.FileVersion; if ($apiUrl -and $orgId) { try { $resp = (New-Object Net.WebClient).DownloadString(\\\"$apiUrl/api/v1/updates/check?organization_id=$orgId\\\"); if ($resp -match '\\\"version\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"') { $offered = $Matches[1]; if ($current -eq $offered) { $needsUpdate = $false } } } catch { } } }; if (-not $needsUpdate) { Write-Output \\\"Version al dia ($current). No requiere actualizacion.\\\"; exit 0 }; Write-Output \\\"Actualizacion necesaria. Descargando MSI...\\\"; New-Item -ItemType Directory -Path (Split-Path $msi) -Force | Out-Null; if (Test-Path $msi) { Remove-Item $msi -Force -ErrorAction SilentlyContinue }; try { $b64 = (New-Object Net.WebClient).DownloadString(\\\"$apiUrl/api/v1/updates/pkg/$orgId\\\"); $bytes = [Convert]::FromBase64String($b64); if ($bytes.Length -lt 100000) { throw \\\"Archivo muy pequeno: $($bytes.Length) bytes\\\" }; [IO.File]::WriteAllBytes($msi, $bytes); Write-Output \\\"MSI descargado: $($bytes.Length) bytes\\\"; exit 0 } catch { Write-Output \\\"Error descargando MSI: $($_.Exception.Message)\\\"; exit 1 }\"",
+            "arguments": "-NoProfile -ExecutionPolicy Bypass -Command \"$s = @'\n[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12\n$exe = 'C:\\Program Files (x86)\\Robles.AI\\AlwaysPrint\\AlwaysPrintTray.exe'\n$apiUrl = '{{%SERVER_URL%}}'\n$orgId = '{{%ORGANIZATION_ID%}}'\n$msi = 'C:\\ProgramData\\AlwaysPrint\\Updates\\AlwaysPrint_update.msi'\n$needsUpdate = $true\nif (Test-Path $exe) {\n  $current = (Get-Item $exe).VersionInfo.FileVersion\n  if ($apiUrl -and $orgId) {\n    try {\n      $resp = (New-Object Net.WebClient).DownloadString(\\\"$apiUrl/api/v1/updates/check?organization_id=$orgId\\\")\n      if ($resp -match '\\\"version\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"') {\n        $offered = $Matches[1]\n        if ($current -eq $offered) { $needsUpdate = $false }\n      }\n    } catch { }\n  }\n}\nif (-not $needsUpdate) { Write-Output \\\"Version al dia ($current). No requiere actualizacion.\\\"; exit 0 }\nWrite-Output \\\"Actualizacion necesaria. Descargando MSI...\\\"\nNew-Item -ItemType Directory -Path (Split-Path $msi) -Force | Out-Null\nif (Test-Path $msi) { Remove-Item $msi -Force -ErrorAction SilentlyContinue }\ntry {\n  $b64 = (New-Object Net.WebClient).DownloadString(\\\"$apiUrl/api/v1/updates/pkg/$orgId\\\")\n  $bytes = [Convert]::FromBase64String($b64)\n  if ($bytes.Length -lt 100000) { throw \\\"Archivo muy pequeno: $($bytes.Length) bytes\\\" }\n  [IO.File]::WriteAllBytes($msi, $bytes)\n  Write-Output \\\"MSI descargado: $($bytes.Length) bytes\\\"\n  exit 0\n} catch {\n  Write-Output \\\"Error descargando MSI: $($_.Exception.Message)\\\"\n  exit 1\n}\n'@\nSet-Content -Path 'C:\\Windows\\Temp\\ap_check_update.ps1' -Value $s -Encoding UTF8\"",
+            "timeout_seconds": 10,
+            "window_style": "Hidden"
+          }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Verificar versión y descargar MSI si necesita actualización (como usuario para proxy)",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+            "arguments": "-NoProfile -ExecutionPolicy Bypass -File \"C:\\Windows\\Temp\\ap_check_update.ps1\"",
             "timeout_seconds": 200,
             "window_style": "Hidden",
             "run_as_logged_in_user": true
