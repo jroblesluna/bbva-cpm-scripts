@@ -534,9 +534,12 @@ export const workstationsApi = {
     commandType: 'restart_service' | 'restart_tray' | 'check_update' | 'execute_on_demand',
     params?: Record<string, unknown>
   ): Promise<{ command_id: string; status: string }> => {
+    // execute_on_demand puede tardar hasta 90s (descarga MSI, limpieza, etc.)
+    const timeout = commandType === 'execute_on_demand' ? 90000 : 30000
     const response = await apiClient.post<{ command_id: string; status: string }>(
       `/workstations/${id}/command`,
-      { command_type: commandType, params: params ?? {} }
+      { command_type: commandType, params: params ?? {} },
+      { timeout }
     )
     return response.data
   },
