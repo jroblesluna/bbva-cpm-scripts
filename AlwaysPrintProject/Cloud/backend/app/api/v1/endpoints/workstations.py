@@ -7,17 +7,20 @@ Este módulo define los endpoints para:
 - Actualización de workstations
 - Gestión de configuración específica
 - Estadísticas
+- Exportación de inventario completo (CSV)
 - Envío de comandos remotos a workstations
 """
 
 import asyncio
 import logging
 import uuid
+from datetime import date
 from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from starlette.responses import StreamingResponse
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -25,6 +28,7 @@ from app.core.utils import get_client_ip, get_workstation_local_ip
 from app.models.audit import ActionType
 from app.models.user import User, UserRole
 from app.models.workstation import Workstation
+from app.services.export_csv import CSVExportService
 from app.schemas import (
     WorkstationResponse,
     WorkstationDetailResponse,
@@ -1440,6 +1444,122 @@ async def get_workstation_stats(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al obtener estadísticas: {str(e)}"
         )
+
+
+# === ENDPOINT DE EXPORTACIÓN DE INVENTARIO (CSV) ===
+
+@router.get("/export")
+def export_workstations(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Exportar inventario completo de workstations como CSV.
+
+    Genera un archivo CSV con todas las workstations accesibles para el usuario,
+    sin paginación ni filtros. Incluye BOM UTF-8 para compatibilidad con Excel.
+
+    - Admin: exporta TODAS las workstations de todas las organizaciones
+    - Operador: solo workstations de su organización
+    - ReadOnly: retorna 403 (sin permisos para exportar)
+
+    Returns:
+        StreamingResponse con CSV (UTF-8 BOM)
+    """
+    from app.models.organization import Organization
+    from app.models.vlan import VLAN
+    from app.models.action_config import ActionConfig, ActionConfigScope
+
+    # ReadOnly no puede exportar
+    if current_user.role == UserRole.READONLY:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sin permisos para exportar"
+        )
+
+    # Construir query base
+    query = db.query(Workstation)
+
+    # Tenant isolation: operadores solo ven su organización
+    if current_user.role == UserRole.OPERATOR:
+        if not current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Operador sin cuenta asignada"
+            )
+        query = query.filter(Workstation.organization_id == current_user.organization_id)
+
+    # Ordenar por IP para consistencia
+    workstations = query.order_by(Workstation.ip_private.asc()).all()
+
+    # Construir lista de dicts con nombres resueltos para cada workstation
+    export_data = []
+    for ws in workstations:
+        # Resolver nombre de organización via relación
+        org_name = ""
+        if ws.organization:
+            org_name = ws.organization.name or ""
+
+        # Resolver nombre de VLAN via relación
+        vlan_name = ""
+        if ws.vlan:
+            vlan_name = ws.vlan.name or ""
+
+        # Resolver nombre de action config activa
+        # Primero intentar desde el campo directo de la workstation
+        config_name = ws.action_config_name or ""
+
+        # Si no tiene config_name, buscar config activa por scope
+        if not config_name:
+            active_config = (
+                db.query(ActionConfig)
+                .filter(
+                    ActionConfig.is_active == True,
+                    (
+                        (ActionConfig.scope == ActionConfigScope.WORKSTATION) &
+                        (ActionConfig.workstation_id == ws.id)
+                    ) | (
+                        (ActionConfig.scope == ActionConfigScope.ORG) &
+                        (ActionConfig.organization_id == ws.organization_id)
+                    )
+                )
+                .first()
+            )
+            if active_config:
+                config_name = active_config.name or ""
+
+        export_data.append({
+            "hostname": ws.hostname or "",
+            "ip_private": ws.ip_private or "",
+            "current_user": ws.current_user or "",
+            "organization_name": org_name,
+            "tray_version": ws.tray_version or "",
+            "action_config_name": config_name,
+            "last_connection": ws.last_connection,
+            "is_online": ws.is_online,
+            "vlan_name": vlan_name,
+        })
+
+    # Generar CSV usando el servicio compartido
+    csv_generator = CSVExportService.generate_workstation_csv(export_data)
+
+    # Construir respuesta streaming con BOM UTF-8
+    def stream_with_bom():
+        """Genera el stream CSV con prefijo BOM para Excel."""
+        yield CSVExportService.utf8_bom().decode("utf-8")
+        for row in csv_generator:
+            yield row
+
+    # Nombre de archivo con fecha actual
+    filename = f"workstations_inventory_{date.today().isoformat()}.csv"
+
+    return StreamingResponse(
+        stream_with_bom(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        }
+    )
 
 
 @router.get("/{workstation_id}", response_model=WorkstationDetailResponse)

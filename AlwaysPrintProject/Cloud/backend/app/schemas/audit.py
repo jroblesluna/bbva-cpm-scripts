@@ -95,3 +95,9 @@ class AuditLogGlobalStatsResponse(BaseModel):
         default_factory=dict,
         description="Conteo de acciones por tipo, agrupado por tipo de entidad"
     )
+
+
+class UserActivityExportParams(BaseModel):
+    """Parámetros de consulta para exportar actividad de usuario."""
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None

@@ -444,6 +444,50 @@ export const usersApi = {
     })
     return response.data
   },
+
+  /**
+   * Obtener actividad del usuario con paginación por cursor.
+   */
+  activity: async (userId: string, params?: {
+    start_date?: string;
+    end_date?: string;
+    cursor?: string;
+    limit?: number;
+  }): Promise<AuditLogListResponse> => {
+    const response = await apiClient.get<AuditLogListResponse>(`/users/${userId}/activity/`, {
+      params,
+    })
+    return response.data
+  },
+
+  /**
+   * Descargar CSV de actividad del usuario.
+   */
+  exportActivity: async (userId: string, params?: {
+    start_date?: string;
+    end_date?: string;
+  }): Promise<void> => {
+    const response = await apiClient.get(`/users/${userId}/activity/export`, {
+      params,
+      responseType: 'blob',
+    })
+    // Crear enlace de descarga temporal
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    // Extraer filename del header Content-Disposition si está disponible
+    const disposition = response.headers['content-disposition']
+    let filename = 'activity_export.csv'
+    if (disposition) {
+      const match = disposition.match(/filename="?([^";\s]+)"?/)
+      if (match) filename = match[1]
+    }
+    link.setAttribute('download', filename)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  },
 }
 
 // ============================================================================
@@ -626,6 +670,30 @@ export const workstationsApi = {
       editable_files: Array<{ label: string; path: string; description: string }>;
     }>(`/workstations/${id}/os-commands`)
     return response.data
+  },
+
+  /**
+   * Descargar CSV de inventario completo de workstations.
+   */
+  exportInventory: async (): Promise<void> => {
+    const response = await apiClient.get('/workstations/export', {
+      responseType: 'blob',
+    })
+    // Crear enlace de descarga temporal
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    const disposition = response.headers['content-disposition']
+    let filename = 'workstations_inventory.csv'
+    if (disposition) {
+      const match = disposition.match(/filename="?([^";\s]+)"?/)
+      if (match) filename = match[1]
+    }
+    link.setAttribute('download', filename)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
   },
 }
 

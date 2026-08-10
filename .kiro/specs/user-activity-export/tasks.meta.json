@@ -1,0 +1,411 @@
+{
+  "pbtResults": {
+    "4.2 Create `tests/test_user_activity.py` — property tests for activity endpoint": {
+      "status": "passed",
+      "lastRunTimestamp": 1786385166241
+    },
+    "4.3 Write property test for date range filtering in `tests/test_user_activity.py`": {
+      "status": "passed",
+      "lastRunTimestamp": 1786385167326
+    },
+    "4.4 Write property test for operator tenant isolation in `tests/test_user_activity.py`": {
+      "status": "passed",
+      "lastRunTimestamp": 1786385168269
+    },
+    "4.5 Write property test for action type inclusion in `tests/test_user_activity.py`": {
+      "status": "passed",
+      "lastRunTimestamp": 1786385169090
+    },
+    "4.6 Write property test for activity CSV column completeness in `tests/test_user_activity.py`": {
+      "status": "passed",
+      "lastRunTimestamp": 1786385169949
+    },
+    "4.7 Create `tests/test_workstation_export.py` — property tests for workstation export": {
+      "status": "passed",
+      "lastRunTimestamp": 1786385184673
+    },
+    "4.8 Write property test for UTF-8 BOM encoding in `tests/test_workstation_export.py`": {
+      "status": "passed",
+      "lastRunTimestamp": 1786385185791
+    }
+  },
+  "executionHistory": {
+    "1.1 Create `app/services/export_csv.py` — shared CSV generation service": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384166596
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384174765
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384499307
+      }
+    ],
+    "1.2 Add `UserActivityExportParams` schema to `app/schemas/audit.py`": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384166636
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384175478
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384500638
+      }
+    ],
+    "2.1 Create `app/api/v1/endpoints/user_activity.py` — activity timeline + export endpoints": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384166663
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384505224
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384733998
+      }
+    ],
+    "2.2 Add export endpoint to `app/api/v1/endpoints/workstations.py`": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384166697
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384506126
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384734895
+      }
+    ],
+    "2.3 Register user_activity router in `app/api/v1/router.py`": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384166738
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384742323
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384791216
+      }
+    ],
+    "3. Checkpoint — Backend verification": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384166767
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384797221
+      }
+    ],
+    "4.1 Create `tests/test_export_csv_service.py` — unit tests for CSV service": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384166794
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384801864
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385206743
+      }
+    ],
+    "4.2 Create `tests/test_user_activity.py` — property tests for activity endpoint": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384166823
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384802703
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385207678
+      }
+    ],
+    "4.3 Write property test for date range filtering in `tests/test_user_activity.py`": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384166850
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384803567
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385208840
+      }
+    ],
+    "4.4 Write property test for operator tenant isolation in `tests/test_user_activity.py`": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384166878
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384804493
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385209784
+      }
+    ],
+    "4.5 Write property test for action type inclusion in `tests/test_user_activity.py`": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384166905
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384805332
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385210660
+      }
+    ],
+    "4.6 Write property test for activity CSV column completeness in `tests/test_user_activity.py`": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384166933
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384812542
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385215563
+      }
+    ],
+    "4.7 Create `tests/test_workstation_export.py` — property tests for workstation export": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384166965
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384813397
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385217241
+      }
+    ],
+    "4.8 Write property test for UTF-8 BOM encoding in `tests/test_workstation_export.py`": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384167005
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384814299
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385217396
+      }
+    ],
+    "5.1 Extend `src/lib/api.ts` with user activity and workstation export methods": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384167030
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384815131
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385218450
+      }
+    ],
+    "6.1 Create Timeline page at `src/app/dashboard/admin/users/[userId]/activity/page.tsx`": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384167060
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385229912
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385561142
+      }
+    ],
+    "6.2 Add \"Ver actividad\" link to Users list page (`src/app/dashboard/admin/users/page.tsx`)": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384167098
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385566858
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385727789
+      }
+    ],
+    "6.3 Add \"Exportar inventario completo\" button to Workstations page (`src/app/dashboard/workstations/page.tsx`)": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384167124
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385230917
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385562172
+      }
+    ],
+    "7.1 Add `timeline` namespace translations to `messages/es.json` and `messages/en.json`": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384167154
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385567840
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385728614
+      }
+    ],
+    "8. Final checkpoint — Ensure all tests pass": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384167184
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385734447
+      },
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385868282
+      }
+    ],
+    "1. Backend CSV export service and schemas": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384500678
+      }
+    ],
+    "2. Backend user activity endpoints": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786384791252
+      }
+    ],
+    "4. Property-based tests (Hypothesis)": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385217434
+      }
+    ],
+    "5. Frontend API extensions": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385218479
+      }
+    ],
+    "6. Frontend pages and components": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385727840
+      }
+    ],
+    "7. Internationalization": [
+      {
+        "executionId": "b1a197ce-0ade-4a73-ab66-e3d27daef627",
+        "chatSessionId": "sess_075c7ee2-42b7-4233-84c3-360040fc5f6f",
+        "timestamp": 1786385728655
+      }
+    ]
+  }
+}

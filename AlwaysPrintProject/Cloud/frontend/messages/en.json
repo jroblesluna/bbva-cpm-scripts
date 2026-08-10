@@ -1597,5 +1597,29 @@
     "noResults": "No articles found",
     "selectedCount": "{count} article(s) selected",
     "loadingArticles": "Loading articles..."
+  },
+  "timeline": {
+    "title": "User Activity",
+    "backToUsers": "Back to users",
+    "exportCsv": "Export CSV",
+    "exportInventory": "Export full inventory",
+    "applyFilters": "Apply filters",
+    "viewActivity": "View activity",
+    "dateRange": {
+      "start": "Start date",
+      "end": "End date"
+    },
+    "emptyState": "No activity found for the selected criteria",
+    "loadMore": "Load more",
+    "totalResults": "{count} results",
+    "tooltip": {
+      "fullExport": "Exports ALL workstations, regardless of applied filters"
+    },
+    "errors": {
+      "exportFailed": "Export error",
+      "exportFailedDescription": "Could not generate the export file. Please try again.",
+      "loadFailed": "Error loading activity"
+    },
+    "loading": "Exporting..."
   }
 }
