@@ -242,6 +242,12 @@ namespace AlwaysPrintTray.Cloud
                     "CloudWebSocketClient: conexión WebSocket establecida exitosamente.");
                 Connected?.Invoke();
 
+                // Esperar a que el SendAsync del register (disparado por Connected) se complete
+                // antes de entrar al receive loop. El método Send() usa Task.Run internamente,
+                // por lo que necesitamos un breve delay para garantizar que el mensaje register
+                // sea escrito al socket antes de procesar mensajes entrantes del servidor.
+                await Task.Delay(100, token).ConfigureAwait(false);
+
                 // Iniciar bucle de recepción de mensajes
                 await ReceiveLoopAsync(ws, token).ConfigureAwait(false);
             }

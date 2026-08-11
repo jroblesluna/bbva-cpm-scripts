@@ -1,0 +1,300 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Implementar comparación semántica de versiones MSI en SyncFromStateAsync": [
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400052805
+      },
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400061096
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400156837
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400165519
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400318015
+      }
+    ],
+    "1.2 Escribir tests unitarios para comparación de versiones MSI": [
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400052852
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400156942
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400331002
+      },
+      {
+        "executionId": "dbbb7bee-02a8-4a12-9488-7d7f2172c870",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786413701886
+      }
+    ],
+    "2.1 Inicializar HttpClient con ProxyHelper.CreateHandler() en DomainHealthChecker": [
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400052877
+      },
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400061146
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400156975
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400166322
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400318956
+      }
+    ],
+    "2.2 Verificar que DomainHealthChecker.Http tiene proxy configurado": [
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400052903
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400157005
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400331853
+      },
+      {
+        "executionId": "dbbb7bee-02a8-4a12-9488-7d7f2172c870",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786413702920
+      }
+    ],
+    "3.1 Agregar asyncio.wait_for con timeout 10s en endpoint WebSocket del backend": [
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400052963
+      },
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400061989
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400157037
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400167315
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400320198
+      }
+    ],
+    "3.2 Agregar delay post-registro en CloudWebSocketClient.ConnectInternalAsync": [
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400052990
+      },
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400062988
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400157074
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400168106
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400321259
+      }
+    ],
+    "3.3 Escribir test del timeout de registro en el backend": [
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400053015
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400157098
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400332662
+      },
+      {
+        "executionId": "dbbb7bee-02a8-4a12-9488-7d7f2172c870",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786413701093
+      }
+    ],
+    "4.1 Agregar método helper IsServiceNotFound y catch en StopService": [
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400053037
+      },
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400063770
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400157132
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400168927
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400322295
+      }
+    ],
+    "4.2 Agregar catch análogo en StartService para servicios inexistentes": [
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400053061
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400157158
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400333464
+      },
+      {
+        "executionId": "dbbb7bee-02a8-4a12-9488-7d7f2172c870",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786413704140
+      }
+    ],
+    "4.3 Escribir tests unitarios para manejo de servicios inexistentes": [
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400053088
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400157190
+      },
+      {
+        "executionId": "dbbb7bee-02a8-4a12-9488-7d7f2172c870",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786413117720
+      },
+      {
+        "executionId": "dbbb7bee-02a8-4a12-9488-7d7f2172c870",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786413356375
+      }
+    ],
+    "5. Checkpoint — Verificar compilación y tests": [
+      {
+        "executionId": "82eb1275-95ae-4547-a8f4-e5e224bd7b6a",
+        "chatSessionId": "sess_7be3035f-2462-4c9c-a954-a67bccee35ce",
+        "timestamp": 1786400053110
+      },
+      {
+        "executionId": "6a17287b-2d19-42aa-bcff-7b8dfe45090f",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786400157219
+      },
+      {
+        "executionId": "dbbb7bee-02a8-4a12-9488-7d7f2172c870",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786413360677
+      },
+      {
+        "executionId": "dbbb7bee-02a8-4a12-9488-7d7f2172c870",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786413436889
+      }
+    ],
+    "3. Fix WebSocket register race condition (Backend + Cliente)": [
+      {
+        "executionId": "dbbb7bee-02a8-4a12-9488-7d7f2172c870",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786413701163
+      }
+    ],
+    "1. Fix MSI version check in PushMessageHandler.SyncFromStateAsync": [
+      {
+        "executionId": "dbbb7bee-02a8-4a12-9488-7d7f2172c870",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786413701918
+      }
+    ],
+    "2. Fix proxy support in DomainHealthChecker HttpClient": [
+      {
+        "executionId": "dbbb7bee-02a8-4a12-9488-7d7f2172c870",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786413702954
+      }
+    ],
+    "4. Handle non-existent services gracefully in AdminActions": [
+      {
+        "executionId": "dbbb7bee-02a8-4a12-9488-7d7f2172c870",
+        "chatSessionId": "sess_a6d86a60-a829-4432-8250-59203682a209",
+        "timestamp": 1786413704186
+      }
+    ]
+  }
+}

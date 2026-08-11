@@ -5,6 +5,7 @@ using System.Threading;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Network;
+using AlwaysPrintTray.Cloud;
 using Microsoft.Win32;
 
 namespace AlwaysPrintTray.Bootstrap
@@ -36,7 +37,9 @@ namespace AlwaysPrintTray.Bootstrap
 
         // HttpClient reutilizable: el pool de conexiones subyacente gestiona el ciclo de vida.
         // No se dispone nunca — es intencional para instancias static.
-        private static readonly HttpClient _http = new HttpClient
+        // Se usa ProxyHelper.CreateHandler() para soportar proxy corporativo (Zscaler, etc.)
+        // disposeHandler: false porque el HttpClient es static y nunca se dispone.
+        private static readonly HttpClient _http = new HttpClient(ProxyHelper.CreateHandler(), disposeHandler: false)
         {
             Timeout = TimeSpan.FromSeconds(TimeoutSecs)
         };
