@@ -343,13 +343,27 @@ namespace AlwaysPrintTray.Cloud
                 }
             }
 
-            // 3. Comparar versión de MSI (msi_version)
+            // 3. Comparar versión de MSI (msi_version) — comparación semántica
             if (!string.IsNullOrEmpty(state.MsiVersion))
             {
                 string currentVersion = System.Reflection.Assembly.GetExecutingAssembly()
                     .GetName().Version?.ToString() ?? "0.0.0.0";
 
-                if (!currentVersion.Equals(state.MsiVersion, StringComparison.OrdinalIgnoreCase))
+                // Comparación semántica: soporta 3 vs 4 segmentos (ej: "1.2.3" vs "1.2.3.0")
+                bool versionAlDia;
+                if (Version.TryParse(currentVersion, out var localVer) &&
+                    Version.TryParse(state.MsiVersion, out var remoteVer))
+                {
+                    // Si la versión local es >= remota, estamos al día (evita downgrades involuntarios)
+                    versionAlDia = (localVer >= remoteVer);
+                }
+                else
+                {
+                    // Fallback a comparación string si algún parse falla
+                    versionAlDia = currentVersion.Equals(state.MsiVersion, StringComparison.OrdinalIgnoreCase);
+                }
+
+                if (!versionAlDia)
                 {
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"PushMessageHandler: SyncFromState — msi_version difiere " +
@@ -362,7 +376,7 @@ namespace AlwaysPrintTray.Cloud
                         {
                             try
                             {
-                                string? msiPath = await _updateDownloader.DownloadFromUrlAsync(
+                                string msiPath = await _updateDownloader.DownloadFromUrlAsync(
                                     state.MsiUrl, state.MsiFileSize, state.MsiVersion);
 
                                 if (msiPath != null)
@@ -392,8 +406,10 @@ namespace AlwaysPrintTray.Cloud
                     }
                     else
                     {
+                        // Versión remota más nueva pero sin URL de descarga — loguear warning
                         AlwaysPrintLogger.WriteTrayWarning(
-                            $"PushMessageHandler: SyncFromState — msi_version difiere pero no hay URL de descarga.");
+                            $"PushMessageHandler: SyncFromState — msi_version remota ({state.MsiVersion}) es más nueva " +
+                            $"que la local ({currentVersion}) pero MsiUrl es null. No se puede descargar.");
                     }
 
                     updatedCount++;

@@ -1053,6 +1053,14 @@ namespace AlwaysPrintService.Actions
                     return true;
                 }
             }
+            catch (InvalidOperationException ex) when (IsServiceNotFound(ex))
+            {
+                // Servicio no instalado en esta workstation — no es un error operacional
+                AlwaysPrintLogger.WriteWarning(
+                    $"StopService: servicio '{serviceName}' no encontrado en esta workstation. " +
+                    "Retornando éxito (nada que detener).");
+                return true;
+            }
             catch (System.TimeoutException)
             {
                 AlwaysPrintLogger.WriteWarning($"StopService: timeout deteniendo {serviceName}");
@@ -1103,11 +1111,38 @@ namespace AlwaysPrintService.Actions
                     return true;
                 }
             }
+            catch (InvalidOperationException ex) when (IsServiceNotFound(ex))
+            {
+                // Servicio no instalado en esta workstation — no es un error operacional
+                AlwaysPrintLogger.WriteWarning(
+                    $"StartService: servicio '{serviceName}' no encontrado en esta workstation. " +
+                    "Retornando éxito (estado deseado no aplica si no existe).");
+                return true;
+            }
             catch (Exception ex)
             {
                 AlwaysPrintLogger.WriteError($"StartService: error iniciando {serviceName}: {ex.Message}", ex);
                 return false;
             }
+        }
+        
+        /// <summary>
+        /// Determina si una InvalidOperationException indica que el servicio no existe.
+        /// ServiceController lanza esta excepción con un InnerException de tipo
+        /// System.ComponentModel.Win32Exception con NativeErrorCode 1060 (ERROR_SERVICE_DOES_NOT_EXIST).
+        /// </summary>
+        private static bool IsServiceNotFound(InvalidOperationException ex)
+        {
+            if (ex.InnerException is System.ComponentModel.Win32Exception win32Ex)
+            {
+                // ERROR_SERVICE_DOES_NOT_EXIST = 1060
+                return win32Ex.NativeErrorCode == 1060;
+            }
+
+            // Fallback: verificar mensaje (menos confiable, pero cubre edge cases de localización)
+            return ex.Message.Contains("was not found") ||
+                   ex.Message.Contains("no se encontró") ||
+                   ex.Message.Contains("does not exist");
         }
         
         // ═══════════════════════════════════════════════════════════════════════

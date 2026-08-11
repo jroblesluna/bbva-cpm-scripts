@@ -27,9 +27,15 @@
     <Compile Include="..\AlwaysPrintTray\OnDemand\StatusDisplayHelper.cs" Link="OnDemand\StatusDisplayHelper.cs" />
     <Compile Include="..\AlwaysPrintTray\Forms\ServiceStatusItem.cs" Link="Forms\ServiceStatusItem.cs" />
     <Compile Include="..\AlwaysPrintTray\Localization\LocalizationManager.cs" Link="Localization\LocalizationManager.cs" />
+    <Compile Include="..\AlwaysPrintTray\Bootstrap\DomainHealthChecker.cs" Link="Bootstrap\DomainHealthChecker.cs" />
+    <Compile Include="..\AlwaysPrintTray\Cloud\ProxyHelper.cs" Link="Cloud\ProxyHelper.cs" />
   </ItemGroup>
   <ItemGroup>
     <!-- Excluir test con dependencia rota: ServiceStatusItem.ActionLabel fue eliminado en refactor -->
     <Compile Remove="OnDemand\ServiceStatusTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Referencias de ensamblado requeridas para linked files de AlwaysPrintTray -->
+    <Reference Include="System.Net.Http" />
   </ItemGroup>
 </Project>

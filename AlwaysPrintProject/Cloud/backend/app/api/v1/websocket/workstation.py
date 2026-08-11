@@ -10,6 +10,7 @@ Este módulo maneja la comunicación bidireccional con las workstations:
 - Recepción de resultados de conectividad
 """
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -92,8 +93,14 @@ async def workstation_websocket(
         await websocket.accept()
         print(f"[WS] Conexión aceptada", flush=True)
         
-        # Esperar mensaje de registro
-        data = await websocket.receive_json()
+        # Esperar mensaje de registro con timeout de 10 segundos.
+        # Si el cliente tarda demasiado (GC pause, CPU spike), cerramos la conexión
+        # en lugar de esperar indefinidamente hasta el TCP timeout.
+        try:
+            data = await asyncio.wait_for(websocket.receive_json(), timeout=10.0)
+        except asyncio.TimeoutError:
+            await _safe_close(websocket, 1008, "Timeout esperando mensaje de registro")
+            return
         print(f"[WS] Mensaje recibido: type={data.get('type')}", flush=True)
         
         if data.get("type") != "register":
