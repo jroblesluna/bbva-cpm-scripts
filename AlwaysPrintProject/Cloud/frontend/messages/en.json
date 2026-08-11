@@ -257,6 +257,7 @@
     "restartConfirmBtn": "Confirm restart",
     "restartSending": "Sending...",
     "pagination": "Showing {start} to {end} of {total} workstations",
+    "perPage": "per page",
     "pageNumber": "Page {page}",
     "deleteTitle": "Delete workstation",
     "deleteConfirmMessage": "Delete {name}? This action cannot be undone.",

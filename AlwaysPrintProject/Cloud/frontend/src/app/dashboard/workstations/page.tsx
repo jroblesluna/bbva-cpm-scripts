@@ -102,7 +102,13 @@ export default function WorkstationsPage() {
   const [sortField, setSortField] = useState<SortField>('ip_private');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [page, setPage] = useState(1);
-  const pageSize = viewMode === 'cards' ? 10 : 20;
+  const [pageSize, setPageSize] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('workstations-page-size');
+      if (stored) return parseInt(stored, 10);
+    }
+    return 25;
+  });
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<'contingency_on' | 'contingency_off' | 'restart_tray' | 'restart_service' | 'check_update' | null>(null);
@@ -113,6 +119,14 @@ export default function WorkstationsPage() {
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
     setPage(1);
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setPage(1);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('workstations-page-size', String(newSize));
+    }
   };
 
   // Resetear página cuando el término de búsqueda con debounce cambia
@@ -894,7 +908,7 @@ export default function WorkstationsPage() {
 
       {/* Contenido principal: vista de tarjetas o tabla */}
       {viewMode === 'cards' ? (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {workstations.length > 0 ? (
             workstations.map((workstation) => (
               <WorkstationCard
@@ -954,13 +968,28 @@ export default function WorkstationsPage() {
       {totalItems > 0 && (
         <div className="bg-white rounded-lg shadow px-4 py-3 flex items-center justify-between border border-gray-200 mt-4 sm:px-6">
           <div className="flex-1 flex items-center justify-between">
-            <p className="text-sm text-gray-700">
-              {t('pagination', {
-                start: paginationStart,
-                end: paginationEnd,
-                total: totalItems,
-              })}
-            </p>
+            <div className="flex items-center gap-4">
+              <p className="text-sm text-gray-700">
+                {t('pagination', {
+                  start: paginationStart,
+                  end: paginationEnd,
+                  total: totalItems,
+                })}
+              </p>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-500">{t('perPage')}</label>
+                <select
+                  value={pageSize}
+                  onChange={(e) => handlePageSizeChange(parseInt(e.target.value, 10))}
+                  className="px-2 py-1 border rounded text-sm"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               {page > 1 && (
                 <Button variant="outline" size="sm" onClick={() => setPage(1)}>
