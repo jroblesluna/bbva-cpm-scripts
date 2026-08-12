@@ -1442,8 +1442,8 @@ function WorkstationCard({
   return (
     <Card className={`hover:shadow-md transition ${selectionMode && isSelected ? 'ring-2 ring-blue-500' : ''}`}>
       <CardContent className="p-4 md:p-6">
-        {/* Fila 1: Icono + IP + Badges + Acciones (desktop) */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        {/* Fila 1: Icono + IP + Badges */}
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             {selectionMode && (
               <input
@@ -1512,92 +1512,6 @@ function WorkstationCard({
             )}
           </div>
 
-          {/* Acciones: visibles en desktop en la misma fila */}
-          <div className="hidden md:flex items-center flex-wrap gap-1">
-            {/* Botón de contingencia forzada */}
-            <Button
-              variant={workstation.forced_contingency ? 'destructive' : 'outline'}
-              size="sm"
-              onClick={() => onToggleForcedContingency()}
-              disabled={isForcedContingencyPending || workstation.vlan?.forced_contingency === true || workstation.organization?.forced_contingency === true}
-              title={
-                workstation.organization?.forced_contingency
-                  ? t('contingencyControlledByOrg')
-                  : workstation.vlan?.forced_contingency
-                    ? t('contingencyControlledByVlan')
-                    : workstation.forced_contingency
-                      ? t('forcedContingencyDeactivate')
-                      : t('forcedContingencyActivate')
-              }
-              className={`${workstation.forced_contingency ? 'bg-orange-600 hover:bg-orange-700' : ''} ${(workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency) ? 'cursor-not-allowed opacity-50' : ''}`}
-            >
-              <ShieldAlert className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onViewDetails}
-              title={t('viewDetails')}
-              className="h-8 w-8 p-0"
-            >
-              <Eye className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onEdit}
-            >
-              <Edit className="w-4 h-4" />
-            </Button>
-            {workstation.is_online && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  title="Descargar Log"
-                  onClick={onDownloadLog}
-                  disabled={isLogPending}
-                >
-                  <FileText className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  title={t('restartServiceTitle')}
-                  onClick={() => onCommand('restart_service')}
-                  disabled={isCommandPending}
-                >
-                  <Power className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  title={t('restartTrayTitle')}
-                  onClick={() => onCommand('restart_tray')}
-                  disabled={isCommandPending}
-                >
-                  <Terminal className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  title={t('commandCheckUpdate')}
-                  onClick={() => onCommand('check_update')}
-                  disabled={isCommandPending}
-                >
-                  <Download className="w-4 h-4" />
-                </Button>
-              </>
-            )}
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={onDelete}
-              disabled={isDeletePending}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </div>
         </div>
 
         {/* Fila 2: Info compacta (hostname, user, org, version, cidr, vlan) */}
@@ -1664,8 +1578,8 @@ function WorkstationCard({
           )}
         </div>
 
-        {/* Fila 4: Acciones en mobile (flex-wrap) */}
-        <div className="flex md:hidden flex-wrap gap-1 mt-3 pt-3 border-t border-gray-100">
+        {/* Fila 4: Acciones (siempre visibles) */}
+        <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t border-gray-100">
           {/* Botón de contingencia forzada */}
           <Button
             variant={workstation.forced_contingency ? 'destructive' : 'outline'}
