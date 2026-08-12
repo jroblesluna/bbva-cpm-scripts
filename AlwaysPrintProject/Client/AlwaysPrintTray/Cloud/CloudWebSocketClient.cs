@@ -82,7 +82,10 @@ namespace AlwaysPrintTray.Cloud
             var handler = new System.Net.Http.HttpClientHandler();
             if (_proxyUri != null)
             {
-                handler.Proxy = new System.Net.WebProxy(_proxyUri);
+                // Mismas credenciales que ProxyHelper.CreateHandler(): sin esto, un proxy
+                // corporativo que exija NTLM/Kerberos (p.ej. Zscaler) responde 407 y la
+                // conexión falla en vez de autenticarse.
+                handler.Proxy = new System.Net.WebProxy(_proxyUri) { Credentials = CredentialCache.DefaultCredentials };
                 handler.UseProxy = true;
             }
             HttpClient = new System.Net.Http.HttpClient(handler)
@@ -214,10 +217,11 @@ namespace AlwaysPrintTray.Cloud
                 // Crear nuevo ClientWebSocket
                 ws = new ClientWebSocket();
 
-                // Configurar proxy si se detectó uno
+                // Configurar proxy si se detectó uno (con credenciales: ver comentario
+                // equivalente en el constructor sobre por qué son necesarias).
                 if (_proxyUri != null)
                 {
-                    ws.Options.Proxy = new WebProxy(_proxyUri);
+                    ws.Options.Proxy = new WebProxy(_proxyUri) { Credentials = CredentialCache.DefaultCredentials };
                 }
 
                 _ws = ws;
