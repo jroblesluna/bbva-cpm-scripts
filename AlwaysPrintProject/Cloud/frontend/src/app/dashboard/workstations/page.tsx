@@ -496,7 +496,7 @@ export default function WorkstationsPage() {
           <p className="text-gray-600 mt-2">{t('subtitle')}</p>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-500 hidden sm:inline">
+          <span className="text-sm text-gray-500 hidden lg:inline">
             {t('lastUpdated', { time: formatDateWithTimezone(lastUpdated, userTimezone) })}
           </span>
           {(currentUser?.role === 'admin' || currentUser?.role === 'operator') && (
@@ -521,63 +521,63 @@ export default function WorkstationsPage() {
       </div>
 
       {effectiveStats && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-6">
           <Card>
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{t('total')}</p>
-                  <p className="text-2xl md:text-3xl font-bold text-gray-900">{effectiveStats.total}</p>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-600 truncate">{t('total')}</p>
+                  <p className="text-2xl lg:text-3xl font-bold text-gray-900">{effectiveStats.total}</p>
                 </div>
-                <Monitor className="w-8 h-8 md:w-12 md:h-12 text-blue-600" />
+                <Monitor className="w-8 h-8 lg:w-10 lg:h-10 shrink-0 text-blue-600" />
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{t('online')}</p>
-                  <p className="text-2xl md:text-3xl font-bold text-gray-900">{effectiveStats.online}</p>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-600 truncate">{t('online')}</p>
+                  <p className="text-2xl lg:text-3xl font-bold text-gray-900">{effectiveStats.online}</p>
                 </div>
-                <CheckCircle className="w-8 h-8 md:w-12 md:h-12 text-green-600" />
+                <CheckCircle className="w-8 h-8 lg:w-10 lg:h-10 shrink-0 text-green-600" />
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{t('offline')}</p>
-                  <p className="text-2xl md:text-3xl font-bold text-gray-600">{effectiveStats.offline}</p>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-600 truncate">{t('offline')}</p>
+                  <p className="text-2xl lg:text-3xl font-bold text-gray-600">{effectiveStats.offline}</p>
                 </div>
-                <XCircle className="w-8 h-8 md:w-12 md:h-12 text-gray-400" />
+                <XCircle className="w-8 h-8 lg:w-10 lg:h-10 shrink-0 text-gray-400" />
               </div>
             </CardContent>
           </Card>
           <Card className={effectiveStats.contingency_active > 0 ? 'border-orange-200 bg-orange-50' : ''}>
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{t('contingency')}</p>
-                  <p className="text-2xl md:text-3xl font-bold text-gray-900">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-600 truncate">{t('contingency')}</p>
+                  <p className="text-2xl lg:text-3xl font-bold text-gray-900">
                     {effectiveStats.contingency_active}
                   </p>
                 </div>
-                <ShieldAlert className={`w-8 h-8 md:w-12 md:h-12 ${effectiveStats.contingency_active > 0 ? 'text-orange-600' : 'text-orange-400'}`} />
+                <ShieldAlert className={`w-8 h-8 lg:w-10 lg:h-10 shrink-0 ${effectiveStats.contingency_active > 0 ? 'text-orange-600' : 'text-orange-400'}`} />
               </div>
             </CardContent>
           </Card>
           <Card className={(effectiveStats.workstations_with_config?.length || 0) > 0 ? 'border-purple-200 bg-purple-50' : ''}>
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{t('withSpecificConfig')}</p>
-                  <p className="text-2xl md:text-3xl font-bold text-gray-900">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-600 truncate">{t('withSpecificConfig')}</p>
+                  <p className="text-2xl lg:text-3xl font-bold text-gray-900">
                     {effectiveStats.workstations_with_config?.length || 0}
                   </p>
                 </div>
-                <Cog className={`w-8 h-8 md:w-12 md:h-12 ${(effectiveStats.workstations_with_config?.length || 0) > 0 ? 'text-purple-600' : 'text-purple-400'}`} />
+                <Cog className={`w-8 h-8 lg:w-10 lg:h-10 shrink-0 ${(effectiveStats.workstations_with_config?.length || 0) > 0 ? 'text-purple-600' : 'text-purple-400'}`} />
               </div>
             </CardContent>
           </Card>
