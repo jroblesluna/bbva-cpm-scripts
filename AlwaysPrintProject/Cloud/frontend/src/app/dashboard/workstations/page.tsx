@@ -1442,76 +1442,74 @@ function WorkstationCard({
   return (
     <Card className={`hover:shadow-md transition ${selectionMode && isSelected ? 'ring-2 ring-blue-500' : ''}`}>
       <CardContent className="p-4 md:p-6">
-        {/* Fila 1: Icono + IP + Badges */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            {selectionMode && (
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={onToggleSelect}
-                onClick={(e) => e.stopPropagation()}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0 cursor-pointer"
-              />
-            )}
-            <div
-              className={`rounded-full p-2 md:p-3 shrink-0 ${
+        {/* Fila 1: Icono + IP */}
+        <div className="flex items-center gap-3">
+          {selectionMode && (
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={onToggleSelect}
+              onClick={(e) => e.stopPropagation()}
+              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0 cursor-pointer"
+            />
+          )}
+          <div
+            className={`rounded-full p-2 shrink-0 ${
+              (workstation.contingency_active || workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency)
+                ? 'bg-orange-100'
+                : workstation.is_online ? 'bg-green-100' : 'bg-gray-100'
+            }`}
+          >
+            <Monitor
+              className={`w-5 h-5 ${
                 (workstation.contingency_active || workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency)
-                  ? 'bg-orange-100'
-                  : workstation.is_online ? 'bg-green-100' : 'bg-gray-100'
+                  ? 'text-orange-600'
+                  : workstation.is_online ? 'text-green-600' : 'text-gray-400'
               }`}
-            >
-              <Monitor
-                className={`w-5 h-5 md:w-6 md:h-6 ${
-                  (workstation.contingency_active || workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency)
-                    ? 'text-orange-600'
-                    : workstation.is_online ? 'text-green-600' : 'text-gray-400'
-                }`}
-              />
-            </div>
-            <h3 className="text-lg md:text-xl font-semibold text-gray-900">
-              {workstation.ip_private}
-            </h3>
-            <Badge variant={workstation.is_online ? 'default' : 'secondary'}>
-              {workstation.is_online ? t('online') : t('offline')}
-            </Badge>
-            {workstation.is_online && workstation.worker_id && (
-              <Badge variant="outline" className="text-xs font-mono border-blue-200 text-blue-600 bg-blue-50">
-                {workstation.worker_id.replace('worker_', 'w')}
-              </Badge>
-            )}
-            {(workstation.contingency_active || workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency) && (
-              <Badge variant="destructive">
-                {t('contingency')}
-              </Badge>
-            )}
-            {(workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency) && (
-              <Badge variant="destructive" className="bg-orange-600">
-                {t('forcedContingencyBadge')}
-              </Badge>
-            )}
-            {/* Indicadores de nivel de contingencia — acumulativos */}
-            {workstation.forced_contingency && (
-              <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
-                {t('contingencyLevelStation')}
-              </Badge>
-            )}
-            {workstation.vlan?.forced_contingency && !workstation.vlan?.contingency_inherited && (
-              <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
-                {t('contingencyLevelVlan')}
-              </Badge>
-            )}
-            {workstation.organization?.forced_contingency && (
-              <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
-                {t('contingencyLevelOrg')}
-              </Badge>
-            )}
-            {/* Indicador de sesión de vista remota activa */}
-            {workstation.remote_view_active && (
-              <RemoteViewIndicator size={14} />
-            )}
+            />
           </div>
-
+          <h3 className="text-base font-semibold text-gray-900 truncate">
+            {workstation.ip_private}
+          </h3>
+        </div>
+        {/* Badges */}
+        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+          <Badge variant={workstation.is_online ? 'default' : 'secondary'} className="text-xs">
+            {workstation.is_online ? t('online') : t('offline')}
+          </Badge>
+          {workstation.is_online && workstation.worker_id && (
+            <Badge variant="outline" className="text-xs font-mono border-blue-200 text-blue-600 bg-blue-50">
+              {workstation.worker_id.replace('worker_', 'w')}
+            </Badge>
+          )}
+          {(workstation.contingency_active || workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency) && (
+            <Badge variant="destructive" className="text-xs">
+              {t('contingency')}
+            </Badge>
+          )}
+          {(workstation.forced_contingency || workstation.vlan?.forced_contingency || workstation.organization?.forced_contingency) && (
+            <Badge variant="destructive" className="text-xs bg-orange-600">
+              {t('forcedContingencyBadge')}
+            </Badge>
+          )}
+          {workstation.forced_contingency && (
+            <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
+              {t('contingencyLevelStation')}
+            </Badge>
+          )}
+          {workstation.vlan?.forced_contingency && !workstation.vlan?.contingency_inherited && (
+            <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
+              {t('contingencyLevelVlan')}
+            </Badge>
+          )}
+          {workstation.organization?.forced_contingency && (
+            <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">
+              {t('contingencyLevelOrg')}
+            </Badge>
+          )}
+          {workstation.remote_view_active && (
+            <RemoteViewIndicator size={14} />
+          )}
         </div>
 
         {/* Fila 2: Info compacta (hostname, user, org, version, cidr, vlan) */}
