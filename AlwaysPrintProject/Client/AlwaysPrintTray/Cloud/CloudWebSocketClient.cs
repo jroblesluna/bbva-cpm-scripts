@@ -261,8 +261,12 @@ namespace AlwaysPrintTray.Cloud
             }
             catch (Exception ex)
             {
+                var innerMsg = ex.InnerException != null
+                    ? $"{ex.InnerException.GetType().Name}: {ex.InnerException.Message}"
+                    : "ninguna";
                 AlwaysPrintLogger.WriteTrayError(
-                    $"CloudWebSocketClient: error al conectar. {ex.Message}");
+                    $"CloudWebSocketClient: error al conectar. Tipo={ex.GetType().Name}, " +
+                    $"InnerException=[{innerMsg}], Mensaje={ex.Message}");
                 Error?.Invoke(ex);
 
                 // Programar reconexión
