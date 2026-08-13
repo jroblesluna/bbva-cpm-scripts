@@ -497,6 +497,101 @@ def step5_delete_empty_vlans(db: Session, org_id, dry_run: bool):
 
 
 # ============================================================================
+# STEP 6: LIMPIAR CIDRs REDUNDANTES EN VLANs DE AGENCIA
+# ============================================================================
+
+def step6_cleanup_vlan_cidrs(db: Session, org_id, dry_run: bool):
+    """
+    Para VLANs con formato "### - Nombre" (agencias):
+    - Verifica si tienen workstations activas (is_online=True)
+    - Si todas las IPs activas comparten los primeros 3 octetos (x.y.z.*)
+    - Y si el CIDR x.y.z.0/24 existe en cidr_ranges
+    - Entonces elimina todos los demás CIDRs y deja solo x.y.z.0/24
+    
+    Esto limpia CIDRs acumulados de workstations que ya no pertenecen a la VLAN.
+    """
+    print("\n" + "=" * 60)
+    print("STEP 6: Limpiar CIDRs redundantes en VLANs de agencia")
+    print("=" * 60)
+    
+    import re
+    
+    # Obtener VLANs con formato "### - Nombre"
+    vlans = db.query(VLAN).filter(VLAN.organization_id == org_id).all()
+    agency_vlans = [v for v in vlans if re.match(r'^\d{3}\s*-\s*.+', v.name)]
+    
+    print(f"  VLANs de agencia encontradas: {len(agency_vlans)}")
+    
+    cleaned = 0
+    skipped_no_ws = 0
+    skipped_multi_subnet = 0
+    skipped_no_canonical_cidr = 0
+    already_clean = 0
+    
+    for vlan in agency_vlans:
+        # Obtener workstations activas (online) de esta VLAN
+        active_ws = db.query(Workstation).filter(
+            Workstation.vlan_id == vlan.id,
+            Workstation.is_online == True
+        ).all()
+        
+        if not active_ws:
+            skipped_no_ws += 1
+            continue
+        
+        # Extraer los primeros 3 octetos de cada IP activa
+        subnets = set()
+        for ws in active_ws:
+            ip = ws.ip_private
+            if not ip:
+                continue
+            parts = ip.split('.')
+            if len(parts) == 4:
+                subnets.add(f"{parts[0]}.{parts[1]}.{parts[2]}")
+        
+        # Verificar que todas las IPs activas comparten el mismo /24
+        if len(subnets) != 1:
+            skipped_multi_subnet += 1
+            if len(subnets) > 1:
+                print(f"  [SKIP] '{vlan.name}' — múltiples subnets: {subnets}")
+            continue
+        
+        # El subnet único (x.y.z)
+        subnet_prefix = subnets.pop()
+        canonical_cidr = f"{subnet_prefix}.0/24"
+        
+        # Verificar que el CIDR canónico existe en cidr_ranges
+        current_cidrs = vlan.cidr_ranges or []
+        if canonical_cidr not in current_cidrs:
+            skipped_no_canonical_cidr += 1
+            print(f"  [SKIP] '{vlan.name}' — CIDR canónico {canonical_cidr} no está en cidr_ranges: {current_cidrs}")
+            continue
+        
+        # Si ya solo tiene el CIDR canónico, no hacer nada
+        if current_cidrs == [canonical_cidr]:
+            already_clean += 1
+            continue
+        
+        # Limpiar: dejar solo el CIDR canónico
+        removed = [c for c in current_cidrs if c != canonical_cidr]
+        print(f"  [CLEAN] '{vlan.name}' — conservando {canonical_cidr}, eliminando: {removed}")
+        
+        if not dry_run:
+            vlan.cidr_ranges = [canonical_cidr]
+        cleaned += 1
+    
+    if not dry_run:
+        db.commit()
+    
+    print(f"\n  Resumen:")
+    print(f"    VLANs limpiadas: {cleaned}")
+    print(f"    Ya limpias: {already_clean}")
+    print(f"    Sin WS activas: {skipped_no_ws}")
+    print(f"    Múltiples subnets: {skipped_multi_subnet}")
+    print(f"    CIDR canónico no presente: {skipped_no_canonical_cidr}")
+
+
+# ============================================================================
 # MAIN
 # ============================================================================
 
@@ -539,6 +634,7 @@ def main():
         step3_upsert_devices(db, org_id, csv_rows, code_to_id, args.dry_run)
         step4_assign_orphan_devices(db, org_id, args.dry_run)
         step5_delete_empty_vlans(db, org_id, args.dry_run)
+        step6_cleanup_vlan_cidrs(db, org_id, args.dry_run)
         
         print("\n" + "=" * 60)
         print("✅ Sincronización completada.")
