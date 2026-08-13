@@ -473,28 +473,35 @@ class WorkstationService:
                 # Verificar si el CIDR cambió respecto al almacenado
                 cidr_changed = workstation.cidr != normalized_cidr
                 
+                # Actualizar CIDR almacenado
+                workstation.cidr = normalized_cidr
+                
+                # Solo re-evaluar VLAN si el CIDR cambió.
+                # Si el CIDR no cambió, respetar la vlan_id actual (puede haber
+                # sido asignada manualmente por un admin desde el dashboard).
                 if cidr_changed:
                     logger.info(
                         f"[REGISTRO] CIDR cambió para workstation {workstation.id}: "
                         f"anterior={workstation.cidr}, nuevo={normalized_cidr}. "
                         f"Re-evaluando VLAN..."
                     )
-                
-                # Actualizar CIDR almacenado
-                workstation.cidr = normalized_cidr
-                
-                # Guardar vlan_id anterior para detectar cambio
-                old_vlan_id = workstation.vlan_id
-                
-                # Asignar VLAN por CIDR (siempre re-evaluar para consistencia)
-                vlan_id = self.detect_or_create_vlan_for_cidr(
-                    db, organization_id, normalized_cidr
-                )
-                workstation.vlan_id = vlan_id
-                
-                # Auditar cambio de VLAN si difiere
-                if old_vlan_id != vlan_id and old_vlan_id is not None:
-                    self._audit_vlan_change(db, workstation, old_vlan_id, vlan_id)
+                    
+                    old_vlan_id = workstation.vlan_id
+                    
+                    vlan_id = self.detect_or_create_vlan_for_cidr(
+                        db, organization_id, normalized_cidr
+                    )
+                    workstation.vlan_id = vlan_id
+                    
+                    # Auditar cambio de VLAN si difiere
+                    if old_vlan_id != vlan_id and old_vlan_id is not None:
+                        self._audit_vlan_change(db, workstation, old_vlan_id, vlan_id)
+                elif workstation.vlan_id is None:
+                    # Si no tiene VLAN asignada (primera vez), asignar por CIDR
+                    vlan_id = self.detect_or_create_vlan_for_cidr(
+                        db, organization_id, normalized_cidr
+                    )
+                    workstation.vlan_id = vlan_id
             else:
                 # Guardar vlan_id anterior para detectar cambio
                 old_vlan_id = workstation.vlan_id
