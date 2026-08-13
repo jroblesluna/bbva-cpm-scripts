@@ -564,15 +564,19 @@ async def toggle_vlan_forced_contingency(
 
     for ws in workstations:
         # Resolver printer_ip para cada workstation:
-        # 1. Desde default_printer_id de la workstation (favorita individual)
+        # 1. Desde default_printer_id de la workstation (favorita individual),
+        #    SOLO si pertenece a esta VLAN (evita usar impresora de VLAN anterior)
         # 2. Desde default_device_id de la VLAN (predeterminada de VLAN)
         # 3. Fallback: primer dispositivo activo de la VLAN
         printer_ip = None
         if enabled:
             if ws.default_printer_id:
                 printer = db.query(Device).filter(Device.id == ws.default_printer_id).first()
-                if printer:
+                if printer and str(printer.vlan_id) == str(vlan.id):
                     printer_ip = printer.ip_address
+                elif printer:
+                    # Favorita obsoleta: pertenece a otra VLAN. Limpiar.
+                    ws.default_printer_id = None
             if not printer_ip and vlan.default_device_id:
                 default_dev = db.query(Device).filter(Device.id == vlan.default_device_id).first()
                 if default_dev:
