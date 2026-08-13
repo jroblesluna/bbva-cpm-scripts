@@ -307,7 +307,19 @@
     "startingSession": "Starting remote view session...",
     "errorStarting": "Error starting remote view session",
     "remoteViewDisabled": "Remote view is not enabled for this organization",
-    "workstationOffline": "Workstation is offline"
+    "workstationOffline": "Workstation is offline",
+    "remoteTerminal": "Remote Terminal",
+    "remoteTerminalPlaceholder": "Type a command...",
+    "remoteTerminalOffline": "Workstation must be online to execute commands",
+    "remoteTerminalExecute": "Execute",
+    "remoteTerminalExecuting": "Executing...",
+    "remoteTerminalTimeout": "Timeout — command did not respond within 45 seconds",
+    "remoteTerminalError": "Error executing command",
+    "remoteTerminalWsDisconnected": "Workstation disconnected during execution",
+    "remoteTerminalCopyHistory": "Copy history",
+    "remoteTerminalCopied": "History copied to clipboard",
+    "remoteTerminalNoOutput": "(no output)",
+    "remoteTerminalClearHistory": "Clear"
   },
   "vlans": {
     "title": "VLANs",

@@ -307,7 +307,19 @@
     "startingSession": "Iniciando sesión de vista remota...",
     "errorStarting": "Error al iniciar la sesión de vista remota",
     "remoteViewDisabled": "La vista remota no está habilitada para esta organización",
-    "workstationOffline": "La workstation está offline"
+    "workstationOffline": "La workstation está offline",
+    "remoteTerminal": "Terminal Remota",
+    "remoteTerminalPlaceholder": "Escribe un comando...",
+    "remoteTerminalOffline": "La workstation debe estar online para ejecutar comandos",
+    "remoteTerminalExecute": "Ejecutar",
+    "remoteTerminalExecuting": "Ejecutando...",
+    "remoteTerminalTimeout": "Timeout — el comando no respondió en 45 segundos",
+    "remoteTerminalError": "Error al ejecutar el comando",
+    "remoteTerminalWsDisconnected": "La workstation se desconectó durante la ejecución",
+    "remoteTerminalCopyHistory": "Copiar historial",
+    "remoteTerminalCopied": "Historial copiado al portapapeles",
+    "remoteTerminalNoOutput": "(sin salida)",
+    "remoteTerminalClearHistory": "Limpiar"
   },
   "vlans": {
     "title": "VLANs",

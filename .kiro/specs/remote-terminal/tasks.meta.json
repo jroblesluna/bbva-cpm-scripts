@@ -1,0 +1,234 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Agregar `REMOTE_COMMAND_EXECUTED` al enum ActionType en `app/models/audit.py`": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604795516
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604803728
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604936158
+      }
+    ],
+    "1.2 Escribir test unitario para el nuevo ActionType": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604795567
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604946963
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786605356058
+      }
+    ],
+    "2.1 Crear `src/hooks/useRemoteTerminal.ts`": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604795618
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604804467
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604938853
+      }
+    ],
+    "2.2 Escribir tests unitarios para `useRemoteTerminal`": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604795650
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604947017
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786605356935
+      }
+    ],
+    "3.1 Agregar `'execute_remote_command'` al type union de `sendCommand` en `src/lib/api.ts`": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604795677
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604805384
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604937094
+      }
+    ],
+    "4.1 Crear `src/components/workstations/RemoteTerminalSection.tsx`": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604795705
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604947041
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786605357760
+      }
+    ],
+    "4.2 Implementar navegación por historial de comandos con teclado": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604795730
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786605362421
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786605399427
+      }
+    ],
+    "4.3 Escribir tests unitarios para `RemoteTerminalSection`": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604795755
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786605404346
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786605599158
+      }
+    ],
+    "5.1 Agregar keys de traducción en `messages/en.json` y `messages/es.json`": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604795780
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604806292
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604938068
+      }
+    ],
+    "6.1 Agregar `RemoteTerminalSection` en `src/app/dashboard/workstations/page.tsx`": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604795807
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786605405134
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786605600200
+      }
+    ],
+    "7. Checkpoint - Verificar implementación completa": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604795831
+      },
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786605604624
+      },
+      {
+        "executionId": "c2719d90-5a3c-4ece-b21c-a6fe925f1ea3",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786609545439
+      }
+    ],
+    "3. Frontend: Actualizar API layer para soportar `execute_remote_command`": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604937119
+      }
+    ],
+    "5. Frontend: Agregar traducciones i18n": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786604938097
+      }
+    ],
+    "1. Backend: Agregar ActionType y migración": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786605356102
+      }
+    ],
+    "2. Frontend: Crear hook `useRemoteTerminal`": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786605356965
+      }
+    ],
+    "4. Frontend: Crear componente `RemoteTerminalSection`": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786605599190
+      }
+    ],
+    "6. Integración: Montar componente en WorkstationDetailModal": [
+      {
+        "executionId": "3ecac8f6-fa20-473d-b4c9-26de120232ff",
+        "chatSessionId": "sess_6c6b110e-7922-479e-97da-8559502a7bb7",
+        "timestamp": 1786605600237
+      }
+    ]
+  }
+}

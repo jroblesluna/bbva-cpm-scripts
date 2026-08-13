@@ -62,6 +62,7 @@ import { LogAnalysisHistory } from '@/components/workstations/LogAnalysisHistory
 import { LogAnalysisButton } from '@/components/workstations/LogAnalysisButton';
 import { OnDemandActionsSection } from '@/components/workstations/OnDemandActionsSection';
 import { OsCommandsSection } from '@/components/workstations/OsCommandsSection';
+import { RemoteTerminalSection } from '@/components/workstations/RemoteTerminalSection';
 import { WorkstationDebuggingSection } from '@/components/debugging/WorkstationDebuggingSection';
 import { RemoteViewIndicator } from '@/components/remote-view/RemoteViewIndicator';
 
@@ -2564,6 +2565,12 @@ function WorkstationDetailModal({
 
           {/* Sección de Comandos de Sistema Operativo */}
           <OsCommandsSection
+            workstationId={workstation.id}
+            isOnline={workstation.is_online}
+          />
+
+          {/* Sección de Terminal Remota */}
+          <RemoteTerminalSection
             workstationId={workstation.id}
             isOnline={workstation.is_online}
           />
