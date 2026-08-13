@@ -1229,6 +1229,15 @@ namespace AlwaysPrintTray.Cloud
                 AlwaysPrintLogger.WriteTrayInfo(
                     $"CloudManager: contingencia forzada recibida. enabled={enabled}, source={source}, source_name={sourceName}, printer_ip={printerIp ?? "null"}");
 
+                // Si se activa contingencia y estamos online, refrescar resources.json
+                // para asegurar que el caché local tenga las impresoras correctas
+                // (la IP de contingencia ya viene en el payload, pero esto actualiza el caché
+                // para futuras activaciones offline o reinicios del servicio).
+                if (enabled)
+                {
+                    DownloadResources();
+                }
+
                 // Validación: si se activa contingencia pero no hay printer_ip, no enviar payload al Service
                 if (enabled && string.IsNullOrEmpty(printerIp))
                 {
