@@ -37,7 +37,7 @@ export interface CommandHistoryEntry {
 export interface UseRemoteTerminalReturn {
   history: CommandHistoryEntry[]
   isExecuting: boolean
-  executeCommand: (command: string) => Promise<void>
+  executeCommand: (command: string, runAsUser?: boolean) => Promise<void>
   clearHistory: () => void
   copyHistory: () => Promise<void>
 }
@@ -61,7 +61,7 @@ export function useRemoteTerminal(workstationId: string): UseRemoteTerminalRetur
    * Ejecuta un comando remoto en la workstation.
    * Previene ejecución concurrente — si ya hay un comando en curso, no hace nada.
    */
-  const executeCommand = useCallback(async (command: string) => {
+  const executeCommand = useCallback(async (command: string, runAsUser: boolean = false) => {
     // Prevenir ejecución concurrente
     if (isExecutingRef.current) return
 
@@ -85,7 +85,7 @@ export function useRemoteTerminal(workstationId: string): UseRemoteTerminalRetur
       const response = await workstationsApi.sendCommand(
         workstationId,
         'execute_remote_command',
-        { command }
+        { command, run_as_user: runAsUser }
       )
 
       // Respuesta exitosa — extraer stdout del response

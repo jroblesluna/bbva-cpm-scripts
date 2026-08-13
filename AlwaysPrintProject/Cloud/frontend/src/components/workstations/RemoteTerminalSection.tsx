@@ -42,6 +42,7 @@ export function RemoteTerminalSection({ workstationId, isOnline }: RemoteTermina
   const [inputValue, setInputValue] = useState('')
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [savedInput, setSavedInput] = useState('')
+  const [runAsUser, setRunAsUser] = useState(false)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const outputRef = useRef<HTMLDivElement>(null)
@@ -78,7 +79,7 @@ export function RemoteTerminalSection({ workstationId, isOnline }: RemoteTermina
     setInputValue('')
     setHistoryIndex(-1)
     setSavedInput('')
-    await executeCommand(trimmed)
+    await executeCommand(trimmed, runAsUser)
   }, [inputValue, isExecuting, executeCommand])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -240,6 +241,19 @@ export function RemoteTerminalSection({ workstationId, isOnline }: RemoteTermina
           autoComplete="off"
           spellCheck={false}
         />
+        <button
+          type="button"
+          onClick={() => setRunAsUser(!runAsUser)}
+          disabled={isExecuting}
+          className={`h-7 px-2 rounded text-[10px] font-mono shrink-0 transition-colors ${
+            runAsUser
+              ? 'bg-amber-600 text-white'
+              : 'bg-gray-700 text-gray-400 hover:text-gray-300'
+          } disabled:opacity-30`}
+          title={runAsUser ? t('remoteTerminalRunAsUser') : t('remoteTerminalRunAsSystem')}
+        >
+          {runAsUser ? 'USER' : 'SYS'}
+        </button>
         <Button
           variant="ghost"
           size="sm"

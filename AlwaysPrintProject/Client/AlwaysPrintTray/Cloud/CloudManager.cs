@@ -1973,14 +1973,11 @@ namespace AlwaysPrintTray.Cloud
         // COMANDOS OS REMOTOS (execute_remote_command, download_file, get/save_file_content)
         // ═══════════════════════════════════════════════════════════════════════
 
-        /// <summary>
-        /// Ejecuta un comando del sistema operativo vía Service (SYSTEM privileges).
-        /// Delega al Service via Named Pipe para tener acceso completo al filesystem.
-        /// </summary>
         private void HandleExecuteRemoteCommand(string commandId, JObject? paramsObj)
         {
             string? command = paramsObj?["command"]?.ToString();
             string? label = paramsObj?["label"]?.ToString() ?? "comando";
+            bool runAsUser = paramsObj?["run_as_user"]?.Value<bool>() ?? false;
 
             if (string.IsNullOrEmpty(command))
             {
@@ -1990,42 +1987,19 @@ namespace AlwaysPrintTray.Cloud
 
             try
             {
-                // Resolver templates antes de enviar al Service
+                // Resolver templates antes de ejecutar
                 command = ResolveCommandTemplates(command);
 
-                AlwaysPrintLogger.WriteTrayInfo(
-                    $"CloudManager: ejecutando comando remoto. label={label}, command={command}");
-
-                var payload = new ExecuteRemoteCommandPayload { Command = command, Label = label };
-                var pipeMessage = PipeMessage.Create(MessageType.ExecuteRemoteCommand, payload);
-                var response = _pipe.Send(pipeMessage);
-
-                if (response == null)
+                if (runAsUser)
                 {
-                    SendCommandResult(commandId, false, "No se recibió respuesta del Service (timeout)");
-                    return;
-                }
-
-                // Intentar parsear como ExecuteRemoteCommandResponsePayload
-                var cmdResult = response.GetPayload<ExecuteRemoteCommandResponsePayload>();
-                if (cmdResult != null && cmdResult.Success)
-                {
-                    var resultPayload = new JObject
-                    {
-                        ["command_id"] = commandId,
-                        ["success"] = true,
-                        ["output"] = cmdResult.Message ?? $"ExitCode={cmdResult.ExitCode}",
-                        ["stdout"] = cmdResult.Stdout
-                    };
-                    _wsClient!.Send("command_result", resultPayload);
-
-                    AlwaysPrintLogger.WriteTrayInfo(
-                        $"CloudManager: comando remoto completado. label={label}, exitCode={cmdResult.ExitCode}, outputLen={cmdResult.Stdout?.Length ?? 0}");
+                    // Ejecutar directamente en el Tray (como el usuario logueado).
+                    // Hereda proxy, credenciales NTLM/Kerberos y certificados del usuario.
+                    ExecuteCommandAsUser(commandId, command, label);
                 }
                 else
                 {
-                    var ack = response.GetPayload<AckPayload>();
-                    SendCommandResult(commandId, false, ack?.Message ?? "Error del Service");
+                    // Delegar al Service (LocalSystem) — comportamiento original
+                    ExecuteCommandViaService(commandId, command, label);
                 }
             }
             catch (Exception ex)
@@ -2033,6 +2007,105 @@ namespace AlwaysPrintTray.Cloud
                 AlwaysPrintLogger.WriteTrayError(
                     $"CloudManager: error ejecutando comando remoto '{label}': {ex.Message}");
                 SendCommandResult(commandId, false, $"Error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta un comando directamente en el proceso del Tray (como el usuario logueado).
+        /// El proceso hereda el proxy, credenciales de dominio y certificados del usuario.
+        /// </summary>
+        private void ExecuteCommandAsUser(string commandId, string command, string label)
+        {
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"CloudManager: ejecutando como usuario. label={label}, command={command}");
+
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = $"/c {command}",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                WorkingDirectory = @"C:\Windows\System32"
+            };
+
+            using (var process = System.Diagnostics.Process.Start(psi))
+            {
+                if (process == null)
+                {
+                    SendCommandResult(commandId, false, "No se pudo iniciar cmd.exe como usuario");
+                    return;
+                }
+
+                string stdout = process.StandardOutput.ReadToEnd();
+                string stderr = process.StandardError.ReadToEnd();
+                process.WaitForExit(30000);
+
+                if (!process.HasExited)
+                {
+                    try { process.Kill(); } catch { }
+                    SendCommandResult(commandId, false, "Timeout: comando excedió 30 segundos");
+                    return;
+                }
+
+                string output = stdout;
+                if (!string.IsNullOrEmpty(stderr))
+                    output += (string.IsNullOrEmpty(output) ? "" : "\n") + stderr;
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: comando como usuario completado. label={label}, exitCode={process.ExitCode}, outputLen={output.Length}");
+
+                var resultPayload = new JObject
+                {
+                    ["command_id"] = commandId,
+                    ["success"] = process.ExitCode == 0,
+                    ["output"] = $"ExitCode={process.ExitCode}",
+                    ["stdout"] = output
+                };
+                _wsClient!.Send("command_result", resultPayload);
+            }
+        }
+
+        /// <summary>
+        /// Delega la ejecución al Service (LocalSystem) vía Named Pipe.
+        /// Comportamiento original para comandos que necesitan permisos elevados.
+        /// </summary>
+        private void ExecuteCommandViaService(string commandId, string command, string label)
+        {
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"CloudManager: ejecutando vía Service. label={label}, command={command}");
+
+            var payload = new ExecuteRemoteCommandPayload { Command = command, Label = label };
+            var pipeMessage = PipeMessage.Create(MessageType.ExecuteRemoteCommand, payload);
+            var response = _pipe.Send(pipeMessage);
+
+            if (response == null)
+            {
+                SendCommandResult(commandId, false, "No se recibió respuesta del Service (timeout)");
+                return;
+            }
+
+            // Intentar parsear como ExecuteRemoteCommandResponsePayload
+            var cmdResult = response.GetPayload<ExecuteRemoteCommandResponsePayload>();
+            if (cmdResult != null && cmdResult.Success)
+            {
+                var resultPayload = new JObject
+                {
+                    ["command_id"] = commandId,
+                    ["success"] = true,
+                    ["output"] = cmdResult.Message ?? $"ExitCode={cmdResult.ExitCode}",
+                    ["stdout"] = cmdResult.Stdout
+                };
+                _wsClient!.Send("command_result", resultPayload);
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: comando vía Service completado. label={label}, exitCode={cmdResult.ExitCode}, outputLen={cmdResult.Stdout?.Length ?? 0}");
+            }
+            else
+            {
+                var ack = response.GetPayload<AckPayload>();
+                SendCommandResult(commandId, false, ack?.Message ?? "Error del Service");
             }
         }
 
