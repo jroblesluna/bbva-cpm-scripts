@@ -483,17 +483,31 @@ class WorkstationService:
                 # Actualizar CIDR almacenado
                 workstation.cidr = normalized_cidr
                 
+                # Guardar vlan_id anterior para detectar cambio
+                old_vlan_id = workstation.vlan_id
+                
                 # Asignar VLAN por CIDR (siempre re-evaluar para consistencia)
                 vlan_id = self.detect_or_create_vlan_for_cidr(
                     db, organization_id, normalized_cidr
                 )
                 workstation.vlan_id = vlan_id
+                
+                # Auditar cambio de VLAN si difiere
+                if old_vlan_id != vlan_id and old_vlan_id is not None:
+                    self._audit_vlan_change(db, workstation, old_vlan_id, vlan_id)
             else:
+                # Guardar vlan_id anterior para detectar cambio
+                old_vlan_id = workstation.vlan_id
+                
                 # Fallback: detectar VLAN por IP privada (legacy)
                 vlan_id = self.detect_vlan_for_ip(
                     db, organization_id, ip_private
                 )
                 workstation.vlan_id = vlan_id
+                
+                # Auditar cambio de VLAN si difiere
+                if old_vlan_id != vlan_id and old_vlan_id is not None:
+                    self._audit_vlan_change(db, workstation, old_vlan_id, vlan_id)
             
             db.commit()
             db.refresh(workstation)
@@ -965,4 +979,56 @@ class WorkstationService:
             workstation_id=workstation_id,
             is_active=True
         ).first()
+
+    def _audit_vlan_change(
+        self, db: Session, workstation: Workstation, old_vlan_id, new_vlan_id
+    ) -> None:
+        """
+        Registra un cambio de VLAN en el audit log.
+        Permite rastrear el historial de ubicaciones de una workstation.
+        """
+        try:
+            from app.models.audit import AuditLog, ActionType
+            import uuid as _uuid
+
+            # Resolver nombres de VLAN para mejor legibilidad
+            old_vlan_name = None
+            new_vlan_name = None
+            if old_vlan_id:
+                old_vlan = db.query(VLAN).filter(VLAN.id == old_vlan_id).first()
+                old_vlan_name = old_vlan.name if old_vlan else str(old_vlan_id)
+            if new_vlan_id:
+                new_vlan = db.query(VLAN).filter(VLAN.id == new_vlan_id).first()
+                new_vlan_name = new_vlan.name if new_vlan else str(new_vlan_id)
+
+            audit_entry = AuditLog(
+                id=_uuid.uuid4(),
+                workstation_id=workstation.id,
+                organization_id=workstation.organization_id,
+                action_type=ActionType.UPDATE,
+                entity_type="workstation",
+                entity_id=workstation.id,
+                old_values={
+                    "vlan_id": str(old_vlan_id) if old_vlan_id else None,
+                    "vlan_name": old_vlan_name,
+                },
+                new_values={
+                    "vlan_id": str(new_vlan_id) if new_vlan_id else None,
+                    "vlan_name": new_vlan_name,
+                    "ip_private": workstation.ip_private,
+                    "cidr": workstation.cidr,
+                },
+                ip_address=workstation.ip_private,
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            )
+            db.add(audit_entry)
+            logger.info(
+                f"[VLAN-CHANGE] Workstation {workstation.id} ({workstation.hostname}): "
+                f"VLAN cambió de '{old_vlan_name}' a '{new_vlan_name}'"
+            )
+        except Exception as e:
+            # No fallar el registro por un error de auditoría
+            logger.warning(
+                f"[VLAN-CHANGE] Error registrando cambio de VLAN en audit: {e}"
+            )
 
