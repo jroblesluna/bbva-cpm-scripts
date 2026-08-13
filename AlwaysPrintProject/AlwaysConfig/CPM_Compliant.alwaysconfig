@@ -1,5 +1,5 @@
 {
-  "version": "12.4",
+  "version": "12.5",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -339,21 +339,21 @@
               }
             },
             {
-              "type": "StopService",
-              "description": "Detener LpdServiceMonitor (no se usa en contingencia)",
+              "type": "StartService",
+              "description": "Iniciar LPDSVC",
               "parameters": {
-                "service_name": "LpdServiceMonitor",
-                "graceful_timeout_seconds": 15,
-                "force_kill_on_timeout": true
+                "service_name": "LPDSVC",
+                "wait_for_running": true,
+                "timeout_seconds": 30
               }
             },
             {
-              "type": "StopService",
-              "description": "Detener LPDSVC (no se usa en contingencia)",
+              "type": "StartService",
+              "description": "Iniciar LpdServiceMonitor",
               "parameters": {
-                "service_name": "LPDSVC",
-                "graceful_timeout_seconds": 15,
-                "force_kill_on_timeout": true
+                "service_name": "LpdServiceMonitor",
+                "wait_for_running": true,
+                "timeout_seconds": 30
               }
             }
           ],
@@ -624,6 +624,24 @@
             "wait_for_running": true,
             "timeout_seconds": 30
           }
+        },
+        {
+          "type": "StartService",
+          "description": "Iniciar LPDSVC",
+          "parameters": {
+            "service_name": "LPDSVC",
+            "wait_for_running": true,
+            "timeout_seconds": 30
+          }
+        },
+        {
+          "type": "StartService",
+          "description": "Iniciar LpdServiceMonitor",
+          "parameters": {
+            "service_name": "LpdServiceMonitor",
+            "wait_for_running": true,
+            "timeout_seconds": 30
+          }
         }
       ]
     },
@@ -804,6 +822,24 @@
           "else_actions": [
             {
               "type": "StopService",
+              "description": "Detener LpdServiceMonitor (contingencia)",
+              "parameters": {
+                "service_name": "LpdServiceMonitor",
+                "graceful_timeout_seconds": 15,
+                "force_kill_on_timeout": true
+              }
+            },
+            {
+              "type": "StopService",
+              "description": "Detener LPDSVC (contingencia)",
+              "parameters": {
+                "service_name": "LPDSVC",
+                "graceful_timeout_seconds": 15,
+                "force_kill_on_timeout": true
+              }
+            },
+            {
+              "type": "StopService",
               "description": "Detener Spooler (contingencia)",
               "parameters": {
                 "service_name": "Spooler",
@@ -825,6 +861,24 @@
               "description": "Iniciar Spooler (contingencia)",
               "parameters": {
                 "service_name": "Spooler",
+                "wait_for_running": true,
+                "timeout_seconds": 30
+              }
+            },
+            {
+              "type": "StartService",
+              "description": "Iniciar LPDSVC (contingencia)",
+              "parameters": {
+                "service_name": "LPDSVC",
+                "wait_for_running": true,
+                "timeout_seconds": 30
+              }
+            },
+            {
+              "type": "StartService",
+              "description": "Iniciar LpdServiceMonitor (contingencia)",
+              "parameters": {
+                "service_name": "LpdServiceMonitor",
                 "wait_for_running": true,
                 "timeout_seconds": 30
               }
