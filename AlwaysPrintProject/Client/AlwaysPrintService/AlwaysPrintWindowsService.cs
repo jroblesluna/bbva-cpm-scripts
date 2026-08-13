@@ -448,6 +448,8 @@ namespace AlwaysPrintService
         /// Callback cuando se recibe ForcedContingencyChanged del Tray.
         /// Ejecuta el trigger OnContingencyActivated o OnContingencyDeactivated según corresponda.
         /// Defensa: si enabled=true y no hay printer_ip válida, no se ejecuta el trigger de activación.
+        /// Defensa: si enabled=true y la contingencia ya está activada (semáforo=1), no se re-ejecuta
+        /// el trigger de activación (evita reinicio de servicios en cada ciclo de telemetría, cada 5 min).
         /// Defensa: si enabled=false y la contingencia ya está desactivada (semáforo=0), no se re-ejecuta
         /// el trigger de desactivación (evita cascada de RunProcess en cada reconexión WebSocket).
         /// </summary>
@@ -465,6 +467,33 @@ namespace AlwaysPrintService
                         "Contingencia forzada recibida sin printer_ip válida. No se ejecutará OnContingencyActivated.",
                         AlwaysPrintLogger.EvtGenericWarning);
                     return;
+                }
+
+                // Verificar si la contingencia ya está activada (semáforo en registro = 1).
+                // Si ya está en 1, no re-ejecutar el trigger para evitar reinicio de servicios
+                // innecesario en cada ciclo de re-sincronización (cada 5 min vía telemetría).
+                try
+                {
+                    using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                        RegistryConfigManager.RegistryPath, writable: false))
+                    {
+                        int currentValue = key != null
+                            ? Convert.ToInt32(key.GetValue("ContingencyEnabled", 0))
+                            : 0;
+
+                        if (currentValue == 1)
+                        {
+                            AlwaysPrintLogger.WriteInfo(
+                                "OnForcedContingencyReceived: contingencia ya activada (semáforo=1). " +
+                                "Omitiendo trigger OnContingencyActivated.");
+                            return;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        $"OnForcedContingencyReceived: no se pudo leer semáforo ContingencyEnabled: {ex.Message}. Ejecutando trigger por precaución.");
                 }
 
                 // Establecer la IP de contingencia como variable del ActionEngine
