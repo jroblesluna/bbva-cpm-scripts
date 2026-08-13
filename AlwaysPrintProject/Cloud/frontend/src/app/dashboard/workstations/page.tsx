@@ -2268,7 +2268,7 @@ function WorkstationForm({
             id="default_printer_id"
             value={formData.default_printer_id || ''}
             onChange={(e) =>
-              setFormData({ ...formData, default_printer_id: e.target.value || undefined })
+              setFormData({ ...formData, default_printer_id: e.target.value || null })
             }
             disabled={isLoading}
             className="w-full px-3 py-2 border rounded-md"
