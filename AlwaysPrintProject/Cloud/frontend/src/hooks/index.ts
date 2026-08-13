@@ -5,3 +5,4 @@
 export * from './useAuth'
 export * from './useWebSocket'
 export * from './useWorkstations'
+export * from './useRemoteTerminal'

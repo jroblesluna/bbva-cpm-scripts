@@ -70,6 +70,7 @@ class ActionType(str, enum.Enum):
     REMOTE_VIEW_MODE_CHANGE = "REMOTE_VIEW_MODE_CHANGE"
     LOGIN = "login"
     LOGIN_FAILED = "login_failed"
+    REMOTE_COMMAND_EXECUTED = "REMOTE_COMMAND_EXECUTED"
 
 
 class AuditLog(Base):

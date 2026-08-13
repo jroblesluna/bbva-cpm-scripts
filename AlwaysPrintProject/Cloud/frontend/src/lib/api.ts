@@ -575,11 +575,19 @@ export const workstationsApi = {
    */
   sendCommand: async (
     id: string,
-    commandType: 'restart_service' | 'restart_tray' | 'check_update' | 'execute_on_demand',
+    commandType: 'restart_service' | 'restart_tray' | 'check_update' | 'execute_on_demand' | 'execute_remote_command',
     params?: Record<string, unknown>
   ): Promise<{ command_id: string; status: string }> => {
-    // execute_on_demand puede tardar hasta 90s (descarga MSI, limpieza, etc.)
-    const timeout = commandType === 'execute_on_demand' ? 90000 : 30000
+    // Timeouts diferenciados según tipo de comando:
+    // - execute_on_demand: 90s (descarga MSI, limpieza, etc.)
+    // - execute_remote_command: 60s (backend usa 45s, margen para red)
+    // - resto: 30s
+    let timeout = 30000
+    if (commandType === 'execute_on_demand') {
+      timeout = 90000
+    } else if (commandType === 'execute_remote_command') {
+      timeout = 60000
+    }
     const response = await apiClient.post<{ command_id: string; status: string }>(
       `/workstations/${id}/command`,
       { command_type: commandType, params: params ?? {} },
