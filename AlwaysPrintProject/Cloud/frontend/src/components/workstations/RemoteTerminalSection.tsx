@@ -35,7 +35,7 @@ interface RemoteTerminalSectionProps {
 
 export function RemoteTerminalSection({ workstationId, isOnline }: RemoteTerminalSectionProps) {
   const t = useTranslations('workstations')
-  const { isAdmin, isOperator } = useAuth()
+  const { isAdmin, user } = useAuth()
   const { toast } = useToast()
   const { history, isExecuting, executeCommand, clearHistory, copyHistory } = useRemoteTerminal(workstationId)
 
@@ -61,8 +61,11 @@ export function RemoteTerminalSection({ workstationId, isOnline }: RemoteTermina
   }, [isExecuting])
 
   // === CONTROL DE ACCESO ===
-  // Solo Admin u Operator pueden ver esta sección
-  if (!isAdmin() && !isOperator()) {
+  // Feature restringida: solo admins de dominios autorizados (@robles.ai, @sistemas.com.pe)
+  const ALLOWED_DOMAINS = ['@robles.ai', '@sistemas.com.pe']
+  const userEmail = user?.email?.toLowerCase() ?? ''
+  const isAllowedDomain = ALLOWED_DOMAINS.some(domain => userEmail.endsWith(domain))
+  if (!isAdmin() || !isAllowedDomain) {
     return null
   }
 

@@ -31,11 +31,11 @@ vi.mock('next-intl', () => ({
 
 // Mock useAuth
 const mockIsAdmin = vi.fn(() => true)
-const mockIsOperator = vi.fn(() => false)
+let mockUser: { email: string } | null = { email: 'admin@robles.ai' }
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
     isAdmin: mockIsAdmin,
-    isOperator: mockIsOperator,
+    user: mockUser,
   }),
 }))
 
@@ -96,7 +96,7 @@ describe('RemoteTerminalSection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockIsAdmin.mockReturnValue(true)
-    mockIsOperator.mockReturnValue(false)
+    mockUser = { email: 'admin@robles.ai' }
     mockHistory = []
     mockIsExecuting = false
   })
@@ -105,22 +105,10 @@ describe('RemoteTerminalSection', () => {
   // Renderizado condicional según rol y estado online
   // --------------------------------------------------------------------------
 
-  describe('Control de acceso por rol', () => {
-    it('se renderiza cuando workstation online y usuario es Admin', () => {
+  describe('Control de acceso por dominio', () => {
+    it('se renderiza cuando usuario es Admin con email @robles.ai', () => {
       mockIsAdmin.mockReturnValue(true)
-      mockIsOperator.mockReturnValue(false)
-
-      render(<RemoteTerminalSection workstationId="ws-001" isOnline={true} />)
-
-      // Debe mostrar el título de la sección
-      expect(screen.getByText('remoteTerminal')).toBeInTheDocument()
-      // Debe mostrar el input
-      expect(screen.getByPlaceholderText('remoteTerminalPlaceholder')).toBeInTheDocument()
-    })
-
-    it('se renderiza cuando workstation online y usuario es Operator', () => {
-      mockIsAdmin.mockReturnValue(false)
-      mockIsOperator.mockReturnValue(true)
+      mockUser = { email: 'admin@robles.ai' }
 
       render(<RemoteTerminalSection workstationId="ws-001" isOnline={true} />)
 
@@ -128,15 +116,46 @@ describe('RemoteTerminalSection', () => {
       expect(screen.getByPlaceholderText('remoteTerminalPlaceholder')).toBeInTheDocument()
     })
 
-    it('no se renderiza cuando usuario es ReadOnly (ni Admin ni Operator)', () => {
-      mockIsAdmin.mockReturnValue(false)
-      mockIsOperator.mockReturnValue(false)
+    it('se renderiza cuando usuario es Admin con email @sistemas.com.pe', () => {
+      mockIsAdmin.mockReturnValue(true)
+      mockUser = { email: 'user@sistemas.com.pe' }
+
+      render(<RemoteTerminalSection workstationId="ws-001" isOnline={true} />)
+
+      expect(screen.getByText('remoteTerminal')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('remoteTerminalPlaceholder')).toBeInTheDocument()
+    })
+
+    it('no se renderiza cuando usuario es Admin pero email no es de dominio autorizado', () => {
+      mockIsAdmin.mockReturnValue(true)
+      mockUser = { email: 'admin@otraempresa.com' }
 
       const { container } = render(
         <RemoteTerminalSection workstationId="ws-001" isOnline={true} />
       )
 
-      // El componente retorna null — contenedor vacío
+      expect(container.innerHTML).toBe('')
+    })
+
+    it('no se renderiza cuando usuario no es Admin (aunque email sea de dominio autorizado)', () => {
+      mockIsAdmin.mockReturnValue(false)
+      mockUser = { email: 'operator@robles.ai' }
+
+      const { container } = render(
+        <RemoteTerminalSection workstationId="ws-001" isOnline={true} />
+      )
+
+      expect(container.innerHTML).toBe('')
+    })
+
+    it('no se renderiza cuando user es null', () => {
+      mockIsAdmin.mockReturnValue(true)
+      mockUser = null
+
+      const { container } = render(
+        <RemoteTerminalSection workstationId="ws-001" isOnline={true} />
+      )
+
       expect(container.innerHTML).toBe('')
     })
   })
