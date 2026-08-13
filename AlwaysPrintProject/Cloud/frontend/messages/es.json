@@ -319,7 +319,9 @@
     "remoteTerminalCopyHistory": "Copiar historial",
     "remoteTerminalCopied": "Historial copiado al portapapeles",
     "remoteTerminalNoOutput": "(sin salida)",
-    "remoteTerminalClearHistory": "Limpiar"
+    "remoteTerminalClearHistory": "Limpiar",
+    "remoteTerminalRunAsUser": "Ejecutando como usuario (proxy/creds)",
+    "remoteTerminalRunAsSystem": "Ejecutando como SYSTEM"
   },
   "vlans": {
     "title": "VLANs",
