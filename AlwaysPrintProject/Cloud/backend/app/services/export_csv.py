@@ -114,9 +114,10 @@ class CSVExportService:
         """
         Genera filas CSV para exportación de inventario de workstations.
 
-        Columnas: hostname, ip_private, current_user, organization_name,
-                  tray_version, action_config_name, last_connection,
-                  is_online, vlan_name
+        Columnas: id, hostname, ip_private, cidr, vlan_name,
+                  organization_name, tray_version, action_config_name,
+                  current_user, last_connection, is_online, created_at,
+                  updated_at
 
         Args:
             workstations: Lista de workstations (dicts o objetos con atributos).
@@ -130,15 +131,19 @@ class CSVExportService:
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow([
+            "id",
             "hostname",
             "ip_private",
-            "current_user",
+            "cidr",
+            "vlan_name",
             "organization_name",
             "tray_version",
             "action_config_name",
+            "current_user",
             "last_connection",
             "is_online",
-            "vlan_name",
+            "created_at",
+            "updated_at",
         ])
         yield output.getvalue()
 
@@ -149,25 +154,33 @@ class CSVExportService:
 
             # Extraer campos (soporta dict y objetos con atributos)
             if isinstance(ws, dict):
+                ws_id = ws.get("id", "")
                 hostname = ws.get("hostname", "")
                 ip_private = ws.get("ip_private", "")
-                current_user = ws.get("current_user", "")
+                cidr = ws.get("cidr", "")
+                vlan_name = ws.get("vlan_name", "")
                 organization_name = ws.get("organization_name", "")
                 tray_version = ws.get("tray_version", "")
                 action_config_name = ws.get("action_config_name", "")
+                current_user = ws.get("current_user", "")
                 last_connection = ws.get("last_connection", "")
                 is_online = ws.get("is_online", False)
-                vlan_name = ws.get("vlan_name", "")
+                created_at = ws.get("created_at", "")
+                updated_at = ws.get("updated_at", "")
             else:
+                ws_id = str(getattr(ws, "id", "")) or ""
                 hostname = getattr(ws, "hostname", "") or ""
                 ip_private = getattr(ws, "ip_private", "") or ""
-                current_user = getattr(ws, "current_user", "") or ""
+                cidr = getattr(ws, "cidr", "") or ""
+                vlan_name = getattr(ws, "vlan_name", "") or ""
                 organization_name = getattr(ws, "organization_name", "") or ""
                 tray_version = getattr(ws, "tray_version", "") or ""
                 action_config_name = getattr(ws, "action_config_name", "") or ""
+                current_user = getattr(ws, "current_user", "") or ""
                 last_connection = getattr(ws, "last_connection", "")
                 is_online = getattr(ws, "is_online", False)
-                vlan_name = getattr(ws, "vlan_name", "") or ""
+                created_at = getattr(ws, "created_at", "")
+                updated_at = getattr(ws, "updated_at", "")
 
             # Convertir last_connection a string ISO si es datetime
             if hasattr(last_connection, "isoformat"):
@@ -175,18 +188,34 @@ class CSVExportService:
             elif last_connection is None:
                 last_connection = ""
 
+            # Convertir created_at a string ISO si es datetime
+            if hasattr(created_at, "isoformat"):
+                created_at = created_at.isoformat()
+            elif created_at is None:
+                created_at = ""
+
+            # Convertir updated_at a string ISO si es datetime
+            if hasattr(updated_at, "isoformat"):
+                updated_at = updated_at.isoformat()
+            elif updated_at is None:
+                updated_at = ""
+
             # Convertir booleano is_online a texto legible
             is_online_text = "Online" if is_online else "Offline"
 
             writer.writerow([
+                ws_id or "",
                 hostname or "",
                 ip_private or "",
-                current_user or "",
+                cidr or "",
+                vlan_name or "",
                 organization_name or "",
                 tray_version or "",
                 action_config_name or "",
+                current_user or "",
                 last_connection or "",
                 is_online_text,
-                vlan_name or "",
+                created_at or "",
+                updated_at or "",
             ])
             yield output.getvalue()

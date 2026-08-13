@@ -1529,15 +1529,19 @@ def export_workstations(
                 config_name = active_config.name or ""
 
         export_data.append({
+            "id": str(ws.id),
             "hostname": ws.hostname or "",
             "ip_private": ws.ip_private or "",
-            "current_user": ws.current_user or "",
+            "cidr": ws.cidr or "",
+            "vlan_name": vlan_name,
             "organization_name": org_name,
             "tray_version": ws.tray_version or "",
             "action_config_name": config_name,
+            "current_user": ws.current_user or "",
             "last_connection": ws.last_connection,
             "is_online": ws.is_online,
-            "vlan_name": vlan_name,
+            "created_at": ws.created_at,
+            "updated_at": ws.updated_at,
         })
 
     # Generar CSV usando el servicio compartido
