@@ -1796,14 +1796,24 @@ async def toggle_workstation_forced_contingency(
             )
 
     # Resolver printer_ip ANTES de modificar estado o hacer commit
-    # 1. Favorita (default_printer_id) si existe
-    # 2. Primer dispositivo activo en la VLAN si no hay favorita
+    # 1. Favorita (default_printer_id) si existe Y pertenece a la VLAN actual
+    # 2. Primer dispositivo activo en la VLAN si no hay favorita válida
     printer_ip = None
     from app.models.device import Device
     if workstation.default_printer_id:
         printer = db.query(Device).filter(Device.id == workstation.default_printer_id).first()
-        if printer:
+        if printer and str(printer.vlan_id) == str(workstation.vlan_id):
             printer_ip = printer.ip_address
+        elif printer:
+            # La favorita NO pertenece a la VLAN actual (WS fue movida de VLAN).
+            # Limpiar referencia obsoleta para evitar este problema en el futuro.
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Workstation {workstation.id}: default_printer_id={workstation.default_printer_id} "
+                f"pertenece a VLAN {printer.vlan_id}, no a la VLAN actual {workstation.vlan_id}. "
+                f"Limpiando referencia obsoleta."
+            )
+            workstation.default_printer_id = None
 
     if not printer_ip and workstation.vlan_id:
         # Fallback: primer dispositivo activo en la VLAN

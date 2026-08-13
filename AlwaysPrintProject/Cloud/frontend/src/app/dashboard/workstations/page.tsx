@@ -389,6 +389,15 @@ export default function WorkstationsPage() {
       setContingencyWsDevicesLoading(true);
       try {
         const devices = await devicesApi.list({ vlan_id: contingencyTarget.vlan_id as string, is_active: true });
+        // Reordenar: si la WS tiene impresora favorita, ponerla primero
+        // (es la que realmente usará el backend al activar contingencia)
+        if (contingencyTarget.default_printer_id && devices.length > 0) {
+          const favIndex = devices.findIndex(d => d.id === contingencyTarget.default_printer_id);
+          if (favIndex > 0) {
+            const [fav] = devices.splice(favIndex, 1);
+            devices.unshift(fav);
+          }
+        }
         setContingencyWsDevices(devices);
       } catch {
         setContingencyWsDevices([]);
@@ -1074,6 +1083,9 @@ export default function WorkstationsPage() {
                       </div>
                       <p className="text-sm text-green-700 font-mono ml-6">
                         {contingencyWsDevices[0].name} — {contingencyWsDevices[0].ip_address}:{contingencyWsDevices[0].port}
+                        {contingencyTarget?.default_printer_id === contingencyWsDevices[0].id && (
+                          <span className="ml-2 text-xs text-green-500">★</span>
+                        )}
                       </p>
                       {contingencyWsDevices.length > 1 && (
                         <p className="text-xs text-green-600 ml-6 mt-1">
