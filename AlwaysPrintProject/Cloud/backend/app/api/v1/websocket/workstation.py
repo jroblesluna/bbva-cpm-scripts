@@ -654,7 +654,84 @@ async def workstation_websocket(
                         message=telemetry_broadcast_msg,
                         db=None
                     )
-            
+
+                # === Re-sincronizar estado de contingencia cada telemetría ===
+                # Esto garantiza que si un paquete forced_contingency se perdió,
+                # la WS se re-sincroniza en máximo 5 min (intervalo de telemetría).
+                try:
+                    sync_db = db if db else SessionLocal()
+                    try:
+                        # Recargar workstation si db fue cerrada por broadcast
+                        if db is None:
+                            ws_fresh = sync_db.query(Workstation).filter(
+                                Workstation.id == workstation_id
+                            ).first()
+                            if not ws_fresh:
+                                continue
+                            ws_org_id = ws_fresh.organization_id
+                            ws_vlan_id = ws_fresh.vlan_id
+                            ws_forced = ws_fresh.forced_contingency
+                        else:
+                            ws_org_id = workstation.organization_id
+                            ws_vlan_id = workstation.vlan_id
+                            ws_forced = workstation.forced_contingency
+
+                        # Resolver estado de contingencia: org > vlan > ws
+                        sync_enabled = False
+                        sync_source = "sync"
+                        sync_source_name = "normal"
+                        sync_printer_ip = ""
+
+                        org_obj = sync_db.query(Organization).filter(
+                            Organization.id == ws_org_id
+                        ).first()
+                        if org_obj and org_obj.forced_contingency:
+                            sync_enabled = True
+                            sync_source = "organization"
+                            sync_source_name = org_obj.name
+
+                        if not sync_enabled and ws_vlan_id:
+                            from app.models.vlan import VLAN as VLANSync
+                            vlan_obj = sync_db.query(VLANSync).filter(
+                                VLANSync.id == ws_vlan_id
+                            ).first()
+                            if vlan_obj and vlan_obj.forced_contingency:
+                                sync_enabled = True
+                                sync_source = "vlan"
+                                sync_source_name = vlan_obj.name
+
+                        if not sync_enabled and ws_forced:
+                            sync_enabled = True
+                            sync_source = "workstation"
+                            sync_source_name = ""
+
+                        # Resolver printer_ip si contingencia activa
+                        if sync_enabled and ws_vlan_id:
+                            from app.models.device import Device as DeviceSync
+                            first_dev = sync_db.query(DeviceSync).filter(
+                                DeviceSync.vlan_id == ws_vlan_id,
+                                DeviceSync.organization_id == ws_org_id,
+                                DeviceSync.is_active == True
+                            ).order_by(DeviceSync.ip_address).first()
+                            if first_dev:
+                                sync_printer_ip = first_dev.ip_address or ""
+
+                        await websocket.send_json({
+                            "type": "forced_contingency",
+                            "enabled": sync_enabled,
+                            "source": sync_source,
+                            "source_name": sync_source_name,
+                            "printer_ip": sync_printer_ip,
+                        })
+                    finally:
+                        if db is None:
+                            sync_db.close()
+                except Exception as e:
+                    logger.warning(
+                        f"[WS] Error en sync de contingencia post-telemetría "
+                        f"para {workstation_id}: {e}"
+                    )
+
             elif message_type == "connectivity_result":
                 # Actualizar última actividad al recibir resultado de conectividad
                 await connection_manager.update_last_activity(workstation_id)
