@@ -1,5 +1,5 @@
 {
-  "version": "13.0",
+  "version": "13.1",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -830,17 +830,35 @@
           "store_result_in": "contingency_enabled"
         },
         {
-          "type": "StartService",
-          "description": "Asegurar Spooler activo (requerido por WMI para SetTcpPort)",
+          "type": "StopService",
+          "description": "Detener LpdServiceMonitor",
+          "parameters": {
+            "service_name": "LpdServiceMonitor",
+            "graceful_timeout_seconds": 15,
+            "force_kill_on_timeout": true
+          }
+        },
+        {
+          "type": "StopService",
+          "description": "Detener LPDSVC",
+          "parameters": {
+            "service_name": "LPDSVC",
+            "graceful_timeout_seconds": 15,
+            "force_kill_on_timeout": true
+          }
+        },
+        {
+          "type": "StopService",
+          "description": "Detener Spooler",
           "parameters": {
             "service_name": "Spooler",
-            "wait_for_running": true,
-            "timeout_seconds": 30
+            "graceful_timeout_seconds": 15,
+            "force_kill_on_timeout": true
           }
         },
         {
           "type": "Conditional",
-          "description": "Si contingencia activa: asegurar puerto apunta a IP directa. Si no: asegurar puerto apunta a CPM local.",
+          "description": "Configurar puerto según modo: contingencia → IP directa, normal → CPM local.",
           "condition": {
             "variable": "contingency_enabled",
             "operator": "equals",
@@ -896,6 +914,15 @@
           },
           "actions": [
             {
+              "type": "StartService",
+              "description": "Iniciar Spooler (requerido para crear cola)",
+              "parameters": {
+                "service_name": "Spooler",
+                "wait_for_running": true,
+                "timeout_seconds": 30
+              }
+            },
+            {
               "type": "RunProcess",
               "description": "Crear cola local con puerto LPMCHybridPort",
               "parameters": {
@@ -903,6 +930,15 @@
                 "arguments": "printui.dll,PrintUIEntry /q /if /b \"{{corporate_queue_name}}\" /r \"LPMCHybridPort\" /m \"Lexmark Universal v2 XL\" /z",
                 "timeout_seconds": 90,
                 "window_style": "Hidden"
+              }
+            },
+            {
+              "type": "StopService",
+              "description": "Detener Spooler (para limpiar spool después)",
+              "parameters": {
+                "service_name": "Spooler",
+                "graceful_timeout_seconds": 15,
+                "force_kill_on_timeout": true
               }
             }
           ],
@@ -917,22 +953,13 @@
             },
             {
               "type": "Conditional",
-              "description": "Si puerto no es LPMCHybridPort: reasignar",
+              "description": "Si puerto no es LPMCHybridPort: reasignar en registro",
               "condition": {
                 "variable": "current_port",
                 "operator": "not_equals",
                 "value": "LPMCHybridPort"
               },
               "actions": [
-                {
-                  "type": "StopService",
-                  "description": "Detener Spooler para modificar registro",
-                  "parameters": {
-                    "service_name": "Spooler",
-                    "graceful_timeout_seconds": 15,
-                    "force_kill_on_timeout": true
-                  }
-                },
                 {
                   "type": "RunProcess",
                   "description": "Actualizar puerto de la cola a LPMCHybridPort en registro",
@@ -942,67 +969,10 @@
                     "timeout_seconds": 15,
                     "window_style": "Hidden"
                   }
-                },
-                {
-                  "type": "StartService",
-                  "description": "Reiniciar Spooler tras cambio de registro",
-                  "parameters": {
-                    "service_name": "Spooler",
-                    "wait_for_running": true,
-                    "timeout_seconds": 30
-                  }
                 }
               ]
             }
           ]
-        },
-        {
-          "type": "RunProcess",
-          "description": "Configurar Datatype EMF en cola corporativa para compatibilidad con apps UWP (Snipping Tool, Photos)",
-          "parameters": {
-            "file_path": "C:\\Windows\\System32\\reg.exe",
-            "arguments": "add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\{{corporate_queue_name}}\" /v Datatype /t REG_SZ /d \"NT EMF 1.008\" /f",
-            "timeout_seconds": 15,
-            "window_style": "Hidden"
-          }
-        },
-        {
-          "type": "RunProcess",
-          "description": "Establecer cola corporativa como impresora predeterminada",
-          "parameters": {
-            "file_path": "C:\\Windows\\System32\\rundll32.exe",
-            "arguments": "printui.dll,PrintUIEntry /y /n \"{{corporate_queue_name}}\"",
-            "timeout_seconds": 15,
-            "window_style": "Hidden",
-            "run_as_logged_in_user": true
-          }
-        },
-        {
-          "type": "StopService",
-          "description": "Detener LpdServiceMonitor",
-          "parameters": {
-            "service_name": "LpdServiceMonitor",
-            "graceful_timeout_seconds": 15,
-            "force_kill_on_timeout": true
-          }
-        },
-        {
-          "type": "StopService",
-          "description": "Detener LPDSVC",
-          "parameters": {
-            "service_name": "LPDSVC",
-            "graceful_timeout_seconds": 15,
-            "force_kill_on_timeout": true
-          }
-        },
-        {
-          "type": "StopService",
-          "description": "Detener Spooler",
-          "parameters": {
-            "service_name": "Spooler",
-            "graceful_timeout_seconds": 15,
-            "force_kill_on_timeout": true
-          }
         },
         {
           "type": "DeleteFolderContents",
@@ -1023,16 +993,6 @@
           }
         },
         {
-          "type": "RunProcess",
-          "description": "Configurar Datatype EMF en cola corporativa para compatibilidad con apps UWP (Snipping Tool, Photos)",
-          "parameters": {
-            "file_path": "C:\\Windows\\System32\\reg.exe",
-            "arguments": "add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\{{corporate_queue_name}}\" /v Datatype /t REG_SZ /d \"NT EMF 1.008\" /f",
-            "timeout_seconds": 15,
-            "window_style": "Hidden"
-          }
-        },
-        {
           "type": "StartService",
           "description": "Iniciar LPDSVC",
           "parameters": {
@@ -1048,6 +1008,16 @@
             "service_name": "LpdServiceMonitor",
             "wait_for_running": true,
             "timeout_seconds": 30
+          }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Configurar Datatype EMF en cola corporativa para compatibilidad con apps UWP (Snipping Tool, Photos)",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\reg.exe",
+            "arguments": "add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\{{corporate_queue_name}}\" /v Datatype /t REG_SZ /d \"NT EMF 1.008\" /f",
+            "timeout_seconds": 15,
+            "window_style": "Hidden"
           }
         },
         {
@@ -1094,6 +1064,27 @@
               }
             }
           ]
+        },
+        {
+          "type": "RunProcess",
+          "description": "Reanudar (quitar pausa) cola corporativa",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\rundll32.exe",
+            "arguments": "printui.dll,PrintUIEntry /Xs /n \"{{corporate_queue_name}}\" status resume",
+            "timeout_seconds": 15,
+            "window_style": "Hidden"
+          }
+        },
+        {
+          "type": "RunProcess",
+          "description": "Establecer cola corporativa como impresora predeterminada",
+          "parameters": {
+            "file_path": "C:\\Windows\\System32\\rundll32.exe",
+            "arguments": "printui.dll,PrintUIEntry /y /n \"{{corporate_queue_name}}\"",
+            "timeout_seconds": 15,
+            "window_style": "Hidden",
+            "run_as_logged_in_user": true
+          }
         }
       ]
     },
