@@ -1,5 +1,5 @@
 {
-  "version": "13.1",
+  "version": "13.2",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -76,6 +76,11 @@
       "label": "Listar jobs en post (pendientes de release)",
       "command": "dir C:\\ProgramData\\LPMC\\Jobs\\{{current_user}}\\CloudHybrid\\post",
       "description": "Mostrar archivos .prn listos para release en la carpeta post del usuario activo"
+    },
+    {
+      "label": "Listar trabajos en cola de impresión",
+      "command": "powershell -NoProfile -Command \"Get-PrintJob -PrinterName '{{corporate_queue_name}}' | Format-Table -AutoSize Id, DocumentName, UserName, SubmittedTime, Size, JobStatus\"",
+      "description": "Muestra los trabajos pendientes en la cola de impresión Windows (LexmarkBBVA)"
     }
   ],
   "downloadable_files": [
