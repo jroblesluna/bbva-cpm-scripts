@@ -33,6 +33,7 @@ from app.api.v1.endpoints import (
     knowledge_articles,
     profile_knowledge_articles,
     user_activity,
+    sync_inventory,
 )
 
 # Router principal de la API v1
@@ -226,6 +227,12 @@ api_router.include_router(
 api_router.include_router(
     health.router,
     tags=["Sistema"]
+)
+
+# Sincronización de inventario (solo Corporate Admin)
+api_router.include_router(
+    sync_inventory.router,
+    tags=["Sync Inventory"]
 )
 
 

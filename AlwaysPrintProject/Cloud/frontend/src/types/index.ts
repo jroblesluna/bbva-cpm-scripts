@@ -47,6 +47,9 @@ export * from './scalability-metrics'
 // Knowledge Article types
 export * from './knowledge-article'
 
+// Sync Inventory types
+export * from './sync-inventory'
+
 // ============================================================================
 // TIPOS COMUNES
 // ============================================================================

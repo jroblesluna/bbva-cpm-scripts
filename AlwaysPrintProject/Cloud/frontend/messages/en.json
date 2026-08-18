@@ -1636,5 +1636,98 @@
       "loadFailed": "Error loading activity"
     },
     "loading": "Exporting..."
+  },
+  "syncInventory": {
+    "title": "Inventory Synchronization",
+    "description": "Execute inventory synchronization steps from CSV against the database. Restricted to Corporate Admins.",
+    "steps": {
+      "step1": {
+        "label": "Sync VLANs",
+        "description": "Create or update VLANs from CSV data"
+      },
+      "step2": {
+        "label": "Reassign Workstations + CIDRs",
+        "description": "Reassign workstations and update CIDR ranges from CSV"
+      },
+      "step3": {
+        "label": "Upsert Devices",
+        "description": "Create or update devices (printers) from CSV"
+      },
+      "step4": {
+        "label": "Assign Orphan Devices",
+        "description": "Assign devices without VLAN based on IP matching"
+      },
+      "step5": {
+        "label": "Delete Empty VLANs",
+        "description": "Remove VLANs with no workstations or devices assigned"
+      },
+      "step6": {
+        "label": "Clean Redundant CIDRs",
+        "description": "Remove CIDR ranges that no longer match any workstation"
+      },
+      "step7": {
+        "label": "Relocate Non-Standard Hostnames",
+        "description": "Move workstations with non-standard hostnames (not W10/W11) to ZZZ VLAN"
+      },
+      "step8": {
+        "label": "Move non-118.x CIDRs to ZZZ",
+        "description": "Move CIDRs not starting with 118. from agencies to ZZZ VLAN"
+      },
+      "step9": {
+        "label": "Reassign from VLAN_xxxx",
+        "description": "Redistribute workstations from special VLANs (VLAN_xxxx) to their agencies"
+      },
+      "step10": {
+        "label": "Rescue from ZZZ by CIDR",
+        "description": "Move workstations from ZZZ to agencies by IP prefix matching"
+      },
+      "step11": {
+        "label": "Delete Empty VLANs (Final)",
+        "description": "Final cleanup: delete all VLANs with no workstations assigned"
+      }
+    },
+    "buttons": {
+      "run": "Run Step",
+      "runAll": "Run All",
+      "uploadCsv": "Upload CSV"
+    },
+    "dryRun": {
+      "toggle": "Dry Run",
+      "banner": "DRY RUN mode — no changes will be saved to the database"
+    },
+    "output": {
+      "title": "Execution output",
+      "placeholder": "Execution output will appear here..."
+    },
+    "errors": {
+      "csvInvalid": "The CSV file is invalid or could not be parsed",
+      "csvRequired": "A CSV file is required for this step",
+      "executionFailed": "Execution failed",
+      "missingColumns": "Missing required columns: {columns}",
+      "timeout": "The operation timed out. It may still be running on the server."
+    },
+    "organizationSelector": {
+      "label": "Organization"
+    },
+    "summary": {
+      "created": "Created",
+      "updated": "Updated",
+      "deleted": "Deleted",
+      "unchanged": "Unchanged",
+      "skipped": "Skipped"
+    },
+    "execution": {
+      "running": "Executing...",
+      "completed": "Completed",
+      "error": "Error"
+    },
+    "csvSteps": "Requires CSV",
+    "dbSteps": "Database only",
+    "postSteps": "Post-processing",
+    "csv": {
+      "dropzone": "Click to select or drag a CSV file",
+      "fileSelected": "{filename} — {rows} data rows",
+      "remove": "Remove"
+    }
   }
 }

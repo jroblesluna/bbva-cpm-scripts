@@ -8,7 +8,7 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslations } from 'next-intl';
-import { Settings } from 'lucide-react';
+import { SyncInventorySection } from '@/components/config/SyncInventorySection';
 
 export default function ConfigPage() {
   const { isAdmin } = useAuth();
@@ -26,11 +26,8 @@ export default function ConfigPage() {
         <p className="mt-2 text-gray-600">{t('systemConfigMsg')}</p>
       </div>
 
-      {/* Placeholder */}
-      <div className="bg-white rounded-lg shadow p-12 text-center">
-        <Settings className="mx-auto h-16 w-16 text-gray-300" />
-        <h3 className="mt-4 text-lg font-medium text-gray-900">{t('comingSoon')}</h3>
-      </div>
+      {/* Sincronización de Inventario */}
+      <SyncInventorySection />
     </div>
   );
 }
