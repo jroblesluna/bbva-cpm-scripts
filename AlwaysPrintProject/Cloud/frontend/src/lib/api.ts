@@ -52,6 +52,7 @@ import type {
   LogAnalysisResponse,
   LogAnalysisListResponse,
   LogAnalysisTodayCheckResponse,
+  SyncExecutionResponse,
 } from '@/types'
 
 // ============================================================================
@@ -1183,6 +1184,41 @@ export const healthApi = {
    */
   check: async (): Promise<{ status: string }> => {
     const response = await apiClient.get<{ status: string }>('/health')
+    return response.data
+  },
+}
+
+// ============================================================================
+// SYNC INVENTORY (Sincronización de Inventario)
+// ============================================================================
+
+export const syncInventoryApi = {
+  /**
+   * Ejecutar paso(s) de sincronización de inventario.
+   * Envía CSV como multipart/form-data.
+   * Timeout extendido a 180s para "Run All" (step=12, ejecuta 11 pasos).
+   */
+  execute: async (params: {
+    step: number
+    dry_run: boolean
+    organization_id: string
+    csv_file?: File
+  }): Promise<SyncExecutionResponse> => {
+    const formData = new FormData()
+    formData.append('step', params.step.toString())
+    formData.append('dry_run', params.dry_run.toString())
+    formData.append('organization_id', params.organization_id)
+    if (params.csv_file) {
+      formData.append('csv_file', params.csv_file)
+    }
+    const response = await apiClient.post<SyncExecutionResponse>(
+      '/admin/sync-inventory/execute',
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 180000,
+      }
+    )
     return response.data
   },
 }

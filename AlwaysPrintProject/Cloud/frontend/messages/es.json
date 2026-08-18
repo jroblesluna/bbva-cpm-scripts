@@ -1636,5 +1636,98 @@
       "loadFailed": "Error al cargar actividad"
     },
     "loading": "Exportando..."
+  },
+  "syncInventory": {
+    "title": "Sincronización de Inventario",
+    "description": "Ejecuta los pasos de sincronización de inventario desde un CSV contra la base de datos. Restringido a Admins Corporativos.",
+    "steps": {
+      "step1": {
+        "label": "Sync VLANs",
+        "description": "Crear o actualizar VLANs desde los datos del CSV"
+      },
+      "step2": {
+        "label": "Reasignar Workstations + CIDRs",
+        "description": "Reasignar workstations y actualizar rangos CIDR desde el CSV"
+      },
+      "step3": {
+        "label": "Upsert Devices",
+        "description": "Crear o actualizar dispositivos (impresoras) desde el CSV"
+      },
+      "step4": {
+        "label": "Asignar Devices Huérfanos",
+        "description": "Asignar dispositivos sin VLAN basándose en coincidencia de IP"
+      },
+      "step5": {
+        "label": "Eliminar VLANs Vacías",
+        "description": "Eliminar VLANs sin workstations ni dispositivos asignados"
+      },
+      "step6": {
+        "label": "Limpiar CIDRs Redundantes",
+        "description": "Eliminar rangos CIDR que ya no coinciden con ninguna workstation"
+      },
+      "step7": {
+        "label": "Reubicar Hostnames No-Estándar",
+        "description": "Mover workstations con hostname no-estándar (no W10/W11) a VLAN ZZZ"
+      },
+      "step8": {
+        "label": "Mover CIDRs no-118.x a ZZZ",
+        "description": "Mover CIDRs que no empiecen con 118. de agencias a VLAN ZZZ"
+      },
+      "step9": {
+        "label": "Reasignar de VLAN_xxxx",
+        "description": "Redistribuir workstations de VLANs especiales (VLAN_xxxx) a sus agencias"
+      },
+      "step10": {
+        "label": "Rescatar de ZZZ por CIDR",
+        "description": "Mover workstations de ZZZ a agencias por coincidencia de prefijo IP"
+      },
+      "step11": {
+        "label": "Eliminar VLANs Vacías (Final)",
+        "description": "Limpieza final: eliminar todas las VLANs sin workstations asignadas"
+      }
+    },
+    "buttons": {
+      "run": "Ejecutar Paso",
+      "runAll": "Ejecutar Todos",
+      "uploadCsv": "Subir CSV"
+    },
+    "dryRun": {
+      "toggle": "Dry Run",
+      "banner": "Modo DRY RUN — no se guardarán cambios en la base de datos"
+    },
+    "output": {
+      "title": "Resultado de ejecución",
+      "placeholder": "La salida de la ejecución aparecerá aquí..."
+    },
+    "errors": {
+      "csvInvalid": "El archivo CSV es inválido o no se pudo parsear",
+      "csvRequired": "Se requiere un archivo CSV para este paso",
+      "executionFailed": "La ejecución falló",
+      "missingColumns": "Faltan columnas requeridas: {columns}",
+      "timeout": "La operación excedió el tiempo límite. Puede seguir ejecutándose en el servidor."
+    },
+    "organizationSelector": {
+      "label": "Organización"
+    },
+    "summary": {
+      "created": "Creados",
+      "updated": "Actualizados",
+      "deleted": "Eliminados",
+      "unchanged": "Sin cambios",
+      "skipped": "Omitidos"
+    },
+    "execution": {
+      "running": "Ejecutando...",
+      "completed": "Completado",
+      "error": "Error"
+    },
+    "csvSteps": "Requiere CSV",
+    "dbSteps": "Solo base de datos",
+    "postSteps": "Post-procesamiento",
+    "csv": {
+      "dropzone": "Haz clic para seleccionar o arrastra un archivo CSV",
+      "fileSelected": "{filename} — {rows} filas de datos",
+      "remove": "Eliminar"
+    }
   }
 }
