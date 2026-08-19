@@ -470,9 +470,10 @@ namespace AlwaysPrintService
                     return;
                 }
 
-                // Verificar si la contingencia ya está activada (semáforo en registro = 1).
-                // Si ya está en 1, no re-ejecutar el trigger para evitar reinicio de servicios
-                // innecesario en cada ciclo de re-sincronización (cada 5 min vía telemetría).
+                // Verificar si la contingencia ya está activada (semáforo en registro = 1)
+                // Y si la IP es la misma que la que se quiere establecer.
+                // Si ya está en 1 CON LA MISMA IP, no re-ejecutar el trigger.
+                // Si ya está en 1 pero con IP DISTINTA, sí re-ejecutar (cambió la impresora destino).
                 try
                 {
                     using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
@@ -484,10 +485,17 @@ namespace AlwaysPrintService
 
                         if (currentValue == 1)
                         {
+                            string currentIp = key?.GetValue("ContingencyPrinterIp", "")?.ToString() ?? "";
+                            if (string.Equals(currentIp, printerIp, StringComparison.OrdinalIgnoreCase))
+                            {
+                                AlwaysPrintLogger.WriteInfo(
+                                    $"OnForcedContingencyReceived: contingencia ya activada con misma IP ({printerIp}). " +
+                                    "Omitiendo trigger OnContingencyActivated.");
+                                return;
+                            }
                             AlwaysPrintLogger.WriteInfo(
-                                "OnForcedContingencyReceived: contingencia ya activada (semáforo=1). " +
-                                "Omitiendo trigger OnContingencyActivated.");
-                            return;
+                                $"OnForcedContingencyReceived: contingencia activa pero IP cambió ({currentIp} → {printerIp}). " +
+                                "Re-ejecutando trigger OnContingencyActivated.");
                         }
                     }
                 }
