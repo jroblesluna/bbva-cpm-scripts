@@ -450,14 +450,33 @@ namespace AlwaysPrintTray.Forms
                     {
                         if (_pipe.IsConnected)
                         {
+                            string? ipToSend;
+                            string? nameToSend;
+
+                            if (sel.IsFavorite)
+                            {
+                                // Quitando favorita → enviar la IP del default (o menor IP como fallback)
+                                var defaultPrinter = _printers.Find(p => p.IsDefault);
+                                if (defaultPrinter == null && _printers.Count > 0)
+                                    defaultPrinter = _printers[0]; // fallback: primera de la lista
+                                ipToSend = defaultPrinter?.IpAddress;
+                                nameToSend = defaultPrinter?.Name;
+                            }
+                            else
+                            {
+                                // Estableciendo nueva favorita → enviar su IP
+                                ipToSend = sel.IpAddress;
+                                nameToSend = sel.Name;
+                            }
+
                             var ipcPayload = new FavoritePrinterChangedPayload
                             {
-                                NewFavoriteIp = sel.IsFavorite ? null : sel.IpAddress,
-                                PrinterName = sel.IsFavorite ? null : sel.Name
+                                NewFavoriteIp = ipToSend,
+                                PrinterName = nameToSend
                             };
                             _pipe.Send(PipeMessage.Create(MessageType.FavoritePrinterChanged, ipcPayload));
                             AlwaysPrintLogger.WriteTrayInfo(
-                                "MyPrintersForm: notificación FavoritePrinterChanged enviada al Service.");
+                                $"MyPrintersForm: notificación FavoritePrinterChanged enviada al Service. IP={ipToSend ?? "null"}");
                         }
                     }
                     catch (Exception pipeEx)
