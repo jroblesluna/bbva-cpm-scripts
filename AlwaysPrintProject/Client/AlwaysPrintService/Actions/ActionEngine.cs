@@ -295,8 +295,11 @@ namespace AlwaysPrintService.Actions
                     return true;
                 }
                 
-                // Limpiar variables antes de ejecutar
+                // Limpiar variables de ejecución antes de ejecutar
+                // (preservar las inyectadas vía SetConfigVariable copiándolas de vuelta)
                 _variables.Clear();
+                foreach (var kvp in _configVariables)
+                    _variables[kvp.Key] = kvp.Value;
                 
                 // Ejecutar cada trigger
                 bool allSuccess = true;
@@ -354,6 +357,8 @@ namespace AlwaysPrintService.Actions
                 $"ActionEngine: iniciando ejecución OnDemand '{label}'");
             
             _variables.Clear();
+            foreach (var kvp in _configVariables)
+                _variables[kvp.Key] = kvp.Value;
             _currentOnDemandLabel = label;
             _currentDepth = 0;
             bool success = ExecuteActions(trigger.Actions);
