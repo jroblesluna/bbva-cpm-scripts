@@ -1622,7 +1622,7 @@ def get_workstation(
 
 
 @router.put("/{workstation_id}", response_model=WorkstationResponse)
-def update_workstation(
+async def update_workstation(
     request: Request,
     workstation_id: UUID,
     workstation_data: WorkstationUpdate,
@@ -1693,6 +1693,51 @@ def update_workstation(
         new_data=update_data,
         ip_address=get_client_ip(request)
     )
+    
+    # Si default_printer_id cambió, notificar a la workstation vía WebSocket
+    if "default_printer_id" in update_data:
+        from app.models.device import Device
+        from app.models.vlan import VLAN as VLANModel3
+        
+        new_printer_id = update_data["default_printer_id"]
+        printer_ip = None
+        printer_name = None
+        
+        if new_printer_id:
+            device = db.query(Device).filter(Device.id == new_printer_id, Device.is_active == True).first()
+            if device:
+                printer_ip = device.ip_address
+                printer_name = device.name
+        else:
+            # Favorita removida → resolver default de VLAN
+            if workstation.vlan_id:
+                vlan = db.query(VLANModel3).filter(VLANModel3.id == workstation.vlan_id).first()
+                if vlan and vlan.default_device_id:
+                    default_dev = db.query(Device).filter(
+                        Device.id == vlan.default_device_id, Device.is_active == True
+                    ).first()
+                    if default_dev:
+                        printer_ip = default_dev.ip_address
+                        printer_name = default_dev.name
+                if not printer_ip:
+                    first_dev = db.query(Device).filter(
+                        Device.organization_id == workstation.organization_id,
+                        Device.vlan_id == workstation.vlan_id,
+                        Device.is_active == True
+                    ).order_by(Device.ip_address).first()
+                    if first_dev:
+                        printer_ip = first_dev.ip_address
+                        printer_name = first_dev.name
+        
+        if printer_ip:
+            workstation_id_str = str(workstation_id)
+            if connection_manager.is_workstation_online(workstation_id_str):
+                message = {
+                    "type": "favorite_printer_changed",
+                    "printer_ip": printer_ip,
+                    "printer_name": printer_name,
+                }
+                await connection_manager.send_to_workstation(workstation_id_str, message)
     
     return workstation
 
