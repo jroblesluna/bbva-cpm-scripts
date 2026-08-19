@@ -65,6 +65,15 @@ if [ ! -d "$SCRIPT_DIR/.terraform" ]; then
   echo ""
 fi
 
+# ── Seleccionar workspace (un state independiente por entorno) ─────────────────
+CURRENT_WS=$(terraform -chdir="$SCRIPT_DIR" workspace show)
+if [ "$CURRENT_WS" != "$ENV" ]; then
+  echo "Cambiando workspace: $CURRENT_WS → $ENV"
+  terraform -chdir="$SCRIPT_DIR" workspace select "$ENV" 2>/dev/null || \
+    terraform -chdir="$SCRIPT_DIR" workspace new "$ENV"
+  echo ""
+fi
+
 # ── Ejecutar terraform ────────────────────────────────────────────────────────
 case "$COMMAND" in
   plan)
