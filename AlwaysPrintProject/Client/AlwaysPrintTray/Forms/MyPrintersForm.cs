@@ -141,7 +141,7 @@ namespace AlwaysPrintTray.Forms
             _btnRefresh = new AppButton
             {
                 Text      = "↺",
-                Location  = new Point(590, 8),
+                Location  = new Point(570, 8),
                 Size      = new Size(40, 32),
                 IsPrimary = false,
                 Font      = new Font("Segoe UI", 14f)
@@ -151,8 +151,8 @@ namespace AlwaysPrintTray.Forms
             _btnClose = new AppButton
             {
                 Text         = "Cerrar",
-                Location     = new Point(640, 8),
-                Size         = new Size(58, 32),
+                Location     = new Point(618, 8),
+                Size         = new Size(66, 32),
                 IsPrimary    = false,
                 DialogResult = DialogResult.OK
             };
