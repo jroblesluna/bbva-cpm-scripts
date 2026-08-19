@@ -275,17 +275,14 @@ namespace AlwaysPrintTray.Forms
             yBottom += 36 + 12;
             ClientSize = new Size(FormWidth, yBottom);
 
-            // Ajustar altura del ListView de progreso para que ocupe hasta el pie
+            // Ajustar altura del ListView de progreso para que llegue hasta el pie
             if (_progressListView != null)
             {
-                int listBottom = yBottom - 36 - 12 - SectionSpacing;
-                int listHeight = listBottom - _progressListView.Top;
-                if (listHeight < 120) listHeight = 120; // mínimo visible
-                _progressListView.Height = listHeight;
-                // Recalcular ClientSize si el listview necesitó más espacio
-                int requiredHeight = _progressListView.Top + listHeight + SectionSpacing + 36 + 12;
-                if (requiredHeight > yBottom)
-                    ClientSize = new Size(FormWidth, requiredHeight);
+                // El separador del pie está en yBottom - 36 - 12 (antes del btn+padding)
+                int separatorY = yBottom - 36 - 12;
+                int availableHeight = separatorY - _progressListView.Top - SectionSpacing;
+                if (availableHeight > 0)
+                    _progressListView.Height = availableHeight;
             }
         }
 
@@ -360,13 +357,12 @@ namespace AlwaysPrintTray.Forms
                 GridLines = true,
                 HeaderStyle = ColumnHeaderStyle.Nonclickable,
                 Font = new Font("Consolas", 8.25f),
-                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right,
             };
             _progressListView.Columns.Add("", 28);
             _progressListView.Columns.Add("Acción", 130);
             _progressListView.Columns.Add("Descripción", RightColWidth - 28 - 130 - 25);
             Controls.Add(_progressListView);
-            // No incrementar y — la altura del ListView se calcula dinámicamente al final
+            y += 184; // Reservar espacio base para el ListView en el cálculo de yR
         }
 
         /// <summary>Construye la sección de servicios monitoreados (columna izquierda).</summary>
