@@ -32,6 +32,7 @@ namespace AlwaysPrintTray.Cloud
         private readonly RegistryConfigManager _registry;
         private readonly string _cloudApiUrl;
         private readonly string _currentVersion;
+        private readonly string? _workstationId;
         private readonly HttpClient _httpClient;
         private bool _disposed;
 
@@ -50,11 +51,13 @@ namespace AlwaysPrintTray.Cloud
         /// <param name="registry">Gestor de configuración del registro para leer el flag local.</param>
         /// <param name="cloudApiUrl">URL base de la API Cloud (ej: https://alwaysprint.apps.iol.pe).</param>
         /// <param name="currentVersion">Versión actualmente instalada del cliente.</param>
-        public UpdateChecker(RegistryConfigManager registry, string cloudApiUrl, string currentVersion)
+        /// <param name="workstationId">ID de la workstation registrada en Cloud (para autenticación vía X-Workstation-ID).</param>
+        public UpdateChecker(RegistryConfigManager registry, string cloudApiUrl, string currentVersion, string? workstationId = null)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _cloudApiUrl = cloudApiUrl ?? throw new ArgumentNullException(nameof(cloudApiUrl));
             _currentVersion = currentVersion ?? throw new ArgumentNullException(nameof(currentVersion));
+            _workstationId = workstationId;
 
             // Crear HttpClient con timeout razonable para evitar bloqueos prolongados
             _httpClient = new HttpClient
@@ -138,7 +141,9 @@ namespace AlwaysPrintTray.Cloud
                 string url = $"{_cloudApiUrl.TrimEnd('/')}/api/v1/updates/check";
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
-                // Autenticación de workstation (se envía la versión actual como header informativo)
+                // Autenticación de workstation vía X-Workstation-ID (evita 401 en redes sin IP pública autorizada)
+                if (!string.IsNullOrEmpty(_workstationId))
+                    request.Headers.Add("X-Workstation-ID", _workstationId);
                 request.Headers.Add("X-Client-Version", _currentVersion);
                 // Headers de identificación para diagnóstico de IPs pendientes
                 request.Headers.Add("X-Workstation-Hostname", Environment.MachineName);

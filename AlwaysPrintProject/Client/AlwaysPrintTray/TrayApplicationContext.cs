@@ -529,7 +529,7 @@ namespace AlwaysPrintTray
                 string currentVersion = System.Reflection.Assembly.GetExecutingAssembly()
                     .GetName().Version?.ToString() ?? "0.0.0.0";
 
-                _updateChecker = new UpdateChecker(_registry, cfg.CloudApiUrl, currentVersion);
+                _updateChecker = new UpdateChecker(_registry, cfg.CloudApiUrl, currentVersion, _cloudManager?.WorkstationId);
                 _updateChecker.UpdateAvailable += OnUpdateAvailable;
                 _updateChecker.Start();
 
