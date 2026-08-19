@@ -2,30 +2,59 @@
 # setup.sh — punto de entrada único para terraform plan/apply/destroy
 #
 # Uso:
-#   ./setup.sh plan     # terraform plan
-#   ./setup.sh apply    # terraform apply
-#   ./setup.sh destroy  # terraform destroy
+#   ./setup.sh dev plan      # terraform plan con dev.tfvars
+#   ./setup.sh prod plan     # terraform plan con prod.tfvars
+#   ./setup.sh dev apply     # terraform apply con dev.tfvars
+#   ./setup.sh prod apply    # terraform apply con prod.tfvars
+#   ./setup.sh dev destroy   # terraform destroy con dev.tfvars
 
 set -euo pipefail
 
-COMMAND="${1:-plan}"
+ENV="${1:-}"
+COMMAND="${2:-plan}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# ── Validar entorno ───────────────────────────────────────────────────────────
+if [[ "$ENV" != "dev" && "$ENV" != "prod" ]]; then
+  echo "Uso: $0 [dev|prod] [plan|apply|destroy]"
+  exit 1
+fi
 
 # ── Validar comando ───────────────────────────────────────────────────────────
 if [[ "$COMMAND" != "plan" && "$COMMAND" != "apply" && "$COMMAND" != "destroy" ]]; then
-  echo "Uso: $0 [plan|apply|destroy]"
+  echo "Uso: $0 [dev|prod] [plan|apply|destroy]"
+  exit 1
+fi
+
+# ── Seleccionar profile AWS según entorno ─────────────────────────────────────
+case "$ENV" in
+  dev)
+    export AWS_PROFILE="AlwaysPrint-dev-040982755196"
+    ;;
+  prod)
+    export AWS_PROFILE="AlwaysPrint-prod-425642439683"
+    ;;
+esac
+
+TFVARS_FILE="$SCRIPT_DIR/${ENV}.tfvars"
+
+if [ ! -f "$TFVARS_FILE" ]; then
+  echo "ERROR: archivo $TFVARS_FILE no encontrado."
   exit 1
 fi
 
 # ── Verificar credenciales AWS ────────────────────────────────────────────────
 if ! aws sts get-caller-identity &>/dev/null; then
-  echo "ERROR: No hay credenciales AWS configuradas."
-  echo "Ejecuta: aws configure  o  export AWS_PROFILE=tu-profile"
+  echo "ERROR: No hay credenciales AWS configuradas para profile $AWS_PROFILE."
+  echo "Ejecuta: aws sso login --profile $AWS_PROFILE"
   exit 1
 fi
 
 echo "────────────────────────────────────────────────"
 echo "  AlwaysPrint Cloud — Terraform $COMMAND"
+echo "  Entorno:  $ENV"
+echo "  Profile:  $AWS_PROFILE"
+echo "  Var-file: ${ENV}.tfvars"
 echo "────────────────────────────────────────────────"
 echo ""
 
@@ -39,12 +68,12 @@ fi
 # ── Ejecutar terraform ────────────────────────────────────────────────────────
 case "$COMMAND" in
   plan)
-    terraform -chdir="$SCRIPT_DIR" plan
+    terraform -chdir="$SCRIPT_DIR" plan -var-file="$TFVARS_FILE"
     ;;
   apply)
-    terraform -chdir="$SCRIPT_DIR" apply
+    terraform -chdir="$SCRIPT_DIR" apply -var-file="$TFVARS_FILE"
     ;;
   destroy)
-    terraform -chdir="$SCRIPT_DIR" destroy
+    terraform -chdir="$SCRIPT_DIR" destroy -var-file="$TFVARS_FILE"
     ;;
 esac
