@@ -1065,8 +1065,8 @@ async def list_workstations(
             s3_metadata = S3UpdateService().get_msi_metadata()
             s3_version = s3_metadata.get("version", "")
             if s3_version and s3_version != "unknown":
-                # Normalizar: las workstations reportan con prefijo "v" (ej: v1.26.813.1118)
-                latest_version = s3_version if s3_version.startswith("v") else f"v{s3_version}"
+                # La BD almacena tray_version sin prefijo "v" (ej: 1.26.819.309)
+                latest_version = s3_version.lstrip("v")
         except Exception:
             # Si S3 no está disponible, fallback al max de tray_version reportado
             all_versions = (
