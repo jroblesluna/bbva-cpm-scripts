@@ -74,6 +74,7 @@ namespace AlwaysPrintService.Actions
         public void SetConfigVariable(string name, string value)
         {
             _configVariables[name] = value;
+            _variables[name] = value;
             AlwaysPrintLogger.WriteInfo($"ActionEngine: variable de configuración '{name}' establecida.");
         }
         
