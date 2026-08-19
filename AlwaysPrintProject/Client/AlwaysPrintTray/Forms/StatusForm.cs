@@ -274,6 +274,13 @@ namespace AlwaysPrintTray.Forms
 
             yBottom += 36 + 12;
             ClientSize = new Size(FormWidth, yBottom);
+
+            // Ajustar altura del ListView de progreso para que ocupe hasta el pie
+            if (_progressListView != null)
+            {
+                int progressBottom = yBottom - 36 - 12 - SectionSpacing; // hasta el separador del pie
+                _progressListView.Height = progressBottom - _progressListView.Top;
+            }
         }
 
         /// <summary>Construye la sección de triggers OnDemand (columna derecha).</summary>
@@ -347,6 +354,7 @@ namespace AlwaysPrintTray.Forms
                 GridLines = true,
                 HeaderStyle = ColumnHeaderStyle.Nonclickable,
                 Font = new Font("Consolas", 8.25f),
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right,
             };
             _progressListView.Columns.Add("", 28);
             _progressListView.Columns.Add("Acción", 130);
@@ -852,7 +860,8 @@ namespace AlwaysPrintTray.Forms
             // Agregar nuevo item
             var newItem = new ListViewItem(statusIcon);
             newItem.SubItems.Add(progress.ActionType);
-            newItem.SubItems.Add(progress.StepName);
+            string indent = progress.Depth > 0 ? new string(' ', progress.Depth * 2) + "↳ " : "";
+            newItem.SubItems.Add(indent + progress.StepName);
             newItem.ForeColor = progress.Status == "running" ? Color.DarkBlue
                 : progress.Status == "ok" ? Color.DarkGreen : Color.DarkRed;
             _progressListView.Items.Add(newItem);

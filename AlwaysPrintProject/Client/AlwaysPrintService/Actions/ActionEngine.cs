@@ -31,12 +31,13 @@ namespace AlwaysPrintService.Actions
         private Func<PipeMessage, bool>? _sendPipeMessageCallback;
         private string? _loadedConfigHash;
         private string? _currentOnDemandLabel;
+        private int _currentDepth;
 
         /// <summary>
         /// Evento emitido por cada paso de una ejecución OnDemand.
-        /// Parámetros: (triggerLabel, actionType, description, status: "running"|"ok"|"error")
+        /// Parámetros: (triggerLabel, actionType, description, status: "running"|"ok"|"error", depth: nivel de anidamiento)
         /// </summary>
-        public event Action<string, string, string, string>? OnActionProgress;
+        public event Action<string, string, string, string, int>? OnActionProgress;
 
         /// <summary>
         /// Hash de la configuración actualmente cargada en memoria.
@@ -353,6 +354,7 @@ namespace AlwaysPrintService.Actions
             
             _variables.Clear();
             _currentOnDemandLabel = label;
+            _currentDepth = 0;
             bool success = ExecuteActions(trigger.Actions);
             _currentOnDemandLabel = null;
             
@@ -364,7 +366,7 @@ namespace AlwaysPrintService.Actions
             // Emitir progreso final: completado
             OnActionProgress?.Invoke(label, "COMPLETE", 
                 success ? "Ejecución completada" : "Ejecución completada con errores",
-                success ? "completed_ok" : "completed_error");
+                success ? "completed_ok" : "completed_error", 0);
             
             return (success, success 
                 ? $"Trigger '{label}' ejecutado correctamente ({sw.ElapsedMilliseconds}ms)"
@@ -387,7 +389,7 @@ namespace AlwaysPrintService.Actions
                     
                     // Emitir progreso: paso iniciando
                     if (_currentOnDemandLabel != null)
-                        OnActionProgress?.Invoke(_currentOnDemandLabel, action.Type, action.Description ?? action.Type, "running");
+                        OnActionProgress?.Invoke(_currentOnDemandLabel, action.Type, action.Description ?? action.Type, "running", _currentDepth);
                     
                     bool success = ExecuteAction(action);
                     
@@ -395,20 +397,20 @@ namespace AlwaysPrintService.Actions
                     {
                         AlwaysPrintLogger.WriteWarning($"ActionEngine: acción '{action.Type}' falló");
                         if (_currentOnDemandLabel != null)
-                            OnActionProgress?.Invoke(_currentOnDemandLabel, action.Type, action.Description ?? action.Type, "error");
+                            OnActionProgress?.Invoke(_currentOnDemandLabel, action.Type, action.Description ?? action.Type, "error", _currentDepth);
                         allSuccess = false;
                     }
                     else
                     {
                         if (_currentOnDemandLabel != null)
-                            OnActionProgress?.Invoke(_currentOnDemandLabel, action.Type, action.Description ?? action.Type, "ok");
+                            OnActionProgress?.Invoke(_currentOnDemandLabel, action.Type, action.Description ?? action.Type, "ok", _currentDepth);
                     }
                 }
                 catch (Exception ex)
                 {
                     AlwaysPrintLogger.WriteError($"ActionEngine: error ejecutando acción '{action.Type}': {ex.Message}", ex);
                     if (_currentOnDemandLabel != null)
-                        OnActionProgress?.Invoke(_currentOnDemandLabel, action.Type, action.Description ?? action.Type, "error");
+                        OnActionProgress?.Invoke(_currentOnDemandLabel, action.Type, action.Description ?? action.Type, "error", _currentDepth);
                     allSuccess = false;
                 }
             }
@@ -645,17 +647,25 @@ namespace AlwaysPrintService.Actions
             
             AlwaysPrintLogger.WriteInfo($"ActionEngine: condición evaluada: {conditionMet}");
             
-            if (conditionMet && action.Actions != null && action.Actions.Count > 0)
+            _currentDepth++;
+            try
             {
-                return ExecuteActions(action.Actions);
+                if (conditionMet && action.Actions != null && action.Actions.Count > 0)
+                {
+                    return ExecuteActions(action.Actions);
+                }
+                else if (!conditionMet && action.ElseActions != null && action.ElseActions.Count > 0)
+                {
+                    AlwaysPrintLogger.WriteInfo("ActionEngine: ejecutando else_actions");
+                    return ExecuteActions(action.ElseActions);
+                }
+                
+                return true;
             }
-            else if (!conditionMet && action.ElseActions != null && action.ElseActions.Count > 0)
+            finally
             {
-                AlwaysPrintLogger.WriteInfo("ActionEngine: ejecutando else_actions");
-                return ExecuteActions(action.ElseActions);
+                _currentDepth--;
             }
-            
-            return true;
         }
         
         private bool ExecuteStopTray(ActionConfig action)

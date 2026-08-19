@@ -580,7 +580,7 @@ namespace AlwaysPrintService
         /// Evento del ActionEngine: progreso de un paso OnDemand.
         /// Envía push al Tray para actualizar la ventana de progreso.
         /// </summary>
-        private void OnActionProgress(string triggerLabel, string actionType, string description, string status)
+        private void OnActionProgress(string triggerLabel, string actionType, string description, string status, int depth)
         {
             if (_pipeServer != null && _pipeServer.IsClientConnected)
             {
@@ -594,6 +594,7 @@ namespace AlwaysPrintService
                         Status = isComplete ? (status == "completed_ok" ? "ok" : "error") : status,
                         IsComplete = isComplete,
                         OverallSuccess = status == "completed_ok",
+                        Depth = depth,
                     });
                 _pipeServer.SendToClient(msg);
             }

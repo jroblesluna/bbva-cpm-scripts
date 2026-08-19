@@ -571,6 +571,10 @@ namespace AlwaysPrint.Shared.Messages
         /// <summary>Duración total en ms (solo relevante si isComplete=true).</summary>
         [JsonProperty("durationMs")]
         public long DurationMs { get; set; }
+
+        /// <summary>Nivel de anidamiento (0=raíz, 1=dentro de Conditional, 2=nested, etc).</summary>
+        [JsonProperty("depth")]
+        public int Depth { get; set; }
     }
 
     // ── Comandos OS remotos (ejecutados por Service con privilegios SYSTEM) ──────
