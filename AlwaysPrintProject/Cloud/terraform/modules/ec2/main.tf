@@ -183,6 +183,8 @@ resource "aws_instance" "main" {
     backend_env_vars    = join("\n", [for k, v in local.backend_env : "${k}=${v}"])
     public_url          = local.public_url
     ws_url              = local.ws_url
+    uvicorn_workers     = var.uvicorn_workers
+    swappiness          = var.swappiness
   }))
 
   tags = { Name = "${local.prefix}-ec2" }

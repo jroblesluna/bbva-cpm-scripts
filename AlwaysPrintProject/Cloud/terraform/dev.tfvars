@@ -27,6 +27,8 @@ frontend_port = 3000
 
 # En Free Tier: t3.small (2GB) / c7i-flex.large (4GB) / m7i-flex.large (8GB)
 ec2_instance_type = "t3.micro"
+uvicorn_workers   = 1
+swappiness        = 1
 
 backend_env_vars = {
   LOG_LEVEL                   = "DEBUG"

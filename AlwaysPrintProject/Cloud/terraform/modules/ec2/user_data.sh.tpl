@@ -36,7 +36,7 @@ sysctl -p /etc/sysctl.d/99-alwaysprint-tcp.conf
 systemctl enable amazon-ssm-agent
 systemctl restart amazon-ssm-agent
 
-# ── Swap (1 GB) — evita thrashing por memoria limitada en t3.micro ────
+# ── Swap (1 GB) — evita OOM en instancias con RAM limitada ────
 if [ ! -f /swapfile ]; then
   fallocate -l 1G /swapfile
   chmod 600 /swapfile
@@ -44,8 +44,8 @@ if [ ! -f /swapfile ]; then
   swapon /swapfile
   echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
 fi
-# Reducir swappiness para que solo use swap bajo presión real
-echo 'vm.swappiness=10' > /etc/sysctl.d/99-swap.conf
+# Swappiness configurable: menor = menos uso de swap (solo bajo presión real)
+echo 'vm.swappiness=${swappiness}' > /etc/sysctl.d/99-swap.conf
 sysctl -p /etc/sysctl.d/99-swap.conf
 
 # Docker Compose plugin
@@ -68,7 +68,7 @@ ENVFILE
 
 # Variables de Redis y multi-worker para WebSocket scaling (entorno DEV)
 echo "REDIS_URL=redis://redis:6379/0" >> $APP_DIR/.env
-echo "UVICORN_WORKERS=2"              >> $APP_DIR/.env
+echo "UVICORN_WORKERS=${uvicorn_workers}"              >> $APP_DIR/.env
 
 # Variables sensibles desde Secrets Manager
 DATABASE_URL=$(aws secretsmanager get-secret-value \
@@ -103,7 +103,7 @@ services:
       - "host.docker.internal:host-gateway"
     command: >
       sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port ${backend_port} --workers $${UVICORN_WORKERS:-2} --ws-ping-interval 300 --ws-ping-timeout 300"
+             uvicorn app.main:app --host 0.0.0.0 --port ${backend_port} --workers $${UVICORN_WORKERS:-${uvicorn_workers}} --ws-ping-interval 300 --ws-ping-timeout 300"
     healthcheck:
       test: ["CMD-SHELL", "python -c 'import urllib.request as u; u.urlopen(chr(104)+chr(116)+chr(116)+chr(112)+chr(58)+chr(47)+chr(47)+chr(108)+chr(111)+chr(99)+chr(97)+chr(108)+chr(104)+chr(111)+chr(115)+chr(116)+chr(58)+chr(56)+chr(48)+chr(48)+chr(48)+chr(47)+chr(97)+chr(112)+chr(105)+chr(47)+chr(118)+chr(49)+chr(47)+chr(104)+chr(101)+chr(97)+chr(108)+chr(116)+chr(104))'"]
       interval: 30s
@@ -228,9 +228,9 @@ cd /opt/alwaysprint
 # Asegurar configuración de Redis y multi-worker en cada deploy
 # (previene drift si el .env fue modificado manualmente)
 sed -i 's|^REDIS_URL=.*|REDIS_URL=redis://redis:6379/0|' .env
-sed -i 's|^UVICORN_WORKERS=.*|UVICORN_WORKERS=2|' .env
+sed -i 's|^UVICORN_WORKERS=.*|UVICORN_WORKERS=${uvicorn_workers}|' .env
 grep -q '^REDIS_URL=' .env || echo 'REDIS_URL=redis://redis:6379/0' >> .env
-grep -q '^UVICORN_WORKERS=' .env || echo 'UVICORN_WORKERS=2' >> .env
+grep -q '^UVICORN_WORKERS=' .env || echo 'UVICORN_WORKERS=${uvicorn_workers}' >> .env
 
 if [ "\$SERVICE" = "backend" ] || [ "\$SERVICE" = "all" ]; then
   docker compose pull backend

@@ -115,6 +115,8 @@ module "ec2" {
   ses_send_policy_arn     = module.ses.ses_send_policy_arn
   database_url_secret_arn = aws_secretsmanager_secret.database_url.arn
   secret_key_arn          = module.secrets.secret_key_arn
+  uvicorn_workers         = var.uvicorn_workers
+  swappiness              = var.swappiness
 
   depends_on = [aws_secretsmanager_secret_version.database_url, module.ses]
 }

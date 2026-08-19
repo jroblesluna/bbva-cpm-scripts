@@ -28,6 +28,18 @@ variable "ec2_instance_type" {
   type        = string
 }
 
+variable "uvicorn_workers" {
+  description = "Número de workers uvicorn para el backend"
+  type        = number
+  default     = 2
+}
+
+variable "swappiness" {
+  description = "Valor de vm.swappiness (0=no swap, 10=solo emergencia, 60=default Linux)"
+  type        = number
+  default     = 10
+}
+
 variable "ses_from_email" {
   description = "Dirección de origen para emails transaccionales vía SES"
   type        = string

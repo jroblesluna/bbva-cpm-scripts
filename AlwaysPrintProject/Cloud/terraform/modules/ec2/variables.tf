@@ -21,3 +21,15 @@ variable "ses_send_policy_arn" {
   description = "ARN de la política IAM de envío SES"
   type        = string
 }
+
+variable "uvicorn_workers" {
+  description = "Número de workers uvicorn para el backend"
+  type        = number
+  default     = 2
+}
+
+variable "swappiness" {
+  description = "Valor de vm.swappiness (0-100). Menor = menos uso de swap."
+  type        = number
+  default     = 10
+}
