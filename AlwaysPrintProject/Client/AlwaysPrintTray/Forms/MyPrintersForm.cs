@@ -441,9 +441,16 @@ namespace AlwaysPrintTray.Forms
                 var response = await _http.PutAsync(url, content);
                 if (response.IsSuccessStatusCode)
                 {
-                    AlwaysPrintLogger.WriteTrayInfo(sel.IsFavorite
-                        ? "MyPrintersForm: favorita eliminada."
-                        : $"MyPrintersForm: favorita → {sel.Name} ({sel.IpAddress})");
+                    if (sel.IsFavorite)
+                    {
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"MyPrintersForm: favorita eliminada (origen: usuario local). Anterior: {sel.Name} ({sel.IpAddress})");
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"MyPrintersForm: favorita establecida (origen: usuario local). Nueva: {sel.Name} ({sel.IpAddress})");
+                    }
 
                     // Notificar al Service para que dispare OnFavoritePrinterChanged
                     try

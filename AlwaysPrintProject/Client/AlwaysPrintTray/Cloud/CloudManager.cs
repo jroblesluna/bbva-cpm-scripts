@@ -364,6 +364,9 @@ namespace AlwaysPrintTray.Cloud
                 case "default_printer_changed":
                     HandleDefaultPrinterChanged(json);
                     break;
+                case "favorite_printer_changed":
+                    HandleFavoritePrinterChangedFromCloud(json);
+                    break;
                 case "message":
                     HandleCloudMessage(json);
                     break;
@@ -1381,6 +1384,65 @@ namespace AlwaysPrintTray.Cloud
             {
                 AlwaysPrintLogger.WriteTrayError(
                     $"CloudManager: error procesando mensaje default_printer_changed. {ex.Message}");
+            }
+        }
+
+        // === Cambio de impresora favorita desde la web ===
+
+        /// <summary>
+        /// Procesa la notificación WebSocket de que la impresora favorita fue cambiada
+        /// desde el frontend web (no desde MyPrintersForm local).
+        /// Envía IPC al Service para que dispare OnFavoritePrinterChanged y redirija
+        /// el puerto si hay contingencia activa.
+        /// </summary>
+        private void HandleFavoritePrinterChangedFromCloud(string json)
+        {
+            try
+            {
+                var obj = JObject.Parse(json);
+                string? printerIp = obj["printer_ip"]?.ToString();
+                string? printerName = obj["printer_name"]?.ToString();
+
+                AlwaysPrintLogger.WriteTrayInfo(
+                    $"CloudManager: favorita cambiada desde frontend web. printer_ip={printerIp ?? "null"}, printer_name={printerName ?? "null"}");
+
+                if (string.IsNullOrEmpty(printerIp))
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        "CloudManager: favorite_printer_changed recibido sin printer_ip. No se notificará al Service.");
+                    return;
+                }
+
+                // Notificar al Service vía Named Pipe (mismo flujo que MyPrintersForm)
+                try
+                {
+                    if (_pipe.IsConnected)
+                    {
+                        var payload = new FavoritePrinterChangedPayload
+                        {
+                            NewFavoriteIp = printerIp,
+                            PrinterName = printerName
+                        };
+                        _pipe.Send(PipeMessage.Create(MessageType.FavoritePrinterChanged, payload));
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            $"CloudManager: FavoritePrinterChanged enviado al Service (origen: frontend web). IP={printerIp}");
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            "CloudManager: pipe desconectado, no se puede notificar cambio de favorita al Service.");
+                    }
+                }
+                catch (Exception pipeEx)
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"CloudManager: error enviando FavoritePrinterChanged al Service: {pipeEx.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"CloudManager: error procesando mensaje favorite_printer_changed. {ex.Message}");
             }
         }
 

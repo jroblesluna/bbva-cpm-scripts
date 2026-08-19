@@ -388,7 +388,7 @@ def get_my_printers(
 
 
 @router.put("/workstation/{workstation_id}/favorite-printer")
-def set_favorite_printer(
+async def set_favorite_printer(
     workstation_id: UUID,
     body: dict,
     db: Session = Depends(get_db)
@@ -399,8 +399,13 @@ def set_favorite_printer(
     Body JSON: { "device_id": "uuid" | null }
     - Si device_id es un UUID válido: establece esa impresora como favorita
     - Si device_id es null: elimina la favorita (usará la de menor IP por defecto)
+    
+    Si la workstation está online, envía WebSocket para que el cliente
+    actualice el puerto de contingencia en tiempo real.
     """
     from app.models.workstation import Workstation
+    from app.models.vlan import VLAN
+    from app.services.websocket_manager import connection_manager
     
     # Buscar la workstation
     workstation = db.query(Workstation).filter(Workstation.id == workstation_id).first()
@@ -411,6 +416,8 @@ def set_favorite_printer(
         )
     
     device_id = body.get("device_id")
+    printer_ip = None
+    printer_name = None
     
     if device_id:
         # Validar que el dispositivo existe y pertenece a la misma organización
@@ -425,11 +432,42 @@ def set_favorite_printer(
                 detail="Dispositivo no encontrado o no pertenece a la organización"
             )
         workstation.default_printer_id = device.id
+        printer_ip = device.ip_address
+        printer_name = device.name
     else:
         workstation.default_printer_id = None
+        # Resolver la IP que se usará (default VLAN o menor IP)
+        if workstation.vlan_id:
+            vlan = db.query(VLAN).filter(VLAN.id == workstation.vlan_id).first()
+            if vlan and vlan.default_device_id:
+                default_dev = db.query(Device).filter(
+                    Device.id == vlan.default_device_id, Device.is_active == True
+                ).first()
+                if default_dev:
+                    printer_ip = default_dev.ip_address
+                    printer_name = default_dev.name
+            if not printer_ip:
+                first_dev = db.query(Device).filter(
+                    Device.organization_id == workstation.organization_id,
+                    Device.vlan_id == workstation.vlan_id,
+                    Device.is_active == True
+                ).order_by(Device.ip_address).first()
+                if first_dev:
+                    printer_ip = first_dev.ip_address
+                    printer_name = first_dev.name
     
     db.commit()
     db.refresh(workstation)
+    
+    # Notificar a la workstation via WebSocket si está online
+    workstation_id_str = str(workstation_id)
+    if printer_ip and connection_manager.is_workstation_online(workstation_id_str):
+        message = {
+            "type": "favorite_printer_changed",
+            "printer_ip": printer_ip,
+            "printer_name": printer_name,
+        }
+        await connection_manager.send_to_workstation(workstation_id_str, message)
     
     return {
         "success": True,
