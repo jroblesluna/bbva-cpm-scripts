@@ -1058,15 +1058,25 @@ async def list_workstations(
             except (ValueError, AttributeError):
                 return (0,)
         
-        # Determinar la versión latest global (max numérica de tray_version)
-        all_versions = (
-            db.query(Workstation.tray_version)
-            .filter(Workstation.tray_version.isnot(None), Workstation.tray_version != "")
-            .distinct()
-            .all()
-        )
-        version_strings = [row[0] for row in all_versions if row[0]]
-        latest_version = max(version_strings, key=parse_version) if version_strings else None
+        # Determinar la versión latest global desde S3 (el MSI más reciente disponible)
+        latest_version = None
+        try:
+            from app.services.s3_update_service import S3UpdateService
+            s3_metadata = S3UpdateService().get_msi_metadata()
+            s3_version = s3_metadata.get("version", "")
+            if s3_version and s3_version != "unknown":
+                # Normalizar: las workstations reportan con prefijo "v" (ej: v1.26.813.1118)
+                latest_version = s3_version if s3_version.startswith("v") else f"v{s3_version}"
+        except Exception:
+            # Si S3 no está disponible, fallback al max de tray_version reportado
+            all_versions = (
+                db.query(Workstation.tray_version)
+                .filter(Workstation.tray_version.isnot(None), Workstation.tray_version != "")
+                .distinct()
+                .all()
+            )
+            version_strings = [row[0] for row in all_versions if row[0]]
+            latest_version = max(version_strings, key=parse_version) if version_strings else None
         
         # Obtener versiones pinneadas por organización
         pinned_orgs = (
