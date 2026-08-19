@@ -1,5 +1,5 @@
 {
-  "version": "13.7",
+  "version": "13.8",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -818,111 +818,112 @@
         },
         {
           "type": "Conditional",
-          "description": "Solo actuar si hay contingencia activa Y la IP favorita es distinta a la IP en uso",
+          "description": "Solo actuar si hay contingencia activa",
           "condition": {
-            "operator": "and",
-            "conditions": [
-              {
-                "variable": "contingency_enabled",
-                "operator": "equals",
-                "value": "1"
-              },
-              {
-                "variable": "new_favorite_ip",
-                "operator": "not_equals",
-                "value": "{{current_contingency_ip}}"
-              }
-            ]
+            "variable": "contingency_enabled",
+            "operator": "equals",
+            "value": "1"
           },
           "actions": [
             {
-              "type": "StopService",
-              "description": "Detener LpdServiceMonitor",
-              "parameters": {
-                "service_name": "LpdServiceMonitor",
-                "graceful_timeout_seconds": 15,
-                "force_kill_on_timeout": true
-              }
-            },
-            {
-              "type": "StopService",
-              "description": "Detener LPDSVC",
-              "parameters": {
-                "service_name": "LPDSVC",
-                "graceful_timeout_seconds": 15,
-                "force_kill_on_timeout": true
-              }
-            },
-            {
-              "type": "PausePrintQueue",
-              "description": "Pausar cola corporativa para evitar jobs en tránsito",
-              "parameters": {
-                "queue_name": "{{corporate_queue_name}}"
-              }
-            },
-            {
-              "type": "StopService",
-              "description": "Detener Spooler",
-              "parameters": {
-                "service_name": "Spooler",
-                "graceful_timeout_seconds": 15,
-                "force_kill_on_timeout": true
-              }
-            },
-            {
-              "type": "StartService",
-              "description": "Iniciar Spooler",
-              "parameters": {
-                "service_name": "Spooler",
-                "wait_for_running": true,
-                "timeout_seconds": 30
-              }
-            },
-            {
-              "type": "WriteAppSetting",
-              "description": "Persistir nueva ContingencyPrinterIp antes de redirigir puerto",
-              "parameters": {
-                "value_name": "ContingencyPrinterIp",
-                "value": "{{new_favorite_ip}}",
-                "value_type": "string"
-              }
-            },
-            {
-              "type": "SetTcpPort",
-              "description": "Redirigir LPMCHybridPort a la nueva IP favorita",
-              "parameters": {
-                "port_name": "LPMCHybridPort",
-                "host_address": "{{new_favorite_ip}}",
-                "port_number": 9100
-              }
-            },
-            {
-              "type": "RunProcess",
-              "description": "Reanudar cola corporativa",
-              "parameters": {
-                "file_path": "C:\\Windows\\System32\\rundll32.exe",
-                "arguments": "printui.dll,PrintUIEntry /Xs /n \"{{corporate_queue_name}}\" status resume",
-                "timeout_seconds": 15,
-                "window_style": "Hidden"
-              }
-            },
-            {
-              "type": "StartService",
-              "description": "Iniciar LPDSVC",
-              "parameters": {
-                "service_name": "LPDSVC",
-                "wait_for_running": true,
-                "timeout_seconds": 30
-              }
-            },
-            {
-              "type": "StartService",
-              "description": "Iniciar LpdServiceMonitor",
-              "parameters": {
-                "service_name": "LpdServiceMonitor",
-                "wait_for_running": true,
-                "timeout_seconds": 30
-              }
+              "type": "Conditional",
+              "description": "Y la IP favorita es distinta a la IP en uso",
+              "condition": {
+                "variable": "new_favorite_ip",
+                "operator": "not_equals",
+                "value": "{{current_contingency_ip}}"
+              },
+              "actions": [
+                {
+                  "type": "StopService",
+                  "description": "Detener LpdServiceMonitor",
+                  "parameters": {
+                    "service_name": "LpdServiceMonitor",
+                    "graceful_timeout_seconds": 15,
+                    "force_kill_on_timeout": true
+                  }
+                },
+                {
+                  "type": "StopService",
+                  "description": "Detener LPDSVC",
+                  "parameters": {
+                    "service_name": "LPDSVC",
+                    "graceful_timeout_seconds": 15,
+                    "force_kill_on_timeout": true
+                  }
+                },
+                {
+                  "type": "PausePrintQueue",
+                  "description": "Pausar cola corporativa para evitar jobs en tránsito",
+                  "parameters": {
+                    "queue_name": "{{corporate_queue_name}}"
+                  }
+                },
+                {
+                  "type": "StopService",
+                  "description": "Detener Spooler",
+                  "parameters": {
+                    "service_name": "Spooler",
+                    "graceful_timeout_seconds": 15,
+                    "force_kill_on_timeout": true
+                  }
+                },
+                {
+                  "type": "StartService",
+                  "description": "Iniciar Spooler",
+                  "parameters": {
+                    "service_name": "Spooler",
+                    "wait_for_running": true,
+                    "timeout_seconds": 30
+                  }
+                },
+                {
+                  "type": "WriteAppSetting",
+                  "description": "Persistir nueva ContingencyPrinterIp antes de redirigir puerto",
+                  "parameters": {
+                    "value_name": "ContingencyPrinterIp",
+                    "value": "{{new_favorite_ip}}",
+                    "value_type": "string"
+                  }
+                },
+                {
+                  "type": "SetTcpPort",
+                  "description": "Redirigir LPMCHybridPort a la nueva IP favorita",
+                  "parameters": {
+                    "port_name": "LPMCHybridPort",
+                    "host_address": "{{new_favorite_ip}}",
+                    "port_number": 9100
+                  }
+                },
+                {
+                  "type": "RunProcess",
+                  "description": "Reanudar cola corporativa",
+                  "parameters": {
+                    "file_path": "C:\\Windows\\System32\\rundll32.exe",
+                    "arguments": "printui.dll,PrintUIEntry /Xs /n \"{{corporate_queue_name}}\" status resume",
+                    "timeout_seconds": 15,
+                    "window_style": "Hidden"
+                  }
+                },
+                {
+                  "type": "StartService",
+                  "description": "Iniciar LPDSVC",
+                  "parameters": {
+                    "service_name": "LPDSVC",
+                    "wait_for_running": true,
+                    "timeout_seconds": 30
+                  }
+                },
+                {
+                  "type": "StartService",
+                  "description": "Iniciar LpdServiceMonitor",
+                  "parameters": {
+                    "service_name": "LpdServiceMonitor",
+                    "wait_for_running": true,
+                    "timeout_seconds": 30
+                  }
+                }
+              ]
             }
           ]
         }
