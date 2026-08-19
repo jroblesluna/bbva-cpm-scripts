@@ -320,6 +320,22 @@ namespace AlwaysPrint.Shared.Messages
     }
 
     /// <summary>
+    /// Payload enviado del Tray al Service cuando el usuario cambia su impresora favorita.
+    /// El Service dispara el trigger OnFavoritePrinterChanged con la variable new_favorite_ip.
+    /// Tray → Service.
+    /// </summary>
+    public class FavoritePrinterChangedPayload
+    {
+        /// <summary>IP de la nueva impresora favorita (null si se removió la favorita).</summary>
+        [JsonProperty("newFavoriteIp")]
+        public string? NewFavoriteIp { get; set; }
+
+        /// <summary>Nombre descriptivo de la impresora (para logs).</summary>
+        [JsonProperty("printerName")]
+        public string? PrinterName { get; set; }
+    }
+
+    /// <summary>
     /// Payload para solicitar acción sobre un servicio Windows.
     /// Tray → Service.
     /// </summary>

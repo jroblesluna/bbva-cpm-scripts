@@ -71,5 +71,8 @@ namespace AlwaysPrint.Shared.Messages
         DownloadFile,                // Tray → Service: leer archivo y comprimir en ZIP
         GetFileContent,              // Tray → Service: leer contenido de archivo texto
         SaveFileContent,             // Tray → Service: escribir contenido en archivo
+
+        // Impresora favorita
+        FavoritePrinterChanged,      // Tray → Service: usuario cambió su impresora favorita
     }
 }

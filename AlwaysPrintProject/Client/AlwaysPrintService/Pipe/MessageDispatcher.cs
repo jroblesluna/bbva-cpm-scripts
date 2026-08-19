@@ -38,6 +38,9 @@ namespace AlwaysPrintService.Pipe
         // Raised when the Tray sends ForcedContingencyChanged.
         public event Action<bool, string, string, string?>? ForcedContingencyReceived;
 
+        // Raised when the Tray sends FavoritePrinterChanged.
+        public event Action<string?, string?>? FavoritePrinterChangedReceived;
+
         // Raised when the DebuggingEngine completes capture (para push al Tray).
         public event Action<string, long>? DebuggingCaptureCompleted;
 
@@ -98,6 +101,7 @@ namespace AlwaysPrintService.Pipe
                     MessageType.DownloadFile                => HandleDownloadFile(request),
                     MessageType.GetFileContent              => HandleGetFileContent(request),
                     MessageType.SaveFileContent             => HandleSaveFileContent(request),
+                    MessageType.FavoritePrinterChanged      => HandleFavoritePrinterChanged(request),
                     _ => PipeMessage.Reply(request, MessageType.Error,
                             new ErrorPayload { Code = "UNKNOWN_TYPE", Message = $"Unknown message type: {request.Type}" })
                 };
@@ -446,6 +450,40 @@ namespace AlwaysPrintService.Pipe
             {
                 AlwaysPrintLogger.WriteError(
                     $"HandleForcedContingencyChanged: error: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = $"Error: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Maneja la notificación del Tray de que el usuario cambió su impresora favorita.
+        /// Extrae la IP de la nueva favorita y dispara el evento para que el Service
+        /// ejecute el trigger OnFavoritePrinterChanged.
+        /// </summary>
+        private PipeMessage HandleFavoritePrinterChanged(PipeMessage req)
+        {
+            try
+            {
+                var payload = req.GetPayload<FavoritePrinterChangedPayload>();
+                if (payload == null)
+                {
+                    return PipeMessage.Reply(req, MessageType.Error,
+                        new ErrorPayload { Code = "INVALID_PAYLOAD", Message = "FavoritePrinterChangedPayload ausente." });
+                }
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"FavoritePrinterChanged: newFavoriteIp={payload.NewFavoriteIp ?? "null"}, printerName={payload.PrinterName ?? "null"}");
+
+                FavoritePrinterChangedReceived?.Invoke(payload.NewFavoriteIp, payload.PrinterName);
+
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = true, Message = "Favorita actualizada." });
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"HandleFavoritePrinterChanged: error: {ex.Message}",
                     AlwaysPrintLogger.EvtGenericError);
                 return PipeMessage.Reply(req, MessageType.Ack,
                     new AckPayload { Success = false, Message = $"Error: {ex.Message}" });

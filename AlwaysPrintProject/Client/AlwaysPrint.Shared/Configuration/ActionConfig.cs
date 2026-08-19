@@ -141,6 +141,7 @@ namespace AlwaysPrint.Shared.Configuration
         public const string OnContingencyDeactivated = "OnContingencyDeactivated";
         public const string OnScheduledTask = "OnScheduledTask";
         public const string OnDemand = "OnDemand";
+        public const string OnFavoritePrinterChanged = "OnFavoritePrinterChanged";
     }
     
     /// <summary>

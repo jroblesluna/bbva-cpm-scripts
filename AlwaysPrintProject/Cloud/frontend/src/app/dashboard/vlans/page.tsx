@@ -158,7 +158,18 @@ export default function VLANsPage() {
       try {
         const response = await apiClient.get(`/devices/?vlan_id=${contingencyTarget.id}`)
         const devices: Device[] = response.data.devices || []
-        setContingencyDevices(devices.filter((d) => d.is_active))
+        const activeDevices = devices.filter((d) => d.is_active)
+        // Priorizar la impresora predeterminada de la VLAN (default_device_id)
+        if (contingencyTarget.default_device_id) {
+          const defaultIdx = activeDevices.findIndex(
+            (d) => d.id === contingencyTarget.default_device_id
+          )
+          if (defaultIdx > 0) {
+            const [defaultDevice] = activeDevices.splice(defaultIdx, 1)
+            activeDevices.unshift(defaultDevice)
+          }
+        }
+        setContingencyDevices(activeDevices)
       } catch {
         setContingencyDevices([])
       } finally {

@@ -927,7 +927,8 @@ namespace AlwaysPrintTray
             var form = new MyPrintersForm(
                 _cloudManager.CloudApiUrl,
                 _cloudManager.WorkstationId,
-                _cloudManager.HttpClient);
+                _cloudManager.HttpClient,
+                _pipe);
             _activeForm = form;
             form.FormClosed += (_, __) => _activeForm = null;
             form.ShowDialog();

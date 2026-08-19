@@ -5,6 +5,8 @@ using System.Drawing.Drawing2D;
 using System.Net.Http;
 using System.Windows.Forms;
 using AlwaysPrint.Shared.Logging;
+using AlwaysPrint.Shared.Messages;
+using AlwaysPrintTray.Pipe;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -16,6 +18,7 @@ namespace AlwaysPrintTray.Forms
         private readonly string     _cloudApiUrl;
         private readonly string     _workstationId;
         private readonly HttpClient _http;
+        private readonly PipeClient _pipe;
 
         private Panel    _pnlHeader = null!;
         private Label    _lblTitle = null!;
@@ -34,11 +37,12 @@ namespace AlwaysPrintTray.Forms
         private string? _defaultPrinterId;
 
         // ── Constructor ──────────────────────────────────────────────────────
-        public MyPrintersForm(string cloudApiUrl, string workstationId, HttpClient http)
+        public MyPrintersForm(string cloudApiUrl, string workstationId, HttpClient http, PipeClient pipe)
         {
             _cloudApiUrl   = cloudApiUrl;
             _workstationId = workstationId;
             _http          = http;
+            _pipe          = pipe;
             InitializeComponents();
             LoadPrinters();
         }
@@ -440,6 +444,28 @@ namespace AlwaysPrintTray.Forms
                     AlwaysPrintLogger.WriteTrayInfo(sel.IsFavorite
                         ? "MyPrintersForm: favorita eliminada."
                         : $"MyPrintersForm: favorita → {sel.Name} ({sel.IpAddress})");
+
+                    // Notificar al Service para que dispare OnFavoritePrinterChanged
+                    try
+                    {
+                        if (_pipe.IsConnected)
+                        {
+                            var ipcPayload = new FavoritePrinterChangedPayload
+                            {
+                                NewFavoriteIp = sel.IsFavorite ? null : sel.IpAddress,
+                                PrinterName = sel.IsFavorite ? null : sel.Name
+                            };
+                            _pipe.Send(PipeMessage.Create(MessageType.FavoritePrinterChanged, ipcPayload));
+                            AlwaysPrintLogger.WriteTrayInfo(
+                                "MyPrintersForm: notificación FavoritePrinterChanged enviada al Service.");
+                        }
+                    }
+                    catch (Exception pipeEx)
+                    {
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            $"MyPrintersForm: error notificando cambio de favorita al Service: {pipeEx.Message}");
+                    }
+
                     LoadPrinters();
                 }
                 else

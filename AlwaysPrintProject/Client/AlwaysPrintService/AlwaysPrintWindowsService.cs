@@ -266,9 +266,10 @@ namespace AlwaysPrintService
                     AlwaysPrintLogger.WriteInfo("Cola de tareas inicializada vacía.", AlwaysPrintLogger.EvtQueueCleared);
 
                 // 5. Iniciar servidor Named Pipe.
-                _dispatcher = new MessageDispatcher(_registry, _taskQueue, _state, ReloadActionConfiguration, LoadResourceVariables, _actionEngine.ExecuteOnDemandTrigger);
+                _dispatcher = new MessageDispatcher(_registry, _taskQueue, _state, ReloadActionConfiguration, LoadResourceVariables, ExecuteOnDemandTriggerWithWatchdogPause);
                 _dispatcher.TrayInitializedReceived += OnTrayInitialized;
                 _dispatcher.ForcedContingencyReceived += OnForcedContingencyReceived;
+                _dispatcher.FavoritePrinterChangedReceived += OnFavoritePrinterChanged;
                 _dispatcher.DebuggingCaptureCompleted += OnDebuggingCaptureCompleted;
                 _dispatcher.DebuggingCaptureErrorOccurred += OnDebuggingCaptureError;
 
@@ -1069,6 +1070,23 @@ namespace AlwaysPrintService
         }
 
         /// <summary>
+        /// Wrapper de ExecuteOnDemandTrigger que pausa el watchdog durante la ejecución.
+        /// Se usa como callback para el MessageDispatcher (OnDemand actions desde Tray/Cloud).
+        /// </summary>
+        private (bool success, string message) ExecuteOnDemandTriggerWithWatchdogPause(string label)
+        {
+            _watchdog.Stop();
+            try
+            {
+                return _actionEngine.ExecuteOnDemandTrigger(label);
+            }
+            finally
+            {
+                StartServiceWatchdog();
+            }
+        }
+
+        /// <summary>
         /// Ejecuta un trigger de acciones si está configurado.
         /// </summary>
         private void ExecuteActionTrigger(string eventName)
@@ -1078,16 +1096,27 @@ namespace AlwaysPrintService
                 if (_actionEngine.HasTrigger(eventName))
                 {
                     AlwaysPrintLogger.WriteInfo($"Ejecutando trigger de acciones para evento: {eventName}");
-                    
-                    bool success = _actionEngine.ExecuteTrigger(eventName);
-                    
-                    if (success)
+
+                    // Pausar watchdog durante la ejecución del trigger para evitar
+                    // que reinicie servicios que el trigger detiene intencionalmente.
+                    _watchdog.Stop();
+                    try
                     {
-                        AlwaysPrintLogger.WriteInfo($"Trigger '{eventName}' ejecutado exitosamente");
+                        bool success = _actionEngine.ExecuteTrigger(eventName);
+
+                        if (success)
+                        {
+                            AlwaysPrintLogger.WriteInfo($"Trigger '{eventName}' ejecutado exitosamente");
+                        }
+                        else
+                        {
+                            AlwaysPrintLogger.WriteWarning($"Trigger '{eventName}' completado con errores");
+                        }
                     }
-                    else
+                    finally
                     {
-                        AlwaysPrintLogger.WriteWarning($"Trigger '{eventName}' completado con errores");
+                        // Restaurar watchdog siempre, incluso si el trigger falló
+                        StartServiceWatchdog();
                     }
                 }
             }
@@ -1095,6 +1124,27 @@ namespace AlwaysPrintService
             {
                 AlwaysPrintLogger.WriteError($"Error ejecutando trigger '{eventName}': {ex.Message}", ex);
             }
+        }
+
+        /// <summary>
+        /// Callback cuando el Tray notifica que el usuario cambió su impresora favorita.
+        /// Establece la variable new_favorite_ip y dispara el trigger OnFavoritePrinterChanged.
+        /// El .alwaysconfig decide si actúa (ej: redirigir puerto solo si hay contingencia activa).
+        /// </summary>
+        private void OnFavoritePrinterChanged(string? newFavoriteIp, string? printerName)
+        {
+            AlwaysPrintLogger.WriteInfo(
+                $"OnFavoritePrinterChanged: newFavoriteIp={newFavoriteIp ?? "null"}, printerName={printerName ?? "null"}");
+
+            if (string.IsNullOrEmpty(newFavoriteIp))
+            {
+                AlwaysPrintLogger.WriteInfo(
+                    "OnFavoritePrinterChanged: favorita removida (IP vacía). No se dispara trigger.");
+                return;
+            }
+
+            _actionEngine.SetConfigVariable("new_favorite_ip", newFavoriteIp);
+            ExecuteActionTrigger(TriggerEvents.OnFavoritePrinterChanged);
         }
     }
 }
