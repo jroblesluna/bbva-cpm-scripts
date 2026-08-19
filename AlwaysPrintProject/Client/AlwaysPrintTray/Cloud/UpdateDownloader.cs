@@ -16,6 +16,7 @@ namespace AlwaysPrintTray.Cloud
     public class UpdateDownloader
     {
         private readonly string _cloudApiUrl;
+        private readonly string? _workstationId;
         private readonly HttpClient _httpClient;
 
         /// <summary>
@@ -36,9 +37,11 @@ namespace AlwaysPrintTray.Cloud
         /// Crea una nueva instancia de UpdateDownloader.
         /// </summary>
         /// <param name="cloudApiUrl">URL base de la API Cloud (ej: https://alwaysprint.apps.iol.pe).</param>
-        public UpdateDownloader(string cloudApiUrl)
+        /// <param name="workstationId">ID de la workstation para autenticación vía X-Workstation-ID.</param>
+        public UpdateDownloader(string cloudApiUrl, string? workstationId = null)
         {
             _cloudApiUrl = cloudApiUrl ?? throw new ArgumentNullException(nameof(cloudApiUrl));
+            _workstationId = workstationId;
 
             // Crear HttpClient que sigue redirects automáticamente (comportamiento por defecto)
             // Timeout generoso para descargas de archivos grandes
@@ -84,6 +87,9 @@ namespace AlwaysPrintTray.Cloud
                 string downloadUrl = $"{_cloudApiUrl.TrimEnd('/')}/api/v1/updates/download";
 
                 var request = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
+                // Header de autenticación de workstation
+                if (!string.IsNullOrEmpty(_workstationId))
+                    request.Headers.Add("X-Workstation-ID", _workstationId);
                 // Headers de identificación para diagnóstico de IPs pendientes
                 request.Headers.Add("X-Workstation-Hostname", Environment.MachineName);
                 request.Headers.Add("X-Workstation-User", Environment.UserName);

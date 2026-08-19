@@ -141,7 +141,7 @@ namespace AlwaysPrintTray.Cloud
             _pipe = pipe;
             _uiContext = uiContext;
             _trayIcon = trayIcon;
-            _updateDownloader = new UpdateDownloader(config.CloudApiUrl);
+            _updateDownloader = new UpdateDownloader(config.CloudApiUrl, _credentials.WorkstationId);
         }
 
         /// <summary>

@@ -579,7 +579,7 @@ namespace AlwaysPrintTray
                         "Se reintentará en el próximo ciclo de verificación.");
                     return;
                 }
-                var downloader = new UpdateDownloader(cloudApiUrl);
+                var downloader = new UpdateDownloader(cloudApiUrl, _cloudManager?.WorkstationId);
 
                 // Descargar MSI (asíncrono, no bloqueante)
                 string? msiPath = await downloader.DownloadAsync(updateInfo.FileSize);
