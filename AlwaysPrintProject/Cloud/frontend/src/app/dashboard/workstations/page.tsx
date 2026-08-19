@@ -389,13 +389,23 @@ export default function WorkstationsPage() {
       setContingencyWsDevicesLoading(true);
       try {
         const devices = await devicesApi.list({ vlan_id: contingencyTarget.vlan_id as string, is_active: true });
-        // Reordenar: si la WS tiene impresora favorita, ponerla primero
-        // (es la que realmente usará el backend al activar contingencia)
-        if (contingencyTarget.default_printer_id && devices.length > 0) {
-          const favIndex = devices.findIndex(d => d.id === contingencyTarget.default_printer_id);
-          if (favIndex > 0) {
-            const [fav] = devices.splice(favIndex, 1);
-            devices.unshift(fav);
+        // Reordenar: priorizar la impresora que el backend usará al activar contingencia
+        // Prioridad: 1) favorita de la WS, 2) default de la VLAN, 3) primer device por nombre
+        let priorityDeviceId = contingencyTarget.default_printer_id;
+        if (!priorityDeviceId && contingencyTarget.vlan_id) {
+          // Obtener default_device_id de la VLAN
+          try {
+            const vlan = await vlansApi.get(contingencyTarget.vlan_id);
+            if (vlan?.default_device_id) {
+              priorityDeviceId = vlan.default_device_id;
+            }
+          } catch { /* ignorar */ }
+        }
+        if (priorityDeviceId && devices.length > 0) {
+          const prioIndex = devices.findIndex(d => d.id === priorityDeviceId);
+          if (prioIndex > 0) {
+            const [prio] = devices.splice(prioIndex, 1);
+            devices.unshift(prio);
           }
         }
         setContingencyWsDevices(devices);
