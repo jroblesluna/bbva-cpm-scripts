@@ -1826,7 +1826,19 @@ async def toggle_workstation_forced_contingency(
             workstation.default_printer_id = None
 
     if not printer_ip and workstation.vlan_id:
-        # Fallback: primer dispositivo activo en la VLAN
+        # Fallback 1: default_device_id de la VLAN (configurado por admin)
+        from app.models.vlan import VLAN as VLANModel2
+        ws_vlan = db.query(VLANModel2).filter(VLANModel2.id == workstation.vlan_id).first()
+        if ws_vlan and ws_vlan.default_device_id:
+            default_dev = db.query(Device).filter(
+                Device.id == ws_vlan.default_device_id,
+                Device.is_active == True
+            ).first()
+            if default_dev:
+                printer_ip = default_dev.ip_address
+
+    if not printer_ip and workstation.vlan_id:
+        # Fallback 2: primer dispositivo activo en la VLAN por IP
         first_device = db.query(Device).filter(
             Device.organization_id == workstation.organization_id,
             Device.vlan_id == workstation.vlan_id,
