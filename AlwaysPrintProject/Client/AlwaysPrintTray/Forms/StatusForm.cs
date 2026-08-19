@@ -278,8 +278,14 @@ namespace AlwaysPrintTray.Forms
             // Ajustar altura del ListView de progreso para que ocupe hasta el pie
             if (_progressListView != null)
             {
-                int progressBottom = yBottom - 36 - 12 - SectionSpacing; // hasta el separador del pie
-                _progressListView.Height = progressBottom - _progressListView.Top;
+                int listBottom = yBottom - 36 - 12 - SectionSpacing;
+                int listHeight = listBottom - _progressListView.Top;
+                if (listHeight < 120) listHeight = 120; // mínimo visible
+                _progressListView.Height = listHeight;
+                // Recalcular ClientSize si el listview necesitó más espacio
+                int requiredHeight = _progressListView.Top + listHeight + SectionSpacing + 36 + 12;
+                if (requiredHeight > yBottom)
+                    ClientSize = new Size(FormWidth, requiredHeight);
             }
         }
 
@@ -360,7 +366,7 @@ namespace AlwaysPrintTray.Forms
             _progressListView.Columns.Add("Acción", 130);
             _progressListView.Columns.Add("Descripción", RightColWidth - 28 - 130 - 25);
             Controls.Add(_progressListView);
-            y += 184;
+            // No incrementar y — la altura del ListView se calcula dinámicamente al final
         }
 
         /// <summary>Construye la sección de servicios monitoreados (columna izquierda).</summary>
