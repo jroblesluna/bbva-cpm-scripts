@@ -557,6 +557,27 @@ class BulkExecutionService:
                 f"(org={org_id})"
             )
 
+            # Esperar brevemente para que el background task procese la cancelación
+            import asyncio
+            await asyncio.sleep(2)
+
+            # Verificar si el task procesó la cancelación — si no, forzar
+            # (esto cubre el caso zombi donde el task murió con el container anterior)
+            current_status = await redis_client.hget(session_key, "status")
+            if current_status == "running":
+                # El task no respondió en 2s — forzar cancelación directa
+                await redis_client.hset(session_key, "status", "cancelled")
+                # Liberar mutex de la organización para permitir nuevas ejecuciones
+                mutex_key = f"bulk:running:{data.get('org_id', '')}"
+                await redis_client.delete(mutex_key)
+                logger.warning(
+                    f"Cancelación forzada para sesión zombi {session_id} "
+                    f"(task no respondió en 2s)"
+                )
+
+            # Re-leer estado actualizado
+            data = await redis_client.hgetall(session_key)
+
             # Retornar estado actual (aún puede mostrar 'running' hasta que
             # el background task procese la cancelación)
             started_at = datetime.fromisoformat(data["started_at"])
