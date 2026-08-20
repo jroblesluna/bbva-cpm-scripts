@@ -890,6 +890,11 @@ namespace AlwaysPrintService
                 if (!string.IsNullOrEmpty(remoteQueuePath))
                     _actionEngine.SetConfigVariable("remote_queue_path", remoteQueuePath!);
 
+                // Cargar vlan_default_printer_ip (predeterminada de la VLAN configurada por admin)
+                var vlanDefaultPrinterIp = obj["vlan_default_printer_ip"]?.ToString();
+                if (!string.IsNullOrEmpty(vlanDefaultPrinterIp))
+                    _actionEngine.SetConfigVariable("vlan_default_printer_ip", vlanDefaultPrinterIp!);
+
                 // Cargar todas las claves de vlan_metadata como variables
                 var metadata = obj["vlan_metadata"] as Newtonsoft.Json.Linq.JObject;
                 if (metadata != null)
@@ -904,7 +909,8 @@ namespace AlwaysPrintService
 
                 AlwaysPrintLogger.WriteInfo(
                     $"LoadResourceVariables: variables cargadas desde resources.json" +
-                    (remoteQueuePath != null ? $" (remote_queue_path={remoteQueuePath})" : ""));
+                    (remoteQueuePath != null ? $" (remote_queue_path={remoteQueuePath})" : "") +
+                    (vlanDefaultPrinterIp != null ? $" (vlan_default_printer_ip={vlanDefaultPrinterIp})" : ""));
             }
             catch (Exception ex)
             {

@@ -2099,6 +2099,9 @@ class WorkstationResourcesResponse(BaseModel):
     vlan_metadata: Optional[dict] = Field(
         None, description="Metadatos completos de la VLAN"
     )
+    vlan_default_printer_ip: Optional[str] = Field(
+        None, description="IP de la impresora predeterminada de la VLAN (configurada por admin)"
+    )
     contingency_printers: list[ContingencyPrinterResource] = Field(
         default_factory=list, description="Impresoras de contingencia disponibles en la VLAN"
     )
@@ -2157,6 +2160,7 @@ def get_workstation_resources(
     # Obtener VLAN de la workstation
     vlan_metadata = None
     remote_queue_path = None
+    vlan_default_printer_ip = None
     contingency_printers = []
 
     if workstation.vlan_id:
@@ -2167,6 +2171,14 @@ def get_workstation_resources(
             vlan_metadata = vlan.vlan_metadata
             if vlan_metadata and isinstance(vlan_metadata, dict):
                 remote_queue_path = vlan_metadata.get("remote_queue_path")
+
+            # Resolver IP predeterminada de la VLAN (configurada por admin)
+            if vlan.default_device_id:
+                default_dev = db.query(Device).filter(
+                    Device.id == vlan.default_device_id, Device.is_active.is_(True)
+                ).first()
+                if default_dev:
+                    vlan_default_printer_ip = default_dev.ip_address
 
             # Obtener dispositivos activos de la VLAN (impresoras de contingencia)
             devices = (
@@ -2204,6 +2216,7 @@ def get_workstation_resources(
     return WorkstationResourcesResponse(
         remote_queue_path=remote_queue_path,
         vlan_metadata=vlan_metadata,
+        vlan_default_printer_ip=vlan_default_printer_ip,
         contingency_printers=contingency_printers
     )
 

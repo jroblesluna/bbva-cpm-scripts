@@ -1379,6 +1379,55 @@ namespace AlwaysPrintTray.Cloud
                             $"CloudManager: error mostrando balloon tip de cambio de impresora. {ex.Message}");
                     }
                 }, null);
+
+                // Refrescar resources.json para que refleje el nuevo vlan_default_printer_ip
+                DownloadResources();
+
+                // Si hay contingencia activa y la workstation NO tiene favorita propia,
+                // redirigir al nuevo default de la VLAN.
+                if (!string.IsNullOrEmpty(printerIp))
+                {
+                    try
+                    {
+                        // Leer resources.json para verificar si hay favorita (is_default=true)
+                        string resourcesPath = AlwaysPrint.Shared.Messages.PipeConstants.ResourcesFilePath;
+                        bool hasFavorite = false;
+
+                        if (File.Exists(resourcesPath))
+                        {
+                            var resourcesJson = File.ReadAllText(resourcesPath, System.Text.Encoding.UTF8);
+                            var resources = JObject.Parse(resourcesJson);
+                            var printers = resources["contingency_printers"] as JArray;
+                            if (printers != null)
+                            {
+                                hasFavorite = printers.Any(p => p["is_default"]?.Value<bool>() == true);
+                            }
+                        }
+
+                        // Solo enviar IPC si NO hay favorita (la VLAN default aplica)
+                        if (!hasFavorite && _pipe.IsConnected)
+                        {
+                            var payload = new FavoritePrinterChangedPayload
+                            {
+                                NewFavoriteIp = printerIp,
+                                PrinterName = printerName
+                            };
+                            _pipe.Send(PipeMessage.Create(MessageType.FavoritePrinterChanged, payload));
+                            AlwaysPrintLogger.WriteTrayInfo(
+                                $"CloudManager: default VLAN cambió y no hay favorita → FavoritePrinterChanged enviado al Service. IP={printerIp}");
+                        }
+                        else if (hasFavorite)
+                        {
+                            AlwaysPrintLogger.WriteTrayInfo(
+                                "CloudManager: default VLAN cambió pero workstation tiene favorita propia. No se redirige.");
+                        }
+                    }
+                    catch (Exception ipcEx)
+                    {
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            $"CloudManager: error procesando redirección por cambio de default VLAN: {ipcEx.Message}");
+                    }
+                }
             }
             catch (Exception ex)
             {
