@@ -1729,5 +1729,25 @@
       "fileSelected": "{filename} — {rows} data rows",
       "remove": "Remove"
     }
+  },
+  "sslCertificate": {
+    "title": "SSL Certificate",
+    "description": "Server SSL/TLS certificate status and renewal.",
+    "domain": "Domain",
+    "issuer": "Issuer",
+    "validFrom": "Valid from",
+    "expiresOn": "Expires on",
+    "daysRemaining": "Days remaining",
+    "status": {
+      "valid": "Valid",
+      "expiringSync": "Expiring soon",
+      "expired": "Expired",
+      "error": "Error"
+    },
+    "renewButton": "Renew certificate",
+    "renewing": "Renewing...",
+    "renewSuccess": "Certificate renewed successfully",
+    "renewError": "Error renewing certificate",
+    "loading": "Checking certificate status..."
   }
 }

@@ -235,6 +235,12 @@ api_router.include_router(
     tags=["Sync Inventory"]
 )
 
+# Gestión de certificado SSL (solo Corporate Admin)
+from app.api.v1.endpoints import ssl as ssl_endpoint
+api_router.include_router(
+    ssl_endpoint.router,
+    tags=["SSL Certificate"]
+)
 
 @api_router.get("/version", tags=["Sistema"])
 async def version():
