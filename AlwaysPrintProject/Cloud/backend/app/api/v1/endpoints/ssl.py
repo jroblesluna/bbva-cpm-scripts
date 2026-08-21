@@ -2,14 +2,24 @@
 Endpoints para monitoreo y renovación de certificados SSL.
 
 Restringido a Corporate Admins (misma lógica que sync_inventory).
-Usa certbot con --webroot para evitar deadlocks con nginx.
+
+Arquitectura:
+- Status: Lee el certificado PEM directamente desde /etc/letsencrypt (montado como volumen)
+  o se conecta via SSL a host.docker.internal:443 (nginx en el host).
+- Renovación: Ejecuta certbot en el HOST usando Docker socket (nsenter al PID 1 del host).
+  Esto evita necesitar certbot dentro del contenedor del backend.
 """
 
-import subprocess
+import os
 import ssl
 import socket
+import subprocess
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urlparse
+
+from cryptography import x509
+from cryptography.x509.oid import NameOID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -60,23 +70,79 @@ class SslRenewResponse(BaseModel):
 
 # === HELPERS ===
 
-def _get_ssl_cert_info(domain: str) -> dict:
-    """Lee información del certificado SSL conectándose al dominio local."""
+def _get_domain() -> str:
+    """Obtiene el dominio del certificado desde FRONTEND_URL."""
+    frontend_url = os.environ.get("FRONTEND_URL", "")
+    if frontend_url:
+        parsed = urlparse(frontend_url)
+        if parsed.hostname:
+            return parsed.hostname
+    return "unknown"
+
+
+def _get_cert_from_file(domain: str) -> dict:
+    """Lee información del certificado directamente del archivo PEM (montado como volumen)."""
+    cert_path = f"/etc/letsencrypt/live/{domain}/cert.pem"
+    if not os.path.exists(cert_path):
+        return {"error": f"Certificado no encontrado: {cert_path}"}
+
     try:
-        # Conectarse a localhost (nginx) con SNI del dominio
+        with open(cert_path, "rb") as f:
+            cert_data = f.read()
+
+        cert = x509.load_pem_x509_certificate(cert_data)
+        now = datetime.now(timezone.utc)
+
+        not_before = cert.not_valid_before_utc
+        not_after = cert.not_valid_after_utc
+        days_remaining = (not_after - now).days
+
+        # Extraer issuer (Organization Name)
+        issuer = "Unknown"
+        try:
+            org_names = cert.issuer.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
+            if org_names:
+                issuer = org_names[0].value
+        except Exception:
+            pass
+
+        return {
+            "issuer": issuer,
+            "not_before": not_before.isoformat(),
+            "not_after": not_after.isoformat(),
+            "days_remaining": days_remaining,
+        }
+    except Exception as e:
+        return {"error": f"Error leyendo PEM: {str(e)}"}
+
+
+def _get_ssl_cert_info(domain: str) -> dict:
+    """Lee información del certificado SSL. Intenta conexión a nginx, luego archivo PEM."""
+    # Primero intentar leer del archivo PEM (más confiable desde Docker)
+    file_info = _get_cert_from_file(domain)
+    if "error" not in file_info:
+        return file_info
+
+    # Fallback: conectarse a nginx en el host via SSL
+    try:
         context = ssl.create_default_context()
         context.check_hostname = False
         context.verify_mode = ssl.CERT_NONE
 
-        with socket.create_connection(("127.0.0.1", 443), timeout=5) as sock:
+        # Conectar a nginx en el host (no localhost — estamos en un contenedor)
+        host = "host.docker.internal"
+        with socket.create_connection((host, 443), timeout=5) as sock:
             with context.wrap_socket(sock, server_hostname=domain) as ssock:
                 cert = ssock.getpeercert(binary_form=False)
                 if not cert:
-                    # Fallback: leer desde archivo de certbot
-                    return _get_cert_from_file(domain)
-                
-                not_after = datetime.strptime(cert["notAfter"], "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
-                not_before = datetime.strptime(cert["notBefore"], "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
+                    return file_info  # Retornar el error original del archivo
+
+                not_after = datetime.strptime(
+                    cert["notAfter"], "%b %d %H:%M:%S %Y %Z"
+                ).replace(tzinfo=timezone.utc)
+                not_before = datetime.strptime(
+                    cert["notBefore"], "%b %d %H:%M:%S %Y %Z"
+                ).replace(tzinfo=timezone.utc)
                 now = datetime.now(timezone.utc)
                 days_remaining = (not_after - now).days
 
@@ -90,87 +156,47 @@ def _get_ssl_cert_info(domain: str) -> dict:
                     "days_remaining": days_remaining,
                 }
     except Exception:
-        return _get_cert_from_file(domain)
+        return file_info  # Retornar el error original del archivo
 
 
-def _get_cert_from_file(domain: str) -> dict:
-    """Lee la fecha de expiración directamente del archivo PEM de certbot."""
-    import os
-    cert_path = f"/etc/letsencrypt/live/{domain}/cert.pem"
-    if not os.path.exists(cert_path):
-        return {"error": f"Certificado no encontrado: {cert_path}"}
+def _run_on_host(command: str, timeout: int = 90) -> tuple[int, str, str]:
+    """
+    Ejecuta un comando en el HOST desde dentro del contenedor Docker.
+    Usa nsenter al PID 1 para ejecutar en el namespace del host.
+    Requiere que el contenedor tenga --pid=host o acceso privilegiado.
 
+    Alternativa: usa Docker socket para lanzar un contenedor efímero en el host.
+    """
+    # Método 1: nsenter (requiere --pid=host y --privileged o CAP_SYS_ADMIN)
     try:
         result = subprocess.run(
-            ["openssl", "x509", "-enddate", "-noout", "-in", cert_path],
-            capture_output=True, text=True, timeout=5
+            ["nsenter", "-t", "1", "-m", "-u", "-i", "-n", "--", "bash", "-c", command],
+            capture_output=True, text=True, timeout=timeout,
         )
-        if result.returncode != 0:
-            return {"error": f"Error leyendo certificado: {result.stderr}"}
-
-        # Parse: notAfter=Nov 19 03:35:55 2026 GMT
-        line = result.stdout.strip()
-        date_str = line.split("=", 1)[1]
-        not_after = datetime.strptime(date_str, "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
-        now = datetime.now(timezone.utc)
-        days_remaining = (not_after - now).days
-
-        # Obtener issuer
-        result_issuer = subprocess.run(
-            ["openssl", "x509", "-issuer", "-noout", "-in", cert_path],
-            capture_output=True, text=True, timeout=5
-        )
-        issuer = "Let's Encrypt"
-        if result_issuer.returncode == 0:
-            issuer_line = result_issuer.stdout.strip()
-            if "O = " in issuer_line:
-                issuer = issuer_line.split("O = ")[1].split(",")[0].strip()
-
-        # Obtener not_before
-        result_start = subprocess.run(
-            ["openssl", "x509", "-startdate", "-noout", "-in", cert_path],
-            capture_output=True, text=True, timeout=5
-        )
-        not_before = None
-        if result_start.returncode == 0:
-            start_str = result_start.stdout.strip().split("=", 1)[1]
-            not_before = datetime.strptime(start_str, "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc).isoformat()
-
-        return {
-            "issuer": issuer,
-            "not_before": not_before,
-            "not_after": not_after.isoformat(),
-            "days_remaining": days_remaining,
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
-
-def _get_domain() -> str:
-    """Obtiene el dominio del certificado desde la configuración."""
-    import os
-    from urllib.parse import urlparse
-
-    # Extraer dominio de FRONTEND_URL (ej: https://alwaysprint.dev.iol.pe → alwaysprint.dev.iol.pe)
-    frontend_url = os.environ.get("FRONTEND_URL", "")
-    if frontend_url:
-        parsed = urlparse(frontend_url)
-        if parsed.hostname:
-            return parsed.hostname
-
-    # Fallback: listar certificados de certbot
-    try:
-        result = subprocess.run(
-            ["certbot", "certificates"],
-            capture_output=True, text=True, timeout=10
-        )
-        for line in result.stdout.split("\n"):
-            if "Domains:" in line:
-                return line.split("Domains:")[1].strip().split()[0]
-    except Exception:
+        return result.returncode, result.stdout, result.stderr
+    except FileNotFoundError:
         pass
+    except subprocess.TimeoutExpired:
+        return 1, "", "Timeout ejecutando comando en el host"
 
-    return "unknown"
+    # Método 2: Docker CLI via socket (ejecutar en un contenedor con host networking)
+    try:
+        docker_cmd = [
+            "docker", "run", "--rm",
+            "--network", "host",
+            "--pid", "host",
+            "-v", "/etc/letsencrypt:/etc/letsencrypt",
+            "-v", "/usr/share/nginx/html:/usr/share/nginx/html",
+            "-v", "/var/lib/letsencrypt:/var/lib/letsencrypt",
+            "certbot/certbot:latest",
+            "bash", "-c", command,
+        ]
+        result = subprocess.run(
+            docker_cmd, capture_output=True, text=True, timeout=timeout,
+        )
+        return result.returncode, result.stdout, result.stderr
+    except Exception as e:
+        return 1, "", f"Error ejecutando en host: {str(e)}"
 
 
 # === ROUTER ===
@@ -227,8 +253,8 @@ async def renew_ssl_certificate(
     """
     Renueva el certificado SSL usando certbot con método webroot.
 
-    Ejecuta: certbot certonly --webroot -w /usr/share/nginx/html -d {domain}
-    Luego recarga nginx para usar el nuevo certificado.
+    Ejecuta certbot en el HOST (no dentro del contenedor del backend) via nsenter.
+    Luego recarga nginx en el host para aplicar el nuevo certificado.
     """
     domain = _get_domain()
 
@@ -238,49 +264,29 @@ async def renew_ssl_certificate(
             detail="No se pudo determinar el dominio del certificado.",
         )
 
+    # Comando que se ejecuta en el HOST
+    renew_command = (
+        f"pkill -f certbot 2>/dev/null; "
+        f"rm -f /var/lib/letsencrypt/.certbot.lock; "
+        f"sleep 1; "
+        f"certbot certonly --webroot -w /usr/share/nginx/html "
+        f"-d {domain} --non-interactive --force-renewal 2>&1; "
+        f"CERTBOT_EXIT=$?; "
+        f"if [ $CERTBOT_EXIT -eq 0 ]; then systemctl reload nginx; fi; "
+        f"exit $CERTBOT_EXIT"
+    )
+
     try:
-        # Matar certbot zombie si existe
-        subprocess.run(["pkill", "-f", "certbot"], capture_output=True, timeout=5)
-        subprocess.run(
-            ["rm", "-f", "/var/lib/letsencrypt/.certbot.lock"],
-            capture_output=True, timeout=5
-        )
+        returncode, stdout, stderr = _run_on_host(renew_command, timeout=90)
 
-        # Ejecutar certbot con webroot (no manipula nginx)
-        result = subprocess.run(
-            [
-                "certbot", "certonly",
-                "--webroot",
-                "-w", "/usr/share/nginx/html",
-                "-d", domain,
-                "--non-interactive",
-                "--force-renewal",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=90,
-        )
-
-        if result.returncode != 0:
-            error_msg = result.stderr or result.stdout
+        if returncode != 0:
+            error_msg = stderr or stdout
             return SslRenewResponse(
                 success=False,
-                message=f"Certbot falló (exit {result.returncode}): {error_msg[-500:]}",
+                message=f"Certbot falló (exit {returncode}): {error_msg[-500:]}",
             )
 
-        # Recargar nginx para usar el nuevo certificado
-        reload_result = subprocess.run(
-            ["systemctl", "reload", "nginx"],
-            capture_output=True, text=True, timeout=10,
-        )
-
-        if reload_result.returncode != 0:
-            return SslRenewResponse(
-                success=True,
-                message=f"Certificado renovado pero nginx no se recargó: {reload_result.stderr}",
-            )
-
-        # Obtener nueva fecha de expiración
+        # Leer nueva fecha de expiración del certificado renovado
         cert_info = _get_cert_from_file(domain)
         new_expiry = cert_info.get("not_after")
 
@@ -290,11 +296,6 @@ async def renew_ssl_certificate(
             new_expiry=new_expiry,
         )
 
-    except subprocess.TimeoutExpired:
-        return SslRenewResponse(
-            success=False,
-            message="Timeout: certbot no completó en 90 segundos.",
-        )
     except Exception as e:
         return SslRenewResponse(
             success=False,

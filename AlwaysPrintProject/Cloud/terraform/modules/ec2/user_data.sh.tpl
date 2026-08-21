@@ -93,11 +93,16 @@ services:
     image: ${backend_ecr_url}:latest
     restart: unless-stopped
     env_file: /opt/alwaysprint/.env
+    pid: host
     ports:
       - "127.0.0.1:${backend_port}:${backend_port}"
     volumes:
       # Montar Docker socket para que el backend pueda recolectar métricas de contenedores
       - /var/run/docker.sock:/var/run/docker.sock
+      # Certificados SSL (read-only) para monitoreo desde el endpoint /admin/ssl/status
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      # Webroot para renovación de certificados (certbot --webroot)
+      - /usr/share/nginx/html:/usr/share/nginx/html
     extra_hosts:
       # Permitir acceso al host desde dentro del contenedor (para verificar nginx)
       - "host.docker.internal:host-gateway"
