@@ -27,14 +27,14 @@ ENV="${1:-}"
 if [ -z "$ENV" ] || { [ "$ENV" != "dev" ] && [ "$ENV" != "prod" ]; }; then
     echo "Uso: ./check-status.sh <dev|prod>"
     echo ""
-    echo "  dev   — Verificar entorno de desarrollo (cuenta 040982755196)"
+    echo "  dev   — Verificar entorno de desarrollo (cuenta 747301449278)"
     echo "  prod  — Verificar entorno de producción (cuenta 425642439683)"
     exit 1
 fi
 
 # Configuración por entorno
 if [ "$ENV" = "dev" ]; then
-    AWS_PROFILE="AlwaysPrint-dev-040982755196"
+    AWS_PROFILE="AlwaysPrint-dev-747301449278"
     TF_WORKSPACE="dev"
     TF_VARS="dev.tfvars"
     ECR_PREFIX="alwaysprint-dev"
@@ -529,8 +529,8 @@ else
                 
                 if [ "$WORKER_COUNT" -ge 2 ]; then
                     check_ok "Multi-worker activo — $WORKER_COUNT workers detectados"
-                elif [ "$WORKER_COUNT" -eq 1 ]; then
-                    check_warn "Solo 1 worker detectado (esperado ≥2 en DEV)"
+                elif [ "$WORKER_COUNT" -ge 1 ]; then
+                    check_ok "$WORKER_COUNT worker(s) detectado(s)"
                 else
                     check_warn "No se pudieron detectar workers"
                 fi

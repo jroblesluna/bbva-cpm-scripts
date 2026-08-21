@@ -29,7 +29,7 @@ fi
 # ── Seleccionar profile AWS según entorno ─────────────────────────────────────
 case "$ENV" in
   dev)
-    export AWS_PROFILE="AlwaysPrint-dev-040982755196"
+    export AWS_PROFILE="AlwaysPrint-dev-747301449278"
     ;;
   prod)
     export AWS_PROFILE="AlwaysPrint-prod-425642439683"
@@ -44,9 +44,9 @@ if [ ! -f "$TFVARS_FILE" ]; then
 fi
 
 # ── Verificar credenciales AWS ────────────────────────────────────────────────
-if ! aws sts get-caller-identity &>/dev/null; then
+if ! aws sts get-caller-identity --profile "$AWS_PROFILE" &>/dev/null; then
   echo "ERROR: No hay credenciales AWS configuradas para profile $AWS_PROFILE."
-  echo "Ejecuta: aws sso login --profile $AWS_PROFILE"
+  echo "Ejecuta: aws configure --profile $AWS_PROFILE"
   exit 1
 fi
 
@@ -75,12 +75,23 @@ if [ "$CURRENT_WS" != "$ENV" ]; then
 fi
 
 # ── Ejecutar terraform ────────────────────────────────────────────────────────
+PLAN_FILE="$SCRIPT_DIR/.tfplan-${ENV}"
+
 case "$COMMAND" in
   plan)
-    terraform -chdir="$SCRIPT_DIR" plan -var-file="$TFVARS_FILE"
+    terraform -chdir="$SCRIPT_DIR" plan -var-file="$TFVARS_FILE" -out="$PLAN_FILE"
+    echo ""
+    echo "Plan guardado en: $PLAN_FILE"
+    echo "Para aplicar: ./setup.sh $ENV apply"
     ;;
   apply)
-    terraform -chdir="$SCRIPT_DIR" apply -var-file="$TFVARS_FILE"
+    if [ -f "$PLAN_FILE" ]; then
+      echo "Aplicando plan guardado..."
+      terraform -chdir="$SCRIPT_DIR" apply "$PLAN_FILE"
+      rm -f "$PLAN_FILE"
+    else
+      terraform -chdir="$SCRIPT_DIR" apply -var-file="$TFVARS_FILE"
+    fi
     ;;
   destroy)
     terraform -chdir="$SCRIPT_DIR" destroy -var-file="$TFVARS_FILE"

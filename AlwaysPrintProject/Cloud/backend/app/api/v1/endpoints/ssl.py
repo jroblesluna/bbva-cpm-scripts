@@ -6,8 +6,9 @@ Restringido a Corporate Admins (misma lógica que sync_inventory).
 Arquitectura:
 - Status: Lee el certificado PEM directamente desde /etc/letsencrypt (montado como volumen)
   o se conecta via SSL a host.docker.internal:443 (nginx en el host).
-- Renovación: Ejecuta certbot en el HOST usando Docker socket (nsenter al PID 1 del host).
-  Esto evita necesitar certbot dentro del contenedor del backend.
+- Renovación: Lanza un contenedor certbot efímero via Docker Engine API (unix socket).
+  No requiere docker CLI ni capabilities especiales — solo el socket montado.
+  Tras renovar, recarga nginx via señal HUP (pid:host) o container efímero.
 """
 
 import os
@@ -171,12 +172,132 @@ def _get_ssl_cert_info(domain: str) -> dict:
 def _run_on_host(command: str, timeout: int = 90) -> tuple[int, str, str]:
     """
     Ejecuta un comando en el HOST desde dentro del contenedor Docker.
-    Usa nsenter al PID 1 para ejecutar en el namespace del host.
-    Requiere que el contenedor tenga --pid=host o acceso privilegiado.
 
-    Alternativa: usa Docker socket para lanzar un contenedor efímero en el host.
+    Estrategia (en orden de prioridad):
+    1. Docker Engine API via unix socket — crea un contenedor efímero con acceso al host.
+       No requiere binario docker CLI ni capabilities especiales, solo el socket montado.
+    2. nsenter al PID 1 (fallback, requiere --pid=host + CAP_SYS_ADMIN).
     """
-    # Método 1: nsenter (requiere --pid=host y --privileged o CAP_SYS_ADMIN)
+    import http.client
+    import json
+    import time
+
+    # Método 1: Docker Engine API via unix socket
+    docker_socket = "/var/run/docker.sock"
+    if os.path.exists(docker_socket):
+        try:
+            conn = http.client.HTTPConnection("localhost")
+            # Monkey-patch para usar unix socket
+            import socket as _socket
+
+            class UnixHTTPConnection(http.client.HTTPConnection):
+                def __init__(self, socket_path: str):
+                    super().__init__("localhost")
+                    self._socket_path = socket_path
+
+                def connect(self):
+                    self.sock = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
+                    self.sock.connect(self._socket_path)
+
+            conn = UnixHTTPConnection(docker_socket)
+
+            # Crear contenedor efímero con certbot
+            container_config = {
+                "Image": "certbot/certbot:latest",
+                "Cmd": ["bash", "-c", command],
+                "HostConfig": {
+                    "NetworkMode": "host",
+                    "Binds": [
+                        "/etc/letsencrypt:/etc/letsencrypt",
+                        "/usr/share/nginx/html:/usr/share/nginx/html",
+                        "/var/lib/letsencrypt:/var/lib/letsencrypt",
+                    ],
+                    "AutoRemove": True,
+                },
+            }
+
+            body = json.dumps(container_config)
+            conn.request("POST", "/containers/create", body=body,
+                         headers={"Content-Type": "application/json"})
+            resp = conn.getresponse()
+            create_data = json.loads(resp.read())
+
+            if resp.status != 201:
+                # Si la imagen no existe, intentar pull
+                if resp.status == 404:
+                    conn.request("POST", "/images/create?fromImage=certbot/certbot&tag=latest")
+                    pull_resp = conn.getresponse()
+                    pull_resp.read()  # Consumir respuesta del pull
+                    # Reintentar crear el contenedor
+                    conn.request("POST", "/containers/create", body=body,
+                                 headers={"Content-Type": "application/json"})
+                    resp = conn.getresponse()
+                    create_data = json.loads(resp.read())
+                    if resp.status != 201:
+                        return 1, "", f"Error creando contenedor: {create_data}"
+                else:
+                    return 1, "", f"Error creando contenedor: {create_data}"
+
+            container_id = create_data["Id"]
+
+            # Iniciar contenedor
+            conn.request("POST", f"/containers/{container_id}/start")
+            start_resp = conn.getresponse()
+            start_resp.read()
+
+            # Esperar a que termine (con timeout)
+            conn.request("POST", f"/containers/{container_id}/wait")
+            # Usar timeout manual
+            conn.sock.settimeout(timeout)
+            try:
+                wait_resp = conn.getresponse()
+                wait_data = json.loads(wait_resp.read())
+                exit_code = wait_data.get("StatusCode", 1)
+            except _socket.timeout:
+                # Timeout — intentar matar el contenedor
+                try:
+                    conn2 = UnixHTTPConnection(docker_socket)
+                    conn2.request("POST", f"/containers/{container_id}/kill")
+                    conn2.getresponse().read()
+                except Exception:
+                    pass
+                return 1, "", "Timeout ejecutando certbot en el host"
+
+            # Obtener logs
+            conn.request("GET", f"/containers/{container_id}/logs?stdout=true&stderr=true")
+            logs_resp = conn.getresponse()
+            raw_logs = logs_resp.read()
+
+            # Docker logs tienen un header de 8 bytes por frame, limpiar
+            stdout_output = ""
+            try:
+                # Intentar decodificar quitando headers de Docker stream
+                i = 0
+                lines = []
+                while i < len(raw_logs):
+                    if i + 8 <= len(raw_logs):
+                        # Header: [stream_type(1), 0, 0, 0, size(4)]
+                        size = int.from_bytes(raw_logs[i+4:i+8], "big")
+                        if size > 0 and i + 8 + size <= len(raw_logs):
+                            lines.append(raw_logs[i+8:i+8+size].decode("utf-8", errors="replace"))
+                            i += 8 + size
+                            continue
+                    # Si el formato no coincide, decodificar todo directamente
+                    stdout_output = raw_logs.decode("utf-8", errors="replace")
+                    break
+                else:
+                    stdout_output = "".join(lines)
+            except Exception:
+                stdout_output = raw_logs.decode("utf-8", errors="replace")
+
+            conn.close()
+            return exit_code, stdout_output, ""
+
+        except Exception as e:
+            # Si falla el Docker API, caer al método 2
+            pass
+
+    # Método 2: nsenter (requiere --pid=host y CAP_SYS_ADMIN)
     try:
         result = subprocess.run(
             ["nsenter", "-t", "1", "-m", "-u", "-i", "-n", "--", "bash", "-c", command],
@@ -188,24 +309,36 @@ def _run_on_host(command: str, timeout: int = 90) -> tuple[int, str, str]:
     except subprocess.TimeoutExpired:
         return 1, "", "Timeout ejecutando comando en el host"
 
-    # Método 2: Docker CLI via socket (ejecutar en un contenedor con host networking)
+    return 1, "", "No se encontró método disponible para ejecutar en el host (sin docker socket ni nsenter)"
+
+
+def _reload_nginx_on_host():
+    """
+    Recarga nginx en el host enviando señal HUP al proceso master.
+    Usa /proc del host (disponible con pid:host) para encontrar nginx master PID.
+    Si no funciona, intenta via Docker API ejecutando nginx -s reload en un container.
+    """
+    import signal
+
+    # Con pid:host, podemos ver los procesos del host en /proc
+    # Buscar el PID master de nginx
     try:
-        docker_cmd = [
-            "docker", "run", "--rm",
-            "--network", "host",
-            "--pid", "host",
-            "-v", "/etc/letsencrypt:/etc/letsencrypt",
-            "-v", "/usr/share/nginx/html:/usr/share/nginx/html",
-            "-v", "/var/lib/letsencrypt:/var/lib/letsencrypt",
-            "certbot/certbot:latest",
-            "bash", "-c", command,
-        ]
         result = subprocess.run(
-            docker_cmd, capture_output=True, text=True, timeout=timeout,
+            ["pgrep", "-f", "nginx: master"],
+            capture_output=True, text=True, timeout=5,
         )
-        return result.returncode, result.stdout, result.stderr
-    except Exception as e:
-        return 1, "", f"Error ejecutando en host: {str(e)}"
+        if result.returncode == 0 and result.stdout.strip():
+            nginx_pid = int(result.stdout.strip().split()[0])
+            os.kill(nginx_pid, signal.SIGHUP)
+            return
+    except Exception:
+        pass
+
+    # Fallback: ejecutar nginx -s reload via Docker API (container efímero con nginx)
+    try:
+        _run_on_host("nginx -s reload", timeout=10)
+    except Exception:
+        pass
 
 
 # === ROUTER ===
@@ -274,16 +407,10 @@ async def renew_ssl_certificate(
             detail="No se pudo determinar el dominio del certificado.",
         )
 
-    # Comando que se ejecuta en el HOST
+    # Comando de certbot (se ejecuta en container efímero via Docker socket)
     renew_command = (
-        f"pkill -f certbot 2>/dev/null; "
-        f"rm -f /var/lib/letsencrypt/.certbot.lock; "
-        f"sleep 1; "
         f"certbot certonly --webroot -w /usr/share/nginx/html "
-        f"-d {domain} --non-interactive --force-renewal 2>&1; "
-        f"CERTBOT_EXIT=$?; "
-        f"if [ $CERTBOT_EXIT -eq 0 ]; then systemctl reload nginx; fi; "
-        f"exit $CERTBOT_EXIT"
+        f"-d {domain} --non-interactive --force-renewal 2>&1"
     )
 
     try:
@@ -295,6 +422,9 @@ async def renew_ssl_certificate(
                 success=False,
                 message=f"Certbot falló (exit {returncode}): {error_msg[-500:]}",
             )
+
+        # Recargar nginx en el host (necesita nsenter o señal via docker)
+        _reload_nginx_on_host()
 
         # Leer nueva fecha de expiración del certificado renovado
         cert_info = _get_cert_from_file(domain)

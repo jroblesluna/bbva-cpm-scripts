@@ -28,7 +28,7 @@ get_config() {
             BUCKET="alwaysprint-prod-docs"
             ;;
         dev)
-            PROFILE="AlwaysPrint-dev-040982755196"
+            PROFILE="AlwaysPrint-dev-747301449278"
             INSTANCE="i-071e328b4dc75a63d"
             BUCKET="alwaysprint-dev-docs"
             ;;

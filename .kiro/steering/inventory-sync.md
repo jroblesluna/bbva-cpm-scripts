@@ -13,7 +13,7 @@ All text, comments, and log messages MUST be in Spanish.
 If the user specifies environment, organization, and CSV explicitly, skip confirmations and execute directly. Otherwise confirm sequentially:
 
 1. **Archivo CSV**: Buscar `Inventario*.csv` en el repositorio. Confirmar si hay ambigüedad.
-2. **Entorno**: DEV (`AlwaysPrint-dev-040982755196`) o PROD (`AlwaysPrint-prod-425642439683`).
+2. **Entorno**: DEV (`AlwaysPrint-dev-747301449278`) o PROD (`AlwaysPrint-prod-425642439683`).
 3. **Organización**: Consultar vía SSM si no se especifica.
 
 ## CSV Format
@@ -153,7 +153,7 @@ Via AWS SSM en la EC2 con el container Docker del backend:
 | EC2 Instance | `i-0b42738edf1860c00` | (consultar) |
 | Container | `alwaysprint-backend-1` | `alwaysprint-backend-1` |
 | S3 Bucket | `alwaysprint-prod-docs` | `alwaysprint-dev-docs` |
-| Profile | `AlwaysPrint-prod-425642439683` | `AlwaysPrint-dev-040982755196` |
+| Profile | `AlwaysPrint-prod-425642439683` | `AlwaysPrint-dev-747301449278` |
 | Region | `us-west-2` | `us-west-2` |
 
 ## Models & Imports

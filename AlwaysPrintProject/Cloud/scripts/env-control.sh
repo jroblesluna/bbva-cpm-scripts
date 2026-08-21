@@ -91,7 +91,7 @@ fi
 # CONFIGURACIÓN POR ENTORNO
 # =============================================================================
 if [ "$ENV" = "dev" ]; then
-    AWS_PROFILE="AlwaysPrint-dev-040982755196"
+    AWS_PROFILE="AlwaysPrint-dev-747301449278"
     EC2_TAG="alwaysprint-dev-ec2"
     RDS_IDENTIFIER="alwaysprint-dev-postgres"
     ENV_LABEL="DESARROLLO"

@@ -4,7 +4,7 @@
 #   ./cleanup-test-ws.sh              # Dry run
 #   ./cleanup-test-ws.sh --delete     # Eliminar
 
-PROFILE="AlwaysPrint-dev-040982755196"
+PROFILE="AlwaysPrint-dev-747301449278"
 INSTANCE="i-071e328b4dc75a63d"
 PATTERN="W10-LT"
 ACTION="count"
