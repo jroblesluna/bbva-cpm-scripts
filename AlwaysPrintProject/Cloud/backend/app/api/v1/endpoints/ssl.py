@@ -315,14 +315,16 @@ def _run_on_host(command: str, timeout: int = 90) -> tuple[int, str, str]:
 
 def _reload_nginx_on_host():
     """
-    Recarga nginx en el host enviando señal HUP al proceso master.
-    Usa /proc del host (disponible con pid:host) para encontrar nginx master PID.
-    Si no funciona, intenta via Docker API ejecutando nginx -s reload en un container.
+    Recarga nginx en el host.
+    Método 1: señal HUP via pgrep/kill (requiere pid:host).
+    Método 2: Container efímero nginx:alpine con host PID+network para ejecutar nginx -s reload.
     """
     import signal
+    import http.client
+    import json
+    import socket as _socket
 
-    # Con pid:host, podemos ver los procesos del host en /proc
-    # Buscar el PID master de nginx
+    # Método 1: pgrep + os.kill (funciona con pid:host)
     try:
         result = subprocess.run(
             ["pgrep", "-f", "nginx: master"],
@@ -335,9 +337,48 @@ def _reload_nginx_on_host():
     except Exception:
         pass
 
-    # Fallback: ejecutar nginx -s reload via Docker API (container efímero con nginx)
+    # Método 2: Container efímero con host PID namespace para señalizar nginx
+    docker_socket = "/var/run/docker.sock"
+    if not os.path.exists(docker_socket):
+        return
+
     try:
-        _run_on_host("nginx -s reload", timeout=10)
+        class UnixHTTPConnection(http.client.HTTPConnection):
+            def __init__(self, socket_path: str):
+                super().__init__("localhost")
+                self._socket_path = socket_path
+
+            def connect(self):
+                self.sock = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
+                self.sock.connect(self._socket_path)
+
+        conn = UnixHTTPConnection(docker_socket)
+        container_config = {
+            "Image": "nginx:alpine",
+            "Entrypoint": ["/bin/sh", "-c"],
+            "Cmd": ["kill -HUP $(cat /proc/1/root/run/nginx.pid 2>/dev/null || pgrep -f 'nginx: master' | head -1) 2>/dev/null || nginx -s reload"],
+            "HostConfig": {
+                "PidMode": "host",
+                "NetworkMode": "host",
+                "AutoRemove": True,
+            },
+        }
+        body = json.dumps(container_config)
+        conn.request("POST", "/containers/create", body=body,
+                     headers={"Content-Type": "application/json"})
+        resp = conn.getresponse()
+        data = json.loads(resp.read())
+        if resp.status == 201:
+            container_id = data["Id"]
+            conn.request("POST", f"/containers/{container_id}/start")
+            conn.getresponse().read()
+            conn.request("POST", f"/containers/{container_id}/wait")
+            conn.sock.settimeout(10)
+            try:
+                conn.getresponse().read()
+            except Exception:
+                pass
+        conn.close()
     except Exception:
         pass
 

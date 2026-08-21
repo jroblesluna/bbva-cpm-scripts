@@ -93,7 +93,6 @@ services:
     image: ${backend_ecr_url}:latest
     restart: unless-stopped
     env_file: /opt/alwaysprint/.env
-    pid: host
     ports:
       - "127.0.0.1:${backend_port}:${backend_port}"
     volumes:
