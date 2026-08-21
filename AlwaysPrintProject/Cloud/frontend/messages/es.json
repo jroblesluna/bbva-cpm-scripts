@@ -1735,9 +1735,10 @@
     "description": "Estado y renovación del certificado SSL/TLS del servidor.",
     "domain": "Dominio",
     "issuer": "Emisor",
-    "validFrom": "Válido desde",
-    "expiresOn": "Expira el",
+    "issuedOn": "Fecha de emisión",
+    "expiresOn": "Fecha de expiración",
     "daysRemaining": "Días restantes",
+    "fingerprint": "Huella SHA-256",
     "status": {
       "valid": "Válido",
       "expiringSync": "Por expirar",

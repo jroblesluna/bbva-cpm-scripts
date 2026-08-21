@@ -22,6 +22,7 @@ interface SslStatus {
   not_before: string | null
   not_after: string | null
   days_remaining: number | null
+  fingerprint_sha256: string | null
   status: 'valid' | 'expiring_soon' | 'expired' | 'error'
   message: string
 }
@@ -142,7 +143,7 @@ export function SslCertificateSection() {
             <span className="text-sm text-gray-700">{sslStatus.message}</span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
               <span className="text-gray-500 block">{t('domain')}</span>
               <span className="font-mono text-gray-900">{sslStatus.domain}</span>
@@ -152,17 +153,29 @@ export function SslCertificateSection() {
               <span className="text-gray-900">{sslStatus.issuer || '—'}</span>
             </div>
             <div>
-              <span className="text-gray-500 block">{t('expiresOn')}</span>
-              <span className="text-gray-900">
-                {sslStatus.not_after ? new Date(sslStatus.not_after).toLocaleDateString() : '—'}
-              </span>
-            </div>
-            <div>
               <span className="text-gray-500 block">{t('daysRemaining')}</span>
               <span className={`font-semibold ${
                 (sslStatus.days_remaining ?? 0) < 14 ? 'text-red-600' : 'text-green-600'
               }`}>
                 {sslStatus.days_remaining ?? '—'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500 block">{t('issuedOn')}</span>
+              <span className="text-gray-900">
+                {sslStatus.not_before ? new Date(sslStatus.not_before).toLocaleString() : '—'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500 block">{t('expiresOn')}</span>
+              <span className="text-gray-900">
+                {sslStatus.not_after ? new Date(sslStatus.not_after).toLocaleString() : '—'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500 block">{t('fingerprint')}</span>
+              <span className="font-mono text-xs text-gray-900 break-all">
+                {sslStatus.fingerprint_sha256 || '—'}
               </span>
             </div>
           </div>

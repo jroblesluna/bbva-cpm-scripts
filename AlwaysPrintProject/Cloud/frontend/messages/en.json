@@ -1735,9 +1735,10 @@
     "description": "Server SSL/TLS certificate status and renewal.",
     "domain": "Domain",
     "issuer": "Issuer",
-    "validFrom": "Valid from",
+    "issuedOn": "Issued on",
     "expiresOn": "Expires on",
     "daysRemaining": "Days remaining",
+    "fingerprint": "SHA-256 Fingerprint",
     "status": {
       "valid": "Valid",
       "expiringSync": "Expiring soon",

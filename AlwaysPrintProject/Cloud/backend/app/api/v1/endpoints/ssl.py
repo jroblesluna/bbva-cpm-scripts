@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 
 from cryptography import x509
 from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives import hashes
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -57,6 +58,7 @@ class SslStatusResponse(BaseModel):
     not_before: Optional[str] = None
     not_after: Optional[str] = None
     days_remaining: Optional[int] = None
+    fingerprint_sha256: Optional[str] = None
     status: str  # "valid", "expiring_soon", "expired", "error"
     message: str
 
@@ -106,11 +108,18 @@ def _get_cert_from_file(domain: str) -> dict:
         except Exception:
             pass
 
+        # Calcular fingerprint SHA-256
+        fingerprint = cert.fingerprint(hashes.SHA256()).hex()
+        fingerprint_formatted = ":".join(
+            fingerprint[i:i+2].upper() for i in range(0, len(fingerprint), 2)
+        )
+
         return {
             "issuer": issuer,
             "not_before": not_before.isoformat(),
             "not_after": not_after.isoformat(),
             "days_remaining": days_remaining,
+            "fingerprint_sha256": fingerprint_formatted,
         }
     except Exception as e:
         return {"error": f"Error leyendo PEM: {str(e)}"}
@@ -241,6 +250,7 @@ async def get_ssl_status(
         not_before=cert_info.get("not_before"),
         not_after=cert_info.get("not_after"),
         days_remaining=days,
+        fingerprint_sha256=cert_info.get("fingerprint_sha256"),
         status=cert_status,
         message=message,
     )
