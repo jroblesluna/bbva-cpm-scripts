@@ -204,7 +204,8 @@ def _run_on_host(command: str, timeout: int = 90) -> tuple[int, str, str]:
             # Crear contenedor efímero con certbot
             container_config = {
                 "Image": "certbot/certbot:latest",
-                "Cmd": ["bash", "-c", command],
+                "Entrypoint": ["/bin/sh", "-c"],
+                "Cmd": [command],
                 "HostConfig": {
                     "NetworkMode": "host",
                     "Binds": [
