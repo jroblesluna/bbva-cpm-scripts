@@ -274,23 +274,35 @@ async def execute_sync_step(
             )
 
         # Leer y parsear el CSV
-        try:
-            raw_content = await csv_file.read()
-            # Intentar decodificar con utf-8-sig para manejar BOM
-            content = raw_content.decode("utf-8-sig")
-        except UnicodeDecodeError:
+        raw_content = await csv_file.read()
+        # Detectar encoding: UTF-8 (con/sin BOM) primero, luego CP1252 (Excel Windows español)
+        content = None
+        for enc in ("utf-8-sig", "cp1252"):
+            try:
+                content = raw_content.decode(enc)
+                break
+            except (UnicodeDecodeError, ValueError):
+                continue
+        if content is None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Error de codificación: el archivo CSV debe estar en formato UTF-8.",
+                detail="Error de codificación: no se pudo decodificar el archivo CSV (esperado UTF-8 o CP1252).",
             )
 
         csv_rows, csv_vlans = _parse_csv_content(content)
     elif csv_file is not None and csv_file.filename:
-        # CSV proporcionado opcionalmente para pasos 4-6 (no requerido pero se puede parsear)
+        # CSV proporcionado opcionalmente para pasos 4+ (no requerido pero se puede parsear)
         try:
             raw_content = await csv_file.read()
-            content = raw_content.decode("utf-8-sig")
-            csv_rows, csv_vlans = _parse_csv_content(content)
+            content = None
+            for enc in ("utf-8-sig", "cp1252"):
+                try:
+                    content = raw_content.decode(enc)
+                    break
+                except (UnicodeDecodeError, ValueError):
+                    continue
+            if content:
+                csv_rows, csv_vlans = _parse_csv_content(content)
         except Exception:
             # Si falla el parseo en pasos opcionales, ignorar silenciosamente
             pass
