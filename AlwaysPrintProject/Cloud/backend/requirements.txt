@@ -51,6 +51,9 @@ fpdf2>=2.7.0  # Generación de reportes PDF de debugging
 # === AWS ===
 boto3>=1.35.0
 
+# === BACKUP & RESTORE ===
+pyzipper>=0.3.6  # ZIP con AES-256 password encryption para backup/restore
+
 # === DOCKER (restart desde el container) ===
 docker>=7.0.0
 

@@ -242,6 +242,20 @@ api_router.include_router(
     tags=["SSL Certificate"]
 )
 
+# Backup & Restore (solo Corporate Admin)
+from app.api.v1.endpoints import backup as backup_endpoint
+api_router.include_router(
+    backup_endpoint.router,
+    tags=["Backup & Restore"]
+)
+
+# Restore desde backup (público, solo BD vacía)
+from app.api.v1.endpoints import restore as restore_endpoint
+api_router.include_router(
+    restore_endpoint.router,
+    tags=["Setup"]
+)
+
 @api_router.get("/version", tags=["Sistema"])
 async def version():
     return {"build_tag": os.environ.get("BUILD_TAG", "dev")}
