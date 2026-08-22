@@ -117,6 +117,7 @@ module "s3" {
   project_name = var.project_name
   environment  = var.environment
   ec2_role_arn = module.ec2.role_arn
+  domain_name  = "${var.subdomain}.${var.zone_name}"
 
   depends_on = [module.ec2]
 }

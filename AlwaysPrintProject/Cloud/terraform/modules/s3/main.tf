@@ -84,6 +84,19 @@ resource "aws_s3_bucket_policy" "artifacts" {
   })
 }
 
+# CORS — permitir uploads directos desde el frontend (presigned URLs para restore)
+resource "aws_s3_bucket_cors_configuration" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["PUT", "GET"]
+    allowed_origins = ["https://${var.domain_name}"]
+    expose_headers  = ["ETag"]
+    max_age_seconds = 3600
+  }
+}
+
 # =============================================================================
 # Bucket S3 — Documentación pública (descarga libre)
 # =============================================================================

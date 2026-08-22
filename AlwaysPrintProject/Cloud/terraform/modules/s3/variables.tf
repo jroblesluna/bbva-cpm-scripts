@@ -14,3 +14,8 @@ variable "ec2_role_arn" {
   type        = string
   description = "ARN del rol IAM del EC2 para la política de lectura del bucket"
 }
+
+variable "domain_name" {
+  type        = string
+  description = "Dominio del frontend (para CORS de presigned URL uploads)"
+}
