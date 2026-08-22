@@ -12,12 +12,14 @@ Funcionalidad:
 """
 
 import asyncio
+import io
 import json
 import logging
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
 import boto3
+import pyzipper
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -152,6 +154,141 @@ def _read_restore_status() -> dict:
         return {"status": "idle"}
 
 
+def _validate_and_extract_manifests(
+    s3, password: Optional[str]
+) -> tuple[dict, dict]:
+    """
+    Descarga ambos ZIPs de S3, valida password y estructura de manifest.
+
+    Retorna tupla (db_manifest, images_manifest) si ambos son válidos.
+    Lanza HTTPException 400 si alguno es inválido.
+    """
+    # --- Validar DB ZIP ---
+    try:
+        response = s3.get_object(
+            Bucket=settings.S3_ARTIFACTS_BUCKET,
+            Key="backups/restore-upload/db.zip",
+        )
+        db_zip_bytes = response["Body"].read()
+    except ClientError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se pudo descargar db.zip de S3.",
+        )
+
+    try:
+        buffer = io.BytesIO(db_zip_bytes)
+        with pyzipper.AESZipFile(buffer, "r") as zf:
+            if password:
+                zf.setpassword(password.encode("utf-8"))
+
+            # Verificar que manifest.json existe
+            if "manifest.json" not in zf.namelist():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="db.zip inválido: no contiene manifest.json. ¿Está seguro de que es un archivo de backup de base de datos?",
+                )
+
+            # Leer y parsear manifest
+            manifest_bytes = zf.read("manifest.json")
+            db_manifest = json.loads(manifest_bytes.decode("utf-8"))
+
+            # Validar campos requeridos del DB manifest
+            if not isinstance(db_manifest.get("version"), str):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="db.zip inválido: manifest.json no tiene campo 'version' válido.",
+                )
+            if not isinstance(db_manifest.get("tables"), dict):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="db.zip inválido: manifest.json no tiene campo 'tables' válido. No es un backup de base de datos.",
+                )
+            if not isinstance(db_manifest.get("total_records"), int):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="db.zip inválido: manifest.json no tiene campo 'total_records' válido.",
+                )
+    except HTTPException:
+        raise
+    except RuntimeError as e:
+        if "password" in str(e).lower() or "Bad password" in str(e):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Contraseña incorrecta para db.zip.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error leyendo db.zip: {str(e)}",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"db.zip corrupto o ilegible: {str(e)}",
+        )
+
+    # --- Validar Images ZIP ---
+    try:
+        response = s3.get_object(
+            Bucket=settings.S3_ARTIFACTS_BUCKET,
+            Key="backups/restore-upload/images.zip",
+        )
+        images_zip_bytes = response["Body"].read()
+    except ClientError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se pudo descargar images.zip de S3.",
+        )
+
+    try:
+        buffer = io.BytesIO(images_zip_bytes)
+        with pyzipper.AESZipFile(buffer, "r") as zf:
+            if password:
+                zf.setpassword(password.encode("utf-8"))
+
+            # Verificar que manifest.json existe
+            if "manifest.json" not in zf.namelist():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="images.zip inválido: no contiene manifest.json. ¿Está seguro de que es un archivo de backup de imágenes?",
+                )
+
+            # Leer y parsear manifest
+            manifest_bytes = zf.read("manifest.json")
+            images_manifest = json.loads(manifest_bytes.decode("utf-8"))
+
+            # Validar campos requeridos del Images manifest
+            if not isinstance(images_manifest.get("version"), str):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="images.zip inválido: manifest.json no tiene campo 'version' válido.",
+                )
+            if not isinstance(images_manifest.get("files"), list):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="images.zip inválido: manifest.json no tiene campo 'files' válido. No es un backup de imágenes.",
+                )
+    except HTTPException:
+        raise
+    except RuntimeError as e:
+        if "password" in str(e).lower() or "Bad password" in str(e):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Contraseña incorrecta para images.zip.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error leyendo images.zip: {str(e)}",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"images.zip corrupto o ilegible: {str(e)}",
+        )
+
+    return db_manifest, images_manifest
+
+
 # === ROUTER ===
 
 router = APIRouter(prefix="/setup/restore")
@@ -227,9 +364,10 @@ async def start_restore(
     """
     Inicia el proceso de restauración asíncrono.
 
-    Verifica que los archivos ZIP hayan sido subidos a S3 (backups/restore-upload/)
-    y lanza RestoreService.restore() como asyncio task.
-    Retorna 202 Accepted inmediatamente.
+    Valida ambos ZIPs (password, manifest estructura y contenido) ANTES de iniciar.
+    Si alguno es inválido, retorna 400 con detalle del error.
+    Si ambos son válidos, lanza RestoreService.restore() como asyncio task.
+    Retorna 202 con resumen de manifests para mostrar en frontend.
     """
     # Verificar que no hay un restore en progreso
     current_status = _read_restore_status()
@@ -239,23 +377,16 @@ async def start_restore(
             detail="Ya hay una restauración en proceso. Espere a que finalice.",
         )
 
-    # Verificar que los archivos existen en S3
+    # Validar ambos ZIPs: descargar, verificar password, estructura de manifest
     s3 = _get_s3_client()
+    db_manifest, images_manifest = _validate_and_extract_manifests(s3, request.password)
 
-    for key, label in [
-        ("backups/restore-upload/db.zip", "db.zip"),
-        ("backups/restore-upload/images.zip", "images.zip"),
-    ]:
-        try:
-            s3.head_object(
-                Bucket=settings.S3_ARTIFACTS_BUCKET,
-                Key=key,
-            )
-        except ClientError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Archivo {label} no encontrado en S3. Suba los archivos antes de iniciar la restauración.",
-            )
+    logger.info(
+        "Manifests validados: DB tables=%d, records=%d, images=%d",
+        len(db_manifest.get("tables", {})),
+        db_manifest.get("total_records", 0),
+        images_manifest.get("total_images", 0),
+    )
 
     # Importar aquí para evitar circular imports
     from app.services.restore_service import RestoreService
@@ -272,6 +403,18 @@ async def start_restore(
     return {
         "message": "Proceso de restauración iniciado",
         "status": "restoring",
+        "db_manifest": {
+            "version": db_manifest.get("version"),
+            "tables": len(db_manifest.get("tables", {})),
+            "total_records": db_manifest.get("total_records", 0),
+            "generated_at": db_manifest.get("generated_at"),
+            "alembic_revision": db_manifest.get("alembic_revision"),
+        },
+        "images_manifest": {
+            "version": images_manifest.get("version"),
+            "total_images": images_manifest.get("total_images", 0),
+            "total_size": images_manifest.get("total_size", 0),
+        },
     }
 
 

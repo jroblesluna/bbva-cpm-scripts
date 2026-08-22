@@ -203,8 +203,11 @@ function RestoreForm({ onRestoreStarted }: { onRestoreStarted: () => void }) {
 
       // 5. Cambiar a pantalla de progreso
       onRestoreStarted()
-    } catch {
-      setError(t('uploadError'))
+    } catch (err: unknown) {
+      // Mostrar el error específico del backend (validación de manifest)
+      // o el mensaje genérico si es un error de red
+      const apiError = err as { detail?: string }
+      setError(apiError?.detail || t('uploadError'))
       setIsUploading(false)
       setUploadStage(null)
     }
