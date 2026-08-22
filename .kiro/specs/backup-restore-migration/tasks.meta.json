@@ -1,0 +1,340 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Agregar `pyzipper` al requirements.txt": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375686530
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375694575
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375797137
+      }
+    ],
+    "1.2 Crear `app/services/backup_service.py` — servicio de generación de backup": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375686572
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375804434
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787376264748
+      }
+    ],
+    "1.3 Crear `app/services/restore_service.py` — servicio de restauración": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375686604
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787376271594
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787376578222
+      }
+    ],
+    "2.1 Crear `app/api/v1/endpoints/backup.py` con dependencia `require_corporate_admin`": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375686672
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787376586442
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787376815368
+      }
+    ],
+    "3.1 Crear `app/api/v1/endpoints/restore.py` con endpoints públicos (solo BD vacía)": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375686705
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787376819044
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787377029642
+      }
+    ],
+    "4.1 Actualizar `app/api/v1/endpoints/setup.py` — agregar detección de restore en progreso": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375686736
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787377033264
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787377133457
+      }
+    ],
+    "5. Checkpoint Backend — Verificar servicios y endpoints": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375686762
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787377137436
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787377955130
+      }
+    ],
+    "6.1 Agregar namespace `backup` en `messages/es.json` y `messages/en.json`": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375686789
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787377964019
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787378300227
+      }
+    ],
+    "7.1 Agregar interfaces TypeScript y funciones API en `src/lib/api.ts`": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375686823
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787378304520
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787378427441
+      }
+    ],
+    "8.1 Crear `src/components/admin/BackupSection.tsx`": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375686882
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787378435599
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787378625869
+      }
+    ],
+    "8.2 Integrar BackupSection en la página admin correspondiente": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375686912
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787378630187
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787378812792
+      }
+    ],
+    "9.1 Modificar `src/app/setup/page.tsx` — agregar tabs y detección de restore en progreso": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375686942
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787378819028
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787379044625
+      }
+    ],
+    "9.2 Implementar formulario de restore en la tab \"Restaurar Backup\"": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375686977
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787379048672
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787379054611
+      }
+    ],
+    "9.3 Implementar pantalla de \"Restauración en proceso\"": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375687012
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787379058777
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787379062915
+      }
+    ],
+    "10.1 Verificar flujo completo de backup": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375687037
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787379072692
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787379385414
+      }
+    ],
+    "10.2 Verificar flujo completo de restore": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787375687075
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787379390109
+      },
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787379602874
+      }
+    ],
+    "1. Backend: Instalar dependencia y crear servicio de backup": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787376578265
+      }
+    ],
+    "2. Backend: Crear endpoints de backup (admin)": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787376815413
+      }
+    ],
+    "3. Backend: Crear endpoints de restore (setup)": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787377029671
+      }
+    ],
+    "4. Backend: Modificar endpoint de setup existente": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787377133489
+      }
+    ],
+    "6. Frontend: Agregar traducciones i18n": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787378300293
+      }
+    ],
+    "7. Frontend: Agregar API client": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787378427476
+      }
+    ],
+    "8. Frontend: Crear componente BackupSection para admin dashboard": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787378812824
+      }
+    ],
+    "9. Frontend: Modificar Setup Page para soportar restore": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787379062950
+      }
+    ],
+    "10. Testing y verificación final": [
+      {
+        "executionId": "1c2283cd-219e-49dd-82db-4f86229de639",
+        "chatSessionId": "sess_178f25e8-d1a2-4d67-a5c6-805514432e33",
+        "timestamp": 1787379602935
+      }
+    ]
+  }
+}

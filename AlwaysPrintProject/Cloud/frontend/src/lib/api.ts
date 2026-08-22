@@ -202,8 +202,8 @@ export const setupApi = {
    * Acepta un AbortSignal opcional para cancelar la petición.
    * No envía token de autenticación (endpoint público).
    */
-  getStatus: async (signal?: AbortSignal): Promise<{ needs_setup: boolean; message: string }> => {
-    const response = await apiClient.get<{ needs_setup: boolean; message: string }>('/setup/status', {
+  getStatus: async (signal?: AbortSignal): Promise<{ needs_setup: boolean; message: string; restore_in_progress?: boolean }> => {
+    const response = await apiClient.get<{ needs_setup: boolean; message: string; restore_in_progress?: boolean }>('/setup/status', {
       signal,
       headers: { Authorization: '' },
     })
@@ -1220,6 +1220,149 @@ export const syncInventoryApi = {
       }
     )
     return response.data
+  },
+}
+
+// ============================================================================
+// BACKUP & RESTORE
+// ============================================================================
+
+/** Estado del proceso de backup */
+export interface BackupStatusResponse {
+  status: 'idle' | 'generating' | 'completed' | 'failed'
+  stage?: string | null
+  progress?: number | null
+  error?: string | null
+  db_zip_size?: number | null
+  images_zip_size?: number | null
+  generated_at?: string | null
+  has_password?: boolean | null
+}
+
+/** Respuesta con presigned URL de descarga */
+export interface BackupDownloadResponse {
+  presigned_url: string
+  file_name: string
+  file_size: number
+  expires_in: number
+}
+
+/** Presigned URLs para upload de restore */
+export interface RestorePresignedUrlsResponse {
+  db_upload_url: string
+  images_upload_url: string
+  expires_in: number
+}
+
+/** Estado del proceso de restauración */
+export interface RestoreStatusResponse {
+  status: 'idle' | 'restoring' | 'completed' | 'failed'
+  stage?: string | null
+  progress?: number | null
+  error?: string | null
+  completed_at?: string | null
+}
+
+export const backupApi = {
+  /**
+   * Iniciar generación de backup.
+   */
+  generate: async (password?: string): Promise<{ message: string; status: string }> => {
+    const response = await apiClient.post<{ message: string; status: string }>(
+      '/admin/backup/generate',
+      { password: password || null }
+    )
+    return response.data
+  },
+
+  /**
+   * Obtener estado actual del backup.
+   */
+  getStatus: async (): Promise<BackupStatusResponse> => {
+    const response = await apiClient.get<BackupStatusResponse>('/admin/backup/status')
+    return response.data
+  },
+
+  /**
+   * Obtener presigned URL de descarga del backup.
+   */
+  getDownloadUrl: async (fileType: 'db' | 'images'): Promise<BackupDownloadResponse> => {
+    const response = await apiClient.get<BackupDownloadResponse>(
+      `/admin/backup/download/${fileType}`
+    )
+    return response.data
+  },
+
+  /**
+   * Eliminar backup actual.
+   */
+  deleteBackup: async (): Promise<{ message: string; status: string }> => {
+    const response = await apiClient.delete<{ message: string; status: string }>(
+      '/admin/backup/delete'
+    )
+    return response.data
+  },
+}
+
+export const restoreApi = {
+  /**
+   * Obtener presigned URLs para upload de archivos de restore.
+   * No envía token (endpoint público).
+   */
+  getPresignedUrls: async (dbZipSize: number, imagesZipSize: number): Promise<RestorePresignedUrlsResponse> => {
+    const response = await apiClient.post<RestorePresignedUrlsResponse>(
+      '/setup/restore/presigned-urls',
+      { db_zip_size: dbZipSize, images_zip_size: imagesZipSize },
+      { headers: { Authorization: '' } }
+    )
+    return response.data
+  },
+
+  /**
+   * Iniciar proceso de restauración.
+   * No envía token (endpoint público).
+   */
+  start: async (password?: string): Promise<{ message: string; status: string }> => {
+    const response = await apiClient.post<{ message: string; status: string }>(
+      '/setup/restore/start',
+      { password: password || null },
+      { headers: { Authorization: '' } }
+    )
+    return response.data
+  },
+
+  /**
+   * Obtener estado actual de la restauración.
+   * No envía token (endpoint público).
+   */
+  getStatus: async (): Promise<RestoreStatusResponse> => {
+    const response = await apiClient.get<RestoreStatusResponse>(
+      '/setup/restore/status',
+      { headers: { Authorization: '' } }
+    )
+    return response.data
+  },
+
+  /**
+   * Upload directo a S3 via presigned URL con tracking de progreso.
+   * Usa axios sin interceptors para el upload directo a S3.
+   */
+  uploadToS3: async (
+    presignedUrl: string,
+    file: File,
+    onProgress?: (percent: number) => void
+  ): Promise<void> => {
+    await axios.put(presignedUrl, file, {
+      headers: {
+        'Content-Type': 'application/zip',
+      },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          onProgress(percent)
+        }
+      },
+    })
   },
 }
 

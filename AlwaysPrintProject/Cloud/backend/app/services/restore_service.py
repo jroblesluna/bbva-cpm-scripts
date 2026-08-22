@@ -1,0 +1,998 @@
+"""
+Servicio de restauración de backup para migración entre cuentas AWS.
+
+Descarga los 2 archivos ZIP (BD + imágenes) previamente subidos a S3
+por el frontend, los valida, limpia la BD, restaura tabla por tabla
+respetando FK, sube imágenes al bucket de destino, y reconstruye URLs.
+
+Estructura esperada en S3:
+  s3://{S3_ARTIFACTS_BUCKET}/backups/restore-upload/db.zip
+  s3://{S3_ARTIFACTS_BUCKET}/backups/restore-upload/images.zip
+  s3://{S3_ARTIFACTS_BUCKET}/backups/restore_status.json  — Estado del proceso
+"""
+
+import json
+import logging
+import uuid
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Optional
+
+import boto3
+import pyzipper
+from botocore.exceptions import ClientError
+from sqlalchemy import inspect, text
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.core.database import SessionLocal
+from app.models import (
+    ActionConfig,
+    AuditLog,
+    ConnectivityResult,
+    ContainerMetric,
+    DebuggingProfile,
+    DebuggingSession,
+    Device,
+    Document,
+    GlobalConfig,
+    HealthCheckResult,
+    KnowledgeArticle,
+    License,
+    LogAnalysis,
+    Message,
+    MessageDelivery,
+    MetricRecord,
+    Organization,
+    PublicIP,
+    StatusSnapshot,
+    TelemetryLog,
+    User,
+    VLAN,
+    VLANConfig,
+    Workstation,
+    WorkstationConfig,
+)
+from app.models.audit import ActionType
+from app.models.debugging import DebuggingSessionStatus
+from app.models.knowledge_article import profile_knowledge_articles
+from app.models.message import DeliveryMode, TargetType
+from app.models.message_delivery import DeliveryStatus
+from app.models.system_status import OverallStatus
+from app.models.user import UserRole
+
+logger = logging.getLogger(__name__)
+
+
+# === MAPEO DE TABLAS A MODELOS (ORDEN DE DEPENDENCIAS FK) ===
+
+TABLE_MODEL_MAP: list[tuple[str, Any]] = [
+    ("organizations", Organization),
+    ("users", User),
+    ("vlans", VLAN),
+    ("devices", Device),
+    ("workstations", Workstation),
+    ("licenses", License),
+    ("global_configs", GlobalConfig),
+    ("vlan_configs", VLANConfig),
+    ("workstation_configs", WorkstationConfig),
+    ("action_configs", ActionConfig),
+    ("public_ips", PublicIP),
+    ("messages", Message),
+    ("message_deliveries", MessageDelivery),
+    ("telemetry_logs", TelemetryLog),
+    ("connectivity_results", ConnectivityResult),
+    ("audit_logs", AuditLog),
+    ("documents", Document),
+    ("debugging_profiles", DebuggingProfile),
+    ("knowledge_articles", KnowledgeArticle),
+    ("profile_knowledge_articles", profile_knowledge_articles),
+    ("debugging_sessions", DebuggingSession),
+    ("log_analyses", LogAnalysis),
+    ("status_snapshots", StatusSnapshot),
+    ("metric_records", MetricRecord),
+    ("health_check_results", HealthCheckResult),
+    ("container_metrics", ContainerMetric),
+]
+
+# Orden de tablas para inserción (misma lista, solo nombres)
+TABLE_ORDER = [name for name, _ in TABLE_MODEL_MAP]
+
+# Mapeo de nombre de tabla → modelo/tabla para acceso rápido
+TABLE_NAME_TO_MODEL: dict[str, Any] = {name: model for name, model in TABLE_MODEL_MAP}
+
+# === MAPEO DE ENUMS POR COLUMNA ===
+# Mapea (tabla, columna) → clase Enum para conversión durante restore
+ENUM_MAP: dict[tuple[str, str], type] = {
+    ("users", "role"): UserRole,
+    ("audit_logs", "action_type"): ActionType,
+    ("messages", "target_type"): TargetType,
+    ("messages", "delivery_mode"): DeliveryMode,
+    ("message_deliveries", "status"): DeliveryStatus,
+    ("debugging_sessions", "status"): DebuggingSessionStatus,
+    ("status_snapshots", "overall_status"): OverallStatus,
+    ("health_check_results", "status"): OverallStatus,
+}
+
+
+class RestoreService:
+    """
+    Servicio de restauración desde backup.
+
+    Descarga ZIPs subidos por el usuario a S3, los valida, limpia la BD,
+    inserta registros tabla por tabla respetando FK, sube imágenes al bucket
+    de destino, y reconstruye URLs de imágenes. El progreso se persiste en S3.
+    """
+
+    STAGES = [
+        ("validating", "Validando archivos", 0, 10),
+        ("cleaning", "Limpiando base de datos", 10, 15),
+        ("restoring_db", "Restaurando base de datos", 15, 70),
+        ("restoring_images", "Restaurando imágenes", 70, 85),
+        ("rebuilding_urls", "Reconstruyendo URLs de imágenes", 85, 90),
+        ("verifying", "Verificando integridad", 90, 100),
+    ]
+
+    def __init__(self):
+        """Inicializa clientes S3 con la configuración del proyecto."""
+        session = boto3.Session(
+            region_name=settings.AWS_REGION,
+            profile_name=settings.AWS_PROFILE or None,
+        )
+        self._s3 = session.client("s3")
+        self._artifacts_bucket = settings.S3_ARTIFACTS_BUCKET
+        self._docs_bucket = settings.S3_DOCS_BUCKET
+
+    # =========================================================================
+    # MÉTODO PRINCIPAL
+    # =========================================================================
+
+    async def restore(self, password: Optional[str] = None) -> None:
+        """
+        Ejecuta restauración completa de forma asíncrona.
+
+        Etapas:
+        1. Descarga ZIPs desde S3 (restore-upload/)
+        2. Valida password, estructura e integridad
+        3. Valida compatibilidad de Alembic revision
+        4. Limpia BD (TRUNCATE CASCADE o delete en orden inverso)
+        5. Inserta registros tabla por tabla en orden FK
+        6. Sube imágenes al bucket de docs
+        7. Reconstruye URLs de imágenes en VLANs
+        8. Verifica integridad (conteos vs manifest)
+        9. Limpia archivos temporales de restore-upload/
+
+        Si falla después de la limpieza, hace TRUNCATE de todas las tablas.
+        """
+        cleaning_done = False
+
+        try:
+            logger.info("Iniciando proceso de restauración...")
+            self._update_restore_status("restoring", "Descargando archivos", 0)
+
+            # --- Descargar ZIPs desde S3 ---
+            db_zip_bytes = self._download_restore_file("backups/restore-upload/db.zip")
+            images_zip_bytes = self._download_restore_file("backups/restore-upload/images.zip")
+
+            if db_zip_bytes is None:
+                raise ValueError("No se encontró db.zip en S3 (backups/restore-upload/db.zip)")
+            if images_zip_bytes is None:
+                raise ValueError("No se encontró images.zip en S3 (backups/restore-upload/images.zip)")
+
+            # --- Etapa 1: Validar ZIPs ---
+            self._update_restore_status(
+                "restoring", self.STAGES[0][1], self.STAGES[0][2]
+            )
+
+            # Validar estructura del DB_ZIP
+            expected_db_files = ["manifest.json"] + [f"{name}.json" for name in TABLE_ORDER]
+            self._validate_zip(db_zip_bytes, password, expected_db_files)
+
+            # Extraer manifest para validaciones
+            manifest = self._extract_manifest(db_zip_bytes, password)
+
+            # Validar compatibilidad de Alembic revision
+            self._validate_alembic_compatibility(manifest)
+
+            # Validar Images_ZIP (al menos manifest.json)
+            self._validate_zip(images_zip_bytes, password, ["manifest.json"])
+
+            # --- Etapa 2: Limpiar BD ---
+            self._update_restore_status(
+                "restoring", self.STAGES[1][1], self.STAGES[1][2]
+            )
+
+            db = SessionLocal()
+            try:
+                self._clean_database(db)
+                db.commit()
+                cleaning_done = True
+            finally:
+                db.close()
+
+            # --- Etapa 3: Restaurar BD tabla por tabla ---
+            self._update_restore_status(
+                "restoring", self.STAGES[2][1], self.STAGES[2][2]
+            )
+
+            table_data = self._extract_all_tables(db_zip_bytes, password)
+            restored_counts: dict[str, int] = {}
+
+            db = SessionLocal()
+            try:
+                total_tables = len(TABLE_ORDER)
+                for idx, table_name in enumerate(TABLE_ORDER):
+                    records = table_data.get(table_name, [])
+                    count = self._restore_table(db, table_name, records)
+                    restored_counts[table_name] = count
+
+                    # Actualizar progreso proporcionalmente entre 15% y 70%
+                    stage_progress = self.STAGES[2][2] + int(
+                        (idx + 1) / total_tables * (self.STAGES[2][3] - self.STAGES[2][2])
+                    )
+                    self._update_restore_status(
+                        "restoring",
+                        f"Restaurando: {table_name} ({count} registros)",
+                        stage_progress,
+                    )
+
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                db.close()
+
+            # --- Etapa 4: Restaurar imágenes ---
+            self._update_restore_status(
+                "restoring", self.STAGES[3][1], self.STAGES[3][2]
+            )
+            uploaded_images = self._upload_images_to_s3(images_zip_bytes, password)
+
+            # --- Etapa 5: Reconstruir URLs ---
+            self._update_restore_status(
+                "restoring", self.STAGES[4][1], self.STAGES[4][2]
+            )
+
+            db = SessionLocal()
+            try:
+                self._rebuild_image_urls(db)
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                db.close()
+
+            # --- Etapa 6: Verificar integridad ---
+            self._update_restore_status(
+                "restoring", self.STAGES[5][1], self.STAGES[5][2]
+            )
+
+            db = SessionLocal()
+            try:
+                self._verify_integrity(db, manifest, restored_counts)
+            finally:
+                db.close()
+
+            # --- Finalizar: Limpiar archivos temporales y actualizar status ---
+            self._cleanup_restore_uploads()
+
+            completed_at = datetime.now(timezone.utc).isoformat()
+            self._update_restore_status(
+                "completed",
+                stage=None,
+                progress=100,
+                error=None,
+                extra={
+                    "completed_at": completed_at,
+                    "tables_restored": len(restored_counts),
+                    "total_records": sum(restored_counts.values()),
+                    "images_uploaded": uploaded_images,
+                },
+            )
+
+            logger.info(
+                "Restauración completada exitosamente: %d tablas, %d registros, %d imágenes",
+                len(restored_counts),
+                sum(restored_counts.values()),
+                uploaded_images,
+            )
+
+        except Exception as e:
+            logger.error("Error en restauración: %s", str(e), exc_info=True)
+
+            # Si ya se limpió la BD y falló después, hacer TRUNCATE total
+            if cleaning_done:
+                try:
+                    logger.warning("Fallo post-limpieza, ejecutando TRUNCATE de seguridad...")
+                    db = SessionLocal()
+                    try:
+                        self._clean_database(db)
+                        db.commit()
+                    finally:
+                        db.close()
+                except Exception as cleanup_err:
+                    logger.error(
+                        "Error adicional durante TRUNCATE de seguridad: %s",
+                        str(cleanup_err),
+                    )
+
+            self._update_restore_status("failed", stage=None, progress=None, error=str(e))
+
+    # =========================================================================
+    # DESCARGA DE ARCHIVOS DESDE S3
+    # =========================================================================
+
+    def _download_restore_file(self, key: str) -> Optional[bytes]:
+        """
+        Descarga un archivo del bucket de artifacts.
+
+        Args:
+            key: Key del archivo en S3.
+
+        Returns:
+            Bytes del archivo, o None si no existe.
+        """
+        try:
+            response = self._s3.get_object(
+                Bucket=self._artifacts_bucket,
+                Key=key,
+            )
+            return response["Body"].read()
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "")
+            if error_code in ("NoSuchKey", "404"):
+                return None
+            raise
+
+    # =========================================================================
+    # VALIDACIÓN DE ZIPs
+    # =========================================================================
+
+    def _validate_zip(
+        self,
+        zip_bytes: bytes,
+        password: Optional[str],
+        expected_files: list[str],
+    ) -> None:
+        """
+        Valida un archivo ZIP: verifica password, estructura e integridad.
+
+        Args:
+            zip_bytes: Contenido del ZIP.
+            password: Password para descifrarlo (None = sin cifrado).
+            expected_files: Lista de archivos esperados dentro del ZIP.
+
+        Raises:
+            ValueError: Si password es incorrecto, estructura inválida o ZIP corrupto.
+        """
+        import io
+
+        try:
+            buffer = io.BytesIO(zip_bytes)
+            with pyzipper.AESZipFile(buffer, "r") as zf:
+                if password:
+                    zf.setpassword(password.encode("utf-8"))
+
+                # Verificar que se puede leer (password correcto)
+                namelist = zf.namelist()
+
+                # Verificar estructura: todos los archivos esperados deben existir
+                missing = [f for f in expected_files if f not in namelist]
+                if missing:
+                    raise ValueError(
+                        f"Estructura inválida del ZIP. Archivos faltantes: {', '.join(missing)}"
+                    )
+
+                # Verificar integridad: intentar leer el primer archivo
+                test_file = expected_files[0]
+                zf.read(test_file)
+
+        except RuntimeError as e:
+            # pyzipper lanza RuntimeError para password incorrecto
+            if "password" in str(e).lower() or "Bad password" in str(e):
+                raise ValueError(
+                    "Contraseña incorrecta. No se puede abrir el archivo ZIP."
+                ) from e
+            raise ValueError(f"Error al validar ZIP: {str(e)}") from e
+        except Exception as e:
+            if isinstance(e, ValueError):
+                raise
+            raise ValueError(f"ZIP corrupto o ilegible: {str(e)}") from e
+
+    def _extract_manifest(self, db_zip_bytes: bytes, password: Optional[str]) -> dict:
+        """
+        Extrae y parsea manifest.json del DB_ZIP.
+
+        Returns:
+            Diccionario con el contenido del manifest.
+        """
+        import io
+
+        buffer = io.BytesIO(db_zip_bytes)
+        with pyzipper.AESZipFile(buffer, "r") as zf:
+            if password:
+                zf.setpassword(password.encode("utf-8"))
+            manifest_bytes = zf.read("manifest.json")
+
+        return json.loads(manifest_bytes.decode("utf-8"))
+
+    def _validate_alembic_compatibility(self, manifest: dict) -> None:
+        """
+        Valida que la revisión de Alembic del backup es compatible con la BD actual.
+
+        Compara manifest.alembic_revision con la revisión actual en la BD.
+        Si no coinciden, aborta la restauración.
+        """
+        backup_revision = manifest.get("alembic_revision")
+        if not backup_revision:
+            logger.warning(
+                "El manifest no incluye alembic_revision — omitiendo validación de compatibilidad"
+            )
+            return
+
+        current_revision = self._get_alembic_head()
+        if not current_revision:
+            logger.warning(
+                "No se pudo obtener la revisión actual de Alembic — omitiendo validación"
+            )
+            return
+
+        if backup_revision != current_revision:
+            raise ValueError(
+                f"Incompatibilidad de schema: el backup fue generado con revisión "
+                f"'{backup_revision}' pero la BD actual está en '{current_revision}'. "
+                f"Ejecute las migraciones necesarias antes de restaurar."
+            )
+
+        logger.info("Compatibilidad de Alembic verificada: %s", current_revision)
+
+    def _get_alembic_head(self) -> Optional[str]:
+        """
+        Obtiene la revisión actual de Alembic desde la tabla alembic_version.
+
+        Returns:
+            String con la revision head, o None si no se puede determinar.
+        """
+        db = SessionLocal()
+        try:
+            result = db.execute(
+                text("SELECT version_num FROM alembic_version LIMIT 1")
+            )
+            row = result.fetchone()
+            if row:
+                return row[0]
+            return None
+        except Exception as e:
+            logger.warning("No se pudo obtener revisión de Alembic: %s", str(e))
+            return None
+        finally:
+            db.close()
+
+    # =========================================================================
+    # LIMPIEZA DE BD
+    # =========================================================================
+
+    def _clean_database(self, db: Session) -> None:
+        """
+        Limpia toda la BD antes del restore.
+
+        Para PostgreSQL: usa TRUNCATE ... CASCADE en todas las tablas.
+        Para SQLite: elimina datos en orden inverso de FK.
+        """
+        if settings.is_sqlite:
+            # SQLite no soporta TRUNCATE CASCADE — eliminar en orden inverso
+            self._clean_database_sqlite(db)
+        else:
+            # PostgreSQL: TRUNCATE CASCADE eficiente
+            self._clean_database_postgresql(db)
+
+    def _clean_database_postgresql(self, db: Session) -> None:
+        """Limpia BD PostgreSQL con TRUNCATE CASCADE."""
+        table_names = [name for name in TABLE_ORDER if name != "profile_knowledge_articles"]
+        # Incluir tabla de asociación
+        table_names.append("profile_knowledge_articles")
+
+        # TRUNCATE todas las tablas de una vez (más eficiente y maneja FK)
+        tables_str = ", ".join(table_names)
+        db.execute(text(f"TRUNCATE TABLE {tables_str} CASCADE"))
+        logger.info("TRUNCATE CASCADE ejecutado en %d tablas", len(table_names))
+
+    def _clean_database_sqlite(self, db: Session) -> None:
+        """Limpia BD SQLite eliminando datos en orden inverso de FK."""
+        # Desactivar FK temporalmente para poder eliminar sin problemas
+        db.execute(text("PRAGMA foreign_keys=OFF"))
+
+        for table_name in reversed(TABLE_ORDER):
+            db.execute(text(f"DELETE FROM {table_name}"))
+            logger.debug("Eliminados registros de tabla %s (SQLite)", table_name)
+
+        # Reactivar FK
+        db.execute(text("PRAGMA foreign_keys=ON"))
+        logger.info("Limpieza SQLite completada: %d tablas", len(TABLE_ORDER))
+
+    # =========================================================================
+    # EXTRACCIÓN DE DATOS DEL ZIP
+    # =========================================================================
+
+    def _extract_all_tables(
+        self, db_zip_bytes: bytes, password: Optional[str]
+    ) -> dict[str, list[dict]]:
+        """
+        Extrae todos los JSON de tablas del DB_ZIP.
+
+        Returns:
+            Diccionario {nombre_tabla: lista_de_registros}.
+        """
+        import io
+
+        table_data: dict[str, list[dict]] = {}
+        buffer = io.BytesIO(db_zip_bytes)
+
+        with pyzipper.AESZipFile(buffer, "r") as zf:
+            if password:
+                zf.setpassword(password.encode("utf-8"))
+
+            for table_name in TABLE_ORDER:
+                filename = f"{table_name}.json"
+                try:
+                    raw = zf.read(filename)
+                    records = json.loads(raw.decode("utf-8"))
+                    table_data[table_name] = records
+                except KeyError:
+                    # Tabla no encontrada en el ZIP — permitir tablas vacías
+                    logger.warning(
+                        "Tabla %s no encontrada en el ZIP — se asume vacía", table_name
+                    )
+                    table_data[table_name] = []
+
+        return table_data
+
+    # =========================================================================
+    # RESTAURACIÓN DE TABLAS
+    # =========================================================================
+
+    def _restore_table(self, db: Session, table_name: str, records: list[dict]) -> int:
+        """
+        Inserta registros en una tabla con conversión de tipos.
+
+        Para tablas ORM regulares, usa db.execute(insert(model.__table__)).
+        Para tablas de asociación (profile_knowledge_articles), usa db.execute(insert(table)).
+
+        Args:
+            db: Sesión de SQLAlchemy.
+            table_name: Nombre de la tabla.
+            records: Lista de dicts con los datos a insertar.
+
+        Returns:
+            Cantidad de registros insertados.
+        """
+        if not records:
+            return 0
+
+        model_or_table = TABLE_NAME_TO_MODEL.get(table_name)
+        if model_or_table is None:
+            logger.warning("Tabla %s no tiene modelo asociado — omitiendo", table_name)
+            return 0
+
+        if table_name == "profile_knowledge_articles":
+            # Tabla de asociación (SQLAlchemy Table, no modelo ORM)
+            return self._restore_association_table(db, model_or_table, records)
+        else:
+            # Tabla ORM regular
+            return self._restore_orm_table(db, table_name, model_or_table, records)
+
+    def _restore_orm_table(
+        self, db: Session, table_name: str, model_class, records: list[dict]
+    ) -> int:
+        """
+        Inserta registros en una tabla ORM con conversión de tipos.
+
+        Detecta columnas UUID, datetime y Enum usando SQLAlchemy inspect,
+        y convierte los valores string del JSON a los tipos nativos.
+        """
+        from app.models.audit import GUID as AuditGUID
+
+        mapper = inspect(model_class)
+        column_info = {}
+
+        for col in mapper.columns:
+            col_type = type(col.type)
+            # Detectar tipo GUID (UUID)
+            is_guid = col_type.__name__ == "GUID" or hasattr(col.type, "impl")
+            # Verificar si es DateTime
+            is_datetime = col_type.__name__ in ("DateTime",)
+            # Verificar si es Enum
+            is_enum = col_type.__name__ in ("Enum",)
+
+            # Verificar GUID de forma más robusta
+            try:
+                from sqlalchemy import TypeDecorator
+                if isinstance(col.type, TypeDecorator):
+                    is_guid = True
+            except ImportError:
+                pass
+
+            column_info[col.key] = {
+                "is_guid": is_guid,
+                "is_datetime": is_datetime,
+                "is_enum": is_enum,
+                "nullable": col.nullable,
+            }
+
+        # Buscar enums aplicables a esta tabla
+        table_enums = {
+            col_name: enum_class
+            for (tbl, col_name), enum_class in ENUM_MAP.items()
+            if tbl == table_name
+        }
+
+        # Convertir y insertar registros en lotes
+        converted_records = []
+        for record in records:
+            converted = {}
+            for key, value in record.items():
+                if key not in column_info:
+                    # Columna no existe en el modelo actual — omitir
+                    continue
+
+                info = column_info[key]
+
+                if value is None:
+                    converted[key] = None
+                elif info["is_guid"]:
+                    converted[key] = self._convert_to_uuid(value)
+                elif info["is_datetime"]:
+                    converted[key] = self._convert_to_datetime(value)
+                elif info["is_enum"] and key in table_enums:
+                    converted[key] = self._convert_to_enum(value, table_enums[key])
+                else:
+                    converted[key] = value
+
+            converted_records.append(converted)
+
+        # Insertar usando bulk insert con la tabla subyacente
+        if converted_records:
+            table = model_class.__table__
+            # Insertar en lotes de 500 para evitar problemas de memoria
+            batch_size = 500
+            for i in range(0, len(converted_records), batch_size):
+                batch = converted_records[i:i + batch_size]
+                db.execute(table.insert(), batch)
+
+        logger.debug("Restaurada tabla %s: %d registros", table_name, len(converted_records))
+        return len(converted_records)
+
+    def _restore_association_table(
+        self, db: Session, table, records: list[dict]
+    ) -> int:
+        """
+        Inserta registros en una tabla de asociación (SQLAlchemy Table).
+
+        Convierte columnas UUID de string a uuid.UUID.
+        """
+        if not records:
+            return 0
+
+        # Las columnas de la tabla de asociación son todas GUID (FK)
+        converted_records = []
+        column_names = [col.name for col in table.columns]
+
+        for record in records:
+            converted = {}
+            for col_name in column_names:
+                value = record.get(col_name)
+                if value is not None:
+                    converted[col_name] = self._convert_to_uuid(value)
+                else:
+                    converted[col_name] = None
+            converted_records.append(converted)
+
+        if converted_records:
+            db.execute(table.insert(), converted_records)
+
+        logger.debug(
+            "Restaurada tabla de asociación profile_knowledge_articles: %d registros",
+            len(converted_records),
+        )
+        return len(converted_records)
+
+    # =========================================================================
+    # CONVERSIÓN DE TIPOS
+    # =========================================================================
+
+    def _convert_to_uuid(self, value: Any) -> Optional[uuid.UUID]:
+        """Convierte string a uuid.UUID. Retorna None si vacío."""
+        if value is None:
+            return None
+        if isinstance(value, uuid.UUID):
+            return value
+        try:
+            return uuid.UUID(str(value))
+        except (ValueError, AttributeError):
+            logger.warning("No se pudo convertir a UUID: %s", value)
+            return None
+
+    def _convert_to_datetime(self, value: Any) -> Optional[datetime]:
+        """
+        Convierte string ISO 8601 a datetime.
+
+        Soporta formatos con y sin zona horaria.
+        """
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value
+        try:
+            # Intentar parsear ISO 8601
+            dt_str = str(value)
+            # Manejar formato con 'Z' como UTC
+            if dt_str.endswith("Z"):
+                dt_str = dt_str[:-1] + "+00:00"
+            return datetime.fromisoformat(dt_str)
+        except (ValueError, TypeError):
+            logger.warning("No se pudo convertir a datetime: %s", value)
+            return None
+
+    def _convert_to_enum(self, value: Any, enum_class: type) -> Any:
+        """
+        Convierte string a instancia de Enum.
+
+        Intenta primero por valor, luego por nombre.
+        """
+        if value is None:
+            return None
+        if isinstance(value, enum_class):
+            return value
+        try:
+            return enum_class(value)
+        except (ValueError, KeyError):
+            try:
+                return enum_class[str(value).upper()]
+            except (KeyError, AttributeError):
+                logger.warning(
+                    "No se pudo convertir '%s' a Enum %s", value, enum_class.__name__
+                )
+                return value
+
+    # =========================================================================
+    # RESTAURACIÓN DE IMÁGENES
+    # =========================================================================
+
+    def _upload_images_to_s3(
+        self, images_zip_bytes: bytes, password: Optional[str]
+    ) -> int:
+        """
+        Extrae imágenes del Images_ZIP y las sube al bucket de docs/imágenes.
+
+        Lee el manifest del ZIP para obtener la lista de archivos, luego
+        sube cada imagen al bucket S3_DOCS_BUCKET.
+
+        Args:
+            images_zip_bytes: Contenido del ZIP de imágenes.
+            password: Password del ZIP (None = sin cifrado).
+
+        Returns:
+            Cantidad de imágenes subidas exitosamente.
+        """
+        import io
+
+        buffer = io.BytesIO(images_zip_bytes)
+        uploaded_count = 0
+
+        with pyzipper.AESZipFile(buffer, "r") as zf:
+            if password:
+                zf.setpassword(password.encode("utf-8"))
+
+            # Leer manifest de imágenes
+            manifest_bytes = zf.read("manifest.json")
+            manifest = json.loads(manifest_bytes.decode("utf-8"))
+
+            files_list = manifest.get("files", [])
+
+            for entry in files_list:
+                filename = entry.get("filename")
+                size = entry.get("size", 0)
+
+                # Solo procesar archivos con datos (size > 0)
+                if not filename or size == 0:
+                    continue
+
+                try:
+                    image_data = zf.read(filename)
+
+                    # Determinar content type
+                    content_type = self._get_image_content_type(filename)
+
+                    self._s3.put_object(
+                        Bucket=self._docs_bucket,
+                        Key=filename,
+                        Body=image_data,
+                        ContentType=content_type,
+                    )
+                    uploaded_count += 1
+                    logger.debug("Imagen subida: %s (%d bytes)", filename, len(image_data))
+
+                except Exception as e:
+                    logger.warning(
+                        "Error subiendo imagen %s: %s", filename, str(e)
+                    )
+
+        logger.info("Imágenes restauradas: %d de %d", uploaded_count, len(files_list))
+        return uploaded_count
+
+    def _get_image_content_type(self, filename: str) -> str:
+        """Determina el content type de una imagen por su extensión."""
+        lower = filename.lower()
+        if lower.endswith(".png"):
+            return "image/png"
+        elif lower.endswith(".gif"):
+            return "image/gif"
+        elif lower.endswith(".webp"):
+            return "image/webp"
+        elif lower.endswith(".svg"):
+            return "image/svg+xml"
+        else:
+            # Default: JPEG (más común para fotos de VLANs)
+            return "image/jpeg"
+
+    # =========================================================================
+    # RECONSTRUCCIÓN DE URLs DE IMÁGENES
+    # =========================================================================
+
+    def _rebuild_image_urls(self, db: Session) -> None:
+        """
+        Reconstruye location_image_url en VLANs usando bucket/región actuales.
+
+        Busca VLANs donde location_image_url es un path relativo
+        (empieza con "vlan-images/") y reconstruye la URL absoluta
+        con el bucket y región configurados.
+
+        Formato resultante:
+            https://{S3_DOCS_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{relative_path}
+        """
+        vlans = (
+            db.query(VLAN)
+            .filter(VLAN.location_image_url.isnot(None))
+            .filter(VLAN.location_image_url != "")
+            .all()
+        )
+
+        updated_count = 0
+        for vlan in vlans:
+            relative_path = vlan.location_image_url
+            # Solo reconstruir si parece un path relativo
+            if relative_path and (
+                relative_path.startswith("vlan-images/")
+                or not relative_path.startswith("http")
+            ):
+                new_url = (
+                    f"https://{self._docs_bucket}.s3.{settings.AWS_REGION}"
+                    f".amazonaws.com/{relative_path}"
+                )
+                vlan.location_image_url = new_url
+                updated_count += 1
+
+        logger.info("URLs de imágenes reconstruidas: %d VLANs", updated_count)
+
+    # =========================================================================
+    # VERIFICACIÓN DE INTEGRIDAD
+    # =========================================================================
+
+    def _verify_integrity(
+        self, db: Session, manifest: dict, restored_counts: dict[str, int]
+    ) -> None:
+        """
+        Verifica que los conteos restaurados coincidan con el manifest.
+
+        Compara la cantidad de registros insertados vs lo esperado en el manifest.
+        Si hay discrepancias significativas, las registra como warning.
+        """
+        tables_info = manifest.get("tables", {})
+        discrepancies: list[str] = []
+
+        for table_name, info in tables_info.items():
+            expected = info.get("count", 0)
+            actual = restored_counts.get(table_name, 0)
+
+            if actual != expected:
+                discrepancies.append(
+                    f"{table_name}: esperado={expected}, restaurado={actual}"
+                )
+
+        if discrepancies:
+            details = "; ".join(discrepancies)
+            logger.warning(
+                "Discrepancias en verificación de integridad: %s", details
+            )
+            # No abortar por discrepancias menores — solo logear
+            # (puede haber tablas nuevas no presentes en backup antiguo)
+        else:
+            logger.info("Verificación de integridad OK: todos los conteos coinciden")
+
+        # Verificación adicional: contar registros reales en BD
+        total_expected = manifest.get("total_records", 0)
+        total_restored = sum(restored_counts.values())
+
+        if total_restored < total_expected * 0.9:
+            # Si se restauró menos del 90%, algo salió mal
+            raise ValueError(
+                f"Verificación de integridad falló: se esperaban {total_expected} "
+                f"registros pero solo se restauraron {total_restored} "
+                f"({total_restored * 100 // max(total_expected, 1)}%)"
+            )
+
+    # =========================================================================
+    # STATUS EN S3
+    # =========================================================================
+
+    def _update_restore_status(
+        self,
+        status: str,
+        stage: Optional[str] = None,
+        progress: Optional[int] = None,
+        error: Optional[str] = None,
+        extra: Optional[dict] = None,
+    ) -> None:
+        """
+        Escribe backups/restore_status.json en S3 con el estado actual del restore.
+
+        El archivo persiste en S3 para sobrevivir reinicios del contenedor
+        y ser consultado por el frontend sin autenticación.
+        """
+        status_data: dict[str, Any] = {
+            "status": status,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        if stage is not None:
+            status_data["stage"] = stage
+        if progress is not None:
+            status_data["progress"] = progress
+        if error is not None:
+            status_data["error"] = error
+        if extra:
+            status_data.update(extra)
+
+        try:
+            self._s3.put_object(
+                Bucket=self._artifacts_bucket,
+                Key="backups/restore_status.json",
+                Body=json.dumps(status_data, ensure_ascii=False).encode("utf-8"),
+                ContentType="application/json",
+            )
+        except Exception as e:
+            # Si no podemos actualizar el status, logear pero no abortar el restore
+            logger.error("Error actualizando restore_status en S3: %s", str(e))
+
+    # =========================================================================
+    # LIMPIEZA
+    # =========================================================================
+
+    def _cleanup_restore_uploads(self) -> None:
+        """
+        Elimina archivos temporales de restore-upload/ en S3.
+
+        Se ejecuta después de un restore exitoso para liberar espacio.
+        """
+        try:
+            response = self._s3.list_objects_v2(
+                Bucket=self._artifacts_bucket,
+                Prefix="backups/restore-upload/",
+            )
+
+            objects = response.get("Contents", [])
+            if objects:
+                delete_keys = [{"Key": obj["Key"]} for obj in objects]
+                self._s3.delete_objects(
+                    Bucket=self._artifacts_bucket,
+                    Delete={"Objects": delete_keys},
+                )
+                logger.info(
+                    "Archivos temporales de restore eliminados: %d", len(delete_keys)
+                )
+
+        except Exception as e:
+            # No abortar si falla la limpieza
+            logger.warning("Error limpiando archivos de restore-upload: %s", str(e))

@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTranslations } from 'next-intl';
 import { SyncInventorySection } from '@/components/config/SyncInventorySection';
 import { SslCertificateSection } from '@/components/config/SslCertificateSection';
+import { BackupSection } from '@/components/admin/BackupSection';
 
 export default function ConfigPage() {
   const { isAdmin } = useAuth();
@@ -32,6 +33,9 @@ export default function ConfigPage() {
 
       {/* Sincronización de Inventario */}
       <SyncInventorySection />
+
+      {/* Backup & Restore */}
+      <BackupSection />
     </div>
   );
 }
