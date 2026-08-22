@@ -489,15 +489,25 @@ class RestoreService:
             self._clean_database_postgresql(db)
 
     def _clean_database_postgresql(self, db: Session) -> None:
-        """Limpia BD PostgreSQL con TRUNCATE CASCADE."""
-        table_names = [name for name in TABLE_ORDER if name != "profile_knowledge_articles"]
-        # Incluir tabla de asociación
-        table_names.append("profile_knowledge_articles")
+        """Limpia BD PostgreSQL con pg_terminate_backend + TRUNCATE CASCADE."""
+        import time
 
-        # TRUNCATE todas las tablas de una vez (más eficiente y maneja FK)
-        tables_str = ", ".join(table_names)
+        # Terminar todas las conexiones excepto la actual para evitar bloqueo de locks
+        # (WebSocket connections, healthchecks, pool connections mantienen locks que
+        # bloquean TRUNCATE indefinidamente)
+        db.execute(text(
+            "SELECT pg_terminate_backend(pid) "
+            "FROM pg_stat_activity "
+            "WHERE datname = current_database() AND pid != pg_backend_pid()"
+        ))
+        db.commit()
+        # Pausa para que PostgreSQL limpie las conexiones terminadas
+        time.sleep(0.5)
+
+        # TRUNCATE todas las tablas de una vez (instantáneo sin importar volumen)
+        tables_str = ", ".join(TABLE_ORDER)
         db.execute(text(f"TRUNCATE TABLE {tables_str} CASCADE"))
-        logger.info("TRUNCATE CASCADE ejecutado en %d tablas", len(table_names))
+        logger.info("TRUNCATE CASCADE ejecutado en %d tablas", len(TABLE_ORDER))
 
     def _clean_database_sqlite(self, db: Session) -> None:
         """Limpia BD SQLite eliminando datos en orden inverso de FK."""
