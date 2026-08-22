@@ -1806,6 +1806,16 @@
     "restoreDoNotClose": "No cierre esta ventana durante la restauración",
     "selectFile": "Seleccionar archivo",
     "noFileSelected": "Ningún archivo seleccionado",
-    "uploadError": "Error subiendo archivos. Intente nuevamente."
+    "uploadError": "Error subiendo archivos. Intente nuevamente.",
+    "factoryResetBtn": "Resetear Sistema",
+    "factoryResetConfirmTitle": "⚠️ FACTORY RESET",
+    "factoryResetConfirmMessage": "Se eliminarán TODOS los datos del sistema (BD + S3). Esta acción es IRREVERSIBLE. ¿Está seguro?",
+    "factoryResetConfirmType": "Escriba RESET para confirmar:",
+    "factoryResetSuccess": "Sistema reseteado. Redirigiendo a setup...",
+    "factoryResetError": "Error durante el factory reset",
+    "factoryResetBackupAvailable": "Hay un backup disponible. Descárgalo antes de continuar:",
+    "factoryResetNoBackup": "⚠️ No hay backup disponible. Se recomienda generar uno antes de resetear el sistema.",
+    "factoryResetCheckboxWithBackup": "Ya descargué los archivos de backup",
+    "factoryResetCheckboxNoBackup": "Entiendo que no hay backup y deseo continuar sin él"
   }
 }

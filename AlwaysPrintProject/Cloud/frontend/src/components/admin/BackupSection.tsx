@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import { Database, Download, Trash2, RefreshCw, Loader2, CheckCircle2, XCircle, Lock } from 'lucide-react'
+import { Database, Download, Trash2, RefreshCw, Loader2, CheckCircle2, XCircle, Lock, AlertTriangle } from 'lucide-react'
 
 import { useAuth } from '@/hooks/useAuth'
 import { backupApi, BackupStatusResponse } from '@/lib/api'
@@ -38,6 +38,8 @@ export function BackupSection() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
+  const [factoryResetLoading, setFactoryResetLoading] = useState(false)
+  const [resetAcknowledged, setResetAcknowledged] = useState(false)
 
   // Control de acceso: solo Corporate Admin de dominios autorizados
   const userEmail = user?.email?.toLowerCase() ?? ''
@@ -70,6 +72,11 @@ export function BackupSection() {
     const interval = setInterval(fetchStatus, POLL_INTERVAL)
     return () => clearInterval(interval)
   }, [isAdmin, isAllowedDomain, status.status, fetchStatus])
+
+  // Resetear checkbox cuando cambia el status del backup
+  useEffect(() => {
+    setResetAcknowledged(false)
+  }, [status.status])
 
   // Generar backup
   const handleGenerate = async () => {
@@ -105,6 +112,23 @@ export function BackupSection() {
     } catch {
       // Error silencioso
     }
+  }
+
+  // Factory reset — fire-and-forget, redirect inmediato
+  const handleFactoryReset = async () => {
+    const confirmText = prompt(t('factoryResetConfirmTitle') + '\n\n' + t('factoryResetConfirmMessage') + '\n\n' + t('factoryResetConfirmType'))
+    if (confirmText !== 'RESET') return
+
+    setFactoryResetLoading(true)
+    try {
+      await backupApi.factoryReset()
+    } catch {
+      // Ignorar errores — el reset ya se disparó o el token ya es inválido
+    }
+    // Limpiar localStorage y redirigir inmediatamente a setup
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('user')
+    window.location.href = '/setup'
   }
 
   // No mostrar si no es Corporate Admin con dominio autorizado
@@ -271,6 +295,76 @@ export function BackupSection() {
           </button>
         </div>
       )}
+
+      {/* Factory Reset — siempre visible para Corporate Admin */}
+      <div className="mt-6 pt-4 border-t border-red-200 dark:border-red-800">
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle className="w-4 h-4 text-red-600" />
+          <span className="text-sm font-semibold text-red-700 dark:text-red-400">{t('factoryResetConfirmTitle')}</span>
+        </div>
+
+        {/* Caso: Backup disponible → ofrecer descarga */}
+        {status.status === 'completed' && (
+          <div className="mb-3 space-y-2">
+            <p className="text-xs text-gray-600 dark:text-gray-400">{t('factoryResetBackupAvailable')}</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => handleDownload('db')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-md text-xs font-medium transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                {t('downloadDb')} ({formatBytes(status.db_zip_size || 0)})
+              </button>
+              <button
+                onClick={() => handleDownload('images')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-md text-xs font-medium transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                {t('downloadImages')} ({formatBytes(status.images_zip_size || 0)})
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Caso: No hay backup → advertencia */}
+        {status.status !== 'completed' && status.status !== 'generating' && (
+          <div className="mb-3">
+            <p className="text-xs text-amber-700 dark:text-amber-400">{t('factoryResetNoBackup')}</p>
+          </div>
+        )}
+
+        {/* Checkbox de confirmación */}
+        {status.status !== 'generating' && (
+          <label className="flex items-start gap-2 mb-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={resetAcknowledged}
+              onChange={(e) => setResetAcknowledged(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+            />
+            <span className="text-xs text-gray-700 dark:text-gray-300">
+              {status.status === 'completed'
+                ? t('factoryResetCheckboxWithBackup')
+                : t('factoryResetCheckboxNoBackup')
+              }
+            </span>
+          </label>
+        )}
+
+        {/* Botón de Factory Reset */}
+        <button
+          onClick={handleFactoryReset}
+          disabled={!resetAcknowledged || factoryResetLoading || status.status === 'generating'}
+          className="flex items-center gap-2 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {factoryResetLoading ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <AlertTriangle className="w-3.5 h-3.5" />
+          )}
+          {t('factoryResetBtn')}
+        </button>
+      </div>
     </div>
   )
 }

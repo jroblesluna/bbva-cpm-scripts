@@ -321,3 +321,113 @@ async def delete_backup(
     logger.info("Backup eliminado por %s", current_user.email)
 
     return {"message": "Backup eliminado exitosamente", "status": "idle"}
+
+
+@router.post(
+    "/factory-reset",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Resetear sistema a estado inicial (factory reset)",
+)
+async def factory_reset(
+    current_user: User = Depends(require_corporate_admin),
+):
+    """
+    Resetea el sistema completo a estado de fábrica (fire-and-forget).
+
+    Retorna 202 inmediatamente y ejecuta la limpieza en background.
+    El frontend redirige a /setup inmediatamente tras recibir 202.
+
+    Operaciones (en background):
+    1. Termina conexiones PostgreSQL + TRUNCATE CASCADE instantáneo (mantiene alembic_version)
+    2. Limpia TODOS los objetos del bucket S3_DOCS_BUCKET (imágenes de VLANs, etc.)
+    3. Limpia archivos de backup del bucket S3_ARTIFACTS_BUCKET
+
+    ADVERTENCIA: Esta operación es IRREVERSIBLE.
+    """
+    logger.warning("FACTORY RESET solicitado por %s — lanzando en background", current_user.email)
+
+    async def _run_factory_reset():
+        """Ejecuta el factory reset en background."""
+        import time
+        from sqlalchemy import text
+        from app.core.database import SessionLocal
+        from app.services.restore_service import TABLE_ORDER
+
+        # 1. Limpiar todas las tablas (mantener alembic_version)
+        # PostgreSQL: pg_terminate_backend + TRUNCATE (instantáneo sin importar volumen)
+        # SQLite: DELETE en orden inverso de FK
+        db = SessionLocal()
+        try:
+            if settings.is_sqlite:
+                db.execute(text("PRAGMA foreign_keys=OFF"))
+                for table_name in reversed(TABLE_ORDER):
+                    db.execute(text(f"DELETE FROM {table_name}"))
+                db.execute(text("PRAGMA foreign_keys=ON"))
+            else:
+                # Terminar todas las conexiones excepto la actual para liberar locks
+                db.execute(text(
+                    "SELECT pg_terminate_backend(pid) "
+                    "FROM pg_stat_activity "
+                    "WHERE datname = current_database() AND pid != pg_backend_pid()"
+                ))
+                db.commit()
+                # Pausa para que PostgreSQL limpie las conexiones terminadas
+                time.sleep(0.5)
+                # TRUNCATE instantáneo — funciona sin bloqueo ahora
+                tables_str = ", ".join(TABLE_ORDER)
+                db.execute(text(f"TRUNCATE TABLE {tables_str} CASCADE"))
+            db.commit()
+            logger.info("FACTORY RESET: BD limpiada (%d tablas)", len(TABLE_ORDER))
+        except Exception as e:
+            db.rollback()
+            logger.error("FACTORY RESET: Error limpiando BD: %s", str(e))
+            return
+        finally:
+            db.close()
+
+        # 2. Limpiar bucket de docs (imágenes de VLANs, etc.)
+        s3 = _get_s3_client()
+        docs_deleted = 0
+        try:
+            paginator = s3.get_paginator("list_objects_v2")
+            for page in paginator.paginate(Bucket=settings.S3_DOCS_BUCKET):
+                objects = page.get("Contents", [])
+                if objects:
+                    delete_keys = [{"Key": obj["Key"]} for obj in objects]
+                    s3.delete_objects(
+                        Bucket=settings.S3_DOCS_BUCKET,
+                        Delete={"Objects": delete_keys},
+                    )
+                    docs_deleted += len(delete_keys)
+            logger.info("FACTORY RESET: S3 docs limpiado (%d objetos)", docs_deleted)
+        except Exception as e:
+            logger.warning("FACTORY RESET: Error parcial limpiando S3 docs: %s", str(e))
+
+        # 3. Limpiar archivos de backup del bucket de artifacts
+        artifacts_deleted = 0
+        try:
+            paginator = s3.get_paginator("list_objects_v2")
+            for page in paginator.paginate(Bucket=settings.S3_ARTIFACTS_BUCKET, Prefix="backups/"):
+                objects = page.get("Contents", [])
+                if objects:
+                    delete_keys = [{"Key": obj["Key"]} for obj in objects]
+                    s3.delete_objects(
+                        Bucket=settings.S3_ARTIFACTS_BUCKET,
+                        Delete={"Objects": delete_keys},
+                    )
+                    artifacts_deleted += len(delete_keys)
+            logger.info("FACTORY RESET: S3 artifacts limpiado (%d objetos)", artifacts_deleted)
+        except Exception as e:
+            logger.warning("FACTORY RESET: Error parcial limpiando S3 artifacts: %s", str(e))
+
+        logger.warning(
+            "FACTORY RESET completado: %d tablas, %d docs, %d artifacts eliminados",
+            len(TABLE_ORDER), docs_deleted, artifacts_deleted,
+        )
+
+    # Lanzar como task en background — retornar 202 inmediatamente
+    asyncio.create_task(_run_factory_reset())
+
+    return {
+        "message": "Factory reset iniciado. El sistema se limpiará en segundos.",
+    }

@@ -1806,6 +1806,16 @@
     "restoreDoNotClose": "Do not close this window during restoration",
     "selectFile": "Select file",
     "noFileSelected": "No file selected",
-    "uploadError": "Error uploading files. Please try again."
+    "uploadError": "Error uploading files. Please try again.",
+    "factoryResetBtn": "Factory Reset",
+    "factoryResetConfirmTitle": "⚠️ FACTORY RESET",
+    "factoryResetConfirmMessage": "ALL system data (DB + S3) will be permanently deleted. This action is IRREVERSIBLE. Are you sure?",
+    "factoryResetConfirmType": "Type RESET to confirm:",
+    "factoryResetSuccess": "System reset. Redirecting to setup...",
+    "factoryResetError": "Error during factory reset",
+    "factoryResetBackupAvailable": "A backup is available. Download it before proceeding:",
+    "factoryResetNoBackup": "⚠️ No backup available. It is recommended to generate one before resetting the system.",
+    "factoryResetCheckboxWithBackup": "I have already downloaded the backup files",
+    "factoryResetCheckboxNoBackup": "I understand there is no backup and wish to proceed without one"
   }
 }

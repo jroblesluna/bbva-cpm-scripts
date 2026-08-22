@@ -1302,6 +1302,16 @@ export const backupApi = {
     )
     return response.data
   },
+
+  /**
+   * Factory reset: limpiar BD + S3 completamente (fire-and-forget).
+   */
+  factoryReset: async (): Promise<{ message: string }> => {
+    const response = await apiClient.post<{ message: string }>(
+      '/admin/backup/factory-reset'
+    )
+    return response.data
+  },
 }
 
 export const restoreApi = {
