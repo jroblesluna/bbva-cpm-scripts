@@ -1772,7 +1772,7 @@ function WorkstationTable({
 
   const SortHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
     <th
-      className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap"
+      className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap"
       onClick={() => onSort(field)}
     >
       <div className="flex items-center gap-1">
@@ -1791,11 +1791,11 @@ function WorkstationTable({
     <Card>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs">
             <thead className="bg-gray-50 border-b">
               <tr>
                 {selectionMode && (
-                  <th className="px-3 py-3 w-8">
+                  <th className="px-2 py-2 w-8">
                     <input
                       type="checkbox"
                       checked={isAllSelected}
@@ -1812,7 +1812,7 @@ function WorkstationTable({
                 <SortHeader field="tray_version">Versión</SortHeader>
                 <SortHeader field="action_config">Config</SortHeader>
                 <SortHeader field="last_connection">Última Conexión</SortHeader>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Acciones
                 </th>
               </tr>
@@ -1821,7 +1821,7 @@ function WorkstationTable({
               {workstations.map((ws) => (
                 <tr key={ws.id} className={`hover:bg-gray-50 transition-colors ${selectionMode && selectedIds.has(ws.id) ? 'bg-blue-50' : ''}`}>
                   {selectionMode && (
-                    <td className="px-3 py-3 w-8">
+                    <td className="px-2 py-1.5 w-8">
                       <input
                         type="checkbox"
                         checked={selectedIds.has(ws.id)}
@@ -1831,7 +1831,7 @@ function WorkstationTable({
                     </td>
                   )}
                   {/* Estado */}
-                  <td className="px-3 py-3 whitespace-nowrap">
+                  <td className="px-2 py-1.5 whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
                       <span
                         className={`w-2.5 h-2.5 rounded-full shrink-0 ${ws.is_online ? 'bg-green-500' : 'bg-gray-400'}`}
@@ -1868,39 +1868,39 @@ function WorkstationTable({
                     </div>
                   </td>
                   {/* IP */}
-                  <td className="px-3 py-3 whitespace-nowrap font-mono font-medium text-gray-900">
+                  <td className="px-2 py-1.5 whitespace-nowrap font-mono font-medium text-gray-900">
                     {ws.ip_private}
                   </td>
                   {/* Hostname */}
-                  <td className="px-3 py-3 whitespace-nowrap text-gray-700">
+                  <td className="px-2 py-1.5 whitespace-nowrap text-gray-700">
                     {ws.hostname ?? '—'}
                   </td>
                   {/* Usuario */}
-                  <td className="px-3 py-3 whitespace-nowrap text-gray-700">
+                  <td className="px-2 py-1.5 whitespace-nowrap text-gray-700">
                     {ws.current_user ?? '—'}
                   </td>
                   {/* Organización */}
-                  <td className="px-3 py-3 whitespace-nowrap text-gray-700">
+                  <td className="px-2 py-1.5 whitespace-nowrap text-gray-700">
                     {ws.organization?.name ?? '—'}
                   </td>
                   {/* Versión */}
-                  <td className="px-3 py-3 whitespace-nowrap font-mono text-xs text-gray-600">
+                  <td className="px-2 py-1.5 whitespace-nowrap font-mono text-xs text-gray-600">
                     {ws.tray_version ? `v${ws.tray_version}` : '—'}
                   </td>
                   {/* Config */}
-                  <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-600">
+                  <td className="px-2 py-1.5 whitespace-nowrap text-xs text-gray-600">
                     {ws.action_config_name
                       ? `${ws.action_config_name} v${ws.action_config_version ?? '?'}`
                       : '—'}
                   </td>
                   {/* Última Conexión */}
-                  <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-500">
+                  <td className="px-2 py-1.5 whitespace-nowrap text-xs text-gray-500">
                     {ws.last_connection
                       ? formatDateWithTimezone(ws.last_connection, userTimezone)
                       : '—'}
                   </td>
                   {/* Acciones */}
-                  <td className="px-3 py-3 whitespace-nowrap">
+                  <td className="px-2 py-1.5 whitespace-nowrap">
                     <div className="flex items-center gap-1">
                       <Button
                         variant="ghost"
