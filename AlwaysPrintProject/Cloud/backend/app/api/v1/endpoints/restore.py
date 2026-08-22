@@ -14,6 +14,7 @@ Funcionalidad:
 import asyncio
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Literal, Optional
 
 import boto3
@@ -100,9 +101,16 @@ def _get_s3_client():
     return session.client("s3")
 
 
+# Timeout en minutos para considerar un restore como zombie/failed
+RESTORE_TIMEOUT_MINUTES = 5
+
+
 def _read_restore_status() -> dict:
     """
     Lee backups/restore_status.json desde S3.
+
+    Si el status es "restoring" pero updated_at tiene más de RESTORE_TIMEOUT_MINUTES
+    sin actualización, se considera "failed" automáticamente (zombie detection).
 
     Retorna el contenido del archivo JSON, o un dict con status "idle"
     si el archivo no existe.
@@ -113,7 +121,29 @@ def _read_restore_status() -> dict:
             Bucket=settings.S3_ARTIFACTS_BUCKET,
             Key="backups/restore_status.json",
         )
-        return json.loads(response["Body"].read().decode("utf-8"))
+        status_data = json.loads(response["Body"].read().decode("utf-8"))
+
+        # Zombie detection: si está "restoring" pero no se actualizó en los últimos N minutos
+        if status_data.get("status") == "restoring":
+            updated_at_str = status_data.get("updated_at")
+            if updated_at_str:
+                try:
+                    updated_at = datetime.fromisoformat(updated_at_str)
+                    now = datetime.now(timezone.utc)
+                    elapsed_minutes = (now - updated_at).total_seconds() / 60
+                    if elapsed_minutes > RESTORE_TIMEOUT_MINUTES:
+                        logger.warning(
+                            "Restore zombie detectado: último update hace %.1f minutos (timeout=%d)",
+                            elapsed_minutes, RESTORE_TIMEOUT_MINUTES,
+                        )
+                        return {
+                            "status": "failed",
+                            "error": f"Timeout — la restauración no respondió en {RESTORE_TIMEOUT_MINUTES} minutos",
+                        }
+                except (ValueError, TypeError):
+                    pass  # Si no se puede parsear, no aplicar timeout
+
+        return status_data
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "")
         if error_code in ("NoSuchKey", "404"):

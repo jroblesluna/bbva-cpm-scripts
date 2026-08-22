@@ -29,13 +29,18 @@ router = APIRouter()
 
 # === HELPERS ===
 
+# Timeout en minutos para considerar un restore como zombie/failed
+RESTORE_TIMEOUT_MINUTES = 5
+
+
 def _read_restore_status() -> dict:
     """
     Lee backups/restore_status.json desde S3.
 
-    Retorna el contenido del archivo JSON, o un dict con status "idle"
-    si el archivo no existe o hay un error de lectura.
+    Si el status es "restoring" pero updated_at tiene más de RESTORE_TIMEOUT_MINUTES
+    sin actualización, se considera "failed" (zombie detection).
     """
+    from datetime import datetime, timezone
     try:
         session = boto3.Session(
             region_name=settings.AWS_REGION,
@@ -46,7 +51,26 @@ def _read_restore_status() -> dict:
             Bucket=settings.S3_ARTIFACTS_BUCKET,
             Key="backups/restore_status.json",
         )
-        return json.loads(response["Body"].read().decode("utf-8"))
+        status_data = json.loads(response["Body"].read().decode("utf-8"))
+
+        # Zombie detection
+        if status_data.get("status") == "restoring":
+            updated_at_str = status_data.get("updated_at")
+            if updated_at_str:
+                try:
+                    updated_at = datetime.fromisoformat(updated_at_str)
+                    now = datetime.now(timezone.utc)
+                    elapsed_minutes = (now - updated_at).total_seconds() / 60
+                    if elapsed_minutes > RESTORE_TIMEOUT_MINUTES:
+                        logger.warning(
+                            "Restore zombie detectado en setup: último update hace %.1f minutos",
+                            elapsed_minutes,
+                        )
+                        return {"status": "failed"}
+                except (ValueError, TypeError):
+                    pass
+
+        return status_data
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "")
         if error_code in ("NoSuchKey", "404"):
