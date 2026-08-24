@@ -6,8 +6,27 @@
  */
 
 /**
+ * Parsea una fecha del backend, asumiendo UTC si el string no trae 'Z' ni offset.
+ * Necesario porque el backend devuelve fechas naive (sin 'Z') que representan UTC;
+ * sin esto, `new Date(str)` las interpreta como hora local del navegador.
+ */
+export function parseBackendDate(date: string | Date): Date {
+  if (typeof date !== 'string') return date
+
+  if (!date.endsWith('Z') && !date.includes('+') && !date.includes('T')) {
+    // Formato: "2026-05-09 22:22:42" -> agregar T y Z
+    return new Date(date.replace(' ', 'T') + 'Z')
+  }
+  if (!date.endsWith('Z') && date.includes('T') && !date.includes('+')) {
+    // Formato: "2026-05-09T22:22:42" -> agregar Z
+    return new Date(date + 'Z')
+  }
+  return new Date(date)
+}
+
+/**
  * Formatea una fecha en formato yyyy-MM-dd HH:mm:ss con timezone.
- * 
+ *
  * @param date - Fecha a formatear (string ISO o Date)
  * @param timezone - Zona horaria (ej: "America/Lima", "UTC")
  * @returns Fecha formateada con timezone (ej: "2026-05-09 18:30:45 UTC-5")
@@ -17,25 +36,9 @@ export function formatDateWithTimezone(
   timezone: string = 'UTC'
 ): string {
   if (!date) return 'N/A'
-  
-  let dateObj: Date
-  
-  if (typeof date === 'string') {
-    // Si la fecha es string y no tiene 'Z' al final, agregarla para indicar UTC
-    // Esto es necesario porque el backend devuelve fechas sin 'Z'
-    if (!date.endsWith('Z') && !date.includes('+') && !date.includes('T')) {
-      // Formato: "2026-05-09 22:22:42" -> agregar T y Z
-      dateObj = new Date(date.replace(' ', 'T') + 'Z')
-    } else if (!date.endsWith('Z') && date.includes('T') && !date.includes('+')) {
-      // Formato: "2026-05-09T22:22:42" -> agregar Z
-      dateObj = new Date(date + 'Z')
-    } else {
-      dateObj = new Date(date)
-    }
-  } else {
-    dateObj = date
-  }
-  
+
+  const dateObj = parseBackendDate(date)
+
   // Verificar si la fecha es válida
   if (isNaN(dateObj.getTime())) return 'Fecha inválida'
   
@@ -175,6 +178,46 @@ export function formatTime(
   } catch (error) {
     console.error('Error al formatear hora:', error)
     return dateObj.toTimeString().split(' ')[0]
+  }
+}
+
+/**
+ * Formatea fecha+hora corta en formato dd/MM HH:mm con timezone (ej. para ejes de gráficos).
+ *
+ * @param date - Fecha a formatear
+ * @param timezone - Zona horaria
+ * @returns Fecha formateada (ej: "24/08 17:30")
+ */
+export function formatDateTimeShort(
+  date: string | Date | null | undefined,
+  timezone: string = 'UTC'
+): string {
+  if (!date) return 'N/A'
+
+  const dateObj = parseBackendDate(date)
+
+  if (isNaN(dateObj.getTime())) return 'Fecha inválida'
+
+  try {
+    const formatter = new Intl.DateTimeFormat('es-PE', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: timezone,
+    })
+
+    const parts = formatter.formatToParts(dateObj)
+    const month = parts.find(p => p.type === 'month')?.value
+    const day = parts.find(p => p.type === 'day')?.value
+    const hour = parts.find(p => p.type === 'hour')?.value
+    const minute = parts.find(p => p.type === 'minute')?.value
+
+    return `${day}/${month} ${hour}:${minute}`
+  } catch (error) {
+    console.error('Error al formatear fecha:', error)
+    return dateObj.toISOString()
   }
 }
 

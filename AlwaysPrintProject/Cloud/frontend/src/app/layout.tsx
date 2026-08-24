@@ -5,6 +5,7 @@ import { QueryProvider } from '@/components/providers/query-provider'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { IntlProvider } from '@/components/providers/IntlProvider'
 import { Toaster } from '@/components/ui/toaster'
+import { HelpButton } from '@/components/help/HelpButton'
 
 // Inter variable font cargada localmente — evita dependencia de Google Fonts en build time
 const inter = localFont({
@@ -35,6 +36,7 @@ export default function RootLayout({
             <IntlProvider>
               {children}
               <Toaster />
+              <HelpButton />
             </IntlProvider>
           </AuthProvider>
         </QueryProvider>

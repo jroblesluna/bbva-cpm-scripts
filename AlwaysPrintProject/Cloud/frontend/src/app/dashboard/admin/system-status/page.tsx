@@ -14,6 +14,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
+import { formatDateWithTimezone } from '@/lib/dateUtils';
 import { useTranslations } from 'next-intl';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -181,6 +183,7 @@ export default function SystemStatusPage() {
   const { toast } = useToast();
   const router = useRouter();
   const { isAdmin, isLoading: authLoading, isAuthenticated } = useAuth();
+  const timezone = useUserTimezone();
 
   const [snapshot, setSnapshot] = useState<StatusSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -286,18 +289,6 @@ export default function SystemStatusPage() {
     } finally {
       setCollecting(false);
     }
-  };
-
-  // Formatear timestamp en zona horaria del usuario
-  const formatTimestamp = (timestamp: string): string => {
-    return new Date(timestamp).toLocaleString(undefined, {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
   };
 
   // Obtener badge de estado del contenedor
@@ -419,7 +410,7 @@ export default function SystemStatusPage() {
 
       {/* Última recolección */}
       <p className="text-sm text-muted-foreground">
-        {t('lastCollection', { time: formatTimestamp(snapshot.timestamp) })}
+        {t('lastCollection', { time: formatDateWithTimezone(snapshot.timestamp, timezone) })}
       </p>
 
       {/* Tabs */}

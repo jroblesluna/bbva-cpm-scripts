@@ -12,6 +12,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
+import { useUserTimezone } from '@/hooks/useUserTimezone'
+import { formatDateTimeShort } from '@/lib/dateUtils'
 import {
   LineChart,
   Line,
@@ -106,6 +108,7 @@ interface MetricChartData {
 
 export default function HistoryTab() {
   const t = useTranslations('systemStatus')
+  const timezone = useUserTimezone()
 
   const [selectedRange, setSelectedRange] = useState<RangeOption>(30)
   const [metricsData, setMetricsData] = useState<Record<string, MetricChartData>>({})
@@ -142,7 +145,7 @@ export default function HistoryTab() {
           (point: HistoryDataPoint) => ({
             timestamp: point.timestamp,
             value: point.value,
-            formattedTime: formatTimestamp(point.timestamp),
+            formattedTime: formatDateTimeShort(point.timestamp, timezone),
             aboveThreshold: point.value > threshold,
           })
         )
@@ -162,7 +165,7 @@ export default function HistoryTab() {
     } finally {
       setLoading(false)
     }
-  }, [selectedRange, t])
+  }, [selectedRange, t, timezone])
 
   useEffect(() => {
     fetchData()
@@ -551,14 +554,3 @@ function UptimeBadge({ percent }: { percent: number }) {
   )
 }
 
-// === UTILIDADES ===
-
-/** Formatea un timestamp ISO a formato legible corto */
-function formatTimestamp(isoString: string): string {
-  const date = new Date(isoString)
-  const month = (date.getMonth() + 1).toString().padStart(2, '0')
-  const day = date.getDate().toString().padStart(2, '0')
-  const hours = date.getHours().toString().padStart(2, '0')
-  const minutes = date.getMinutes().toString().padStart(2, '0')
-  return `${day}/${month} ${hours}:${minutes}`
-}
