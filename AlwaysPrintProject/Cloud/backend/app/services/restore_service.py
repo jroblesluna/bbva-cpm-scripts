@@ -147,9 +147,14 @@ class RestoreService:
     # MÉTODO PRINCIPAL
     # =========================================================================
 
-    async def restore(self, password: Optional[str] = None) -> None:
+    def restore(self, password: Optional[str] = None) -> None:
         """
-        Ejecuta restauración completa de forma asíncrona.
+        Ejecuta la restauración completa.
+
+        Sin código async real adentro (SQLAlchemy y boto3 son síncronos) — el
+        endpoint la lanza en un thread aparte (loop.run_in_executor) en vez de
+        asyncio.create_task, para no bloquear el event loop del servidor entero
+        mientras dura (puede ser minutos con backups grandes).
 
         Etapas:
         1. Descarga ZIPs desde S3 (restore-upload/)
@@ -166,6 +171,10 @@ class RestoreService:
         """
         cleaning_done = False
 
+        logger.info("#" * 60)
+        logger.info("#### INICIO RESTORE ####")
+        logger.info("#" * 60)
+
         try:
             logger.info("Iniciando proceso de restauración...")
             self._update_restore_status("restoring", "Descargando archivos", 0)
@@ -179,25 +188,39 @@ class RestoreService:
             if images_zip_bytes is None:
                 raise ValueError("No se encontró images.zip en S3 (backups/restore-upload/images.zip)")
 
+            logger.info(
+                "ZIPs descargados: db.zip=%d bytes, images.zip=%d bytes",
+                len(db_zip_bytes), len(images_zip_bytes),
+            )
+
             # --- Etapa 1: Validar ZIPs ---
+            logger.info("[1/6] Validando archivos (password, estructura, integridad)...")
             self._update_restore_status(
                 "restoring", self.STAGES[0][1], self.STAGES[0][2]
             )
 
-            # Validar estructura del DB_ZIP
-            expected_db_files = ["manifest.json"] + [f"{name}.json" for name in TABLE_ORDER]
-            self._validate_zip(db_zip_bytes, password, expected_db_files)
+            # Validar estructura del DB_ZIP — solo manifest.json es obligatorio.
+            # Los .json de cada tabla son opcionales: _extract_all_tables() ya trata
+            # una tabla ausente como vacía (con warning), así que no tiene sentido
+            # abortar el restore completo por, ej., un telemetry_logs.json faltante.
+            self._validate_zip(db_zip_bytes, password, ["manifest.json"])
 
-            # Extraer manifest para validaciones
+            # Extraer manifest y validar que tenga los campos esperados (version, tables, total_records)
             manifest = self._extract_manifest(db_zip_bytes, password)
+            self._validate_manifest_fields(manifest, "db")
 
             # Validar compatibilidad de Alembic revision
             self._validate_alembic_compatibility(manifest)
 
-            # Validar Images_ZIP (al menos manifest.json)
+            # Validar Images_ZIP (al menos manifest.json) y sus campos (version, files)
             self._validate_zip(images_zip_bytes, password, ["manifest.json"])
+            images_manifest = self._extract_images_manifest(images_zip_bytes, password)
+            self._validate_manifest_fields(images_manifest, "images")
+
+            logger.info("Validación OK: %d registros esperados según manifest", manifest.get("total_records", 0))
 
             # --- Etapa 2: Limpiar BD ---
+            logger.info("[2/6] Limpiando base de datos...")
             self._update_restore_status(
                 "restoring", self.STAGES[1][1], self.STAGES[1][2]
             )
@@ -209,47 +232,77 @@ class RestoreService:
                 cleaning_done = True
             finally:
                 db.close()
+            logger.info("Base de datos limpiada")
 
             # --- Etapa 3: Restaurar BD tabla por tabla ---
+            logger.info("[3/6] Restaurando base de datos tabla por tabla...")
             self._update_restore_status(
                 "restoring", self.STAGES[2][1], self.STAGES[2][2]
             )
 
-            table_data = self._extract_all_tables(db_zip_bytes, password)
+            table_data, missing_tables = self._extract_all_tables(db_zip_bytes, password)
             restored_counts: dict[str, int] = {}
+            tables_detail: list[dict[str, Any]] = []
 
             db = SessionLocal()
             try:
+                # Deshabilitar FK constraints durante la inserción: vlans.default_device_id
+                # → devices.id y devices.vlan_id → vlans.id son una dependencia circular
+                # imposible de resolver solo con el orden de TABLE_ORDER.
+                if not settings.is_sqlite:
+                    db.execute(text("SET session_replication_role = 'replica'"))
+
                 total_tables = len(TABLE_ORDER)
                 for idx, table_name in enumerate(TABLE_ORDER):
                     records = table_data.get(table_name, [])
                     count = self._restore_table(db, table_name, records)
                     restored_counts[table_name] = count
+                    tables_detail.append({"table": table_name, "count": count})
 
                     # Actualizar progreso proporcionalmente entre 15% y 70%
                     stage_progress = self.STAGES[2][2] + int(
                         (idx + 1) / total_tables * (self.STAGES[2][3] - self.STAGES[2][2])
                     )
+                    logger.info(
+                        "  (%d/%d) %s: %d registros [%d%%]",
+                        idx + 1, total_tables, table_name, count, stage_progress,
+                    )
                     self._update_restore_status(
                         "restoring",
                         f"Restaurando: {table_name} ({count} registros)",
                         stage_progress,
+                        extra={
+                            "tables_total": total_tables,
+                            "tables_done": idx + 1,
+                            "current_table": table_name,
+                            "tables_detail": tables_detail,
+                        },
                     )
 
+                # Re-habilitar FK constraints antes del commit final
+                if not settings.is_sqlite:
+                    db.execute(text("SET session_replication_role = 'origin'"))
                 db.commit()
             except Exception:
                 db.rollback()
                 raise
             finally:
                 db.close()
+            logger.info(
+                "Base de datos restaurada: %d tablas, %d registros",
+                len(restored_counts), sum(restored_counts.values()),
+            )
 
             # --- Etapa 4: Restaurar imágenes ---
+            logger.info("[4/6] Restaurando imágenes...")
             self._update_restore_status(
                 "restoring", self.STAGES[3][1], self.STAGES[3][2]
             )
             uploaded_images = self._upload_images_to_s3(images_zip_bytes, password)
+            logger.info("Imágenes restauradas: %d", uploaded_images)
 
             # --- Etapa 5: Reconstruir URLs ---
+            logger.info("[5/6] Reconstruyendo URLs de imágenes...")
             self._update_restore_status(
                 "restoring", self.STAGES[4][1], self.STAGES[4][2]
             )
@@ -265,15 +318,17 @@ class RestoreService:
                 db.close()
 
             # --- Etapa 6: Verificar integridad ---
+            logger.info("[6/6] Verificando integridad...")
             self._update_restore_status(
                 "restoring", self.STAGES[5][1], self.STAGES[5][2]
             )
 
             db = SessionLocal()
             try:
-                self._verify_integrity(db, manifest, restored_counts)
+                self._verify_integrity(db, manifest, restored_counts, missing_tables)
             finally:
                 db.close()
+            logger.info("Verificación de integridad OK")
 
             # --- Finalizar: Limpiar archivos temporales y actualizar status ---
             self._cleanup_restore_uploads()
@@ -298,6 +353,9 @@ class RestoreService:
                 sum(restored_counts.values()),
                 uploaded_images,
             )
+            logger.info("#" * 60)
+            logger.info("#### FIN RESTORE — OK ####")
+            logger.info("#" * 60)
 
         except Exception as e:
             logger.error("Error en restauración: %s", str(e), exc_info=True)
@@ -319,6 +377,9 @@ class RestoreService:
                     )
 
             self._update_restore_status("failed", stage=None, progress=None, error=str(e))
+            logger.info("#" * 60)
+            logger.info("#### FIN RESTORE — FAILED ####")
+            logger.info("#" * 60)
 
     # =========================================================================
     # DESCARGA DE ARCHIVOS DESDE S3
@@ -408,15 +469,68 @@ class RestoreService:
         Returns:
             Diccionario con el contenido del manifest.
         """
+        return self._read_manifest_json(db_zip_bytes, password, "db.zip")
+
+    def _extract_images_manifest(self, images_zip_bytes: bytes, password: Optional[str]) -> dict:
+        """
+        Extrae y parsea manifest.json del Images_ZIP.
+
+        Returns:
+            Diccionario con el contenido del manifest.
+        """
+        return self._read_manifest_json(images_zip_bytes, password, "images.zip")
+
+    def _read_manifest_json(
+        self, zip_bytes: bytes, password: Optional[str], filename: str
+    ) -> dict:
+        """Lee manifest.json de un ZIP y lo parsea, con mensaje de error claro si el JSON es inválido."""
         import io
 
-        buffer = io.BytesIO(db_zip_bytes)
+        buffer = io.BytesIO(zip_bytes)
         with pyzipper.AESZipFile(buffer, "r") as zf:
             if password:
                 zf.setpassword(password.encode("utf-8"))
             manifest_bytes = zf.read("manifest.json")
 
-        return json.loads(manifest_bytes.decode("utf-8"))
+        try:
+            return json.loads(manifest_bytes.decode("utf-8"))
+        except json.JSONDecodeError as e:
+            raise ValueError(f"{filename} inválido: manifest.json no es JSON válido ({e}).") from e
+
+    def _validate_manifest_fields(self, manifest: dict, kind: str) -> None:
+        """
+        Valida que el manifest tenga los campos requeridos con el tipo correcto.
+
+        Args:
+            manifest: Diccionario ya parseado del manifest.json.
+            kind: "db" o "images" — determina qué campos son obligatorios.
+
+        Raises:
+            ValueError: Con mensaje específico del campo faltante o inválido.
+        """
+        filename = "db.zip" if kind == "db" else "images.zip"
+
+        if not isinstance(manifest.get("version"), str):
+            raise ValueError(
+                f"{filename} inválido: manifest.json no tiene campo 'version' válido."
+            )
+
+        if kind == "db":
+            if not isinstance(manifest.get("tables"), dict):
+                raise ValueError(
+                    f"{filename} inválido: manifest.json no tiene campo 'tables' válido. "
+                    "No es un backup de base de datos."
+                )
+            if not isinstance(manifest.get("total_records"), int):
+                raise ValueError(
+                    f"{filename} inválido: manifest.json no tiene campo 'total_records' válido."
+                )
+        else:
+            if not isinstance(manifest.get("files"), list):
+                raise ValueError(
+                    f"{filename} inválido: manifest.json no tiene campo 'files' válido. "
+                    "No es un backup de imágenes."
+                )
 
     def _validate_alembic_compatibility(self, manifest: dict) -> None:
         """
@@ -489,7 +603,24 @@ class RestoreService:
             self._clean_database_postgresql(db)
 
     def _clean_database_postgresql(self, db: Session) -> None:
-        """Limpia BD PostgreSQL con TRUNCATE CASCADE."""
+        """
+        Limpia BD PostgreSQL con TRUNCATE CASCADE.
+
+        Antes de TRUNCATE, termina cualquier otra conexión abierta a la BD
+        (mismo patrón que factory_reset en backup.py). Sin esto, una conexión
+        "idle in transaction" (ej. un request anterior que dejó una sesión sin
+        cerrar) puede bloquear el TRUNCATE indefinidamente esperando el lock.
+        """
+        import time
+
+        db.execute(text(
+            "SELECT pg_terminate_backend(pid) "
+            "FROM pg_stat_activity "
+            "WHERE datname = current_database() AND pid != pg_backend_pid()"
+        ))
+        db.commit()
+        time.sleep(0.5)
+
         table_names = [name for name in TABLE_ORDER if name != "profile_knowledge_articles"]
         # Incluir tabla de asociación
         table_names.append("profile_knowledge_articles")
@@ -518,16 +649,19 @@ class RestoreService:
 
     def _extract_all_tables(
         self, db_zip_bytes: bytes, password: Optional[str]
-    ) -> dict[str, list[dict]]:
+    ) -> tuple[dict[str, list[dict]], set[str]]:
         """
         Extrae todos los JSON de tablas del DB_ZIP.
 
         Returns:
-            Diccionario {nombre_tabla: lista_de_registros}.
+            Tupla (table_data, missing_tables): table_data es un diccionario
+            {nombre_tabla: lista_de_registros}; missing_tables es el conjunto de
+            tablas cuyo .json no estaba en el ZIP (ej. excluidas a propósito).
         """
         import io
 
         table_data: dict[str, list[dict]] = {}
+        missing_tables: set[str] = set()
         buffer = io.BytesIO(db_zip_bytes)
 
         with pyzipper.AESZipFile(buffer, "r") as zf:
@@ -541,13 +675,14 @@ class RestoreService:
                     records = json.loads(raw.decode("utf-8"))
                     table_data[table_name] = records
                 except KeyError:
-                    # Tabla no encontrada en el ZIP — permitir tablas vacías
+                    # Tabla no encontrada en el ZIP — se asume excluida a propósito
                     logger.warning(
-                        "Tabla %s no encontrada en el ZIP — se asume vacía", table_name
+                        "Tabla %s no encontrada en el ZIP — se omite (0 registros)", table_name
                     )
                     table_data[table_name] = []
+                    missing_tables.add(table_name)
 
-        return table_data
+        return table_data, missing_tables
 
     # =========================================================================
     # RESTAURACIÓN DE TABLAS
@@ -881,18 +1016,29 @@ class RestoreService:
     # =========================================================================
 
     def _verify_integrity(
-        self, db: Session, manifest: dict, restored_counts: dict[str, int]
+        self,
+        db: Session,
+        manifest: dict,
+        restored_counts: dict[str, int],
+        missing_tables: set[str],
     ) -> None:
         """
         Verifica que los conteos restaurados coincidan con el manifest.
 
         Compara la cantidad de registros insertados vs lo esperado en el manifest.
-        Si hay discrepancias significativas, las registra como warning.
+        Las tablas ausentes del ZIP (missing_tables) se excluyen del total esperado:
+        si el usuario quitó a propósito el .json de una tabla, eso no debe contar
+        como "datos perdidos" — se resta su conteo del manifest antes de comparar.
+        Si hay discrepancias significativas en tablas que sí estaban presentes,
+        se registran como warning.
         """
         tables_info = manifest.get("tables", {})
         discrepancies: list[str] = []
 
         for table_name, info in tables_info.items():
+            if table_name in missing_tables:
+                continue  # Ausencia intencional/conocida — ya se logueó al extraer
+
             expected = info.get("count", 0)
             actual = restored_counts.get(table_name, 0)
 
@@ -911,12 +1057,22 @@ class RestoreService:
         else:
             logger.info("Verificación de integridad OK: todos los conteos coinciden")
 
-        # Verificación adicional: contar registros reales en BD
-        total_expected = manifest.get("total_records", 0)
+        # Verificación adicional: contar registros reales en BD, descontando del
+        # total esperado las tablas que no estaban en el ZIP (excluidas a propósito).
+        excluded_records = sum(
+            tables_info.get(t, {}).get("count", 0) for t in missing_tables
+        )
+        total_expected = manifest.get("total_records", 0) - excluded_records
         total_restored = sum(restored_counts.values())
 
+        if missing_tables:
+            logger.info(
+                "Tablas excluidas del ZIP: %s (%d registros descontados del total esperado)",
+                ", ".join(sorted(missing_tables)), excluded_records,
+            )
+
         if total_restored < total_expected * 0.9:
-            # Si se restauró menos del 90%, algo salió mal
+            # Si se restauró menos del 90% de lo que SÍ estaba en el ZIP, algo salió mal
             raise ValueError(
                 f"Verificación de integridad falló: se esperaban {total_expected} "
                 f"registros pero solo se restauraron {total_restored} "

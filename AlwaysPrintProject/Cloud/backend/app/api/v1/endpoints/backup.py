@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from typing import Literal, Optional
 
 import boto3
+from botocore.client import Config
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -84,12 +85,18 @@ class BackupDownloadResponse(BaseModel):
 # === HELPERS ===
 
 def _get_s3_client():
-    """Crea cliente S3 con la configuración del proyecto."""
+    """
+    Crea cliente S3 con la configuración del proyecto.
+
+    Fuerza SigV4: sin esto, las presigned URLs de descarga pueden generarse
+    con SigV2 (deprecado), que S3 rechaza — el navegador lo reporta como
+    error de CORS aunque el bucket ya tenga CORS bien configurado.
+    """
     session = boto3.Session(
         region_name=settings.AWS_REGION,
         profile_name=settings.AWS_PROFILE or None,
     )
-    return session.client("s3")
+    return session.client("s3", config=Config(signature_version="s3v4"))
 
 
 def _read_backup_status() -> dict:
@@ -132,7 +139,7 @@ async def generate_backup(
     Inicia la generación asíncrona de un backup completo.
 
     Verifica que no haya un backup en generación actualmente.
-    Lanza el proceso de BackupService.generate() como asyncio task.
+    Lanza BackupService.generate() (síncrono) en un thread del executor.
     Retorna 202 Accepted inmediatamente.
     """
     # Verificar que no hay backup en generación
@@ -146,9 +153,11 @@ async def generate_backup(
     # Importar aquí para evitar circular imports
     from app.services.backup_service import BackupService
 
-    # Lanzar generación como task asíncrono
+    # Lanzar generación en un thread aparte — generate() es código síncrono
+    # (SQLAlchemy/boto3 bloqueantes); con asyncio.create_task() correría sobre
+    # el mismo event loop del servidor y lo congelaría entero mientras dura.
     service = BackupService()
-    asyncio.create_task(service.generate(password=request.password))
+    asyncio.get_running_loop().run_in_executor(None, service.generate, request.password)
 
     logger.info(
         "Backup solicitado por %s (con password: %s)",
@@ -346,8 +355,8 @@ async def factory_reset(
     """
     logger.warning("FACTORY RESET solicitado por %s — lanzando en background", current_user.email)
 
-    async def _run_factory_reset():
-        """Ejecuta el factory reset en background."""
+    def _run_factory_reset():
+        """Ejecuta el factory reset en background (código síncrono, corre en un thread)."""
         import time
         from sqlalchemy import text
         from app.core.database import SessionLocal
@@ -425,8 +434,9 @@ async def factory_reset(
             len(TABLE_ORDER), docs_deleted, artifacts_deleted,
         )
 
-    # Lanzar como task en background — retornar 202 inmediatamente
-    asyncio.create_task(_run_factory_reset())
+    # Lanzar en un thread aparte — código síncrono, no debe bloquear el event loop.
+    # Retorna 202 inmediatamente.
+    asyncio.get_running_loop().run_in_executor(None, _run_factory_reset)
 
     return {
         "message": "Factory reset iniciado. El sistema se limpiará en segundos.",

@@ -4,6 +4,15 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { setupApi, restoreApi, RestoreStatusResponse } from '@/lib/api'
+import { validateBackupZip, BackupZipErrorCode, BackupZipManifestSummary } from '@/lib/backupZipValidation'
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+}
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,6 +31,7 @@ function RestoreProgressScreen() {
   const [countdown, setCountdown] = useState(3)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const tablesListRef = useRef<HTMLDivElement | null>(null)
 
   const getStageLabel = useCallback((stage: string | null | undefined): string => {
     if (!stage) return ''
@@ -61,25 +71,33 @@ function RestoreProgressScreen() {
     }
   }, [])
 
-  // Countdown para redirección cuando completado
+  // Countdown para redirección cuando completado — el updater de setCountdown
+  // debe ser puro (sin side effects), así que solo baja el número acá.
   useEffect(() => {
     if (restoreStatus.status === 'completed') {
       countdownRef.current = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            if (countdownRef.current) clearInterval(countdownRef.current)
-            router.push('/login')
-            return 0
-          }
-          return prev - 1
-        })
+        setCountdown((prev) => (prev <= 1 ? 0 : prev - 1))
       }, 1000)
     }
 
     return () => {
       if (countdownRef.current) clearInterval(countdownRef.current)
     }
-  }, [restoreStatus.status, router])
+  }, [restoreStatus.status])
+
+  // Navegación (side effect real) separada del cálculo del countdown de arriba.
+  useEffect(() => {
+    if (restoreStatus.status === 'completed' && countdown === 0) {
+      router.push('/login')
+    }
+  }, [restoreStatus.status, countdown, router])
+
+  // Auto-scroll al final de la lista de tablas cuando llega una nueva
+  useEffect(() => {
+    if (tablesListRef.current) {
+      tablesListRef.current.scrollTop = tablesListRef.current.scrollHeight
+    }
+  }, [restoreStatus.tables_detail])
 
   if (restoreStatus.status === 'completed') {
     return (
@@ -125,9 +143,12 @@ function RestoreProgressScreen() {
   }
 
   // Status: restoring
+  const tablesDetail = restoreStatus.tables_detail ?? []
+  const hasTablesDetail = tablesDetail.length > 0
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <Card className="w-full max-w-md">
+      <Card className={`w-full ${hasTablesDetail ? 'max-w-lg' : 'max-w-md'}`}>
         <CardContent className="p-6">
           <div className="text-center">
             <Loader2 className="h-10 w-10 text-blue-600 animate-spin mx-auto mb-4" />
@@ -151,6 +172,48 @@ function RestoreProgressScreen() {
               {t('restoreDoNotClose')}
             </p>
           </div>
+
+          {/* Detalle tabla por tabla (solo durante restoring_db) */}
+          {hasTablesDetail && (
+            <div className="mt-4 text-left">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-medium text-gray-700">
+                  {t('restoreTablesProgress')}
+                </p>
+                {restoreStatus.tables_total != null && restoreStatus.tables_done != null && (
+                  <p className="text-xs text-gray-500">
+                    {restoreStatus.tables_done} / {restoreStatus.tables_total}
+                  </p>
+                )}
+              </div>
+              <div
+                ref={tablesListRef}
+                className="max-h-40 overflow-y-auto rounded-md border bg-gray-50 divide-y divide-gray-100"
+              >
+                {tablesDetail.map((row, i) => {
+                  const isCurrent = row.table === restoreStatus.current_table && i === tablesDetail.length - 1
+                  return (
+                    <div
+                      key={row.table}
+                      className={`flex items-center justify-between px-2 py-1 text-xs ${
+                        isCurrent ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5 truncate">
+                        {isCurrent ? (
+                          <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+                        ) : (
+                          <CheckCircle className="h-3 w-3 shrink-0 text-green-600" />
+                        )}
+                        <span className="truncate">{row.table}</span>
+                      </span>
+                      <span className="shrink-0 text-gray-500">{row.count}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -161,23 +224,99 @@ function RestoreProgressScreen() {
 // FORMULARIO DE RESTORE
 // ============================================================================
 
+const CLIENT_ZIP_ERROR_KEYS: Record<BackupZipErrorCode, string> = {
+  MISSING_MANIFEST: 'restoreClientErrorMissingManifest',
+  BAD_PASSWORD: 'restoreClientErrorBadPassword',
+  CORRUPT: 'restoreClientErrorCorrupt',
+  INVALID_JSON: 'restoreClientErrorInvalidJson',
+  MISSING_VERSION: 'restoreClientErrorMissingVersion',
+  MISSING_TABLES: 'restoreClientErrorMissingTables',
+  MISSING_TOTAL_RECORDS: 'restoreClientErrorMissingTotalRecords',
+  MISSING_FILES: 'restoreClientErrorMissingFiles',
+  UNKNOWN: 'restoreClientErrorUnknown',
+}
+
+/** Construye el mensaje de error con el detalle de diagnóstico (carpeta envolvente o archivos encontrados) si existe. */
+function buildZipErrorMessage(
+  t: ReturnType<typeof useTranslations>,
+  result: { error?: BackupZipErrorCode; detail?: string },
+  file: string
+): string {
+  if (result.error === 'MISSING_MANIFEST' && result.detail?.startsWith('wrapped:')) {
+    const folder = result.detail.slice('wrapped:'.length)
+    return t('restoreClientErrorWrappedFolder', { file, folder })
+  }
+  if (result.error === 'MISSING_MANIFEST' && result.detail?.startsWith('found:')) {
+    const found = result.detail.slice('found:'.length)
+    return t('restoreClientErrorMissingManifestFound', { file, found })
+  }
+  return t(CLIENT_ZIP_ERROR_KEYS[result.error ?? 'UNKNOWN'], { file })
+}
+
 function RestoreForm({ onRestoreStarted }: { onRestoreStarted: () => void }) {
   const t = useTranslations('backup')
   const [dbFile, setDbFile] = useState<File | null>(null)
   const [imagesFile, setImagesFile] = useState<File | null>(null)
   const [password, setPassword] = useState('')
   const [isUploading, setIsUploading] = useState(false)
-  const [uploadStage, setUploadStage] = useState<'db' | 'images' | null>(null)
+  const [uploadStage, setUploadStage] = useState<'validating' | 'db' | 'images' | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [dbManifest, setDbManifest] = useState<BackupZipManifestSummary | null>(null)
+  const [imagesManifest, setImagesManifest] = useState<BackupZipManifestSummary | null>(null)
+  const submittingRef = useRef(false)
+
+  // Cambiar el archivo (o quitarlo) limpia el error/manifest viejo — ya no aplica al nuevo archivo.
+  const handleDbFileChange = (file: File | null) => {
+    setDbFile(file)
+    setError(null)
+    setDbManifest(null)
+  }
+  const handleImagesFileChange = (file: File | null) => {
+    setImagesFile(file)
+    setError(null)
+    setImagesManifest(null)
+  }
 
   const handleRestore = async () => {
     if (!dbFile || !imagesFile) return
+    // Guard síncrono contra doble-submit: setIsUploading(true) no oculta el botón
+    // hasta el próximo render, así que un doble-click rápido puede disparar esto
+    // dos veces y mandar dos flujos de upload/start en paralelo.
+    if (submittingRef.current) return
+    submittingRef.current = true
 
     setError(null)
     setIsUploading(true)
+    setDbManifest(null)
+    setImagesManifest(null)
 
     try {
+      // 0. Validar manifests en el navegador ANTES de subir (evita subir ZIPs grandes inválidos).
+      //    El backend valida igual — esto solo da feedback rápido sin gastar ancho de banda.
+      setUploadStage('validating')
+      const pwd = password || undefined
+
+      const dbValidation = await validateBackupZip(dbFile, pwd, 'db')
+      if (!dbValidation.valid) {
+        setError(buildZipErrorMessage(t, dbValidation, 'db.zip'))
+        setIsUploading(false)
+        setUploadStage(null)
+        submittingRef.current = false
+        return
+      }
+      setDbManifest(dbValidation.manifest ?? null)
+
+      const imagesValidation = await validateBackupZip(imagesFile, pwd, 'images')
+      if (!imagesValidation.valid) {
+        setError(buildZipErrorMessage(t, imagesValidation, 'images.zip'))
+        setIsUploading(false)
+        setUploadStage(null)
+        submittingRef.current = false
+        return
+      }
+      setImagesManifest(imagesValidation.manifest ?? null)
+
       // 1. Obtener presigned URLs
       const { db_upload_url, images_upload_url } = await restoreApi.getPresignedUrls(
         dbFile.size,
@@ -204,19 +343,83 @@ function RestoreForm({ onRestoreStarted }: { onRestoreStarted: () => void }) {
       // 5. Cambiar a pantalla de progreso
       onRestoreStarted()
     } catch {
+      // El restore es fire-and-forget en el backend: aunque esta request se
+      // cancele/falle del lado del cliente (ej. timeout), el backend puede
+      // haberla recibido y ya estar restaurando. Antes de mostrar error,
+      // confirmamos el estado real con /status en vez de asumir que no pasó nada.
+      try {
+        const status = await restoreApi.getStatus()
+        if (status.status === 'restoring' || status.status === 'completed') {
+          onRestoreStarted()
+          return
+        }
+      } catch {
+        // Si ni siquiera se pudo consultar el status, cae al error genérico abajo.
+      }
       setError(t('uploadError'))
       setIsUploading(false)
       setUploadStage(null)
+      submittingRef.current = false
     }
   }
 
+  const manifestSummary = (dbManifest || imagesManifest) && (
+    <div className="rounded-md border bg-gray-50 p-3 space-y-1.5">
+      <p className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
+        <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+        {t('restoreManifestValid')}
+      </p>
+      {dbManifest && (
+        <p className="text-xs text-gray-600">
+          {t('restoreManifestDb', {
+            tables: dbManifest.tableCount ?? 0,
+            records: (dbManifest.totalRecords ?? 0).toLocaleString(),
+          })}
+        </p>
+      )}
+      {imagesManifest && (
+        <p className="text-xs text-gray-600">
+          {t('restoreManifestImages', {
+            images: imagesManifest.totalImages ?? 0,
+            size: formatBytes(imagesManifest.totalSize ?? 0),
+          })}
+        </p>
+      )}
+      {dbManifest?.generatedAt && (
+        <p className="text-xs text-gray-400">
+          {t('restoreManifestGeneratedAt', { date: new Date(dbManifest.generatedAt).toLocaleString() })}
+        </p>
+      )}
+    </div>
+  )
+
   if (isUploading) {
+    if (uploadStage === 'validating') {
+      return (
+        <div className="space-y-4">
+          <Alert>
+            <FileArchive className="h-4 w-4" />
+            <AlertDescription>{t('restoreValidatingFiles')}</AlertDescription>
+          </Alert>
+          {manifestSummary}
+          <div className="flex items-center justify-center py-2">
+            <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />
+          </div>
+          <p className="text-xs text-amber-600 font-medium text-center">
+            {t('restoreDoNotClose')}
+          </p>
+        </div>
+      )
+    }
+
     return (
       <div className="space-y-4">
         <Alert>
           <Upload className="h-4 w-4" />
           <AlertDescription>{t('restoreUploading')}</AlertDescription>
         </Alert>
+
+        {manifestSummary}
 
         <div className="space-y-2">
           <p className="text-sm font-medium text-gray-700">
@@ -268,7 +471,7 @@ function RestoreForm({ onRestoreStarted }: { onRestoreStarted: () => void }) {
               type="file"
               accept=".zip"
               className="hidden"
-              onChange={(e) => setDbFile(e.target.files?.[0] || null)}
+              onChange={(e) => handleDbFileChange(e.target.files?.[0] || null)}
             />
           </label>
           <Button
@@ -281,7 +484,7 @@ function RestoreForm({ onRestoreStarted }: { onRestoreStarted: () => void }) {
               input.accept = '.zip'
               input.onchange = (e) => {
                 const file = (e.target as HTMLInputElement).files?.[0]
-                if (file) setDbFile(file)
+                if (file) handleDbFileChange(file)
               }
               input.click()
             }}
@@ -306,7 +509,7 @@ function RestoreForm({ onRestoreStarted }: { onRestoreStarted: () => void }) {
               type="file"
               accept=".zip"
               className="hidden"
-              onChange={(e) => setImagesFile(e.target.files?.[0] || null)}
+              onChange={(e) => handleImagesFileChange(e.target.files?.[0] || null)}
             />
           </label>
           <Button
@@ -319,7 +522,7 @@ function RestoreForm({ onRestoreStarted }: { onRestoreStarted: () => void }) {
               input.accept = '.zip'
               input.onchange = (e) => {
                 const file = (e.target as HTMLInputElement).files?.[0]
-                if (file) setImagesFile(file)
+                if (file) handleImagesFileChange(file)
               }
               input.click()
             }}

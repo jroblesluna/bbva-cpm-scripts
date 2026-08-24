@@ -17,6 +17,7 @@ import logging
 from typing import Literal, Optional
 
 import boto3
+from botocore.client import Config
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -80,6 +81,12 @@ class RestoreStartRequest(BaseModel):
     )
 
 
+class TableProgress(BaseModel):
+    """Progreso de restauración de una tabla individual."""
+    table: str
+    count: int
+
+
 class RestoreStatusResponse(BaseModel):
     """Estado actual del proceso de restauración."""
     status: Literal["idle", "restoring", "completed", "failed"]
@@ -87,17 +94,28 @@ class RestoreStatusResponse(BaseModel):
     progress: Optional[int] = None
     error: Optional[str] = None
     completed_at: Optional[str] = None
+    # Detalle tabla por tabla durante la etapa "restoring_db"
+    tables_total: Optional[int] = None
+    tables_done: Optional[int] = None
+    current_table: Optional[str] = None
+    tables_detail: Optional[list[TableProgress]] = None
 
 
 # === HELPERS ===
 
 def _get_s3_client():
-    """Crea cliente S3 con la configuración del proyecto."""
+    """
+    Crea cliente S3 con la configuración del proyecto.
+
+    Fuerza SigV4: sin esto, generate_presigned_url para put_object con
+    ContentType puede caer en SigV2 (deprecado), que S3 rechaza — el navegador
+    lo reporta como error de CORS aunque el bucket ya tenga CORS bien configurado.
+    """
     session = boto3.Session(
         region_name=settings.AWS_REGION,
         profile_name=settings.AWS_PROFILE or None,
     )
-    return session.client("s3")
+    return session.client("s3", config=Config(signature_version="s3v4"))
 
 
 def _read_restore_status() -> dict:
@@ -198,7 +216,7 @@ async def start_restore(
     Inicia el proceso de restauración asíncrono.
 
     Verifica que los archivos ZIP hayan sido subidos a S3 (backups/restore-upload/)
-    y lanza RestoreService.restore() como asyncio task.
+    y lanza RestoreService.restore() (síncrono) en un thread del executor.
     Retorna 202 Accepted inmediatamente.
     """
     # Verificar que no hay un restore en progreso
@@ -230,9 +248,11 @@ async def start_restore(
     # Importar aquí para evitar circular imports
     from app.services.restore_service import RestoreService
 
-    # Lanzar restauración como task asíncrono
+    # Lanzar restauración en un thread aparte — restore() es código síncrono
+    # (SQLAlchemy/boto3 bloqueantes); con asyncio.create_task() correría sobre
+    # el mismo event loop del servidor y lo congelaría entero mientras dura.
     service = RestoreService()
-    asyncio.create_task(service.restore(password=request.password))
+    asyncio.get_running_loop().run_in_executor(None, service.restore, request.password)
 
     logger.info(
         "Restauración iniciada (con password: %s)",
@@ -269,4 +289,8 @@ async def get_restore_status():
         progress=status_data.get("progress"),
         error=status_data.get("error"),
         completed_at=status_data.get("completed_at"),
+        tables_total=status_data.get("tables_total"),
+        tables_done=status_data.get("tables_done"),
+        current_table=status_data.get("current_table"),
+        tables_detail=status_data.get("tables_detail"),
     )

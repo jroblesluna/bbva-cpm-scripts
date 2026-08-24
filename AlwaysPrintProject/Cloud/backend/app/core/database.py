@@ -129,7 +129,14 @@ def get_db() -> Generator[Session, None, None]:
     try:
         yield db
     finally:
-        db.close()
+        try:
+            db.close()
+        except Exception as e:
+            # La conexión pudo haber sido terminada externamente (ej. TRUNCATE de
+            # restore/factory-reset hace pg_terminate_backend de otras conexiones).
+            # db.close() intenta un ROLLBACK sobre ella y falla — no hay nada que
+            # limpiar en ese caso, así que se loguea y no se deja escapar.
+            logger.warning("Error cerrando sesión de BD (conexión ya cerrada externamente): %s", e)
 
 
 # === FUNCIONES DE UTILIDAD ===

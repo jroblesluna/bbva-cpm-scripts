@@ -1254,6 +1254,12 @@ export interface RestorePresignedUrlsResponse {
   expires_in: number
 }
 
+/** Progreso de restauración de una tabla individual */
+export interface TableProgress {
+  table: string
+  count: number
+}
+
 /** Estado del proceso de restauración */
 export interface RestoreStatusResponse {
   status: 'idle' | 'restoring' | 'completed' | 'failed'
@@ -1261,6 +1267,10 @@ export interface RestoreStatusResponse {
   progress?: number | null
   error?: string | null
   completed_at?: string | null
+  tables_total?: number | null
+  tables_done?: number | null
+  current_table?: string | null
+  tables_detail?: TableProgress[] | null
 }
 
 export const backupApi = {
@@ -1333,10 +1343,14 @@ export const restoreApi = {
    * No envía token (endpoint público).
    */
   start: async (password?: string): Promise<{ message: string; status: string }> => {
+    // Timeout corto: en el caso sano /start responde en <1s (solo head_object + count()
+    // antes de lanzar el restore en background). Si tarda más, algo anda mal — no vale
+    // la pena esperar mucho porque el caller (page.tsx) ya tiene un fallback que consulta
+    // /status para confirmar si el restore arrancó igual pese al timeout.
     const response = await apiClient.post<{ message: string; status: string }>(
       '/setup/restore/start',
       { password: password || null },
-      { headers: { Authorization: '' } }
+      { headers: { Authorization: '' }, timeout: 8000 }
     )
     return response.data
   },

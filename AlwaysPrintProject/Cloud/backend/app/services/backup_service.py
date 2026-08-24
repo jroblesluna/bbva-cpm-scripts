@@ -120,9 +120,14 @@ class BackupService:
     # MÉTODO PRINCIPAL
     # =========================================================================
 
-    async def generate(self, password: Optional[str] = None) -> None:
+    def generate(self, password: Optional[str] = None) -> None:
         """
-        Genera backup completo de forma asíncrona.
+        Genera backup completo.
+
+        Sin código async real adentro (SQLAlchemy y boto3 son síncronos) — el
+        endpoint la lanza en un thread aparte (loop.run_in_executor) en vez de
+        asyncio.create_task, para no bloquear el event loop del servidor entero
+        mientras dura.
 
         Etapas:
         1. Limpia backup anterior
@@ -312,14 +317,27 @@ class BackupService:
         """
         records = db.query(model_class).all()
         mapper = inspect(model_class)
-        columns = [col.key for col in mapper.columns]
+
+        # col.key es el nombre de columna de la tabla (usado también al insertar
+        # en el restore vía table.insert()), y puede diferir del atributo Python
+        # cuando el modelo usa un alias — ej. VLAN.vlan_metadata = Column("metadata", ...)
+        # ("metadata" está reservado por Declarative, así que el atributo se
+        # renombra). Leer con getattr(record, col.key) en ese caso devuelve el
+        # MetaData de SQLAlchemy en vez del valor real de la columna. Hay que
+        # resolver el atributo ORM correcto por columna antes de leer.
+        col_to_attr = {
+            col.key: prop.key
+            for prop in mapper.column_attrs
+            for col in prop.columns
+        }
 
         result = []
         for record in records:
             row = {}
-            for col_name in columns:
-                value = getattr(record, col_name)
-                row[col_name] = self._convert_value(value)
+            for col in mapper.columns:
+                attr_name = col_to_attr.get(col.key, col.key)
+                value = getattr(record, attr_name)
+                row[col.key] = self._convert_value(value)
             result.append(row)
 
         return result

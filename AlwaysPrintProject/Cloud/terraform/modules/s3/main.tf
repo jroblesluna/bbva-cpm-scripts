@@ -4,6 +4,12 @@
 locals {
   # Nombre del bucket incluye environment para evitar colisión entre cuentas
   bucket_name = "${var.project_name}-${var.environment}-artifacts"
+
+  # En dev se permite además localhost:3000 para poder probar uploads (presigned URLs)
+  # contra el frontend corriendo en local sin desplegar.
+  artifacts_cors_origins = var.environment == "dev" ? [
+    "https://${var.domain_name}", "http://localhost:3000"
+  ] : ["https://${var.domain_name}"]
 }
 
 resource "aws_s3_bucket" "artifacts" {
@@ -91,7 +97,7 @@ resource "aws_s3_bucket_cors_configuration" "artifacts" {
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["PUT", "GET"]
-    allowed_origins = ["https://${var.domain_name}"]
+    allowed_origins = local.artifacts_cors_origins
     expose_headers  = ["ETag"]
     max_age_seconds = 3600
   }
