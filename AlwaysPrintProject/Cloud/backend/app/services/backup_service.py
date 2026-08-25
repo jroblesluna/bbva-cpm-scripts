@@ -89,6 +89,20 @@ TABLE_MODEL_MAP: list[tuple[str, Any]] = [
     ("container_metrics", ContainerMetric),
 ]
 
+# Tablas de historial/telemetría — pueden ser enormes (telemetry_logs, audit_logs
+# de organizaciones grandes) y no son necesarias para restaurar el estado operativo
+# del sistema. Excluidas por defecto; el usuario las incluye a propósito.
+OPTIONAL_TABLES: list[str] = [
+    "telemetry_logs",
+    "connectivity_results",
+    "debugging_sessions",
+    "log_analyses",
+    "status_snapshots",
+    "metric_records",
+    "health_check_results",
+    "container_metrics",
+]
+
 
 class BackupService:
     """
@@ -120,7 +134,11 @@ class BackupService:
     # MÉTODO PRINCIPAL
     # =========================================================================
 
-    def generate(self, password: Optional[str] = None) -> None:
+    def generate(
+        self,
+        password: Optional[str] = None,
+        include_optional_tables: Optional[list[str]] = None,
+    ) -> None:
         """
         Genera backup completo.
 
@@ -129,9 +147,16 @@ class BackupService:
         asyncio.create_task, para no bloquear el event loop del servidor entero
         mientras dura.
 
+        Args:
+            password: Password para cifrar los ZIP (None = sin cifrado).
+            include_optional_tables: Nombres de OPTIONAL_TABLES a incluir. Por
+                defecto (None/vacío) se excluyen todas — son tablas de
+                historial/telemetría, potencialmente enormes, no necesarias para
+                restaurar el estado operativo del sistema.
+
         Etapas:
         1. Limpia backup anterior
-        2. Exporta BD tabla por tabla → JSON
+        2. Exporta BD tabla por tabla → JSON (solo obligatorias + opcionales incluidas)
         3. Descarga imágenes de VLANs desde S3
         4. Crea DB_ZIP (con password si aplica)
         5. Crea Images_ZIP (con password si aplica)
@@ -140,8 +165,13 @@ class BackupService:
 
         Si falla en cualquier punto, actualiza status a failed con el error.
         """
+        include_optional = set(include_optional_tables or []) & set(OPTIONAL_TABLES)
+
         try:
-            logger.info("Iniciando generación de backup...")
+            logger.info(
+                "Iniciando generación de backup... (tablas opcionales: %s)",
+                ", ".join(sorted(include_optional)) or "ninguna",
+            )
             self._update_status("generating", "Iniciando backup", 0)
 
             # Limpiar backup anterior
@@ -153,7 +183,7 @@ class BackupService:
             )
             db = SessionLocal()
             try:
-                table_data, table_counts = self._export_all_tables(db)
+                table_data, table_counts = self._export_all_tables(db, include_optional)
                 alembic_revision = self._get_alembic_revision(db)
             finally:
                 db.close()
@@ -269,6 +299,7 @@ class BackupService:
                     "images_zip_size": len(images_zip_bytes),
                     "generated_at": generated_at,
                     "has_password": password is not None,
+                    "included_optional_tables": sorted(include_optional),
                 },
             )
 
@@ -285,17 +316,29 @@ class BackupService:
     # EXPORTACIÓN DE BD
     # =========================================================================
 
-    def _export_all_tables(self, db: Session) -> tuple[dict[str, list[dict]], dict[str, int]]:
+    def _export_all_tables(
+        self, db: Session, include_optional: set[str]
+    ) -> tuple[dict[str, list[dict]], dict[str, int]]:
         """
-        Exporta todas las tablas en orden de dependencias FK.
+        Exporta todas las tablas obligatorias, más las tablas opcionales incluidas
+        en include_optional, en orden de dependencias FK.
+
+        Las tablas opcionales no seleccionadas ni siquiera se consultan (para que
+        excluir telemetry_logs, por ejemplo, también ahorre tiempo/memoria) y quedan
+        fuera del manifest — RestoreService ya trata los .json ausentes como
+        opcionales y no cuenta sus registros como esperados.
 
         Returns:
-            Tupla con (datos por tabla, conteo por tabla).
+            Tupla con (datos por tabla, conteo por tabla) — solo tablas incluidas.
         """
         table_data: dict[str, list[dict]] = {}
         table_counts: dict[str, int] = {}
 
         for table_name, model_or_table in TABLE_MODEL_MAP:
+            if table_name in OPTIONAL_TABLES and table_name not in include_optional:
+                logger.debug("Tabla opcional %s excluida del backup", table_name)
+                continue
+
             if table_name == "profile_knowledge_articles":
                 # Tabla de asociación (no tiene modelo ORM)
                 records = self._export_association_table(db, model_or_table)

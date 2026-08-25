@@ -189,6 +189,7 @@ export default function SystemStatusPage() {
   const [loading, setLoading] = useState(true);
   const [collecting, setCollecting] = useState(false);
   const [activeTab, setActiveTab] = useState('current');
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Redirigir a dashboard principal si el usuario no es admin
@@ -252,6 +253,7 @@ export default function SystemStatusPage() {
       }
 
       setSnapshot(result);
+      setHistoryRefreshKey((prev) => prev + 1);
       toast({
         title: t('collectSuccess'),
         description: t('collectSuccessDesc'),
@@ -541,7 +543,7 @@ export default function SystemStatusPage() {
 
         {/* Tab: Histórico */}
         <TabsContent value="history">
-          <HistoryTab />
+          <HistoryTab refreshKey={historyRefreshKey} />
         </TabsContent>
 
         {/* Tab: Workers */}

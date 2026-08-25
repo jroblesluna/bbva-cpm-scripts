@@ -106,7 +106,7 @@ interface MetricChartData {
 
 // === COMPONENTE PRINCIPAL ===
 
-export default function HistoryTab() {
+export default function HistoryTab({ refreshKey }: { refreshKey?: number }) {
   const t = useTranslations('systemStatus')
   const timezone = useUserTimezone()
 
@@ -165,7 +165,7 @@ export default function HistoryTab() {
     } finally {
       setLoading(false)
     }
-  }, [selectedRange, t, timezone])
+  }, [selectedRange, t, timezone, refreshKey])
 
   useEffect(() => {
     fetchData()

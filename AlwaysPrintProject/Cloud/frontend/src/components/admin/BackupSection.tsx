@@ -12,11 +12,33 @@ import { Database, Download, Trash2, RefreshCw, Loader2, CheckCircle2, XCircle, 
 
 import { useAuth } from '@/hooks/useAuth'
 import { backupApi, BackupStatusResponse } from '@/lib/api'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 
 // === CONSTANTES ===
 
 const ALLOWED_DOMAINS = ['@robles.ai', '@sistemas.com.pe']
 const POLL_INTERVAL = 5000
+
+// Claves i18n por tabla opcional (namespace "backup") — deben cubrir todo lo que
+// devuelva GET /admin/backup/optional-tables. Si el backend agrega una tabla
+// opcional nueva sin traducción acá, se muestra el nombre crudo como fallback.
+const OPTIONAL_TABLE_LABEL_KEYS: Record<string, string> = {
+  telemetry_logs: 'optionalTableTelemetryLogs',
+  connectivity_results: 'optionalTableConnectivityResults',
+  debugging_sessions: 'optionalTableDebuggingSessions',
+  log_analyses: 'optionalTableLogAnalyses',
+  status_snapshots: 'optionalTableStatusSnapshots',
+  metric_records: 'optionalTableMetricRecords',
+  health_check_results: 'optionalTableHealthCheckResults',
+  container_metrics: 'optionalTableContainerMetrics',
+}
 
 // === HELPERS ===
 
@@ -40,6 +62,9 @@ export function BackupSection() {
   const [initialLoading, setInitialLoading] = useState(true)
   const [factoryResetLoading, setFactoryResetLoading] = useState(false)
   const [resetAcknowledged, setResetAcknowledged] = useState(false)
+  const [optionalTables, setOptionalTables] = useState<string[]>([])
+  const [selectedOptionalTables, setSelectedOptionalTables] = useState<Set<string>>(new Set())
+  const [showGenerateModal, setShowGenerateModal] = useState(false)
 
   // Control de acceso: solo Corporate Admin de dominios autorizados
   const userEmail = user?.email?.toLowerCase() ?? ''
@@ -61,10 +86,26 @@ export function BackupSection() {
   useEffect(() => {
     if (isAdmin() && isAllowedDomain) {
       fetchStatus()
+      backupApi.getOptionalTables().then(setOptionalTables).catch(() => {})
     } else {
       setInitialLoading(false)
     }
   }, [isAdmin, isAllowedDomain, fetchStatus])
+
+  const toggleOptionalTable = (table: string) => {
+    setSelectedOptionalTables((prev) => {
+      const next = new Set(prev)
+      if (next.has(table)) next.delete(table)
+      else next.add(table)
+      return next
+    })
+  }
+
+  const toggleAllOptionalTables = () => {
+    setSelectedOptionalTables((prev) =>
+      prev.size === optionalTables.length ? new Set() : new Set(optionalTables)
+    )
+  }
 
   // Polling cada 5s mientras el estado es "generating"
   useEffect(() => {
@@ -78,19 +119,20 @@ export function BackupSection() {
     setResetAcknowledged(false)
   }, [status.status])
 
-  // Generar backup
-  const handleGenerate = async () => {
+  // Generar backup. No se espera la respuesta completa: el backend responde 202
+  // casi al instante (corre en un thread aparte) y el progreso real se sigue vía
+  // polling de /status — igual que el flujo de restore.
+  const handleGenerate = () => {
+    setShowGenerateModal(false)
     setLoading(true)
-    try {
-      await backupApi.generate(password || undefined)
-      setPassword('')
-      // Pequeño delay para que el backend actualice el status
-      setTimeout(fetchStatus, 1000)
-    } catch {
-      // El error se reflejará en el status al siguiente polling
-    } finally {
+    backupApi.generate(password || undefined, Array.from(selectedOptionalTables)).catch(() => {
+      // El error real (si lo hay) se refleja en el status al siguiente polling
+    })
+    setPassword('')
+    setTimeout(() => {
       setLoading(false)
-    }
+      fetchStatus()
+    }, 800)
   }
 
   // Descargar archivo
@@ -134,18 +176,6 @@ export function BackupSection() {
   // No mostrar si no es Corporate Admin con dominio autorizado
   if (!isAdmin() || !isAllowedDomain) return null
 
-  // Loading inicial
-  if (initialLoading) {
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div className="flex items-center gap-2">
-          <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-          <span className="text-sm text-gray-500">{t('generating')}</span>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
       {/* Header */}
@@ -155,6 +185,16 @@ export function BackupSection() {
       </div>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{t('description')}</p>
 
+      {/* Loading inicial */}
+      {initialLoading && (
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          {t('loading')}
+        </div>
+      )}
+
+      {!initialLoading && (
+      <>
       {/* Estado: Idle — Sin backup previo */}
       {status.status === 'idle' && (
         <div className="space-y-4">
@@ -162,23 +202,8 @@ export function BackupSection() {
             <span className="w-2 h-2 bg-gray-400 rounded-full" />
             {t('statusIdle')}
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              <span className="flex items-center gap-1">
-                <Lock className="w-3.5 h-3.5" />
-                {t('passwordField')}
-              </span>
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={t('passwordPlaceholder')}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
           <button
-            onClick={handleGenerate}
+            onClick={() => setShowGenerateModal(true)}
             disabled={loading}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium disabled:opacity-50 transition-colors"
           >
@@ -226,6 +251,15 @@ export function BackupSection() {
             <p className="text-xs text-green-600 dark:text-green-500 ml-6">
               {t('hasPassword', { value: status.has_password ? t('hasPasswordYes') : t('hasPasswordNo') })}
             </p>
+            <p className="text-xs text-green-600 dark:text-green-500 ml-6">
+              {status.included_optional_tables && status.included_optional_tables.length > 0
+                ? t('optionalTablesIncluded', {
+                    tables: status.included_optional_tables
+                      .map((tbl) => (OPTIONAL_TABLE_LABEL_KEYS[tbl] ? t(OPTIONAL_TABLE_LABEL_KEYS[tbl]) : tbl))
+                      .join(', '),
+                  })
+                : t('optionalTablesNoneIncluded')}
+            </p>
           </div>
 
           {/* Botones de descarga */}
@@ -249,7 +283,7 @@ export function BackupSection() {
           {/* Acciones adicionales */}
           <div className="flex gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
             <button
-              onClick={handleGenerate}
+              onClick={() => setShowGenerateModal(true)}
               disabled={loading}
               className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md text-sm transition-colors disabled:opacity-50"
             >
@@ -282,7 +316,7 @@ export function BackupSection() {
             )}
           </div>
           <button
-            onClick={handleGenerate}
+            onClick={() => setShowGenerateModal(true)}
             disabled={loading}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium disabled:opacity-50 transition-colors"
           >
@@ -296,75 +330,163 @@ export function BackupSection() {
         </div>
       )}
 
-      {/* Factory Reset — siempre visible para Corporate Admin */}
-      <div className="mt-6 pt-4 border-t border-red-200 dark:border-red-800">
-        <div className="flex items-center gap-2 mb-3">
-          <AlertTriangle className="w-4 h-4 text-red-600" />
-          <span className="text-sm font-semibold text-red-700 dark:text-red-400">{t('factoryResetConfirmTitle')}</span>
+      {/* Factory Reset — zona de peligro, siempre visible para Corporate Admin */}
+      <div className="mt-6 rounded-lg border border-red-200 dark:border-red-900 overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-950/40 border-b border-red-200 dark:border-red-900">
+          <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+          <span className="text-sm font-bold text-red-700 dark:text-red-400 tracking-wide">
+            {t('factoryResetConfirmTitle')}
+          </span>
         </div>
 
-        {/* Caso: Backup disponible → ofrecer descarga */}
-        {status.status === 'completed' && (
-          <div className="mb-3 space-y-2">
-            <p className="text-xs text-gray-600 dark:text-gray-400">{t('factoryResetBackupAvailable')}</p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => handleDownload('db')}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-md text-xs font-medium transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" />
-                {t('downloadDb')} ({formatBytes(status.db_zip_size || 0)})
-              </button>
-              <button
-                onClick={() => handleDownload('images')}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-md text-xs font-medium transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" />
-                {t('downloadImages')} ({formatBytes(status.images_zip_size || 0)})
-              </button>
+        <div className="p-4 space-y-4">
+          {/* Caso: Backup disponible → ofrecer descarga */}
+          {status.status === 'completed' && (
+            <div className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-3 space-y-2">
+              <p className="text-xs font-medium text-blue-700 dark:text-blue-400">{t('factoryResetBackupAvailable')}</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleDownload('db')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 rounded-md text-xs font-medium transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  {t('downloadDb')} ({formatBytes(status.db_zip_size || 0)})
+                </button>
+                <button
+                  onClick={() => handleDownload('images')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 rounded-md text-xs font-medium transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  {t('downloadImages')} ({formatBytes(status.images_zip_size || 0)})
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-
-        {/* Caso: No hay backup → advertencia */}
-        {status.status !== 'completed' && status.status !== 'generating' && (
-          <div className="mb-3">
-            <p className="text-xs text-amber-700 dark:text-amber-400">{t('factoryResetNoBackup')}</p>
-          </div>
-        )}
-
-        {/* Checkbox de confirmación */}
-        {status.status !== 'generating' && (
-          <label className="flex items-start gap-2 mb-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={resetAcknowledged}
-              onChange={(e) => setResetAcknowledged(e.target.checked)}
-              className="mt-0.5 w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
-            />
-            <span className="text-xs text-gray-700 dark:text-gray-300">
-              {status.status === 'completed'
-                ? t('factoryResetCheckboxWithBackup')
-                : t('factoryResetCheckboxNoBackup')
-              }
-            </span>
-          </label>
-        )}
-
-        {/* Botón de Factory Reset */}
-        <button
-          onClick={handleFactoryReset}
-          disabled={!resetAcknowledged || factoryResetLoading || status.status === 'generating'}
-          className="flex items-center gap-2 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {factoryResetLoading ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <AlertTriangle className="w-3.5 h-3.5" />
           )}
-          {t('factoryResetBtn')}
-        </button>
+
+          {/* Caso: No hay backup → advertencia */}
+          {status.status !== 'completed' && status.status !== 'generating' && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-700 dark:text-amber-400">{t('factoryResetNoBackup')}</p>
+            </div>
+          )}
+
+          {/* Checkbox de confirmación */}
+          {status.status !== 'generating' && (
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={resetAcknowledged}
+                onChange={(e) => setResetAcknowledged(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                {status.status === 'completed'
+                  ? t('factoryResetCheckboxWithBackup')
+                  : t('factoryResetCheckboxNoBackup')
+                }
+              </span>
+            </label>
+          )}
+
+          {/* Botón de Factory Reset */}
+          <button
+            onClick={handleFactoryReset}
+            disabled={!resetAcknowledged || factoryResetLoading || status.status === 'generating'}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+          >
+            {factoryResetLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <AlertTriangle className="w-4 h-4" />
+            )}
+            {t('factoryResetBtn')}
+          </button>
+        </div>
       </div>
+      </>
+      )}
+
+      {/* Modal de opciones de generación de backup */}
+      <Dialog open={showGenerateModal} onOpenChange={setShowGenerateModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Database className="w-5 h-5 text-blue-600" />
+              {t('generateBtn')}
+            </DialogTitle>
+            <DialogDescription>{t('description')}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                <span className="flex items-center gap-1">
+                  <Lock className="w-3.5 h-3.5" />
+                  {t('passwordField')}
+                </span>
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t('passwordPlaceholder')}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            {/* Tablas opcionales (historial/telemetría) — excluidas por defecto */}
+            {optionalTables.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium">{t('optionalTablesLabel')}</label>
+                  <button
+                    type="button"
+                    onClick={toggleAllOptionalTables}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    {selectedOptionalTables.size === optionalTables.length
+                      ? t('optionalTablesDeselectAll')
+                      : t('optionalTablesSelectAll')}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{t('optionalTablesHint')}</p>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 p-2">
+                  {optionalTables.map((table) => (
+                    <label key={table} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedOptionalTables.has(table)}
+                        onChange={() => toggleOptionalTable(table)}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      {OPTIONAL_TABLE_LABEL_KEYS[table] ? t(OPTIONAL_TABLE_LABEL_KEYS[table]) : table}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setShowGenerateModal(false)}
+              className="px-4 py-2 rounded-md text-sm font-medium border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              {t('cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
+            >
+              <Database className="w-4 h-4" />
+              {t('generateBtn')}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

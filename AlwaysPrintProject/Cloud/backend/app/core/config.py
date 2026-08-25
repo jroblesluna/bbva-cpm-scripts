@@ -40,7 +40,8 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = 10
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800  # 30 minutos — evita conexiones stale por timeout de RDS
-    
+    DB_ECHO: bool = False  # Loguea cada query SQL exitosa (ruidoso) — dejar en False, los errores igual se ven en el traceback
+
     # === CONFIGURACIÓN DE SEGURIDAD ===
     SECRET_KEY: str = "CHANGE_THIS_IN_PRODUCTION_TO_A_SECURE_RANDOM_STRING"
     ALGORITHM: str = "HS256"

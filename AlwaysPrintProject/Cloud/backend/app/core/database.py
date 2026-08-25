@@ -26,7 +26,7 @@ def get_engine_config() -> dict:
         dict: Configuración del engine para create_engine()
     """
     config = {
-        "echo": settings.LOG_LEVEL == "DEBUG",  # Log de queries SQL en modo debug
+        "echo": settings.DB_ECHO,  # Log de cada query SQL exitosa — desacoplado de LOG_LEVEL para no ahogar los errores
     }
     
     if settings.is_sqlite:

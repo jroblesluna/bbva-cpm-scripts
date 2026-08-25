@@ -1237,6 +1237,7 @@ export interface BackupStatusResponse {
   images_zip_size?: number | null
   generated_at?: string | null
   has_password?: boolean | null
+  included_optional_tables?: string[] | null
 }
 
 /** Respuesta con presigned URL de descarga */
@@ -1275,12 +1276,14 @@ export interface RestoreStatusResponse {
 
 export const backupApi = {
   /**
-   * Iniciar generación de backup.
+   * Iniciar generación de backup. No se espera a que termine — el backend responde
+   * 202 casi al instante y el progreso real se seguía vía polling de getStatus().
    */
-  generate: async (password?: string): Promise<{ message: string; status: string }> => {
+  generate: async (password?: string, includeOptionalTables: string[] = []): Promise<{ message: string; status: string }> => {
     const response = await apiClient.post<{ message: string; status: string }>(
       '/admin/backup/generate',
-      { password: password || null }
+      { password: password || null, include_optional_tables: includeOptionalTables },
+      { timeout: 8000 }
     )
     return response.data
   },
@@ -1291,6 +1294,14 @@ export const backupApi = {
   getStatus: async (): Promise<BackupStatusResponse> => {
     const response = await apiClient.get<BackupStatusResponse>('/admin/backup/status')
     return response.data
+  },
+
+  /**
+   * Listar las tablas opcionales (historial/telemetría) disponibles para incluir.
+   */
+  getOptionalTables: async (): Promise<string[]> => {
+    const response = await apiClient.get<{ tables: string[] }>('/admin/backup/optional-tables')
+    return response.data.tables
   },
 
   /**

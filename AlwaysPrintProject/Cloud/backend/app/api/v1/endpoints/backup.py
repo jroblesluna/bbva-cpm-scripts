@@ -59,6 +59,10 @@ class BackupGenerateRequest(BaseModel):
         max_length=128,
         description="Password para cifrar ZIPs con AES-256 (opcional)",
     )
+    include_optional_tables: list[str] = Field(
+        default_factory=list,
+        description="Tablas opcionales (historial/telemetría) a incluir. Por defecto ninguna.",
+    )
 
 
 class BackupStatusResponse(BaseModel):
@@ -72,6 +76,12 @@ class BackupStatusResponse(BaseModel):
     images_zip_size: Optional[int] = None
     generated_at: Optional[str] = None
     has_password: Optional[bool] = None
+    included_optional_tables: Optional[list[str]] = None
+
+
+class BackupOptionalTablesResponse(BaseModel):
+    """Lista de tablas opcionales disponibles para incluir en el backup."""
+    tables: list[str]
 
 
 class BackupDownloadResponse(BaseModel):
@@ -157,12 +167,15 @@ async def generate_backup(
     # (SQLAlchemy/boto3 bloqueantes); con asyncio.create_task() correría sobre
     # el mismo event loop del servidor y lo congelaría entero mientras dura.
     service = BackupService()
-    asyncio.get_running_loop().run_in_executor(None, service.generate, request.password)
+    asyncio.get_running_loop().run_in_executor(
+        None, service.generate, request.password, request.include_optional_tables
+    )
 
     logger.info(
-        "Backup solicitado por %s (con password: %s)",
+        "Backup solicitado por %s (con password: %s, tablas opcionales: %s)",
         current_user.email,
         request.password is not None,
+        ", ".join(request.include_optional_tables) or "ninguna",
     )
 
     return {
@@ -196,7 +209,22 @@ async def get_backup_status(
         images_zip_size=status_data.get("images_zip_size"),
         generated_at=status_data.get("generated_at"),
         has_password=status_data.get("has_password"),
+        included_optional_tables=status_data.get("included_optional_tables"),
     )
+
+
+@router.get(
+    "/optional-tables",
+    response_model=BackupOptionalTablesResponse,
+    summary="Listar tablas opcionales disponibles para el backup",
+)
+async def get_optional_tables(
+    current_user: User = Depends(require_corporate_admin),
+):
+    """Tablas de historial/telemetría que el usuario puede optar por incluir."""
+    from app.services.backup_service import OPTIONAL_TABLES
+
+    return BackupOptionalTablesResponse(tables=OPTIONAL_TABLES)
 
 
 @router.get(
