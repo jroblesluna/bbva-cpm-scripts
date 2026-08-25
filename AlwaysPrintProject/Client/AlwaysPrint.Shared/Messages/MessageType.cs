@@ -74,5 +74,8 @@ namespace AlwaysPrint.Shared.Messages
 
         // Impresora favorita
         FavoritePrinterChanged,      // Tray → Service: usuario cambió su impresora favorita
+
+        // Certificado ECDSA
+        ResetCertVersion,            // Tray → Service: resetear CertVersion a 0 (requiere HKLM, el Tray no tiene permisos)
     }
 }

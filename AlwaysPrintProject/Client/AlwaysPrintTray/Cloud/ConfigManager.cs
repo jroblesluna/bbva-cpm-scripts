@@ -33,6 +33,12 @@ namespace AlwaysPrintTray.Cloud
         private static volatile string? _expectedCertHash;
 
         /// <summary>
+        /// Referencia al PipeClient usado para delegar al Service operaciones que requieren
+        /// privilegios HKLM (el Tray corre sin elevación). Asignada por el único constructor.
+        /// </summary>
+        private static PipeClient? _pipeClientRef;
+
+        /// <summary>
         /// Actualiza el cert_hash esperado del servidor.
         /// Llamado desde CloudManager al recibir el enrichment.
         /// Si el cert local no coincide con el hash del servidor, lo invalida inmediatamente
@@ -67,6 +73,7 @@ namespace AlwaysPrintTray.Cloud
         {
             _httpClient = httpClient;
             _pipeClient = pipeClient;
+            _pipeClientRef = pipeClient;
             
             // Ruta donde el Service guarda la configuración activa.
             // El Tray solo lee desde aquí; la escritura la hace el Service (LocalSystem).
@@ -156,11 +163,30 @@ namespace AlwaysPrintTray.Cloud
                 // de escritura sobre ese archivo (creado por Service como SYSTEM).
                 // La eliminación se delega al Service vía mensaje SaveActionConfig con contenido vacío.
 
-                // Resetear CertVersion a 0 para forzar re-descarga en el próximo sync
-                SignatureVerifier.SetLocalCertVersion(0);
+                // Resetear CertVersion a 0 para forzar re-descarga en el próximo sync.
+                // Requiere escritura en HKLM: el Tray no tiene permisos, se delega al Service.
+                if (_pipeClientRef != null && _pipeClientRef.IsConnected)
+                {
+                    var message = PipeMessage.Create(MessageType.ResetCertVersion, null);
+                    var response = _pipeClientRef.Send(message);
 
-                AlwaysPrintLogger.WriteTrayWarning(
-                    "ConfigManager: CertVersion reseteado a 0. Se forzará re-descarga del certificado en el próximo ciclo.");
+                    if (response?.Type == MessageType.Ack)
+                    {
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            "ConfigManager: CertVersion reseteado a 0 vía Service. Se forzará re-descarga del certificado en el próximo ciclo.");
+                    }
+                    else
+                    {
+                        AlwaysPrintLogger.WriteTrayError(
+                            "ConfigManager: el Service no confirmó el reseteo de CertVersion.");
+                    }
+                }
+                else
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        "ConfigManager: pipe no conectado, no se pudo resetear CertVersion. " +
+                        "Quedará desactualizado hasta el próximo reinicio del Service o reconexión.");
+                }
             }
             catch (Exception ex)
             {

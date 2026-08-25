@@ -140,6 +140,13 @@ namespace AlwaysPrint.Shared.Security
                 using (var cert = new X509Certificate2(certPath))
                 using (ECDsa ecDsa = cert.GetECDsaPublicKey())
                 {
+                    int localCertVersion = GetLocalCertVersion(traySource);
+                    LogInfo(
+                        $"SignatureVerifier: certificado en uso — Thumbprint={cert.Thumbprint}, " +
+                        $"Subject=\"{cert.Subject}\", Vigencia={cert.NotBefore:yyyy-MM-dd}..{cert.NotAfter:yyyy-MM-dd}, " +
+                        $"CertVersion(registro)={localCertVersion}, HashConfig={hashHex}.",
+                        traySource);
+
                     if (ecDsa == null)
                     {
                         LogError(
@@ -166,7 +173,8 @@ namespace AlwaysPrint.Shared.Security
                     if (!isValid)
                     {
                         LogError(
-                            "SignatureVerifier: firma ECDSA inválida — la configuración fue alterada o el certificado no corresponde.",
+                            $"SignatureVerifier: firma ECDSA INVÁLIDA — la configuración fue alterada o el certificado no corresponde. " +
+                            $"Thumbprint={cert.Thumbprint}, HashConfig={hashHex}.",
                             traySource, AlwaysPrintLogger.EvtGenericError);
                         return false;
                     }
@@ -175,7 +183,8 @@ namespace AlwaysPrint.Shared.Security
                 // 5. Firma válida — extraer config como string para el ActionEngine
                 configJson = configToken.ToString(Formatting.None);
                 LogInfo(
-                    "SignatureVerifier: verificación de firma ECDSA exitosa.", traySource);
+                    $"SignatureVerifier: verificación de firma ECDSA EXITOSA — certificado y hash coinciden (HashConfig={hashHex}).",
+                    traySource);
                 return true;
             }
             catch (JsonException ex)

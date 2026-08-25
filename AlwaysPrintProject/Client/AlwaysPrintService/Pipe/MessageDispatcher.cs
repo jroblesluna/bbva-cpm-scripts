@@ -6,6 +6,7 @@ using System.Text;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
+using AlwaysPrint.Shared.Security;
 using AlwaysPrintService.Debugging;
 using AlwaysPrintService.Queue;
 using AlwaysPrintService.Tasks;
@@ -88,6 +89,7 @@ namespace AlwaysPrintService.Pipe
                     MessageType.CloudConfigurationReceived  => HandleCloudConfigurationReceived(request),
                     MessageType.ActionConfigChanged         => HandleActionConfigChanged(request),
                     MessageType.SaveActionConfig            => HandleSaveActionConfig(request),
+                    MessageType.ResetCertVersion             => HandleResetCertVersion(request),
                     MessageType.InstallUpdate               => HandleInstallUpdate(request),
                     MessageType.ForcedContingencyChanged    => HandleForcedContingencyChanged(request),
                     MessageType.SaveResources               => HandleSaveResources(request),
@@ -278,6 +280,30 @@ namespace AlwaysPrintService.Pipe
             }
 
             return PipeMessage.Reply(req, MessageType.InstallUpdateResponse, result);
+        }
+
+        /// <summary>
+        /// Maneja la solicitud del Tray para resetear CertVersion a 0 en el registro.
+        /// El Tray no tiene permisos de escritura en HKLM; solo el Service (LocalSystem) puede.
+        /// Se usa cuando el Tray invalida el certificado local (firma inválida, hash manipulado, etc.)
+        /// para forzar la re-descarga del certificado correcto en el próximo sync.
+        /// </summary>
+        private PipeMessage HandleResetCertVersion(PipeMessage req)
+        {
+            try
+            {
+                SignatureVerifier.SetLocalCertVersion(0);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = true, Message = "CertVersion reseteado a 0." });
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError(
+                    $"ResetCertVersion: error al resetear CertVersion: {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+                return PipeMessage.Reply(req, MessageType.Ack,
+                    new AckPayload { Success = false, Message = $"Error al resetear: {ex.Message}" });
+            }
         }
 
         /// <summary>
