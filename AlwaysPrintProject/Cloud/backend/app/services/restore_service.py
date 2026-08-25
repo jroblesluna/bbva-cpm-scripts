@@ -20,6 +20,7 @@ from enum import Enum
 from typing import Any, Optional
 
 import boto3
+import psutil
 import pyzipper
 from botocore.exceptions import ClientError
 from sqlalchemy import inspect, text
@@ -133,6 +134,15 @@ class RestoreService:
         ("rebuilding_urls", "Reconstruyendo URLs de imágenes", 85, 90),
         ("verifying", "Verificando integridad", 90, 100),
     ]
+
+    # Un dict de Python con claves cortas + valores string/UUID suele pesar
+    # 3-5x su tamaño en JSON crudo (overhead de objetos CPython) — usamos 4x
+    # como estimado conservador, no es un cálculo exacto.
+    JSON_TO_PYTHON_MEMORY_RATIO = 4
+    # No usar más del 50% de la RAM disponible para cargar una sola tabla —
+    # deja margen para el resto del proceso (otros workers, buffers de la
+    # conexión a la BD) y para el margen de error del estimado de arriba.
+    MAX_TABLE_MEMORY_FRACTION = 0.5
 
     def __init__(self):
         """Inicializa clientes S3 con la configuración del proyecto."""
@@ -263,6 +273,7 @@ class RestoreService:
                     if password:
                         zf.setpassword(password.encode("utf-8"))
                     for idx, table_name in enumerate(TABLE_ORDER):
+                        self._check_memory_budget(zf, table_name)
                         records = self._extract_table(zf, table_name, missing_tables)
                         count = self._restore_table(db, table_name, records)
                         del records
@@ -657,6 +668,45 @@ class RestoreService:
     # EXTRACCIÓN DE DATOS DEL ZIP
     # =========================================================================
 
+    def _check_memory_budget(self, zf: "pyzipper.AESZipFile", table_name: str) -> None:
+        """
+        Aborta con un error claro si no hay RAM suficiente para cargar esta
+        tabla completa, en vez de intentarlo y arriesgarse a que el kernel
+        mate el worker sin avisar (OOM-kill).
+
+        Un OOM-kill real no se puede "atrapar": el proceso muere de golpe, sin
+        ejecutar ningún except, dejando restore_status.json congelado en
+        "restoring" para siempre (así quedó dev el 2026-08-25 con
+        telemetry_logs). La única forma de convertir eso en un error visible
+        es adelantarse: chequear el tamaño de la tabla contra la RAM
+        disponible ANTES de leerla, y fallar de forma controlada si no entra.
+        Esta excepción la atrapa el except general de restore() más abajo,
+        que ya marca status="failed" con el motivo y limpia la BD.
+
+        No aplica a SQLite (tests locales) ni si la tabla no está en el ZIP.
+        """
+        if settings.is_sqlite:
+            return
+        try:
+            info = zf.getinfo(f"{table_name}.json")
+        except KeyError:
+            return  # tabla ausente del ZIP — _extract_table ya lo maneja
+
+        estimated_bytes = info.file_size * self.JSON_TO_PYTHON_MEMORY_RATIO
+        available_bytes = psutil.virtual_memory().available
+        budget_bytes = available_bytes * self.MAX_TABLE_MEMORY_FRACTION
+
+        if estimated_bytes > budget_bytes:
+            raise MemoryError(
+                f"No hay memoria suficiente para restaurar la tabla '{table_name}': "
+                f"pesa {info.file_size / 1024 / 1024:.0f}MB sin comprimir "
+                f"(~{estimated_bytes / 1024 / 1024:.0f}MB estimados en memoria), "
+                f"pero el presupuesto seguro es {budget_bytes / 1024 / 1024:.0f}MB "
+                f"({available_bytes / 1024 / 1024:.0f}MB disponibles en el sistema). "
+                f"Excluí esta tabla del backup (tablas opcionales) o restaurá en una "
+                f"instancia con más RAM."
+            )
+
     def _extract_table(
         self, zf: "pyzipper.AESZipFile", table_name: str, missing_tables: set[str]
     ) -> list[dict]:
@@ -758,41 +808,60 @@ class RestoreService:
             if tbl == table_name
         }
 
-        # Convertir y insertar registros en lotes
-        converted_records = []
-        for record in records:
-            converted = {}
-            for key, value in record.items():
-                if key not in column_info:
-                    # Columna no existe en el modelo actual — omitir
-                    continue
+        if not records:
+            return 0
 
-                info = column_info[key]
+        table = model_class.__table__
+        batch_size = 500
+        total = 0
+        # Convierte e inserta en lotes sin armar antes una segunda lista con la
+        # tabla entera convertida — eso duplicaba en memoria una tabla que ya
+        # puede ser grande de por sí (records viene de _extract_table, ya
+        # materializada completa desde el JSON del backup). Además vamos
+        # "pop"-eando records al procesar cada lote para que Python libere
+        # cada dict ya insertado en vez de mantener la lista completa hasta
+        # terminar toda la tabla. El orden de inserción no importa: las FK
+        # quedan deshabilitadas (session_replication_role='replica') durante
+        # toda la etapa 3 del restore.
+        # ponytail: esto reduce el pico de memoria a ~2x el tamaño de la tabla
+        # (JSON parseado + un lote de 500), no lo elimina — una tabla cuyo
+        # JSON parseado por sí solo ya no entra en RAM (ver incidente OOM con
+        # telemetry_logs) necesita parseo incremental del ZIP (ijson) o pasar
+        # el backup a JSONL, no solo esto.
+        records.reverse()
+        while records:
+            batch = []
+            for _ in range(min(batch_size, len(records))):
+                batch.append(self._convert_record(records.pop(), column_info, table_enums))
+            db.execute(table.insert(), batch)
+            total += len(batch)
 
-                if value is None:
-                    converted[key] = None
-                elif info["is_guid"]:
-                    converted[key] = self._convert_to_uuid(value)
-                elif info["is_datetime"]:
-                    converted[key] = self._convert_to_datetime(value)
-                elif info["is_enum"] and key in table_enums:
-                    converted[key] = self._convert_to_enum(value, table_enums[key])
-                else:
-                    converted[key] = value
+        logger.debug("Restaurada tabla %s: %d registros", table_name, total)
+        return total
 
-            converted_records.append(converted)
+    def _convert_record(
+        self, record: dict, column_info: dict[str, dict], table_enums: dict[str, type]
+    ) -> dict:
+        """Convierte un registro (dict crudo del JSON) a tipos nativos según column_info."""
+        converted = {}
+        for key, value in record.items():
+            if key not in column_info:
+                # Columna no existe en el modelo actual — omitir
+                continue
 
-        # Insertar usando bulk insert con la tabla subyacente
-        if converted_records:
-            table = model_class.__table__
-            # Insertar en lotes de 500 para evitar problemas de memoria
-            batch_size = 500
-            for i in range(0, len(converted_records), batch_size):
-                batch = converted_records[i:i + batch_size]
-                db.execute(table.insert(), batch)
+            info = column_info[key]
 
-        logger.debug("Restaurada tabla %s: %d registros", table_name, len(converted_records))
-        return len(converted_records)
+            if value is None:
+                converted[key] = None
+            elif info["is_guid"]:
+                converted[key] = self._convert_to_uuid(value)
+            elif info["is_datetime"]:
+                converted[key] = self._convert_to_datetime(value)
+            elif info["is_enum"] and key in table_enums:
+                converted[key] = self._convert_to_enum(value, table_enums[key])
+            else:
+                converted[key] = value
+        return converted
 
     def _restore_association_table(
         self, db: Session, table, records: list[dict]
