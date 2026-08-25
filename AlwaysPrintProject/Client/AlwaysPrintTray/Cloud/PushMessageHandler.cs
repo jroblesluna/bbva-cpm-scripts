@@ -633,6 +633,15 @@ namespace AlwaysPrintTray.Cloud
                 {
                     AlwaysPrintLogger.WriteTrayInfo(
                         $"PushMessageHandler: certificado ECDSA actualizado exitosamente a versión {certVersion.Value}");
+
+                    // El cert nuevo puede desbloquear un config que antes se rechazó por falta
+                    // de certificado (fail-closed). Re-sincronizar ahora en vez de esperar al
+                    // próximo ciclo periódico de SyncFromState (hasta ~15 min de espera).
+                    DistributionState stateToResync = GetCachedState();
+                    if (stateToResync != null)
+                    {
+                        await SyncFromStateAsync(stateToResync);
+                    }
                 }
                 else
                 {
