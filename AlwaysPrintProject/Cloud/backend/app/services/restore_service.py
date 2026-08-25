@@ -11,6 +11,7 @@ Estructura esperada en S3:
   s3://{S3_ARTIFACTS_BUCKET}/backups/restore_status.json  — Estado del proceso
 """
 
+import io
 import json
 import logging
 import uuid
@@ -200,7 +201,7 @@ class RestoreService:
             )
 
             # Validar estructura del DB_ZIP — solo manifest.json es obligatorio.
-            # Los .json de cada tabla son opcionales: _extract_all_tables() ya trata
+            # Los .json de cada tabla son opcionales: _extract_table() ya trata
             # una tabla ausente como vacía (con warning), así que no tiene sentido
             # abortar el restore completo por, ej., un telemetry_logs.json faltante.
             self._validate_zip(db_zip_bytes, password, ["manifest.json"])
@@ -235,14 +236,19 @@ class RestoreService:
             logger.info("Base de datos limpiada")
 
             # --- Etapa 3: Restaurar BD tabla por tabla ---
+            # Cada tabla se extrae del ZIP dentro del mismo loop de inserción, una
+            # a la vez (no las 26 de golpe antes de insertar la primera): con
+            # backups de ~1.6M registros, acumular todo el JSON parseado en
+            # memoria antes de tocar la BD puede exceder la RAM del worker y
+            # matarlo a mitad de restore, dejando la BD truncada y vacía.
             logger.info("[3/6] Restaurando base de datos tabla por tabla...")
             self._update_restore_status(
                 "restoring", self.STAGES[2][1], self.STAGES[2][2]
             )
 
-            table_data, missing_tables = self._extract_all_tables(db_zip_bytes, password)
             restored_counts: dict[str, int] = {}
             tables_detail: list[dict[str, Any]] = []
+            missing_tables: set[str] = set()
 
             db = SessionLocal()
             try:
@@ -253,31 +259,35 @@ class RestoreService:
                     db.execute(text("SET session_replication_role = 'replica'"))
 
                 total_tables = len(TABLE_ORDER)
-                for idx, table_name in enumerate(TABLE_ORDER):
-                    records = table_data.get(table_name, [])
-                    count = self._restore_table(db, table_name, records)
-                    restored_counts[table_name] = count
-                    tables_detail.append({"table": table_name, "count": count})
+                with pyzipper.AESZipFile(io.BytesIO(db_zip_bytes), "r") as zf:
+                    if password:
+                        zf.setpassword(password.encode("utf-8"))
+                    for idx, table_name in enumerate(TABLE_ORDER):
+                        records = self._extract_table(zf, table_name, missing_tables)
+                        count = self._restore_table(db, table_name, records)
+                        del records
+                        restored_counts[table_name] = count
+                        tables_detail.append({"table": table_name, "count": count})
 
-                    # Actualizar progreso proporcionalmente entre 15% y 70%
-                    stage_progress = self.STAGES[2][2] + int(
-                        (idx + 1) / total_tables * (self.STAGES[2][3] - self.STAGES[2][2])
-                    )
-                    logger.info(
-                        "  (%d/%d) %s: %d registros [%d%%]",
-                        idx + 1, total_tables, table_name, count, stage_progress,
-                    )
-                    self._update_restore_status(
-                        "restoring",
-                        f"Restaurando: {table_name} ({count} registros)",
-                        stage_progress,
-                        extra={
-                            "tables_total": total_tables,
-                            "tables_done": idx + 1,
-                            "current_table": table_name,
-                            "tables_detail": tables_detail,
-                        },
-                    )
+                        # Actualizar progreso proporcionalmente entre 15% y 70%
+                        stage_progress = self.STAGES[2][2] + int(
+                            (idx + 1) / total_tables * (self.STAGES[2][3] - self.STAGES[2][2])
+                        )
+                        logger.info(
+                            "  (%d/%d) %s: %d registros [%d%%]",
+                            idx + 1, total_tables, table_name, count, stage_progress,
+                        )
+                        self._update_restore_status(
+                            "restoring",
+                            f"Restaurando: {table_name} ({count} registros)",
+                            stage_progress,
+                            extra={
+                                "tables_total": total_tables,
+                                "tables_done": idx + 1,
+                                "current_table": table_name,
+                                "tables_detail": tables_detail,
+                            },
+                        )
 
                 # Re-habilitar FK constraints antes del commit final
                 if not settings.is_sqlite:
@@ -647,42 +657,27 @@ class RestoreService:
     # EXTRACCIÓN DE DATOS DEL ZIP
     # =========================================================================
 
-    def _extract_all_tables(
-        self, db_zip_bytes: bytes, password: Optional[str]
-    ) -> tuple[dict[str, list[dict]], set[str]]:
+    def _extract_table(
+        self, zf: "pyzipper.AESZipFile", table_name: str, missing_tables: set[str]
+    ) -> list[dict]:
         """
-        Extrae todos los JSON de tablas del DB_ZIP.
+        Extrae y parsea el JSON de una sola tabla desde el ZIP ya abierto.
 
-        Returns:
-            Tupla (table_data, missing_tables): table_data es un diccionario
-            {nombre_tabla: lista_de_registros}; missing_tables es el conjunto de
-            tablas cuyo .json no estaba en el ZIP (ej. excluidas a propósito).
+        Se llama una tabla a la vez desde el loop de restauración (ver
+        `restore()`), no de una sola vez para las 26 tablas, para no acumular
+        ~1.6M registros en memoria antes de empezar a insertar.
         """
-        import io
-
-        table_data: dict[str, list[dict]] = {}
-        missing_tables: set[str] = set()
-        buffer = io.BytesIO(db_zip_bytes)
-
-        with pyzipper.AESZipFile(buffer, "r") as zf:
-            if password:
-                zf.setpassword(password.encode("utf-8"))
-
-            for table_name in TABLE_ORDER:
-                filename = f"{table_name}.json"
-                try:
-                    raw = zf.read(filename)
-                    records = json.loads(raw.decode("utf-8"))
-                    table_data[table_name] = records
-                except KeyError:
-                    # Tabla no encontrada en el ZIP — se asume excluida a propósito
-                    logger.warning(
-                        "Tabla %s no encontrada en el ZIP — se omite (0 registros)", table_name
-                    )
-                    table_data[table_name] = []
-                    missing_tables.add(table_name)
-
-        return table_data, missing_tables
+        filename = f"{table_name}.json"
+        try:
+            raw = zf.read(filename)
+        except KeyError:
+            # Tabla no encontrada en el ZIP — se asume excluida a propósito
+            logger.warning(
+                "Tabla %s no encontrada en el ZIP — se omite (0 registros)", table_name
+            )
+            missing_tables.add(table_name)
+            return []
+        return json.loads(raw.decode("utf-8"))
 
     # =========================================================================
     # RESTAURACIÓN DE TABLAS
