@@ -1600,9 +1600,10 @@ def generate_certificate(
     organization.ecdsa_cert_version = 1
     organization.ecdsa_cert_expires_at = expires_at
 
-    # Computar SHA256 del certificado para validación de integridad en workstations
+    # Computar SHA256 del certificado (bytes crudos, igual a lo subido a S3 y
+    # a lo que el cliente hashea al leer el .cer de disco) para validación de integridad.
     import hashlib
-    cert_hash = hashlib.sha256(cert_pem.encode("utf-8")).hexdigest()
+    cert_hash = hashlib.sha256(cert_pem).hexdigest()
     organization.ecdsa_cert_hash = cert_hash
 
     # 6. Commit a base de datos
@@ -1693,6 +1694,12 @@ async def rotate_certificate(
     organization.ecdsa_cert_version = new_version
     organization.ecdsa_cert_expires_at = expires_at
 
+    # Computar SHA256 del nuevo certificado (bytes crudos) — las workstations lo usan
+    # para validar integridad del .cer en disco (ver ConfigManager.ValidateCertIntegrity).
+    import hashlib
+    new_cert_hash = hashlib.sha256(cert_pem).hexdigest()
+    organization.ecdsa_cert_hash = new_cert_hash
+
     # 7. Re-firmar TODOS los ActionConfigs activos de la organización
     active_configs = db.query(ActionConfig).filter(
         ActionConfig.organization_id == org_id,
@@ -1754,6 +1761,7 @@ async def rotate_certificate(
             org_id=str(org_id),
             cert_version=new_version,
             cert_url=cert_url,
+            cert_hash=new_cert_hash,
         )
 
         # Push a workstations online vía PushDistributionService

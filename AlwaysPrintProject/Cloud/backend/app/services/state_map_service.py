@@ -642,6 +642,8 @@ class StateMapService:
         elif update_type == "cert":
             org_state.cert_version = update_data.get("cert_version", 0)
             org_state.cert_url = update_data.get("cert_url")
+            if update_data.get("cert_hash") is not None:
+                org_state.cert_hash = update_data.get("cert_hash")
 
         elif update_type == "msi":
             org_state.msi_version = update_data.get("msi_version")
@@ -796,7 +798,9 @@ class StateMapService:
         if org_state:
             org_state.loaded_at = time.time()
 
-    async def update_cert(self, org_id: str, cert_version: int, cert_url: str) -> None:
+    async def update_cert(
+        self, org_id: str, cert_version: int, cert_url: str, cert_hash: str | None = None
+    ) -> None:
         """
         Actualiza cert en el map local y publica a Redis.
 
@@ -804,10 +808,15 @@ class StateMapService:
             org_id: UUID de la organización.
             cert_version: Nueva versión del certificado ECDSA.
             cert_url: URL pública S3 del archivo .cer.
+            cert_hash: SHA256 hex del contenido del .cer, para validación de integridad
+                en el cliente. Si se omite, el estado en memoria conserva el hash anterior
+                (evitar esto — deja al cliente comparando contra un hash obsoleto).
         """
         org_state = self._get_or_create_org_state(org_id)
         org_state.cert_version = cert_version
         org_state.cert_url = cert_url
+        if cert_hash is not None:
+            org_state.cert_hash = cert_hash
 
         logger.info(
             "state_map.cert_actualizado",
@@ -819,6 +828,7 @@ class StateMapService:
         await self._publish_update(org_id, "cert", {
             "cert_version": cert_version,
             "cert_url": cert_url,
+            "cert_hash": cert_hash,
         })
 
     async def update_msi(
