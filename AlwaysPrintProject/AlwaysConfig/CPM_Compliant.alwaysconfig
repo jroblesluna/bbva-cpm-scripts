@@ -436,7 +436,7 @@
           "parameters": {
             "file_path": "C:\\Windows\\System32\\rundll32.exe",
             "arguments": "printui.dll,PrintUIEntry /Xs /n \"{{corporate_queue_name}}\" status resume",
-            "timeout_seconds": 15,
+            "timeout_seconds": 30,
             "window_style": "Hidden"
           }
         },
@@ -445,7 +445,7 @@
           "description": "Establecer cola corporativa como impresora predeterminada",
           "parameters": {
             "file_path": "C:\\Windows\\System32\\rundll32.exe",
-            "arguments": "printui.dll,PrintUIEntry /y /n \"{{corporate_queue_name}}\"",
+            "arguments": "printui.dll,PrintUIEntry /q /y /n \"{{corporate_queue_name}}\"",
             "timeout_seconds": 15,
             "window_style": "Hidden",
             "run_as_logged_in_user": true
@@ -570,7 +570,7 @@
           "parameters": {
             "file_path": "C:\\Windows\\System32\\rundll32.exe",
             "arguments": "printui.dll,PrintUIEntry /Xs /n \"{{corporate_queue_name}}\" status resume",
-            "timeout_seconds": 15,
+            "timeout_seconds": 30,
             "window_style": "Hidden"
           }
         },
@@ -579,7 +579,7 @@
           "description": "Establecer cola corporativa como impresora predeterminada",
           "parameters": {
             "file_path": "C:\\Windows\\System32\\rundll32.exe",
-            "arguments": "printui.dll,PrintUIEntry /y /n \"{{corporate_queue_name}}\"",
+            "arguments": "printui.dll,PrintUIEntry /q /y /n \"{{corporate_queue_name}}\"",
             "timeout_seconds": 15,
             "window_style": "Hidden",
             "run_as_logged_in_user": true
@@ -697,7 +697,7 @@
           "parameters": {
             "file_path": "C:\\Windows\\System32\\rundll32.exe",
             "arguments": "printui.dll,PrintUIEntry /Xs /n \"{{corporate_queue_name}}\" status resume",
-            "timeout_seconds": 15,
+            "timeout_seconds": 30,
             "window_style": "Hidden"
           }
         },
@@ -706,7 +706,7 @@
           "description": "Establecer cola corporativa como impresora predeterminada",
           "parameters": {
             "file_path": "C:\\Windows\\System32\\rundll32.exe",
-            "arguments": "printui.dll,PrintUIEntry /y /n \"{{corporate_queue_name}}\"",
+            "arguments": "printui.dll,PrintUIEntry /q /y /n \"{{corporate_queue_name}}\"",
             "timeout_seconds": 15,
             "window_style": "Hidden",
             "run_as_logged_in_user": true
@@ -787,7 +787,7 @@
           "parameters": {
             "file_path": "C:\\Windows\\System32\\rundll32.exe",
             "arguments": "printui.dll,PrintUIEntry /Xs /n \"{{corporate_queue_name}}\" status resume",
-            "timeout_seconds": 15,
+            "timeout_seconds": 30,
             "window_style": "Hidden"
           }
         },
@@ -796,7 +796,7 @@
           "description": "Establecer cola corporativa como impresora predeterminada",
           "parameters": {
             "file_path": "C:\\Windows\\System32\\rundll32.exe",
-            "arguments": "printui.dll,PrintUIEntry /y /n \"{{corporate_queue_name}}\"",
+            "arguments": "printui.dll,PrintUIEntry /q /y /n \"{{corporate_queue_name}}\"",
             "timeout_seconds": 15,
             "window_style": "Hidden",
             "run_as_logged_in_user": true
@@ -911,7 +911,7 @@
                   "parameters": {
                     "file_path": "C:\\Windows\\System32\\rundll32.exe",
                     "arguments": "printui.dll,PrintUIEntry /Xs /n \"{{corporate_queue_name}}\" status resume",
-                    "timeout_seconds": 15,
+                    "timeout_seconds": 30,
                     "window_style": "Hidden"
                   }
                 },
@@ -1212,7 +1212,7 @@
           "parameters": {
             "file_path": "C:\\Windows\\System32\\rundll32.exe",
             "arguments": "printui.dll,PrintUIEntry /Xs /n \"{{corporate_queue_name}}\" status resume",
-            "timeout_seconds": 15,
+            "timeout_seconds": 30,
             "window_style": "Hidden"
           }
         },
@@ -1221,7 +1221,7 @@
           "description": "Establecer cola corporativa como impresora predeterminada",
           "parameters": {
             "file_path": "C:\\Windows\\System32\\rundll32.exe",
-            "arguments": "printui.dll,PrintUIEntry /y /n \"{{corporate_queue_name}}\"",
+            "arguments": "printui.dll,PrintUIEntry /q /y /n \"{{corporate_queue_name}}\"",
             "timeout_seconds": 15,
             "window_style": "Hidden",
             "run_as_logged_in_user": true

@@ -32,6 +32,7 @@ namespace AlwaysPrintService.Actions
         private string? _loadedConfigHash;
         private string? _currentOnDemandLabel;
         private int _currentDepth;
+        private readonly List<string> _failedActionDescriptions = new List<string>();
 
         /// <summary>
         /// Evento emitido por cada paso de una ejecución OnDemand.
@@ -361,22 +362,25 @@ namespace AlwaysPrintService.Actions
                 _variables[kvp.Key] = kvp.Value;
             _currentOnDemandLabel = label;
             _currentDepth = 0;
+            _failedActionDescriptions.Clear();
             bool success = ExecuteActions(trigger.Actions);
+            var failedDescriptions = _failedActionDescriptions.ToList();
+            _failedActionDescriptions.Clear();
             _currentOnDemandLabel = null;
-            
+
             sw.Stop();
             AlwaysPrintLogger.WriteInfo(
                 $"ActionEngine: OnDemand '{label}' completado. " +
                 $"Success={success}, Duración={sw.ElapsedMilliseconds}ms");
 
             // Emitir progreso final: completado
-            OnActionProgress?.Invoke(label, "COMPLETE", 
+            OnActionProgress?.Invoke(label, "COMPLETE",
                 success ? "Ejecución completada" : "Ejecución completada con errores",
                 success ? "completed_ok" : "completed_error", 0);
-            
-            return (success, success 
+
+            return (success, success
                 ? $"Trigger '{label}' ejecutado correctamente ({sw.ElapsedMilliseconds}ms)"
-                : $"Trigger '{label}' falló durante ejecución");
+                : $"Trigger '{label}' ejecutado con errores en: {string.Join("; ", failedDescriptions)}");
         }
         
         // ═══════════════════════════════════════════════════════════════════════
@@ -404,6 +408,8 @@ namespace AlwaysPrintService.Actions
                         AlwaysPrintLogger.WriteWarning($"ActionEngine: acción '{action.Type}' falló");
                         if (_currentOnDemandLabel != null)
                             OnActionProgress?.Invoke(_currentOnDemandLabel, action.Type, action.Description ?? action.Type, "error", _currentDepth);
+                        if (action.Type != ActionTypes.Conditional)
+                            _failedActionDescriptions.Add(action.Description ?? action.Type);
                         allSuccess = false;
                     }
                     else
@@ -417,6 +423,7 @@ namespace AlwaysPrintService.Actions
                     AlwaysPrintLogger.WriteError($"ActionEngine: error ejecutando acción '{action.Type}': {ex.Message}", ex);
                     if (_currentOnDemandLabel != null)
                         OnActionProgress?.Invoke(_currentOnDemandLabel, action.Type, action.Description ?? action.Type, "error", _currentDepth);
+                    _failedActionDescriptions.Add($"{action.Description ?? action.Type} ({ex.Message})");
                     allSuccess = false;
                 }
             }

@@ -72,6 +72,19 @@ export function OnDemandActionsSection({ workstationId, isOnline }: OnDemandActi
       setConfirmAction(null);
     },
     onError: (error: { detail?: string; status?: number }) => {
+      // Un 500 en execute_on_demand significa que la workstation SÍ ejecutó el
+      // trigger y respondió — solo que uno o más pasos fallaron. Es distinto de
+      // 409 (offline) o 408/504 (sin respuesta): ahí no se ejecutó nada.
+      if (error.status === 500) {
+        toast({
+          variant: 'destructive',
+          title: t('actionExecutedWithErrors'),
+          description: error.detail ?? t('actionFailed'),
+        });
+        setConfirmAction(null);
+        return;
+      }
+
       let description: string;
       if (error.status === 409) {
         description = t('wsOfflineTooltip');

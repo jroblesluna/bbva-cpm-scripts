@@ -272,6 +272,7 @@
     "actionExecuted": "Acción ejecutada exitosamente",
     "actionExecutedDesc": "Duración: {duration}ms",
     "actionFailed": "Error al ejecutar acción",
+    "actionExecutedWithErrors": "Acción ejecutada con errores",
     "actionTimeout": "Timeout — la acción puede seguir ejecutándose en la workstation",
     "actionConfirm": "¿Ejecutar esta acción?",
     "actionConfirmDesc": "Se ejecutará \"{label}\" en la workstation. {description}",

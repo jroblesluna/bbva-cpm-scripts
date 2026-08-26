@@ -3,6 +3,7 @@ using NUnit.Framework;
 using AlwaysPrint.Shared.Configuration;
 using AlwaysPrintService.Actions;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace AlwaysPrint.Tests.OnDemand
 {
@@ -162,6 +163,54 @@ namespace AlwaysPrint.Tests.OnDemand
                 "El mensaje debe indicar que el trigger no fue encontrado.");
             Assert.That(message, Does.Contain("Trigger Inexistente"),
                 "El mensaje de error debe incluir el label buscado.");
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // TEST: Falla parcial reporta qué pasos fallaron (no un mensaje genérico)
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Cuando algunas acciones del trigger fallan pero otras se ejecutan bien,
+        /// el mensaje de error debe listar la descripción de los pasos que fallaron
+        /// en vez de un texto genérico ("falló durante ejecución") que no distingue
+        /// "no se ejecutó nada" de "se ejecutó pero con errores puntuales".
+        /// </summary>
+        [Test]
+        public void ExecuteOnDemandTrigger_AccionFalla_MensajeListaPasosFallidos()
+        {
+            // Arrange — trigger con una acción que falla de forma determinística
+            // (RunProcess contra un archivo que no existe) rodeada de acciones que sí pasan.
+            var config = new ActionConfiguration
+            {
+                Name = "TestConfig",
+                Version = "1.0",
+                Triggers = new List<TriggerConfig>
+                {
+                    new TriggerConfig
+                    {
+                        Event = "OnDemand",
+                        Label = "Limpiar Sistema de Impresión",
+                        Actions = new List<ActionConfig>
+                        {
+                            new ActionConfig { Type = "KillProcessesByName", Description = "Paso previo ok",
+                                Parameters = JObject.FromObject(new { process_name = "no-such-process.exe" }) },
+                            new ActionConfig { Type = "RunProcess", Description = "Ejecutar script inexistente",
+                                Parameters = JObject.FromObject(new { file_path = @"C:\ruta\que\no\existe.bat", timeout_seconds = 1 }) },
+                        }
+                    }
+                }
+            };
+            LoadConfig(config);
+
+            // Act
+            var (success, message) = _engine.ExecuteOnDemandTrigger("Limpiar Sistema de Impresión");
+
+            // Assert
+            Assert.IsFalse(success, "Debe reportar success=false si un paso falló.");
+            Assert.That(message, Does.Contain("Ejecutar script inexistente"),
+                "El mensaje debe nombrar el paso que falló, no un texto genérico.");
+            Assert.That(message, Does.Not.Contain("Paso previo ok"),
+                "El mensaje no debe listar pasos que sí funcionaron.");
         }
 
         /// <summary>
