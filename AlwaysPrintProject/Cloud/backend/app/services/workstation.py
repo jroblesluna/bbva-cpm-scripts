@@ -438,11 +438,30 @@ class WorkstationService:
             f"tray_version={tray_version}"
         )
         
-        # 1. Buscar workstation existente
+        # 1. Buscar workstation existente por IP privada
         workstation = db.query(Workstation).filter_by(
             ip_private=ip_private
         ).first()
-        
+
+        # Fallback: si no coincide por IP (ej. cambio de lease DHCP, o el
+        # cliente perdió su WorkstationId cacheado tras una reinstalación),
+        # buscar por os_serial. A diferencia de ip_private, os_serial
+        # identifica la instalación de Windows y no cambia con la red ni
+        # con reinstalaciones de la app — evita crear un duplicado para el
+        # mismo equipo físico. Si dos registros concurrentes chocaran en la
+        # misma ip_private (carrera rarísima), la unique constraint hace
+        # fallar el commit y el handler de arriba cierra el WS con error;
+        # el cliente reintenta.
+        if not workstation and os_serial:
+            workstation = db.query(Workstation).filter_by(
+                os_serial=os_serial
+            ).first()
+            if workstation:
+                logger.info(
+                    f"[REGISTRO] Workstation {workstation.id} encontrada por os_serial "
+                    f"(ip_private cambió: {workstation.ip_private} -> {ip_private})"
+                )
+
         if workstation:
             logger.info(
                 f"[REGISTRO] Workstation existente encontrada: "
@@ -450,18 +469,19 @@ class WorkstationService:
                 f"ip_private={workstation.ip_private}, "
                 f"hostname={workstation.hostname}"
             )
-            
+
             # Actualizar campos básicos de la workstation existente
+            workstation.ip_private = ip_private
             if hostname:
                 workstation.hostname = hostname
             if os_serial:
                 workstation.os_serial = os_serial
             if current_user:
                 workstation.current_user = current_user
-            
+
             workstation.is_online = True
             workstation.last_connection = datetime.now(timezone.utc).replace(tzinfo=None)
-            
+
             # Guardar tray_version si se proporcionó
             if tray_version:
                 workstation.tray_version = tray_version

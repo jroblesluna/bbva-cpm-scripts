@@ -8,6 +8,7 @@ Este módulo define los endpoints para:
 """
 
 import json
+import logging
 from typing import Optional
 from uuid import UUID
 
@@ -25,6 +26,8 @@ from app.models.workstation import Workstation
 from app.schemas import GlobalConfigUpdate, GlobalConfigResponse
 from app.services.config import ConfigService
 from app.services.audit import AuditService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -144,13 +147,27 @@ def get_effective_config_by_ip(
             Workstation.organization_id == organization_id,
         ).first()
     else:
-        # Sin organización resuelta → 404
+        # Sin organización resuelta → 404. Loggear IP y headers de proxy para
+        # poder diagnosticar por qué esta IP pública no matcheó ninguna
+        # PublicIP autorizada (puede diferir de la IP vista en el registro
+        # WebSocket si el cliente sale por una ruta de red distinta).
+        logger.warning(
+            f"[CONFIG] workstation_id={workstation_id}: no se pudo resolver "
+            f"organization_id. client_ip={get_client_ip(request)}, "
+            f"x_forwarded_for={request.headers.get('X-Forwarded-For')}, "
+            f"x_real_ip={request.headers.get('X-Real-IP')}, "
+            f"request_client={request.client.host if request.client else None}"
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workstation con ID {workstation_id} no encontrada"
         )
 
     if not workstation:
+        logger.warning(
+            f"[CONFIG] workstation_id={workstation_id}: no encontrada para "
+            f"organization_id={organization_id}. client_ip={get_client_ip(request)}"
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workstation con ID {workstation_id} no encontrada"
@@ -162,6 +179,10 @@ def get_effective_config_by_ip(
     ).first()
 
     if not global_config:
+        logger.warning(
+            f"[CONFIG] workstation_id={workstation_id}: no hay GlobalConfig "
+            f"para organization_id={workstation.organization_id}"
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Workstation con ID {workstation_id} no encontrada"
