@@ -808,6 +808,51 @@ class ConnectionManager:
             f"Cerradas: {closed_count}, Errores: {error_count}, Total: {len(workstation_ids)}"
         )
 
+    async def force_disconnect_organization(
+        self, organization_id: str, reason: str = "Reconexión forzada por administrador"
+    ) -> int:
+        """
+        Cierra las conexiones WebSocket de workstations de una organización.
+
+        Modo single-worker (sin Redis): no hay otros procesos a los que avisar,
+        alcanza con cerrar las conexiones locales. Ver la versión con pub/sub
+        en RedisConnectionManager para el caso multi-worker.
+
+        Args:
+            organization_id: UUID de la organización
+            reason: Razón del cierre (máx 123 bytes, va en el close frame)
+
+        Returns:
+            Número de conexiones cerradas.
+        """
+        truncated_reason = reason[:123]
+
+        async with self._lock:
+            local_ws_ids = [
+                ws_id for ws_id, org_id in self.org_ids.items()
+                if org_id == organization_id
+            ]
+
+        closed_count = 0
+        for ws_id in local_ws_ids:
+            try:
+                async with self._lock:
+                    ws = self.workstation_connections.get(ws_id)
+                if ws:
+                    await ws.close(code=1001, reason=truncated_reason)
+                    closed_count += 1
+            except Exception as e:
+                logger.warning(
+                    f"[FORCE_DISCONNECT] Error cerrando WebSocket de workstation {ws_id}: "
+                    f"{type(e).__name__}: {e}"
+                )
+
+        logger.info(
+            f"[FORCE_DISCONNECT] organization_id={organization_id}: "
+            f"{closed_count} conexiones cerradas."
+        )
+        return closed_count
+
 
 # === FACTORY CONDICIONAL ===
 # Selecciona el manager según la configuración de Redis.

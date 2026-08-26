@@ -923,6 +923,17 @@ class RedisConnectionManager:
                                 if not k.startswith("_") and k != "organization_id"
                             }
                             await self._deliver_to_local_org_workstations(target_org_id, clean_payload)
+                    elif target == "force_disconnect":
+                        # Cierre forzado de conexiones locales de esta org (post-restore de BD)
+                        org_id_from_channel = channel.split(":", 1)[1] if ":" in channel else None
+                        org_id_from_payload = payload.get("organization_id") if isinstance(payload, dict) else None
+                        target_org_id = org_id_from_payload or org_id_from_channel
+
+                        if target_org_id:
+                            await self._close_local_org_workstations(
+                                target_org_id,
+                                payload.get("reason", "Reconexión forzada por administrador"),
+                            )
                     else:
                         # Comportamiento original: entregar a operadores locales (frontend)
                         async with self._lock:
@@ -1107,6 +1118,85 @@ class RedisConnectionManager:
             skipped_tenant_fail=skipped,
             message_type=payload.get("type", "unknown"),
         )
+
+    async def force_disconnect_organization(
+        self, organization_id: str, reason: str = "Reconexión forzada por administrador"
+    ) -> int:
+        """
+        Cierra todas las conexiones WebSocket de workstations de una organización,
+        en este worker y en todos los demás (cross-worker vía pub/sub org:{id}).
+
+        Paso operativo pensado para después de restaurar un backup de BD: las
+        conexiones que seguían abiertas quedan registradas en Redis bajo el
+        WorkstationId que tenían ANTES del restore (self.org_ids se puebla al
+        conectar, no se resincroniza contra la BD). Si ese id ya no coincide
+        con la fila restaurada, la workstation queda invisible para el
+        dashboard aunque siga conectada. Cerrar la conexión fuerza al Tray a
+        reconectar y re-registrarse contra los datos ya restaurados — sin
+        reiniciar el backend ni afectar otras organizaciones.
+
+        Args:
+            organization_id: UUID de la organización
+            reason: Razón del cierre (máx 123 bytes, va en el close frame)
+
+        Returns:
+            Conexiones cerradas en ESTE worker. Las de otros workers se
+            cierran de forma asíncrona al recibir el mensaje publicado.
+        """
+        closed_local = await self._close_local_org_workstations(organization_id, reason)
+
+        if self._redis_available and self._redis:
+            try:
+                payload = {
+                    "_target": "force_disconnect",
+                    "_origin_worker": self._worker_id,
+                    "organization_id": organization_id,
+                    "reason": reason,
+                }
+                await self._redis.publish(
+                    f"org:{organization_id}", json.dumps(payload, default=str)
+                )
+            except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
+                logger.warning(
+                    "redis.publish_failed",
+                    channel=f"org:{organization_id}",
+                    error=str(e),
+                )
+
+        return closed_local
+
+    async def _close_local_org_workstations(self, organization_id: str, reason: str) -> int:
+        """Cierra las conexiones LOCALES (este worker) de workstations de una organización."""
+        truncated_reason = reason[:123]
+
+        local_ws_ids = [
+            ws_id for ws_id, org_id in self.org_ids.items()
+            if org_id == organization_id
+        ]
+
+        closed = 0
+        for ws_id in local_ws_ids:
+            try:
+                async with self._lock:
+                    ws = self.workstation_connections.get(ws_id)
+                if ws:
+                    await ws.close(code=1001, reason=truncated_reason)
+                    closed += 1
+            except Exception as e:
+                logger.warning(
+                    "force_disconnect.close_error",
+                    workstation_id=ws_id,
+                    error=str(e),
+                )
+
+        if closed:
+            logger.info(
+                "force_disconnect.local_closed",
+                organization_id=organization_id,
+                count=closed,
+            )
+
+        return closed
 
     async def _deliver_global_broadcast(self, payload: dict) -> None:
         """
