@@ -853,6 +853,42 @@ class ConnectionManager:
         )
         return closed_count
 
+    async def force_disconnect_all(
+        self, reason: str = "Reconexión forzada por administrador"
+    ) -> int:
+        """
+        Cierra TODAS las conexiones WebSocket de workstations (todas las
+        organizaciones). Modo single-worker: no hay otros procesos a los
+        que avisar, alcanza con cerrar las conexiones locales.
+
+        Args:
+            reason: Razón del cierre (máx 123 bytes, va en el close frame)
+
+        Returns:
+            Número de conexiones cerradas.
+        """
+        truncated_reason = reason[:123]
+
+        async with self._lock:
+            ws_ids = list(self.workstation_connections.keys())
+
+        closed_count = 0
+        for ws_id in ws_ids:
+            try:
+                async with self._lock:
+                    ws = self.workstation_connections.get(ws_id)
+                if ws:
+                    await ws.close(code=1001, reason=truncated_reason)
+                    closed_count += 1
+            except Exception as e:
+                logger.warning(
+                    f"[FORCE_DISCONNECT_ALL] Error cerrando WebSocket de workstation {ws_id}: "
+                    f"{type(e).__name__}: {e}"
+                )
+
+        logger.info(f"[FORCE_DISCONNECT_ALL] {closed_count} conexiones cerradas.")
+        return closed_count
+
 
 # === FACTORY CONDICIONAL ===
 # Selecciona el manager según la configuración de Redis.

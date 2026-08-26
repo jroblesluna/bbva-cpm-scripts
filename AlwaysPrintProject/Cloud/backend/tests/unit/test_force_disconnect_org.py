@@ -87,3 +87,51 @@ class TestConnectionManagerForceDisconnect:
         assert closed == 1
         mocks["ws-1"].close.assert_awaited_once_with(code=1001, reason="test")
         mocks["ws-2"].close.assert_not_awaited()
+
+
+class TestForceDisconnectAll:
+    """
+    force_disconnect_all: usado al final de un restore de BD completo, donde
+    se reemplazan TODAS las organizaciones — a diferencia de
+    force_disconnect_organization, no filtra por org_id en absoluto, así que
+    también alcanza a conexiones cuyo org_id en vivo ya no existe en la BD
+    restaurada (el caso que force_disconnect_organization por sí solo no
+    puede cubrir).
+    """
+
+    @pytest.mark.asyncio
+    async def test_redis_manager_closes_every_connection_regardless_of_org(self):
+        manager = RedisConnectionManager(redis_url=None)
+        mocks = _make_manager_with_connections(manager, {
+            "ws-1": "org-A",
+            "ws-2": "org-B",
+            "ws-3": "org-organizacion-que-ya-no-existe-tras-el-restore",
+        })
+
+        closed = await manager.force_disconnect_all(reason="test")
+
+        assert closed == 3
+        for mock_ws in mocks.values():
+            mock_ws.close.assert_awaited_once_with(code=1001, reason="test")
+
+    @pytest.mark.asyncio
+    async def test_connection_manager_closes_every_connection_regardless_of_org(self):
+        manager = ConnectionManager()
+        mocks = _make_manager_with_connections(manager, {
+            "ws-1": "org-A",
+            "ws-2": "org-B",
+        })
+
+        closed = await manager.force_disconnect_all(reason="test")
+
+        assert closed == 2
+        for mock_ws in mocks.values():
+            mock_ws.close.assert_awaited_once_with(code=1001, reason="test")
+
+    @pytest.mark.asyncio
+    async def test_no_connections_returns_zero(self):
+        manager = RedisConnectionManager(redis_url=None)
+
+        closed = await manager.force_disconnect_all()
+
+        assert closed == 0

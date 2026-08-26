@@ -941,7 +941,14 @@ class RedisConnectionManager:
                         for user_id in user_ids:
                             await self.send_to_operator(user_id, payload)
                 elif channel == "global:broadcast":
-                    await self._deliver_global_broadcast(payload)
+                    if isinstance(payload, dict) and payload.get("_target") == "force_disconnect_all":
+                        origin = payload.get("_origin_worker")
+                        if origin != self._worker_id:
+                            await self._close_local_all_workstations(
+                                payload.get("reason", "Reconexión forzada por administrador")
+                            )
+                    else:
+                        await self._deliver_global_broadcast(payload)
 
             except asyncio.CancelledError:
                 logger.info("redis.listener_cancelled")
@@ -1195,6 +1202,72 @@ class RedisConnectionManager:
                 organization_id=organization_id,
                 count=closed,
             )
+
+        return closed
+
+    async def force_disconnect_all(
+        self, reason: str = "Reconexión forzada por administrador"
+    ) -> int:
+        """
+        Cierra TODAS las conexiones WebSocket de workstations (todas las
+        organizaciones), en este worker y en todos los demás.
+
+        Paso automático al final de un restore de BD completo: como se
+        reemplazan TODAS las organizaciones (no solo una), no alcanza con
+        force_disconnect_organization por cada org restaurada — quedarían
+        afuera las conexiones cuyo org_id en vivo (fijado al conectar) ya
+        no corresponde a ninguna fila de la BD restaurada.
+
+        Args:
+            reason: Razón del cierre (máx 123 bytes, va en el close frame)
+
+        Returns:
+            Conexiones cerradas en ESTE worker. Las de otros workers se
+            cierran de forma asíncrona al recibir el mensaje publicado.
+        """
+        closed_local = await self._close_local_all_workstations(reason)
+
+        if self._redis_available and self._redis:
+            try:
+                payload = {
+                    "_target": "force_disconnect_all",
+                    "_origin_worker": self._worker_id,
+                    "reason": reason,
+                }
+                await self._redis.publish("global:broadcast", json.dumps(payload, default=str))
+            except (aioredis.ConnectionError, aioredis.TimeoutError, OSError) as e:
+                logger.warning(
+                    "redis.publish_failed",
+                    channel="global:broadcast",
+                    error=str(e),
+                )
+
+        return closed_local
+
+    async def _close_local_all_workstations(self, reason: str) -> int:
+        """Cierra TODAS las conexiones locales (este worker), sin filtrar por org."""
+        truncated_reason = reason[:123]
+
+        async with self._lock:
+            ws_ids = list(self.workstation_connections.keys())
+
+        closed = 0
+        for ws_id in ws_ids:
+            try:
+                async with self._lock:
+                    ws = self.workstation_connections.get(ws_id)
+                if ws:
+                    await ws.close(code=1001, reason=truncated_reason)
+                    closed += 1
+            except Exception as e:
+                logger.warning(
+                    "force_disconnect_all.close_error",
+                    workstation_id=ws_id,
+                    error=str(e),
+                )
+
+        if closed:
+            logger.info("force_disconnect_all.local_closed", count=closed)
 
         return closed
 

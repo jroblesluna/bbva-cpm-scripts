@@ -361,6 +361,16 @@ class RestoreService:
             # la vieja, y es barato (segundos) frente a lo que dura un restore.
             self._rotate_all_certificates()
 
+            # --- Forzar reconexión de workstations que siguen conectadas ---
+            # Una conexión WebSocket que nunca se cortó sigue registrada bajo el
+            # WorkstationId (y organization_id) que tenía ANTES del restore — el
+            # restore reemplaza la BD entera, no las conexiones ya abiertas.
+            # Sin esto, esas workstations siguen funcionando pero el dashboard
+            # las muestra "desconectadas" porque su id ya no matchea ninguna
+            # fila restaurada. Cerrar la conexión fuerza a cada Tray a
+            # reconectar y re-registrarse contra los datos ya restaurados.
+            self._force_disconnect_all_workstations()
+
             # --- Finalizar: Limpiar archivos temporales y actualizar status ---
             self._cleanup_restore_uploads()
 
@@ -1258,6 +1268,41 @@ class RestoreService:
             "Rotación de certificados completada: %d/%d organizaciones.",
             rotated, len(org_ids),
         )
+
+    # =========================================================================
+    # RECONEXIÓN FORZADA DE WORKSTATIONS
+    # =========================================================================
+
+    def _force_disconnect_all_workstations(self) -> None:
+        """
+        Cierra toda conexión WebSocket de workstation que haya sobrevivido al
+        restore, para forzar reconexión y re-registro contra la BD ya
+        restaurada. Ver comentario en restore() para el porqué.
+
+        No aborta el restore si falla — el restore de BD ya terminó en este
+        punto; en el peor caso, las workstations conectadas quedan
+        temporalmente "offline" en el dashboard hasta el próximo reinicio del
+        Tray, sin pérdida de datos.
+        """
+        import asyncio
+        from app.services.websocket_manager import connection_manager
+
+        try:
+            closed = asyncio.run(
+                connection_manager.force_disconnect_all(
+                    reason="Reconexión forzada tras restore de BD"
+                )
+            )
+            logger.info(
+                "Reconexión forzada tras restore: %d conexión(es) WebSocket cerrada(s) en este worker.",
+                closed,
+            )
+        except Exception as e:
+            logger.error(
+                "Reconexión forzada tras restore falló: %s. Las workstations que seguían "
+                "conectadas pueden figurar como offline hasta que el Tray se reinicie solo.",
+                str(e),
+            )
 
     # =========================================================================
     # LIMPIEZA
