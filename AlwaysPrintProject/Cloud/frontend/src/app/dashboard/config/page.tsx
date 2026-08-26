@@ -9,10 +9,13 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslations } from 'next-intl';
-import { Shield, FileSpreadsheet, Database } from 'lucide-react';
+import { Shield, FileSpreadsheet, Database, ShieldAlert } from 'lucide-react';
 import { SyncInventorySection } from '@/components/config/SyncInventorySection';
 import { SslCertificateSection } from '@/components/config/SslCertificateSection';
 import { BackupSection } from '@/components/admin/BackupSection';
+
+// Debe reflejar ALLOWED_DOMAINS del backend (ssl.py, sync_inventory.py, backup.py)
+const ALLOWED_DOMAINS = ['@robles.ai', '@sistemas.com.pe'];
 
 type TabKey = 'certificate' | 'sync' | 'backup';
 
@@ -29,12 +32,25 @@ const TABS: TabDef[] = [
 ];
 
 export default function ConfigPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const t = useTranslations('config');
   const [activeTab, setActiveTab] = useState<TabKey>('certificate');
 
   if (!isAdmin()) {
     return null;
+  }
+
+  const email = (user?.email || '').toLowerCase();
+  const isCorporateAdmin = ALLOWED_DOMAINS.some((domain) => email.endsWith(domain));
+
+  if (!isCorporateAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <ShieldAlert className="h-12 w-12 text-red-500 mb-4" />
+        <h1 className="text-xl font-semibold text-gray-900">{t('accessDeniedTitle')}</h1>
+        <p className="mt-2 text-gray-600">{t('accessDeniedMsg')}</p>
+      </div>
+    );
   }
 
   return (

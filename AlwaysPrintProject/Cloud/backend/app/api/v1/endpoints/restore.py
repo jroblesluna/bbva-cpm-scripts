@@ -110,12 +110,22 @@ def _get_s3_client():
     Fuerza SigV4: sin esto, generate_presigned_url para put_object con
     ContentType puede caer en SigV2 (deprecado), que S3 rechaza — el navegador
     lo reporta como error de CORS aunque el bucket ya tenga CORS bien configurado.
+
+    Fuerza también el endpoint regional explícito: sin esto, botocore firma
+    generate_presigned_url() contra el host global "s3.amazonaws.com" (sin
+    región) aunque el cliente resuelva su propio endpoint como
+    "s3.<region>.amazonaws.com" — para un bucket fuera de us-east-1, S3
+    responde SignatureDoesNotMatch en ese host global (confirmado en dev).
     """
     session = boto3.Session(
         region_name=settings.AWS_REGION,
         profile_name=settings.AWS_PROFILE or None,
     )
-    return session.client("s3", config=Config(signature_version="s3v4"))
+    return session.client(
+        "s3",
+        endpoint_url=f"https://s3.{settings.AWS_REGION}.amazonaws.com",
+        config=Config(signature_version="s3v4"),
+    )
 
 
 def _read_restore_status() -> dict:

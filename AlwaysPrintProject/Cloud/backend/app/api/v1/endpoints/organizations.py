@@ -1641,39 +1641,41 @@ def generate_certificate(
     }
 
 
-@router.post("/{org_id}/certificate/rotate", status_code=status.HTTP_200_OK)
-async def rotate_certificate(
-    request: Request,
+async def rotate_organization_certificate(
+    db: Session,
     org_id: UUID,
-    current_user: User = Depends(require_admin),
-    db: Session = Depends(get_db)
-):
+    actor_id: Optional[str] = None,
+    actor_ip: Optional[str] = None,
+) -> Optional[dict]:
     """
-    Rotar el certificado ECDSA de una organización (solo Admin).
+    Rota el certificado ECDSA de una organización: genera un par de claves nuevo,
+    re-firma los ActionConfigs activos, sube todo a S3, notifica a workstations
+    online y actualiza el state map de distribución push.
 
-    Genera un nuevo par de claves ECDSA P-256, re-firma todos los ActionConfigs
-    activos de la organización con la nueva clave, sube el nuevo certificado a S3
-    y notifica a las workstations online via WebSocket.
+    A diferencia del endpoint HTTP (que exige un certificado previo), esta función
+    es tolerante: si el org no existe o nunca tuvo certificado, no hace nada y
+    retorna None. Esto permite llamarla en bucle sobre TODOS los orgs sin filtrar
+    primero — pensada para reutilizarse desde:
+    - POST /{org_id}/certificate/rotate (acción manual, ver más abajo)
+    - RestoreService al final de cualquier restore: la clave privada restaurada
+      queda cifrada con el SECRET_KEY del entorno de origen del backup —
+      indescifrable en el entorno de destino. Rotar genera una identidad ECDSA
+      nueva sin necesitar abrir la vieja, y de paso corrige cualquier
+      ecdsa_cert_hash que haya quedado desincronizado.
 
-    El certificado anterior se mantiene en S3 (no se elimina) para permitir
-    que workstations offline validen configs firmados con la versión previa
-    durante un período de transición.
+    Args:
+        actor_id: UUID del usuario que dispara la rotación, para auditoría.
+            None indica una acción automática del sistema (ej. post-restore).
+        actor_ip: IP del actor, para auditoría. None si no aplica (sistema).
+
+    Returns:
+        dict con cert_version/cert_url/expires_at/configs_re_signed, o None si
+        no había nada que rotar.
     """
-    # 1. Buscar la organización
     organization = db.query(Organization).filter(Organization.id == org_id).first()
 
-    if not organization:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Organización con ID {org_id} no encontrada"
-        )
-
-    # 2. Verificar que la organización TIENE un certificado previo
-    if not organization.ecdsa_cert_version or organization.ecdsa_cert_version == 0:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="La organización no tiene certificado. Genere uno primero."
-        )
+    if not organization or not organization.ecdsa_cert_version:
+        return None
 
     old_cert_version = organization.ecdsa_cert_version
 
@@ -1788,7 +1790,7 @@ async def rotate_certificate(
         action_type="config_change",
         entity_type="organization",
         entity_id=str(org_id),
-        user_id=str(current_user.id),
+        user_id=actor_id,
         organization_id=str(org_id),
         old_values={
             "cert_version": old_cert_version,
@@ -1798,15 +1800,15 @@ async def rotate_certificate(
             "expires_at": expires_at.isoformat(),
             "configs_re_signed": configs_re_signed,
         },
-        ip_address=get_client_ip(request)
+        ip_address=actor_ip
     )
 
     logger.info(
-        "Certificado ECDSA rotado: org_id=%s, v%d→v%d, configs_re_signed=%d, admin_id=%s",
-        org_id, old_cert_version, new_version, configs_re_signed, current_user.id,
+        "Certificado ECDSA rotado: org_id=%s, v%d→v%d, configs_re_signed=%d, actor_id=%s",
+        org_id, old_cert_version, new_version, configs_re_signed, actor_id or "system",
     )
 
-    # 11. Retornar respuesta
+    # 11. Retornar resultado
     return {
         "cert_version": new_version,
         "cert_url": cert_url,
@@ -1814,6 +1816,46 @@ async def rotate_certificate(
         "configs_re_signed": configs_re_signed,
         "message": "Certificado rotado exitosamente",
     }
+
+
+@router.post("/{org_id}/certificate/rotate", status_code=status.HTTP_200_OK)
+async def rotate_certificate(
+    request: Request,
+    org_id: UUID,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Rotar el certificado ECDSA de una organización (solo Admin).
+
+    Genera un nuevo par de claves ECDSA P-256, re-firma todos los ActionConfigs
+    activos de la organización con la nueva clave, sube el nuevo certificado a S3
+    y notifica a las workstations online via WebSocket.
+
+    El certificado anterior se mantiene en S3 (no se elimina) para permitir
+    que workstations offline validen configs firmados con la versión previa
+    durante un período de transición.
+    """
+    organization = db.query(Organization).filter(Organization.id == org_id).first()
+
+    if not organization:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Organización con ID {org_id} no encontrada"
+        )
+
+    if not organization.ecdsa_cert_version or organization.ecdsa_cert_version == 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La organización no tiene certificado. Genere uno primero."
+        )
+
+    result = await rotate_organization_certificate(
+        db, org_id,
+        actor_id=str(current_user.id),
+        actor_ip=get_client_ip(request),
+    )
+    return result
 
 
 @router.get("/{org_id}/certificate/info")

@@ -495,7 +495,9 @@
     "selectOrgTitle": "Selecciona una organización",
     "selectOrgMsg": "Selecciona una organización del selector superior para ver o editar su configuración.",
     "systemConfigTitle": "Configuración de Sistema",
-    "systemConfigMsg": "Esta configuración se aplica a todas las organizaciones. Cada organización puede sobrescribir estos valores.",
+    "systemConfigMsg": "Configuración global del sistema.",
+    "accessDeniedTitle": "Permisos insuficientes",
+    "accessDeniedMsg": "No tienes permisos suficientes para acceder a la configuración del sistema.",
     "tabCertificate": "Certificado SSL",
     "tabSync": "Sincronización",
     "tabBackup": "Backup & Restore",
@@ -916,7 +918,9 @@
     "pinSuccessDesc": "La organización usará siempre la versión {version}",
     "unpinSuccess": "Versión despineada",
     "unpinSuccessDesc": "La organización usará la versión latest",
-    "pinError": "No se pudo actualizar la versión asignada"
+    "pinError": "No se pudo actualizar la versión asignada",
+    "pagination": "Mostrando {start} a {end} de {total} versiones",
+    "pageNumber": "Página {page}"
   },
   "devices": {
     "title": "Dispositivos",

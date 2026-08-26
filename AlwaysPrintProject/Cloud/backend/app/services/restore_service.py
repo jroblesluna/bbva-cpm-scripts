@@ -351,6 +351,16 @@ class RestoreService:
                 db.close()
             logger.info("Verificación de integridad OK")
 
+            # --- Rotar certificados ECDSA de todos los orgs restaurados ---
+            # La clave privada de cada org viene cifrada con el SECRET_KEY del
+            # entorno donde se generó el backup — indescifrable en este entorno
+            # si son distintos (ej. restore prod→dev), y aunque coincidan, un
+            # ecdsa_cert_hash desincronizado de una rotación posterior al backup
+            # igual rompería la verificación de firma en los clientes. Rotar
+            # incondicionalmente genera una identidad nueva sin necesitar abrir
+            # la vieja, y es barato (segundos) frente a lo que dura un restore.
+            self._rotate_all_certificates()
+
             # --- Finalizar: Limpiar archivos temporales y actualizar status ---
             self._cleanup_restore_uploads()
 
@@ -1185,6 +1195,69 @@ class RestoreService:
         except Exception as e:
             # Si no podemos actualizar el status, logear pero no abortar el restore
             logger.error("Error actualizando restore_status en S3: %s", str(e))
+
+    # =========================================================================
+    # ROTACIÓN DE CERTIFICADOS ECDSA
+    # =========================================================================
+
+    def _rotate_all_certificates(self) -> None:
+        """
+        Rota el certificado ECDSA de cada organización restaurada que tenga uno.
+
+        Ver el docstring de rotate_organization_certificate() (organizations.py)
+        para el porqué de hacerlo incondicionalmente, no solo cuando se sabe que
+        el restore fue cross-entorno: la clave privada restaurada puede venir
+        cifrada con el SECRET_KEY de otro entorno (indescifrable acá), o traer
+        un ecdsa_cert_hash desincronizado de una rotación posterior al backup —
+        ambos casos rompen la verificación de firma en los clientes hasta que
+        alguien rota manualmente. Rotar es barato (segundos) frente a lo que
+        dura un restore completo.
+
+        Corre en el mismo thread síncrono que el resto de restore() (ver
+        docstring de esa función) — cada rotación individual usa su propio
+        asyncio.run() ya que rotate_organization_certificate() es async.
+        Un fallo en un org no aborta el restore ni bloquea a los demás.
+        """
+        import asyncio
+        from app.api.v1.endpoints.organizations import rotate_organization_certificate
+
+        db = SessionLocal()
+        try:
+            org_ids = [
+                org_id for (org_id,) in
+                db.query(Organization.id)
+                .filter(Organization.ecdsa_cert_version > 0)
+                .all()
+            ]
+        finally:
+            db.close()
+
+        if not org_ids:
+            logger.info("Rotación de certificados: ningún org con certificado ECDSA, nada que rotar.")
+            return
+
+        logger.info("Rotando certificados ECDSA de %d organización(es)...", len(org_ids))
+        rotated = 0
+        for org_id in org_ids:
+            db = SessionLocal()
+            try:
+                result = asyncio.run(rotate_organization_certificate(db, org_id))
+                if result:
+                    rotated += 1
+            except Exception as e:
+                logger.error(
+                    "Rotación de certificado falló para org_id=%s: %s. "
+                    "Esa organización queda con la clave restaurada del backup — "
+                    "rotar manualmente desde Org Settings → Certificado.",
+                    org_id, str(e),
+                )
+            finally:
+                db.close()
+
+        logger.info(
+            "Rotación de certificados completada: %d/%d organizaciones.",
+            rotated, len(org_ids),
+        )
 
     # =========================================================================
     # LIMPIEZA

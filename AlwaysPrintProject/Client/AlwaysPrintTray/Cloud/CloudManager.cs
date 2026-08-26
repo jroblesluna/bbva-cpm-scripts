@@ -117,6 +117,7 @@ namespace AlwaysPrintTray.Cloud
         private RemoteViewController? _remoteView;
         private bool _noConfigWarningShown;
         private bool _disposed;
+        private bool? _lastForcedContingencyEnabled;
 
         /// <summary>
         /// Crea una nueva instancia de CloudManager.
@@ -1291,6 +1292,24 @@ namespace AlwaysPrintTray.Cloud
                         $"CloudManager: error notificando contingencia forzada al Service. {ex.Message}");
                 }
 
+                // El registro (config_update al reconectar/reiniciar) siempre reenvía el estado
+                // actual de contingencia, aunque no haya cambiado desde la última vez conocida.
+                // Solo mostrar el balloon tip cuando el estado realmente cambió, para no
+                // notificar "desactivada" en cada reinicio del Service/Tray. Se compara contra
+                // el semáforo persistido en registro (mismo que usa el Service) para que la
+                // deduplicación sobreviva a un reinicio del proceso Tray, no solo a reconexiones.
+                if (_lastForcedContingencyEnabled == null)
+                    _lastForcedContingencyEnabled = ReadPersistedContingencyState();
+
+                bool isRealChange = _lastForcedContingencyEnabled != enabled;
+                _lastForcedContingencyEnabled = enabled;
+                if (!isRealChange)
+                {
+                    AlwaysPrintLogger.WriteTrayInfo(
+                        $"CloudManager: forced_contingency sin cambio real (enabled={enabled}). Omitiendo balloon tip.");
+                    return;
+                }
+
                 // Mostrar notificación al usuario en el system tray
                 _uiContext.Post(_ =>
                 {
@@ -1333,6 +1352,33 @@ namespace AlwaysPrintTray.Cloud
             {
                 AlwaysPrintLogger.WriteTrayError(
                     $"CloudManager: error procesando mensaje forced_contingency. {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Lee el semáforo ContingencyEnabled persistido en registro por el Service.
+        /// Usado para inicializar el último estado conocido de contingencia forzada
+        /// tras un reinicio del proceso Tray, evitando notificar "desactivada" cuando
+        /// en realidad nunca estuvo activa.
+        /// </summary>
+        private static bool ReadPersistedContingencyState()
+        {
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    RegistryConfigManager.RegistryPath, writable: false))
+                {
+                    int currentValue = key != null
+                        ? Convert.ToInt32(key.GetValue("ContingencyEnabled", 0))
+                        : 0;
+                    return currentValue == 1;
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"CloudManager: no se pudo leer semáforo ContingencyEnabled del registro: {ex.Message}. Asumiendo false.");
+                return false;
             }
         }
 

@@ -495,7 +495,9 @@
     "selectOrgTitle": "Select an organization",
     "selectOrgMsg": "Select an organization from the selector above to view or edit its configuration.",
     "systemConfigTitle": "System Configuration",
-    "systemConfigMsg": "This configuration applies to all organizations. Each organization can override these values.",
+    "systemConfigMsg": "Global system configuration.",
+    "accessDeniedTitle": "Insufficient permissions",
+    "accessDeniedMsg": "You don't have sufficient permissions to access the system configuration.",
     "tabCertificate": "SSL Certificate",
     "tabSync": "Sync",
     "tabBackup": "Backup & Restore",
@@ -916,7 +918,9 @@
     "pinSuccessDesc": "The organization will always use version {version}",
     "unpinSuccess": "Version unpinned",
     "unpinSuccessDesc": "The organization will use the latest version",
-    "pinError": "Could not update the assigned version"
+    "pinError": "Could not update the assigned version",
+    "pagination": "Showing {start} to {end} of {total} versions",
+    "pageNumber": "Page {page}"
   },
   "devices": {
     "title": "Devices",

@@ -1,5 +1,5 @@
 {
-  "version": "13.8",
+  "version": "13.9",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -81,6 +81,16 @@
       "label": "Listar trabajos en cola de impresión",
       "command": "powershell -NoProfile -Command \"Get-PrintJob -PrinterName '{{corporate_queue_name}}' | Format-Table -AutoSize Id, DocumentName, UserName, SubmittedTime, Size, JobStatus\"",
       "description": "Muestra los trabajos pendientes en la cola de impresión Windows (LexmarkBBVA)"
+    },
+    {
+      "label": "Verificar versión de certificado ECDSA",
+      "command": "powershell -NoProfile -Command \"$v = (Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Robles.AI\\AlwaysPrint' -Name CertVersion -ErrorAction SilentlyContinue).CertVersion; if ($null -eq $v) { $v = 0 }; Write-Output ('CertVersion: ' + $v)\"",
+      "description": "Muestra la versión del certificado ECDSA persistida en el registro (HKLM) de la estación"
+    },
+    {
+      "label": "Verificar hash del certificado local",
+      "command": "powershell -NoProfile -Command \"$p = 'C:\\ProgramData\\AlwaysPrint\\config\\org.cer'; if (Test-Path $p) { $h = (Get-FileHash -Algorithm SHA256 -Path $p).Hash.ToLower(); Write-Output ('CertHash SHA256: ' + $h) } else { Write-Output 'org.cer no encontrado en disco' }\"",
+      "description": "Calcula el hash SHA256 del certificado ECDSA local (org.cer) para comparar contra el ecdsa_cert_hash de la organización en Cloud"
     }
   ],
   "downloadable_files": [

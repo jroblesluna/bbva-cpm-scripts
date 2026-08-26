@@ -25,6 +25,8 @@ import {
   Download,
   Trash2,
   Upload,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -123,6 +125,8 @@ export default function UpdatesPage() {
     file: File | null;
     version: string;
   }>({ open: false, file: null, version: '' });
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   const isAdmin = user?.role === 'admin';
 
@@ -314,6 +318,15 @@ export default function UpdatesPage() {
       return !isLatest && !isPinned;
     });
   }, [versions, msiInfo, pinnedVersions]);
+
+  const totalPages = Math.ceil(versions.length / pageSize);
+  const paginatedVersions = versions.slice((page - 1) * pageSize, page * pageSize);
+  const paginationStart = (page - 1) * pageSize + 1;
+  const paginationEnd = Math.min(page * pageSize, versions.length);
+
+  useEffect(() => {
+    setPage(1);
+  }, [versions.length]);
 
   // Manejar selección individual de versión
   const handleVersionSelect = (version: string, checked: boolean) => {
@@ -605,7 +618,7 @@ export default function UpdatesPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {versions.map((v) => {
+                      {paginatedVersions.map((v) => {
                         const orgsUsingThis = organizations.filter(
                           (o) => o.targetVersion === v.version
                         );
@@ -686,6 +699,35 @@ export default function UpdatesPage() {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* Paginación */}
+          {versions.length > 0 && totalPages > 1 && (
+            <div className="bg-white rounded-lg shadow px-4 py-3 flex items-center justify-between border border-gray-200">
+              <div className="flex-1 flex items-center justify-between">
+                <p className="text-sm text-gray-700">
+                  {t('pagination', { start: paginationStart, end: paginationEnd, total: versions.length })}
+                </p>
+                <div className="flex items-center gap-2">
+                  {page > 1 && (
+                    <Button variant="outline" size="sm" onClick={() => setPage(1)}>
+                      {tCommon('first')}
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    {tCommon('previous')}
+                  </Button>
+                  <span className="text-sm text-gray-600 px-2">
+                    {t('pageNumber', { page })}
+                  </span>
+                  <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages}>
+                    {tCommon('next')}
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
         </>
       )}
