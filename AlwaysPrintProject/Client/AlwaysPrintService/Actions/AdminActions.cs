@@ -410,23 +410,36 @@ namespace AlwaysPrintService.Actions
         /// <summary>
         /// Clasifica usuarios huérfanos (sin sesión activa) en "recientes" y "stale"
         /// basándose en la fecha de última modificación de NTUSER.DAT.
-        /// - Recientes: NTUSER.DAT modificado hoy → preservar token, solo limpiar jobs.
-        /// - Stale: NTUSER.DAT modificado antes de hoy → borrar carpeta completa.
+        /// - Recientes: NTUSER.DAT modificado dentro del umbral → preservar token, solo limpiar jobs.
+        /// - Stale: NTUSER.DAT modificado antes del umbral → borrar carpeta completa.
         /// </summary>
         /// <param name="basePath">Directorio base donde están las carpetas de usuarios (ej: C:\ProgramData\LPMC\Jobs)</param>
         /// <param name="excludeUsers">Lista de usuarios a excluir (ej: inactive_users con sesión disconnected)</param>
         /// <param name="excludeActiveConsoleUser">Si true, excluye al usuario activo en consola</param>
+        /// <param name="staleAfterDays">
+        /// Días (múltiplos de 24h) desde la última actividad para considerar un usuario como stale.
+        /// 0 (default) = umbral en medianoche del día actual (DateTime.Today), comportamiento original.
+        /// N > 0 = umbral en DateTime.Now - N*24h (ej: 3 → ahora menos 72 horas exactas).
+        /// Mínimo efectivo: 0. Valores negativos se tratan como 0.
+        /// </param>
         /// <returns>Clasificación con listas de usuarios recientes y stale</returns>
         public static OrphanedClassification ClassifyOrphanedUsers(
-            string basePath, List<string> excludeUsers, bool excludeActiveConsoleUser = true)
+            string basePath, List<string> excludeUsers, bool excludeActiveConsoleUser = true,
+            int staleAfterDays = 0)
         {
             var result = new OrphanedClassification();
 
             try
             {
+                // Calcular umbral: 0 días → DateTime.Today (medianoche), N días → ahora - N*24h
+                DateTime threshold = staleAfterDays <= 0
+                    ? DateTime.Today
+                    : DateTime.Now.AddDays(-staleAfterDays);
+
                 AlwaysPrintLogger.WriteInfo(
                     $"ClassifyOrphanedUsers: iniciando en {basePath}, " +
-                    $"excludeUsers=[{string.Join(", ", excludeUsers)}], excludeActiveConsole={excludeActiveConsoleUser}");
+                    $"excludeUsers=[{string.Join(", ", excludeUsers)}], excludeActiveConsole={excludeActiveConsoleUser}, " +
+                    $"staleAfterDays={staleAfterDays}, threshold={threshold:yyyy-MM-dd HH:mm:ss}");
 
                 if (!Directory.Exists(basePath))
                 {
@@ -447,8 +460,6 @@ namespace AlwaysPrintService.Actions
                     }
                 }
 
-                DateTime todayStart = DateTime.Today; // 00:00:00 del día actual
-
                 foreach (var dir in Directory.GetDirectories(basePath))
                 {
                     string folderName = Path.GetFileName(dir);
@@ -459,10 +470,9 @@ namespace AlwaysPrintService.Actions
                         continue;
                     }
 
-                    // Determinar si el usuario tuvo actividad hoy via NTUSER.DAT
                     DateTime lastActivity = GetUserLastLogoffTime(folderName);
 
-                    if (lastActivity >= todayStart)
+                    if (lastActivity >= threshold)
                     {
                         result.Recent.Add(folderName);
                         AlwaysPrintLogger.WriteInfo(

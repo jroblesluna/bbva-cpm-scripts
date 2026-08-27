@@ -835,6 +835,8 @@ namespace AlwaysPrintService.Actions
             }
 
             bool excludeActiveConsole = action.Parameters?["exclude_active_console_user"]?.Value<bool>() ?? true;
+            int staleAfterDays = GetParameter<int>(action, "stale_after_days", 0);
+            if (staleAfterDays < 0) staleAfterDays = 0;
 
             // Obtener lista de usuarios a excluir desde la variable especificada
             var excludeUsers = new List<string>();
@@ -853,7 +855,7 @@ namespace AlwaysPrintService.Actions
                 }
             }
 
-            var classification = AdminActions.ClassifyOrphanedUsers(basePath!, excludeUsers, excludeActiveConsole);
+            var classification = AdminActions.ClassifyOrphanedUsers(basePath!, excludeUsers, excludeActiveConsole, staleAfterDays);
 
             // Almacenar resultado en dos variables separadas: {store_result_in}_recent y {store_result_in}_stale
             if (!string.IsNullOrEmpty(action.StoreResultIn))
