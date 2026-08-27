@@ -382,7 +382,9 @@ async def send_command(
         
         success = response_data.get("success", False) if response_data else False
         duration_ms = response_data.get("duration_ms") if response_data else None
-        result_message = response_data.get("message", "") if response_data else "Timeout"
+        result_message = (
+            response_data.get("message") or response_data.get("output") or ""
+        ) if response_data else "Timeout"
         
         audit_service.log_action(
             db=db,
