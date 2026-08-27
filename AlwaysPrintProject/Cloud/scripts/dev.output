@@ -1,0 +1,57 @@
+app_url = "https://alwaysprint.dev.iol.pe"
+
+backend_ecr_url = "747301449278.dkr.ecr.us-west-2.amazonaws.com/alwaysprint-dev-backend"
+
+ec2_instance_id = "i-0065b19f1f80f2c3d"
+
+ec2_public_ip = "54.186.209.211"
+
+frontend_ecr_url = "747301449278.dkr.ecr.us-west-2.amazonaws.com/alwaysprint-dev-frontend"
+
+github_actions_secrets = {
+  "AWS_ACCESS_KEY_ID" = "(IAM Access Key ID con permisos ECR + SSM)"
+  "AWS_SECRET_ACCESS_KEY" = "(IAM Secret Access Key correspondiente)"
+}
+
+rds_endpoint = "alwaysprint-dev-postgres.c1meyeysaq69.us-west-2.rds.amazonaws.com"
+
+s3_bucket_arn = "arn:aws:s3:::alwaysprint-dev-artifacts"
+
+s3_bucket_name = "alwaysprint-dev-artifacts"
+
+ses_dns_records = {
+  "1_verificacion_dominio" = {
+    "nombre" = "_amazonses.dev.iol.pe"
+    "tipo" = "TXT"
+    "valor" = "tP5wCGAYy4L230SOb09exfLHDt4AAxyZu0DSMSPysfs="
+  }
+  "2_dkim_1" = {
+    "nombre" = "afjb4giluxdgjexj5vk3ctfatztpwyk3._domainkey.dev.iol.pe"
+    "tipo" = "CNAME"
+    "valor" = "afjb4giluxdgjexj5vk3ctfatztpwyk3.dkim.amazonses.com"
+  }
+  "3_dkim_2" = {
+    "nombre" = "pzd7wqueybeazwq3uzyzjsnu5ebqnv2k._domainkey.dev.iol.pe"
+    "tipo" = "CNAME"
+    "valor" = "pzd7wqueybeazwq3uzyzjsnu5ebqnv2k.dkim.amazonses.com"
+  }
+  "4_dkim_3" = {
+    "nombre" = "2cetqyigoj54cpdikyhjseuprbmvt5mu._domainkey.dev.iol.pe"
+    "tipo" = "CNAME"
+    "valor" = "2cetqyigoj54cpdikyhjseuprbmvt5mu.dkim.amazonses.com"
+  }
+  "5_mail_from_mx" = {
+    "nombre" = "mail.dev.iol.pe"
+    "tipo" = "MX"
+    "valor" = "10 feedback-smtp.us-west-2.amazonses.com"
+  }
+  "6_mail_from_spf" = {
+    "nombre" = "mail.dev.iol.pe"
+    "tipo" = "TXT"
+    "valor" = "v=spf1 include:amazonses.com ~all"
+  }
+}
+
+ssm_access = {
+  "comando" = "aws ssm start-session --target i-0065b19f1f80f2c3d --region us-west-2"
+}

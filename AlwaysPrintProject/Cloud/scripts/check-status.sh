@@ -3,10 +3,15 @@
 # AlwaysPrint Cloud Manager - Script de verificación de estado
 # Ejecutar desde tu máquina local para verificar que todo está operativo
 #
-# Uso: ./check-status.sh <dev|prod>
+# Uso: ./check-status.sh <dev|prod> [--from-file]
+#
+# Opciones:
+#   --from-file  Lee outputs de <env>.output (mismo directorio del script)
+#                en vez de ejecutar terraform output. Útil cuando no tienes
+#                terraform state local pero sí la salida de un apply reciente.
 #
 # Flujo:
-#   0. Selecciona entorno y lee outputs de Terraform
+#   0. Selecciona entorno y lee outputs de Terraform (o archivo)
 #   1. Verifica DNS (registros A, DKIM, MX)
 #   2. Verifica infraestructura AWS (EC2, RDS, ECR)
 #   3. Verifica containers y aplicación vía SSM
@@ -20,15 +25,28 @@
 set -o pipefail
 
 # =============================================================================
-# VALIDACIÓN DE PARÁMETRO
+# VALIDACIÓN DE PARÁMETROS
 # =============================================================================
 ENV="${1:-}"
+FROM_FILE=false
+
+# Parsear flags opcionales
+shift 2>/dev/null || true
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --from-file) FROM_FILE=true ;;
+        *) ;;
+    esac
+    shift
+done
 
 if [ -z "$ENV" ] || { [ "$ENV" != "dev" ] && [ "$ENV" != "prod" ]; }; then
-    echo "Uso: ./check-status.sh <dev|prod>"
+    echo "Uso: ./check-status.sh <dev|prod> [--from-file]"
     echo ""
     echo "  dev   — Verificar entorno de desarrollo (cuenta 747301449278)"
     echo "  prod  — Verificar entorno de producción (cuenta 425642439683)"
+    echo ""
+    echo "  --from-file  Lee outputs de <env>.output en vez de ejecutar terraform output"
     exit 1
 fi
 
@@ -187,8 +205,98 @@ ssm_exec() {
 print_header "0. ENTORNO: $ENV_LABEL [$ENV] — Perfil: $AWS_PROFILE"
 
 TF_DIR="$(cd "$(dirname "$0")/../terraform" 2>/dev/null && pwd)"
+SCRIPTS_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
 
-if [ -d "$TF_DIR/.terraform" ]; then
+# Función para parsear output en formato HCL (terraform output sin -json)
+parse_tf_output_file() {
+    local file="$1"
+    python3 -c "
+import sys, re
+
+content = open('$file').read()
+
+# Extraer valores simples: key = \"value\"
+simple = re.findall(r'^(\w+)\s*=\s*\"([^\"]+)\"', content, re.MULTILINE)
+result = {}
+for key, val in simple:
+    result[key] = val
+
+import json
+print(json.dumps(result))
+" 2>/dev/null
+}
+
+# Función para parsear output HCL completo a formato JSON compatible con terraform output -json
+parse_tf_output_file_full() {
+    local file="$1"
+    python3 -c "
+import sys, re, json
+
+content = open('$file').read()
+
+# Parsear la estructura completa del output de Terraform (formato HCL)
+result = {}
+
+# Valores simples: key = \"value\"
+for match in re.finditer(r'^(\w+)\s*=\s*\"([^\"]+)\"\s*$', content, re.MULTILINE):
+    key, val = match.groups()
+    result[key] = {'value': val}
+
+# Bloques complejos (ses_dns_records, github_actions_secrets, ssm_access)
+# Buscar ses_dns_records específicamente
+ses_match = re.search(r'ses_dns_records\s*=\s*\{(.+?)\n\}', content, re.DOTALL)
+if ses_match:
+    ses_block = ses_match.group(1)
+    ses_records = {}
+    # Encontrar cada sub-bloque: \"key\" = { ... }
+    for entry in re.finditer(r'\"(\w+)\"\s*=\s*\{([^}]+)\}', ses_block):
+        entry_key = entry.group(1)
+        entry_body = entry.group(2)
+        record = {}
+        for field in re.finditer(r'\"(\w+)\"\s*=\s*\"([^\"]+)\"', entry_body):
+            record[field.group(1)] = field.group(2)
+        ses_records[entry_key] = record
+    result['ses_dns_records'] = {'value': ses_records}
+
+print(json.dumps(result))
+" 2>/dev/null
+}
+
+if [ "$FROM_FILE" = "true" ]; then
+    OUTPUT_FILE="${SCRIPTS_DIR}/${ENV}.output"
+    
+    if [ -f "$OUTPUT_FILE" ]; then
+        echo -e "  ${CYAN}Leyendo outputs desde archivo: ${ENV}.output${NC}"
+        
+        # Parsear el archivo de output (formato HCL de terraform output)
+        TF_FILE_DATA=$(parse_tf_output_file "$OUTPUT_FILE")
+        
+        if [ -n "$TF_FILE_DATA" ]; then
+            DOMAIN=$(echo "$TF_FILE_DATA" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('app_url','').replace('https://',''))" 2>/dev/null)
+            INSTANCE_ID=$(echo "$TF_FILE_DATA" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('ec2_instance_id',''))" 2>/dev/null)
+            EC2_IP=$(echo "$TF_FILE_DATA" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('ec2_public_ip',''))" 2>/dev/null)
+            RDS_ENDPOINT=$(echo "$TF_FILE_DATA" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('rds_endpoint',''))" 2>/dev/null)
+            BACKEND_ECR=$(echo "$TF_FILE_DATA" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('backend_ecr_url',''))" 2>/dev/null)
+            FRONTEND_ECR=$(echo "$TF_FILE_DATA" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('frontend_ecr_url',''))" 2>/dev/null)
+            
+            # Generar TF_OUTPUT en formato JSON para compatibilidad con sección de DNS/SES
+            TF_OUTPUT=$(parse_tf_output_file_full "$OUTPUT_FILE")
+            
+            check_ok "Outputs leídos desde ${ENV}.output"
+            echo -e "  ${NC}  Domain:       ${DOMAIN:-no definido}"
+            echo -e "  ${NC}  Instance ID:  ${INSTANCE_ID:-no definido}"
+            echo -e "  ${NC}  EC2 IP:       ${EC2_IP:-no definido}"
+            echo -e "  ${NC}  RDS:          ${RDS_ENDPOINT:-no definido}"
+            echo -e "  ${NC}  Backend ECR:  ${BACKEND_ECR:-no definido}"
+            echo -e "  ${NC}  Frontend ECR: ${FRONTEND_ECR:-no definido}"
+        else
+            check_fail "No se pudieron parsear outputs de ${ENV}.output"
+        fi
+    else
+        check_fail "Archivo ${OUTPUT_FILE} no encontrado"
+        recommend "Crear archivo ${ENV}.output con la salida de: terraform output"
+    fi
+elif [ -d "$TF_DIR/.terraform" ]; then
     echo -e "  ${CYAN}Seleccionando workspace '$TF_WORKSPACE' y leyendo outputs...${NC}"
     
     # Cambiar al workspace correcto

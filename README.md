@@ -2,7 +2,7 @@
 
 Este repositorio contiene dos sistemas complementarios para gestión de impresión corporativa.
 
-**Última actualización**: 8 de mayo de 2026
+**Última actualización**: 26 de agosto de 2026
 
 ---
 

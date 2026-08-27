@@ -3,7 +3,7 @@
 Sistema de contingencia complementario para gestión de impresión corporativa con arquitectura cliente-servidor.
 
 **Versión**: 1.0.0  
-**Última actualización**: 8 de mayo de 2026
+**Última actualización**: 26 de agosto de 2026
 
 ---
 
@@ -149,6 +149,11 @@ Ver [Client/README.md](Client/README.md) para más detalles.
 - ✅ Subdominios por cliente
 - ✅ API Keys en dos niveles (Organization + Workstation)
 - ✅ Escalable hasta 200,000+ workstations
+- ✅ Backup/Restore con streaming (migración entre cuentas AWS)
+- ✅ Reconexión forzada de workstations post-restore
+- ✅ Registro robusto de workstations (fallback por os_serial ante cambio de IP)
+- ✅ Widget de ayuda global (FAQ + glosario de plataforma)
+- ✅ Firma digital ECDSA con rotación de certificados
 
 ### Client (Windows)
 - ✅ Servicio Windows (LocalSystem, sin Internet)
@@ -159,6 +164,10 @@ Ver [Client/README.md](Client/README.md) para más detalles.
 - ✅ Instalador MSI con ProductCode fijo
 - ✅ Modo consola para debugging
 - ✅ **Mecanismo de contingencia** para el sistema de producción
+- ✅ Verificación de firma digital ECDSA (fail-closed)
+- ✅ Rotación de certificados con delegación Service↔Tray
+- ✅ OnDemand actions con partial-failure reporting detallado
+- ✅ Deduplicación de notificaciones de contingencia forzada
 
 ---
 
@@ -199,6 +208,8 @@ Ver [Client/README.md](Client/README.md) para más detalles.
 - ✅ Validación de configuración
 - ✅ Logs estructurados con Event IDs
 - ✅ Proxy corporativo soportado
+- ✅ Firma digital ECDSA para configs (integridad + autenticidad)
+- ✅ Delegación de permisos Service↔Tray para escritura en HKLM
 
 ---
 
@@ -233,6 +244,9 @@ Ver [Client/README.md](Client/README.md) para más detalles.
 - ✅ Cloud Manager: Backend multi-tenant, Frontend dashboard, telemetría, conectividad
 - ✅ Configuración jerárquica (Global → VLAN → Workstation)
 - ✅ Sistema de configuración de acciones remotas (.alwaysconfig)
+- ✅ Firma digital ECDSA con rotación de certificados
+- ✅ Backup/Restore con streaming para migración entre cuentas AWS
+- ✅ Widget de ayuda global (FAQ + glosario de plataforma)
 - ✅ CI/CD via GitHub Actions + AWS SSM
 - ⏳ Integración completa Cloud ↔ Client (heartbeat, config sync)
 

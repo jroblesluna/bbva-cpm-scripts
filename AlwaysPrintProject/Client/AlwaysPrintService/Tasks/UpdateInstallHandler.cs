@@ -332,6 +332,26 @@ call :getTS
 echo [%TS%] [UPD] Event 1020: [PASO 3] net stop exitcode=%errorlevel% >> %LOG%
 timeout /t 3 /nobreak > nul
 
+REM Esperar a que el proceso del Service realmente termine (evitar 1603 por handles abiertos)
+call :getTS
+echo [%TS%] [UPD] Event 1020: [PASO 3b] Esperando que {ServiceName} termine completamente... >> %LOG%
+set WAIT_COUNT=0
+:wait_service
+tasklist /fi ""IMAGENAME eq AlwaysPrintService.exe"" 2>nul | findstr /i ""AlwaysPrintService"" > nul 2>&1
+if %errorlevel% neq 0 goto :service_done
+set /a WAIT_COUNT=%WAIT_COUNT%+1
+if %WAIT_COUNT% geq 10 goto :force_kill_service
+timeout /t 1 /nobreak > nul
+goto :wait_service
+:force_kill_service
+call :getTS
+echo [%TS%] [UPD] Event 1091: WARN - Service aun activo tras 10s. Matando proceso. >> %LOG%
+taskkill /f /im AlwaysPrintService.exe > nul 2>&1
+timeout /t 2 /nobreak > nul
+:service_done
+call :getTS
+echo [%TS%] [UPD] Event 1020: [PASO 3b] Proceso Service terminado. >> %LOG%
+
 call :getTS
 echo [%TS%] [UPD] Event 1020: [PASO 4] Ejecutando msiexec /i (silencioso)... >> %LOG%
 msiexec /i ""{msiFilePath}"" /quiet /norestart REINSTALLMODE=amus /l*v ""{msiFilePath}.msiexec.log""

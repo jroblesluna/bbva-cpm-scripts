@@ -90,12 +90,33 @@ Redirige tráfico → IP impresora:puerto estándar (bypass CPM/Linux)
 | `AlwaysPrintProject/Client/AlwaysPrintService/Actions/ActionEngine.cs` | Motor de ejecución de acciones |
 | `AlwaysPrintProject/Client/AlwaysPrintService/Actions/AdminActions.cs` | 9 funciones administrativas |
 | `AlwaysPrintProject/Client/AlwaysPrint.Shared/Configuration/ActionConfig.cs` | Schemas de configuración |
-| `AlwaysPrintProject/Client/AlwaysPrintTray/Cloud/ConfigManager.cs` | Gestión de descarga de configs |
+| `AlwaysPrintProject/Client/AlwaysPrintTray/Cloud/ConfigManager.cs` | Gestión de descarga de configs + rotación de certificados |
 | `AlwaysPrintProject/Client/CPM_Compliant.alwaysconfig` | Ejemplo de configuración |
 | `AlwaysPrintProject/Cloud/backend/app/models/action_config.py` | Modelo de BD |
 | `AlwaysPrintProject/Cloud/backend/app/api/v1/endpoints/action_config.py` | API REST (8 endpoints) |
 | `AlwaysPrintProject/Cloud/frontend/src/app/dashboard/admin/action-configs/page.tsx` | UI de gestión |
 | `AlwaysPrintProject/ACTION_CONFIG_IMPLEMENTATION.md` | Documentación técnica completa |
+
+### Sistema de Firma Digital y Certificados (AlwaysPrint)
+
+| Archivo | Propósito |
+|---|---|
+| `AlwaysPrintProject/Client/AlwaysPrint.Shared/Security/SignatureVerifier.cs` | Verificación ECDSA + descarga/rotación de certificados |
+| `AlwaysPrintProject/Client/AlwaysPrintService/Pipe/MessageDispatcher.cs` | Despacha mensajes IPC incluyendo `UpdateCertVersion` |
+| `AlwaysPrintProject/Client/AlwaysPrintTray/Cloud/PushMessageHandler.cs` | Maneja push de `cert_rotated` desde Cloud |
+| `AlwaysPrintProject/Cloud/backend/app/api/v1/endpoints/organizations.py` | Endpoint de rotación de certificado ECDSA |
+| `AlwaysPrintProject/Cloud/backend/app/services/state_map_service.py` | Propaga `ecdsa_cert_hash` en state map |
+
+### Sistema de Backup/Restore (AlwaysPrint Cloud)
+
+| Archivo | Propósito |
+|---|---|
+| `AlwaysPrintProject/Cloud/backend/app/api/v1/endpoints/backup.py` | Endpoints de backup con tablas opcionales |
+| `AlwaysPrintProject/Cloud/backend/app/api/v1/endpoints/restore.py` | Endpoints de restore con streaming |
+| `AlwaysPrintProject/Cloud/backend/app/services/backup_service.py` | Servicio de backup (SigV4, tablas selectivas) |
+| `AlwaysPrintProject/Cloud/backend/app/services/restore_service.py` | Servicio de restore (streaming, prevención OOM) |
+| `AlwaysPrintProject/Cloud/frontend/src/components/admin/BackupSection.tsx` | UI de backup con selección de tablas |
+| `AlwaysPrintProject/Cloud/frontend/src/lib/backupZipValidation.ts` | Validación de ZIP antes de restore |
 
 ## Variables de Entorno CUPS Relevantes
 
@@ -149,6 +170,10 @@ Estos archivos **no están en el repositorio**, existen solo en el servidor Linu
 - Named Pipe: usar `PipeConstants.PIPE_NAME` (no hardcodear)
 - Mensajes IPC: usar clases de `Payloads.cs` (no strings crudos)
 - **Configuración de Acciones**: Usar `ActionEngine` para ejecutar acciones, no implementar lógica directamente
+- **Firma Digital**: Siempre verificar con `SignatureVerifier.VerifyConfig()` antes de ejecutar configs descargadas
+- **Operaciones privilegiadas (Registry HKLM)**: Delegar al Service via Named Pipe (Tray no tiene permisos)
+- **OnDemand partial-failure**: ActionEngine trackea acciones fallidas y retorna descripciones individuales (no solo true/false)
+- **Notificaciones de contingencia**: Deduplicar comparando contra estado persistido en Registry (no notificar si no cambió)
 - **Imports**: Siempre usar `from app.core.database import Base` (no `app.db.base_class`)
 
 ### Sistema de Contingencia (AlwaysPrint - Python/TypeScript)
@@ -156,6 +181,8 @@ Estos archivos **no están en el repositorio**, existen solo en el servidor Linu
 - Backend: todas las queries deben filtrar por `organization_id` (tenant isolation)
 - Backend: usar Pydantic schemas para validación
 - Backend: **CRÍTICO** - Importar Base desde `app.core.database`, no desde `app.db`
+- Backend: registro de workstations busca por `ip_private` primero, luego fallback por `os_serial` (evita duplicados por cambio de IP/DHCP)
+- Backend: presigned URLs S3 deben usar endpoint regional explícito (`s3.<region>.amazonaws.com`) + SigV4
 - Frontend: usar TypeScript estricto (no `any`)
 - Frontend: componentes reutilizables en `components/ui/`
 - Frontend: componentes shadcn/ui deben importar desde `@radix-ui/react-*`
@@ -178,6 +205,10 @@ Estos archivos **no están en el repositorio**, existen solo en el servidor Linu
 - **No importar Base desde `app.db`** - siempre usar `app.core.database`
 - No crear archivos en `src/lib/` sin verificar `.gitignore` (puede ser ignorado)
 - No modificar el sistema de acciones sin leer `ACTION_CONFIG_IMPLEMENTATION.md`
+- **No eliminar verificación de firma ECDSA** — fail-closed es obligatorio
+- **No escribir en HKLM desde el Tray** — siempre delegar al Service via Named Pipe
+- **No cargar backups completos en memoria** durante restore — usar streaming
+- **No usar SigV2** para presigned URLs de S3 — solo SigV4
 
 ### Ambos Sistemas
 - No asumir que AlwaysPrint reemplaza Lexmark CPM (son complementarios)
@@ -566,6 +597,104 @@ Ver `AlwaysPrintProject/ACTION_CONFIG_IMPLEMENTATION.md` para:
 - Guía de troubleshooting
 - Métricas y monitoreo
 
+## Sistema de Firma Digital y Rotación de Certificados
+
+**Estado**: ✅ Implementado (Agosto 2026)
+
+### Descripción
+
+Sistema de verificación de integridad y autenticidad para archivos `.alwaysconfig` firmados digitalmente con ECDSA P-256. Los archivos se firman en el backend y se verifican en el cliente Windows antes de ejecutar acciones.
+
+### Componentes
+
+| Componente | Responsabilidad |
+|---|---|
+| `SignatureVerifier.cs` | Verificación ECDSA, descarga de certificados, gestión de CertVersion en registry |
+| `ConfigManager.cs` | Orquesta descarga de config firmada + verificación + re-sync tras rotación |
+| `PushMessageHandler.cs` | Recibe push `cert_rotated` desde Cloud vía WebSocket y ejecuta rotación |
+| `MessageDispatcher.cs` (Service) | Despacha `UpdateCertVersion` del Tray al Service para escritura en HKLM |
+| `organizations.py` (Backend) | Endpoint de rotación de certificado con propagación de `ecdsa_cert_hash` |
+| `state_map_service.py` (Backend) | Persiste `ecdsa_cert_hash` en el state map para distribución a workstations |
+
+### Flujo de Verificación
+
+```
+1. Tray descarga config firmada (JSON envolvente: {config, hash, signature, cert_version})
+2. SignatureVerifier.VerifyConfig():
+   a. Parsea JSON envolvente
+   b. Verifica hash SHA256 del config (integridad)
+   c. Carga certificado .cer local
+   d. Convierte firma DER → IEEE P1363 (compatibilidad Python↔.NET)
+   e. Verifica firma ECDSA sobre hashBytes
+3. Si válido → ActionEngine ejecuta config
+4. Si inválido → rechaza (fail-closed)
+```
+
+### Rotación de Certificados
+
+```
+1. Admin rota certificado en Cloud → Backend genera nuevo keypair ECDSA P-256
+2. Backend publica push `cert_rotated` con nueva URL del .cer y cert_version
+3. Tray recibe push → descarga nuevo certificado → guarda en disco local
+4. Tray envía `UpdateCertVersion` al Service via Named Pipe (Tray no tiene permisos HKLM)
+5. Service escribe CertVersion en HKLM\SOFTWARE\Robles.AI\AlwaysPrint
+6. Tray re-sincroniza config inmediatamente (no espera al próximo ciclo periódico)
+```
+
+### Reglas Críticas
+
+- **Fail-closed**: Si la firma no verifica → rechazar config, NUNCA ejecutar sin verificación
+- **Delegación de privilegios**: Tray (usuario) NO puede escribir en HKLM → delega al Service (LocalSystem)
+- **Re-sync post-rotación**: Después de descargar cert nuevo, re-intentar config que pudo haber fallado por cert viejo
+- **Conversión DER→P1363**: Python cryptography firma en DER; .NET Framework 4.8 espera IEEE P1363
+
+### Qué NO Hacer
+
+- **No eliminar la verificación de firma** para resolver problemas de compatibilidad (ver regla impact-analysis)
+- **No escribir CertVersion desde el Tray** directamente (no tiene permisos HKLM)
+- **No ignorar cert_version mismatch** — siempre descargar el certificado actualizado
+- **No cachear certificados en memoria** sin verificar versión contra registry
+
+## Sistema de Backup/Restore (Migración entre Cuentas)
+
+**Estado**: ✅ Implementado (Agosto 2026)
+
+### Descripción
+
+Pipeline de backup y restore para migración completa entre instancias AWS (dev↔prod o cuentas diferentes). Soporta backup selectivo de tablas, streaming de restore para prevenir OOM, y validación de ZIP en frontend.
+
+### Características
+
+- ✅ Backup completo o selectivo (tablas opcionales: audit_logs, knowledge_articles)
+- ✅ Streaming de extracción en restore (previene OOM-kill en backups grandes)
+- ✅ Validación de ZIP en frontend antes de enviar al backend
+- ✅ Manejo de circular FK (disable/enable constraints durante restore)
+- ✅ SigV4 + endpoint regional explícito para presigned URLs
+- ✅ Fail-fast en memoria insuficiente (verifica disponibilidad antes de extraer)
+- ✅ CORS habilitado en bucket S3 para presigned URL uploads directos
+- ✅ Reconexión forzada de workstations post-restore (evita WS fantasma en dashboard)
+- ✅ Rotación automática de certificados ECDSA post-restore
+
+### Archivos Clave
+
+| Archivo | Rol |
+|---|---|
+| `app/services/backup_service.py` | Genera ZIP con dump de BD + metadata, tablas selectivas |
+| `app/services/restore_service.py` | Restore con streaming, prevención OOM, force-disconnect post-restore |
+| `app/api/v1/endpoints/backup.py` | API de backup (selección de tablas opcionales) |
+| `app/api/v1/endpoints/restore.py` | API de restore con validación |
+| `app/services/websocket_manager.py` | `force_disconnect_all()` — cierra WS tras restore |
+| `scripts/force_disconnect_org.py` | Script standalone para forzar reconexión de una org |
+| `src/lib/backupZipValidation.ts` | Validación client-side del ZIP antes de upload |
+| `src/components/admin/BackupSection.tsx` | UI con selección de tablas y progreso |
+
+### Qué NO Hacer
+
+- **No cargar backup completo en memoria** durante restore — usar streaming
+- **No ignorar circular FK** — deshabilitarlas antes de INSERT, rehabilitar después
+- **No usar SigV2** para presigned URLs — solo SigV4 es compatible con IAM policies actuales
+- **No usar endpoint global S3** (`s3.amazonaws.com`) — usar regional (`s3.<region>.amazonaws.com`) para que la firma coincida
+- **No omitir force-disconnect post-restore** — las WS con conexión abierta quedarían con IDs huérfanos
 
 ---
 
