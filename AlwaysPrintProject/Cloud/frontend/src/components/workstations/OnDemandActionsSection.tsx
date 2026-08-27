@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { Play, Loader2, Zap, WifiOff } from 'lucide-react';
+import { Play, Loader2, Zap, WifiOff, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -42,6 +42,7 @@ export function OnDemandActionsSection({ workstationId, isOnline }: OnDemandActi
   const tCommon = useTranslations('common');
   const { toast } = useToast();
   const [confirmAction, setConfirmAction] = useState<OnDemandAction | null>(null);
+  const [errorDetail, setErrorDetail] = useState<{ label: string; detail: string } | null>(null);
 
   // Obtener acciones OnDemand disponibles
   const { data: actions, isLoading } = useQuery<OnDemandAction[]>({
@@ -71,17 +72,16 @@ export function OnDemandActionsSection({ workstationId, isOnline }: OnDemandActi
       });
       setConfirmAction(null);
     },
-    onError: (error: { detail?: string; status?: number }) => {
-      // Un 500 en execute_on_demand significa que la workstation SÍ ejecutó el
-      // trigger y respondió — solo que uno o más pasos fallaron. Es distinto de
-      // 409 (offline) o 408/504 (sin respuesta): ahí no se ejecutó nada.
+    onError: (error: { detail?: string; status?: number }, label: string) => {
+      // Un 500 significa que la workstation ejecutó el trigger pero uno o más pasos
+      // fallaron — mostrar el detalle completo en un diálogo expandible en vez de
+      // un toast truncado, para que el usuario vea exactamente qué falló.
       if (error.status === 500) {
-        toast({
-          variant: 'destructive',
-          title: t('actionExecutedWithErrors'),
-          description: error.detail ?? t('actionFailed'),
-        });
         setConfirmAction(null);
+        setErrorDetail({
+          label,
+          detail: error.detail ?? t('actionFailed'),
+        });
         return;
       }
 
@@ -221,6 +221,31 @@ export function OnDemandActionsSection({ workstationId, isOnline }: OnDemandActi
                   {t('executeAction')}
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de error con detalle completo de pasos fallidos */}
+      <Dialog open={!!errorDetail} onOpenChange={(open) => !open && setErrorDetail(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              {t('actionExecutedWithErrors')}
+            </DialogTitle>
+            <DialogDescription>
+              {errorDetail && t('actionErrorLabel', { label: errorDetail.label })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-2 rounded-md bg-red-50 border border-red-200 p-3 max-h-60 overflow-y-auto">
+            <p className="text-sm text-red-800 whitespace-pre-wrap font-mono break-words">
+              {errorDetail?.detail}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setErrorDetail(null)}>
+              {tCommon('close')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -273,6 +273,7 @@
     "actionExecutedDesc": "Duración: {duration}ms",
     "actionFailed": "Error al ejecutar acción",
     "actionExecutedWithErrors": "Acción ejecutada con errores",
+    "actionErrorLabel": "El trigger \"{label}\" completó con uno o más pasos fallidos:",
     "actionTimeout": "Timeout — la acción puede seguir ejecutándose en la workstation",
     "actionConfirm": "¿Ejecutar esta acción?",
     "actionConfirmDesc": "Se ejecutará \"{label}\" en la workstation. {description}",

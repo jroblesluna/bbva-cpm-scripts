@@ -273,6 +273,7 @@
     "actionExecutedDesc": "Duration: {duration}ms",
     "actionFailed": "Failed to execute action",
     "actionExecutedWithErrors": "Action executed with errors",
+    "actionErrorLabel": "Trigger \"{label}\" completed with one or more failed steps:",
     "actionTimeout": "Timeout — the action may still be running on the workstation",
     "actionConfirm": "Execute this action?",
     "actionConfirmDesc": "Will execute \"{label}\" on the workstation. {description}",
