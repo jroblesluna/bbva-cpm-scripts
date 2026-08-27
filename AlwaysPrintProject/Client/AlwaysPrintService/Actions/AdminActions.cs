@@ -1100,13 +1100,53 @@ namespace AlwaysPrintService.Actions
             catch (System.TimeoutException)
             {
                 AlwaysPrintLogger.WriteWarning($"StopService: timeout deteniendo {serviceName}");
-                
+
                 if (forceKillOnTimeout)
                 {
-                    AlwaysPrintLogger.WriteWarning($"StopService: intentando kill forzado de {serviceName}");
-                    // TODO: Implementar kill forzado del proceso del servicio
+                    AlwaysPrintLogger.WriteWarning($"StopService: intentando kill forzado de '{serviceName}'...");
+                    try
+                    {
+                        // Obtener PID del servicio via WMI
+                        int pid = GetServiceProcessId(serviceName);
+                        if (pid > 0)
+                        {
+                            using (var proc = Process.GetProcessById(pid))
+                            {
+                                proc.Kill();
+                                proc.WaitForExit(5000);
+                                AlwaysPrintLogger.WriteInfo(
+                                    $"StopService: proceso PID={pid} de '{serviceName}' terminado forzosamente.");
+                            }
+                        }
+                        else
+                        {
+                            AlwaysPrintLogger.WriteWarning(
+                                $"StopService: no se pudo obtener PID de '{serviceName}' para kill forzado.");
+                            return false;
+                        }
+
+                        // Verificar que realmente se detuvo
+                        using (var sc2 = new ServiceController(serviceName))
+                        {
+                            sc2.Refresh();
+                            if (sc2.Status == ServiceControllerStatus.Stopped)
+                            {
+                                AlwaysPrintLogger.WriteInfo($"StopService: '{serviceName}' detenido correctamente tras kill forzado.");
+                                return true;
+                            }
+                            AlwaysPrintLogger.WriteWarning(
+                                $"StopService: '{serviceName}' sigue en estado '{sc2.Status}' tras kill forzado.");
+                            return false;
+                        }
+                    }
+                    catch (Exception killEx)
+                    {
+                        AlwaysPrintLogger.WriteError(
+                            $"StopService: error en kill forzado de '{serviceName}': {killEx.Message}", killEx);
+                        return false;
+                    }
                 }
-                
+
                 return false;
             }
             catch (Exception ex)
@@ -1162,6 +1202,34 @@ namespace AlwaysPrintService.Actions
             }
         }
         
+        /// <summary>
+        /// Obtiene el PID del proceso asociado a un servicio de Windows via WMI.
+        /// Retorna -1 si no se puede determinar.
+        /// </summary>
+        private static int GetServiceProcessId(string serviceName)
+        {
+            try
+            {
+                string safe = serviceName.Replace("'", "''");
+                using (var searcher = new ManagementObjectSearcher(
+                    $"SELECT ProcessId FROM Win32_Service WHERE Name = '{safe}'"))
+                {
+                    foreach (ManagementObject obj in searcher.Get())
+                    {
+                        object pidValue = obj["ProcessId"];
+                        if (pidValue != null)
+                            return Convert.ToInt32(pidValue);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning(
+                    $"GetServiceProcessId: error obteniendo PID de '{serviceName}': {ex.Message}");
+            }
+            return -1;
+        }
+
         /// <summary>
         /// Determina si una InvalidOperationException indica que el servicio no existe.
         /// ServiceController lanza esta excepción con un InnerException de tipo
