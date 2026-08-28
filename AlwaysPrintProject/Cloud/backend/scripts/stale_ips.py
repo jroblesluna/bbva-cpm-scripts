@@ -1,7 +1,10 @@
 """
 stale_ips.py — Lista workstations con IPs que:
   1. Estuvieron activas al menos 24h  (updated_at - created_at > 24h)
+     updated_at se actualiza en cada reconexión/heartbeat, por lo que
+     la diferencia con created_at indica que la estación tuvo actividad real.
   2. No se han conectado en más de 90 días  (updated_at < hoy - 90 días)
+     Es decir, la última conexión registrada supera el umbral de inactividad.
 
 Uso:
     python scripts/stale_ips.py
@@ -98,7 +101,7 @@ def main() -> None:
             print(f"No se encontraron IPs stale (inactivas >{args.days}d con >{args.min_hours}h de actividad).")
             return
 
-        headers = ["ip_private", "hostname", "current_user", "created_at", "updated_at", "dias_inactiva", "is_online", "org_name"]
+        headers = ["ip_private", "hostname", "current_user", "created_at", "ultima_conexion", "dias_inactiva", "is_online", "org_name"]
 
         if args.csv:
             writer = csv.writer(sys.stdout)
@@ -119,7 +122,7 @@ def main() -> None:
             # Salida tabular en consola
             print(f"\nWorkstations inactivas >  {args.days} días  |  actividad mínima > {args.min_hours}h")
             print(f"Umbral de inactividad: {stale_threshold.date()}  |  Total encontradas: {len(rows)}\n")
-            print(f"{'IP':<18} {'Hostname':<20} {'Usuario':<15} {'Creada':<12} {'Últ. actualización':<20} {'Días inactiva':>13}  {'Org'}")
+            print(f"{'IP':<18} {'Hostname':<20} {'Usuario':<15} {'Creada':<12} {'Última conexión':<20} {'Días inactiva':>13}  {'Org'}")
             print("-" * 110)
             for row in rows:
                 dias = (datetime.now(timezone.utc).replace(tzinfo=None) - row.updated_at).days
