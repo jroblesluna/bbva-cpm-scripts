@@ -9,15 +9,16 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslations } from 'next-intl';
-import { Shield, FileSpreadsheet, Database, ShieldAlert } from 'lucide-react';
+import { Shield, FileSpreadsheet, Database, ShieldAlert, WifiOff } from 'lucide-react';
 import { SyncInventorySection } from '@/components/config/SyncInventorySection';
 import { SslCertificateSection } from '@/components/config/SslCertificateSection';
 import { BackupSection } from '@/components/admin/BackupSection';
+import { StaleWorkstationsSection } from '@/components/config/StaleWorkstationsSection';
 
 // Debe reflejar ALLOWED_DOMAINS del backend (ssl.py, sync_inventory.py, backup.py)
 const ALLOWED_DOMAINS = ['@robles.ai', '@sistemas.com.pe'];
 
-type TabKey = 'certificate' | 'sync' | 'backup';
+type TabKey = 'certificate' | 'sync' | 'backup' | 'stale';
 
 interface TabDef {
   key: TabKey;
@@ -29,6 +30,7 @@ const TABS: TabDef[] = [
   { key: 'certificate', labelKey: 'tabCertificate', icon: Shield },
   { key: 'sync', labelKey: 'tabSync', icon: FileSpreadsheet },
   { key: 'backup', labelKey: 'tabBackup', icon: Database },
+  { key: 'stale', labelKey: 'tabStale', icon: WifiOff },
 ];
 
 export default function ConfigPage() {
@@ -85,6 +87,7 @@ export default function ConfigPage() {
       {activeTab === 'certificate' && <SslCertificateSection />}
       {activeTab === 'sync' && <SyncInventorySection />}
       {activeTab === 'backup' && <BackupSection />}
+      {activeTab === 'stale' && <StaleWorkstationsSection />}
     </div>
   );
 }

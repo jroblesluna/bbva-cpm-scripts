@@ -1578,6 +1578,63 @@ def export_workstations(
     )
 
 
+@router.get("/stale", response_model=WorkstationListResponse)
+def list_stale_workstations(
+    days: int = Query(90, ge=1, description="Días de inactividad para considerar stale"),
+    min_hours: int = Query(24, ge=1, description="Horas mínimas de actividad registrada (updated_at - created_at)"),
+    organization_id: Optional[UUID] = Query(None, description="Filtrar por organización (solo Admin)"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Listar workstations inactivas (stale):
+    - updated_at - created_at > min_hours * 3600s  (tuvieron actividad real)
+    - updated_at < now - days                       (no se han conectado en N días)
+
+    Admin: puede ver todas las orgs o filtrar por organization_id.
+    Operador: solo ve su propia organización.
+    """
+    from datetime import datetime, timedelta
+    from sqlalchemy import and_, func
+
+    stale_threshold = datetime.utcnow() - timedelta(days=days)
+    min_active_seconds = min_hours * 3600
+
+    base_query = db.query(Workstation).filter(
+        and_(
+            func.extract("epoch", Workstation.updated_at - Workstation.created_at) > min_active_seconds,
+            Workstation.updated_at < stale_threshold,
+        )
+    )
+
+    # Operadores solo ven su organización
+    if current_user.role == UserRole.OPERATOR:
+        if not current_user.organization_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operador sin cuenta asignada")
+        base_query = base_query.filter(Workstation.organization_id == current_user.organization_id)
+    elif organization_id:
+        base_query = base_query.filter(Workstation.organization_id == organization_id)
+
+    total = base_query.count()
+    items = (
+        base_query
+        .order_by(Workstation.updated_at.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    return WorkstationListResponse(
+        items=[WorkstationResponse.from_orm(w) for w in items],
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=(total + page_size - 1) // page_size if page_size > 0 else 1,
+    )
+
+
 @router.get("/{workstation_id}", response_model=WorkstationDetailResponse)
 def get_workstation(
     workstation_id: UUID,

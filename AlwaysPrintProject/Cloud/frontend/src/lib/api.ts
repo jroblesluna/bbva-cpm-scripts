@@ -654,6 +654,22 @@ export const workstationsApi = {
   },
 
   /**
+   * Listar workstations inactivas (stale):
+   * - updated_at - created_at > min_hours * 3600s (tuvieron actividad real)
+   * - updated_at < now - days (no se han conectado en N días)
+   */
+  listStale: async (params?: {
+    days?: number
+    min_hours?: number
+    organization_id?: string
+    page?: number
+    page_size?: number
+  }): Promise<WorkstationListResponse> => {
+    const response = await apiClient.get<WorkstationListResponse>('/workstations/stale', { params })
+    return response.data
+  },
+
+  /**
    * Obtener acciones OnDemand disponibles para una workstation.
    * Se extraen del config efectivo (triggers con event="OnDemand").
    */
