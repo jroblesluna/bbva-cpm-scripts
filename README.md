@@ -317,10 +317,29 @@ Cuando llega un trabajo a una cola CUPS, el filtro de producción resuelve la wo
       - FILTER_DNS_IP=0.0.0.0 → IP del mapfile (columna 3)
       - FILTER_DNS_IP=<IP>    → resuelve por DNS (fallback w10→w11)
 7. Verifica puerto 515 abierto en la IP destino
-8. Crea/actualiza cola dinámica: lpd://<IP>:515/LexmarkBBVA
+8. Crea/actualiza cola dinámica <WINHOST> → lpd://<IP>:515/LexmarkBBVA
 9. Inyecta encabezado PJL + firma PCL y envía con lp
 10. Fallback opcional a Tea4Cups (cola p<puesto>) para PDF
 ```
+
+**Precisiones sobre el nombre de la cola dinámica (`WINHOST`) y el número de puesto:**
+
+El filtro **reconstruye** el nombre `WINHOST="w10${AGENCIA}0${SERVLIN}p${YY2}"`
+desde los campos extraídos; no es una simple "inserción del 1" sobre el nombre de
+la cola de entrada. Dos consecuencias:
+
+- **Prefijo `w10` vs `w11`:** el nombre de la cola dinámica **no siempre es `w10`**.
+
+  | Modo | Match | Nombre de la cola dinámica |
+  |---|---|---|
+  | Mapfile (`FILTER_DNS_IP=0.0.0.0`) | w10 o w11 | siempre `w10XXX0YpZZ` (el fallback w11 del mapfile no reasigna `WINHOST`) |
+  | DNS | w10 | `w10XXX0YpZZ` |
+  | DNS | fallback w11 | `w11XXX0YpZZ` (el fallback DNS **sí** reasigna `WINHOST` a w11) |
+
+- **Número de puesto (`YY2`) puede diferir de `POSXX`:** con `PLANTILLA_GRANDE=ON`,
+  a los puestos con `XX≥21` se les resta 10 (`YY=XX-10`) y los `XX` en 11-20 se
+  rechazan. Por eso el `YY2` del nombre dinámico puede no coincidir con el puesto
+  de la cola de entrada.
 
 ### Rol del `finger`
 

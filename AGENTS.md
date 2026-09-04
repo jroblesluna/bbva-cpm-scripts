@@ -198,6 +198,20 @@ Búsqueda en el mapfile (regex): `^w10${AGENCIA}0[0-9]p${YY2}[A-Za-z]?\|`,
 con fallback a `^w11${AGENCIA}...`. El `[0-9]` en posición 7 tolera que el
 `SERVLIN` real del hostname difiera del extraído del PUESTO.
 
+**Nombre real de la cola dinámica (`WINHOST`) — NO siempre `w10`:**
+
+| Modo | Match | Cola dinámica |
+|---|---|---|
+| Mapfile (`FILTER_DNS_IP=0.0.0.0`) | w10 o w11 | siempre `w10XXX0YpZZ` (el fallback w11 del mapfile NO reasigna `WINHOST`) |
+| DNS | w10 | `w10XXX0YpZZ` |
+| DNS | fallback w11 | `w11XXX0YpZZ` (el fallback DNS SÍ reasigna `WINHOST`) |
+
+El nombre se **reconstruye** con `WINHOST="w10${AGENCIA}0${SERVLIN}p${YY2}"`, no
+es una inserción literal del `1`. Además, con `PLANTILLA_GRANDE=ON` el `YY2` puede
+diferir del puesto de la cola de entrada (a `XX≥21` se le resta 10; 11-20 se
+rechazan), por lo que el número de puesto de la cola dinámica puede no coincidir
+con el de la cola que recibió el job.
+
 > **Nota sobre el mapfile real:** el tercer campo (IP) puede faltar en algunas
 > entradas (ej. `w1035401p01a|o0354p13`). El usuario puede ser personal
 > (`P008967`) o genérico de oficina (`o0354p04` = `o` + agencia + `p` + puesto).
