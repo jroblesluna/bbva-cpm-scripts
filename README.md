@@ -603,6 +603,28 @@ echo test > /var/lib/lexmark/test.txt
 /usr/lib/cups/backend/lpd 999 user Job 1 "" /var/lib/lexmark/test.txt lpd://<WINIP>:515/LexmarkBBVA
 ```
 
+### Firma de una cola asociada a `filtro_nacarpr` (producción)
+
+Una cola CUPS correctamente configurada con el filtro de producción se ve así en
+la interfaz web de CUPS (o en `lpstat`):
+
+```
+w091001p22 (inactiva, aceptando trabajos, compartida)
+  Descripción:  Impresora con filtro_nacarpr Lexmark
+  Ubicación:    filtro_nacarpr
+  Controlador:  Local System V Printer (escala de grises)
+  Conexión:     lpd://118.180.54.14:515/lp
+```
+
+Puntos a verificar:
+- **Nombre de cola** con formato `w0XXX0YpZZ` (10 chars, prefijo `w0`).
+- **Descripción/Ubicación** mencionan `filtro_nacarpr`.
+- **Controlador** "Local System V Printer" (usa el interface script, no un PPD raw).
+- **Estado normal**: "inactiva, aceptando trabajos, compartida" — la cola procesa
+  bajo demanda; "inactiva" no significa deshabilitada.
+- Un job cancelado con **"La impresora no responde"** corresponde al fallo del
+  puerto 515 en la IP destino (el filtro aborta con `Puerto 515 cerrado`).
+
 ---
 
 ## Troubleshooting
