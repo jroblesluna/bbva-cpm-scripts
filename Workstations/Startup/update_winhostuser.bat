@@ -2,32 +2,52 @@
 setlocal EnableDelayedExpansion
 setlocal EnableExtensions
 
+REM ═══════════════════════════════════════════════════════════════════════
+REM  FLAG DE DEBUGGING
+REM  DEBUG=1 -> imprime mensajes de rastreo [DBG] paso a paso.
+REM  DEBUG=0 -> modo silencioso (solo se muestran [ERROR] y [ADVERTENCIA]).
+REM  Se puede sobrescribir desde el entorno: set DEBUG=1 && update_winhostuser.bat
+REM ═══════════════════════════════════════════════════════════════════════
+if not defined DEBUG set "DEBUG=1"
+call :dbg "===== INICIO update_winhostuser (DEBUG=%DEBUG%) ====="
+call :dbg "COMPUTERNAME=%COMPUTERNAME%  USERNAME=%USERNAME%"
+
 REM Comprobar si el cliente LPR está instalado
+call :dbg "Verificando disponibilidad de LPR..."
 where lpr >nul 2>nul
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Comando LPR no encontrado. Por favor, habilite la característica "LPR Port Monitor".
     exit /b 1
 )
+call :dbg "LPR disponible."
 
 REM ───────── INTENTO 1: virtconf.txt (srvhost) ─────────
 set "VCONF=D:\VirtAplic\VirtRM\virtconf.txt"
+call :dbg "INTENTO 1: buscando virtconf en %VCONF%"
 if exist "%VCONF%" (
+    call :dbg "virtconf.txt encontrado, leyendo srvhost="
     for /f "usebackq tokens=2 delims=='" %%A in (`findstr /i /b "srvhost=" "%VCONF%"`) do (
         set "RAWIP=%%A"
     )
     if defined RAWIP (
+        call :dbg "srvhost RAWIP=!RAWIP!"
         for /f "tokens=1-4 delims=." %%a in ("!RAWIP!") do (
             set "SERVER=%%a.%%b.%%c.210"
         )
         echo [virtconf] SERVER cargado desde virtconf.txt: !SERVER!
         goto DERIVAR_VMHOST
+    ) else (
+        call :dbg "virtconf.txt sin campo srvhost= valido; se pasa a INTENTO 2"
     )
+) else (
+    call :dbg "virtconf.txt no existe; se pasa a INTENTO 2 (VMX)"
 )
 
 REM ───────── INTENTO 2: VMX (si no se definio SERVER) ─────────
 REM Primero probar C:\imagenes_12\Nacar_Suse12.vmx; si no, C:\VMware\Nacar_Suse12.vmx; si no, error.
 
 :DERIVAR_VMHOST
+call :dbg "DERIVAR_VMHOST: buscando archivo VMX"
 set "VMXFILE=C:\imagenes_12\Nacar_Suse12.vmx"
 if not exist "%VMXFILE%" (
     set "VMXFILE=C:\VMware\Nacar_Suse12.vmx"
@@ -45,13 +65,14 @@ if not exist "%VMXFILE%" (
         )
     )
 )
+call :dbg "VMX seleccionado: !VMXFILE!"
 
 for /f "tokens=2 delims==" %%A in ('findstr /b "ethernet0.address" "%VMXFILE%"') do (
     for /f "tokens=* delims= " %%B in ("%%~A") do set MAC=%%B
 )
 set MAC=%MAC:"=%
 
-echo MAC: %MAC%
+call :dbg "MAC extraida del VMX: %MAC%"
 
 if not defined MAC (
     if defined SERVER (
@@ -68,9 +89,13 @@ set "CHAR13=%MAC:~12,1%"
 set "CHAR14=%MAC:~13,1%"
 set "CHAR16=%MAC:~15,1%"
 set "CHAR17=%MAC:~16,1%"
+call :dbg "Chars MAC -> CHAR10=%CHAR10% CHAR11=%CHAR11% CHAR13=%CHAR13% CHAR14=%CHAR14% CHAR16=%CHAR16% CHAR17=%CHAR17%"
 
 REM Si SERVER no vino de virtconf, derivarlo de la MAC (flujo VMware puro)
-if not defined SERVER set SERVER=s0%CHAR11%%CHAR13%%CHAR14%00%CHAR10%.nacarpe.igrupobbva
+if not defined SERVER (
+    set SERVER=s0%CHAR11%%CHAR13%%CHAR14%00%CHAR10%.nacarpe.igrupobbva
+    call :dbg "SERVER derivado de la MAC (VMware puro): !SERVER!"
+)
 
 REM Derivar hostname de la VM Linux desde la MAC del VMX
 REM MAC "00:50:56:YX:XX:ZZ" -> w10<XXX>0<Y>p<ZZ>
@@ -78,6 +103,7 @@ REM   XXX (agencia)  = CHAR11 + CHAR13 + CHAR14  (ej. 9,1,0 -> "910")
 REM   Y   (servidor) = CHAR10                    (ej. 1)
 REM   ZZ  (puesto)   = CHAR16 + CHAR17           (ej. 2,2 -> "22")
 set "VMHOST=w10%CHAR11%%CHAR13%%CHAR14%0%CHAR10%p%CHAR16%%CHAR17%"
+call :dbg "VMHOST derivado: %VMHOST%"
 echo VM Host derivado: %VMHOST%
 
 :CONTINUAR
@@ -85,10 +111,12 @@ echo Server: %SERVER%
 set QUEUE=CPMWinHostUser
 echo Queue: %QUEUE%
 
+call :dbg "Detectando IP local (ignora 169.x y 127.0.0.1)..."
 set "IP="
 for /f "tokens=2 delims=:" %%A in ('ipconfig ^| findstr /i "IPv4"') do (
     set "raw=%%A"
     set "raw=!raw: =!"
+    call :dbg "  IPv4 candidata: !raw!"
     if /i not "!raw:~0,3!"=="169" if /i not "!raw!"=="127.0.0.1" if not defined IP set "IP=!raw!"
 )
 if not defined IP set "IP=unknown"
@@ -108,8 +136,10 @@ set "SENDHOST=%COMPUTERNAME%"
 REM ¿El hostname cumple la estructura de agencia W1######P## + sufijo opcional?
 REM Se valida contra los primeros 11 chars; si coinciden, es agencia y se trunca.
 set "HOST11=%COMPUTERNAME:~0,11%"
+call :dbg "Evaluando flujo: HOST11=!HOST11! (primeros 11 chars de %COMPUTERNAME%)"
 set "IS_AGENCIA=0"
 echo(%HOST11%| findstr /I /X /R "W1[0-9][0-9][0-9][0-9][0-9][0-9]P[0-9][0-9]" >nul && set "IS_AGENCIA=1"
+call :dbg "IS_AGENCIA=!IS_AGENCIA! (1=agencia, 0=sede central)"
 
 if "!IS_AGENCIA!"=="1" (
     set "SENDHOST=!HOST11!"
@@ -122,15 +152,32 @@ if "!IS_AGENCIA!"=="1" (
         echo [ADVERTENCIA] Hostname %COMPUTERNAME% no es de agencia pero VMHOST no derivado; se usa %COMPUTERNAME%
     )
 )
+call :dbg "SENDHOST final=!SENDHOST!"
 
 set "DATA=!SENDHOST!^|%USERNAME%^|%IP%"
 echo DATA: "!DATA!"
 set "TEMPFILE=%TEMP%\hostuser_%RANDOM%.txt"
-echo TEMPFILE: %TEMPFILE%
+call :dbg "TEMPFILE=%TEMPFILE%"
 echo !DATA! > "%TEMPFILE%"
-echo Temp File: %TEMPFILE%
-type "%TEMPFILE%"
+call :dbg "Contenido del archivo temporal:"
+if "%DEBUG%"=="1" type "%TEMPFILE%"
 echo Exec: lpr -S %SERVER% -P %QUEUE% "%TEMPFILE%"
 lpr -S %SERVER% -P %QUEUE% "%TEMPFILE%"
-echo del "%TEMPFILE%"
+set "LPRRC=!errorlevel!"
+if not "!LPRRC!"=="0" (
+    echo [ADVERTENCIA] El comando lpr devolvio codigo de error !LPRRC!
+) else (
+    call :dbg "lpr ejecutado sin error."
+)
+call :dbg "Eliminando archivo temporal %TEMPFILE%"
 del "%TEMPFILE%"
+call :dbg "===== FIN update_winhostuser ====="
+exit /b 0
+
+REM ═══════════════════════════════════════════════════════════════════════
+REM  SUBRUTINA :dbg  -> imprime el argumento solo si DEBUG=1
+REM  Uso: call :dbg "mensaje a rastrear"
+REM ═══════════════════════════════════════════════════════════════════════
+:dbg
+if "%DEBUG%"=="1" echo [DBG] %~1
+goto :eof
