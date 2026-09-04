@@ -136,8 +136,21 @@ La variable `$DEVICE_URI` es seteada por CUPS con la URI del dispositivo de la c
 
 **Aplica solo al Sistema de Producción (Lexmark CPM)**
 
-> **IMPORTANTE — Existen DOS nomenclaturas relacionadas por una transformación
-> que hace el filtro. No confundirlas.**
+> **IMPORTANTE — Existen VARIAS nomenclaturas relacionadas por transformaciones.
+> Todas comparten los campos XXX (agencia, 3 díg), Y (SERVLIN, 1 díg), ZZ (puesto,
+> 2 díg). Cambian prefijo y longitud según el contexto. No confundirlas.**
+
+| Contexto | Formato | Chars | Ejemplo |
+|---|---|---|---|
+| Hostname Windows físico (agencias) | `W10XXX0YPZZ` / `W11XXX0YPZZ` (+ `A` opc.) | 11-12 | `W1035401P19`, `W1134901P02A` |
+| Hostname enviado al mapfile (trunc. 11) | `w10XXX0YpZZ` / `w11XXX0YpZZ` | 11 | `w1035401p19` |
+| PUESTO = cola CUPS / `Where` del finger | `w0XXX0YpZZ` | 10 | `w035401p19` |
+| Servidor Nacar Linux | `s0XXX00Y` | 8 | `s0354001` |
+| MAC del VMX (`ethernet0.address`) | `??:??:??:YX:XX:ZZ` | — | `00:50:56:19:10:22` |
+
+**Coincidencia parcial Windows ↔ Linux:** el hostname Windows empieza con `w10`
+o `w11`; reemplazando los 2 chars tras la `w` por un solo `0` (`w10`→`w0`,
+`w11`→`w0`) se obtiene el PUESTO (cola CUPS / `Where` del finger).
 
 ### 1) `PUESTO` — cola CUPS de entrada / `Where` del finger (10 chars, prefijo `w0`)
 
@@ -203,22 +216,35 @@ En Sede Central el nombre físico de Windows equivale al usuario (`P######` /
 del archivo VMX (`ethernet0.address`):
 
 ```
-MAC "00:50:56:YX:XX:ZZ" -> w10<XXX>0<Y>p<ZZ>
-Ej.  "00:50:56:19:10:22" -> w1091001p22
-     XXX (agencia) = 9,1,0  |  Y (SERVLIN) = 1  |  ZZ (puesto) = 22
+MAC "??:??:??:YX:XX:ZZ" -> VMHOST y SERVER
+Ej.  "00:50:56:19:10:22":
+     XXX (agencia) = X,XX = 9,1,0 = "910"  |  Y (SERVLIN) = 1  |  ZZ (puesto) = 22
+  -> VMHOST = w10 + XXX + 0 + Y + p + ZZ = w1091001p22
+  -> SERVER = s0  + XXX + 00 + Y          = s0910001.nacarpe.igrupobbva
 ```
 
+**Fuentes del SERVER (destino del `lpr`):**
+1. `virtconf.txt` (`srvhost=`): 3 primeros octetos + 4.º octeto forzado a `.210`
+   (ej. `srvhost=118.68.8.53` → `SERVER=118.68.8.210`).
+2. Sin virtconf: `s0XXX00Y.nacarpe.igrupobbva` derivado de la MAC.
+
 **Limitación conocida:** una workstation VirtAplic **sin** archivo VMX no puede
-derivar `VMHOST`. El script emite `[ADVERTENCIA]` y usa `%COMPUTERNAME%` como
+derivar `VMHOST`. Un hostname de agencia funciona igual (no lo necesita); un
+hostname de Sede Central cae en `[ADVERTENCIA]` y usa `%COMPUTERNAME%` como
 fallback (no hará match). Pendiente: identificar la fuente del nombre de VM en
 `virtconf.txt`.
+
+**Windows 11 en Sede Central:** el `.bat` deriva el `VMHOST` siempre con prefijo
+`w10`. Si la VM real es `w11...`, el filtro lo resuelve por su fallback `w10→w11`.
+Comportamiento intencional.
 
 ### Rol del `finger`
 
 `finger` solo identifica el **usuario LDAP** con sesión activa en el puesto
 (cruzando su salida contra `$PUESTO`). No resuelve IP ni hostname de la VM.
-Salida típica: `PE.017241 | PE.P017241 | w1091001p22.nacarpe.igrupobbva`
-(login LDAP | hostname Windows físico | FQDN de la VM = PUESTO/cola CUPS).
+Salida real (columnas `Login | Name | Where`):
+`PE.P034887 | PE.P034887 | w035401p03.nacarpe.igrupobbva`
+(login LDAP | nombre | `Where` = PUESTO/cola CUPS de **10 chars**, prefijo `w0`).
 
 ## Archivos de Datos en Producción
 

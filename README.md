@@ -193,46 +193,57 @@ El servidor Linux no conoce de antemano la IP de la workstation Windows a la que
 
 ### Nomenclatura: dos nombres relacionados por una transformación
 
-Existen **dos nomenclaturas** distintas que el filtro relaciona. No confundirlas.
+Todas las nomenclaturas comparten los mismos campos: **XXX** = código de agencia
+(3 dígitos), **Y** = servidor de agencia (SERVLIN, 1 dígito), **ZZ** = número de
+puesto (2 dígitos). Cambian solo el prefijo y la longitud según el contexto.
 
-**1) `PUESTO` — cola CUPS de entrada / `Where` del finger** (10 chars, prefijo `w0`)
+| Contexto | Formato | Chars | Ejemplo |
+|---|---|---|---|
+| **Hostname Windows físico** (agencias) | `W10XXX0YPZZ` / `W11XXX0YPZZ` (+ sufijo `A` opcional) | 11-12 | `W1035401P19`, `W1134901P02A` |
+| **Hostname enviado al mapfile** (trunc. a 11) | `w10XXX0YpZZ` / `w11XXX0YpZZ` | 11 | `w1035401p19` |
+| **PUESTO** = cola CUPS / `Where` del finger | `w0XXX0YpZZ` | 10 | `w035401p19` |
+| **Servidor Nacar Linux** | `s0XXX00Y` | 8 | `s0354001` |
+| **MAC del VMX** (`ethernet0.address`) | `??:??:??:YX:XX:ZZ` | — | `00:50:56:19:10:22` |
 
-Es el nombre de la cola donde llega el job y el valor de la columna `Where` del
-`finger` (ej. `w035401p19.nacarpe.i`):
+**La relación clave (coincidencia parcial Windows ↔ Linux):**
 
-```
-w 0 3 5 4 0 1 p 1 9      ← 10 chars
-0 1 2 3 4 5 6 7 8 9
-    └─┬─┘   │   └┬┘
-     XXX    S    ZZ       AGENCIA=354 (pos 2-4), SERVLIN=1 (pos 6), puesto=19 (pos 8-9)
-```
-
-**2) Hostname Windows — clave del mapfile y de la cola dinámica** (11 chars, prefijo `w1`)
-
-Es el nombre físico de la workstation en agencias y la clave de
-`win_hostname_user.txt`:
-
-```
-w 1 0 3 5 4 0 1 p 1 9    ← 11 chars
-0 1 2 3 4 5 6 7 8 9 10
-  │ └─┬─┘   │   └┬┘
-  │  XXX    S    ZZ       pos 2 = 0 (w10/Win10) o 1 (w11/Win11)
-  └── w10 / w11
-```
-
-- Ejemplos: `w1035401p19`, `w1091001p22`, `w1009101p03` (Win10), `w1134901p02` (Win11).
-- Sufijo alfabético opcional (`w1035401p01a`, 12 chars) → siempre se **trunca a 11**.
-
-**Transformación (la hace `filtro_nacarpr`):**
+El hostname Windows empieza con `w10` o `w11`. Si se reemplazan los **2 caracteres
+tras la `w`** por un **solo `0`** (`w10`→`w0`, `w11`→`w0`), se obtiene el PUESTO,
+que es el nombre de la cola CUPS y el `Where` del finger:
 
 ```
-PUESTO  w035401p19  (10, w0)  ──►  WINHOST="w10${AGENCIA}0${SERVLIN}p${YY2}"  ──►  w1035401p19  (11, w1)
-                                   (fallback a w11 si no hay match en el mapfile)
+Windows   w1 0 35401 p 19   (11, w10)  ┐
+Windows   w1 1 34901 p 02   (11, w11)  ├─ "w10"/"w11" → "w0" ─►  PUESTO w035401p19 (10)
+                                       ┘                                 = cola CUPS = finger Where
+```
+
+El filtro `filtro_nacarpr` hace la transformación **inversa**: parte del PUESTO
+(que obtiene de `lpstat`) y reconstruye el hostname Windows para buscar en el mapfile:
+
+```
+PUESTO  w035401p19  ──►  WINHOST="w10${AGENCIA}0${SERVLIN}p${YY2}"  ──►  w1035401p19
+        (10, w0)         AGENCIA=354  SERVLIN=1  ZZ=19                    (11, w10)
+                         con fallback a w11 si no hay match en el mapfile
+```
+
+**Derivación desde la MAC del VMX** (segmentos `YX:XX:ZZ`, ej. `19:10:22`):
+
+```
+MAC "??:??:??:YX:XX:ZZ"  ──►  XXX (agencia) = X + XX   Y (SERVLIN) = Y   ZZ (puesto) = ZZ
+Ej. "00:50:56:19:10:22"  ──►  XXX = 9,1,0 = "910"      Y = 1             ZZ = "22"
+
+  → VMHOST  = w10 + XXX + 0 + Y + p + ZZ  = w1091001p22
+  → SERVER  = s0  + XXX + 00 + Y          = s0910001.nacarpe.igrupobbva
 ```
 
 > **Nota del mapfile real:** el tercer campo (IP) puede faltar en algunas entradas
 > (`w1035401p01a|o0354p13`). El usuario puede ser personal (`P008967`) o genérico
 > de oficina (`o0354p04` = `o` + agencia + `p` + puesto).
+
+> **Nota Windows 11 en Sede Central:** el `.bat` deriva el `VMHOST` siempre con
+> prefijo `w10`. Si una workstation de Sede corre Windows 11 (VM `w11...`), el
+> registro queda como `w10...`; el filtro lo resuelve igual gracias al fallback
+> `w10→w11`. Comportamiento intencional.
 
 ### Fase 1 — Registro de mapping (`update_winhostuser.bat` → `filtro_winhostuser`)
 
@@ -261,26 +272,32 @@ w1035401p01a|o0354p13                 ← sin IP (tercer campo ausente)
 
 | Caso | Condición | Hostname enviado |
 |---|---|---|
-| **Agencia** | `%COMPUTERNAME%` cumple `W1######P##` (con sufijo opcional) | El propio hostname, truncado a 11 chars |
-| **Sede Central** | Cualquier otro (`P017241`, `XP12345`, `DESKTOP-*`, etc.) | `VMHOST` derivado de la MAC del VMX |
+| **Agencia** | `%COMPUTERNAME%` es `W10XXX0YPZZ`, `W11XXX0YPZZ`, `W10XXX0YPZZA` o `W11XXX0YPZZA` | El propio hostname, truncado a 11 chars |
+| **Sede Central** | Cualquier otro (`P017241`, `P017241A`, `XP12345`, `DESKTOP-*`, `W11PRUEBAOF3`, etc.) | `VMHOST` derivado de la MAC del VMX |
 
-En Sede Central el nombre físico de Windows equivale al usuario (ej. `P017241`) y no coincide con ninguna cola CUPS. Por eso se deriva el hostname de la VM Linux desde la dirección MAC del archivo VMX:
+En agencias el hostname físico ya es válido (`W1...`); solo se trunca a 11 chars y
+se envía tal cual. En Sede Central el nombre físico equivale al usuario
+(ej. `P017241`) y no coincide con ninguna cola CUPS, por lo que se deriva el
+`VMHOST` desde la MAC del VMX (ver "Derivación desde la MAC" arriba):
 
 ```
-MAC del VMX  "00:50:56:19:10:22"  ─►  w1091001p22
-                       └─┬─┘└┬┘
-              segmentos  YX:XX  ZZ
-              XXX (agencia) = 9,1,0 → "910"
-              Y   (SERVLIN) = 1
-              ZZ  (puesto)  = 2,2  → "22"
-              → w10 + 910 + 0 + 1 + p + 22
+MAC "00:50:56:19:10:22"  ─►  VMHOST = w1091001p22   (w10 + 910 + 0 + 1 + p + 22)
 ```
 
-Fuentes de la IP del servidor Linux destino del LPR:
-1. `D:\VirtAplic\VirtRM\virtconf.txt` (clave `srvhost=`, se fuerza el 4.º octeto a `.210`)
-2. Archivo VMX (`Nacar_Suse12.vmx`), derivando el nombre del servidor desde la MAC
+**Fuentes del SERVER (destino del `lpr`):**
 
-> **Limitación conocida:** una workstation VirtAplic **sin** archivo VMX no puede derivar el `VMHOST`. En ese caso el script emite advertencia y usa `%COMPUTERNAME%` como fallback (que no hará match). Pendiente de identificar la fuente del nombre de VM dentro de `virtconf.txt`.
+1. `D:\VirtAplic\VirtRM\virtconf.txt` (clave `srvhost=`): toma los **3 primeros
+   octetos** de esa IP y **fuerza el 4.º octeto a `.210`** (ej. `srvhost=118.68.8.53`
+   → `SERVER=118.68.8.210`).
+2. Si no hay virtconf: deriva `s0XXX00Y.nacarpe.igrupobbva` desde la MAC del VMX.
+
+En ambos casos, si existe el VMX se deriva además el `VMHOST` (necesario para Sede).
+
+> **Limitación conocida:** una workstation VirtAplic **sin** archivo VMX no puede
+> derivar el `VMHOST`. Un hostname de agencia funciona igual (no necesita VMHOST),
+> pero un hostname de Sede Central caería en advertencia y se enviaría
+> `%COMPUTERNAME%` (que no hará match). Pendiente de identificar la fuente del
+> nombre de VM dentro de `virtconf.txt`.
 
 ### Fase 2 — Resolución en tiempo de impresión (`filtro_nacarpr`)
 
