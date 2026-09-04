@@ -136,31 +136,58 @@ La variable `$DEVICE_URI` es seteada por CUPS con la URI del dispositivo de la c
 
 **Aplica solo al Sistema de Producción (Lexmark CPM)**
 
-### Nombre de cola CUPS de entrada (`PUESTO`)
+> **IMPORTANTE — Existen DOS nomenclaturas relacionadas por una transformación
+> que hace el filtro. No confundirlas.**
 
-El `PUESTO` que `filtro_nacarpr` obtiene de `lpstat` es el nombre de la cola CUPS
-donde llegó el job. El filtro extrae (índices 0-based sobre `$PUESTO`):
+### 1) `PUESTO` — cola CUPS de entrada / `Where` del finger (10 chars, prefijo `w0`)
+
+Es el nombre de la cola donde llega el job (obtenido de `lpstat`) y el mismo valor
+que muestra el `finger` en la columna `Where` (ej. `w035401p19.nacarpe.i`).
+Estructura `w0 ### 0 S p XX` (10 chars):
+
+```
+w 0 3 5 4 0 1 p 1 9      Ejemplo: w035401p19
+0 1 2 3 4 5 6 7 8 9               agencia=354, SERVLIN=1, puesto=19
+```
+
+El filtro extrae (índices 0-based sobre `$PUESTO`):
 - `AGENCIA="${PUESTO:2:3}"` — posiciones 2-4: código de agencia (3 dígitos)
 - `SERVLIN="${PUESTO:6:1}"` — posición 6: servidor de agencia (1 dígito)
 - `POSXX="${PUESTO:8:2}"` — posiciones 8-9: número de puesto (2 dígitos)
 
-### Hostname de la VM Linux (clave del mapfile y de la cola dinámica)
+### 2) Hostname Windows — clave del mapfile y de la cola dinámica (11 chars, prefijo `w1`)
 
-El hostname de la VM Linux tiene **11 caracteres** con estructura `w1 0 XXX 0 S p ZZ`:
+Es el nombre físico de la máquina Windows en agencias y coincide con la clave del
+`win_hostname_user.txt` y con la cola dinámica que crea el filtro. Estructura
+`w1 [0/1] ### 0 S p XX` (11 chars):
 
 ```
-w 1 0 X X X 0 S p Z Z      Ejemplo: w1091001p22
-0 1 2 3 4 5 6 7 8 9 10               agencia=910, SERVLIN=1, puesto=22
+w 1 0 3 5 4 0 1 p 1 9      Ejemplo: w1035401p19
+0 1 2 3 4 5 6 7 8 9 10              agencia=354, SERVLIN=1, puesto=19
 ```
 
-- posición 2: `0` (w10) o `1` (w11) según la variante de imagen.
-- posiciones 3-5 (`XXX`): código de agencia.
-- posición 7 (`S`): servidor de agencia (SERVLIN).
-- posiciones 9-10 (`ZZ`): número de puesto.
-- Sufijo alfabético opcional (`w1091001p22a`, 12 chars) → **siempre se trunca a 11**.
+- posición 2: `0` (w10, Windows 10) o `1` (w11, Windows 11) según la imagen.
+- Sufijo alfabético opcional (`w1035401p01a`, 12 chars) → **siempre se trunca a 11**.
 
-Este hostname coincide exactamente con el nombre de la cola CUPS dinámica que
-`filtro_nacarpr` crea (`lpd://<IP>:515/LexmarkBBVA`) y con la clave del mapfile.
+### Transformación PUESTO → Hostname Windows (la hace `filtro_nacarpr`)
+
+El filtro construye el hostname Windows insertando `1` tras la `w` y un `0` extra:
+
+```
+WINHOST="w10${AGENCIA}0${SERVLIN}p${YY2}"
+
+PUESTO   w035401p19  (10, w0)  ──►  WINHOST  w1035401p19  (11, w1)
+             │                             (con fallback a w11 si no hay match)
+    AGENCIA=354  SERVLIN=1  PUESTO=19
+```
+
+Búsqueda en el mapfile (regex): `^w10${AGENCIA}0[0-9]p${YY2}[A-Za-z]?\|`,
+con fallback a `^w11${AGENCIA}...`. El `[0-9]` en posición 7 tolera que el
+`SERVLIN` real del hostname difiera del extraído del PUESTO.
+
+> **Nota sobre el mapfile real:** el tercer campo (IP) puede faltar en algunas
+> entradas (ej. `w1035401p01a|o0354p13`). El usuario puede ser personal
+> (`P008967`) o genérico de oficina (`o0354p04` = `o` + agencia + `p` + puesto).
 
 ### Decisión Agencia vs Sede Central (`update_winhostuser.bat`)
 

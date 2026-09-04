@@ -191,26 +191,48 @@ Redirige tráfico → IP impresora:puerto estándar (bypass CPM/Linux)
 
 El servidor Linux no conoce de antemano la IP de la workstation Windows a la que debe enviar cada trabajo. Esa relación se resuelve en **dos fases**: primero un registro de mapping (workstation → servidor), y luego una resolución en tiempo de impresión (job → workstation destino).
 
-### Nomenclatura del puesto (hostname de la VM Linux)
+### Nomenclatura: dos nombres relacionados por una transformación
 
-La pieza central de todo el enrutamiento es el **hostname de la VM Linux** que corre en cada workstation. Tiene 11 caracteres con la estructura `w1 0 XXX 0 S p ZZ`:
+Existen **dos nomenclaturas** distintas que el filtro relaciona. No confundirlas.
+
+**1) `PUESTO` — cola CUPS de entrada / `Where` del finger** (10 chars, prefijo `w0`)
+
+Es el nombre de la cola donde llega el job y el valor de la columna `Where` del
+`finger` (ej. `w035401p19.nacarpe.i`):
 
 ```
-w 1 0 X X X 0 S p Z Z
+w 0 3 5 4 0 1 p 1 9      ← 10 chars
+0 1 2 3 4 5 6 7 8 9
+    └─┬─┘   │   └┬┘
+     XXX    S    ZZ       AGENCIA=354 (pos 2-4), SERVLIN=1 (pos 6), puesto=19 (pos 8-9)
+```
+
+**2) Hostname Windows — clave del mapfile y de la cola dinámica** (11 chars, prefijo `w1`)
+
+Es el nombre físico de la workstation en agencias y la clave de
+`win_hostname_user.txt`:
+
+```
+w 1 0 3 5 4 0 1 p 1 9    ← 11 chars
 0 1 2 3 4 5 6 7 8 9 10
-│ │ │ └─┬─┘ │ │ │ └┬┘
-│ │ │  XXX  │ │ │  ZZ = número de puesto (2 dígitos)
-│ │ │       │ │ └──── literal 'p'
-│ │ │       │ └────── S = servidor de agencia (SERVLIN, 1 dígito)
-│ │ │       └──────── literal '0'
-│ │ └──────────────── XXX = código de agencia (3 dígitos)
-│ └────────────────── '0' (w10) o '1' (w11) según variante
-└──────────────────── literal 'w'
+  │ └─┬─┘   │   └┬┘
+  │  XXX    S    ZZ       pos 2 = 0 (w10/Win10) o 1 (w11/Win11)
+  └── w10 / w11
 ```
 
-- Ejemplos: `w1091001p22`, `w1012301p15`.
-- Puede llevar un **sufijo alfabético opcional** (`w1012301p15a`, 12 chars) que siempre se **trunca a los primeros 11**.
-- Este hostname coincide **exactamente** con el nombre de la cola CUPS en el servidor Linux.
+- Ejemplos: `w1035401p19`, `w1091001p22`, `w1009101p03` (Win10), `w1134901p02` (Win11).
+- Sufijo alfabético opcional (`w1035401p01a`, 12 chars) → siempre se **trunca a 11**.
+
+**Transformación (la hace `filtro_nacarpr`):**
+
+```
+PUESTO  w035401p19  (10, w0)  ──►  WINHOST="w10${AGENCIA}0${SERVLIN}p${YY2}"  ──►  w1035401p19  (11, w1)
+                                   (fallback a w11 si no hay match en el mapfile)
+```
+
+> **Nota del mapfile real:** el tercer campo (IP) puede faltar en algunas entradas
+> (`w1035401p01a|o0354p13`). El usuario puede ser personal (`P008967`) o genérico
+> de oficina (`o0354p04` = `o` + agencia + `p` + puesto).
 
 ### Fase 1 — Registro de mapping (`update_winhostuser.bat` → `filtro_winhostuser`)
 
@@ -227,10 +249,12 @@ update_winhostuser.bat                      filtro_winhostuser
                                               5. Escribe en win_hostname_user.txt
 ```
 
-Formato almacenado en `/var/lib/lexmark/win_hostname_user.txt`:
+Formato almacenado en `/var/lib/lexmark/win_hostname_user.txt` (ejemplos reales):
 ```
-w1091001p22|p017241|118.222.235.53
-   (cola)     (usuario)   (IP Windows)
+w1035401p19|o0354p10|118.68.8.59      ← usuario genérico de oficina
+w1035401p16|p008967|118.68.8.56       ← usuario personal
+w1035401p01a|o0354p13                 ← sin IP (tercer campo ausente)
+ (hostname 11-12)  (usuario)  (IP Windows, opcional)
 ```
 
 **Decisión Agencia vs Sede Central en el `.bat`** (basada en el hostname Windows, `%COMPUTERNAME%`):
@@ -263,7 +287,7 @@ Fuentes de la IP del servidor Linux destino del LPR:
 Cuando llega un trabajo a una cola CUPS, el filtro de producción resuelve la workstation destino:
 
 ```
-1. lpstat  ──►  PUESTO (nombre de cola, ej. w0123001p15)
+1. lpstat  ──►  PUESTO (nombre de cola, 10 chars, ej. w035401p19)
 2. finger  ──►  USUARIO LDAP de la sesión activa en ese puesto
 3. ¿USUARIO = root?  ──► SÍ: job de Nacar Web → cola remota p1<puesto> → FIN
                           NO: continuar
@@ -283,12 +307,15 @@ Cuando llega un trabajo a una cola CUPS, el filtro de producción resuelve la wo
 
 ### Rol del `finger`
 
-`finger` **solo** se usa para identificar el usuario LDAP con sesión activa en el puesto, cruzando la salida contra el `PUESTO`. No resuelve IP ni hostname de la VM. Ejemplo de salida:
+`finger` **solo** se usa para identificar el usuario LDAP con sesión activa en el puesto, cruzando la salida contra el `PUESTO`. No resuelve IP ni hostname de la VM. Ejemplo real de salida (columnas `Login` / `Name` / `Where`):
 
 ```
-PE.017241        PE.P017241        w1091001p22.nacarpe.igrupobbva
-  (login LDAP)    (hostname Win)     (FQDN de la VM = PUESTO/cola CUPS)
+PE.P034887   PE.P034887   w035401p03.nacarpe.igrupobbva
+ (login LDAP) (nombre)      (Where = PUESTO/cola CUPS de 10 chars, w0)
 ```
+
+El `Where` es el **PUESTO de 10 chars** (`w0...`), que el filtro transforma al
+hostname Windows de 11 chars (`w1...`) para buscar en el mapfile.
 
 ### Resumen del recorrido completo
 
