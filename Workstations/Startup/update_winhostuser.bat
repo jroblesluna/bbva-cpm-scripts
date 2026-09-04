@@ -1,6 +1,5 @@
 @echo off
-setlocal EnableDelayedExpansion
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 
 REM ═══════════════════════════════════════════════════════════════════════
 REM  FLAG DE DEBUGGING
@@ -169,8 +168,18 @@ if not "!LPRRC!"=="0" (
 ) else (
     call :dbg "lpr ejecutado sin error."
 )
-call :dbg "Eliminando archivo temporal %TEMPFILE%"
-del "%TEMPFILE%"
+REM Borrar el temporal solo si la variable esta definida y el archivo existe.
+REM /F fuerza, /Q modo silencioso (evita el prompt "¿Esta seguro (S/N)?").
+if defined TEMPFILE (
+    if exist "!TEMPFILE!" (
+        call :dbg "Eliminando archivo temporal !TEMPFILE!"
+        del /F /Q "!TEMPFILE!"
+    ) else (
+        call :dbg "Temporal no existe, nada que eliminar: !TEMPFILE!"
+    )
+) else (
+    call :dbg "TEMPFILE no definido, se omite el borrado."
+)
 call :dbg "===== FIN update_winhostuser ====="
 exit /b 0
 
