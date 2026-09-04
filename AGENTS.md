@@ -260,6 +260,25 @@ Salida real (columnas `Login | Name | Where`):
 `PE.P034887 | PE.P034887 | w035401p03.nacarpe.igrupobbva`
 (login LDAP | nombre | `Where` = PUESTO/cola CUPS de **10 chars**, prefijo `w0`).
 
+### Ciclo de vida de la cola dinámica (comportamientos clave)
+
+- **Crear-verificar-enviar en la misma corrida:** el filtro crea o verifica la
+  cola (`lpadmin` + `cupsenable` + `cupsaccept`) ANTES del `lp -d`. Usa la misma
+  variable `$CUPS_QUEUE` para nombrar, crear y enviar → el job siempre llega a una
+  cola que existe. No hay desincronización dentro de una ejecución.
+- **El nombre `w10`/`w11` es cosmético:** lo que determina el destino real del job
+  es el URI `lpd://$WINIP:515/LexmarkBBVA`, NO el nombre de la cola. Una máquina
+  Win11 con cola llamada `w10...` imprime igual.
+- **Auto-actualización por cambio de IP:** si la IP de la workstation cambia, el
+  `.bat` refresca el mapfile al inicio de sesión; en el siguiente job el filtro
+  compara `CURURI` vs `EXPECT_URI` y, si difieren, ejecuta `lpadmin -v` para
+  reapuntar antes de imprimir. Ventana de riesgo: un job que llegue entre el
+  cambio de IP y la próxima corrida del `.bat`.
+- **Sin duplicados en el mapfile:** `filtro_winhostuser` elimina líneas con el
+  mismo hostname o la misma IP antes de insertar la nueva (evita obsoletos por DHCP).
+- **Posible acumulación de colas w10/w11:** solo si se alterna modo mapfile↔DNS
+  entre trabajos (no ocurre en operación estable con modo fijo).
+
 ## Archivos de Datos en Producción
 
 **Aplica solo al Sistema de Producción (Lexmark CPM)**

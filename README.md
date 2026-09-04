@@ -696,6 +696,135 @@ done
 - Para forzar recreación de una cola: `lpadmin -x w1<puesto>` y re-imprimir.
 - Al desplegar una nueva versión del filtro: copiar `filtro_nacarpr_pro.cpm` como `/root/bin/filtro_nacarpr` y reinstalar en las colas afectadas con `lpadmin -p <cola> -i /root/bin/filtro_nacarpr`.
 
+---
+
+## Preguntas Frecuentes (FAQ)
+
+Preguntas y respuestas sobre el flujo de resolución de impresión de producción
+(Lexmark CPM). Todas verificadas contra el código de `filtro_nacarpr_pro.cpm`,
+`filtro_winhostuser` y `update_winhostuser.bat`.
+
+### Nomenclatura y estructura
+
+**P: ¿Cuántas nomenclaturas hay y en qué se diferencian?**
+R: Cinco, todas comparten los campos XXX (agencia), Y (SERVLIN) y ZZ (puesto):
+- Hostname Windows físico (agencias): `W10XXX0YPZZ` / `W11XXX0YPZZ` (11-12 chars, con sufijo `A` opcional).
+- Hostname enviado al mapfile: igual pero truncado a 11 chars.
+- PUESTO / cola CUPS de entrada / `Where` del finger: `w0XXX0YpZZ` (10 chars, prefijo `w0`).
+- Servidor Nacar Linux: `s0XXX00Y` (8 chars).
+- MAC del VMX: `??:??:??:YX:XX:ZZ`.
+
+**P: ¿Por qué el PUESTO tiene 10 chars (`w0`) y el hostname del mapfile 11 (`w1`)?**
+R: Son dos cosas distintas. El PUESTO es el nombre de la cola de entrada y el
+`Where` del finger. El hostname del mapfile es el nombre físico de la máquina
+Windows. El filtro los relaciona: `w10`/`w11` → `w0` (quitar 2 chars tras la `w`,
+poner un solo `0`). Al revés, el filtro reconstruye `w0...` → `w10...`.
+
+**P: ¿El `w0091001p17` de 11 chars que aparece en CUPS es válido?**
+R: No, es un error manual de tipeo. La nomenclatura oficial de cola es
+`w0XXX0YpZZ` (10 chars).
+
+### Registro de mapping (`update_winhostuser.bat`)
+
+**P: ¿Qué decide si una workstation usa el flujo de Agencia o de Sede Central?**
+R: El `%COMPUTERNAME%`. Si cumple `W10XXX0YPZZ` / `W11XXX0YPZZ` (con sufijo
+opcional) → Agencia (envía el hostname truncado a 11). Cualquier otro
+(`P017241`, `XP12345`, `DESKTOP-*`, etc.) → Sede Central (deriva el VMHOST del VMX).
+
+**P: ¿Por qué en Sede Central no se usa el `%COMPUTERNAME%`?**
+R: Porque en Sede el nombre físico de Windows equivale al usuario (`P017241`) y
+no coincide con ninguna cola CUPS. Se deriva el nombre de la VM Linux
+(`w10XXX0YpZZ`) desde la MAC del VMX.
+
+**P: ¿Cómo se deriva el hostname de la VM y el servidor desde la MAC?**
+R: De la MAC `??:??:??:YX:XX:ZZ` (ej. `00:50:56:19:10:22`):
+- VMHOST = `w10` + XXX + `0` + Y + `p` + ZZ = `w1091001p22`
+- SERVER = `s0` + XXX + `00` + Y = `s0910001.nacarpe.igrupobbva`
+
+**P: ¿De dónde sale la IP del servidor Linux para el `lpr`?**
+R: De `virtconf.txt` (`srvhost=`, tomando 3 octetos + `.210`) si existe; si no, se
+deriva `s0XXX00Y.nacarpe.igrupobbva` desde la MAC del VMX.
+
+**P: ¿Qué pasa en una workstation VirtAplic sin archivo VMX?**
+R: No se puede derivar el VMHOST. Un hostname de agencia funciona igual (no lo
+necesita). Un hostname de Sede Central cae en advertencia y se envía
+`%COMPUTERNAME%` (que no hará match). Es una limitación conocida pendiente de
+identificar la fuente del nombre de VM en `virtconf.txt`.
+
+### Resolución en impresión (`filtro_nacarpr`)
+
+**P: ¿Para qué se usa el `finger`?**
+R: Solo para identificar el usuario LDAP con sesión activa en el puesto (cruzando
+su salida contra el PUESTO). No resuelve IP ni hostname de la VM.
+
+**P: ¿Qué pasa si el job llega como usuario `root`?**
+R: Es un job de Nacar Web. Se reenvía directo a la cola remota `p1<puesto>` de
+sede central y el filtro termina sin procesar CPM.
+
+**P: ¿Por qué el filtro busca en el mapfile primero `w10` y luego `w11`?**
+R: Porque el PUESTO (`w0...`) no conserva el indicador de versión de Windows. El
+filtro no sabe si la máquina es Win10 o Win11, así que prueba `w10` y, si no
+encuentra la línea, `w11`. El fallback sirve para **hallar la línea correcta y
+obtener la IP** (dato crítico para el `lpr`).
+
+**P: En modo DNS, ¿por qué también prueba w10 y luego w11 si el hostname debería ser exacto?**
+R: Por la misma razón: el PUESTO no dice la versión de Windows. En modo DNS el
+filtro no lee el mapfile; reconstruye `w10<...>.pe.igrupobbva`, y si el DNS no
+resuelve, reintenta con `w11`.
+
+**P: ¿El nombre de la cola dinámica es siempre `w10`?**
+R: Depende del modo:
+- Modo mapfile (`FILTER_DNS_IP=0.0.0.0`): **siempre `w10...`**, aunque la máquina sea Win11 (el fallback del mapfile no reasigna el nombre, solo obtiene la IP).
+- Modo DNS con resolución `w10`: `w10...`.
+- Modo DNS con fallback a `w11`: `w11...`.
+
+**P: ¿Importa que la cola se llame `w10` aunque la máquina sea Windows 11?**
+R: No para imprimir. El nombre de la cola es una etiqueta interna de CUPS. Lo que
+determina el destino real del job es el URI `lpd://<IP>:515/LexmarkBBVA`, que
+apunta a la IP correcta obtenida del mapfile o DNS.
+
+**P: ¿El número de puesto de la cola dinámica siempre coincide con el de la cola de entrada?**
+R: No necesariamente. Con `PLANTILLA_GRANDE=ON`, a los puestos con `XX≥21` se les
+resta 10 (`YY=XX-10`) y los `XX` en 11-20 se rechazan. El `YY2` del nombre
+dinámico puede diferir del puesto de la cola de entrada.
+
+### Cola dinámica y cambios de IP
+
+**P: ¿El job siempre llega a una cola que existe?**
+R: Sí. Dentro de una misma ejecución, el filtro crea/verifica la cola
+(`lpadmin` + `cupsenable` + `cupsaccept`) **antes** de enviar el job con `lp -d`.
+Se usa la misma variable para nombrar, crear y enviar, así que no hay
+desincronización.
+
+**P: Si cambia la IP de la workstation Windows, ¿se actualiza la cola dinámica?**
+R: Sí, en el siguiente job. El filtro compara el URI actual de la cola contra el
+esperado (`lpd://<IP_nueva>:515/...`) y, si difieren, ejecuta `lpadmin -v` para
+reapuntar antes de imprimir. Requiere que el mapfile ya esté actualizado (el
+`.bat` lo refresca al inicio de sesión) — hay una ventana entre el cambio de IP
+y la próxima corrida del `.bat`.
+
+**P: ¿Se acumulan colas duplicadas (w10 y w11) para una misma máquina?**
+R: Solo si se alterna entre modo mapfile y modo DNS entre trabajos, lo cual no es
+lo normal (el modo es fijo por `lexmark_filtro.config`). En operación estable con
+un solo modo, cada puesto tiene una única cola dinámica.
+
+**P: ¿Cómo evita el mapfile entradas obsoletas al cambiar la IP?**
+R: `filtro_winhostuser` elimina cualquier línea con el mismo hostname o la misma
+IP antes de insertar el registro nuevo, evitando duplicados por rotación de IP/DHCP.
+
+### Configuración del filtro
+
+**P: ¿Qué hacen los parámetros de `lexmark_filtro.config`?**
+R:
+- `PLANTILLA_GRANDE` (ON/OFF): si ON, puestos `XX≥21` se mapean a `YY=XX-10`; 11-20 inválidos.
+- `USUARIO_GENERICO` (ON/OFF): ON usa el usuario del mapfile (col 2); OFF usa el del finger.
+- `FILTER_DNS_IP` (`0.0.0.0` o IP): `0.0.0.0` usa la IP del mapfile; una IP hace resolución DNS (fallback w10→w11).
+
+**P: ¿Cómo se ve una cola correctamente asociada al filtro de producción?**
+R: En CUPS: Descripción/Ubicación mencionan `filtro_nacarpr`, controlador "Local
+System V Printer", conexión `lpd://<IP>:515/lp`, estado "inactiva, aceptando
+trabajos, compartida" (procesa bajo demanda). Ver "Firma de una cola asociada a
+`filtro_nacarpr`" arriba.
 
 ---
 
