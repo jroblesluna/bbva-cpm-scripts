@@ -136,12 +136,62 @@ La variable `$DEVICE_URI` es seteada por CUPS con la URI del dispositivo de la c
 
 **Aplica solo al Sistema de Producción (Lexmark CPM)**
 
-Un `PUESTO` tiene el formato `w0###0SpXX` (10 chars) donde:
-- posiciones 2-4: código de agencia
-- posición 6: identificador servidor Linux
-- posiciones 8-9: número de puesto (XX)
+### Nombre de cola CUPS de entrada (`PUESTO`)
 
-El host Windows correspondiente sigue el mismo patrón con prefijo `w10` o `w11`.
+El `PUESTO` que `filtro_nacarpr` obtiene de `lpstat` es el nombre de la cola CUPS
+donde llegó el job. El filtro extrae (índices 0-based sobre `$PUESTO`):
+- `AGENCIA="${PUESTO:2:3}"` — posiciones 2-4: código de agencia (3 dígitos)
+- `SERVLIN="${PUESTO:6:1}"` — posición 6: servidor de agencia (1 dígito)
+- `POSXX="${PUESTO:8:2}"` — posiciones 8-9: número de puesto (2 dígitos)
+
+### Hostname de la VM Linux (clave del mapfile y de la cola dinámica)
+
+El hostname de la VM Linux tiene **11 caracteres** con estructura `w1 0 XXX 0 S p ZZ`:
+
+```
+w 1 0 X X X 0 S p Z Z      Ejemplo: w1091001p22
+0 1 2 3 4 5 6 7 8 9 10               agencia=910, SERVLIN=1, puesto=22
+```
+
+- posición 2: `0` (w10) o `1` (w11) según la variante de imagen.
+- posiciones 3-5 (`XXX`): código de agencia.
+- posición 7 (`S`): servidor de agencia (SERVLIN).
+- posiciones 9-10 (`ZZ`): número de puesto.
+- Sufijo alfabético opcional (`w1091001p22a`, 12 chars) → **siempre se trunca a 11**.
+
+Este hostname coincide exactamente con el nombre de la cola CUPS dinámica que
+`filtro_nacarpr` crea (`lpd://<IP>:515/LexmarkBBVA`) y con la clave del mapfile.
+
+### Decisión Agencia vs Sede Central (`update_winhostuser.bat`)
+
+El `.bat` decide qué hostname registrar en el mapfile según `%COMPUTERNAME%`:
+
+| Caso | Condición | Hostname enviado al mapfile |
+|---|---|---|
+| **Agencia** | `%COMPUTERNAME%` cumple `W1######P##` (con sufijo opcional) | El propio hostname, truncado a 11 chars |
+| **Sede Central** | Cualquier otro (`P017241`, `P017241A`, `XP12345`, `DESKTOP-*`, `W11PRUEBAOF3`) | `VMHOST` derivado de la MAC del VMX |
+
+En Sede Central el nombre físico de Windows equivale al usuario (`P######` /
+`XP#####`) y no coincide con ninguna cola CUPS. El `VMHOST` se deriva de la MAC
+del archivo VMX (`ethernet0.address`):
+
+```
+MAC "00:50:56:YX:XX:ZZ" -> w10<XXX>0<Y>p<ZZ>
+Ej.  "00:50:56:19:10:22" -> w1091001p22
+     XXX (agencia) = 9,1,0  |  Y (SERVLIN) = 1  |  ZZ (puesto) = 22
+```
+
+**Limitación conocida:** una workstation VirtAplic **sin** archivo VMX no puede
+derivar `VMHOST`. El script emite `[ADVERTENCIA]` y usa `%COMPUTERNAME%` como
+fallback (no hará match). Pendiente: identificar la fuente del nombre de VM en
+`virtconf.txt`.
+
+### Rol del `finger`
+
+`finger` solo identifica el **usuario LDAP** con sesión activa en el puesto
+(cruzando su salida contra `$PUESTO`). No resuelve IP ni hostname de la VM.
+Salida típica: `PE.017241 | PE.P017241 | w1091001p22.nacarpe.igrupobbva`
+(login LDAP | hostname Windows físico | FQDN de la VM = PUESTO/cola CUPS).
 
 ## Archivos de Datos en Producción
 
@@ -161,6 +211,20 @@ Estos archivos **no están en el repositorio**, existen solo en el servidor Linu
 - Las secciones del código se separan con comentarios `# === NOMBRE DE SECCIÓN ===`
 - El número de versión se define como `VERSION="vYYYYMMDDhhmm"` en la línea 4
 - Actualizar `VERSION` en cada modificación siguiendo el formato de fecha
+
+### Sistema de Producción (Windows - Batch `.bat`)
+- Usar **un solo** `setlocal EnableExtensions EnableDelayedExpansion`. NUNCA dos
+  `setlocal` seguidos: el segundo sin `EnableDelayedExpansion` desactiva la
+  expansión `!VAR!` y deja variables vacías (causó un `del` sobre el directorio
+  actual con comodín).
+- Dentro de bloques `if (...)`/`for (...)`, leer variables asignadas en el mismo
+  bloque con `!VAR!` (delayed), no `%VAR%`.
+- Borrado de temporales **fail-safe**: validar `if defined VAR` + `if exist` y
+  usar `del /F /Q` (nunca `del "%VAR%"` sin validar — si `VAR` está vacío borra
+  el directorio actual).
+- Flag `DEBUG` (por defecto `1`) + subrutina `:dbg` para trazas `[DBG]`. Los
+  mensajes `[ERROR]` y `[ADVERTENCIA]` se muestran siempre, independientes del flag.
+- Comentarios y mensajes en español.
 
 ### Sistema de Contingencia (AlwaysPrint - C#)
 - Usar `AlwaysPrintLogger` para todos los logs (no `Console.WriteLine`)
@@ -194,6 +258,10 @@ Estos archivos **no están en el repositorio**, existen solo en el servidor Linu
 - No usar `bashisms` incompatibles con bash 4.x de SUSE 12
 - No modificar las cabeceras `@PJL` sin conocimiento del protocolo PJL/Lexmark
 - No cambiar el nombre de la cola LPD de Windows (`LexmarkBBVA`) sin actualizar `configuration.json`
+- **No usar doble `setlocal`** en los `.bat` (rompe la delayed expansion)
+- **No ejecutar `del "%VAR%"` sin validar** que la variable esté definida y el archivo exista (riesgo de borrado con comodín en el directorio actual)
+- No enviar `%COMPUTERNAME%` como hostname en Sede Central — debe usarse el `VMHOST` derivado de la MAC (ver "Lógica de Nomenclatura")
+- No cambiar la validación de longitud de hostname en `filtro_winhostuser` (11-12 → 11) sin verificar que las colas CUPS siguen siendo de 11 chars
 
 ### Sistema de Contingencia (AlwaysPrint)
 - No usar `Console.WriteLine` en lugar de `AlwaysPrintLogger`

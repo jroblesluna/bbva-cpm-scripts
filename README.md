@@ -2,7 +2,7 @@
 
 Este repositorio contiene dos sistemas complementarios para gestión de impresión corporativa.
 
-**Última actualización**: 26 de agosto de 2026
+**Última actualización**: 28 de agosto de 2026
 
 ---
 
@@ -184,6 +184,122 @@ Redirige tráfico → IP impresora:puerto estándar (bypass CPM/Linux)
 - **Producción**: Tráfico pasa por Lexmark CPM → Servidor Linux → Impresora
 - **Contingencia**: Tráfico va directo desde Windows → Impresora (bypass completo)
 - **Servidor Linux**: Siempre operativo (responsabilidad BBVA), pero no se usa en contingencia
+
+---
+
+## 🧭 Arquitectura de Resolución de Impresión
+
+El servidor Linux no conoce de antemano la IP de la workstation Windows a la que debe enviar cada trabajo. Esa relación se resuelve en **dos fases**: primero un registro de mapping (workstation → servidor), y luego una resolución en tiempo de impresión (job → workstation destino).
+
+### Nomenclatura del puesto (hostname de la VM Linux)
+
+La pieza central de todo el enrutamiento es el **hostname de la VM Linux** que corre en cada workstation. Tiene 11 caracteres con la estructura `w1 0 XXX 0 S p ZZ`:
+
+```
+w 1 0 X X X 0 S p Z Z
+0 1 2 3 4 5 6 7 8 9 10
+│ │ │ └─┬─┘ │ │ │ └┬┘
+│ │ │  XXX  │ │ │  ZZ = número de puesto (2 dígitos)
+│ │ │       │ │ └──── literal 'p'
+│ │ │       │ └────── S = servidor de agencia (SERVLIN, 1 dígito)
+│ │ │       └──────── literal '0'
+│ │ └──────────────── XXX = código de agencia (3 dígitos)
+│ └────────────────── '0' (w10) o '1' (w11) según variante
+└──────────────────── literal 'w'
+```
+
+- Ejemplos: `w1091001p22`, `w1012301p15`.
+- Puede llevar un **sufijo alfabético opcional** (`w1012301p15a`, 12 chars) que siempre se **trunca a los primeros 11**.
+- Este hostname coincide **exactamente** con el nombre de la cola CUPS en el servidor Linux.
+
+### Fase 1 — Registro de mapping (`update_winhostuser.bat` → `filtro_winhostuser`)
+
+Al inicio de sesión, cada workstation envía su mapping al servidor Linux vía LPR a la cola `CPMWinHostUser`:
+
+```
+Workstation Windows                         Servidor Linux (cola CPMWinHostUser)
+───────────────────                         ────────────────────────────────────
+update_winhostuser.bat                      filtro_winhostuser
+  1. Determina el hostname a enviar   ──►      1. Valida formato (3 campos, 2 pipes)
+     (ver decisión Agencia/Sede)              2. Valida hostname (11-12 chars → 11)
+  2. Detecta IP local del equipo              3. Valida usuario (o/p/xp) e IP (118.*)
+  3. Envía: HOSTNAME|USUARIO|IP        LPR    4. Elimina duplicados por host o IP
+                                              5. Escribe en win_hostname_user.txt
+```
+
+Formato almacenado en `/var/lib/lexmark/win_hostname_user.txt`:
+```
+w1091001p22|p017241|118.222.235.53
+   (cola)     (usuario)   (IP Windows)
+```
+
+**Decisión Agencia vs Sede Central en el `.bat`** (basada en el hostname Windows, `%COMPUTERNAME%`):
+
+| Caso | Condición | Hostname enviado |
+|---|---|---|
+| **Agencia** | `%COMPUTERNAME%` cumple `W1######P##` (con sufijo opcional) | El propio hostname, truncado a 11 chars |
+| **Sede Central** | Cualquier otro (`P017241`, `XP12345`, `DESKTOP-*`, etc.) | `VMHOST` derivado de la MAC del VMX |
+
+En Sede Central el nombre físico de Windows equivale al usuario (ej. `P017241`) y no coincide con ninguna cola CUPS. Por eso se deriva el hostname de la VM Linux desde la dirección MAC del archivo VMX:
+
+```
+MAC del VMX  "00:50:56:19:10:22"  ─►  w1091001p22
+                       └─┬─┘└┬┘
+              segmentos  YX:XX  ZZ
+              XXX (agencia) = 9,1,0 → "910"
+              Y   (SERVLIN) = 1
+              ZZ  (puesto)  = 2,2  → "22"
+              → w10 + 910 + 0 + 1 + p + 22
+```
+
+Fuentes de la IP del servidor Linux destino del LPR:
+1. `D:\VirtAplic\VirtRM\virtconf.txt` (clave `srvhost=`, se fuerza el 4.º octeto a `.210`)
+2. Archivo VMX (`Nacar_Suse12.vmx`), derivando el nombre del servidor desde la MAC
+
+> **Limitación conocida:** una workstation VirtAplic **sin** archivo VMX no puede derivar el `VMHOST`. En ese caso el script emite advertencia y usa `%COMPUTERNAME%` como fallback (que no hará match). Pendiente de identificar la fuente del nombre de VM dentro de `virtconf.txt`.
+
+### Fase 2 — Resolución en tiempo de impresión (`filtro_nacarpr`)
+
+Cuando llega un trabajo a una cola CUPS, el filtro de producción resuelve la workstation destino:
+
+```
+1. lpstat  ──►  PUESTO (nombre de cola, ej. w0123001p15)
+2. finger  ──►  USUARIO LDAP de la sesión activa en ese puesto
+3. ¿USUARIO = root?  ──► SÍ: job de Nacar Web → cola remota p1<puesto> → FIN
+                          NO: continuar
+4. Extrae AGENCIA, SERVLIN, POSXX del PUESTO
+5. Busca en win_hostname_user.txt por regex:
+      ^w10<AGENCIA>0[0-9]p<YY2>[A-Za-z]?\|      (fallback a w11)
+6. Obtiene USUARIO final e IP:
+      - USUARIO_GENERICO=ON  → usuario del mapfile (columna 2)
+      - USUARIO_GENERICO=OFF → usuario del finger
+      - FILTER_DNS_IP=0.0.0.0 → IP del mapfile (columna 3)
+      - FILTER_DNS_IP=<IP>    → resuelve por DNS (fallback w10→w11)
+7. Verifica puerto 515 abierto en la IP destino
+8. Crea/actualiza cola dinámica: lpd://<IP>:515/LexmarkBBVA
+9. Inyecta encabezado PJL + firma PCL y envía con lp
+10. Fallback opcional a Tea4Cups (cola p<puesto>) para PDF
+```
+
+### Rol del `finger`
+
+`finger` **solo** se usa para identificar el usuario LDAP con sesión activa en el puesto, cruzando la salida contra el `PUESTO`. No resuelve IP ni hostname de la VM. Ejemplo de salida:
+
+```
+PE.017241        PE.P017241        w1091001p22.nacarpe.igrupobbva
+  (login LDAP)    (hostname Win)     (FQDN de la VM = PUESTO/cola CUPS)
+```
+
+### Resumen del recorrido completo
+
+```
+[Arranque] Workstation ──LPR──► CPMWinHostUser ──► win_hostname_user.txt
+                                                          │
+[Impresión] Job ──► cola CUPS ──► filtro_nacarpr ─────────┘
+                                        │  (busca IP por PUESTO en el mapfile)
+                                        ▼
+                          lpd://<IP_Windows>:515/LexmarkBBVA ──► Impresora
+```
 
 ---
 
@@ -404,8 +520,14 @@ Get-Service LPDSVC
 ### 3. Configurar script de inicio
 Agregar `Workstations/Startup/update_winhostuser.bat` al arranque (Inicio del usuario o GPO). Este script:
 - Lee `virtconf.txt` (clave `srvhost=`) o `Nacar_Suse12.vmx` para deducir la IP del servidor Linux.
+- Deriva el hostname de la VM Linux desde la MAC del VMX (necesario para Sede Central).
+- Decide qué hostname enviar según `%COMPUTERNAME%` (ver "Arquitectura de Resolución de Impresión"):
+  - **Agencia** (`W1######P##`): envía el hostname truncado a 11 chars.
+  - **Sede Central** (`P######`, `XP#####`, etc.): envía el `VMHOST` derivado de la MAC.
 - Detecta la IP válida del equipo.
 - Envía `hostname|usuario|ip` a la cola Linux `CPMWinHostUser`.
+
+> El script incluye un flag `DEBUG` (por defecto `1`) que imprime trazas `[DBG]` paso a paso. Para modo silencioso, ejecutar con `set DEBUG=0` o cambiar el valor por defecto. Los mensajes `[ERROR]` y `[ADVERTENCIA]` se muestran siempre.
 
 ### 4. Instalar cliente CPM
 Ejecutar el instalador junto a `Client Installer/configuration.json` (deben estar en la misma carpeta):
@@ -448,6 +570,8 @@ echo test > /var/lib/lexmark/test.txt
 **Cola apunta a IP incorrecta:** confirmar `/var/lib/lexmark/win_hostname_user.txt` y `lpstat -v <cola>`. El filtro auto-corrige la URI en el siguiente job.
 
 **Host Windows no encontrado en mapfile:** el mapfile puede tener entradas `w11XXXXX` mientras la regex busca `w10XXXXX`. Verificar el prefijo real con `cat /var/lib/lexmark/win_hostname_user.txt`.
+
+**Workstation de Sede Central sin entrada en mapfile:** el hostname físico Windows (`P017241`) no coincide con las colas CUPS. El `.bat` debe enviar el hostname de la VM (`w10...`) derivado de la MAC del VMX. Si la máquina es VirtAplic **sin** VMX, ese hostname no se puede derivar (limitación conocida): revisar la traza `[DBG]` del script y el log `lexmark_winhostuser.log` para confirmar qué se envió.
 
 **Tea4Cups no genera PDF:** confirmar existencia de cola `p<puesto>` y que usa backend Tea4Cups.
 
