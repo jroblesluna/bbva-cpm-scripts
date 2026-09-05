@@ -1587,7 +1587,7 @@ def export_workstations(
 @router.get("/stale", response_model=WorkstationListResponse)
 def list_stale_workstations(
     days: int = Query(90, ge=1, description="Días de inactividad para considerar stale"),
-    min_hours: int = Query(24, ge=1, description="Horas mínimas de actividad registrada (updated_at - created_at)"),
+    min_hours: int = Query(24, ge=1, description="Horas mínimas de actividad registrada (last_seen - created_at)"),
     organization_id: Optional[UUID] = Query(None, description="Filtrar por organización (solo Admin)"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
@@ -1596,8 +1596,12 @@ def list_stale_workstations(
 ):
     """
     Listar workstations inactivas (stale):
-    - updated_at - created_at > min_hours * 3600s  (tuvieron actividad real)
-    - updated_at < now - days                       (no se han conectado en N días)
+    - last_seen - created_at > min_hours * 3600s  (tuvieron actividad real de conexión)
+    - last_seen < now - days                       (no se han conectado en N días)
+
+    Usa last_seen (columna de actividad real de conexión, migración 036) en lugar de
+    updated_at, que se actualiza con cualquier cambio de registro y no refleja
+    la última vez que el equipo estuvo online.
 
     Admin: puede ver todas las orgs o filtrar por organization_id.
     Operador: solo ve su propia organización.
@@ -1610,8 +1614,11 @@ def list_stale_workstations(
 
     base_query = db.query(Workstation).filter(
         and_(
-            func.extract("epoch", Workstation.updated_at - Workstation.created_at) > min_active_seconds,
-            Workstation.updated_at < stale_threshold,
+            # Tuvieron actividad real: la diferencia entre last_seen y created_at
+            # supera el mínimo de horas configurado.
+            func.extract("epoch", Workstation.last_seen - Workstation.created_at) > min_active_seconds,
+            # No se han conectado en los últimos N días.
+            Workstation.last_seen < stale_threshold,
         )
     )
 
@@ -1626,7 +1633,7 @@ def list_stale_workstations(
     total = base_query.count()
     items = (
         base_query
-        .order_by(Workstation.updated_at.asc())
+        .order_by(Workstation.last_seen.asc())  # primero los más tiempo sin conectarse
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
