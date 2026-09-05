@@ -1639,12 +1639,12 @@ def list_stale_workstations(
         .all()
     )
 
+    skip = (page - 1) * page_size
     return WorkstationListResponse(
         items=[WorkstationResponse.from_orm(w) for w in items],
         total=total,
-        page=page,
-        page_size=page_size,
-        pages=(total + page_size - 1) // page_size if page_size > 0 else 1,
+        skip=skip,
+        limit=page_size,
     )
 
 
