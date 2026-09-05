@@ -72,14 +72,22 @@ class RedisConnectionManager:
         self.last_activity: Dict[str, datetime] = {}
         self.org_ids: Dict[str, str] = {}
 
+        # Último `last_seen` volcado a BD por el flush periódico (Req 1.7). Por worker: cada
+        # worker persiste el last_seen de SUS ws conectadas (coherente con el WorkerRegistry).
+        # Permite escribir SOLO las que avanzaron por ciclo (no en cada telemetría — Req 1.8).
+        self._last_seen_flushed: Dict[str, datetime] = {}
+
         # Lock para operaciones thread-safe
         self._lock = asyncio.Lock()
 
         # Flag para detener el ping loop
         self._ping_loop_running = False
 
-        # Cola de desconexiones pendientes de persistir en BD (batch)
-        self._disconnect_queue: List[str] = []
+        # Cola de desconexiones pendientes de persistir en BD (batch).
+        # Cada entrada mapea workstation_id -> última actividad real conocida (o None si
+        # no hay). Se persiste como `last_seen` al marcar offline (Req 1.5) usando el ts de
+        # actividad real, NO el momento del evento de desconexión.
+        self._disconnect_queue: Dict[str, Optional[datetime]] = {}
         self._disconnect_flush_task: Optional[asyncio.Task] = None
         self._db_session_factory = None
 
@@ -355,13 +363,17 @@ class RedisConnectionManager:
         # Obtener org_id ANTES de eliminar de org_ids (necesario para decremento)
         org_id = self.org_ids.get(workstation_id)
 
-        # Limpiar estado local
+        # Limpiar estado local. Se captura last_activity ANTES de eliminarla para
+        # persistir last_seen con el ts de actividad real (Req 1.5), no el del evento.
         if workstation_id in self.last_pong:
             del self.last_pong[workstation_id]
-        self.last_activity.pop(workstation_id, None)
+        last_activity_ts = self.last_activity.pop(workstation_id, None)
         self.org_ids.pop(workstation_id, None)
         self._ws_vlan_ids.pop(workstation_id, None)
         self._pending_pongs.pop(workstation_id, None)
+        # Olvidar la marca de flush: la persistencia de last_seen al ir offline la cubre el
+        # disconnect batch; al reconectar se re-evalúa desde cero.
+        self._last_seen_flushed.pop(workstation_id, None)
 
         # Decrementar contador org y conditional UNSUBSCRIBE
         if org_id and org_id in self._org_ws_count:
@@ -394,8 +406,8 @@ class RedisConnectionManager:
         # el fallback sync también sea consistente sin esperar al próximo heartbeat.
         self._global_online_snapshot.discard(workstation_id)
 
-        # Encolar para batch update de BD
-        self._disconnect_queue.append(workstation_id)
+        # Encolar para batch update de BD (con la última actividad real conocida)
+        self._disconnect_queue[workstation_id] = last_activity_ts
         if self._disconnect_flush_task is None or self._disconnect_flush_task.done():
             self._disconnect_flush_task = asyncio.create_task(
                 self._flush_disconnect_queue()
@@ -405,20 +417,26 @@ class RedisConnectionManager:
         """
         Espera 3 segundos y luego hace batch UPDATE de todas las ws encoladas.
         Agrupa desconexiones masivas en queries batch a la BD.
+
+        Además de `is_online=False`, persiste `last_seen` con la última actividad real
+        conocida de cada ws (Req 1.5). Ir offline NO reactiva `billing_status` (no es
+        actividad nueva): solo se escribe en el UPDATE batch, sin pasar por `mark_activity`.
         """
+        from app.services.last_seen_tracker import mark_offline_with_last_seen
+
         while True:
             await asyncio.sleep(3)
 
-            ids_to_flush = self._disconnect_queue.copy()
+            to_flush = dict(self._disconnect_queue)
             self._disconnect_queue.clear()
 
-            if not ids_to_flush:
+            if not to_flush:
                 return
 
             if self._db_session_factory is None:
                 logger.warning(
                     "flush_disconnect.no_factory",
-                    count=len(ids_to_flush),
+                    count=len(to_flush),
                     msg="db_session_factory es None, descartando batch",
                 )
                 return
@@ -426,18 +444,12 @@ class RedisConnectionManager:
             try:
                 db = self._db_session_factory()
                 try:
-                    from app.models.workstation import Workstation
-                    updated = db.query(Workstation).filter(
-                        Workstation.id.in_(ids_to_flush)
-                    ).update(
-                        {Workstation.is_online: False},
-                        synchronize_session=False,
-                    )
+                    updated = mark_offline_with_last_seen(db, to_flush)
                     db.commit()
                     logger.info(
                         "batch_disconnect.complete",
                         updated=updated,
-                        enqueued=len(ids_to_flush),
+                        enqueued=len(to_flush),
                     )
                 except Exception as e:
                     db.rollback()
@@ -1904,15 +1916,69 @@ class RedisConnectionManager:
                     total_connected=len(workstation_ids),
                 )
 
+            # === FASE 3.5: Flush periódico de last_seen (Req 1.7, 1.8) ===
+            # Persistir en un único UPDATE batch el last_seen de las ws ONLINE conectadas a
+            # ESTE worker cuya última actividad en memoria avanzó respecto al valor ya
+            # volcado. Cada worker cubre sus propias conexiones (coherente con el
+            # WorkerRegistry). No se escribe en cada telemetría (Req 1.8): solo aquí, una
+            # vez por ciclo, y solo las que avanzaron (Req 1.7).
+            # Lectura simple de dicts sin lock (atómica por worker en asyncio; no se ponen
+            # locks en hot paths — reglas multi-worker del repo).
+            connected_activity = {
+                ws_id: self.last_activity.get(ws_id)
+                for ws_id in list(self.workstation_connections.keys())
+            }
+
+            pending_flush: Dict[str, datetime] = {}
+            for ws_id, ts in connected_activity.items():
+                if ts is None:
+                    continue
+                flushed = self._last_seen_flushed.get(ws_id)
+                if flushed is None or ts > flushed:
+                    pending_flush[ws_id] = ts
+
+            if pending_flush:
+                from app.services.last_seen_tracker import batch_update_last_seen
+                try:
+                    db = db_session_factory()
+                    try:
+                        # UPDATE plano de last_seen (NO toca is_online ni billing_status).
+                        updated = batch_update_last_seen(db, pending_flush)
+                        db.commit()
+                        # Solo tras un commit exitoso se marca lo volcado, para que el
+                        # próximo ciclo escriba únicamente avances posteriores.
+                        self._last_seen_flushed.update(pending_flush)
+                        logger.info(
+                            "ping_loop.phase35_last_seen_flush",
+                            updated=updated,
+                            connected=len(connected_activity),
+                        )
+                    except Exception as e:
+                        db.rollback()
+                        logger.error(
+                            "ping_loop.last_seen_flush_error",
+                            error=str(e),
+                            pending=len(pending_flush),
+                        )
+                    finally:
+                        db.close()
+                except Exception as e:
+                    logger.error("ping_loop.session_error", error=str(e))
+
             # === FASE 4: Batch disconnect de muertas ===
             if dead_workstations:
                 dead_workstations = list(set(dead_workstations))
 
+                # Capturar la última actividad real conocida ANTES de eliminarla, para
+                # persistir last_seen con el ts que disparó la evaluación de inactividad
+                # (Req 1.6), NO el momento del evento de muerte.
+                dead_last_seen: Dict[str, Optional[datetime]] = {}
                 for ws_id in dead_workstations:
                     self.workstation_connections.pop(ws_id, None)
-                    self.last_activity.pop(ws_id, None)
+                    dead_last_seen[ws_id] = self.last_activity.pop(ws_id, None)
                     self.last_pong.pop(ws_id, None)
                     self.org_ids.pop(ws_id, None)
+                    self._last_seen_flushed.pop(ws_id, None)
                     self._pending_pongs.pop(ws_id, None)
 
                 # Unregister de WorkerRegistry (ya no se desuscriben canales ws:{id})
@@ -1920,17 +1986,13 @@ class RedisConnectionManager:
                     if self._worker_registry:
                         await self._worker_registry.unregister_workstation(ws_id)
 
-                # Batch UPDATE en BD
+                # Batch UPDATE en BD (is_online=False + last_seen con actividad real).
+                # Ir offline NO reactiva billing_status (no es actividad nueva).
+                from app.services.last_seen_tracker import mark_offline_with_last_seen
                 try:
                     db = db_session_factory()
                     try:
-                        from app.models.workstation import Workstation
-                        updated = db.query(Workstation).filter(
-                            Workstation.id.in_(dead_workstations)
-                        ).update(
-                            {Workstation.is_online: False},
-                            synchronize_session=False,
-                        )
+                        updated = mark_offline_with_last_seen(db, dead_last_seen)
                         db.commit()
                         logger.info(
                             "ping_loop.phase4_batch_disconnect",

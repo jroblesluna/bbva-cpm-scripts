@@ -3,6 +3,7 @@
  */
 
 import type { Organization } from './organization'
+import type { BillingStatus } from './billing'
 
 export interface Workstation {
   id: string
@@ -16,6 +17,13 @@ export interface Workstation {
   contingency_active: boolean
   forced_contingency: boolean
   worker_id: string | null
+  /**
+   * Estado del ciclo de vida de facturación de la workstation (columna `billing_status`).
+   * Task 29 lo dejó diferido; el backend `WorkstationResponse` ya lo incluye. Determina el
+   * comportamiento del borrado (delete físico si 'new'; archivado si no-'new' offline) y el
+   * filtro "ocultar archived" del listado (Req 10.6, 10.7).
+   */
+  billing_status: BillingStatus
   last_connection: string | null
   first_seen: string
   created_at: string

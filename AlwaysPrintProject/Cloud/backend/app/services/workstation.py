@@ -21,6 +21,7 @@ from sqlalchemy import or_
 from app.models.workstation import Workstation, License
 from app.models.organization import Organization, PublicIP
 from app.models.vlan import VLAN
+from app.services.last_seen_tracker import mark_activity
 
 logger = logging.getLogger(__name__)
 
@@ -480,7 +481,12 @@ class WorkstationService:
                 workstation.current_user = current_user
 
             workstation.is_online = True
-            workstation.last_connection = datetime.now(timezone.utc).replace(tzinfo=None)
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            workstation.last_connection = now
+            # Registro/re-registro cuenta como actividad real (Req 1.4): actualizar
+            # last_seen y reactivar el estado de facturación si venía recycled/archived
+            # (Req 2.8), en la misma transacción del registro.
+            mark_activity(db, workstation, now)
 
             # Guardar tray_version si se proporcionó
             if tray_version:
@@ -606,6 +612,10 @@ class WorkstationService:
             # Fallback: detectar VLAN por IP privada (legacy)
             vlan_id = self.detect_vlan_for_ip(db, organization_id, ip_private)
         
+        # Un único timestamp para first_seen/last_seen/last_connection en la creación,
+        # de modo que last_seen == first_seen exactamente (Req 1.2). El objeto es nuevo,
+        # así que se asigna last_seen directamente en el constructor (no vía mark_activity).
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         workstation = Workstation(
             organization_id=account.id,
             vlan_id=vlan_id,
@@ -617,8 +627,9 @@ class WorkstationService:
             tray_version=tray_version,
             is_online=True,
             contingency_active=False,
-            last_connection=datetime.now(timezone.utc).replace(tzinfo=None),
-            first_seen=datetime.now(timezone.utc).replace(tzinfo=None)
+            last_connection=now,
+            first_seen=now,
+            last_seen=now
         )
         
         db.add(workstation)
@@ -722,7 +733,11 @@ class WorkstationService:
         workstation.is_online = is_online
         
         if is_online:
-            workstation.last_connection = datetime.now(timezone.utc).replace(tzinfo=None)
+            # Nueva conexión: actualizar last_connection y también last_seen (Req 1.4),
+            # reactivando el estado de facturación si venía recycled/archived (Req 2.8).
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            workstation.last_connection = now
+            mark_activity(db, workstation, now)
         
         if current_user is not None:
             workstation.current_user = current_user

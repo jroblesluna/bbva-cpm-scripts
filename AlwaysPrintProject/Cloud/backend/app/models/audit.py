@@ -71,6 +71,17 @@ class ActionType(str, enum.Enum):
     LOGIN = "login"
     LOGIN_FAILED = "login_failed"
     REMOTE_COMMAND_EXECUTED = "REMOTE_COMMAND_EXECUTED"
+    # === ACCIONES SENSIBLES DE FACTURACIÓN (Usage and Billing, task 33 / Req 11.4) ===
+    # NOTA (mismo criterio que 022/033/035): SQLAlchemy envía el NOMBRE del miembro (no el
+    # .value) como etiqueta del enum PostgreSQL. Por eso el valor se define igual al nombre
+    # (MAYÚSCULA) para ser consistente, y la migración 037_add_billing_audit_actions agrega
+    # estas etiquetas en MAYÚSCULA al tipo `actiontype`.
+    BILLING_MODE_CHANGE = "BILLING_MODE_CHANGE"      # Cambio de modalidad (monthly↔annual).
+    TIMEZONE_LOCK = "TIMEZONE_LOCK"                  # Bloqueo de timezone tras el primer cierre.
+    WORKSTATION_ARCHIVE = "WORKSTATION_ARCHIVE"      # Archivado manual de una workstation.
+    RATE_PLAN_EDIT = "RATE_PLAN_EDIT"                # Edición de tarifas (default u org).
+    BILLING_CLOSURE = "BILLING_CLOSURE"              # Ejecución de un cierre (auto/retroactivo).
+    ANNUAL_SETTLEMENT = "ANNUAL_SETTLEMENT"          # Liquidación anual (creación/confirmación).
 
 
 class AuditLog(Base):

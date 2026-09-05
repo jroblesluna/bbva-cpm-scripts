@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.services.websocket_manager import connection_manager
 from app.services.status_scheduler import status_scheduler
+from app.services.billing_close_scheduler import billing_close_scheduler
 from app.services.scalability_metrics import scalability_collector
 from app.services.status_batch_writer import status_batch_writer
 from app.services.push_services import get_state_map_service
@@ -54,6 +55,9 @@ async def lifespan(app: FastAPI):
     # Startup: Iniciar scheduler de recolección de métricas
     status_scheduler.start()
 
+    # Startup: Iniciar scheduler de cierre mensual automático (Usage and Billing)
+    billing_close_scheduler.start()
+
     # Startup: Iniciar batch writer de status_update (flush cada 5s)
     status_batch_writer.start()
     
@@ -64,6 +68,9 @@ async def lifespan(app: FastAPI):
 
     # Shutdown: Detener batch writer de status_update
     status_batch_writer.stop()
+
+    # Shutdown: Detener scheduler de cierre mensual automático (Usage and Billing)
+    billing_close_scheduler.stop()
 
     # Shutdown: Detener scheduler de recolección de métricas
     status_scheduler.stop()

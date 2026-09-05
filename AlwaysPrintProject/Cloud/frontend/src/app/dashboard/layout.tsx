@@ -43,6 +43,7 @@ import {
   PanelLeftOpen,
   Zap,
   Eye,
+  Receipt,
 } from 'lucide-react'
 
 // Definición de items de navegación
@@ -125,6 +126,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       labelKey: 'groupSystem',
       items: [
         { key: 'users', href: '/dashboard/admin/users', icon: Users },
+        { key: 'usageAndBilling', href: '/dashboard/admin/usage-and-billing', icon: Receipt },
         { key: 'updates', href: '/dashboard/admin/updates', icon: Download },
         { key: 'knowledgeBase', href: '/dashboard/admin/knowledge-base', icon: Library },
         { key: 'documentation', href: '/dashboard/documentation', icon: BookOpen },

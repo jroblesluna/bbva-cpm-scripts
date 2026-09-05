@@ -34,6 +34,9 @@ from app.api.v1.endpoints import (
     profile_knowledge_articles,
     user_activity,
     sync_inventory,
+    billing_rates,
+    billing_annual,
+    billing_closures,
 )
 
 # Router principal de la API v1
@@ -233,6 +236,28 @@ api_router.include_router(
 api_router.include_router(
     sync_inventory.router,
     tags=["Sync Inventory"]
+)
+
+# Tarifas y planes de facturación (Usage and Billing, solo superadmin)
+api_router.include_router(
+    billing_rates.router,
+    prefix="/billing",
+    tags=["Facturación - Tarifas"]
+)
+
+# Suscripción anual de facturación (Usage and Billing, solo superadmin)
+api_router.include_router(
+    billing_annual.router,
+    prefix="/billing",
+    tags=["Facturación - Suscripción Anual"]
+)
+
+# Cierres mensuales de facturación (Usage and Billing): lectura (admin/operador de su org)
+# y cierre retroactivo (solo superadmin).
+api_router.include_router(
+    billing_closures.router,
+    prefix="/billing",
+    tags=["Facturación - Cierres"]
 )
 
 # Gestión de certificado SSL (solo Corporate Admin)

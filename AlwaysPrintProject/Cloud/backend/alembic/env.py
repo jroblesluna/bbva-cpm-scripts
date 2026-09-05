@@ -21,6 +21,13 @@ from app.models.debugging import DebuggingProfile, DebuggingSession
 from app.models.system_status import (
     StatusSnapshot, MetricRecord, HealthCheckResult, ContainerMetric
 )
+from app.models.billing import (
+    BillingRatePlan,
+    BillingOrgPlan,
+    BillingClosure,
+    BillingClosureItem,
+    BillingAnnualSubscription,
+)
 
 config = context.config
 

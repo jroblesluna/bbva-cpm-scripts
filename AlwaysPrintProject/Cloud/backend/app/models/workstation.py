@@ -8,7 +8,7 @@ Este módulo define:
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, CheckConstraint, text
 from sqlalchemy.orm import relationship, foreign
 
 from app.core.database import Base
@@ -63,12 +63,32 @@ class Workstation(Base):
     # Impresora predeterminada asignada
     default_printer_id = Column(GUID, ForeignKey("devices.id", ondelete="SET NULL"), nullable=True)
     
+    # === FACTURACIÓN (Usage and Billing) ===
+    # Última actividad real conocida de la workstation. Fuente confiable para las reglas de
+    # reciclaje y facturación (a diferencia de last_connection, que no refleja actividad
+    # continua). Tras la migración es NOT NULL; en el registro se inicializa = first_seen.
+    # El server_default CURRENT_TIMESTAMP es solo una red de seguridad para inserts que
+    # omitan el campo (un DEFAULT SQL no puede referenciar first_seen de la misma fila).
+    last_seen = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"))
+
+    # Estado del ciclo de vida de facturación de la IP registrada.
+    # Valores válidos: 'new', 'billable', 'recycled', 'archived' (ver CheckConstraint abajo).
+    billing_status = Column(String(16), nullable=False, server_default="new")
+
     # === TIMESTAMPS ===
     last_connection = Column(DateTime, nullable=True)
     first_seen = Column(DateTime, nullable=False, default=datetime.utcnow)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
+    # === RESTRICCIONES DE TABLA ===
+    __table_args__ = (
+        CheckConstraint(
+            "billing_status IN ('new','billable','recycled','archived')",
+            name="ck_ws_billing_status",
+        ),
+    )
+
     # === RELACIONES ===
     organization = relationship("Organization", back_populates="workstations")
     vlan = relationship("VLAN", back_populates="workstations")

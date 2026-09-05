@@ -8,7 +8,7 @@ Este módulo define:
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Text, TypeDecorator, JSON
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Text, TypeDecorator, JSON, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
 
@@ -134,10 +134,23 @@ class Organization(Base):
     # Default: {"enabled": false} — se parsea al cargar y se persiste como JSON
     remote_view = Column(JSON, nullable=True, server_default='{"enabled": false}')
 
+    # === FACTURACIÓN (Usage and Billing) ===
+    # Modalidad de facturación de la organización: 'monthly' (Mensual) o 'annual' (Anual).
+    # Valor por defecto seguro 'monthly' hasta que un superadministrador la defina.
+    billing_mode = Column(String(16), nullable=False, server_default="monthly")
+
     # === TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
+    # === RESTRICCIONES DE TABLA ===
+    __table_args__ = (
+        CheckConstraint(
+            "billing_mode IN ('monthly','annual')",
+            name="ck_org_billing_mode",
+        ),
+    )
+
     # === RELACIONES ===
     users = relationship("User", back_populates="organization", cascade="all, delete-orphan")
     public_ips = relationship("PublicIP", back_populates="organization", cascade="all, delete-orphan")
