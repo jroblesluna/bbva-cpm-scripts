@@ -141,6 +141,7 @@ class CSVExportService:
             "action_config_name",
             "current_user",
             "last_connection",
+            "last_seen",
             "is_online",
             "created_at",
             "updated_at",
@@ -164,6 +165,7 @@ class CSVExportService:
                 action_config_name = ws.get("action_config_name", "")
                 current_user = ws.get("current_user", "")
                 last_connection = ws.get("last_connection", "")
+                last_seen = ws.get("last_seen", "")
                 is_online = ws.get("is_online", False)
                 created_at = ws.get("created_at", "")
                 updated_at = ws.get("updated_at", "")
@@ -178,6 +180,7 @@ class CSVExportService:
                 action_config_name = getattr(ws, "action_config_name", "") or ""
                 current_user = getattr(ws, "current_user", "") or ""
                 last_connection = getattr(ws, "last_connection", "")
+                last_seen = getattr(ws, "last_seen", "")
                 is_online = getattr(ws, "is_online", False)
                 created_at = getattr(ws, "created_at", "")
                 updated_at = getattr(ws, "updated_at", "")
@@ -187,6 +190,12 @@ class CSVExportService:
                 last_connection = last_connection.isoformat()
             elif last_connection is None:
                 last_connection = ""
+
+            # Convertir last_seen a string ISO si es datetime
+            if hasattr(last_seen, "isoformat"):
+                last_seen = last_seen.isoformat()
+            elif last_seen is None:
+                last_seen = ""
 
             # Convertir created_at a string ISO si es datetime
             if hasattr(created_at, "isoformat"):
@@ -214,6 +223,7 @@ class CSVExportService:
                 action_config_name or "",
                 current_user or "",
                 last_connection or "",
+                last_seen or "",
                 is_online_text,
                 created_at or "",
                 updated_at or "",

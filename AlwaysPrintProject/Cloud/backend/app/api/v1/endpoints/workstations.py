@@ -1557,6 +1557,7 @@ def export_workstations(
             "action_config_name": config_name,
             "current_user": ws.current_user or "",
             "last_connection": ws.last_connection,
+            "last_seen": ws.last_seen,
             "is_online": ws.is_online,
             "created_at": ws.created_at,
             "updated_at": ws.updated_at,
