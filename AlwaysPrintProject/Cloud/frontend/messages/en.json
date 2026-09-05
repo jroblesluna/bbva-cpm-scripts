@@ -46,7 +46,9 @@
     "bulkConfirmBtn": "Confirm — {action}",
     "bulkRestartServiceTooltip": "Restart Service (all WS)",
     "bulkRestartTrayTooltip": "Restart Tray (all WS)",
-    "bulkCheckUpdateTooltip": "Check Update (all WS)"
+    "bulkCheckUpdateTooltip": "Check Update (all WS)",
+    "of": "of",
+    "showing": "Showing"
   },
   "nav": {
     "dashboard": "Dashboard",
