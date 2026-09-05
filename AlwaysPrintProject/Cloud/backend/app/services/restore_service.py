@@ -31,6 +31,11 @@ from app.core.database import SessionLocal
 from app.models import (
     ActionConfig,
     AuditLog,
+    BillingAnnualSubscription,
+    BillingClosure,
+    BillingClosureItem,
+    BillingOrgPlan,
+    BillingRatePlan,
     ConnectivityResult,
     ContainerMetric,
     DebuggingProfile,
@@ -79,6 +84,16 @@ TABLE_MODEL_MAP: list[tuple[str, Any]] = [
     ("vlan_configs", VLANConfig),
     ("workstation_configs", WorkstationConfig),
     ("action_configs", ActionConfig),
+    # Facturación (Usage and Billing) — dependen de organizations y users (ya
+    # restaurados arriba). billing_closure_items tiene FK → billing_closures, por
+    # lo que DEBE restaurarse después de billing_closures. billing_org_plans NO
+    # tiene FK a billing_rate_plans (guarda una copia congelada de los tramos en
+    # JSON), pero se listan juntos por claridad conceptual.
+    ("billing_rate_plans", BillingRatePlan),
+    ("billing_org_plans", BillingOrgPlan),
+    ("billing_closures", BillingClosure),
+    ("billing_closure_items", BillingClosureItem),  # FK → billing_closures (va después)
+    ("billing_annual_subscriptions", BillingAnnualSubscription),
     ("public_ips", PublicIP),
     ("messages", Message),
     ("message_deliveries", MessageDelivery),

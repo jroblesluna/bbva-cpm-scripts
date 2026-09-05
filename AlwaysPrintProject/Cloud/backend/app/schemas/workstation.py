@@ -101,6 +101,14 @@ class WorkstationResponse(BaseModel):
     is_online: bool
     contingency_active: bool
     forced_contingency: bool = False
+    billing_status: str = Field(
+        "new",
+        description=(
+            "Estado del ciclo de vida de facturación: 'new' | 'billable' | 'recycled' | "
+            "'archived'. Permite al frontend anticipar si una eliminación será física "
+            "(solo 'new') o un archivado (no-'new'), y por qué (Req 3.6)."
+        ),
+    )
     action_config_mandatory: bool = False
     worker_id: Optional[str] = Field(None, description="ID del worker que tiene la conexión WebSocket activa (ej: worker_25)")
     last_connection: Optional[datetime] = None

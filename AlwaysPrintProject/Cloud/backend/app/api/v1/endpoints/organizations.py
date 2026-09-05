@@ -21,6 +21,7 @@ from app.models.user import User, UserRole
 from app.models.organization import Organization, PublicIP
 from app.models.workstation import Workstation
 from app.models.action_config import ActionConfig, ActionConfigScope
+from app.models.billing import BillingClosure
 from app.schemas import WorkstationListResponse
 from app.services.websocket_manager import connection_manager
 from app.schemas.organization import (
@@ -54,6 +55,44 @@ router = APIRouter()
 
 # Instancia del servicio de configuración para broadcast
 _config_service = ConfigService()
+
+
+def _audit_timezone_lock(
+    db: Session,
+    organization: Organization,
+    current_user: User,
+    attempted_timezone: str,
+    request: Request,
+) -> None:
+    """
+    Registra en auditoría un intento de cambio de timezone bloqueado (Req 11.4).
+
+    El bloqueo de timezone tras el primer cierre es una acción sensible: aunque el cambio se
+    rechaza (409), el intento debe quedar trazado. Se registra de forma fail-safe: si la
+    escritura del log fallara, no debe impedir que el endpoint devuelva su 409 (la auditoría
+    es un registro adicional, no la acción principal). Tenant isolation: organization_id de la
+    propia organización.
+    """
+    try:
+        AuditService().log_action(
+            db=db,
+            action_type=ActionType.TIMEZONE_LOCK,
+            entity_type="organization",
+            entity_id=str(organization.id),
+            user_id=str(current_user.id),
+            organization_id=str(organization.id),
+            old_values={"timezone": organization.timezone},
+            new_values={
+                "attempted_timezone": attempted_timezone,
+                "blocked": True,
+                "reason": "org_has_closures",
+            },
+            ip_address=get_client_ip(request),
+        )
+    except Exception as exc:  # noqa: BLE001 — la auditoría no debe impedir el rechazo 409
+        # Dejar la sesión utilizable si el INSERT del log falló (evita transacción envenenada).
+        db.rollback()
+        logger.error("No se pudo registrar la auditoría de bloqueo de timezone: %s", exc)
 
 
 async def _broadcast_config_update_to_org(db: Session, organization_id: str) -> int:
@@ -303,6 +342,34 @@ async def update_my_organization(
         sensitive_fields = ["is_active"]
         for field in sensitive_fields:
             update_data.pop(field, None)
+    
+    # Timezone lock (Req 4.3, 4.4): si la organización ya tiene al menos un cierre mensual
+    # registrado, su timezone queda bloqueada. Todos los cierres, cortes de mes y capping se
+    # calculan en la timezone de la org, por lo que cambiarla tras un cierre corrompería la
+    # contabilidad histórica. Se rechaza con 409 y mensaje explicativo.
+    if "timezone" in update_data and update_data["timezone"] != organization.timezone:
+        has_closures = (
+            db.query(BillingClosure)
+            .filter(BillingClosure.organization_id == organization.id)
+            .first()
+        )
+        if has_closures is not None:
+            # Auditar el bloqueo de timezone antes de rechazar (Req 11.4).
+            _audit_timezone_lock(
+                db=db,
+                organization=organization,
+                current_user=current_user,
+                attempted_timezone=update_data["timezone"],
+                request=request,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "No se puede cambiar la zona horaria: la organización ya tiene al menos "
+                    "un cierre mensual registrado. La timezone queda bloqueada para preservar "
+                    "la consistencia contable de los cierres."
+                ),
+            )
     
     # Verificar nombre único si se está actualizando
     if "name" in update_data and update_data["name"] != organization.name:
@@ -737,6 +804,34 @@ async def update_organization(
     
     # Actualizar campos
     update_data = org_data.model_dump(exclude_unset=True)
+    
+    # Timezone lock (Req 4.3, 4.4): si la organización ya tiene al menos un cierre mensual
+    # registrado, su timezone queda bloqueada. Todos los cierres, cortes de mes y capping se
+    # calculan en la timezone de la org, por lo que cambiarla tras un cierre corrompería la
+    # contabilidad histórica. Se rechaza con 409 y mensaje explicativo.
+    if "timezone" in update_data and update_data["timezone"] != organization.timezone:
+        has_closures = (
+            db.query(BillingClosure)
+            .filter(BillingClosure.organization_id == organization.id)
+            .first()
+        )
+        if has_closures is not None:
+            # Auditar el bloqueo de timezone antes de rechazar (Req 11.4).
+            _audit_timezone_lock(
+                db=db,
+                organization=organization,
+                current_user=current_user,
+                attempted_timezone=update_data["timezone"],
+                request=request,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "No se puede cambiar la zona horaria: la organización ya tiene al menos "
+                    "un cierre mensual registrado. La timezone queda bloqueada para preservar "
+                    "la consistencia contable de los cierres."
+                ),
+            )
     
     # Verificar nombre único si se está actualizando
     if "name" in update_data and update_data["name"] != organization.name:

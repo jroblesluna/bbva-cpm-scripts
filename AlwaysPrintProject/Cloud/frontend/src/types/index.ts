@@ -50,6 +50,9 @@ export * from './knowledge-article'
 // Sync Inventory types
 export * from './sync-inventory'
 
+// Billing types (Usage and Billing)
+export * from './billing'
+
 // ============================================================================
 // TIPOS COMUNES
 // ============================================================================

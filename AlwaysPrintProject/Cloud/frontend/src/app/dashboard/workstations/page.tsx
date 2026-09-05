@@ -91,6 +91,10 @@ export default function WorkstationsPage() {
   const [filterVlanId, setFilterVlanId] = useState<string | undefined>(() => searchParams.get('vlan_id') || undefined);
   const [filterVersion, setFilterVersion] = useState<'current' | 'outdated' | undefined>(undefined);
   const [filterHasConfig, setFilterHasConfig] = useState<boolean | undefined>(undefined);
+  // Req 10.6: filtro "ocultar archived" activado por defecto (análogo al de online).
+  // El endpoint de listado no expone un parámetro server-side para billing_status, así que el
+  // filtro se aplica en cliente sobre los items ya paginados (documentado).
+  const [hideArchived, setHideArchived] = useState<boolean>(true);
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
   const [editingWorkstation, setEditingWorkstation] = useState<Workstation | null>(null);
   const [contingencyTarget, setContingencyTarget] = useState<Workstation | null>(null);
@@ -322,7 +326,10 @@ export default function WorkstationsPage() {
     }
   };
 
-  const workstations = workstationsData?.items || [];
+  // Req 10.6: "ocultar archived" (default ON) aplicado en cliente sobre la página actual.
+  const workstations = (workstationsData?.items || []).filter(
+    (ws) => !hideArchived || ws.billing_status !== 'archived'
+  );
 
   const totalItems = workstationsData?.total || 0;
   const totalPages = Math.ceil(totalItems / pageSize);
@@ -745,11 +752,26 @@ export default function WorkstationsPage() {
                 </span>
                 {t('withSpecificConfig')}
               </button>
+              {/* Req 10.6: ocultar workstations archivadas (activado por defecto). */}
+              <button
+                onClick={() => { setHideArchived(!hideArchived); setPage(1); }}
+                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-all select-none ${
+                  hideArchived
+                    ? 'border-slate-300 bg-slate-100 text-slate-700'
+                    : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                }`}
+              >
+                <span className={`flex w-3.5 h-3.5 items-center justify-center rounded-sm border shrink-0 transition-colors ${hideArchived ? 'border-slate-500 bg-slate-500' : 'border-gray-300 bg-white'}`}>
+                  {hideArchived && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 5l2.5 2.5L8 3"/></svg>}
+                </span>
+                {t('hideArchived')}
+              </button>
               {(searchTerm ||
                 filterOnline !== undefined ||
                 filterContingency !== undefined ||
                 filterVersion !== undefined ||
                 filterHasConfig !== undefined ||
+                !hideArchived ||
                 filterOrgId ||
                 filterVlanId) && (
                 <Button
@@ -763,6 +785,7 @@ export default function WorkstationsPage() {
                     setFilterVlanId(undefined);
                     setFilterVersion(undefined);
                     setFilterHasConfig(undefined);
+                    setHideArchived(true);
                     setPage(1);
                   }}
                 >
@@ -1139,8 +1162,16 @@ export default function WorkstationsPage() {
         </div>
       )}
 
-      {/* Modal de confirmación de eliminación */}
-      {deleteTarget && (
+      {/* Modal de confirmación de eliminación (Req 10.7):
+          Antes de ejecutar, indica el resultado real según billing_status + is_online:
+          - 'new'                   → eliminación FÍSICA.
+          - no-'new' offline        → ARCHIVADO (no borrado físico).
+          - no-'new' online         → RECHAZO (el backend responde 409; debe estar offline). */}
+      {deleteTarget && (() => {
+        const isNew = deleteTarget.billing_status === 'new';
+        const cannotArchiveOnline = !isNew && deleteTarget.is_online;
+        const wsName = deleteTarget.hostname || deleteTarget.ip_private;
+        return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <Card className="max-w-md w-full">
             <CardHeader>
@@ -1150,29 +1181,65 @@ export default function WorkstationsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-gray-600">
-                {t('deleteConfirmMessage', { name: deleteTarget.hostname || deleteTarget.ip_private })}
-              </p>
+              {/* Preview del efecto real de la acción */}
+              {cannotArchiveOnline ? (
+                <Alert variant="destructive">
+                  <ShieldAlert className="h-4 w-4" />
+                  <AlertDescription>
+                    {t('deleteCannotArchiveOnline', { name: wsName })}
+                  </AlertDescription>
+                </Alert>
+              ) : isNew ? (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    {t('deleteWillDelete', { name: wsName })}
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <Alert>
+                  <FileText className="h-4 w-4" />
+                  <AlertDescription>
+                    {t('deleteWillArchive', { name: wsName })}
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setDeleteTarget(null)}>
                   {tCommon('cancel')}
                 </Button>
                 <Button
                   variant="destructive"
-                  disabled={deleteMutation.isPending}
+                  disabled={deleteMutation.isPending || cannotArchiveOnline}
                   onClick={() => {
                     deleteMutation.mutate(deleteTarget.id, {
+                      onError: (err: unknown) => {
+                        const e = err as { detail?: string; status?: number };
+                        const description = e?.status === 409
+                          ? t('deleteRejectedOnline')
+                          : (e?.detail ?? t('deleteError'));
+                        toast({
+                          variant: 'destructive',
+                          title: tCommon('error'),
+                          description,
+                        });
+                      },
                       onSettled: () => setDeleteTarget(null),
                     });
                   }}
                 >
-                  {deleteMutation.isPending ? t('deleting') : tCommon('delete')}
+                  {deleteMutation.isPending
+                    ? t('deleting')
+                    : isNew
+                      ? tCommon('delete')
+                      : t('archiveAction')}
                 </Button>
               </div>
             </CardContent>
           </Card>
         </div>
-      )}
+        );
+      })()}
 
       {/* Modal de confirmación de reinicio de servicio/tray */}
       {restartTarget && (

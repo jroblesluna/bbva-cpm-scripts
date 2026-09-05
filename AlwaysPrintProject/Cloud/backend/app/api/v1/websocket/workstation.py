@@ -872,10 +872,15 @@ async def _handle_telemetry(
     # Esto cubre el caso donde el WebSocket se reconectó pero is_online quedó en False
     from app.models.workstation import Workstation as WS
     from datetime import datetime, timezone
+    from app.services.last_seen_tracker import mark_activity
     ws = db.query(WS).filter(WS.id == workstation_id).first()
     if ws and not ws.is_online:
         ws.is_online = True
         ws.last_connection = datetime.now(timezone.utc).replace(tzinfo=None)
+        # Transición offline→online: usar el timestamp de la última telemetría real como
+        # last_seen (Req 1.5), NO el momento del evento. mark_activity también reactiva el
+        # billing_status (recycled/archived → billable) en la misma transacción (Req 2.8).
+        mark_activity(db, ws, telemetry_log.recorded_at)
         try:
             db.commit()
             logger.info("Telemetría restauró is_online=True para workstation_id=%s", workstation_id)

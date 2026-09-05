@@ -45,6 +45,12 @@ from app.schemas import (
 from app.services.workstation import WorkstationService
 from app.services.config import ConfigService
 from app.services.audit import AuditService
+from app.services.billing_deletion_service import (
+    OUTCOME_ARCHIVED,
+    OUTCOME_DELETED,
+    OUTCOME_REJECTED,
+    billing_deletion_service,
+)
 from app.services.websocket_manager import connection_manager
 
 router = APIRouter()
@@ -2106,32 +2112,181 @@ def delete_workstation(
                 detail="No tienes permisos para eliminar esta workstation"
             )
     
-    # Guardar datos para auditoría
+    # Guardar datos para auditoría (antes de mutar/borrar la fila)
     old_data = {
         "ip_private": workstation.ip_private,
         "hostname": workstation.hostname,
         "organization_id": str(workstation.organization_id) if workstation.organization_id else None,
+        "billing_status": workstation.billing_status,
     }
     
-    # Eliminar workstation (cascade elimina relaciones)
-    db.delete(workstation)
+    # Aplicar la restricción de eliminación centralizada (Req 3.1–3.4):
+    #   - billing_status == 'new'  → eliminación física de la fila.
+    #   - no-'new' offline         → archivado lógico (billing_status = 'archived').
+    #   - no-'new' online          → rechazo (debe estar offline para archivar).
+    # El servicio NO commitea; controlamos la transacción aquí.
+    result = billing_deletion_service.delete_or_archive(db, workstation)
+    
+    # Rechazo: la workstation ya facturada está online y no puede archivarse (Req 3.2, 3.3).
+    if result.outcome == OUTCOME_REJECTED:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "La workstation ha sido facturada y debe estar offline para poder archivarse. "
+                "No es posible eliminarla ni archivarla mientras esté conectada."
+            ),
+        )
+    
+    # Confirmar la eliminación física o el archivado en una sola transacción.
     db.commit()
     
-    # Registrar en auditoría
+    # Registrar en auditoría reflejando la acción real (delete físico vs archivado).
+    # En el archivado la fila persiste (soft-delete): registramos el nuevo billing_status.
+    is_archive = result.outcome == OUTCOME_ARCHIVED
     audit_service = AuditService()
     audit_service.log_action(
         db=db,
-        action_type="delete",
+        # El archivado manual (soft-delete) se audita con su propio tipo (Req 11.4); la
+        # eliminación física conserva DELETE. Así el archivado sensible es filtrable aparte.
+        action_type=ActionType.WORKSTATION_ARCHIVE if is_archive else ActionType.DELETE,
         entity_type="Workstation",
+        # En el archivado la fila sigue existiendo → conservamos el vínculo con la workstation.
+        workstation_id=str(workstation_id) if is_archive else None,
         entity_id=str(workstation_id),
         user_id=str(current_user.id),
         organization_id=old_data["organization_id"],
         old_values=old_data,
-        new_values={},
+        new_values=(
+            {"action": "archive", "billing_status": OUTCOME_ARCHIVED, "reason": result.reason}
+            if is_archive
+            else {"action": "delete", "reason": result.reason}
+        ),
         ip_address=get_client_ip(request)
     )
     
     return None
+
+
+# === BORRADO MASIVO DE WORKSTATIONS (Req 3.5, 3.6) ===
+
+class BulkDeleteRequest(BaseModel):
+    """Payload del borrado masivo: lista de IDs de workstations a eliminar/archivar."""
+    workstation_ids: list[UUID] = Field(
+        ..., min_length=1, description="IDs de las workstations a procesar"
+    )
+
+
+class BulkDeleteRejected(BaseModel):
+    """Entrada de rechazo en el reporte de borrado masivo."""
+    ip: str = Field(..., description="IP privada de la workstation rechazada")
+    reason: str = Field(..., description="Motivo del rechazo (p. ej. 'online')")
+
+
+class BulkDeleteReport(BaseModel):
+    """
+    Reporte de desglose del borrado masivo (Req 3.5).
+
+    Cada workstation se clasifica según el resultado de aplicar la restricción de eliminación:
+        - deleted:   IPs eliminadas físicamente (billing_status == 'new').
+        - archived:  IPs archivadas (soft-delete de no-'new' offline).
+        - rejected:  IPs no procesadas (no-'new' online) con su motivo.
+        - not_found: IDs que no existen o que el operador no puede ver (tenant isolation).
+    """
+    deleted: list[str] = Field(default_factory=list)
+    archived: list[str] = Field(default_factory=list)
+    rejected: list[BulkDeleteRejected] = Field(default_factory=list)
+    not_found: list[UUID] = Field(default_factory=list)
+
+
+@router.post("/bulk-delete", response_model=BulkDeleteReport)
+def bulk_delete_workstations(
+    request: Request,
+    payload: BulkDeleteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Eliminar/archivar múltiples workstations en una sola operación (Req 3.5, 3.6).
+
+    Aplica la MISMA restricción de eliminación que el borrado individual a cada workstation
+    (`BillingDeletionService.delete_or_archive`), procesando cada una según su estado:
+        - `billing_status == 'new'`      → eliminación física.
+        - no-`new` offline               → archivado lógico.
+        - no-`new` online                → rechazo (debe estar offline).
+
+    - Admin: puede procesar workstations de cualquier organización.
+    - Operador: solo las de su propia organización (tenant isolation). Los IDs fuera de su
+      alcance se reportan como `not_found` (no se filtran ni se procesan).
+
+    Todo el lote se confirma en una única transacción (commit al final). Se devuelve un reporte
+    con el desglose por-workstation (deleted/archived/rejected/not_found).
+
+    Args:
+        payload: lista de IDs de workstations a procesar.
+        current_user: Usuario autenticado.
+        db: Sesión de base de datos.
+
+    Returns:
+        BulkDeleteReport con el desglose de resultados.
+    """
+    report = BulkDeleteReport()
+
+    # De-duplicar preservando el orden (evita procesar dos veces el mismo ID).
+    seen: set[UUID] = set()
+    unique_ids = [wid for wid in payload.workstation_ids if not (wid in seen or seen.add(wid))]
+
+    for workstation_id in unique_ids:
+        workstation = db.query(Workstation).filter(Workstation.id == workstation_id).first()
+
+        # No existe → not_found.
+        if not workstation:
+            report.not_found.append(workstation_id)
+            continue
+
+        # Tenant isolation (Req 3.4): el operador solo ve/procesa las de su organización.
+        # Un ID fuera de su alcance se reporta como not_found (no se revela su existencia).
+        if current_user.role == UserRole.OPERATOR:
+            if workstation.organization_id != current_user.organization_id:
+                report.not_found.append(workstation_id)
+                continue
+
+        # Aplicar la restricción de eliminación centralizada (sin commit; se commitea el lote).
+        result = billing_deletion_service.delete_or_archive(db, workstation)
+
+        if result.outcome == OUTCOME_DELETED:
+            report.deleted.append(result.ip_private)
+        elif result.outcome == OUTCOME_ARCHIVED:
+            report.archived.append(result.ip_private)
+        else:  # OUTCOME_REJECTED
+            report.rejected.append(
+                BulkDeleteRejected(ip=result.ip_private, reason=result.reason or "rejected")
+            )
+
+    # Confirmar todo el lote en una sola transacción (Req 3.5).
+    db.commit()
+
+    # Auditar el resumen de la operación masiva.
+    audit_service = AuditService()
+    audit_service.log_action(
+        db=db,
+        action_type=ActionType.DELETE,
+        entity_type="Workstation",
+        entity_id=str(current_user.organization_id) if current_user.organization_id else str(current_user.id),
+        user_id=str(current_user.id),
+        organization_id=str(current_user.organization_id) if current_user.organization_id else None,
+        old_values={"requested_ids": [str(wid) for wid in unique_ids]},
+        new_values={
+            "action": "bulk_delete",
+            "deleted": report.deleted,
+            "archived": report.archived,
+            "rejected": [r.model_dump() for r in report.rejected],
+            "not_found": [str(wid) for wid in report.not_found],
+        },
+        ip_address=get_client_ip(request)
+    )
+
+    return report
 
 
 # === ENDPOINT DE RECURSOS (CONTINGENCIA) ===

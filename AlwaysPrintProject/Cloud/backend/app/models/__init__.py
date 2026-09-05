@@ -15,6 +15,13 @@ from app.models.message import Message, TargetType, DeliveryMode
 from app.models.message_delivery import MessageDelivery, DeliveryStatus
 from app.models.telemetry import TelemetryLog, ConnectivityResult
 from app.models.action_config import ActionConfig
+from app.models.billing import (
+    BillingRatePlan,
+    BillingOrgPlan,
+    BillingClosure,
+    BillingClosureItem,
+    BillingAnnualSubscription,
+)
 from app.models.device import Device
 from app.models.document import Document
 from app.models.log_analysis import LogAnalysis
@@ -66,6 +73,13 @@ __all__ = [
     
     # Action config models
     "ActionConfig",
+    
+    # Billing models (Usage and Billing)
+    "BillingRatePlan",
+    "BillingOrgPlan",
+    "BillingClosure",
+    "BillingClosureItem",
+    "BillingAnnualSubscription",
     
     # Device models
     "Device",

@@ -29,6 +29,12 @@ logger = logging.getLogger(__name__)
 # Segundos de espera máxima para pong tras Death Ping
 PONG_TIMEOUT_SECONDS: int = 30
 
+# Helper compartido: marca offline un lote y persiste last_seen con la actividad real
+# conocida por-ws (Req 1.5, 1.6). Reutilizado por el flush de desconexión y el Death Ping.
+from app.services.last_seen_tracker import mark_offline_with_last_seen as _mark_offline_with_last_seen
+# Helper del flush periódico de last_seen de ws online (Req 1.7, 1.8).
+from app.services.last_seen_tracker import batch_update_last_seen as _batch_update_last_seen
+
 
 class ConnectionManager:
     """
@@ -57,13 +63,21 @@ class ConnectionManager:
         # Flag para detener el ping loop
         self._ping_loop_running = False
 
-        # Cola de desconexiones pendientes de persistir en BD (batch)
-        self._disconnect_queue: List[str] = []
+        # Cola de desconexiones pendientes de persistir en BD (batch).
+        # Cada entrada mapea workstation_id -> última actividad real conocida (o None si
+        # no hay). Se persiste como `last_seen` al marcar offline (Req 1.5) usando el ts de
+        # actividad real, NO el momento del evento de desconexión.
+        self._disconnect_queue: Dict[str, Optional[datetime]] = {}
         self._disconnect_flush_task: Optional[asyncio.Task] = None
         self._db_session_factory = None
         
         # Última actividad por workstation: {workstation_id: datetime (UTC naive)}
         self.last_activity: Dict[str, datetime] = {}
+
+        # Último `last_seen` volcado a BD por el flush periódico (Req 1.7): permite que
+        # cada ciclo del loop de ~60s escriba SOLO las workstations cuya actividad avanzó
+        # respecto al valor ya persistido (no en cada telemetría — Req 1.8).
+        self._last_seen_flushed: Dict[str, datetime] = {}
         
         # Organización de cada workstation conectada: {workstation_id: str(org_id)}
         self.org_ids: Dict[str, str] = {}
@@ -140,6 +154,8 @@ class ConnectionManager:
             websocket: WebSocket que se está desconectando (para comparar con el activo)
         """
         should_mark_offline = False
+        # Última actividad real conocida de la ws (para persistir como last_seen al ir offline).
+        last_activity_ts: Optional[datetime] = None
         
         async with self._lock:
             if workstation_id in self.workstation_connections:
@@ -153,15 +169,20 @@ class ConnectionManager:
             if should_mark_offline and workstation_id in self.last_pong:
                 del self.last_pong[workstation_id]
             
-            # Limpiar registros de actividad, organización y pongs pendientes
+            # Limpiar registros de actividad, organización y pongs pendientes.
+            # Se captura last_activity ANTES de eliminarla para persistir last_seen con el
+            # ts de actividad real (Req 1.5), no con el momento del evento de desconexión.
             if should_mark_offline:
-                self.last_activity.pop(workstation_id, None)
+                last_activity_ts = self.last_activity.pop(workstation_id, None)
                 self.org_ids.pop(workstation_id, None)
                 self._pending_pongs.pop(workstation_id, None)
+                # Olvidar la marca de flush: la persistencia de last_seen al ir offline la
+                # cubre el disconnect batch; al reconectar se re-evalúa desde cero.
+                self._last_seen_flushed.pop(workstation_id, None)
         
         # Encolar para batch update en vez de query individual
         if should_mark_offline:
-            self._disconnect_queue.append(workstation_id)
+            self._disconnect_queue[workstation_id] = last_activity_ts
             # Iniciar flush task si no existe
             if self._disconnect_flush_task is None or self._disconnect_flush_task.done():
                 self._disconnect_flush_task = asyncio.create_task(
@@ -174,6 +195,10 @@ class ConnectionManager:
         Repite mientras sigan llegando desconexiones a la cola.
         Esto agrupa desconexiones masivas (ej: 500 ws desconectándose a la vez)
         en queries batch a la BD.
+
+        Además de `is_online=False`, persiste `last_seen` con la última actividad real
+        conocida de cada ws (Req 1.5). Ir offline NO reactiva `billing_status` (no es
+        actividad nueva): solo se escribe en el UPDATE batch, sin pasar por `mark_activity`.
         """
         import logging
         logger = logging.getLogger(__name__)
@@ -181,17 +206,17 @@ class ConnectionManager:
         while True:
             await asyncio.sleep(3)
             
-            # Tomar todos los IDs pendientes
-            ids_to_flush = self._disconnect_queue.copy()
+            # Tomar todos los pendientes (dict {ws_id: last_activity_ts|None})
+            to_flush = dict(self._disconnect_queue)
             self._disconnect_queue.clear()
             
-            if not ids_to_flush:
+            if not to_flush:
                 # Cola vacía — terminar el loop
                 return
             
             if self._db_session_factory is None:
                 logger.warning(
-                    f"_flush_disconnect_queue: {len(ids_to_flush)} ws pendientes "
+                    f"_flush_disconnect_queue: {len(to_flush)} ws pendientes "
                     f"pero _db_session_factory es None. Descartando."
                 )
                 return
@@ -199,17 +224,11 @@ class ConnectionManager:
             try:
                 db = self._db_session_factory()
                 try:
-                    from app.models.workstation import Workstation
-                    updated = db.query(Workstation).filter(
-                        Workstation.id.in_(ids_to_flush)
-                    ).update(
-                        {Workstation.is_online: False},
-                        synchronize_session=False
-                    )
+                    updated = _mark_offline_with_last_seen(db, to_flush)
                     db.commit()
                     logger.info(
                         f"Batch disconnect: {updated} workstations marcadas offline "
-                        f"(de {len(ids_to_flush)} encoladas)"
+                        f"(de {len(to_flush)} encoladas)"
                     )
                 except Exception as e:
                     db.rollback()
@@ -563,31 +582,82 @@ class ConnectionManager:
                     f"Fase 3: {pings_enviados} Death Pings enviados a workstations inactivas "
                     f"(de {len(workstation_ids)} conectadas)"
                 )
+
+            # === FASE 3.5: Flush periódico de last_seen (Req 1.7, 1.8) ===
+            # Persistir en un único UPDATE batch el last_seen de las ws ONLINE (conectadas
+            # localmente) cuya última actividad en memoria avanzó respecto al valor ya
+            # volcado. No se escribe en cada telemetría individual (Req 1.8): solo aquí,
+            # una vez por ciclo, y solo las que avanzaron (Req 1.7).
+            async with self._lock:
+                # Snapshot atómico de la actividad de las ws conectadas. Lectura simple de
+                # dicts (no se ponen locks en hot paths de escritura por-mensaje).
+                connected_activity = {
+                    ws_id: self.last_activity.get(ws_id)
+                    for ws_id in self.workstation_connections.keys()
+                }
+
+            # Seleccionar solo las que avanzaron respecto al último flush persistido.
+            pending_flush: Dict[str, datetime] = {}
+            for ws_id, ts in connected_activity.items():
+                if ts is None:
+                    continue
+                flushed = self._last_seen_flushed.get(ws_id)
+                if flushed is None or ts > flushed:
+                    pending_flush[ws_id] = ts
+
+            if pending_flush:
+                try:
+                    db = db_session_factory()
+                    try:
+                        # UPDATE plano de last_seen (NO toca is_online ni billing_status).
+                        updated = _batch_update_last_seen(db, pending_flush)
+                        db.commit()
+                        # Solo tras un commit exitoso se marca lo volcado, de modo que el
+                        # próximo ciclo escriba únicamente avances posteriores.
+                        self._last_seen_flushed.update(pending_flush)
+                        logger.info(
+                            f"Fase 3.5: Flush periódico de last_seen — "
+                            f"{updated} workstations online actualizadas "
+                            f"(de {len(connected_activity)} conectadas)"
+                        )
+                    except Exception as e:
+                        db.rollback()
+                        logger.error(
+                            f"Error en flush periódico de last_seen "
+                            f"({len(pending_flush)} ws pendientes): {e}. Se hizo rollback."
+                        )
+                    finally:
+                        db.close()
+                except Exception as e:
+                    logger.error(
+                        f"Error creando sesión para flush periódico de last_seen: {e}"
+                    )
             
             # === FASE 4: Batch disconnect de muertas ===
             if dead_workstations:
                 # Eliminar duplicados
                 dead_workstations = list(set(dead_workstations))
                 
-                # Remover de dicts en memoria
+                # Remover de dicts en memoria. Se captura la última actividad real conocida
+                # (last_activity) ANTES de eliminarla, para persistir last_seen con el ts de
+                # actividad que disparó la evaluación de inactividad (Req 1.6), NO el momento
+                # del evento de muerte.
+                dead_last_seen: Dict[str, Optional[datetime]] = {}
                 async with self._lock:
                     for ws_id in dead_workstations:
                         self.workstation_connections.pop(ws_id, None)
-                        self.last_activity.pop(ws_id, None)
+                        dead_last_seen[ws_id] = self.last_activity.pop(ws_id, None)
                         self.last_pong.pop(ws_id, None)
                         self.org_ids.pop(ws_id, None)
                         self._pending_pongs.pop(ws_id, None)
+                        self._last_seen_flushed.pop(ws_id, None)
                 
-                # Batch UPDATE en BD
+                # Batch UPDATE en BD (is_online=False + last_seen con actividad real).
+                # Ir offline NO reactiva billing_status (no es actividad nueva).
                 try:
                     db = db_session_factory()
                     try:
-                        updated = db.query(Workstation).filter(
-                            Workstation.id.in_(dead_workstations)
-                        ).update(
-                            {Workstation.is_online: False},
-                            synchronize_session=False
-                        )
+                        updated = _mark_offline_with_last_seen(db, dead_last_seen)
                         db.commit()
                         logger.info(
                             f"Fase 4: Batch disconnect completado — "
