@@ -41,6 +41,7 @@ from app.schemas.billing_closures import (
     ClosureItemsPage,
     ClosureReportDataResponse,
     ClosureReportUrlResponse,
+    ContingencySummaryResponse,
     RetroactiveCloseResponse,
 )
 from app.services.billing_close_service import (
@@ -472,6 +473,11 @@ def get_closure_report_data(
     report_row = closure_report_service.get_report_row(db, closure)
     ai_analysis = report_row.ai_analysis if report_row is not None else None
 
+    # Resumen de contingencia del ciclo (fail-safe: nunca rompe la respuesta).
+    contingency_summary = closure_report_service.build_contingency_summary(
+        db, organization, closure
+    )
+
     return ClosureReportDataResponse(
         header=ClosureHeaderResponse.model_validate(closure),
         tiers_applied=closure.tiers_applied,
@@ -479,4 +485,5 @@ def get_closure_report_data(
         ai_analysis=ai_analysis,
         currency="USD",
         taxes_included=False,
+        contingency=ContingencySummaryResponse(**contingency_summary.to_dict()),
     )

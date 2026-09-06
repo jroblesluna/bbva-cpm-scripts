@@ -159,6 +159,29 @@ class HistoryPoint(BaseModel):
     amount: Decimal
 
 
+class ContingencySummaryResponse(BaseModel):
+    """
+    Resumen de metricas de contingencia del ciclo (fail-safe, informativo).
+
+    Refleja los campos de `ContingencySummary` del servicio: activaciones y equipos distintos
+    que entraron en contingencia durante el ciclo, entradas masivas a nivel de agencia (VLAN) y
+    de organizacion, equipos que permanecen en contingencia al cierre (reconstruido point-in-time
+    desde la auditoria) y contingencia forzada vigente (org/VLAN). `data_available` es False
+    cuando el calculo fallo (fail-safe): en ese caso todos los conteos van en 0/False y la
+    generacion del reporte no se bloquea.
+    """
+
+    activations_in_cycle: int
+    distinct_ws_activated: int
+    active_at_cutoff: int
+    mass_vlan_events: int
+    mass_org_events: int
+    forced_vlan_count: int
+    forced_org: bool
+    data_available: bool
+    mass_vlan_detail: list = []
+
+
 class ClosureReportDataResponse(BaseModel):
     """
     Datos estructurados del reporte para la vista previa del frontend (Req 8.7).
@@ -166,7 +189,8 @@ class ClosureReportDataResponse(BaseModel):
     Reutiliza `ClosureHeaderResponse` como `header` (cabecera inmutable del cierre) y agrega el
     desglose de tramos del mes (`tiers_applied`), la serie historica (`history`) y el texto IA
     si existe (`ai_analysis`, None si el LLM fallo). `currency`/`taxes_included` reflejan la
-    declaracion obligatoria de precios en USD sin impuestos (Req 11.5).
+    declaracion obligatoria de precios en USD sin impuestos (Req 11.5). `contingency` agrega el
+    resumen de contingencia del ciclo (None por compatibilidad si no se calculo).
     """
 
     header: ClosureHeaderResponse
@@ -175,3 +199,4 @@ class ClosureReportDataResponse(BaseModel):
     ai_analysis: Optional[str] = None
     currency: str = "USD"
     taxes_included: bool = False
+    contingency: Optional[ContingencySummaryResponse] = None

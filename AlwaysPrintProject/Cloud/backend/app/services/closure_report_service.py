@@ -63,6 +63,76 @@ _S3_KEY_PREFIX = "billing-reports"
 # alineado con `debugging.py` y con `ClosureReportUrlResponse.expires_in_seconds`.
 _PRESIGNED_URL_EXPIRES_SECONDS = 3600
 
+# === MÉTRICAS DE CONTINGENCIA (resumen para el reporte de cierre) ===
+# Umbrales para clasificar "entradas masivas" de contingencia dentro del ciclo.
+_MASS_WINDOW_MINUTES = 10   # ventana de tiempo para agrupar activaciones cercanas
+_MASS_MIN_PER_VLAN = 5      # >= N WS distintas de una VLAN en la ventana → masiva por agencia
+_MASS_ORG_PCT = 0.30        # >= 30% de las WS de la org en la ventana → masiva por organización
+
+# Cantidad máxima de eventos masivos por VLAN detallados en el resumen (top N para no inflar
+# el prompt/PDF). El conteo total (`mass_vlan_events`) no está limitado por este tope.
+_MASS_VLAN_DETAIL_TOP = 10
+
+
+class ContingencySummary:
+    """
+    Resumen de métricas de contingencia del ciclo de cierre (fail-safe, informativo).
+
+    Es un objeto de resultado simple (sin estado ni efectos secundarios) que agrega las
+    métricas de contingencia reconstruidas desde la auditoría (`audit_logs`) y el estado
+    vigente de contingencia forzada (org/VLAN). Nunca afecta la factura: si algo falla al
+    calcularlo, se devuelve un resumen en ceros con `data_available=False`.
+
+    Atributos:
+        activations_in_cycle: número de activaciones (contingency_active=true) en el ciclo.
+        distinct_ws_activated: WS distintas que activaron al menos una vez en el ciclo.
+        active_at_cutoff: WS en contingencia al cutoff (reconstruido point-in-time desde auditoría).
+        mass_vlan_events: número de entradas masivas a nivel VLAN/agencia.
+        mass_vlan_detail: lista de dicts (top eventos) con
+            {"vlan_id": str|None, "count": int, "window_start": iso, "window_end": iso}.
+        mass_org_events: entradas masivas a nivel organización.
+        forced_vlan_count: VLANs con forced_contingency=True vigentes (contingencia forzada manual).
+        forced_org: org.forced_contingency vigente.
+        data_available: True si se pudo consultar la auditoría (para el fail-safe).
+    """
+
+    def __init__(
+        self,
+        *,
+        activations_in_cycle: int = 0,
+        distinct_ws_activated: int = 0,
+        active_at_cutoff: int = 0,
+        mass_vlan_events: int = 0,
+        mass_vlan_detail: Optional[list] = None,
+        mass_org_events: int = 0,
+        forced_vlan_count: int = 0,
+        forced_org: bool = False,
+        data_available: bool = True,
+    ) -> None:
+        self.activations_in_cycle = activations_in_cycle
+        self.distinct_ws_activated = distinct_ws_activated
+        self.active_at_cutoff = active_at_cutoff
+        self.mass_vlan_events = mass_vlan_events
+        self.mass_vlan_detail = mass_vlan_detail if mass_vlan_detail is not None else []
+        self.mass_org_events = mass_org_events
+        self.forced_vlan_count = forced_vlan_count
+        self.forced_org = forced_org
+        self.data_available = data_available
+
+    def to_dict(self) -> dict:
+        """Serializa el resumen a un dict plano (para construir schemas de respuesta)."""
+        return {
+            "activations_in_cycle": self.activations_in_cycle,
+            "distinct_ws_activated": self.distinct_ws_activated,
+            "active_at_cutoff": self.active_at_cutoff,
+            "mass_vlan_events": self.mass_vlan_events,
+            "mass_vlan_detail": self.mass_vlan_detail,
+            "mass_org_events": self.mass_org_events,
+            "forced_vlan_count": self.forced_vlan_count,
+            "forced_org": self.forced_org,
+            "data_available": self.data_available,
+        }
+
 
 class ClosureReportError(Exception):
     """Error durante la generación del Reporte de Cierre Mensual."""
@@ -143,6 +213,244 @@ class ClosureReportService:
 
         return series
 
+    # === Métricas de contingencia del ciclo (resumen fail-safe) ===
+
+    def build_contingency_summary(
+        self,
+        db: Session,
+        org: Organization,
+        closure: BillingClosure,
+    ) -> ContingencySummary:
+        """
+        Construye el resumen de métricas de contingencia del ciclo del cierre (fail-safe).
+
+        El ciclo es el intervalo `[cycle_start, cutoff)`, donde
+        `cycle_start = datetime(period_year, period_month, 1)` (naive UTC, consistente con
+        `AuditLog.created_at`, que se guarda como `datetime.utcnow()`) y `cutoff = closure.cutoff_at`.
+
+        Métricas calculadas:
+        - `activations_in_cycle` / `distinct_ws_activated`: sobre los `AuditLog` de tipo
+          `CONTINGENCY_TOGGLE` de la org dentro del ciclo, se cuentan las activaciones
+          (`new_values["contingency_active"] is True`) y las WS distintas que activaron.
+        - `active_at_cutoff` (reconstrucción EXACTA point-in-time): para cada WS de la org se
+          toma su ÚLTIMO `CONTINGENCY_TOGGLE` con `created_at < cutoff`; si su
+          `contingency_active` es True, la WS estaba en contingencia al cierre. Se traen todos
+          los toggles de la org (`created_at < cutoff`) ordenados por `(workstation_id, created_at)`
+          y se conserva el último por WS en memoria (evita N queries).
+          LIMITACIÓN CONOCIDA: por la retención de 12 meses de `audit_logs`
+          (`audit.cleanup_old_logs`), cierres muy antiguos pueden SUBCONTAR este valor si el
+          toggle relevante ya fue purgado. Es una métrica informativa fail-safe: NO afecta la
+          factura.
+        - `mass_vlan_events` / `mass_vlan_detail` / `mass_org_events` (ventana deslizante):
+          se ordenan cronológicamente las activaciones (activated=True) del ciclo. Por VLAN, por
+          cada activación se cuentan las WS DISTINTAS de la MISMA VLAN activadas en la ventana
+          `[t, t + _MASS_WINDOW_MINUTES)`; si el conteo `>= _MASS_MIN_PER_VLAN`, se cuenta 1
+          evento masivo y el cursor de esa VLAN avanza más allá de la ventana (evita
+          solapamientos/doble conteo). El detalle guarda el top `_MASS_VLAN_DETAIL_TOP` por
+          `count`. A nivel org, mismo algoritmo global (todas las VLANs juntas) contra el umbral
+          `ceil(total_ws * _MASS_ORG_PCT)`; si `total_ws == 0`, `mass_org_events = 0`.
+        - `forced_vlan_count` / `forced_org`: VLANs con `forced_contingency=True` y
+          `org.forced_contingency` vigentes al momento de la consulta (contingencia forzada manual).
+
+        FAIL-SAFE: toda la lógica va en try/except; ante CUALQUIER excepción se registra un
+        warning y se devuelve un `ContingencySummary` en ceros con `data_available=False`. Nunca
+        se propaga: el reporte no debe romperse por las métricas de contingencia.
+        """
+        from datetime import timedelta
+
+        from app.models.audit import AuditLog, ActionType
+        from app.models.workstation import Workstation
+        from app.models.vlan import VLAN
+
+        try:
+            cycle_start = datetime(closure.period_year, closure.period_month, 1)
+            cutoff = closure.cutoff_at
+
+            # --- Mapa workstation_id -> vlan_id de la org (para agrupar por agencia/VLAN) ---
+            ws_rows = (
+                db.query(Workstation.id, Workstation.vlan_id)
+                .filter(Workstation.organization_id == org.id)
+                .all()
+            )
+            ws_to_vlan = {row[0]: row[1] for row in ws_rows}
+            total_ws = len(ws_rows)
+
+            # --- Activaciones dentro del ciclo [cycle_start, cutoff) ---
+            cycle_toggles = (
+                db.query(AuditLog)
+                .filter(
+                    AuditLog.organization_id == org.id,
+                    AuditLog.action_type == ActionType.CONTINGENCY_TOGGLE,
+                    AuditLog.created_at >= cycle_start,
+                    AuditLog.created_at < cutoff,
+                )
+                .order_by(AuditLog.created_at.asc())
+                .all()
+            )
+
+            activations = []  # (created_at, workstation_id) de las activaciones true del ciclo
+            for log in cycle_toggles:
+                if self._toggle_is_activation(log):
+                    activations.append((log.created_at, log.workstation_id))
+
+            activations_in_cycle = len(activations)
+            distinct_ws_activated = len(
+                {ws_id for (_, ws_id) in activations if ws_id is not None}
+            )
+
+            # --- active_at_cutoff: último toggle por WS con created_at < cutoff ---
+            all_toggles = (
+                db.query(AuditLog)
+                .filter(
+                    AuditLog.organization_id == org.id,
+                    AuditLog.action_type == ActionType.CONTINGENCY_TOGGLE,
+                    AuditLog.created_at < cutoff,
+                    AuditLog.workstation_id.isnot(None),
+                )
+                .order_by(
+                    AuditLog.workstation_id.asc(),
+                    AuditLog.created_at.asc(),
+                )
+                .all()
+            )
+            last_toggle_by_ws = {}  # workstation_id -> último AuditLog (por created_at asc)
+            for log in all_toggles:
+                last_toggle_by_ws[log.workstation_id] = log  # el asc deja el último al final
+            active_at_cutoff = sum(
+                1
+                for log in last_toggle_by_ws.values()
+                if self._toggle_is_activation(log)
+            )
+
+            # --- Detección de entradas masivas (ventana deslizante) ---
+            window = timedelta(minutes=_MASS_WINDOW_MINUTES)
+
+            # Agrupar activaciones por VLAN (con la WS distinta como criterio de conteo).
+            activations_by_vlan = {}  # vlan_id -> list[(created_at, ws_id)]
+            for (created_at, ws_id) in activations:
+                vlan_id = ws_to_vlan.get(ws_id)
+                activations_by_vlan.setdefault(vlan_id, []).append((created_at, ws_id))
+
+            mass_vlan_events = 0
+            mass_vlan_detail = []
+            for vlan_id, events in activations_by_vlan.items():
+                events.sort(key=lambda e: e[0])
+                count, detail = self._count_mass_windows(
+                    events, window, _MASS_MIN_PER_VLAN
+                )
+                mass_vlan_events += count
+                for d in detail:
+                    mass_vlan_detail.append(
+                        {
+                            "vlan_id": str(vlan_id) if vlan_id is not None else None,
+                            "count": d["count"],
+                            "window_start": d["window_start"],
+                            "window_end": d["window_end"],
+                        }
+                    )
+
+            # Top N por count (los eventos masivos más grandes primero).
+            mass_vlan_detail.sort(key=lambda d: d["count"], reverse=True)
+            mass_vlan_detail = mass_vlan_detail[:_MASS_VLAN_DETAIL_TOP]
+
+            # Masiva a nivel organización: ventana global sobre TODAS las activaciones.
+            if total_ws > 0:
+                import math
+
+                org_threshold = max(1, math.ceil(total_ws * _MASS_ORG_PCT))
+                org_events = sorted(activations, key=lambda e: e[0])
+                mass_org_events, _ = self._count_mass_windows(
+                    org_events, window, org_threshold
+                )
+            else:
+                mass_org_events = 0
+
+            # --- Contingencia forzada vigente (org/VLAN) ---
+            forced_vlan_count = (
+                db.query(VLAN)
+                .filter(
+                    VLAN.organization_id == org.id,
+                    VLAN.forced_contingency.is_(True),
+                )
+                .count()
+            )
+            forced_org = bool(getattr(org, "forced_contingency", False))
+
+            return ContingencySummary(
+                activations_in_cycle=activations_in_cycle,
+                distinct_ws_activated=distinct_ws_activated,
+                active_at_cutoff=active_at_cutoff,
+                mass_vlan_events=mass_vlan_events,
+                mass_vlan_detail=mass_vlan_detail,
+                mass_org_events=mass_org_events,
+                forced_vlan_count=forced_vlan_count,
+                forced_org=forced_org,
+                data_available=True,
+            )
+        except Exception as exc:
+            # FAIL-SAFE: nunca propagar. Resumen en ceros con data_available=False.
+            logger.warning(
+                "[CLOSURE_REPORT] Resumen de contingencia no disponible (fail-safe): %s",
+                exc,
+            )
+            return ContingencySummary(data_available=False)
+
+    @staticmethod
+    def _toggle_is_activation(log) -> bool:
+        """
+        Indica si un `AuditLog` de `CONTINGENCY_TOGGLE` representa una activación (true).
+
+        Lee `new_values["contingency_active"]` de forma defensiva (el JSON column suele venir ya
+        deserializado como dict). Cualquier otro tipo/ausencia se trata como NO activación.
+        """
+        new_values = getattr(log, "new_values", None)
+        if isinstance(new_values, dict):
+            return new_values.get("contingency_active") is True
+        return False
+
+    @staticmethod
+    def _count_mass_windows(events, window, threshold):
+        """
+        Cuenta ventanas "masivas" sobre una lista de activaciones ordenada cronológicamente.
+
+        `events` es una lista de tuplas `(created_at, workstation_id)` YA ordenada asc. Para cada
+        activación no consumida se cuentan las WS DISTINTAS activadas en `[t, t + window)`; si el
+        conteo `>= threshold`, se cuenta 1 evento masivo, se registra su detalle y el cursor
+        avanza más allá de la ventana (todas las activaciones dentro de `[t, t + window)` se
+        marcan como consumidas) para no contar solapamientos varias veces.
+
+        Devuelve `(count, detail)` donde `detail` es una lista de dicts
+        `{"count": int, "window_start": iso, "window_end": iso}`.
+        """
+        count = 0
+        detail = []
+        n = len(events)
+        i = 0
+        while i < n:
+            t0 = events[i][0]
+            window_end = t0 + window
+            distinct_ws = set()
+            j = i
+            while j < n and events[j][0] < window_end:
+                ws_id = events[j][1]
+                if ws_id is not None:
+                    distinct_ws.add(ws_id)
+                j += 1
+            if len(distinct_ws) >= threshold:
+                count += 1
+                detail.append(
+                    {
+                        "count": len(distinct_ws),
+                        "window_start": t0.isoformat(),
+                        "window_end": window_end.isoformat(),
+                    }
+                )
+                # Avanzar más allá de la ventana (consumir todas las activaciones en [t0, end)).
+                i = j
+            else:
+                i += 1
+        return count, detail
+
     # === Persistencia del artefacto derivado (billing_closure_reports) ===
 
     def get_report_row(
@@ -200,6 +508,7 @@ class ClosureReportService:
         header: BillingClosure,
         history: List[HistoryPoint],
         items: List[BillingClosureItem],
+        contingency: Optional[ContingencySummary] = None,
     ) -> str:
         """
         Construye el prompt (en español) para el análisis IA del consumo del cierre.
@@ -210,6 +519,11 @@ class ClosureReportService:
         español: resumen ejecutivo, análisis de evolución/crecimiento por número de ciclo de
         servicio y observaciones. `items` se acepta por firma (contexto disponible) aunque el
         detalle por IP se resume vía los totales del cierre para no inflar el prompt.
+
+        Si `contingency` viene y tiene `data_available`, se agrega una sección con los eventos de
+        contingencia del ciclo y se pide comentar en las observaciones si hubo contingencia masiva
+        y su posible impacto operativo. Si es `None` o no hay datos, la sección se omite
+        (compatibilidad hacia atrás).
         """
         sections: List[str] = []
 
@@ -256,7 +570,26 @@ class ClosureReportService:
             "## Desglose de tramos del mes objetivo\n" + self._format_tiers(header.tiers_applied)
         )
 
+        # Eventos de contingencia del ciclo (opcional; solo si hay datos disponibles).
+        if contingency is not None and contingency.data_available:
+            sections.append(
+                "## Eventos de contingencia del ciclo\n"
+                f"- Activaciones de contingencia en el mes: {contingency.activations_in_cycle} "
+                f"(equipos distintos: {contingency.distinct_ws_activated})\n"
+                f"- Entradas masivas a nivel de agencia (VLAN): {contingency.mass_vlan_events}\n"
+                f"- Entradas masivas a nivel de organizacion: {contingency.mass_org_events}\n"
+                f"- Equipos que permanecen en contingencia al cierre: {contingency.active_at_cutoff}\n"
+                f"- Contingencia forzada vigente: organizacion={contingency.forced_org}, "
+                f"VLANs={contingency.forced_vlan_count}"
+            )
+
         # Solicitud concreta de las tres secciones en español.
+        observaciones_extra = ""
+        if contingency is not None and contingency.data_available:
+            observaciones_extra = (
+                " Comenta explicitamente si hubo contingencia masiva (a nivel de agencia/VLAN o de "
+                "organizacion) y su posible impacto operativo."
+            )
         sections.append(
             "## Solicitud\n"
             "Redacta un analisis en espanol con exactamente estas tres secciones:\n"
@@ -265,7 +598,7 @@ class ClosureReportService:
             "de servicio (compara ciclos, identifica tendencias de crecimiento o reduccion de "
             "estaciones facturables y del monto).\n"
             "3. Observaciones (detalle relevante del desglose de tramos, reciclaje/archivado y "
-            "cualquier nota util para sustentar la factura)."
+            "cualquier nota util para sustentar la factura)." + observaciones_extra
         )
 
         return "\n\n".join(sections)
@@ -448,6 +781,7 @@ class ClosureReportService:
         items: List[BillingClosureItem],
         history: List[HistoryPoint],
         regenerate: bool = False,
+        contingency: Optional[ContingencySummary] = None,
     ) -> Optional[str]:
         """
         Resuelve el análisis IA del cierre: caché si existe, si no invoca el LLM (fail-safe).
@@ -473,7 +807,7 @@ class ClosureReportService:
                 return cached.ai_analysis
 
         # 2. Construir prompt e invocar el LLM (fail-safe ante cualquier fallo).
-        prompt = self.build_ai_prompt(header, history, items)
+        prompt = self.build_ai_prompt(header, history, items, contingency=contingency)
         try:
             analysis_text, model_id = await self._invoke_llm(prompt, org)
         except Exception as exc:
@@ -628,6 +962,10 @@ class ClosureReportService:
 
         history = self.build_history_series(db, org, up_to=closure)
 
+        # Resumen de contingencia del ciclo (fail-safe): se calcula ANTES del análisis IA para
+        # alimentar el prompt y, en paralelo, la nueva sección del PDF.
+        contingency = self.build_contingency_summary(db, org, closure)
+
         analysis = await self.resolve_ai_analysis(
             db,
             closure,
@@ -636,6 +974,7 @@ class ClosureReportService:
             items,
             history,
             regenerate=regenerate,
+            contingency=contingency,
         )
 
         # Render de gráficos server-side (PNG en memoria; degradan de forma elegante sin datos).
@@ -651,6 +990,7 @@ class ClosureReportService:
             history_png,
             analysis,
             org,
+            contingency=contingency,
         )
 
         # Subida a S3 sobre la key determinista (sobre-escribe en regenerate).
@@ -1139,6 +1479,7 @@ def compose_pdf(
     history_png: bytes,
     analysis: Optional[str],
     org: Organization,
+    contingency: Optional["ContingencySummary"] = None,
 ) -> bytes:
     """
     Compone el PDF del Reporte de Cierre Mensual (sustento de factura) con las 9 secciones.
@@ -1153,6 +1494,10 @@ def compose_pdf(
       4. Grafico de composicion de tramos (`tiers_png`).
       5. Grafico de evolucion historica (`history_png`).
       6. Tabla resumen del desglose por tramo (from, to, rate, ips_in_tier, subtotal).
+      6b. Contingencia del ciclo: activaciones, entradas masivas (VLAN/org), equipos en
+          contingencia al cierre y contingencia forzada vigente (o nota fail-safe si
+          `contingency is None` o no hay datos). Va JUSTO DESPUES de conceptos/tarifas + tabla de
+          tramos y ANTES del analisis IA.
       7. Analisis IA, o nota fail-safe si `analysis is None` (Req 5.4).
       8. Nota explicita USD sin impuestos (Req 3.7).
       9. Footer de copyright de Inversiones On Line S.A.C. en cada pagina (Req 3.8).
@@ -1459,6 +1804,43 @@ def compose_pdf(
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(5)
 
+    # ==================================================================================
+    # Sección 6b — Contingencia del ciclo (JUSTO DESPUÉS de conceptos/tramos, ANTES del IA)
+    # ==================================================================================
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 7, _sanitize_latin1("Contingencia del ciclo"), ln=True)
+    pdf.ln(2)
+
+    if contingency is None or not contingency.data_available:
+        # Fail-safe: métricas no disponibles → nota en cursiva gris, no bloquea el reporte.
+        pdf.set_font("Helvetica", "I", 10)
+        pdf.set_text_color(120, 120, 120)
+        pdf.set_x(pdf.l_margin + 2)
+        pdf.multi_cell(
+            effective_width - 2,
+            5,
+            _sanitize_latin1("Metricas de contingencia no disponibles para este cierre."),
+        )
+    else:
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(60, 60, 60)
+        forced_org_txt = "si" if contingency.forced_org else "no"
+        contingency_lines = [
+            f"Activaciones de contingencia en el mes: {contingency.activations_in_cycle} "
+            f"(equipos distintos: {contingency.distinct_ws_activated})",
+            f"Entradas masivas a nivel de agencia (VLAN): {contingency.mass_vlan_events}",
+            f"Entradas masivas a nivel de organizacion: {contingency.mass_org_events}",
+            f"Equipos en contingencia al cierre: {contingency.active_at_cutoff}",
+            f"Contingencia forzada vigente: organizacion={forced_org_txt}, "
+            f"VLANs={contingency.forced_vlan_count}",
+        ]
+        for line in contingency_lines:
+            pdf.set_x(pdf.l_margin + 2)
+            pdf.multi_cell(effective_width - 2, 5, _sanitize_latin1(f"- {line}"))
+
+    pdf.ln(2)
+    pdf.set_text_color(60, 60, 60)
     pdf.set_draw_color(200, 200, 200)
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(5)
