@@ -328,7 +328,9 @@ async def get_closure_report(
         )
         db.commit()
         report_url = closure_report_service.generate_presigned_url(
-            s3_key, download_filename=download_filename
+            s3_key,
+            download_filename=download_filename
+            or closure_report_service.build_download_filename(closure, organization),
         )
     except ClosureReportError as exc:
         # Fallo controlado de S3/pipeline: fail-closed, no dejar artefacto parcial servible.
@@ -399,7 +401,9 @@ async def regenerate_closure_report(
         )
         db.commit()
         report_url = closure_report_service.generate_presigned_url(
-            s3_key, download_filename=download_filename
+            s3_key,
+            download_filename=download_filename
+            or closure_report_service.build_download_filename(closure, organization),
         )
     except ClosureReportError as exc:
         db.rollback()

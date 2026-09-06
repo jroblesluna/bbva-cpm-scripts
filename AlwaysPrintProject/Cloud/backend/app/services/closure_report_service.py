@@ -386,6 +386,31 @@ class ClosureReportService:
                 f"Error generando presigned URL del reporte de cierre: {exc}"
             ) from exc
 
+    def build_download_filename(self, header: "BillingClosure", org: "Organization") -> str:
+        """
+        Construye el nombre de descarga del PDF con la organización y el periodo del cierre.
+
+        Formato: `Reporte_Cierre_<Org>_<YYYY-MM>.pdf`. El nombre de la organización se sanea a
+        ASCII (se quitan acentos/caracteres no alfanuméricos y los espacios pasan a `_`) para que
+        sea un nombre de archivo válido y estable en cualquier navegador/SO.
+        """
+        import re
+        import unicodedata
+
+        org_name = getattr(org, "name", None) or "Organizacion"
+        # Normalizar a ASCII: quitar acentos y dejar solo alfanumérico + espacios/guiones.
+        ascii_name = (
+            unicodedata.normalize("NFKD", str(org_name))
+            .encode("ascii", "ignore")
+            .decode("ascii")
+        )
+        ascii_name = re.sub(r"[^A-Za-z0-9]+", "_", ascii_name).strip("_")
+        if not ascii_name:
+            ascii_name = "Organizacion"
+
+        period = f"{int(header.period_year):04d}-{int(header.period_month):02d}"
+        return f"Reporte_Cierre_{ascii_name}_{period}.pdf"
+
     # === Análisis IA cacheado con fail-safe ===
 
     async def resolve_ai_analysis(
@@ -1245,59 +1270,8 @@ def compose_pdf(
     pdf.ln(5)
 
     # ==================================================================================
-    # Sección 3 — Conceptos, tarifas, modalidad y tabla de tramos
-    # ==================================================================================
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 7, _sanitize_latin1("Conceptos, tarifas y modalidad"), ln=True)
-    pdf.ln(2)
-    pdf.set_font("Helvetica", "", 9)
-    pdf.set_text_color(60, 60, 60)
-
-    conceptos = [
-        "Facturable: estacion (IP privada) contabilizada para el cobro del periodo.",
-        "Reciclado: estacion reutilizada dentro del ciclo; no genera cargo adicional.",
-        "Archivado: estacion retirada/archivada; se conserva como sustento historico.",
-        f"Modalidad aplicada: {header.mode}. Moneda: USD (sin impuestos).",
-    ]
-    for line in conceptos:
-        pdf.set_x(pdf.l_margin + 2)
-        pdf.multi_cell(effective_width - 2, 5, _sanitize_latin1(f"- {line}"))
-
-    pdf.ln(3)
-    pdf.set_font("Helvetica", "B", 9)
-    pdf.set_text_color(60, 60, 60)
-    pdf.cell(0, 5, _sanitize_latin1("Tabla de tramos (tarifa por tramo):"), ln=True)
-    pdf.set_font("Helvetica", "", 9)
-
-    tiers_applied = header.tiers_applied or []
-    if tiers_applied:
-        for index, tier in enumerate(tiers_applied):
-            if not isinstance(tier, dict):
-                continue
-            rango = _tier_label(tier, index)
-            rate = tier.get("rate")
-            pdf.set_x(pdf.l_margin + 4)
-            pdf.multi_cell(
-                effective_width - 4,
-                5,
-                _sanitize_latin1(f"- Tramo {rango}: tarifa USD {rate} por estacion"),
-            )
-    else:
-        pdf.set_x(pdf.l_margin + 4)
-        pdf.multi_cell(
-            effective_width - 4,
-            5,
-            _sanitize_latin1("- (sin tramos aplicados / sin IPs facturables)"),
-        )
-
-    pdf.ln(4)
-    pdf.set_draw_color(200, 200, 200)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(5)
-
-    # ==================================================================================
-    # Secciones 4 y 5 — Gráficos en dos columnas (Composición izquierda, Evolución derecha)
+    # Gráficos en dos columnas (Composición izquierda, Evolución derecha) — van ANTES de
+    # conceptos/tarifas para dar contexto visual del consumo y su evolución.
     # ==================================================================================
     # Layout de dos columnas a la misma altura: cada gráfico ocupa ~48% del ancho efectivo,
     # con un gutter central. Los títulos se dibujan sobre cada columna a la misma `y`, y las
@@ -1353,31 +1327,64 @@ def compose_pdf(
     pdf.ln(5)
 
     # ==================================================================================
-    # Sección 6 — Tabla resumen del desglose por tramo (from, to, rate, ips_in_tier, subtotal)
+    # Conceptos/tarifas/modalidad (izquierda, stacked) + Tabla de tramos (derecha, como tabla)
     # ==================================================================================
+    # Dos columnas a la misma altura: a la izquierda las definiciones de conceptos, la modalidad
+    # y la moneda; a la derecha la tabla del desglose por tramo (Desde/Hasta/Tarifa/IPs/Subtotal)
+    # con su fila de total, que reconcilia con `header.amount` (fuente de verdad).
+    tiers_applied = header.tiers_applied or []
+
+    _INFO_GUTTER = 6.0
+    info_col_width = (effective_width - _INFO_GUTTER) / 2.0
+    info_left_x = pdf.l_margin
+    info_right_x = pdf.l_margin + info_col_width + _INFO_GUTTER
+    info_top_y = pdf.get_y()
+
+    # --- Columna izquierda: Conceptos, tarifas y modalidad (stacked) ---
+    pdf.set_xy(info_left_x, info_top_y)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 7, _sanitize_latin1("Desglose por tramo"), ln=True)
-    pdf.ln(2)
-
-    # Cabecera de la tabla (anchos proporcionales al ancho efectivo).
-    col_widths = [
-        effective_width * 0.15,  # Desde
-        effective_width * 0.15,  # Hasta
-        effective_width * 0.22,  # Tarifa
-        effective_width * 0.20,  # IPs
-        effective_width * 0.28,  # Subtotal
+    pdf.cell(info_col_width, 7, _sanitize_latin1("Conceptos, tarifas y modalidad"), ln=True)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(60, 60, 60)
+    conceptos = [
+        "Facturable: estacion (IP privada) contabilizada para el cobro del periodo.",
+        "Reciclado: estacion reutilizada dentro del ciclo; no genera cargo adicional.",
+        "Archivado: estacion retirada/archivada; se conserva como sustento historico.",
+        f"Modalidad aplicada: {header.mode}. Moneda: USD (sin impuestos).",
     ]
-    headers = ["Desde", "Hasta", "Tarifa (USD)", "IPs", "Subtotal (USD)"]
-    pdf.set_font("Helvetica", "B", 9)
+    for line in conceptos:
+        pdf.set_x(info_left_x)
+        pdf.multi_cell(info_col_width, 5, _sanitize_latin1(f"- {line}"))
+    left_info_bottom_y = pdf.get_y()
+
+    # --- Columna derecha: Tabla del desglose por tramo ---
+    pdf.set_xy(info_right_x, info_top_y)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(info_col_width, 7, _sanitize_latin1("Desglose por tramo"), ln=True)
+
+    # Anchos de columna de la tabla, proporcionales al ancho de la columna derecha.
+    tbl_col_widths = [
+        info_col_width * 0.16,  # Desde
+        info_col_width * 0.16,  # Hasta
+        info_col_width * 0.24,  # Tarifa
+        info_col_width * 0.16,  # IPs
+        info_col_width * 0.28,  # Subtotal
+    ]
+    tbl_headers = ["Desde", "Hasta", "Tarifa", "IPs", "Subtotal"]
+
+    # Cabecera de la tabla.
+    pdf.set_xy(info_right_x, info_top_y + 8)
+    pdf.set_font("Helvetica", "B", 8)
     pdf.set_fill_color(230, 230, 230)
     pdf.set_text_color(0, 0, 0)
-    pdf.set_x(pdf.l_margin)
-    for width, title in zip(col_widths, headers):
+    for width, title in zip(tbl_col_widths, tbl_headers):
         pdf.cell(width, 6, _sanitize_latin1(title), border=1, align="C", fill=True)
     pdf.ln(6)
 
-    pdf.set_font("Helvetica", "", 9)
+    # Filas de tramos.
+    pdf.set_font("Helvetica", "", 8)
     pdf.set_text_color(60, 60, 60)
     if tiers_applied:
         for tier in tiers_applied:
@@ -1395,14 +1402,14 @@ def compose_pdf(
                 str(ips_in_tier),
                 str(subtotal),
             ]
-            pdf.set_x(pdf.l_margin)
-            for width, cell in zip(col_widths, row):
+            pdf.set_x(info_right_x)
+            for width, cell in zip(tbl_col_widths, row):
                 pdf.cell(width, 6, _sanitize_latin1(cell), border=1, align="C")
             pdf.ln(6)
     else:
-        pdf.set_x(pdf.l_margin)
+        pdf.set_x(info_right_x)
         pdf.cell(
-            sum(col_widths),
+            sum(tbl_col_widths),
             6,
             _sanitize_latin1("(sin tramos aplicados / monto 0.00)"),
             border=1,
@@ -1411,12 +1418,20 @@ def compose_pdf(
         pdf.ln(6)
 
     # Fila de total (reconcilia con header.amount, la fuente de verdad).
-    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(0, 0, 0)
-    pdf.set_x(pdf.l_margin)
-    pdf.cell(sum(col_widths[:4]), 6, _sanitize_latin1("Total (monto de cabecera)"), border=1, align="R")
-    pdf.cell(col_widths[4], 6, _sanitize_latin1(f"USD {reconciliation.header_amount}"), border=1, align="C")
-    pdf.ln(8)
+    pdf.set_x(info_right_x)
+    pdf.cell(sum(tbl_col_widths[:4]), 6, _sanitize_latin1("Total"), border=1, align="R")
+    pdf.cell(tbl_col_widths[4], 6, _sanitize_latin1(f"USD {reconciliation.header_amount}"), border=1, align="C")
+    pdf.ln(6)
+    right_info_bottom_y = pdf.get_y()
+
+    # Continuar debajo de la columna más alta y dibujar el separador.
+    pdf.set_y(max(left_info_bottom_y, right_info_bottom_y))
+    pdf.ln(2)
+    pdf.set_draw_color(200, 200, 200)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(5)
 
     pdf.set_draw_color(200, 200, 200)
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
