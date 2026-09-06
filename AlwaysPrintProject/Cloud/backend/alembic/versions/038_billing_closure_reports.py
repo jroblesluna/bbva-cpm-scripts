@@ -1,6 +1,6 @@
 """Crear tabla billing_closure_reports (artefacto derivado del cierre: análisis IA + PDF cacheado).
 
-Revision ID: 038_create_billing_closure_reports
+Revision ID: 038_billing_closure_reports
 Revises: 037_add_billing_audit_actions
 Create Date: 2026-08-21 00:00:00.000000
 
@@ -26,7 +26,7 @@ import sqlalchemy as sa
 # Reutilizar el tipo GUID para consistencia con los modelos ORM y compatibilidad SQLite.
 from app.models.organization import GUID
 
-revision: str = '038_create_billing_closure_reports'
+revision: str = '038_billing_closure_reports'
 down_revision: Union[str, None] = '037_add_billing_audit_actions'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
