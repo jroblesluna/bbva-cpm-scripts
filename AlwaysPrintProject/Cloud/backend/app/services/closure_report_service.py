@@ -1173,37 +1173,48 @@ def compose_pdf(
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(5)
 
-    # Metadata de portada.
+    # ==================================================================================
+    # Secciones 1(datos) y 2 — Dos columnas: "Datos del cierre" (izq) y "Resumen del cierre" (der)
+    # ==================================================================================
+    # Los metadatos del cierre (izquierda) y el resumen de totales/monto (derecha) se disponen
+    # en dos columnas a la MISMA altura. Cada bloque tiene su propio título. La nota de
+    # reconciliación (si el desglose no reconcilia) se dibuja debajo de ambas columnas, a todo
+    # el ancho, como aviso.
     org_name = getattr(org, "name", None) or getattr(org, "id", "N/A")
     tipo_cierre = "Retroactivo" if header.is_retroactive else "Normal"
+
+    _META_GUTTER = 6.0  # separación horizontal entre columnas (mm)
+    meta_col_width = (effective_width - _META_GUTTER) / 2.0
+    meta_left_x = pdf.l_margin
+    meta_right_x = pdf.l_margin + meta_col_width + _META_GUTTER
+    blocks_top_y = pdf.get_y()
+
+    # --- Columna izquierda: "Datos del cierre" ---
+    pdf.set_xy(meta_left_x, blocks_top_y)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(meta_col_width, 7, _sanitize_latin1("Datos del cierre"), ln=True)
     pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(80, 80, 80)
-    portada_lines = [
+    pdf.set_text_color(60, 60, 60)
+    datos_lines = [
         f"Organizacion: {org_name}",
         f"Periodo: {_fmt_period(header)}",
         f"Modalidad: {header.mode}",
         f"Tipo de cierre: {tipo_cierre}",
-        f"Fecha de generacion: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        f"Generacion: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}",
     ]
-    for line in portada_lines:
-        pdf.set_x(pdf.l_margin)
-        pdf.cell(0, 5, _sanitize_latin1(line), ln=True)
+    for line in datos_lines:
+        pdf.set_x(meta_left_x)
+        pdf.multi_cell(meta_col_width, 5, _sanitize_latin1(f"- {line}"))
+    left_bottom_y = pdf.get_y()
 
-    pdf.ln(4)
-    pdf.set_draw_color(200, 200, 200)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(5)
-
-    # ==================================================================================
-    # Sección 2 — Resumen del cierre (totales, monto USD, tipo de cierre + nota reconciliación)
-    # ==================================================================================
+    # --- Columna derecha: "Resumen del cierre" ---
+    pdf.set_xy(meta_right_x, blocks_top_y)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 7, _sanitize_latin1("Resumen del cierre"), ln=True)
-    pdf.ln(2)
+    pdf.cell(meta_col_width, 7, _sanitize_latin1("Resumen del cierre"), ln=True)
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(60, 60, 60)
-
     resumen_lines = [
         f"Estaciones facturables: {header.total_billable}",
         f"Estaciones recicladas: {header.total_recycled}",
@@ -1212,10 +1223,14 @@ def compose_pdf(
         f"Tipo de cierre: {tipo_cierre}",
     ]
     for line in resumen_lines:
-        pdf.set_x(pdf.l_margin + 2)
-        pdf.multi_cell(effective_width - 2, 5, _sanitize_latin1(f"- {line}"))
+        pdf.set_x(meta_right_x)
+        pdf.multi_cell(meta_col_width, 5, _sanitize_latin1(f"- {line}"))
+    right_bottom_y = pdf.get_y()
 
-    # Anotación de discrepancia de reconciliación (solo si NO reconcilia, task 6.2).
+    # Continuar debajo de la columna más alta.
+    pdf.set_y(max(left_bottom_y, right_bottom_y))
+
+    # Anotación de discrepancia de reconciliación (solo si NO reconcilia, task 6.2), a todo el ancho.
     if reconciliation.note:
         pdf.ln(2)
         pdf.set_font("Helvetica", "B", 9)
