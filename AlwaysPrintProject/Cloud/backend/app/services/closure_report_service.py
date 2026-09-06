@@ -1282,31 +1282,57 @@ def compose_pdf(
     pdf.ln(5)
 
     # ==================================================================================
-    # Sección 4 — Gráfico de composición de tramos
+    # Secciones 4 y 5 — Gráficos en dos columnas (Composición izquierda, Evolución derecha)
     # ==================================================================================
+    # Layout de dos columnas a la misma altura: cada gráfico ocupa ~48% del ancho efectivo,
+    # con un gutter central. Los títulos se dibujan sobre cada columna a la misma `y`, y las
+    # imágenes se colocan con `x` explícito y la MISMA `y` de tope. fpdf2 calcula la altura de
+    # cada imagen por su aspect ratio (ambos PNG comparten figsize 7x4 → misma altura), de modo
+    # que quedan alineados. Al final, el cursor avanza por debajo del gráfico más alto.
+    from PIL import Image as _PILImage  # backend de imagen ya presente (matplotlib/fpdf2)
+
+    _GUTTER = 6.0  # separación horizontal entre columnas (mm)
+    col_width = (effective_width - _GUTTER) / 2.0
+    left_x = pdf.l_margin
+    right_x = pdf.l_margin + col_width + _GUTTER
+
+    def _png_height_for_width(png_bytes: bytes, width_mm: float) -> float:
+        """Altura (mm) que tendrá el PNG al escalarlo a `width_mm`, según su aspect ratio."""
+        try:
+            with _PILImage.open(io.BytesIO(png_bytes)) as im:
+                w_px, h_px = im.size
+            if w_px:
+                return width_mm * (h_px / w_px)
+        except Exception:
+            pass
+        # Fallback al aspect ratio de figsize (7x4) si no se pudo leer el PNG.
+        return width_mm * (4.0 / 7.0)
+
+    # Títulos de ambas columnas a la misma altura.
+    titles_y = pdf.get_y()
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 7, _sanitize_latin1("Composicion de tramos"), ln=True)
-    pdf.ln(2)
+    pdf.set_xy(left_x, titles_y)
+    pdf.cell(col_width, 7, _sanitize_latin1("Composicion de tramos"), align="C")
+    pdf.set_xy(right_x, titles_y)
+    pdf.cell(col_width, 7, _sanitize_latin1("Evolucion historica"), align="C")
+
+    images_y = titles_y + 9  # debajo de los títulos
+    left_h = 0.0
+    right_h = 0.0
     if tiers_png:
-        # Incrustar el PNG desde memoria (fpdf2 acepta un BytesIO con `name` para inferir formato).
         tiers_buf = io.BytesIO(tiers_png)
         tiers_buf.name = "tiers.png"
-        pdf.image(tiers_buf, w=effective_width * 0.85, x=pdf.l_margin)
-    pdf.ln(4)
-
-    # ==================================================================================
-    # Sección 5 — Gráfico de evolución histórica
-    # ==================================================================================
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 7, _sanitize_latin1("Evolucion historica"), ln=True)
-    pdf.ln(2)
+        left_h = _png_height_for_width(tiers_png, col_width)
+        pdf.image(tiers_buf, x=left_x, y=images_y, w=col_width)
     if history_png:
         history_buf = io.BytesIO(history_png)
         history_buf.name = "history.png"
-        pdf.image(history_buf, w=effective_width * 0.85, x=pdf.l_margin)
-    pdf.ln(4)
+        right_h = _png_height_for_width(history_png, col_width)
+        pdf.image(history_buf, x=right_x, y=images_y, w=col_width)
+
+    # Avanzar el cursor por debajo del gráfico más alto y dibujar el separador.
+    pdf.set_y(images_y + max(left_h, right_h) + 4)
     pdf.set_draw_color(200, 200, 200)
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(5)
