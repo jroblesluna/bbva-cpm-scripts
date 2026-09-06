@@ -185,8 +185,8 @@ export function ClosuresTable({ organizationId, t, tCommon }: ClosuresTableProps
                       <td className="px-3 py-3 whitespace-nowrap font-medium">
                         {formatAmount(closure.amount)}
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end gap-1">
+                      <td className="px-3 py-3 text-right">
+                        <div className="flex flex-wrap items-center justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
