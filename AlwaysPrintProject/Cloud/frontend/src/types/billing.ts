@@ -219,3 +219,49 @@ export interface BulkDeleteReport {
   rejected: BulkDeleteRejected[]
   not_found: string[]
 }
+
+// ── Reporte de Cierre Mensual (billing_closures.py → schemas de reporte) ─────
+
+/**
+ * Respuesta del endpoint de reporte (GET /billing/closures/{closure_id}/report y
+ * POST .../report/regenerate). Corresponde al schema `ClosureReportUrlResponse`.
+ * - `report_url`: presigned URL SigV4 regional al PDF en S3.
+ * - `expires_in_seconds`: expiración de la presigned URL (por defecto 3600).
+ * - `cached`: `true` si se sirvió desde S3 sin regenerar.
+ * - `ai_analysis_available`: `false` si el LLM falló (fail-safe); el PDF se genera igual.
+ */
+export interface ClosureReportUrlResponse {
+  report_url: string
+  expires_in_seconds: number
+  cached: boolean
+  ai_analysis_available: boolean
+}
+
+/**
+ * Punto de la serie histórica de cierres de una organización (uno por ciclo/mes de servicio).
+ * Corresponde al schema `HistoryPoint`. `cycle` es 1-based (el cierre más antiguo = 1).
+ * `amount` es dinero (`number | string`), ver "Nota sobre dinero (Decimal)" arriba.
+ */
+export interface HistoryPoint {
+  cycle: number
+  period_year: number
+  period_month: number
+  total_billable: number
+  total_recycled: number
+  total_archived: number
+  amount: number | string
+}
+
+/**
+ * Datos estructurados del reporte para la vista previa (GET .../report-data).
+ * Corresponde al schema `ClosureReportDataResponse`. Alimenta los gráficos de composición de
+ * tramos y evolución histórica en pantalla (recharts). `ai_analysis` es `null` bajo fail-safe.
+ */
+export interface ClosureReportData {
+  header: ClosureHeader
+  tiers_applied: unknown[]
+  history: HistoryPoint[]
+  ai_analysis: string | null
+  currency: string
+  taxes_included: boolean
+}

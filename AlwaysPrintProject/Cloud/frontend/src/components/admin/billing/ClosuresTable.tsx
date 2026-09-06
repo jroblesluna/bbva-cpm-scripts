@@ -22,10 +22,12 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
+import { useAuth } from '@/hooks/useAuth'
 import { getClosures } from '@/lib/api/billing'
 import type { ClosureHeader } from '@/types/billing'
 
 import { ClosureDetailDrawer } from './ClosureDetailDrawer'
+import { ClosureReportActions } from './ClosureReportActions'
 
 /** Cierres por página en la tabla (estándar de listados: 20 para tabla). */
 const PAGE_SIZE = 20
@@ -68,6 +70,12 @@ function formatAmount(amount: number | string): string {
 }
 
 export function ClosuresTable({ organizationId, t, tCommon }: ClosuresTableProps) {
+  // `t` del namespace `billingReport` para las acciones del reporte PDF (Task 10.3).
+  const tReport = useTranslations('billingReport')
+  // El rol `admin` es el superadministrador del sistema (habilita "Regenerar análisis").
+  const { isAdmin } = useAuth()
+  const canRegenerate = isAdmin()
+
   // Cierre seleccionado para el detalle por IP (null = drawer cerrado).
   const [selectedClosure, setSelectedClosure] = useState<ClosureHeader | null>(null)
   // Página actual (1-based) de la tabla de cierres.
@@ -178,20 +186,28 @@ export function ClosuresTable({ organizationId, t, tCommon }: ClosuresTableProps
                         {formatAmount(closure.amount)}
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 gap-1"
-                          onClick={(e) => {
-                            // Evita que el click en el botón dispare también el onClick de la fila.
-                            e.stopPropagation()
-                            setSelectedClosure(closure)
-                          }}
-                          title={t('viewDetail')}
-                        >
-                          <Eye className="h-4 w-4" />
-                          <span className="hidden sm:inline">{t('viewDetail')}</span>
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 gap-1"
+                            onClick={(e) => {
+                              // Evita que el click en el botón dispare el onClick de la fila.
+                              e.stopPropagation()
+                              setSelectedClosure(closure)
+                            }}
+                            title={t('viewDetail')}
+                          >
+                            <Eye className="h-4 w-4" />
+                            <span className="hidden lg:inline">{t('viewDetail')}</span>
+                          </Button>
+                          {/* Acciones del reporte PDF: descargar, regenerar (admin) y vista previa. */}
+                          <ClosureReportActions
+                            closure={closure}
+                            isAdmin={canRegenerate}
+                            t={tReport}
+                          />
+                        </div>
                       </td>
                     </tr>
                   ))}

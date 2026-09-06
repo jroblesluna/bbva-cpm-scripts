@@ -97,3 +97,81 @@ class ClosureItemsPage(BaseModel):
     page: int
     page_size: int
     items: List[ClosureItemResponse]
+
+
+# === REPORTE DE CIERRE MENSUAL (task 2.1) ===
+#
+# Schemas de salida del Reporte de Cierre Mensual (PDF), sustento formal de la factura.
+# El reporte es de solo lectura sobre el snapshot inmutable del cierre; estos schemas
+# describen la presigned URL del PDF cacheado, la metadata de generacion y los datos
+# estructurados que alimentan tanto el PDF como la vista previa del frontend.
+
+
+class ClosureReportUrlResponse(BaseModel):
+    """
+    Respuesta de `GET .../report` y `POST .../report/regenerate` (Req 1.1, 1.3).
+
+    `report_url` es la presigned URL SigV4 regional del PDF en S3; `cached` es True cuando el
+    artefacto se sirvio desde S3 sin recomputar (Cache_Hit) y False tras generar/regenerar;
+    `ai_analysis_available` es False cuando el LLM fallo (fail-safe, Req 5.4) y el PDF se
+    genero con la nota de analisis IA no disponible.
+    """
+
+    report_url: str
+    expires_in_seconds: int = 3600
+    cached: bool
+    ai_analysis_available: bool
+
+
+class ClosureReportMeta(BaseModel):
+    """
+    Metadata de generacion del reporte, de la fila `BillingClosureReport` (Req 6.1).
+
+    Expone el modelo LLM usado y las fechas de generacion (IA y PDF). Los campos son nullable
+    porque el reporte puede no haberse generado aun o el analisis IA puede no estar disponible
+    (fail-safe). `ai_analysis_available` deriva de si el `ai_analysis` persistido es no nulo.
+    """
+
+    closure_id: UUID
+    ai_model: Optional[str] = None
+    ai_generated_at: Optional[datetime] = None
+    pdf_generated_at: Optional[datetime] = None
+    ai_analysis_available: bool
+
+    model_config = {"from_attributes": True}
+
+
+class HistoryPoint(BaseModel):
+    """
+    Punto de la serie historica de cierres de la organizacion (Req 7.4).
+
+    `cycle` es el numero de ciclo/mes de servicio (1-based; el cierre mas antiguo es 1),
+    derivado ordenando los cierres por `(period_year, period_month)`. Incluye los totales por
+    estado y el monto del cierre de ese ciclo para graficar la evolucion historica.
+    """
+
+    cycle: int
+    period_year: int
+    period_month: int
+    total_billable: int
+    total_recycled: int
+    total_archived: int
+    amount: Decimal
+
+
+class ClosureReportDataResponse(BaseModel):
+    """
+    Datos estructurados del reporte para la vista previa del frontend (Req 8.7).
+
+    Reutiliza `ClosureHeaderResponse` como `header` (cabecera inmutable del cierre) y agrega el
+    desglose de tramos del mes (`tiers_applied`), la serie historica (`history`) y el texto IA
+    si existe (`ai_analysis`, None si el LLM fallo). `currency`/`taxes_included` reflejan la
+    declaracion obligatoria de precios en USD sin impuestos (Req 11.5).
+    """
+
+    header: ClosureHeaderResponse
+    tiers_applied: list
+    history: List[HistoryPoint]
+    ai_analysis: Optional[str] = None
+    currency: str = "USD"
+    taxes_included: bool = False

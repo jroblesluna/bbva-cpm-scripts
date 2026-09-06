@@ -48,6 +48,10 @@ httpx>=0.27.0  # Para providers LLM (OpenAI, Anthropic)
 # === PDF GENERATION ===
 fpdf2>=2.7.0  # Generación de reportes PDF de debugging
 
+# === CHARTS (server-side) ===
+matplotlib>=3.8,<4.0  # Render server-side de gráficos a PNG (modo headless Agg)
+Pillow>=10.0,<12.0  # Backend de imagen usado por matplotlib / fpdf2 image()
+
 # === AWS ===
 boto3>=1.35.0
 
