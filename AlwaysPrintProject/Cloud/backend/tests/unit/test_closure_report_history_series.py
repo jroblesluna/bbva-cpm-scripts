@@ -160,3 +160,52 @@ def test_empty_series_for_org_without_closures(db, service):
     """Una organización sin cierres produce una serie vacía (sin excepción)."""
     org = _make_org(db, "Org Sin Cierres")
     assert service.build_history_series(db, org) == []
+
+
+def test_up_to_excludes_future_periods(db, service):
+    """
+    Corte point-in-time: con `up_to=<cierre objetivo>` la serie SOLO incluye cierres cuyo
+    periodo sea MENOR O IGUAL al del objetivo; los periodos posteriores se excluyen.
+
+    Un reporte histórico es un snapshot: el reporte de mayo no debe reflejar junio/julio/agosto.
+    """
+    org = _make_org(db, "Org PointInTime")
+
+    # Insertar deliberadamente desordenado para probar también el ordenamiento.
+    closure_jul = _make_closure(db, org, 2026, 7, total_billable=70)
+    closure_may = _make_closure(db, org, 2026, 5, total_billable=50)
+    _make_closure(db, org, 2026, 8, total_billable=80)
+    _make_closure(db, org, 2026, 6, total_billable=60)
+
+    # up_to = mayo → solo mayo (1 punto), cycle=1, periodo (2026, 5).
+    series_may = service.build_history_series(db, org, up_to=closure_may)
+    assert len(series_may) == 1
+    assert series_may[0].cycle == 1
+    assert (series_may[0].period_year, series_may[0].period_month) == (2026, 5)
+
+    # up_to = julio → mayo, junio, julio (3 puntos); NINGUNO de agosto; cycles [1, 2, 3].
+    series_jul = service.build_history_series(db, org, up_to=closure_jul)
+    periods_jul = [(p.period_year, p.period_month) for p in series_jul]
+    assert periods_jul == [(2026, 5), (2026, 6), (2026, 7)]
+    assert (2026, 8) not in periods_jul
+    assert [p.cycle for p in series_jul] == [1, 2, 3]
+
+
+def test_no_up_to_returns_full_series(db, service):
+    """Sin `up_to` (o `up_to=None`) la serie incluye todos los cierres (compatibilidad hacia atrás)."""
+    org = _make_org(db, "Org SerieCompleta")
+
+    _make_closure(db, org, 2026, 7, total_billable=70)
+    _make_closure(db, org, 2026, 5, total_billable=50)
+    _make_closure(db, org, 2026, 8, total_billable=80)
+    _make_closure(db, org, 2026, 6, total_billable=60)
+
+    # Sin corte: los 4 cierres, en orden cronológico.
+    series_full = service.build_history_series(db, org)
+    periods_full = [(p.period_year, p.period_month) for p in series_full]
+    assert periods_full == [(2026, 5), (2026, 6), (2026, 7), (2026, 8)]
+    assert [p.cycle for p in series_full] == [1, 2, 3, 4]
+
+    # up_to=None explícito equivale a serie completa.
+    series_none = service.build_history_series(db, org, up_to=None)
+    assert [(p.period_year, p.period_month) for p in series_none] == periods_full

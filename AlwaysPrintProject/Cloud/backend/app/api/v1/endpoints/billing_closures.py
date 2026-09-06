@@ -466,7 +466,7 @@ def get_closure_report_data(
     _assert_org_scope(current_user, closure.organization_id)
     organization = _get_org_or_404(db, closure.organization_id)
 
-    history = closure_report_service.build_history_series(db, organization)
+    history = closure_report_service.build_history_series(db, organization, up_to=closure)
 
     # Análisis IA ya persistido (si existe); esta ruta NO invoca el LLM (solo lectura).
     report_row = closure_report_service.get_report_row(db, closure)

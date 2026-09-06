@@ -36,6 +36,7 @@ import boto3
 import matplotlib.pyplot as plt  # import DESPUÉS de matplotlib.use("Agg")
 from botocore.client import Config
 from botocore.exceptions import ClientError
+import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -78,28 +79,53 @@ class ClosureReportService:
     IA cacheado; el resto del pipeline (PDF, S3) se añade en tareas posteriores.
     """
 
-    def build_history_series(self, db: Session, org: Organization) -> List[HistoryPoint]:
+    def build_history_series(
+        self,
+        db: Session,
+        org: Organization,
+        up_to: Optional[BillingClosure] = None,
+    ) -> List[HistoryPoint]:
         """
         Deriva la serie histórica de cierres de la organización con su número de ciclo.
 
-        Consulta todos los `BillingClosure` de la organización (tenant isolation por
-        `organization_id`) ordenados cronológicamente por `(period_year, period_month)` de
-        más antiguo a más reciente, y asigna `cycle` 1-based: el cierre más antiguo es el
-        ciclo 1 (primer mes de servicio) y la numeración crece consecutivamente.
+        Consulta los `BillingClosure` de la organización (tenant isolation por `organization_id`)
+        ordenados cronológicamente por `(period_year, period_month)` de más antiguo a más reciente,
+        y asigna `cycle` 1-based: el cierre más antiguo es el ciclo 1 (primer mes de servicio) y la
+        numeración crece consecutivamente.
+
+        Corte point-in-time (Req: reporte histórico): si se pasa `up_to` (el cierre objetivo del
+        reporte), la serie SOLO incluye cierres cuyo periodo sea MENOR O IGUAL a
+        `(up_to.period_year, up_to.period_month)`. Así un reporte histórico (p. ej. mayo) nunca
+        refleja información de periodos posteriores (junio, julio, ...) que no se conocían al
+        momento de ese cierre. Si `up_to` es `None`, no se aplica corte (serie completa).
 
         Devuelve un `HistoryPoint` por cierre con el ciclo, el periodo, los totales por estado
         (facturables/reciclados/archivados) y el monto del cierre, listos para graficar la
         evolución histórica.
         """
-        closures = (
-            db.query(BillingClosure)
-            .filter(BillingClosure.organization_id == org.id)  # tenant isolation
-            .order_by(
-                BillingClosure.period_year.asc(),
-                BillingClosure.period_month.asc(),
-            )
-            .all()
+        query = db.query(BillingClosure).filter(
+            BillingClosure.organization_id == org.id  # tenant isolation
         )
+
+        # Corte point-in-time: no incluir periodos posteriores al cierre objetivo.
+        # (year < ty) OR (year == ty AND month <= tm) — comparación cronológica portable.
+        if up_to is not None:
+            ty = up_to.period_year
+            tm = up_to.period_month
+            query = query.filter(
+                sa.or_(
+                    BillingClosure.period_year < ty,
+                    sa.and_(
+                        BillingClosure.period_year == ty,
+                        BillingClosure.period_month <= tm,
+                    ),
+                )
+            )
+
+        closures = query.order_by(
+            BillingClosure.period_year.asc(),
+            BillingClosure.period_month.asc(),
+        ).all()
 
         series: List[HistoryPoint] = []
         for index, closure in enumerate(closures):
@@ -600,7 +626,7 @@ class ClosureReportService:
             .all()
         )
 
-        history = self.build_history_series(db, org)
+        history = self.build_history_series(db, org, up_to=closure)
 
         analysis = await self.resolve_ai_analysis(
             db,
