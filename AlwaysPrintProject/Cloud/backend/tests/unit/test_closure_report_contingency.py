@@ -134,6 +134,42 @@ def _make_toggle(
     return log
 
 
+def _make_forced_toggle(
+    db,
+    org: Organization,
+    *,
+    forced: bool,
+    scope: str,
+    affected_workstations: int,
+    created_at: datetime,
+) -> AuditLog:
+    """
+    Crea un AuditLog CONTINGENCY_TOGGLE del ESQUEMA B (contingencia forzada Org/VLAN).
+
+    new_values trae `forced_contingency`/`scope`/`source`/`force_all`/`affected_workstations` y
+    `workstation_id = None`, tal como lo emiten organizations.py y vlans.py (source manual_endpoint).
+    """
+    log = AuditLog(
+        id=uuid.uuid4(),
+        workstation_id=None,
+        organization_id=org.id,
+        action_type=ActionType.CONTINGENCY_TOGGLE,
+        entity_type="organization" if scope == "organization" else "vlan",
+        entity_id=org.id,
+        new_values={
+            "forced_contingency": forced,
+            "scope": scope,
+            "source": "manual_endpoint",
+            "force_all": True,
+            "affected_workstations": affected_workstations,
+        },
+        created_at=created_at,
+    )
+    db.add(log)
+    db.flush()
+    return log
+
+
 @pytest.fixture
 def service() -> ClosureReportService:
     return ClosureReportService()
@@ -298,3 +334,155 @@ def test_fail_safe_returns_zeros_and_data_available_false(db, service, monkeypat
     assert summary.active_at_cutoff == 0
     assert summary.mass_vlan_events == 0
     assert summary.mass_org_events == 0
+
+
+def test_forced_contingency_org_events_counted_separately(db, service):
+    """
+    Reproduce el caso real de agosto: contingencia FORZADA a nivel organización (esquema B).
+    2 eventos ON + 2 eventos OFF, affected_workstations=2 c/u, workstation_id=None →
+    - forced_org_activations == 2 (los ON scope=organization)
+    - forced_deactivations == 2 (los OFF)
+    - forced_affected_ws_total == 4 (2 + 2 de los ON)
+    - deactivations_in_cycle == 2 (solo forzadas OFF; no hay salidas por-equipo)
+    - activations_in_cycle == 0 y active_at_cutoff == 0 (NO confundir con el esquema A).
+    """
+    org = _make_org(db, "Org Forzada Agosto")
+    base = _CYCLE_START + timedelta(days=5)
+
+    # 2 ON / 2 OFF intercalados, affected=2 cada ON.
+    _make_forced_toggle(
+        db, org, forced=True, scope="organization",
+        affected_workstations=2, created_at=base,
+    )
+    _make_forced_toggle(
+        db, org, forced=False, scope="organization",
+        affected_workstations=2, created_at=base + timedelta(hours=1),
+    )
+    _make_forced_toggle(
+        db, org, forced=True, scope="organization",
+        affected_workstations=2, created_at=base + timedelta(hours=2),
+    )
+    _make_forced_toggle(
+        db, org, forced=False, scope="organization",
+        affected_workstations=2, created_at=base + timedelta(hours=3),
+    )
+
+    closure = _make_closure(db, org)
+    summary = service.build_contingency_summary(db, org, closure)
+
+    assert summary.data_available is True
+    # Métricas forzadas (esquema B).
+    assert summary.forced_org_activations == 2
+    assert summary.forced_vlan_activations == 0
+    assert summary.forced_deactivations == 2
+    assert summary.forced_affected_ws_total == 4
+    assert summary.deactivations_in_cycle == 2
+    # CLAVE: no se contaminan las métricas por-equipo (esquema A).
+    assert summary.activations_in_cycle == 0
+    assert summary.distinct_ws_activated == 0
+    assert summary.active_at_cutoff == 0
+    assert summary.mass_vlan_events == 0
+    assert summary.mass_org_events == 0
+
+
+def test_forced_contingency_vlan_events_counted_separately(db, service):
+    """
+    Contingencia FORZADA a nivel VLAN/agencia (esquema B, scope="vlan") →
+    forced_vlan_activations cuenta los ON; forced_org_activations queda en 0.
+    """
+    org = _make_org(db, "Org Forzada VLAN")
+    base = _CYCLE_START + timedelta(days=6)
+
+    _make_forced_toggle(
+        db, org, forced=True, scope="vlan",
+        affected_workstations=3, created_at=base,
+    )
+    _make_forced_toggle(
+        db, org, forced=True, scope="vlan",
+        affected_workstations=5, created_at=base + timedelta(hours=1),
+    )
+    _make_forced_toggle(
+        db, org, forced=False, scope="vlan",
+        affected_workstations=0, created_at=base + timedelta(hours=2),
+    )
+
+    closure = _make_closure(db, org)
+    summary = service.build_contingency_summary(db, org, closure)
+
+    assert summary.data_available is True
+    assert summary.forced_vlan_activations == 2
+    assert summary.forced_org_activations == 0
+    assert summary.forced_deactivations == 1
+    assert summary.forced_affected_ws_total == 8  # 3 + 5
+    assert summary.deactivations_in_cycle == 1
+    # Sin contaminación del esquema A.
+    assert summary.activations_in_cycle == 0
+    assert summary.active_at_cutoff == 0
+
+
+def test_forced_events_do_not_pollute_schema_a_metrics(db, service):
+    """
+    Con eventos por-equipo (esquema A) Y forzados (esquema B) en el MISMO ciclo, cada conjunto
+    de métricas se computa por separado: los forzados NO incrementan activations_in_cycle /
+    mass_* del esquema A, y las salidas por-equipo se suman a deactivations_in_cycle junto con
+    las forzadas OFF.
+    """
+    org = _make_org(db, "Org Mixta")
+    vlan = _make_vlan(db, org, "VLAN Mixta")
+    ws1 = _make_ws(db, org, vlan)
+    ws2 = _make_ws(db, org, vlan)
+    # WS extra sin toggles: eleva el umbral de "masiva org" (ceil(total_ws * 0.30)) por encima de
+    # las 2 activaciones dispersas, para que la ausencia de masivas sea significativa.
+    for _ in range(8):
+        _make_ws(db, org, vlan)
+
+    base = _CYCLE_START + timedelta(days=7)
+
+    # Esquema A: 2 activaciones true dispersas (fuera de la ventana) + 1 desactivación por-equipo.
+    _make_toggle(db, org, ws1, active=True, created_at=base)
+    _make_toggle(
+        db, org, ws2, active=True,
+        created_at=base + timedelta(minutes=_MASS_WINDOW_MINUTES + 5),
+    )
+    _make_toggle(db, org, ws1, active=False, created_at=base + timedelta(hours=4))
+
+    # Esquema B: 1 ON org (affected=2) + 1 OFF org.
+    _make_forced_toggle(
+        db, org, forced=True, scope="organization",
+        affected_workstations=2, created_at=base + timedelta(hours=1),
+    )
+    _make_forced_toggle(
+        db, org, forced=False, scope="organization",
+        affected_workstations=2, created_at=base + timedelta(hours=5),
+    )
+
+    closure = _make_closure(db, org)
+    summary = service.build_contingency_summary(db, org, closure)
+
+    assert summary.data_available is True
+    # Esquema A intacto: 2 activaciones por-equipo, 2 WS distintas, sin masivas (< umbral).
+    assert summary.activations_in_cycle == 2
+    assert summary.distinct_ws_activated == 2
+    assert summary.mass_vlan_events == 0
+    assert summary.mass_org_events == 0
+    # Esquema B computado por separado.
+    assert summary.forced_org_activations == 1
+    assert summary.forced_deactivations == 1
+    assert summary.forced_affected_ws_total == 2
+    # SALIDAS totales: 1 por-equipo (esquema A false) + 1 forzada OFF = 2.
+    assert summary.deactivations_in_cycle == 2
+
+
+def test_new_forced_fields_default_zero_when_empty(db, service):
+    """Una org sin eventos forzados devuelve las nuevas métricas forzadas en 0 (no None)."""
+    org = _make_org(db, "Org Sin Forzadas")
+    closure = _make_closure(db, org)
+
+    summary = service.build_contingency_summary(db, org, closure)
+
+    assert summary.data_available is True
+    assert summary.forced_org_activations == 0
+    assert summary.forced_vlan_activations == 0
+    assert summary.forced_deactivations == 0
+    assert summary.forced_affected_ws_total == 0
+    assert summary.deactivations_in_cycle == 0

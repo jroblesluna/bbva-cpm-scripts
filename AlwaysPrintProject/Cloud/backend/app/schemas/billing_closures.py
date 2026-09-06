@@ -166,9 +166,13 @@ class ContingencySummaryResponse(BaseModel):
     Refleja los campos de `ContingencySummary` del servicio: activaciones y equipos distintos
     que entraron en contingencia durante el ciclo, entradas masivas a nivel de agencia (VLAN) y
     de organizacion, equipos que permanecen en contingencia al cierre (reconstruido point-in-time
-    desde la auditoria) y contingencia forzada vigente (org/VLAN). `data_available` es False
-    cuando el calculo fallo (fail-safe): en ese caso todos los conteos van en 0/False y la
-    generacion del reporte no se bloquea.
+    desde la auditoria) y contingencia forzada vigente (org/VLAN). Ademas, las metricas de
+    contingencia FORZADA manual del ciclo (Org/VLAN): activaciones ON por scope
+    (`forced_org_activations` / `forced_vlan_activations`), desactivaciones forzadas
+    (`forced_deactivations`), equipos afectados acumulados (`forced_affected_ws_total`) y las
+    SALIDAS totales del ciclo (`deactivations_in_cycle` = salidas por-equipo + forzadas OFF).
+    `data_available` es False cuando el calculo fallo (fail-safe): en ese caso todos los conteos
+    van en 0/False y la generacion del reporte no se bloquea.
     """
 
     activations_in_cycle: int
@@ -178,6 +182,13 @@ class ContingencySummaryResponse(BaseModel):
     mass_org_events: int
     forced_vlan_count: int
     forced_org: bool
+    # Métricas de contingencia FORZADA Org/VLAN del ciclo (esquema B). Defaults en 0 por
+    # compatibilidad: un summary fail-safe o clientes viejos no las requieren.
+    forced_org_activations: int = 0
+    forced_vlan_activations: int = 0
+    forced_deactivations: int = 0
+    forced_affected_ws_total: int = 0
+    deactivations_in_cycle: int = 0
     data_available: bool
     mass_vlan_detail: list = []
 
