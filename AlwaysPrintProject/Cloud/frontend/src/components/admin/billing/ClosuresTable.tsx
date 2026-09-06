@@ -12,7 +12,7 @@
  * datos ya vienen filtrados por organización desde el backend / tenant isolation).
  */
 
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { CalendarClock, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -151,65 +151,67 @@ export function ClosuresTable({ organizationId, t, tCommon }: ClosuresTableProps
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       {t('colAmount')}
                     </th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      {tCommon('actions')}
-                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {pageItems.map((closure) => (
-                    <tr
-                      key={closure.id}
-                      className="border-b last:border-b-0 hover:bg-gray-50 cursor-pointer"
-                      onClick={() => setSelectedClosure(closure)}
-                    >
-                      <td className="px-3 py-3 whitespace-nowrap font-medium">
-                        <span className="flex items-center gap-2">
-                          {formatPeriod(closure.period_year, closure.period_month)}
-                          {closure.is_retroactive && (
-                            <Badge variant="outline" className="text-amber-600 border-amber-300">
-                              {t('retroactiveBadge')}
-                            </Badge>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">
-                        {formatDate(closure.cutoff_at)}
-                      </td>
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        <Badge variant="secondary">{t(`mode.${closure.mode}`)}</Badge>
-                      </td>
-                      <td className="px-3 py-3 whitespace-nowrap">{closure.total_billable}</td>
-                      <td className="px-3 py-3 whitespace-nowrap">{closure.total_recycled}</td>
-                      <td className="px-3 py-3 whitespace-nowrap">{closure.total_archived}</td>
-                      <td className="px-3 py-3 whitespace-nowrap font-medium">
-                        {formatAmount(closure.amount)}
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        <div className="flex flex-wrap items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 gap-1"
-                            onClick={(e) => {
-                              // Evita que el click en el botón dispare el onClick de la fila.
-                              e.stopPropagation()
-                              setSelectedClosure(closure)
-                            }}
-                            title={t('viewDetail')}
-                          >
-                            <Eye className="h-4 w-4" />
-                            <span className="hidden lg:inline">{t('viewDetail')}</span>
-                          </Button>
-                          {/* Acciones del reporte PDF: descargar, regenerar (admin) y vista previa. */}
-                          <ClosureReportActions
-                            closure={closure}
-                            isAdmin={canRegenerate}
-                            t={tReport}
-                          />
-                        </div>
-                      </td>
-                    </tr>
+                    <Fragment key={closure.id}>
+                      {/* Fila 1: columnas de datos. Click abre el detalle. */}
+                      <tr
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => setSelectedClosure(closure)}
+                      >
+                        <td className="px-3 pt-3 whitespace-nowrap font-medium">
+                          <span className="flex items-center gap-2">
+                            {formatPeriod(closure.period_year, closure.period_month)}
+                            {closure.is_retroactive && (
+                              <Badge variant="outline" className="text-amber-600 border-amber-300">
+                                {t('retroactiveBadge')}
+                              </Badge>
+                            )}
+                          </span>
+                        </td>
+                        <td className="px-3 pt-3 whitespace-nowrap text-muted-foreground">
+                          {formatDate(closure.cutoff_at)}
+                        </td>
+                        <td className="px-3 pt-3 whitespace-nowrap">
+                          <Badge variant="secondary">{t(`mode.${closure.mode}`)}</Badge>
+                        </td>
+                        <td className="px-3 pt-3 whitespace-nowrap">{closure.total_billable}</td>
+                        <td className="px-3 pt-3 whitespace-nowrap">{closure.total_recycled}</td>
+                        <td className="px-3 pt-3 whitespace-nowrap">{closure.total_archived}</td>
+                        <td className="px-3 pt-3 whitespace-nowrap font-medium">
+                          {formatAmount(closure.amount)}
+                        </td>
+                      </tr>
+                      {/* Fila 2: acciones, a todo el ancho (segunda fila del cierre). */}
+                      <tr className="border-b last:border-b-0 hover:bg-gray-50">
+                        <td colSpan={7} className="px-3 pb-3 pt-1">
+                          <div className="flex flex-wrap items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 gap-1"
+                              onClick={(e) => {
+                                // Evita que el click dispare la navegación de la fila de datos.
+                                e.stopPropagation()
+                                setSelectedClosure(closure)
+                              }}
+                              title={t('viewDetail')}
+                            >
+                              <Eye className="h-4 w-4" />
+                              <span className="hidden lg:inline">{t('viewDetail')}</span>
+                            </Button>
+                            {/* Acciones del reporte PDF: descargar, regenerar (admin) y vista previa. */}
+                            <ClosureReportActions
+                              closure={closure}
+                              isAdmin={canRegenerate}
+                              t={tReport}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
