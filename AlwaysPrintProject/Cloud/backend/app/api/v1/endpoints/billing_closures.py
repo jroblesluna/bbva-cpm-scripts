@@ -39,6 +39,8 @@ from app.schemas.billing_closures import (
     ClosureHeaderResponse,
     ClosureItemResponse,
     ClosureItemsPage,
+    ClosureReportDataResponse,
+    ClosureReportUrlResponse,
     RetroactiveCloseResponse,
 )
 from app.services.billing_close_service import (
@@ -46,10 +48,17 @@ from app.services.billing_close_service import (
     BillingSequenceError,
     billing_close_service,
 )
+from app.services.closure_report_service import (
+    ClosureReportError,
+    ClosureReportService,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Servicio sin estado del Reporte de Cierre Mensual (PDF + caché S3 + análisis IA).
+closure_report_service = ClosureReportService()
 
 
 def _get_org_or_404(db: Session, org_id: UUID) -> Organization:
@@ -61,6 +70,19 @@ def _get_org_or_404(db: Session, org_id: UUID) -> Organization:
             detail=f"Organización con ID {org_id} no encontrada",
         )
     return organization
+
+
+def _get_closure_or_404(db: Session, closure_id: UUID) -> BillingClosure:
+    """Obtiene el cierre por ID o lanza 404 (base para resolver su tenant scope)."""
+    closure = (
+        db.query(BillingClosure).filter(BillingClosure.id == closure_id).first()
+    )
+    if closure is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Cierre con ID {closure_id} no encontrado",
+        )
+    return closure
 
 
 def _assert_org_scope(current_user: User, org_id: UUID) -> None:
@@ -252,4 +274,205 @@ def close_retroactive(
         closed=True,
         detail=f"Cierre retroactivo generado para {year}-{month:02d}.",
         closure=closure,
+    )
+
+# ── Reporte de Cierre Mensual (PDF + análisis IA) ────────────────────────────
+#
+# Sustento formal de la factura. El PDF se genera/sirve desde caché S3 con una key
+# determinista por cierre; el análisis IA se cachea (fail-safe) en la tabla auxiliar
+# `billing_closure_reports`. Los endpoints reutilizan EXACTAMENTE los mismos guards de
+# permisos que el resto del archivo: `require_operator_or_admin` + `_assert_org_scope`
+# (tenant isolation, Req 11.3). El cierre y sus items se tratan como SOLO LECTURA.
+
+
+@router.get(
+    "/closures/{closure_id}/report",
+    response_model=ClosureReportUrlResponse,
+    summary="Obtener (o generar) el PDF del reporte de cierre y su presigned URL (admin/operador)",
+)
+async def get_closure_report(
+    closure_id: UUID,
+    download_filename: str | None = Query(
+        None, description="Nombre sugerido de descarga del PDF (opcional)"
+    ),
+    current_user: User = Depends(require_operator_or_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Genera (o sirve desde caché) el PDF del reporte de cierre y devuelve su presigned URL
+    (Req 1.1, 1.4, 1.5, 6.3, 8.1-8.7).
+
+    Flujo:
+    1. Resuelve el cierre (404 si no existe) y valida el tenant scope con `_assert_org_scope`
+       (un operador solo su organización; el superadministrador cualquiera — mismo criterio que
+       `list_closure_items`).
+    2. Ejecuta `generate_or_get(regenerate=False)`: cache-hit si el PDF ya existe en S3, o pipeline
+       completo (serie histórica → IA fail-safe → gráficos → PDF → upload) en cache-miss.
+    3. Confirma la transacción (persiste metadata del análisis IA / artefacto) y genera la presigned
+       URL de descarga (SigV4 regional, expira en 3600s).
+
+    El fallo del LLM NO es error: se refleja en `ai_analysis_available=False` (fail-safe, Req 5.4).
+
+    Errores:
+        403: operador consultando un cierre de otra organización.
+        404: el cierre no existe.
+        502/500: fallo de S3 al generar/servir el artefacto o su presigned URL.
+    """
+    closure = _get_closure_or_404(db, closure_id)
+    _assert_org_scope(current_user, closure.organization_id)
+    organization = _get_org_or_404(db, closure.organization_id)
+
+    try:
+        s3_key, ai_available, cached = await closure_report_service.generate_or_get(
+            db, closure, organization, regenerate=False
+        )
+        db.commit()
+        report_url = closure_report_service.generate_presigned_url(
+            s3_key, download_filename=download_filename
+        )
+    except ClosureReportError as exc:
+        # Fallo controlado de S3/pipeline: fail-closed, no dejar artefacto parcial servible.
+        db.rollback()
+        logger.error(
+            "Fallo al generar el reporte de cierre %s: %s", closure_id, exc
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"No se pudo generar el reporte de cierre: {exc}",
+        )
+    except Exception as exc:
+        db.rollback()
+        logger.exception(
+            "Error inesperado generando el reporte de cierre %s", closure_id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error inesperado generando el reporte de cierre: {exc}",
+        )
+
+    return ClosureReportUrlResponse(
+        report_url=report_url,
+        expires_in_seconds=3600,
+        cached=cached,
+        ai_analysis_available=ai_available,
+    )
+
+
+@router.post(
+    "/closures/{closure_id}/report/regenerate",
+    response_model=ClosureReportUrlResponse,
+    summary="Regenerar análisis IA y PDF del reporte, sobre-escribiendo la caché (admin/superadmin)",
+)
+async def regenerate_closure_report(
+    closure_id: UUID,
+    download_filename: str | None = Query(
+        None, description="Nombre sugerido de descarga del PDF (opcional)"
+    ),
+    current_user: User = Depends(require_operator_or_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Recomputa el análisis IA y el PDF, sobre-escribiendo el artefacto cacheado (Req 1.1, 6.3, 6.4,
+    6.5, 8.1-8.7).
+
+    Autorización: superadministrador (`UserRole.ADMIN`, acceso global) siempre; un operador solo
+    puede regenerar el reporte de un cierre de SU propia organización. Se implementa con el mismo
+    patrón del archivo — `require_operator_or_admin` + `_assert_org_scope` —: `_assert_org_scope`
+    bloquea (403) a un operador de otra organización, y el superadministrador pasa para cualquiera.
+
+    Ejecuta `generate_or_get(regenerate=True)`: recomputa el análisis IA, sobre-escribe `ai_analysis`
+    en `billing_closure_reports`, re-renderiza gráficos, regenera el PDF y sobre-escribe la misma
+    S3 key. La respuesta siempre tiene `cached=False`.
+
+    Errores:
+        403: operador regenerando un cierre de otra organización.
+        404: el cierre no existe.
+        502/500: fallo de S3 al regenerar el artefacto o su presigned URL.
+    """
+    closure = _get_closure_or_404(db, closure_id)
+    _assert_org_scope(current_user, closure.organization_id)
+    organization = _get_org_or_404(db, closure.organization_id)
+
+    try:
+        s3_key, ai_available, cached = await closure_report_service.generate_or_get(
+            db, closure, organization, regenerate=True
+        )
+        db.commit()
+        report_url = closure_report_service.generate_presigned_url(
+            s3_key, download_filename=download_filename
+        )
+    except ClosureReportError as exc:
+        db.rollback()
+        logger.error(
+            "Fallo al regenerar el reporte de cierre %s: %s", closure_id, exc
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"No se pudo regenerar el reporte de cierre: {exc}",
+        )
+    except Exception as exc:
+        db.rollback()
+        logger.exception(
+            "Error inesperado regenerando el reporte de cierre %s", closure_id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error inesperado regenerando el reporte de cierre: {exc}",
+        )
+
+    logger.info(
+        "Reporte de cierre regenerado: closure=%s, org=%s, por user=%s",
+        closure_id,
+        closure.organization_id,
+        current_user.id,
+    )
+    return ClosureReportUrlResponse(
+        report_url=report_url,
+        expires_in_seconds=3600,
+        cached=False,  # regenerar siempre (re)genera el artefacto (nunca cache-hit)
+        ai_analysis_available=ai_available,
+    )
+
+
+@router.get(
+    "/closures/{closure_id}/report-data",
+    response_model=ClosureReportDataResponse,
+    summary="Datos estructurados del reporte para vista previa en la UI (admin/operador)",
+)
+def get_closure_report_data(
+    closure_id: UUID,
+    current_user: User = Depends(require_operator_or_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Devuelve los datos estructurados del reporte (cabecera, tramos, serie histórica y análisis IA
+    si existe) para renderizar la vista previa en la UI sin descargar el PDF (Req 8.7, 11.5).
+
+    Tenant isolation: resuelve el cierre (404 si no existe) y valida el scope con `_assert_org_scope`
+    (un operador solo su organización; el superadministrador cualquiera). Es de SOLO LECTURA: no
+    genera el PDF ni invoca el LLM; solo lee la serie histórica y el `ai_analysis` ya cacheado (si
+    lo hay). `currency`/`taxes_included` reflejan la declaración obligatoria de precios en USD sin
+    impuestos.
+
+    Errores:
+        403: operador consultando un cierre de otra organización.
+        404: el cierre no existe.
+    """
+    closure = _get_closure_or_404(db, closure_id)
+    _assert_org_scope(current_user, closure.organization_id)
+    organization = _get_org_or_404(db, closure.organization_id)
+
+    history = closure_report_service.build_history_series(db, organization)
+
+    # Análisis IA ya persistido (si existe); esta ruta NO invoca el LLM (solo lectura).
+    report_row = closure_report_service.get_report_row(db, closure)
+    ai_analysis = report_row.ai_analysis if report_row is not None else None
+
+    return ClosureReportDataResponse(
+        header=ClosureHeaderResponse.model_validate(closure),
+        tiers_applied=closure.tiers_applied,
+        history=history,
+        ai_analysis=ai_analysis,
+        currency="USD",
+        taxes_included=False,
     )

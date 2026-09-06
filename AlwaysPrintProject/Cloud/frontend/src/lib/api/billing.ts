@@ -34,6 +34,8 @@ import type {
   BulkDeleteReport,
   ClosureHeader,
   ClosureItemsPage,
+  ClosureReportData,
+  ClosureReportUrlResponse,
   OrgModeResponse,
   OrgPlan,
   OrgPlanUpsert,
@@ -156,6 +158,61 @@ export async function closeRetroactive(
 ): Promise<RetroactiveCloseResponse> {
   const response = await apiClient.post<RetroactiveCloseResponse>(
     `/billing/organizations/${orgId}/closures/retroactive`
+  )
+  return response.data
+}
+
+// ── Reporte de Cierre Mensual (PDF) ──────────────────────────────────────────
+
+/**
+ * Obtiene (o genera si no existe) el reporte PDF de un cierre y devuelve su presigned URL.
+ * GET /billing/closures/{closure_id}/report (admin/operador de su org).
+ *
+ * Sirve desde caché S3 si el artefacto ya existe (`cached=true`). El fallo del análisis IA
+ * no es error (fail-safe): el PDF se genera igual con `ai_analysis_available=false`.
+ *
+ * @param closureId - ID del cierre.
+ */
+export async function getClosureReport(
+  closureId: string
+): Promise<ClosureReportUrlResponse> {
+  const response = await apiClient.get<ClosureReportUrlResponse>(
+    `/billing/closures/${closureId}/report`
+  )
+  return response.data
+}
+
+/**
+ * Regenera el análisis IA y el PDF del cierre, sobre-escribiendo el artefacto cacheado.
+ * POST /billing/closures/{closure_id}/report/regenerate (solo superadmin o admin de la org).
+ *
+ * Siempre recomputa: la respuesta trae `cached=false`.
+ *
+ * @param closureId - ID del cierre.
+ */
+export async function regenerateClosureReport(
+  closureId: string
+): Promise<ClosureReportUrlResponse> {
+  const response = await apiClient.post<ClosureReportUrlResponse>(
+    `/billing/closures/${closureId}/report/regenerate`
+  )
+  return response.data
+}
+
+/**
+ * Devuelve los datos estructurados del reporte para la vista previa en pantalla (recharts).
+ * GET /billing/closures/{closure_id}/report-data (admin/operador de su org).
+ *
+ * Incluye cabecera, desglose de tramos, serie histórica y el texto de IA si existe
+ * (`ai_analysis = null` bajo fail-safe).
+ *
+ * @param closureId - ID del cierre.
+ */
+export async function getClosureReportData(
+  closureId: string
+): Promise<ClosureReportData> {
+  const response = await apiClient.get<ClosureReportData>(
+    `/billing/closures/${closureId}/report-data`
   )
   return response.data
 }

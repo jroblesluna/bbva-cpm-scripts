@@ -7,6 +7,7 @@ Este módulo define las tablas que sustentan la facturación por IP privada regi
 - BillingClosure: cabecera de cierre mensual (una por organización/año/mes).
 - BillingClosureItem: detalle por IP de un cierre (sustento inmutable).
 - BillingAnnualSubscription: suscripción anual y su liquidación informativa.
+- BillingClosureReport: artefacto derivado (análisis IA + PDF cacheado) 1:1 por cierre.
 
 Todas las tablas están aisladas por organización (tenant isolation) mediante organization_id.
 Se reutiliza el tipo GUID definido en app.models.organization para compatibilidad
@@ -24,6 +25,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     JSON,
+    Text,
     UniqueConstraint,
 )
 
@@ -202,4 +204,48 @@ class BillingAnnualSubscription(Base):
         return (
             f"<BillingAnnualSubscription(id={self.id}, "
             f"organization_id={self.organization_id}, status={self.status})>"
+        )
+
+
+class BillingClosureReport(Base):
+    """
+    Artefacto derivado del cierre (análisis IA + PDF cacheado), 1:1 con el cierre.
+
+    Se modela como tabla auxiliar (no como columnas sobre billing_closures) para NO
+    contaminar el sustento inmutable de la factura con datos derivados/mutables: el
+    análisis IA puede regenerarse y el PDF puede recomputarse. Regenerar hace UPDATE/UPSERT
+    aquí, nunca sobre el cierre (evita reescrituras/locks sobre la tabla de facturación).
+
+    El UniqueConstraint sobre closure_id garantiza la relación 1:1 y la FK ON DELETE CASCADE
+    asegura que borrar el cierre padre elimine su reporte. organization_id se desnormaliza
+    (indexado) para tenant isolation y tareas de limpieza. ai_analysis NULL significa que la
+    IA no está disponible (fail-safe): un fallo del LLM nunca bloquea la generación del PDF.
+    """
+    __tablename__ = "billing_closure_reports"
+
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    closure_id = Column(
+        GUID,
+        ForeignKey("billing_closures.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,  # relación 1:1 con el cierre
+    )
+    organization_id = Column(
+        GUID,
+        nullable=False,
+        index=True,  # desnormalizado para tenant isolation / limpieza
+    )
+    ai_analysis = Column(Text, nullable=True)  # NULL = IA no disponible (fail-safe)
+    ai_model = Column(String(100), nullable=True)  # id del modelo LLM usado (bedrock/openai)
+    ai_generated_at = Column(DateTime, nullable=True)
+    pdf_s3_key = Column(String(512), nullable=True)  # key determinista cacheada
+    pdf_generated_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return (
+            f"<BillingClosureReport(id={self.id}, closure_id={self.closure_id}, "
+            f"organization_id={self.organization_id})>"
         )
