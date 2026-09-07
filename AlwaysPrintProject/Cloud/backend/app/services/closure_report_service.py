@@ -1825,6 +1825,115 @@ def _quantize_half_up(value: Decimal, exp: Decimal) -> Decimal:
     return value.quantize(exp, rounding=ROUND_HALF_UP)
 
 
+def _fmt_money(value: object) -> str:
+    """
+    Formatea un importe SIEMPRE con exactamente 2 decimales (presentación).
+
+    Reutiliza `_to_decimal` para parsear de forma tolerante y `_quantize_half_up` con
+    `_HEADER_QUANTIZE` (half-up a 2 decimales), replicando el redondeo de la cabecera. Ante
+    cualquier valor no parseable devuelve "0.00" (fail-safe). NO altera valores usados en la
+    reconciliación: es solo formateo de presentación (ej. 0.5 -> "0.50", 228.8 -> "228.80").
+    """
+    try:
+        return str(_quantize_half_up(_to_decimal(value), _HEADER_QUANTIZE))
+    except Exception:
+        return "0.00"
+
+
+def _fmt_closure_date(header, org) -> str:
+    """
+    Devuelve la "Fecha de cierre" como el primer instante del mes SIGUIENTE al periodo.
+
+    El cierre corresponde al periodo `header.period_year`/`header.period_month`; la fecha de
+    cierre es el día 1 del mes siguiente a las 00:00 hora LOCAL de la organizacion (no se
+    convierte desde UTC: los 00:00 ya son hora local). La tz se resuelve igual que en
+    `_summarize_contingency`: `header.timezone -> org.timezone -> "UTC"` (aqui el `header` ES
+    el closure). Formato de salida: `YYYY-MM-DD HH:MM (<tz_name>)`, p.ej.
+    `2026-06-01 00:00 (America/Lima)`.
+
+    Fail-safe: ante cualquier excepción devuelve el periodo siguiente en UTC sin romper.
+    """
+    try:
+        year = int(getattr(header, "period_year"))
+        month = int(getattr(header, "period_month"))
+        if month == 12:
+            next_year, next_month = year + 1, 1
+        else:
+            next_year, next_month = year, month + 1
+
+        tz_name = (
+            getattr(header, "timezone", None)
+            or getattr(org, "timezone", None)
+            or "UTC"
+        )
+        # Validar que la tz exista (fail-safe → "UTC" si es inválida o ausente).
+        try:
+            from zoneinfo import ZoneInfo
+
+            ZoneInfo(tz_name)
+        except Exception:
+            tz_name = "UTC"
+
+        # Instante naive en hora local de la org (00:00 del mes siguiente). NO se convierte
+        # desde UTC: los 00:00 ya representan hora local de la organizacion.
+        closure_dt = datetime(next_year, next_month, 1, 0, 0, 0)
+        return f"{closure_dt.strftime('%Y-%m-%d %H:%M')} ({tz_name})"
+    except Exception:
+        # Fallback duro: intenta al menos el periodo siguiente en UTC.
+        try:
+            year = int(getattr(header, "period_year"))
+            month = int(getattr(header, "period_month"))
+            if month == 12:
+                next_year, next_month = year + 1, 1
+            else:
+                next_year, next_month = year, month + 1
+            return f"{next_year:04d}-{next_month:02d}-01 00:00 (UTC)"
+        except Exception:
+            return "-"
+
+
+def _split_bold_segments(text: str) -> list:
+    """
+    Segmenta `text` en pares (fragmento, es_negrita) alternando por marcadores `**`.
+
+    Enfoque mínimo sin dependencias: divide por `**` y marca en negrita los segmentos en
+    posición impar (los que quedan ENTRE pares de `**`). Garantiza que ningún fragmento de
+    salida contiene `**`. Ejemplos:
+      - "1. **Resumen ejecutivo:**" -> [("1. ", False), ("Resumen ejecutivo:", True)]
+      - "sin negrita"               -> [("sin negrita", False)]
+      - "a **b** c **d**"           -> [("a ", False), ("b", True), (" c ", False), ("d", True)]
+
+    Los segmentos vacíos se descartan. Si hay un número impar de `**` (marcador sin cerrar),
+    el resto se trata como texto normal para no perder contenido.
+    """
+    if not text:
+        return []
+    parts = text.split("**")
+    segments = []
+    for index, part in enumerate(parts):
+        if part == "":
+            continue
+        is_bold = index % 2 == 1
+        segments.append((part, is_bold))
+    return segments
+
+
+def _render_inline_md(pdf, text, width, height, base_size=11) -> None:
+    """
+    Renderiza una línea con negrita inline `**...**` usando `pdf.write` (fpdf2).
+
+    Segmenta con `_split_bold_segments` y pinta cada fragmento cambiando la fuente a "B" para
+    los segmentos en negrita y "" para el resto, todo en la misma línea; termina con un salto
+    de línea (`ln`). Así ningún `**` queda como texto literal en el PDF. Restaura la fuente
+    normal al final.
+    """
+    for fragment, is_bold in _split_bold_segments(text):
+        pdf.set_font("Helvetica", "B" if is_bold else "", base_size)
+        pdf.write(height, fragment)
+    pdf.set_font("Helvetica", "", base_size)
+    pdf.ln(height)
+
+
 class ReconciliationResult:
     """
     Resultado de la validación de reconciliación de montos.
@@ -2292,7 +2401,7 @@ def compose_pdf(
         f"Periodo: {_fmt_period(header)}",
         f"Modalidad: {header.mode}",
         f"Tipo de cierre: {tipo_cierre}",
-        f"Generacion: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        f"Fecha de cierre: {_fmt_closure_date(header, org)}",
     ]
     for line in datos_lines:
         pdf.set_x(meta_left_x)
@@ -2308,7 +2417,7 @@ def compose_pdf(
         f"Estaciones facturables: {header.total_billable}",
         f"Estaciones recicladas: {header.total_recycled}",
         f"Estaciones archivadas: {header.total_archived}",
-        f"Monto total: USD {reconciliation.header_amount}",
+        f"Monto total: USD {_fmt_money(reconciliation.header_amount)}",
         f"Tipo de cierre: {tipo_cierre}",
     ]
     for line in resumen_lines:
@@ -2455,9 +2564,9 @@ def compose_pdf(
             row = [
                 str(tier_from if tier_from is not None else "-"),
                 str(tier_to if tier_to is not None else "+"),
-                str(rate),
+                _fmt_money(rate),
                 str(ips_in_tier),
-                str(subtotal),
+                _fmt_money(subtotal),
             ]
             # Zebra striping suave: filas impares con fill gris #f1f5f9.
             if row_index % 2 == 1:
@@ -2486,7 +2595,7 @@ def compose_pdf(
     pdf.set_fill_color(226, 232, 240)  # #e2e8f0 (azul/gris suave para destacar el total)
     pdf.set_x(info_right_x)
     pdf.cell(sum(tbl_col_widths[:4]), 6, _sanitize_latin1("Total"), border=1, align="R", fill=True)
-    pdf.cell(tbl_col_widths[4], 6, _sanitize_latin1(f"USD {reconciliation.header_amount}"), border=1, align="C", fill=True)
+    pdf.cell(tbl_col_widths[4], 6, _sanitize_latin1(f"USD {_fmt_money(reconciliation.header_amount)}"), border=1, align="C", fill=True)
     pdf.ln(6)
     right_info_bottom_y = pdf.get_y()
 
@@ -2778,30 +2887,49 @@ def compose_pdf(
         # replicando el estilo de `debugging_analysis._generate_pdf`.
         pdf.set_font("Helvetica", "", 11)
         pdf.set_text_color(0, 0, 0)
+        import re as _re
+
+        # Detecta líneas numeradas tipo "1. ..." para tratarlas como subtítulo (pequeño ln antes).
+        _numbered_re = _re.compile(r"^\d+\.\s+")
         for raw_line in analysis.split("\n"):
             line = _sanitize_latin1(raw_line)
             pdf.set_x(pdf.l_margin)
-            if line.startswith("## "):
-                pdf.ln(3)
-                pdf.set_font("Helvetica", "B", 13)
-                pdf.multi_cell(effective_width, 6, line[3:])
-                pdf.set_font("Helvetica", "", 11)
-            elif line.startswith("### "):
+            if line.startswith("### "):
+                # H3 (se evalúa antes que "## " / "# " por ser prefijo más largo).
                 pdf.ln(2)
                 pdf.set_font("Helvetica", "B", 11)
                 pdf.multi_cell(effective_width, 6, line[4:])
                 pdf.set_font("Helvetica", "", 11)
+            elif line.startswith("## "):
+                pdf.ln(3)
+                pdf.set_font("Helvetica", "B", 13)
+                pdf.multi_cell(effective_width, 6, line[3:])
+                pdf.set_font("Helvetica", "", 11)
+            elif line.startswith("# "):
+                # H1 (tamaño B 14). Va tras "### "/"## " para no capturarlas por error.
+                pdf.ln(3)
+                pdf.set_font("Helvetica", "B", 14)
+                pdf.multi_cell(effective_width, 6, line[2:])
+                pdf.set_font("Helvetica", "", 11)
             elif line.startswith("**") and line.endswith("**") and len(line) > 4:
+                # Encabezado completo en negrita (comportamiento previo, sin asteriscos literales).
                 pdf.set_font("Helvetica", "B", 11)
                 pdf.multi_cell(effective_width, 6, line.strip("*"))
                 pdf.set_font("Helvetica", "", 11)
             elif line.startswith("- ") or line.startswith("* "):
+                # Viñeta: renderiza el contenido con soporte de negrita inline `**...**`.
                 pdf.set_x(pdf.l_margin + 4)
-                pdf.multi_cell(effective_width - 4, 5, f"- {line[2:]}")
+                _render_inline_md(pdf, f"- {line[2:]}", effective_width - 4, 5, base_size=11)
             elif line.strip() == "":
                 pdf.ln(3)
             else:
-                pdf.multi_cell(effective_width, 5, line)
+                # Línea numerada ("N. ...") → pequeño ln antes para tratarla como subtítulo.
+                if _numbered_re.match(line):
+                    pdf.ln(1)
+                # CUALQUIER línea restante (incluida numerada) se renderiza con negrita inline
+                # para que ningún `**...**` quede como texto literal en el PDF.
+                pdf.set_x(pdf.l_margin)
+                _render_inline_md(pdf, line, effective_width, 5, base_size=11)
 
     # (La nota USD sin impuestos —sección 8, Req 3.7— se dibuja al pie de la PÁGINA 1, no aquí.)
     # Sección 9 (footer de copyright) se dibuja automáticamente en cada página vía footer().
