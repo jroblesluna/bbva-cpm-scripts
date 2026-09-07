@@ -2259,6 +2259,17 @@ def compose_pdf(
                 f"(c) {year} Inversiones On Line S.A.C. - Todos los derechos reservados",
                 align="C",
             )
+            # Logo Robles.AI abajo a la DERECHA en TODAS las páginas (pegado al margen derecho,
+            # cerca del pie). No se solapa con el copyright centrado porque ocupa el extremo
+            # derecho. Fail-safe: si el asset no está o no se puede incrustar, no rompe el PDF.
+            robles_path = getattr(self, "report_robles_logo_path", None)
+            if robles_path:
+                try:
+                    _rw = 22.0
+                    # Abajo a la derecha: x = ancho pagina - margen der - ancho logo; y cerca del pie.
+                    self.image(robles_path, x=self.w - self.r_margin - _rw, y=self.h - 16, w=_rw)
+                except Exception:
+                    pass
 
     pdf = ClosureReportPDF()
     # Márgenes: la banda del header mide 16mm; top margin 24mm deja 8mm de aire para que el
@@ -2273,6 +2284,9 @@ def compose_pdf(
     pdf.report_org_name = _org_name_hdr
     pdf.report_period = _fmt_period(header)
     pdf.report_logo_path = alwaysprint_logo if os.path.exists(alwaysprint_logo) else None
+    # Ruta del logo Robles.AI que consume footer() para dibujarlo abajo a la derecha en TODAS
+    # las páginas (setear ANTES del primer add_page, igual que report_logo_path).
+    pdf.report_robles_logo_path = robles_logo if os.path.exists(robles_logo) else None
 
     pdf.add_page()
     effective_width = pdf.w - pdf.l_margin - pdf.r_margin
@@ -2341,39 +2355,44 @@ def compose_pdf(
     # empieza debajo (logo en y=24, título en y=44) para no solaparse con la banda. El logo mini
     # de AlwaysPrint ya va en la banda del header → NO se repite grande en la portada.
     # ==================================================================================
-    # Logo IOL (Inversiones On Line) arriba a la IZQUIERDA, a la MISMA altura y ancho que el
-    # logo Robles.AI de la derecha (IOL izquierda, Robles.AI derecha).
+    # Logo IOL (Inversiones On Line) arriba a la IZQUIERDA, ~20% más grande (w=42, antes 35).
+    # El logo Robles.AI YA NO va en la portada: ahora se dibuja en footer() abajo a la derecha.
     if os.path.exists(iol_logo):
         try:
-            pdf.image(iol_logo, x=pdf.l_margin, y=24.0, w=35.0)
+            pdf.image(iol_logo, x=pdf.l_margin, y=24.0, w=42.0)
         except Exception:
             # Fail-safe: si el asset no se puede incrustar, no romper la generacion del PDF.
             pass
-    if os.path.exists(robles_logo):
-        # Logo Robles.AI a la derecha (x=155..190, w=35) + subtítulo "Division de Automatizacion"
-        # JUSTO DEBAJO del logo, alineado a la izquierda del mismo (a la altura de la "R").
-        _robles_logo_y = 24.0
-        _robles_logo_w = 35.0
-        pdf.image(robles_logo, x=155, y=_robles_logo_y, w=_robles_logo_w)
-        # Altura real del logo Robles.AI para pegar el subtítulo justo debajo (aspect ratio del PNG).
-        try:
-            with open(robles_logo, "rb") as _f:
-                _robles_h = _png_height_for_width(_f.read(), _robles_logo_w)
-        except Exception:
-            _robles_h = _robles_logo_w * (1.0 / 3.0)  # fallback aproximado
-        pdf.set_font("Helvetica", "I", 6.5)
-        pdf.set_text_color(100, 100, 100)
-        pdf.set_xy(155, _robles_logo_y + _robles_h + 1)
-        pdf.cell(40, 3, _sanitize_latin1("Division de Automatizacion"), align="L")
-    else:
-        # Fallback textual si no está el asset.
-        pdf.set_font("Helvetica", "B", 9)
-        pdf.set_text_color(100, 100, 100)
-        pdf.set_xy(130, 26)
-        pdf.cell(70, 4, "Robles.AI", align="R")
 
-    # Título centrado (debajo de los logos de portada).
-    pdf.set_xy(10, 44)
+    # Bloque de datos de contacto a la DERECHA del logo IOL (logo ocupa x=15..57 con w=42; el
+    # texto arranca en x≈60 = l_margin + 44). Todos los textos pasan por _sanitize_latin1 para
+    # quedar Latin-1 safe. "Peru" sin tilde a propósito para máxima seguridad de encoding.
+    _iol_text_x = pdf.l_margin + 44  # ≈ 59
+    _iol_text_w = 120.0  # ancho suficiente para no truncar teléfonos ni URL
+    # L1: razón social (negrita, negro).
+    pdf.set_xy(_iol_text_x, 26.0)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(_iol_text_w, 5, _sanitize_latin1("Inversiones On Line S.A.C."), align="L")
+    # L2: dirección (gris oscuro).
+    pdf.set_xy(_iol_text_x, 31.0)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(60, 60, 60)
+    pdf.cell(_iol_text_w, 5, _sanitize_latin1("Calle Cuarenta 190 - San Isidro - Lima - Peru"), align="L")
+    # L3: teléfonos (gris oscuro).
+    pdf.set_xy(_iol_text_x, 36.0)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(60, 60, 60)
+    pdf.cell(_iol_text_w, 5, _sanitize_latin1("+1 (408) 590-0153 / +1 (669) 300-2772"), align="L")
+    # L4: URL en azul (simula enlace).
+    pdf.set_xy(_iol_text_x, 41.0)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(37, 99, 235)  # #2563eb
+    pdf.cell(_iol_text_w, 5, _sanitize_latin1("https://sistemas.com.pe"), align="L")
+
+    # Título centrado: bajado a y=56 para quedar DEBAJO del logo IOL (más grande) y del bloque
+    # de contacto (que termina en ~y=46). Antes estaba en y=44 y se solapaba.
+    pdf.set_xy(10, 56)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(0, 10, _sanitize_latin1("Reporte de Cierre Mensual - Detalle de Servicios Prestados"), ln=True, align="C")
