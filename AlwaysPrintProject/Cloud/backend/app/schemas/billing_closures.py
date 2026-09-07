@@ -171,7 +171,10 @@ class ContingencySummaryResponse(BaseModel):
     - Nivel agencia/VLAN: ingresos/salidas (`vlan_entries`/`vlan_exits`) y tiempo de proteccion
       agregado (`vlan_protection_seconds`).
     - Nivel workstation: ingresos/salidas (`ws_entries`/`ws_exits`) e intervenciones emparejadas
-      entrada->salida (`ws_interventions` = acciones/tickets ahorrados a la Mesa de Ayuda).
+      entrada->salida separadas por esquema: `ws_auto_interventions` (esquema A, auto-proteccion:
+      AHORRAN un ticket a la Mesa de Ayuda) y `ws_remote_interventions` (esquema B scope=workstation,
+      remotas manuales ejecutadas desde el panel: NO ahorran una accion, FACILITAN la atencion sin
+      desplazamiento presencial).
     - Estado vigente y magnitud: contingencia forzada actual (`forced_org_now` /
       `forced_vlan_count_now`) y equipos afectados en la mayor intervencion del ciclo
       (`max_affected_ws`, maximo real, no suma).
@@ -195,7 +198,8 @@ class ContingencySummaryResponse(BaseModel):
     # Nivel workstation.
     ws_entries: int = 0
     ws_exits: int = 0
-    ws_interventions: int = 0
+    ws_auto_interventions: int = 0
+    ws_remote_interventions: int = 0
     # Estado vigente + magnitud real.
     forced_org_now: bool = False
     forced_vlan_count_now: int = 0

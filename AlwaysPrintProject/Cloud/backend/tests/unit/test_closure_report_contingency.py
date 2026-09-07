@@ -10,9 +10,11 @@ alimentan el prompt IA, el PDF (tabla) y el endpoint report-data del Reporte de 
    timestamps de entrada YA convertidos a la tz de la org.
 2. Nivel VLAN/AGENCIA (scope=vlan): `vlan_entries`/`vlan_exits` cuentan ON/OFF; el tiempo de
    protección se calcula por VLAN (agrupando por `entity_id`) y se suma.
-3. Nivel WORKSTATION: esquema A (`contingency_active`) y esquema B (scope=workstation) mezclados;
-   `ws_interventions` cuenta las intervenciones EMPAREJADAS entrada→salida (tickets ahorrados);
-   un ON sin OFF suma a `ws_entries` pero NO a `ws_interventions`.
+3. Nivel WORKSTATION: `ws_entries`/`ws_exits` mezclan esquema A (`contingency_active`) y esquema B
+   (scope=workstation); las intervenciones EMPAREJADAS entrada→salida se SEPARAN por esquema:
+   `ws_auto_interventions` (esquema A, auto-proteccion: AHORRAN un ticket) y `ws_remote_interventions`
+   (esquema B scope=workstation, remotas manuales: FACILITAN la atencion sin visita presencial).
+   Un ON sin OFF suma a `ws_entries` pero NO a las intervenciones emparejadas.
 4. `max_affected_ws` es el MÁXIMO de affected_workstations entre los ON forzados (no la suma).
 5. Timezone: el formateo de `org_entry_datetimes` respeta la tz de la org.
 6. Fail-safe: ante una excepción → `data_available=False` y ceros; org vacía → ceros con
@@ -334,7 +336,8 @@ def test_ws_interventions_paired_only(db, service):
     assert summary.data_available is True
     assert summary.ws_entries == 2  # 2 ON
     assert summary.ws_exits == 1    # 1 OFF
-    assert summary.ws_interventions == 1  # solo el par ON→OFF cuenta
+    assert summary.ws_auto_interventions == 1  # solo el par ON→OFF (esquema A) cuenta
+    assert summary.ws_remote_interventions == 0  # no hubo esquema B scope=workstation
 
 
 def test_ws_scheme_b_workstation_scope_counts(db, service):
@@ -354,7 +357,36 @@ def test_ws_scheme_b_workstation_scope_counts(db, service):
 
     assert summary.ws_entries == 1
     assert summary.ws_exits == 1
-    assert summary.ws_interventions == 1
+    assert summary.ws_remote_interventions == 1  # esquema B scope=workstation (remota manual)
+    assert summary.ws_auto_interventions == 0    # no hubo esquema A
+
+
+def test_ws_auto_and_remote_separated(db, service):
+    """
+    Mismo ciclo: un ws con esquema A ON→OFF (1 auto) y otro equipo con esquema B scope=workstation
+    ON→OFF (1 remota). Se separan en ws_auto_interventions / ws_remote_interventions; ws_entries y
+    ws_exits siguen sumando AMBOS esquemas.
+    """
+    org = _make_org(db, "Org WS Mixta")
+    vlan = _make_vlan(db, org, "VLAN Mixta")
+    ws_auto = _make_ws(db, org, vlan)
+    ws_remote_id = uuid.uuid4()
+    base = _CYCLE_START + timedelta(days=7)
+
+    # Esquema A (auto-proteccion): ON→OFF.
+    _make_toggle(db, org, ws_auto, active=True, created_at=base)
+    _make_toggle(db, org, ws_auto, active=False, created_at=base + timedelta(hours=1))
+    # Esquema B scope=workstation (remota manual): ON→OFF.
+    _make_forced_toggle(db, org, forced=True, scope="workstation", affected_workstations=1, created_at=base + timedelta(hours=2), workstation_id=ws_remote_id)
+    _make_forced_toggle(db, org, forced=False, scope="workstation", affected_workstations=1, created_at=base + timedelta(hours=3), workstation_id=ws_remote_id)
+
+    closure = _make_closure(db, org)
+    summary = service.build_contingency_summary(db, org, closure)
+
+    assert summary.ws_auto_interventions == 1
+    assert summary.ws_remote_interventions == 1
+    assert summary.ws_entries == 2  # 1 esquema A ON + 1 esquema B ON
+    assert summary.ws_exits == 2    # 1 esquema A OFF + 1 esquema B OFF
 
 
 # === max_affected_ws ===
@@ -427,7 +459,8 @@ def test_fail_safe_returns_zeros_and_data_available_false(db, service, monkeypat
     assert summary.org_entries == 0
     assert summary.org_protection_seconds == 0
     assert summary.vlan_entries == 0
-    assert summary.ws_interventions == 0
+    assert summary.ws_auto_interventions == 0
+    assert summary.ws_remote_interventions == 0
     assert summary.max_affected_ws == 0
 
 
@@ -445,7 +478,8 @@ def test_empty_org_returns_zeros_with_data_available_true(db, service):
     assert summary.vlan_entries == 0
     assert summary.vlan_protection_seconds == 0
     assert summary.ws_entries == 0
-    assert summary.ws_interventions == 0
+    assert summary.ws_auto_interventions == 0
+    assert summary.ws_remote_interventions == 0
     assert summary.forced_org_now is False
     assert summary.forced_vlan_count_now == 0
     assert summary.max_affected_ws == 0
@@ -481,7 +515,8 @@ def test_to_dict_has_exact_new_fields(db, service):
         "vlan_protection_seconds",
         "ws_entries",
         "ws_exits",
-        "ws_interventions",
+        "ws_auto_interventions",
+        "ws_remote_interventions",
         "forced_org_now",
         "forced_vlan_count_now",
         "max_affected_ws",
@@ -532,7 +567,8 @@ def test_compose_pdf_smoke_with_contingency_data():
         vlan_protection_seconds=7200,
         ws_entries=4,
         ws_exits=4,
-        ws_interventions=4,
+        ws_auto_interventions=2,
+        ws_remote_interventions=2,
         forced_org_now=True,
         forced_vlan_count_now=2,
         max_affected_ws=5382,

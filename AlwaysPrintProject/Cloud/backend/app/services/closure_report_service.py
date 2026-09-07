@@ -104,9 +104,16 @@ class ContingencySummary:
         --- Nivel WORKSTATION (scope=workstation forzado, esquema B) + esquema A por-equipo ---
         ws_entries: ON scope=workstation forzados + activaciones esquema A (contingency_active=true).
         ws_exits: OFF scope=workstation forzados + desactivaciones esquema A (contingency_active=false).
-        ws_interventions: intervenciones EMPAREJADAS entrada→salida a nivel workstation
-            ("tickets/acciones ahorrados" a la Mesa de Ayuda); un ON sin OFF NO cuenta como
-            intervención completada (ver `_count_paired_interventions`).
+        ws_auto_interventions: intervenciones EMPAREJADAS entrada→salida del esquema A
+            (auto-proteccion local del cliente: la workstation entró/salió de contingencia
+            AUTOMÁTICAMENTE). Estas SÍ AHORRAN un ticket/acción manual a la Mesa de Ayuda
+            (el equipo se auto-protegió sin intervención). Un ON sin OFF NO cuenta
+            (ver `_count_paired_interventions`).
+        ws_remote_interventions: intervenciones EMPAREJADAS entrada→salida del esquema B
+            scope=workstation (un operador FORZÓ contingencia REMOTA sobre el equipo desde el
+            panel, source=manual_endpoint). NO ahorran una acción manual: SON la acción, pero
+            ejecutada de forma remota, evitando el desplazamiento presencial (FACILITAN/agilizan
+            la atención). Un ON sin OFF NO cuenta (ver `_count_paired_interventions`).
 
         --- Estado vigente + magnitud real ---
         forced_org_now: org.forced_contingency vigente (estado actual).
@@ -132,7 +139,8 @@ class ContingencySummary:
         # Nivel workstation.
         ws_entries: int = 0,
         ws_exits: int = 0,
-        ws_interventions: int = 0,
+        ws_auto_interventions: int = 0,
+        ws_remote_interventions: int = 0,
         # Estado vigente + magnitud real.
         forced_org_now: bool = False,
         forced_vlan_count_now: int = 0,
@@ -151,7 +159,8 @@ class ContingencySummary:
         self.vlan_protection_seconds = vlan_protection_seconds
         self.ws_entries = ws_entries
         self.ws_exits = ws_exits
-        self.ws_interventions = ws_interventions
+        self.ws_auto_interventions = ws_auto_interventions
+        self.ws_remote_interventions = ws_remote_interventions
         self.forced_org_now = forced_org_now
         self.forced_vlan_count_now = forced_vlan_count_now
         self.max_affected_ws = max_affected_ws
@@ -170,7 +179,8 @@ class ContingencySummary:
             "vlan_protection_seconds": self.vlan_protection_seconds,
             "ws_entries": self.ws_entries,
             "ws_exits": self.ws_exits,
-            "ws_interventions": self.ws_interventions,
+            "ws_auto_interventions": self.ws_auto_interventions,
+            "ws_remote_interventions": self.ws_remote_interventions,
             "forced_org_now": self.forced_org_now,
             "forced_vlan_count_now": self.forced_vlan_count_now,
             "max_affected_ws": self.max_affected_ws,
@@ -285,8 +295,11 @@ class ClosureReportService:
         - Nivel workstation: `ws_entries`/`ws_exits` mezclan los ON/OFF scope=workstation forzados
           (esquema B, agrupados por `entity_id`/`workstation_id`) con las activaciones/
           desactivaciones esquema A (`contingency_active` true/false, agrupadas por `workstation_id`).
-          `ws_interventions` cuenta las intervenciones EMPAREJADAS entrada→salida por equipo
-          (`_count_paired_interventions`) = acciones/tickets ahorrados a la Mesa de Ayuda.
+          Las intervenciones EMPAREJADAS entrada→salida (`_count_paired_interventions`) se separan
+          por esquema en DOS acumuladores distintos: `ws_auto_events_by_id` (solo esquema A,
+          auto-proteccion → `ws_auto_interventions`, AHORRAN un ticket) y `ws_remote_events_by_id`
+          (solo esquema B scope=workstation, remotas manuales → `ws_remote_interventions`, SON la
+          acción pero ejecutada remotamente, FACILITAN la atención sin visita presencial).
         - `max_affected_ws` = máximo `affected_workstations` entre los ON forzados del ciclo
           (magnitud real de la mayor intervención; NO la suma → evita el doble conteo previo).
         - `forced_org_now` / `forced_vlan_count_now`: estado vigente de contingencia forzada.
@@ -352,7 +365,9 @@ class ClosureReportService:
 
             ws_entries = 0
             ws_exits = 0
-            ws_events_by_id = {}  # equipo_id -> list[(created_at, is_on)] (esquema A y B ws)
+            # Separación por esquema para el pairing de intervenciones (entries/exits siguen sumando ambos).
+            ws_auto_events_by_id = {}    # esquema A (key = workstation_id): auto-proteccion, AHORRAN ticket
+            ws_remote_events_by_id = {}  # esquema B scope=workstation (key = workstation_id or entity_id): remotas
 
             max_affected_ws = 0
 
@@ -395,32 +410,33 @@ class ClosureReportService:
                                 (log.created_at, False)
                             )
                     elif scope == "workstation":
-                        # Forzada a nivel workstation: agrupar por workstation_id si viene,
-                        # si no por entity_id (id del equipo afectado).
+                        # Forzada REMOTA a nivel workstation (esquema B): agrupar por workstation_id
+                        # si viene, si no por entity_id (id del equipo afectado). Estas SON acciones
+                        # de la Mesa de Ayuda ejecutadas remotamente (NO ahorran un ticket).
                         ws_key = log.workstation_id or log.entity_id
                         if is_on:
                             ws_entries += 1
-                            ws_events_by_id.setdefault(ws_key, []).append(
+                            ws_remote_events_by_id.setdefault(ws_key, []).append(
                                 (log.created_at, True)
                             )
                         elif is_off:
                             ws_exits += 1
-                            ws_events_by_id.setdefault(ws_key, []).append(
+                            ws_remote_events_by_id.setdefault(ws_key, []).append(
                                 (log.created_at, False)
                             )
                     continue  # una fila del esquema B NUNCA cuenta como toggle por-equipo esquema A
 
-                # --- Esquema A: toggle automático por-workstation ---
+                # --- Esquema A: toggle automático por-workstation (auto-proteccion, AHORRAN ticket) ---
                 if "contingency_active" in nv:
                     ws_key = log.workstation_id
                     if nv.get("contingency_active") is True:
                         ws_entries += 1
-                        ws_events_by_id.setdefault(ws_key, []).append(
+                        ws_auto_events_by_id.setdefault(ws_key, []).append(
                             (log.created_at, True)
                         )
                     elif nv.get("contingency_active") is False:
                         ws_exits += 1
-                        ws_events_by_id.setdefault(ws_key, []).append(
+                        ws_auto_events_by_id.setdefault(ws_key, []).append(
                             (log.created_at, False)
                         )
 
@@ -436,10 +452,17 @@ class ClosureReportService:
                     events, cycle_start, cutoff
                 )
 
-            # --- Intervenciones workstation EMPAREJADAS (tickets ahorrados) ---
-            ws_interventions = 0
-            for _ws_key, events in ws_events_by_id.items():
-                ws_interventions += self._count_paired_interventions(events)
+            # --- Intervenciones workstation EMPAREJADAS, separadas por esquema ---
+            # Esquema A (auto-proteccion): AHORRAN un ticket a la Mesa de Ayuda.
+            ws_auto_interventions = sum(
+                self._count_paired_interventions(ev)
+                for ev in ws_auto_events_by_id.values()
+            )
+            # Esquema B scope=workstation (remotas manuales): FACILITAN atencion sin visita presencial.
+            ws_remote_interventions = sum(
+                self._count_paired_interventions(ev)
+                for ev in ws_remote_events_by_id.values()
+            )
 
             # --- Contingencia forzada vigente (estado actual) ---
             forced_vlan_count_now = (
@@ -464,7 +487,8 @@ class ClosureReportService:
                 vlan_protection_seconds=vlan_protection_seconds,
                 ws_entries=ws_entries,
                 ws_exits=ws_exits,
-                ws_interventions=ws_interventions,
+                ws_auto_interventions=ws_auto_interventions,
+                ws_remote_interventions=ws_remote_interventions,
                 forced_org_now=forced_org_now,
                 forced_vlan_count_now=forced_vlan_count_now,
                 max_affected_ws=max_affected_ws,
@@ -686,8 +710,10 @@ class ClosureReportService:
                 f"- Ingresos a contingencia a nivel agencia/VLAN: {contingency.vlan_entries}\n"
                 f"- Salidas de contingencia a nivel agencia/VLAN: {contingency.vlan_exits}\n"
                 f"- Tiempo de proteccion a nivel agencia/VLAN: {vlan_protection_hours} horas\n"
-                f"- Intervenciones automatizadas a nivel workstation (entrada->salida emparejadas): "
-                f"{contingency.ws_interventions}\n"
+                f"- Intervenciones AUTOMATIZADAS a nivel workstation (auto-proteccion, evitan/ahorran "
+                f"un ticket a la Mesa de Ayuda): {contingency.ws_auto_interventions}\n"
+                f"- Intervenciones REMOTAS a nivel workstation (ejecutadas por la Mesa de Ayuda desde "
+                f"el panel, sin desplazamiento presencial): {contingency.ws_remote_interventions}\n"
                 f"- Equipos afectados en la mayor intervencion: {contingency.max_affected_ws}\n"
                 f"- Contingencia forzada vigente: organizacion={contingency.forced_org_now}, "
                 f"VLANs={contingency.forced_vlan_count_now}"
@@ -697,13 +723,17 @@ class ClosureReportService:
         observaciones_extra = ""
         if contingency is not None and contingency.data_available:
             observaciones_extra = (
-                " En las observaciones ESTIMA e indica EXPLICITAMENTE las ACCIONES y TICKETS "
-                "AHORRADOS a la Mesa de Ayuda (o al operador) gracias a la entrada y salida de "
-                "contingencia automatizada y masiva: cada intervencion workstation emparejada y "
-                "cada intervencion masiva a nivel organizacion o agencia/VLAN evita trabajo manual "
-                "(un ticket/accion por equipo intervenido que ya no requiere atencion presencial o "
-                "remota). Comenta ademas el valor del tiempo de proteccion a nivel organizacion "
-                "(cuanto tiempo estuvo el servicio de impresion resguardado por la contingencia)."
+                " En las observaciones DISTINGUE CLARAMENTE dos tipos de intervencion a nivel "
+                "workstation, con semantica distinta: (a) las intervenciones AUTOMATIZADAS "
+                "(esquema de auto-proteccion) AHORRAN un ticket/accion a la Mesa de Ayuda porque el "
+                "equipo se auto-protegio SIN intervencion humana; ESTIMA e indica EXPLICITAMENTE los "
+                "tickets/acciones ahorrados con estas. (b) Las intervenciones REMOTAS son acciones "
+                "que la Mesa de Ayuda SI ejecuto, pero de forma REMOTA desde el panel, evitando el "
+                "desplazamiento presencial; NO las cuentes como tickets ahorrados sino como atencion "
+                "remota eficiente: describe el BENEFICIO OPERATIVO (resolucion sin visita presencial, "
+                "menor tiempo de atencion). Comenta ademas el valor del tiempo de proteccion a nivel "
+                "organizacion (cuanto tiempo estuvo el servicio de impresion resguardado por la "
+                "contingencia)."
             )
         sections.append(
             "## Solicitud\n"
@@ -1985,8 +2015,12 @@ def compose_pdf(
                 _fmt_hm(contingency.vlan_protection_seconds),
             ),
             (
-                "Intervenciones automatizadas a nivel Workstation (evitan accion manual)",
-                str(contingency.ws_interventions),
+                "Intervenciones automatizadas a nivel Workstation (auto-proteccion, ahorran ticket)",
+                str(contingency.ws_auto_interventions),
+            ),
+            (
+                "Intervenciones remotas a nivel Workstation (ejecutadas por Mesa de Ayuda, sin visita presencial)",
+                str(contingency.ws_remote_interventions),
             ),
             (
                 "Equipos afectados en la mayor intervencion",
