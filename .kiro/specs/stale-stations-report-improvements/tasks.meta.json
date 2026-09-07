@@ -1,0 +1,505 @@
+{
+  "pbtResults": {
+    "2.6 Property test: `total` y paginación consistentes con el filtro": {
+      "status": "passed",
+      "lastRunTimestamp": 1788782192867
+    },
+    "2.4 Property test: el ordenamiento no altera el conjunto filtrado": {
+      "status": "passed",
+      "lastRunTimestamp": 1788782335977
+    }
+  },
+  "executionHistory": {
+    "1.1 Añadir `last_seen: datetime` a `WorkstationResponse`": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495021
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781504412
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781592068
+      }
+    ],
+    "1.2 Escribir prueba de ejemplo: `last_seen` presente en cada item": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495064
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781598610
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781854833
+      }
+    ],
+    "2.1 Definir los Enums `StaleSortBy` y `StaleSortDir`": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495091
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781599528
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781855839
+      }
+    ],
+    "2.2 Agregar params `sort_by`/`sort_dir`, mapeo de columnas y `order_by` antes de paginar": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495120
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781859705
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781991386
+      }
+    ],
+    "2.3 Escribir pruebas de ejemplo de ordenamiento y filtros": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495166
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781996103
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782631641
+      }
+    ],
+    "2.4 Property test: el ordenamiento no altera el conjunto filtrado": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495196
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781997055
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782632930
+      }
+    ],
+    "2.5 Property test: `dias_inactiva` DESC ≡ `last_seen` ASC": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495222
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781998468
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782634326
+      }
+    ],
+    "2.6 Property test: `total` y paginación consistentes con el filtro": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495248
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781999856
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782635728
+      }
+    ],
+    "2.7 Property test: aislamiento por inquilino bajo cualquier orden": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495276
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782000802
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782636643
+      }
+    ],
+    "3. Checkpoint - Backend": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495305
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782646615
+      }
+    ],
+    "4.1 Añadir `last_seen: string` a la interfaz `Workstation`": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495334
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781505366
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781593359
+      }
+    ],
+    "4.2 Añadir `sort_by`/`sort_dir` opcionales a `workstationsApi.listStale`": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495360
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781506624
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781594424
+      }
+    ],
+    "5.1 Corregir \"Días inactiva\" y \"Última conexión\" para usar `last_seen`": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495388
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782647648
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782764821
+      }
+    ],
+    "5.2 Añadir `formatDateTimeInOrgTz` y aplicar fecha+hora en zona de la organización": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495416
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782769216
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782864923
+      }
+    ],
+    "5.3 Implementar estado y control de ordenamiento server-side": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495449
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782865948
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782964832
+      }
+    ],
+    "5.4 Hacer clicables los encabezados de tabla con indicador de dirección": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495483
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782965771
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783111610
+      }
+    ],
+    "5.5 Corregir paginación tapada por el FAB de info": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495528
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782971253
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783113071
+      }
+    ],
+    "5.6 Resaltado crítico de estaciones ≥ 180 días": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495556
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782972675
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783114459
+      }
+    ],
+    "5.7 Tooltip/ayuda para \"Actividad mínima (horas)\" y tipado estricto": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495583
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782973618
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783115401
+      }
+    ],
+    "6.1 Agregar claves en `es.json` y `en.json`": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495613
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783119420
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783211840
+      }
+    ],
+    "7.1 Pruebas de \"Días inactiva\" y \"Última conexión\"": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495644
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783216738
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783637740
+      }
+    ],
+    "7.2 Prueba de formateo en zona horaria de la organización": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495672
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783217712
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783639130
+      }
+    ],
+    "7.3 Pruebas de ordenamiento e indicador de columna activa": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495699
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783219103
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783634146
+      }
+    ],
+    "7.4 Prueba de paginación no tapada por el FAB": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495724
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783220086
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783635383
+      }
+    ],
+    "7.5 Prueba de resaltado crítico y de i18n/tipado": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495754
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783221361
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783636764
+      }
+    ],
+    "7.6 Property test: `formatDateTimeInOrgTz` idempotente por zona": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495783
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783640309
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783792600
+      }
+    ],
+    "8. Checkpoint final": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781495812
+      },
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783864369
+      }
+    ],
+    "4. Exponer `last_seen` en el frontend (tipo y API client)": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781594464
+      }
+    ],
+    "1. Exponer `last_seen` en el schema de respuesta del backend": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788781854877
+      }
+    ],
+    "2. Añadir ordenamiento server-side al endpoint `list_stale_workstations`": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788782636712
+      }
+    ],
+    "5. Actualizar `StaleWorkstationsSection` (datos, formateo, sort, UI)": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783115436
+      }
+    ],
+    "6. Añadir claves i18n nuevas (namespace `config`)": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783211869
+      }
+    ],
+    "7. Pruebas de frontend": [
+      {
+        "executionId": "c39be574-bc17-45ac-9181-367f774403d1",
+        "chatSessionId": "sess_ce427328-040c-41fb-9a88-144020c8351a",
+        "timestamp": 1788783792634
+      }
+    ]
+  }
+}

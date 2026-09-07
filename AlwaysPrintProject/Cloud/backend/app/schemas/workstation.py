@@ -115,6 +115,11 @@ class WorkstationResponse(BaseModel):
     first_seen: datetime
     created_at: datetime
     updated_at: datetime
+    # Columna real de última actividad (migración 036, NOT NULL). Se expone de forma
+    # aditiva para que el frontend calcule los días de inactividad y muestre la última
+    # conexión real, sin caer a updated_at (que refleja cualquier cambio de registro).
+    # Poblado automáticamente vía from_attributes desde Workstation.last_seen.
+    last_seen: datetime
     cidr: Optional[str] = Field(None, description="CIDR de la subred reportado por la workstation")
     tray_version: Optional[str] = Field(None, description="Versión del AlwaysPrintTray instalado")
     action_config_name: Optional[str] = Field(None, description="Nombre de la action config activa")
