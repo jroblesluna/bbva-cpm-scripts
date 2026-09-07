@@ -2097,9 +2097,17 @@ def compose_pdf(
                 self.set_xy(self.w - 100 - 8, 5)
                 self.cell(100, 6, _sanitize_latin1(right_txt), align="R")
 
-            # Restaurar color de texto para el contenido del cuerpo. NO reposicionar el cursor:
-            # fpdf2 lo coloca en el top margin tras header(), así el cuerpo no se solapa con la banda.
+            # Restaurar color de texto para el contenido del cuerpo.
             self.set_text_color(0, 0, 0)
+
+            # ANCLA ANTI-SOLAPAMIENTO: dejar el cursor SIEMPRE en el top margin al terminar el
+            # header. fpdf2 invoca header() al inicio de CADA página, incluidas las que crea el
+            # AUTO PAGE BREAK cuando un multi_cell desborda (3ra, 4ta, N-ésima). En esas páginas
+            # el flujo puede reanudarse en una `y` que cae DENTRO de la banda (16mm), solapando el
+            # texto con la banda azul. Anclar aquí (top margin 24mm >= banda 16mm, 8mm de holgura)
+            # garantiza que TODA página, manual o automática, reanude el cuerpo debajo de la banda.
+            self.set_y(self.t_margin)
+            self.set_x(self.l_margin)
 
         def footer(self) -> None:
             self.set_y(-15)
