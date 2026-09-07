@@ -41,6 +41,8 @@ const workstationArb: fc.Arbitrary<Workstation> = fc.record({
   first_seen: fc.constant('2024-01-01T00:00:00Z'),
   created_at: fc.constant('2024-01-01T00:00:00Z'),
   updated_at: fc.constant('2024-01-01T00:00:00Z'),
+  // Columna real de actividad (migración 036, NOT NULL) ahora requerida por el tipo Workstation
+  last_seen: fc.constant('2024-01-01T00:00:00Z'),
   cidr: fc.option(fc.constant('192.168.1.0/24'), { nil: null }),
   tray_version: fc.option(fc.string({ minLength: 1, maxLength: 10 }), { nil: null }),
   action_config_name: fc.constant(null as string | null),

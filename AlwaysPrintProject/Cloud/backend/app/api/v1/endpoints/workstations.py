@@ -15,6 +15,7 @@ import asyncio
 import logging
 import uuid
 from datetime import date
+from enum import Enum
 from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
@@ -55,6 +56,28 @@ from app.services.websocket_manager import connection_manager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+# === ENUMS DE ORDENAMIENTO PARA ESTACIONES INACTIVAS ===
+# Definidos a nivel de módulo para poder usarse como defaults de Query en
+# el endpoint list_stale_workstations (ordenamiento server-side).
+
+
+class StaleSortBy(str, Enum):
+    """Columnas por las que se puede ordenar el reporte de estaciones inactivas."""
+    ip = "ip"
+    hostname = "hostname"
+    current_user = "current_user"
+    organizacion = "organizacion"
+    created_at = "created_at"
+    last_seen = "last_seen"
+    dias_inactiva = "dias_inactiva"
+
+
+class StaleSortDir(str, Enum):
+    """Dirección de ordenamiento: ascendente o descendente."""
+    asc = "asc"
+    desc = "desc"
 
 
 # === SCHEMAS PARA COMANDOS REMOTOS ===
@@ -1592,6 +1615,8 @@ def list_stale_workstations(
     organization_id: Optional[UUID] = Query(None, description="Filtrar por organización (solo Admin)"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
+    sort_by: StaleSortBy = Query(StaleSortBy.last_seen, description="Columna de ordenamiento"),
+    sort_dir: StaleSortDir = Query(StaleSortDir.asc, description="Dirección de ordenamiento"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1606,14 +1631,23 @@ def list_stale_workstations(
 
     Admin: puede ver todas las orgs o filtrar por organization_id.
     Operador: solo ve su propia organización.
+
+    Ordenamiento server-side vía sort_by/sort_dir. El default (last_seen/asc)
+    preserva el comportamiento previo (primero los más tiempo sin conectarse).
     """
     from datetime import datetime, timedelta
     from sqlalchemy import and_, func
+    from sqlalchemy.orm import joinedload
+    from app.models.organization import Organization
 
     stale_threshold = datetime.utcnow() - timedelta(days=days)
     min_active_seconds = min_hours * 3600
 
-    base_query = db.query(Workstation).filter(
+    # Eager-load de la organización para que viaje 'timezone' en cada item y
+    # evitar N+1 al serializar fechas en la zona horaria de la organización.
+    base_query = db.query(Workstation).options(
+        joinedload(Workstation.organization)
+    ).filter(
         and_(
             # Tuvieron actividad real: la diferencia entre last_seen y created_at
             # supera el mínimo de horas configurado.
@@ -1631,10 +1665,41 @@ def list_stale_workstations(
     elif organization_id:
         base_query = base_query.filter(Workstation.organization_id == organization_id)
 
+    # Mapeo de sort_by → columna SQLAlchemy. La ordenación por nombre de
+    # organización requiere un outerjoin explícito a Organization (no excluye
+    # estaciones cuya relación pudiera faltar).
+    sort_columns = {
+        StaleSortBy.ip:            Workstation.ip_private,
+        StaleSortBy.hostname:      Workstation.hostname,
+        StaleSortBy.current_user:  Workstation.current_user,
+        StaleSortBy.organizacion:  Organization.name,      # requiere outerjoin(Organization)
+        StaleSortBy.created_at:    Workstation.created_at,
+        StaleSortBy.last_seen:     Workstation.last_seen,
+        # dias_inactiva no tiene columna física: es una función monótona
+        # decreciente de last_seen (a mayor días inactiva, más antiguo last_seen).
+        # Se ordena por last_seen en dirección INVERTIDA respecto a la solicitada.
+        StaleSortBy.dias_inactiva: Workstation.last_seen,
+    }
+    column = sort_columns[sort_by]
+
+    # Inversión para dias_inactiva: "días DESC" == "last_seen ASC".
+    effective_dir = sort_dir
+    if sort_by == StaleSortBy.dias_inactiva:
+        effective_dir = StaleSortDir.asc if sort_dir == StaleSortDir.desc else StaleSortDir.desc
+
+    order_expr = column.asc() if effective_dir == StaleSortDir.asc else column.desc()
+
+    # Para ordenar por Organization.name se requiere el outerjoin.
+    if sort_by == StaleSortBy.organizacion:
+        base_query = base_query.outerjoin(
+            Organization, Workstation.organization_id == Organization.id
+        )
+
+    # total se calcula sobre el conjunto filtrado (independiente del sort).
     total = base_query.count()
     items = (
         base_query
-        .order_by(Workstation.last_seen.asc())  # primero los más tiempo sin conectarse
+        .order_by(order_expr)  # ordenar ANTES de paginar
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()

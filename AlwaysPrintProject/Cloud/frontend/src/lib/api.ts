@@ -664,8 +664,21 @@ export const workstationsApi = {
     organization_id?: string
     page?: number
     page_size?: number
+    sort_by?: 'ip' | 'hostname' | 'current_user' | 'organizacion' | 'created_at' | 'last_seen' | 'dias_inactiva'
+    sort_dir?: 'asc' | 'desc'
   }): Promise<WorkstationListResponse> => {
-    const response = await apiClient.get<WorkstationListResponse>('/workstations/stale', { params })
+    // Propagar solo los parámetros definidos como query params (evita enviar `undefined`).
+    const queryParams: Record<string, string | number> = {}
+    if (params) {
+      if (params.days !== undefined) queryParams.days = params.days
+      if (params.min_hours !== undefined) queryParams.min_hours = params.min_hours
+      if (params.organization_id !== undefined) queryParams.organization_id = params.organization_id
+      if (params.page !== undefined) queryParams.page = params.page
+      if (params.page_size !== undefined) queryParams.page_size = params.page_size
+      if (params.sort_by !== undefined) queryParams.sort_by = params.sort_by
+      if (params.sort_dir !== undefined) queryParams.sort_dir = params.sort_dir
+    }
+    const response = await apiClient.get<WorkstationListResponse>('/workstations/stale', { params: queryParams })
     return response.data
   },
 

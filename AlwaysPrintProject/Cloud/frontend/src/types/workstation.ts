@@ -28,6 +28,12 @@ export interface Workstation {
   first_seen: string
   created_at: string
   updated_at: string
+  /**
+   * Última vez real que la estación estuvo en línea (columna `last_seen`, migración 036, NOT NULL).
+   * Cadena ISO de fecha-hora. A diferencia de `updated_at` (que cambia con cualquier update de
+   * registro), refleja la actividad real y se usa para calcular "Días inactiva" y "Última conexión".
+   */
+  last_seen: string
   cidr: string | null
   tray_version: string | null
   action_config_name: string | null
