@@ -137,9 +137,6 @@ export function ClosuresTable({ organizationId, t, tCommon }: ClosuresTableProps
                       {t('colCutoff')}
                     </th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      {t('colMode')}
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       {t('colBillable')}
                     </th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -174,9 +171,6 @@ export function ClosuresTable({ organizationId, t, tCommon }: ClosuresTableProps
                         <td className="px-3 pt-3 whitespace-nowrap text-muted-foreground">
                           {formatDate(closure.cutoff_at)}
                         </td>
-                        <td className="px-3 pt-3 whitespace-nowrap">
-                          <Badge variant="secondary">{t(`mode.${closure.mode}`)}</Badge>
-                        </td>
                         <td className="px-3 pt-3 whitespace-nowrap">{closure.total_billable}</td>
                         <td className="px-3 pt-3 whitespace-nowrap">{closure.total_recycled}</td>
                         <td className="px-3 pt-3 whitespace-nowrap">{closure.total_archived}</td>
@@ -186,12 +180,12 @@ export function ClosuresTable({ organizationId, t, tCommon }: ClosuresTableProps
                       </tr>
                       {/* Fila 2: acciones, a todo el ancho (segunda fila del cierre). */}
                       <tr className="border-b last:border-b-0 hover:bg-gray-50">
-                        <td colSpan={7} className="px-3 pb-3 pt-1">
-                          <div className="flex flex-wrap items-center justify-end gap-1">
+                        <td colSpan={6} className="px-3 pb-3 pt-1">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 gap-1"
+                              className="h-7 px-2 gap-1.5"
                               onClick={(e) => {
                                 // Evita que el click dispare la navegación de la fila de datos.
                                 e.stopPropagation()

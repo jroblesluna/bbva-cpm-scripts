@@ -218,12 +218,12 @@ export function ClosureReportActions({ closure, isAdmin, t }: ClosureReportActio
   const period = formatPeriod(closure.period_year, closure.period_month)
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-1">
+    <div className="flex flex-wrap items-center justify-end gap-2">
       {/* Vista previa opcional (recharts). */}
       <Button
         variant="ghost"
         size="sm"
-        className="h-7 gap-1"
+        className="h-7 px-2 gap-1.5"
         onClick={(e) => {
           e.stopPropagation()
           setPreviewOpen(true)
@@ -238,7 +238,7 @@ export function ClosureReportActions({ closure, isAdmin, t }: ClosureReportActio
       <Button
         variant="ghost"
         size="sm"
-        className="h-7 gap-1"
+        className="h-7 px-2 gap-1.5"
         onClick={(e) => {
           e.stopPropagation()
           downloadMutation.mutate()
@@ -261,7 +261,7 @@ export function ClosureReportActions({ closure, isAdmin, t }: ClosureReportActio
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 gap-1"
+          className="h-7 px-2 gap-1.5"
           onClick={(e) => {
             e.stopPropagation()
             setConfirmOpen(true)
