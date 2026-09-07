@@ -630,7 +630,11 @@ class ClosureReportService:
         sections.append(
             "Eres un analista de consumo y facturacion de servicios de impresion corporativa. "
             "Redacta en espanol, con tono profesional y objetivo, sin exagerar hallazgos. "
-            "Todos los precios estan expresados en dolares americanos (USD) y NO incluyen impuestos."
+            "Todos los precios estan expresados en dolares americanos (USD) y NO incluyen impuestos. "
+            "IMPORTANTE: la unidad de facturacion es la ESTACION IP (una IP privada / workstation "
+            "contabilizada), NO impresiones, paginas ni copias. Los tramos de tarifa se aplican "
+            "sobre la CANTIDAD DE ESTACIONES IP facturables del periodo. Nunca describas los tramos "
+            "como impresiones o paginas."
         )
 
         # Modalidad y moneda del cierre objetivo.
@@ -666,7 +670,7 @@ class ClosureReportService:
 
         # Desglose de tramos del mes objetivo (composición del monto).
         sections.append(
-            "## Desglose de tramos del mes objetivo\n" + self._format_tiers(header.tiers_applied)
+            "## Desglose de tramos por estaciones IP del mes objetivo\n" + self._format_tiers(header.tiers_applied)
         )
 
         # Estadísticas de uso de contingencia del ciclo (opcional; solo si hay datos disponibles).
@@ -737,7 +741,8 @@ class ClosureReportService:
             subtotal = tier.get("subtotal")
             rango = f"{tier_from}-{tier_to}" if tier_to is not None else f"{tier_from}+"
             lines.append(
-                f"- Tramo {rango}: tarifa=USD {rate}, IPs={ips_in_tier}, subtotal=USD {subtotal}"
+                f"- Tramo {rango} estaciones IP: tarifa=USD {rate}, "
+                f"estaciones_ip={ips_in_tier}, subtotal=USD {subtotal}"
             )
 
         return "\n".join(lines) if lines else "- (sin tramos aplicados / sin IPs facturables)"
@@ -1267,9 +1272,9 @@ def render_tiers_chart(tiers_applied: list) -> bytes:
     try:
         ax = fig.add_subplot(111)
         bars = ax.bar(labels, values, color="#2563eb")
-        ax.set_title("Composición de IPs facturables por tramo")
-        ax.set_xlabel("Tramo (rango de IPs)")
-        ax.set_ylabel("IPs facturables")
+        ax.set_title("Composición de estaciones IP facturables por tramo")
+        ax.set_xlabel("Tramo (rango de estaciones IP)")
+        ax.set_ylabel("Estaciones IP facturables")
         ax.margins(y=0.15)  # espacio para las anotaciones sobre las barras
 
         # Anotar el valor sobre cada barra.
@@ -1849,7 +1854,8 @@ def compose_pdf(
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(60, 60, 60)
     conceptos = [
-        "Facturable: estacion (IP privada) contabilizada para el cobro del periodo.",
+        "Facturable: estacion (IP privada) contabilizada para el cobro del periodo "
+        "(la unidad de cobro es la estacion IP, no impresiones).",
         "Reciclado: estacion reutilizada dentro del ciclo; no genera cargo adicional.",
         "Archivado: estacion retirada/archivada; se conserva como sustento historico.",
         f"Modalidad aplicada: {header.mode}. Moneda: USD (sin impuestos).",
@@ -1870,10 +1876,10 @@ def compose_pdf(
         info_col_width * 0.16,  # Desde
         info_col_width * 0.16,  # Hasta
         info_col_width * 0.24,  # Tarifa
-        info_col_width * 0.16,  # IPs
+        info_col_width * 0.16,  # Estaciones IP
         info_col_width * 0.28,  # Subtotal
     ]
-    tbl_headers = ["Desde", "Hasta", "Tarifa", "IPs", "Subtotal"]
+    tbl_headers = ["Desde", "Hasta", "Tarifa", "Estaciones", "Subtotal"]
 
     # Cabecera de la tabla.
     pdf.set_xy(info_right_x, info_top_y + 8)
