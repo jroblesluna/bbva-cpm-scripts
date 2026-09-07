@@ -63,106 +63,117 @@ _S3_KEY_PREFIX = "billing-reports"
 # alineado con `debugging.py` y con `ClosureReportUrlResponse.expires_in_seconds`.
 _PRESIGNED_URL_EXPIRES_SECONDS = 3600
 
-# === MÉTRICAS DE CONTINGENCIA (resumen para el reporte de cierre) ===
-# Umbrales para clasificar "entradas masivas" de contingencia dentro del ciclo.
-_MASS_WINDOW_MINUTES = 10   # ventana de tiempo para agrupar activaciones cercanas
-_MASS_MIN_PER_VLAN = 5      # >= N WS distintas de una VLAN en la ventana → masiva por agencia
-_MASS_ORG_PCT = 0.30        # >= 30% de las WS de la org en la ventana → masiva por organización
-
-# Cantidad máxima de eventos masivos por VLAN detallados en el resumen (top N para no inflar
-# el prompt/PDF). El conteo total (`mass_vlan_events`) no está limitado por este tope.
-_MASS_VLAN_DETAIL_TOP = 10
+# === ESTADÍSTICAS DE USO DE CONTINGENCIA (resumen para el reporte de cierre) ===
+# El resumen se orienta a VALOR OPERATIVO: cuántas veces entró/salió la contingencia por nivel
+# (organización, agencia/VLAN, workstation), cuánto tiempo estuvo "protegido" cada nivel y
+# cuántas intervenciones manuales se ahorraron a la Mesa de Ayuda. Ya NO hay algoritmos de
+# "ventana masiva" ni conteos con doble sumatoria: se reemplazan por pairing de intervalos
+# ON→OFF (ver `_pair_protection_intervals` / `_count_paired_interventions`).
 
 
 class ContingencySummary:
     """
-    Resumen de métricas de contingencia del ciclo de cierre (fail-safe, informativo).
+    Estadísticas de uso de contingencia del ciclo de cierre (fail-safe, informativas).
 
-    Es un objeto de resultado simple (sin estado ni efectos secundarios) que agrega las
-    métricas de contingencia reconstruidas desde la auditoría (`audit_logs`) y el estado
-    vigente de contingencia forzada (org/VLAN). Nunca afecta la factura: si algo falla al
-    calcularlo, se devuelve un resumen en ceros con `data_available=False`.
+    Objeto de resultado simple (sin estado ni efectos secundarios) que agrega el uso de
+    contingencia reconstruido desde la auditoría (`audit_logs`) y el estado vigente de
+    contingencia forzada (org/VLAN). Nunca afecta la factura: si algo falla al calcularlo, se
+    devuelve un resumen en ceros con `data_available=False` (fail-safe).
+
+    Distingue dos esquemas de `new_values` del mismo `ActionType.CONTINGENCY_TOGGLE`:
+      A) Automático por-workstation: `{"contingency_active": bool}`, `workstation_id` poblado.
+      B) Forzada manual: `{"forced_contingency": bool, "scope": "organization"|"vlan"|"workstation",
+         "affected_workstations": int, ...}`, `workstation_id` NULL (id de la entidad en `entity_id`).
 
     Atributos:
-        activations_in_cycle: número de activaciones (contingency_active=true) en el ciclo.
-            SOLO cuenta el esquema A (toggle automático por-workstation). Las forzadas Org/VLAN
-            (esquema B) NUNCA suman aquí.
-        distinct_ws_activated: WS distintas que activaron al menos una vez en el ciclo (esquema A).
-        active_at_cutoff: WS en contingencia al cutoff (reconstruido point-in-time desde auditoría,
-            SOLO esquema A con workstation_id NOT NULL). Las forzadas Org/VLAN vigentes al cierre NO
-            se reflejan aquí: se ven en `forced_org` / `forced_vlan_count` (estado actual) y en las
-            métricas de eventos forzados del ciclo (`forced_org_activations`, `forced_vlan_activations`,
-            `forced_affected_ws_total`).
-        mass_vlan_events: número de entradas masivas a nivel VLAN/agencia (algoritmo de ventana
-            por-equipo, esquema A únicamente).
-        mass_vlan_detail: lista de dicts (top eventos) con
-            {"vlan_id": str|None, "count": int, "window_start": iso, "window_end": iso}.
-        mass_org_events: entradas masivas a nivel organización (esquema A únicamente).
-        forced_vlan_count: VLANs con forced_contingency=True vigentes (contingencia forzada manual,
-            estado actual).
-        forced_org: org.forced_contingency vigente (estado actual).
-        forced_org_activations: eventos ON del ciclo con forced_contingency=true y scope=organization
-            (esquema B, contingencia forzada manual a nivel organización).
-        forced_vlan_activations: eventos ON del ciclo con forced_contingency=true y scope=vlan
-            (esquema B, contingencia forzada manual a nivel agencia/VLAN).
-        forced_deactivations: eventos OFF del ciclo con forced_contingency=false (cualquier scope,
-            esquema B).
-        forced_affected_ws_total: suma de affected_workstations de los ON forzados del ciclo (esquema B).
-        deactivations_in_cycle: SALIDAS totales del ciclo = desactivaciones automáticas por-equipo
-            (esquema A, contingency_active=false) + desactivaciones forzadas (esquema B, forced OFF).
-        data_available: True si se pudo consultar la auditoría (para el fail-safe).
+        data_available: True si se pudo consultar la auditoría (fail-safe). False → todo en ceros.
+        timezone: string IANA de la tz usada para formatear timestamps (org/closure, fallback "UTC").
+
+        --- Nivel ORGANIZACIÓN (intervención masiva forzada, scope=organization) ---
+        org_entries: eventos ON forzados scope=organization en el ciclo (entradas a contingencia).
+        org_exits: eventos OFF forzados scope=organization en el ciclo (salidas).
+        org_entry_datetimes: timestamps ISO de cada entrada ON org, YA convertidos a la tz de la org.
+        org_protection_seconds: tiempo total (s) de estadía en contingencia a nivel org en el ciclo
+            (pairing ON→OFF con corte a cycle_start/cutoff; ver `_pair_protection_intervals`).
+
+        --- Nivel VLAN/AGENCIA (scope=vlan) ---
+        vlan_entries: eventos ON forzados scope=vlan en el ciclo.
+        vlan_exits: eventos OFF forzados scope=vlan en el ciclo.
+        vlan_protection_seconds: suma de estadías (s) de TODAS las VLAN (pairing por entity_id).
+
+        --- Nivel WORKSTATION (scope=workstation forzado, esquema B) + esquema A por-equipo ---
+        ws_entries: ON scope=workstation forzados + activaciones esquema A (contingency_active=true).
+        ws_exits: OFF scope=workstation forzados + desactivaciones esquema A (contingency_active=false).
+        ws_interventions: intervenciones EMPAREJADAS entrada→salida a nivel workstation
+            ("tickets/acciones ahorrados" a la Mesa de Ayuda); un ON sin OFF NO cuenta como
+            intervención completada (ver `_count_paired_interventions`).
+
+        --- Estado vigente + magnitud real ---
+        forced_org_now: org.forced_contingency vigente (estado actual).
+        forced_vlan_count_now: VLANs con forced_contingency=True vigentes (estado actual).
+        max_affected_ws: MÁXIMO de affected_workstations entre los ON forzados del ciclo
+            (magnitud real de la mayor intervención, NO la suma → evita el doble conteo previo).
     """
 
     def __init__(
         self,
         *,
-        activations_in_cycle: int = 0,
-        distinct_ws_activated: int = 0,
-        active_at_cutoff: int = 0,
-        mass_vlan_events: int = 0,
-        mass_vlan_detail: Optional[list] = None,
-        mass_org_events: int = 0,
-        forced_vlan_count: int = 0,
-        forced_org: bool = False,
-        forced_org_activations: int = 0,
-        forced_vlan_activations: int = 0,
-        forced_deactivations: int = 0,
-        forced_affected_ws_total: int = 0,
-        deactivations_in_cycle: int = 0,
         data_available: bool = True,
+        timezone: str = "UTC",
+        # Nivel organización.
+        org_entries: int = 0,
+        org_exits: int = 0,
+        org_entry_datetimes: Optional[list] = None,
+        org_protection_seconds: int = 0,
+        # Nivel VLAN/agencia.
+        vlan_entries: int = 0,
+        vlan_exits: int = 0,
+        vlan_protection_seconds: int = 0,
+        # Nivel workstation.
+        ws_entries: int = 0,
+        ws_exits: int = 0,
+        ws_interventions: int = 0,
+        # Estado vigente + magnitud real.
+        forced_org_now: bool = False,
+        forced_vlan_count_now: int = 0,
+        max_affected_ws: int = 0,
     ) -> None:
-        self.activations_in_cycle = activations_in_cycle
-        self.distinct_ws_activated = distinct_ws_activated
-        self.active_at_cutoff = active_at_cutoff
-        self.mass_vlan_events = mass_vlan_events
-        self.mass_vlan_detail = mass_vlan_detail if mass_vlan_detail is not None else []
-        self.mass_org_events = mass_org_events
-        self.forced_vlan_count = forced_vlan_count
-        self.forced_org = forced_org
-        self.forced_org_activations = forced_org_activations
-        self.forced_vlan_activations = forced_vlan_activations
-        self.forced_deactivations = forced_deactivations
-        self.forced_affected_ws_total = forced_affected_ws_total
-        self.deactivations_in_cycle = deactivations_in_cycle
         self.data_available = data_available
+        self.timezone = timezone
+        self.org_entries = org_entries
+        self.org_exits = org_exits
+        self.org_entry_datetimes = (
+            org_entry_datetimes if org_entry_datetimes is not None else []
+        )
+        self.org_protection_seconds = org_protection_seconds
+        self.vlan_entries = vlan_entries
+        self.vlan_exits = vlan_exits
+        self.vlan_protection_seconds = vlan_protection_seconds
+        self.ws_entries = ws_entries
+        self.ws_exits = ws_exits
+        self.ws_interventions = ws_interventions
+        self.forced_org_now = forced_org_now
+        self.forced_vlan_count_now = forced_vlan_count_now
+        self.max_affected_ws = max_affected_ws
 
     def to_dict(self) -> dict:
         """Serializa el resumen a un dict plano (para construir schemas de respuesta)."""
         return {
-            "activations_in_cycle": self.activations_in_cycle,
-            "distinct_ws_activated": self.distinct_ws_activated,
-            "active_at_cutoff": self.active_at_cutoff,
-            "mass_vlan_events": self.mass_vlan_events,
-            "mass_vlan_detail": self.mass_vlan_detail,
-            "mass_org_events": self.mass_org_events,
-            "forced_vlan_count": self.forced_vlan_count,
-            "forced_org": self.forced_org,
-            "forced_org_activations": self.forced_org_activations,
-            "forced_vlan_activations": self.forced_vlan_activations,
-            "forced_deactivations": self.forced_deactivations,
-            "forced_affected_ws_total": self.forced_affected_ws_total,
-            "deactivations_in_cycle": self.deactivations_in_cycle,
             "data_available": self.data_available,
+            "timezone": self.timezone,
+            "org_entries": self.org_entries,
+            "org_exits": self.org_exits,
+            "org_entry_datetimes": self.org_entry_datetimes,
+            "org_protection_seconds": self.org_protection_seconds,
+            "vlan_entries": self.vlan_entries,
+            "vlan_exits": self.vlan_exits,
+            "vlan_protection_seconds": self.vlan_protection_seconds,
+            "ws_entries": self.ws_entries,
+            "ws_exits": self.ws_exits,
+            "ws_interventions": self.ws_interventions,
+            "forced_org_now": self.forced_org_now,
+            "forced_vlan_count_now": self.forced_vlan_count_now,
+            "max_affected_ws": self.max_affected_ws,
         }
 
 
@@ -254,78 +265,69 @@ class ClosureReportService:
         closure: BillingClosure,
     ) -> ContingencySummary:
         """
-        Construye el resumen de métricas de contingencia del ciclo del cierre (fail-safe).
+        Construye las estadísticas de uso de contingencia del ciclo del cierre (fail-safe).
 
         El ciclo es el intervalo `[cycle_start, cutoff)`, donde
         `cycle_start = datetime(period_year, period_month, 1)` (naive UTC, consistente con
-        `AuditLog.created_at`, que se guarda como `datetime.utcnow()`) y `cutoff = closure.cutoff_at`.
+        `AuditLog.created_at`) y `cutoff = closure.cutoff_at` (naive UTC).
 
-        Métricas calculadas:
-        DOS ESQUEMAS de `new_values` en los `CONTINGENCY_TOGGLE` (ambos matchean el mismo
-        `ActionType.CONTINGENCY_TOGGLE`, NO se toca ese filtro):
+        DOS ESQUEMAS de `new_values` del mismo `ActionType.CONTINGENCY_TOGGLE` (NO se toca el filtro):
           A) Automático por-workstation: `{"contingency_active": bool}`, `workstation_id` poblado.
-          B) Forzada manual Org/VLAN: `{"forced_contingency": bool, "scope": "organization"|"vlan",
-             "affected_workstations": int, ...}`, `workstation_id` NULL.
-        Las métricas del esquema A y del esquema B se computan por SEPARADO y NO se mezclan: una
-        fila del esquema B nunca cuenta como activación/desactivación por-equipo (y viceversa).
+          B) Forzada manual: `{"forced_contingency": bool, "scope": "organization"|"vlan"|"workstation",
+             "affected_workstations": int, ...}`, `workstation_id` NULL; la entidad va en `entity_id`.
 
-        - `activations_in_cycle` / `distinct_ws_activated` (SOLO esquema A): sobre los `AuditLog` de
-          tipo `CONTINGENCY_TOGGLE` de la org dentro del ciclo, se cuentan las activaciones
-          (`new_values["contingency_active"] is True`) y las WS distintas que activaron.
-        - Métricas forzadas del ciclo (SOLO esquema B): `forced_org_activations` /
-          `forced_vlan_activations` cuentan los ON (`forced_contingency=true`) por scope;
-          `forced_deactivations` cuenta los OFF (`forced_contingency=false`, cualquier scope);
-          `forced_affected_ws_total` suma los `affected_workstations` de los ON forzados.
-        - `deactivations_in_cycle`: SALIDAS totales del ciclo = desactivaciones por-equipo del
-          esquema A (`contingency_active=false`) + `forced_deactivations` (esquema B OFF).
-        - `active_at_cutoff` (reconstrucción EXACTA point-in-time): para cada WS de la org se
-          toma su ÚLTIMO `CONTINGENCY_TOGGLE` con `created_at < cutoff`; si su
-          `contingency_active` es True, la WS estaba en contingencia al cierre. Se traen todos
-          los toggles de la org (`created_at < cutoff`) ordenados por `(workstation_id, created_at)`
-          y se conserva el último por WS en memoria (evita N queries).
-          `active_at_cutoff` es SOLO sobre el esquema A con `workstation_id NOT NULL` (equipos
-          concretos en contingencia por detección automática al cierre). Las forzadas Org/VLAN
-          vigentes al cierre NO se cuentan aquí: se reflejan en `forced_org` / `forced_vlan_count`
-          (estado actual) y en las métricas de eventos forzados del ciclo.
-          LIMITACIÓN CONOCIDA: por la retención de 12 meses de `audit_logs`
-          (`audit.cleanup_old_logs`), cierres muy antiguos pueden SUBCONTAR este valor si el
-          toggle relevante ya fue purgado. Es una métrica informativa fail-safe: NO afecta la
-          factura.
-        - `mass_vlan_events` / `mass_vlan_detail` / `mass_org_events` (ventana deslizante):
-          se ordenan cronológicamente las activaciones (activated=True) del ciclo. Por VLAN, por
-          cada activación se cuentan las WS DISTINTAS de la MISMA VLAN activadas en la ventana
-          `[t, t + _MASS_WINDOW_MINUTES)`; si el conteo `>= _MASS_MIN_PER_VLAN`, se cuenta 1
-          evento masivo y el cursor de esa VLAN avanza más allá de la ventana (evita
-          solapamientos/doble conteo). El detalle guarda el top `_MASS_VLAN_DETAIL_TOP` por
-          `count`. A nivel org, mismo algoritmo global (todas las VLANs juntas) contra el umbral
-          `ceil(total_ws * _MASS_ORG_PCT)`; si `total_ws == 0`, `mass_org_events = 0`.
-        - `forced_vlan_count` / `forced_org`: VLANs con `forced_contingency=True` y
-          `org.forced_contingency` vigentes al momento de la consulta (contingencia forzada manual).
+        Se calcula por NIVEL (organización / VLAN / workstation) orientado a valor operativo:
+        - Ingresos/salidas (entries/exits) por nivel = conteo de eventos ON/OFF de ese scope.
+        - Tiempo de PROTECCIÓN (protection_seconds) por nivel = pairing de intervalos ON→OFF
+          (`_pair_protection_intervals`), con corte a `cycle_start` (OFF sin ON previo, venía del
+          mes anterior) y a `cutoff` (ON sin OFF al cierre). VLAN se agrupa por `entity_id` y se
+          suma. Nivel org agrupa todos los eventos B scope=organization.
+        - Nivel workstation: `ws_entries`/`ws_exits` mezclan los ON/OFF scope=workstation forzados
+          (esquema B, agrupados por `entity_id`/`workstation_id`) con las activaciones/
+          desactivaciones esquema A (`contingency_active` true/false, agrupadas por `workstation_id`).
+          `ws_interventions` cuenta las intervenciones EMPAREJADAS entrada→salida por equipo
+          (`_count_paired_interventions`) = acciones/tickets ahorrados a la Mesa de Ayuda.
+        - `max_affected_ws` = máximo `affected_workstations` entre los ON forzados del ciclo
+          (magnitud real de la mayor intervención; NO la suma → evita el doble conteo previo).
+        - `forced_org_now` / `forced_vlan_count_now`: estado vigente de contingencia forzada.
+        - `timezone`: se resuelve `closure.timezone or org.timezone or "UTC"` (zoneinfo). Los
+          timestamps de entrada org (`org_entry_datetimes`) se convierten naive-UTC → tz local.
 
         FAIL-SAFE: toda la lógica va en try/except; ante CUALQUIER excepción se registra un
-        warning y se devuelve un `ContingencySummary` en ceros con `data_available=False`. Nunca
-        se propaga: el reporte no debe romperse por las métricas de contingencia.
+        warning y se devuelve un `ContingencySummary(data_available=False)` (ceros). Nunca se
+        propaga: el reporte no debe romperse por estas estadísticas.
         """
-        from datetime import timedelta
+        from zoneinfo import ZoneInfo
 
         from app.models.audit import AuditLog, ActionType
-        from app.models.workstation import Workstation
         from app.models.vlan import VLAN
 
         try:
             cycle_start = datetime(closure.period_year, closure.period_month, 1)
             cutoff = closure.cutoff_at
 
-            # --- Mapa workstation_id -> vlan_id de la org (para agrupar por agencia/VLAN) ---
-            ws_rows = (
-                db.query(Workstation.id, Workstation.vlan_id)
-                .filter(Workstation.organization_id == org.id)
-                .all()
+            # --- Resolver la tz de formateo: closure.timezone -> org.timezone -> "UTC" ---
+            tz_name = (
+                getattr(closure, "timezone", None)
+                or getattr(org, "timezone", None)
+                or "UTC"
             )
-            ws_to_vlan = {row[0]: row[1] for row in ws_rows}
-            total_ws = len(ws_rows)
+            try:
+                tz = ZoneInfo(tz_name)
+            except Exception:
+                # tz inválida → cae a UTC (fail-safe local, no rompe el resumen completo).
+                tz_name = "UTC"
+                tz = ZoneInfo("UTC")
 
-            # --- Activaciones dentro del ciclo [cycle_start, cutoff) ---
+            def _to_local_iso(dt_naive_utc: datetime) -> str:
+                """Convierte un created_at naive-UTC a ISO en la tz resuelta."""
+                return (
+                    dt_naive_utc.replace(tzinfo=ZoneInfo("UTC"))
+                    .astimezone(tz)
+                    .isoformat()
+                )
+
+            # --- Toggles de la org en [cycle_start, cutoff) ordenados asc ---
             cycle_toggles = (
                 db.query(AuditLog)
                 .filter(
@@ -338,122 +340,109 @@ class ClosureReportService:
                 .all()
             )
 
-            # Recorremos las MISMAS filas del ciclo distinguiendo los DOS esquemas de new_values:
-            #  - Esquema A (automático por-workstation): {"contingency_active": bool}. Alimenta
-            #    activations_in_cycle / distinct_ws_activated / mass_* (algoritmo de ventana).
-            #  - Esquema B (forzada manual Org/VLAN): {"forced_contingency": bool, "scope": ...,
-            #    "affected_workstations": int, ...}, con workstation_id NULL. Alimenta las métricas
-            #    forzadas separadas. Una fila de un esquema NO debe contaminar las del otro.
-            activations = []  # (created_at, workstation_id) de las activaciones true del ciclo (esquema A)
-            auto_deactivations = 0  # salidas por-equipo del esquema A (contingency_active=false)
-            forced_org_activations = 0
-            forced_vlan_activations = 0
-            forced_deactivations = 0
-            forced_affected_ws_total = 0
+            # Acumuladores por nivel.
+            org_entries = 0
+            org_exits = 0
+            org_entry_datetimes: list = []
+            org_events = []  # (created_at, is_on) del scope=organization (para pairing)
+
+            vlan_entries = 0
+            vlan_exits = 0
+            vlan_events_by_id = {}  # entity_id -> list[(created_at, is_on)]
+
+            ws_entries = 0
+            ws_exits = 0
+            ws_events_by_id = {}  # equipo_id -> list[(created_at, is_on)] (esquema A y B ws)
+
+            max_affected_ws = 0
+
             for log in cycle_toggles:
                 nv = log.new_values if isinstance(log.new_values, dict) else None
                 if nv is None:
                     continue
 
-                # --- Esquema B: contingencia forzada Org/VLAN (source manual_endpoint) ---
+                # --- Esquema B: contingencia forzada (source manual_endpoint) ---
                 if ("forced_contingency" in nv) or (
-                    nv.get("scope") in ("organization", "vlan")
+                    nv.get("scope") in ("organization", "vlan", "workstation")
                 ):
-                    if nv.get("forced_contingency") is True:
-                        scope = nv.get("scope")
-                        if scope == "organization":
-                            forced_org_activations += 1
-                        elif scope == "vlan":
-                            forced_vlan_activations += 1
-                        forced_affected_ws_total += int(nv.get("affected_workstations") or 0)
-                    elif nv.get("forced_contingency") is False:
-                        forced_deactivations += 1
-                    continue  # una fila del esquema B NUNCA cuenta como toggle por-equipo
+                    scope = nv.get("scope")
+                    is_on = nv.get("forced_contingency") is True
+                    is_off = nv.get("forced_contingency") is False
+                    if is_on:
+                        # Magnitud real de la mayor intervención (máximo, NO suma).
+                        affected = int(nv.get("affected_workstations") or 0)
+                        if affected > max_affected_ws:
+                            max_affected_ws = affected
+
+                    if scope == "organization":
+                        if is_on:
+                            org_entries += 1
+                            org_entry_datetimes.append(_to_local_iso(log.created_at))
+                            org_events.append((log.created_at, True))
+                        elif is_off:
+                            org_exits += 1
+                            org_events.append((log.created_at, False))
+                    elif scope == "vlan":
+                        vlan_key = log.entity_id  # id de la VLAN (entity_id, ver vlans.py)
+                        if is_on:
+                            vlan_entries += 1
+                            vlan_events_by_id.setdefault(vlan_key, []).append(
+                                (log.created_at, True)
+                            )
+                        elif is_off:
+                            vlan_exits += 1
+                            vlan_events_by_id.setdefault(vlan_key, []).append(
+                                (log.created_at, False)
+                            )
+                    elif scope == "workstation":
+                        # Forzada a nivel workstation: agrupar por workstation_id si viene,
+                        # si no por entity_id (id del equipo afectado).
+                        ws_key = log.workstation_id or log.entity_id
+                        if is_on:
+                            ws_entries += 1
+                            ws_events_by_id.setdefault(ws_key, []).append(
+                                (log.created_at, True)
+                            )
+                        elif is_off:
+                            ws_exits += 1
+                            ws_events_by_id.setdefault(ws_key, []).append(
+                                (log.created_at, False)
+                            )
+                    continue  # una fila del esquema B NUNCA cuenta como toggle por-equipo esquema A
 
                 # --- Esquema A: toggle automático por-workstation ---
                 if "contingency_active" in nv:
+                    ws_key = log.workstation_id
                     if nv.get("contingency_active") is True:
-                        activations.append((log.created_at, log.workstation_id))
+                        ws_entries += 1
+                        ws_events_by_id.setdefault(ws_key, []).append(
+                            (log.created_at, True)
+                        )
                     elif nv.get("contingency_active") is False:
-                        auto_deactivations += 1
+                        ws_exits += 1
+                        ws_events_by_id.setdefault(ws_key, []).append(
+                            (log.created_at, False)
+                        )
 
-            activations_in_cycle = len(activations)
-            distinct_ws_activated = len(
-                {ws_id for (_, ws_id) in activations if ws_id is not None}
+            # --- Tiempo de protección a nivel organización (pairing ON→OFF) ---
+            org_protection_seconds = self._pair_protection_intervals(
+                org_events, cycle_start, cutoff
             )
 
-            # SALIDAS totales del ciclo: por-equipo (esquema A, false) + forzadas OFF (esquema B).
-            deactivations_in_cycle = auto_deactivations + forced_deactivations
-
-            # --- active_at_cutoff: último toggle por WS con created_at < cutoff ---
-            all_toggles = (
-                db.query(AuditLog)
-                .filter(
-                    AuditLog.organization_id == org.id,
-                    AuditLog.action_type == ActionType.CONTINGENCY_TOGGLE,
-                    AuditLog.created_at < cutoff,
-                    AuditLog.workstation_id.isnot(None),
+            # --- Tiempo de protección a nivel VLAN: pairing por cada VLAN y suma ---
+            vlan_protection_seconds = 0
+            for _vlan_key, events in vlan_events_by_id.items():
+                vlan_protection_seconds += self._pair_protection_intervals(
+                    events, cycle_start, cutoff
                 )
-                .order_by(
-                    AuditLog.workstation_id.asc(),
-                    AuditLog.created_at.asc(),
-                )
-                .all()
-            )
-            last_toggle_by_ws = {}  # workstation_id -> último AuditLog (por created_at asc)
-            for log in all_toggles:
-                last_toggle_by_ws[log.workstation_id] = log  # el asc deja el último al final
-            active_at_cutoff = sum(
-                1
-                for log in last_toggle_by_ws.values()
-                if self._toggle_is_activation(log)
-            )
 
-            # --- Detección de entradas masivas (ventana deslizante) ---
-            window = timedelta(minutes=_MASS_WINDOW_MINUTES)
+            # --- Intervenciones workstation EMPAREJADAS (tickets ahorrados) ---
+            ws_interventions = 0
+            for _ws_key, events in ws_events_by_id.items():
+                ws_interventions += self._count_paired_interventions(events)
 
-            # Agrupar activaciones por VLAN (con la WS distinta como criterio de conteo).
-            activations_by_vlan = {}  # vlan_id -> list[(created_at, ws_id)]
-            for (created_at, ws_id) in activations:
-                vlan_id = ws_to_vlan.get(ws_id)
-                activations_by_vlan.setdefault(vlan_id, []).append((created_at, ws_id))
-
-            mass_vlan_events = 0
-            mass_vlan_detail = []
-            for vlan_id, events in activations_by_vlan.items():
-                events.sort(key=lambda e: e[0])
-                count, detail = self._count_mass_windows(
-                    events, window, _MASS_MIN_PER_VLAN
-                )
-                mass_vlan_events += count
-                for d in detail:
-                    mass_vlan_detail.append(
-                        {
-                            "vlan_id": str(vlan_id) if vlan_id is not None else None,
-                            "count": d["count"],
-                            "window_start": d["window_start"],
-                            "window_end": d["window_end"],
-                        }
-                    )
-
-            # Top N por count (los eventos masivos más grandes primero).
-            mass_vlan_detail.sort(key=lambda d: d["count"], reverse=True)
-            mass_vlan_detail = mass_vlan_detail[:_MASS_VLAN_DETAIL_TOP]
-
-            # Masiva a nivel organización: ventana global sobre TODAS las activaciones.
-            if total_ws > 0:
-                import math
-
-                org_threshold = max(1, math.ceil(total_ws * _MASS_ORG_PCT))
-                org_events = sorted(activations, key=lambda e: e[0])
-                mass_org_events, _ = self._count_mass_windows(
-                    org_events, window, org_threshold
-                )
-            else:
-                mass_org_events = 0
-
-            # --- Contingencia forzada vigente (org/VLAN) ---
-            forced_vlan_count = (
+            # --- Contingencia forzada vigente (estado actual) ---
+            forced_vlan_count_now = (
                 db.query(VLAN)
                 .filter(
                     VLAN.organization_id == org.id,
@@ -461,91 +450,102 @@ class ClosureReportService:
                 )
                 .count()
             )
-            forced_org = bool(getattr(org, "forced_contingency", False))
+            forced_org_now = bool(getattr(org, "forced_contingency", False))
 
             return ContingencySummary(
-                activations_in_cycle=activations_in_cycle,
-                distinct_ws_activated=distinct_ws_activated,
-                active_at_cutoff=active_at_cutoff,
-                mass_vlan_events=mass_vlan_events,
-                mass_vlan_detail=mass_vlan_detail,
-                mass_org_events=mass_org_events,
-                forced_vlan_count=forced_vlan_count,
-                forced_org=forced_org,
-                forced_org_activations=forced_org_activations,
-                forced_vlan_activations=forced_vlan_activations,
-                forced_deactivations=forced_deactivations,
-                forced_affected_ws_total=forced_affected_ws_total,
-                deactivations_in_cycle=deactivations_in_cycle,
                 data_available=True,
+                timezone=tz_name,
+                org_entries=org_entries,
+                org_exits=org_exits,
+                org_entry_datetimes=org_entry_datetimes,
+                org_protection_seconds=org_protection_seconds,
+                vlan_entries=vlan_entries,
+                vlan_exits=vlan_exits,
+                vlan_protection_seconds=vlan_protection_seconds,
+                ws_entries=ws_entries,
+                ws_exits=ws_exits,
+                ws_interventions=ws_interventions,
+                forced_org_now=forced_org_now,
+                forced_vlan_count_now=forced_vlan_count_now,
+                max_affected_ws=max_affected_ws,
             )
         except Exception as exc:
             # FAIL-SAFE: nunca propagar. Resumen en ceros con data_available=False.
             logger.warning(
-                "[CLOSURE_REPORT] Resumen de contingencia no disponible (fail-safe): %s",
+                "[CLOSURE_REPORT] Estadisticas de contingencia no disponibles (fail-safe): %s",
                 exc,
             )
             return ContingencySummary(data_available=False)
 
     @staticmethod
-    def _toggle_is_activation(log) -> bool:
+    def _pair_protection_intervals(events, cycle_start, cutoff) -> int:
         """
-        Indica si un `AuditLog` de `CONTINGENCY_TOGGLE` representa una activación por-equipo (true).
+        Empareja eventos ON→OFF de UN scope/entidad y devuelve el total de segundos de protección.
 
-        SOLO considera el esquema A (toggle automático por-workstation): lee
-        `new_values["contingency_active"]` de forma defensiva (el JSON column suele venir ya
-        deserializado como dict). Las filas del esquema B (forzada Org/VLAN, que traen
-        `forced_contingency`/`scope` y NO `contingency_active`) devuelven False a propósito, para
-        NO contaminar `active_at_cutoff` (que reconstruye el estado por-workstation al cierre).
-        Cualquier otro tipo/ausencia se trata como NO activación.
+        `events` es una lista de tuplas `(created_at, is_on: bool)` para UN scope/entidad. Se
+        ordena asc y se recorre manteniendo un "abierto" (timestamp del ON sin cerrar). Reglas:
+          * ON sin abierto → abre intervalo en ese ts.
+          * ON con abierto → se ignora (re-activación redundante; NO reinicia el intervalo).
+          * OFF con abierto → cierra [abierto, ts], suma (ts - abierto), limpia abierto.
+          * OFF sin abierto → venía en contingencia del mes anterior → cierra [cycle_start, ts].
+          * Al final, si queda un abierto (ON sin OFF en el ciclo) → cierra en [abierto, cutoff].
+
+        Devuelve el total de segundos (int, >= 0). Los intervalos negativos (datos inconsistentes)
+        se saturan a 0 para no restar tiempo de protección.
         """
-        new_values = getattr(log, "new_values", None)
-        if isinstance(new_values, dict):
-            return new_values.get("contingency_active") is True
-        return False
+        total_seconds = 0
+        opened = None  # timestamp del ON abierto sin cerrar
+
+        for created_at, is_on in sorted(events, key=lambda e: e[0]):
+            if is_on:
+                if opened is None:
+                    opened = created_at
+                # con abierto → re-activación redundante: ignorar (no reinicia).
+            else:  # OFF
+                if opened is not None:
+                    delta = (created_at - opened).total_seconds()
+                    if delta > 0:
+                        total_seconds += int(delta)
+                    opened = None
+                else:
+                    # OFF sin ON previo: contingencia heredada del mes anterior.
+                    delta = (created_at - cycle_start).total_seconds()
+                    if delta > 0:
+                        total_seconds += int(delta)
+
+        # ON sin OFF al cierre → se corta en cutoff.
+        if opened is not None:
+            delta = (cutoff - opened).total_seconds()
+            if delta > 0:
+                total_seconds += int(delta)
+
+        return max(0, total_seconds)
 
     @staticmethod
-    def _count_mass_windows(events, window, threshold):
+    def _count_paired_interventions(events) -> int:
         """
-        Cuenta ventanas "masivas" sobre una lista de activaciones ordenada cronológicamente.
+        Cuenta intervenciones EMPAREJADAS entrada→salida (ON→OFF) de UN equipo.
 
-        `events` es una lista de tuplas `(created_at, workstation_id)` YA ordenada asc. Para cada
-        activación no consumida se cuentan las WS DISTINTAS activadas en `[t, t + window)`; si el
-        conteo `>= threshold`, se cuenta 1 evento masivo, se registra su detalle y el cursor
-        avanza más allá de la ventana (todas las activaciones dentro de `[t, t + window)` se
-        marcan como consumidas) para no contar solapamientos varias veces.
-
-        Devuelve `(count, detail)` donde `detail` es una lista de dicts
-        `{"count": int, "window_start": iso, "window_end": iso}`.
+        Variante de `_pair_protection_intervals` que, en lugar de sumar segundos, CUENTA cuántos
+        ON obtienen su OFF (intervalos cerrados). Un ON abierto al final del ciclo NO cuenta como
+        intervención completada. Un OFF sin ON previo tampoco suma (no hubo entrada dentro del
+        ciclo que emparejar). Cada par cerrado equivale a una acción manual ahorrada a la Mesa
+        de Ayuda.
         """
-        count = 0
-        detail = []
-        n = len(events)
-        i = 0
-        while i < n:
-            t0 = events[i][0]
-            window_end = t0 + window
-            distinct_ws = set()
-            j = i
-            while j < n and events[j][0] < window_end:
-                ws_id = events[j][1]
-                if ws_id is not None:
-                    distinct_ws.add(ws_id)
-                j += 1
-            if len(distinct_ws) >= threshold:
-                count += 1
-                detail.append(
-                    {
-                        "count": len(distinct_ws),
-                        "window_start": t0.isoformat(),
-                        "window_end": window_end.isoformat(),
-                    }
-                )
-                # Avanzar más allá de la ventana (consumir todas las activaciones en [t0, end)).
-                i = j
-            else:
-                i += 1
-        return count, detail
+        interventions = 0
+        opened = False
+
+        for _created_at, is_on in sorted(events, key=lambda e: e[0]):
+            if is_on:
+                # ON con abierto → re-activación redundante: no abre un nuevo par.
+                opened = True
+            else:  # OFF
+                if opened:
+                    interventions += 1
+                    opened = False
+                # OFF sin abierto → no hay entrada que emparejar dentro del ciclo.
+
+        return interventions
 
     # === Persistencia del artefacto derivado (billing_closure_reports) ===
 
@@ -616,12 +616,13 @@ class ClosureReportService:
         servicio y observaciones. `items` se acepta por firma (contexto disponible) aunque el
         detalle por IP se resume vía los totales del cierre para no inflar el prompt.
 
-        Si `contingency` viene y tiene `data_available`, se agrega una sección con los eventos de
-        contingencia del ciclo (activaciones y salidas por-equipo, entradas masivas, contingencia
-        FORZADA Org/VLAN del ciclo con equipos afectados, y contingencia forzada vigente) y se pide
-        comentar en las observaciones si hubo contingencia masiva/forzada, sus entradas y SALIDAS y
-        su posible impacto operativo. Si es `None` o no hay datos, la sección se omite
-        (compatibilidad hacia atrás).
+        Si `contingency` viene y tiene `data_available`, se agrega una sección con las ESTADÍSTICAS
+        DE USO de contingencia del ciclo (ingresos/salidas y tiempo de protección por nivel org y
+        agencia/VLAN, intervenciones workstation emparejadas, y magnitud de la mayor intervención)
+        y se pide EXPLÍCITAMENTE que en las observaciones ESTIME las acciones y tickets ahorrados a
+        la Mesa de Ayuda gracias a la entrada/salida de contingencia automatizada y masiva, además
+        del valor del tiempo de protección a nivel organización. Si es `None` o no hay datos, la
+        sección se omite (compatibilidad hacia atrás).
         """
         sections: List[str] = []
 
@@ -668,35 +669,37 @@ class ClosureReportService:
             "## Desglose de tramos del mes objetivo\n" + self._format_tiers(header.tiers_applied)
         )
 
-        # Eventos de contingencia del ciclo (opcional; solo si hay datos disponibles).
+        # Estadísticas de uso de contingencia del ciclo (opcional; solo si hay datos disponibles).
         if contingency is not None and contingency.data_available:
+            org_protection_hours = round(contingency.org_protection_seconds / 3600.0, 1)
+            vlan_protection_hours = round(contingency.vlan_protection_seconds / 3600.0, 1)
             sections.append(
-                "## Eventos de contingencia del ciclo\n"
-                f"- Activaciones de contingencia en el mes: {contingency.activations_in_cycle} "
-                f"(equipos distintos: {contingency.distinct_ws_activated})\n"
-                f"- Entradas masivas a nivel de agencia (VLAN): {contingency.mass_vlan_events}\n"
-                f"- Entradas masivas a nivel de organizacion: {contingency.mass_org_events}\n"
-                f"- Equipos que permanecen en contingencia al cierre: {contingency.active_at_cutoff}\n"
-                f"- Contingencia forzada activada a nivel organizacion (eventos ON): "
-                f"{contingency.forced_org_activations}\n"
-                f"- Contingencia forzada activada a nivel agencia/VLAN (eventos ON): "
-                f"{contingency.forced_vlan_activations}\n"
-                f"- Desactivaciones/salidas de contingencia en el mes: "
-                f"{contingency.deactivations_in_cycle}\n"
-                f"- Equipos afectados por activaciones forzadas (acumulado): "
-                f"{contingency.forced_affected_ws_total}\n"
-                f"- Contingencia forzada vigente: organizacion={contingency.forced_org}, "
-                f"VLANs={contingency.forced_vlan_count}"
+                "## Estadisticas de uso de contingencia del ciclo\n"
+                f"- Ingresos a contingencia a nivel organizacion (intervencion masiva): "
+                f"{contingency.org_entries}\n"
+                f"- Salidas de contingencia a nivel organizacion: {contingency.org_exits}\n"
+                f"- Tiempo de proteccion a nivel organizacion: {org_protection_hours} horas\n"
+                f"- Ingresos a contingencia a nivel agencia/VLAN: {contingency.vlan_entries}\n"
+                f"- Salidas de contingencia a nivel agencia/VLAN: {contingency.vlan_exits}\n"
+                f"- Tiempo de proteccion a nivel agencia/VLAN: {vlan_protection_hours} horas\n"
+                f"- Intervenciones automatizadas a nivel workstation (entrada->salida emparejadas): "
+                f"{contingency.ws_interventions}\n"
+                f"- Equipos afectados en la mayor intervencion: {contingency.max_affected_ws}\n"
+                f"- Contingencia forzada vigente: organizacion={contingency.forced_org_now}, "
+                f"VLANs={contingency.forced_vlan_count_now}"
             )
 
         # Solicitud concreta de las tres secciones en español.
         observaciones_extra = ""
         if contingency is not None and contingency.data_available:
             observaciones_extra = (
-                " Comenta explicitamente si hubo contingencia masiva (a nivel de agencia/VLAN o de "
-                "organizacion) y su posible impacto operativo. Comenta tambien las entradas y las "
-                "SALIDAS (desactivaciones) de contingencia del ciclo, y la contingencia forzada a "
-                "nivel de organizacion o de agencia/VLAN si las hubo."
+                " En las observaciones ESTIMA e indica EXPLICITAMENTE las ACCIONES y TICKETS "
+                "AHORRADOS a la Mesa de Ayuda (o al operador) gracias a la entrada y salida de "
+                "contingencia automatizada y masiva: cada intervencion workstation emparejada y "
+                "cada intervencion masiva a nivel organizacion o agencia/VLAN evita trabajo manual "
+                "(un ticket/accion por equipo intervenido que ya no requiere atencion presencial o "
+                "remota). Comenta ademas el valor del tiempo de proteccion a nivel organizacion "
+                "(cuanto tiempo estuvo el servicio de impresion resguardado por la contingencia)."
             )
         sections.append(
             "## Solicitud\n"
@@ -1579,6 +1582,24 @@ def _fmt_period(header: BillingClosure) -> str:
     return f"{int(header.period_year):04d}-{int(header.period_month):02d}"
 
 
+def _fmt_hm(total_seconds: int) -> str:
+    """
+    Formatea una duración en segundos a "Xh Ym" (p. ej. 3661 -> "1h 1m"; 0 -> "0h 0m").
+
+    Los segundos residuales se truncan (solo horas y minutos completos), suficiente para el
+    reporte. Valores negativos o no numéricos se saturan a "0h 0m" (defensivo).
+    """
+    try:
+        secs = int(total_seconds)
+    except (TypeError, ValueError):
+        secs = 0
+    if secs < 0:
+        secs = 0
+    hours = secs // 3600
+    minutes = (secs % 3600) // 60
+    return f"{hours}h {minutes}m"
+
+
 def compose_pdf(
     header: BillingClosure,
     items: List[BillingClosureItem],
@@ -1602,10 +1623,11 @@ def compose_pdf(
       4. Grafico de composicion de tramos (`tiers_png`).
       5. Grafico de evolucion historica (`history_png`).
       6. Tabla resumen del desglose por tramo (from, to, rate, ips_in_tier, subtotal).
-      6b. Contingencia del ciclo: activaciones, entradas masivas (VLAN/org), equipos en
-          contingencia al cierre y contingencia forzada vigente (o nota fail-safe si
-          `contingency is None` o no hay datos). Va JUSTO DESPUES de conceptos/tarifas + tabla de
-          tramos y ANTES del analisis IA.
+      6b. Contingencia del ciclo: TABLA de estadisticas de uso (ingresos/salidas y tiempo de
+          proteccion por nivel org y agencia/VLAN, intervenciones workstation emparejadas, mayor
+          intervencion y contingencia forzada vigente), mas las fechas de entrada org en la tz de
+          la org (o nota fail-safe si `contingency is None` o no hay datos). Va JUSTO DESPUES de
+          conceptos/tarifas + tabla de tramos y ANTES del analisis IA.
       7. Analisis IA, o nota fail-safe si `analysis is None` (Req 5.4).
       8. Nota explicita USD sin impuestos (Req 3.7).
       9. Footer de copyright de Inversiones On Line S.A.C. en cada pagina (Req 3.8).
@@ -1921,7 +1943,7 @@ def compose_pdf(
     pdf.ln(2)
 
     if contingency is None or not contingency.data_available:
-        # Fail-safe: métricas no disponibles → nota en cursiva gris, no bloquea el reporte.
+        # Fail-safe: estadísticas no disponibles → nota en cursiva gris, no bloquea el reporte.
         pdf.set_font("Helvetica", "I", 10)
         pdf.set_text_color(120, 120, 120)
         pdf.set_x(pdf.l_margin + 2)
@@ -1931,29 +1953,89 @@ def compose_pdf(
             _sanitize_latin1("Metricas de contingencia no disponibles para este cierre."),
         )
     else:
-        pdf.set_font("Helvetica", "", 10)
-        pdf.set_text_color(60, 60, 60)
-        forced_org_txt = "si" if contingency.forced_org else "no"
-        contingency_lines = [
-            f"Activaciones de contingencia en el mes: {contingency.activations_in_cycle} "
-            f"(equipos distintos: {contingency.distinct_ws_activated})",
-            f"Entradas masivas a nivel de agencia (VLAN): {contingency.mass_vlan_events}",
-            f"Entradas masivas a nivel de organizacion: {contingency.mass_org_events}",
-            f"Equipos en contingencia al cierre: {contingency.active_at_cutoff}",
-            f"Contingencia forzada a nivel organizacion (activaciones): "
-            f"{contingency.forced_org_activations}",
-            f"Contingencia forzada a nivel agencia/VLAN (activaciones): "
-            f"{contingency.forced_vlan_activations}",
-            f"Salidas de contingencia en el mes (desactivaciones): "
-            f"{contingency.deactivations_in_cycle}",
-            f"Equipos afectados por activaciones forzadas (acumulado): "
-            f"{contingency.forced_affected_ws_total}",
-            f"Contingencia forzada vigente: organizacion={forced_org_txt}, "
-            f"VLANs={contingency.forced_vlan_count}",
+        # Subtítulo de la tabla de estadísticas de uso.
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_x(pdf.l_margin)
+        pdf.cell(0, 6, _sanitize_latin1("Estadisticas de uso de contingencia"), ln=True)
+        pdf.ln(1)
+
+        forced_org_txt = "si" if contingency.forced_org_now else "no"
+        # Filas de la tabla (Métrica | Valor); los valores se sanitizan al dibujar.
+        rows = [
+            (
+                "Ingresos a contingencia - Organizacion (intervencion masiva)",
+                str(contingency.org_entries),
+            ),
+            ("Salidas de contingencia - Organizacion", str(contingency.org_exits)),
+            (
+                "Tiempo de proteccion a nivel Organizacion",
+                _fmt_hm(contingency.org_protection_seconds),
+            ),
+            ("Ingresos a contingencia - Agencia/VLAN", str(contingency.vlan_entries)),
+            ("Salidas de contingencia - Agencia/VLAN", str(contingency.vlan_exits)),
+            (
+                "Tiempo de proteccion a nivel Agencia/VLAN",
+                _fmt_hm(contingency.vlan_protection_seconds),
+            ),
+            (
+                "Intervenciones automatizadas a nivel Workstation (evitan accion manual)",
+                str(contingency.ws_interventions),
+            ),
+            (
+                "Equipos afectados en la mayor intervencion",
+                str(contingency.max_affected_ws),
+            ),
+            (
+                "Contingencia forzada vigente",
+                f"organizacion={forced_org_txt}, VLANs={contingency.forced_vlan_count_now}",
+            ),
         ]
-        for line in contingency_lines:
-            pdf.set_x(pdf.l_margin + 2)
-            pdf.multi_cell(effective_width - 2, 5, _sanitize_latin1(f"- {line}"))
+
+        # Anchos de columna de la tabla (Métrica ancha, Valor angosto).
+        metric_w = effective_width * 0.68
+        value_w = effective_width - metric_w
+        line_h = 6
+
+        # Cabecera de la tabla (con fill), al estilo del resto del PDF.
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_fill_color(230, 230, 230)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_x(pdf.l_margin)
+        pdf.cell(metric_w, line_h, _sanitize_latin1("Metrica"), border=1, align="L", fill=True)
+        pdf.cell(value_w, line_h, _sanitize_latin1("Valor"), border=1, align="C", fill=True)
+        pdf.ln(line_h)
+
+        # Filas de datos.
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(60, 60, 60)
+        for metric, value in rows:
+            pdf.set_x(pdf.l_margin)
+            pdf.cell(metric_w, line_h, _sanitize_latin1(metric), border=1, align="L")
+            pdf.cell(value_w, line_h, _sanitize_latin1(value), border=1, align="C")
+            pdf.ln(line_h)
+
+        # Fechas y horas de entrada a contingencia a nivel organización (si las hubo).
+        entry_dts = contingency.org_entry_datetimes or []
+        if entry_dts:
+            shown = entry_dts[:10]
+            extra = len(entry_dts) - len(shown)
+            joined = "; ".join(str(dt) for dt in shown)
+            if extra > 0:
+                joined = f"{joined} y {extra} mas"
+            tz_label = contingency.timezone or "UTC"
+            pdf.ln(2)
+            pdf.set_font("Helvetica", "", 9)
+            pdf.set_text_color(60, 60, 60)
+            pdf.set_x(pdf.l_margin)
+            pdf.multi_cell(
+                effective_width,
+                5,
+                _sanitize_latin1(
+                    f"Fechas y horas de entrada a contingencia (Organizacion) "
+                    f"({tz_label}): {joined}"
+                ),
+            )
 
     pdf.ln(2)
     pdf.set_text_color(60, 60, 60)

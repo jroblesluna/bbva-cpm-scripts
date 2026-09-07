@@ -161,36 +161,45 @@ class HistoryPoint(BaseModel):
 
 class ContingencySummaryResponse(BaseModel):
     """
-    Resumen de metricas de contingencia del ciclo (fail-safe, informativo).
+    Estadisticas de uso de contingencia del ciclo (fail-safe, informativas).
 
-    Refleja los campos de `ContingencySummary` del servicio: activaciones y equipos distintos
-    que entraron en contingencia durante el ciclo, entradas masivas a nivel de agencia (VLAN) y
-    de organizacion, equipos que permanecen en contingencia al cierre (reconstruido point-in-time
-    desde la auditoria) y contingencia forzada vigente (org/VLAN). Ademas, las metricas de
-    contingencia FORZADA manual del ciclo (Org/VLAN): activaciones ON por scope
-    (`forced_org_activations` / `forced_vlan_activations`), desactivaciones forzadas
-    (`forced_deactivations`), equipos afectados acumulados (`forced_affected_ws_total`) y las
-    SALIDAS totales del ciclo (`deactivations_in_cycle` = salidas por-equipo + forzadas OFF).
-    `data_available` es False cuando el calculo fallo (fail-safe): en ese caso todos los conteos
-    van en 0/False y la generacion del reporte no se bloquea.
+    Refleja EXACTAMENTE los campos de `ContingencySummary.to_dict()` del servicio, orientados a
+    valor operativo por nivel:
+    - Nivel organizacion: ingresos/salidas (`org_entries`/`org_exits`), timestamps de entrada en
+      la tz de la org (`org_entry_datetimes`) y tiempo de proteccion en segundos
+      (`org_protection_seconds`).
+    - Nivel agencia/VLAN: ingresos/salidas (`vlan_entries`/`vlan_exits`) y tiempo de proteccion
+      agregado (`vlan_protection_seconds`).
+    - Nivel workstation: ingresos/salidas (`ws_entries`/`ws_exits`) e intervenciones emparejadas
+      entrada->salida (`ws_interventions` = acciones/tickets ahorrados a la Mesa de Ayuda).
+    - Estado vigente y magnitud: contingencia forzada actual (`forced_org_now` /
+      `forced_vlan_count_now`) y equipos afectados en la mayor intervencion del ciclo
+      (`max_affected_ws`, maximo real, no suma).
+
+    `timezone` es la tz IANA usada para formatear los timestamps. `data_available` es False cuando
+    el calculo fallo (fail-safe): en ese caso todo va en 0/False y la generacion del reporte no se
+    bloquea. Todos los campos llevan default salvo `data_available` (para no romper el fail-safe).
     """
 
-    activations_in_cycle: int
-    distinct_ws_activated: int
-    active_at_cutoff: int
-    mass_vlan_events: int
-    mass_org_events: int
-    forced_vlan_count: int
-    forced_org: bool
-    # Métricas de contingencia FORZADA Org/VLAN del ciclo (esquema B). Defaults en 0 por
-    # compatibilidad: un summary fail-safe o clientes viejos no las requieren.
-    forced_org_activations: int = 0
-    forced_vlan_activations: int = 0
-    forced_deactivations: int = 0
-    forced_affected_ws_total: int = 0
-    deactivations_in_cycle: int = 0
     data_available: bool
-    mass_vlan_detail: list = []
+    timezone: str = "UTC"
+    # Nivel organización.
+    org_entries: int = 0
+    org_exits: int = 0
+    org_entry_datetimes: list = []
+    org_protection_seconds: int = 0
+    # Nivel agencia/VLAN.
+    vlan_entries: int = 0
+    vlan_exits: int = 0
+    vlan_protection_seconds: int = 0
+    # Nivel workstation.
+    ws_entries: int = 0
+    ws_exits: int = 0
+    ws_interventions: int = 0
+    # Estado vigente + magnitud real.
+    forced_org_now: bool = False
+    forced_vlan_count_now: int = 0
+    max_affected_ws: int = 0
 
 
 class ClosureReportDataResponse(BaseModel):
