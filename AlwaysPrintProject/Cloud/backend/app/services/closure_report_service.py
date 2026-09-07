@@ -14,17 +14,15 @@ reconciliación de montos (`validate_reconciliation`), la composición del PDF d
 `upload_to_s3` / `generate_presigned_url`). La orquestación `generate_or_get` se agrega en la
 tarea siguiente.
 
-Nota sobre matplotlib (headless):
-    El backend corre en contenedores sin servidor gráfico, por lo que se fija el backend
-    no interactivo "Agg" a nivel de módulo ANTES de importar `pyplot`. Hacerlo aquí garantiza
-    que cualquier import posterior de `matplotlib.pyplot` (en las funciones de render) no
-    intente abrir un display.
+Nota sobre matplotlib (headless + LAZY import):
+    matplotlib NO se importa a nivel de módulo. Es una dependencia PESADA cuyo primer import
+    reconstruye el font cache (fontManager) cuando el cachedir está frío, lo que penalizaba el
+    ARRANQUE del backend (el router `billing_closures` importa este servicio en el startup). Por
+    eso se difiere (lazy) al interior de las funciones de render mediante el helper `_get_pyplot()`,
+    que fija el backend headless "Agg" en ese momento —ANTES de importar `pyplot`— para que no se
+    intente abrir un display en el contenedor. Así el costo se paga sólo la primera vez que se
+    RENDERIZA un gráfico (operación lenta y poco frecuente), no en cada arranque.
 """
-
-import matplotlib
-
-# Fijar backend headless "Agg" ANTES de cualquier import de pyplot (sin display en contenedor).
-matplotlib.use("Agg")
 
 import io
 import os
@@ -33,7 +31,6 @@ from decimal import Decimal, InvalidOperation
 from typing import List, Optional
 
 import boto3
-import matplotlib.pyplot as plt  # import DESPUÉS de matplotlib.use("Agg")
 from botocore.client import Config
 from botocore.exceptions import ClientError
 import sqlalchemy as sa
@@ -1303,6 +1300,23 @@ class ClosureReportService:
 #         servicio" cuando solo hay un punto.
 
 
+def _get_pyplot():
+    """
+    Importa matplotlib.pyplot de forma LAZY (perezosa), fijando el backend headless "Agg".
+
+    matplotlib es una dependencia PESADA cuyo primer import reconstruye el font cache
+    (fontManager) si el cachedir esta frio; hacerlo a nivel de modulo penalizaba el arranque
+    del backend (el router billing_closures importa este servicio en el startup). Al diferirlo
+    aca, el costo se paga solo la primera vez que se RENDERIZA un grafico (operacion lenta y
+    poco frecuente), no en cada arranque. Se fija "Agg" ANTES de importar pyplot (sin display
+    en contenedor).
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    return plt
+
+
 def _tier_ips(tier: object) -> int:
     """
     Extrae `ips_in_tier` (entero >= 0) de un tramo de `tiers_applied` de forma defensiva.
@@ -1521,6 +1535,7 @@ def _placeholder_png(message: str) -> bytes:
     Se emplea cuando no hay datos que graficar (p. ej. "sin IPs facturables"): produce un
     artefacto válido y no vacío para que la composición del PDF nunca falle por falta de datos.
     """
+    plt = _get_pyplot()  # import LAZY de matplotlib.pyplot (no penaliza el arranque del backend)
     fig = plt.figure(figsize=(6, 3.5))
     try:
         ax = fig.add_subplot(111)
@@ -1584,6 +1599,7 @@ def render_tiers_chart(tiers_applied: list) -> bytes:
     labels = [_tier_label(t, i) for i, (t, _) in enumerate(populated)]
     values = [ips for (_, ips) in populated]
 
+    plt = _get_pyplot()  # import LAZY de matplotlib.pyplot (no penaliza el arranque del backend)
     fig = plt.figure(figsize=(7, 4))
     try:
         ax = fig.add_subplot(111)
@@ -1668,6 +1684,7 @@ def render_history_chart(history: list) -> bytes:
     billable = [int(getattr(p, "total_billable", 0) or 0) for p in points]
     amounts = [float(_to_decimal(getattr(p, "amount", 0))) for p in points]
 
+    plt = _get_pyplot()  # import LAZY de matplotlib.pyplot (no penaliza el arranque del backend)
     fig = plt.figure(figsize=(7, 4))
     try:
         ax_bill = fig.add_subplot(111)

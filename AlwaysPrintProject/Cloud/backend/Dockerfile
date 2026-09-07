@@ -26,6 +26,10 @@ RUN pip install --upgrade pip && \
 # Copiar código de la aplicación
 COPY . .
 
+# Pre-construir el font cache de matplotlib en la imagen (evita que el primer render en runtime
+# reconstruya el fontManager, lo que agregaba decenas de segundos de latencia tras cada deploy).
+RUN python -c "import matplotlib; matplotlib.use('Agg'); import matplotlib.pyplot as plt; plt.figure(); print('matplotlib font cache preconstruido')"
+
 # Copiar y configurar script de inicio
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
