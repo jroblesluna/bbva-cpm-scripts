@@ -166,7 +166,9 @@ class ContingencySummaryResponse(BaseModel):
     Refleja EXACTAMENTE los campos de `ContingencySummary.to_dict()` del servicio, orientados a
     valor operativo por nivel:
     - Nivel organizacion: ingresos/salidas (`org_entries`/`org_exits`), timestamps de entrada en
-      la tz de la org (`org_entry_datetimes`) y tiempo de proteccion en segundos
+      la tz de la org (`org_entry_datetimes`), la cronologia de tramos de contingencia
+      (`org_intervals`: cada tramo entrada/salida con su duracion, start_iso/end_iso/
+      duration_seconds/open_at_start/open_at_end) y tiempo de proteccion en segundos
       (`org_protection_seconds`).
     - Nivel agencia/VLAN: ingresos/salidas (`vlan_entries`/`vlan_exits`) y tiempo de proteccion
       agregado (`vlan_protection_seconds`).
@@ -190,6 +192,7 @@ class ContingencySummaryResponse(BaseModel):
     org_entries: int = 0
     org_exits: int = 0
     org_entry_datetimes: list = []
+    org_intervals: list = []
     org_protection_seconds: int = 0
     # Nivel agencia/VLAN.
     vlan_entries: int = 0

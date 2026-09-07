@@ -278,6 +278,90 @@ def test_org_off_without_on_cut_at_cycle_start(db, service):
     assert summary.org_protection_seconds == 3600
 
 
+# === Cronología de tramos org (org_intervals) ===
+
+
+def test_org_intervals_pairing(db, service):
+    """
+    2 ON + 2 OFF org emparejados → org_intervals tiene 2 tramos cerrados (start/end no None,
+    open_at_start/open_at_end False) con duraciones 3600 y 1800; la suma coincide con
+    org_protection_seconds.
+    """
+    org = _make_org(db, "Org Intervals")
+    base = _CYCLE_START + timedelta(days=2)
+
+    # Tramo 1: [base, base+1h] = 3600s. Tramo 2: [base+3h, base+3h+30m] = 1800s.
+    _make_forced_toggle(db, org, forced=True, scope="organization", affected_workstations=5, created_at=base)
+    _make_forced_toggle(db, org, forced=False, scope="organization", affected_workstations=5, created_at=base + timedelta(hours=1))
+    _make_forced_toggle(db, org, forced=True, scope="organization", affected_workstations=5, created_at=base + timedelta(hours=3))
+    _make_forced_toggle(db, org, forced=False, scope="organization", affected_workstations=5, created_at=base + timedelta(hours=3, minutes=30))
+
+    closure = _make_closure(db, org)
+    summary = service.build_contingency_summary(db, org, closure)
+
+    assert summary.data_available is True
+    assert len(summary.org_intervals) == 2
+
+    first = summary.org_intervals[0]
+    assert first["start_iso"] is not None
+    assert first["end_iso"] is not None
+    assert first["open_at_start"] is False
+    assert first["open_at_end"] is False
+    assert first["duration_seconds"] == 3600
+
+    second = summary.org_intervals[1]
+    assert second["duration_seconds"] == 1800
+
+    total = sum(iv["duration_seconds"] for iv in summary.org_intervals)
+    assert total == summary.org_protection_seconds == 3600 + 1800
+
+
+def test_org_interval_open_at_end(db, service):
+    """
+    1 ON sin OFF (a cutoff-1h) → 1 tramo con open_at_end=True, end_iso None (vigente al cierre),
+    start_iso no None, duración == 3600.
+    """
+    org = _make_org(db, "Org Interval Abierto")
+    _make_forced_toggle(
+        db, org, forced=True, scope="organization",
+        affected_workstations=1, created_at=_CUTOFF - timedelta(hours=1),
+    )
+
+    closure = _make_closure(db, org)
+    summary = service.build_contingency_summary(db, org, closure)
+
+    assert len(summary.org_intervals) == 1
+    iv = summary.org_intervals[0]
+    assert iv["open_at_end"] is True
+    assert iv["open_at_start"] is False
+    assert iv["start_iso"] is not None
+    assert iv["end_iso"] is None  # se corta en cutoff (marca "vigente al cierre" en el PDF)
+    assert iv["duration_seconds"] == 3600
+
+
+def test_org_interval_open_at_start(db, service):
+    """
+    1 OFF sin ON previo (a cycle_start+1h) → 1 tramo con open_at_start=True, start_iso None
+    (inicio del ciclo), end_iso no None, duración == 3600.
+    """
+    org = _make_org(db, "Org Interval Heredado")
+    _make_forced_toggle(
+        db, org, forced=False, scope="organization",
+        affected_workstations=1, created_at=_CYCLE_START + timedelta(hours=1),
+    )
+
+    closure = _make_closure(db, org)
+    summary = service.build_contingency_summary(db, org, closure)
+
+    assert len(summary.org_intervals) == 1
+    iv = summary.org_intervals[0]
+    assert iv["open_at_start"] is True
+    assert iv["open_at_end"] is False
+    assert iv["start_iso"] is None  # arranca en cycle_start (marca "inicio del ciclo" en el PDF)
+    assert iv["end_iso"] is not None
+    assert iv["duration_seconds"] == 3600
+
+
 # === Nivel VLAN/AGENCIA ===
 
 
@@ -509,6 +593,7 @@ def test_to_dict_has_exact_new_fields(db, service):
         "org_entries",
         "org_exits",
         "org_entry_datetimes",
+        "org_intervals",
         "org_protection_seconds",
         "vlan_entries",
         "vlan_exits",
@@ -561,6 +646,22 @@ def test_compose_pdf_smoke_with_contingency_data():
         org_entries=2,
         org_exits=2,
         org_entry_datetimes=["2026-05-10T10:00:00-05:00", "2026-05-11T08:00:00-05:00"],
+        org_intervals=[
+            {
+                "start_iso": "2026-05-10T10:00:00-05:00",
+                "end_iso": "2026-05-10T11:00:00-05:00",
+                "duration_seconds": 3600,
+                "open_at_start": False,
+                "open_at_end": False,
+            },
+            {
+                "start_iso": "2026-05-11T08:00:00-05:00",
+                "end_iso": None,
+                "duration_seconds": 1800,
+                "open_at_start": False,
+                "open_at_end": True,
+            },
+        ],
         org_protection_seconds=5400,
         vlan_entries=3,
         vlan_exits=3,

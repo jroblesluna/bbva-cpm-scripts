@@ -93,6 +93,18 @@ class ContingencySummary:
         org_entries: eventos ON forzados scope=organization en el ciclo (entradas a contingencia).
         org_exits: eventos OFF forzados scope=organization en el ciclo (salidas).
         org_entry_datetimes: timestamps ISO de cada entrada ON org, YA convertidos a la tz de la org.
+            (se mantiene por compatibilidad; el PDF ahora usa `org_intervals` para la cronología).
+        org_intervals: cronología de TRAMOS de contingencia a nivel org (pairing ON→OFF con la
+            MISMA semántica de `_pair_protection_intervals`, ver `_pair_org_intervals`). Cada
+            elemento es un dict con:
+              - start_iso: ISO tz-local del ON (entrada). None si el tramo venía abierto del mes
+                anterior (OFF sin ON previo → arranca en cycle_start).
+              - end_iso: ISO tz-local del OFF (salida). None si quedó abierto al cierre (ON sin OFF
+                → se corta en cutoff).
+              - duration_seconds: duración del tramo (int, >=0), con corte a cycle_start/cutoff.
+              - open_at_start: True si el tramo venía en contingencia del mes anterior.
+              - open_at_end: True si el tramo quedó vigente en contingencia al cierre.
+            La suma de `duration_seconds` coincide por construcción con `org_protection_seconds`.
         org_protection_seconds: tiempo total (s) de estadía en contingencia a nivel org en el ciclo
             (pairing ON→OFF con corte a cycle_start/cutoff; ver `_pair_protection_intervals`).
 
@@ -131,6 +143,7 @@ class ContingencySummary:
         org_entries: int = 0,
         org_exits: int = 0,
         org_entry_datetimes: Optional[list] = None,
+        org_intervals: Optional[list] = None,
         org_protection_seconds: int = 0,
         # Nivel VLAN/agencia.
         vlan_entries: int = 0,
@@ -153,6 +166,7 @@ class ContingencySummary:
         self.org_entry_datetimes = (
             org_entry_datetimes if org_entry_datetimes is not None else []
         )
+        self.org_intervals = org_intervals if org_intervals is not None else []
         self.org_protection_seconds = org_protection_seconds
         self.vlan_entries = vlan_entries
         self.vlan_exits = vlan_exits
@@ -173,6 +187,7 @@ class ContingencySummary:
             "org_entries": self.org_entries,
             "org_exits": self.org_exits,
             "org_entry_datetimes": self.org_entry_datetimes,
+            "org_intervals": self.org_intervals,
             "org_protection_seconds": self.org_protection_seconds,
             "vlan_entries": self.vlan_entries,
             "vlan_exits": self.vlan_exits,
@@ -445,6 +460,13 @@ class ClosureReportService:
                 org_events, cycle_start, cutoff
             )
 
+            # --- Cronología de tramos org (misma semántica de pairing, tz-local) ---
+            # `org_protection_seconds` sigue siendo la fuente de verdad del "Tiempo total";
+            # por construcción sum(iv["duration_seconds"]) == org_protection_seconds.
+            org_intervals = self._pair_org_intervals(
+                org_events, cycle_start, cutoff, _to_local_iso
+            )
+
             # --- Tiempo de protección a nivel VLAN: pairing por cada VLAN y suma ---
             vlan_protection_seconds = 0
             for _vlan_key, events in vlan_events_by_id.items():
@@ -481,6 +503,7 @@ class ClosureReportService:
                 org_entries=org_entries,
                 org_exits=org_exits,
                 org_entry_datetimes=org_entry_datetimes,
+                org_intervals=org_intervals,
                 org_protection_seconds=org_protection_seconds,
                 vlan_entries=vlan_entries,
                 vlan_exits=vlan_exits,
@@ -544,6 +567,80 @@ class ClosureReportService:
                 total_seconds += int(delta)
 
         return max(0, total_seconds)
+
+    @staticmethod
+    def _pair_org_intervals(events, cycle_start, cutoff, to_iso) -> list:
+        """
+        Empareja eventos ON→OFF a nivel organización y devuelve la CRONOLOGÍA de tramos.
+
+        Comparte EXACTAMENTE la semántica de emparejado de `_pair_protection_intervals` (no la
+        modifica), pero en lugar de devolver solo el total de segundos, devuelve la LISTA de
+        tramos individuales para dibujar la tabla cronológica del PDF. Por construcción, la suma
+        de `duration_seconds` de todos los tramos coincide con `_pair_protection_intervals`.
+
+        `events` es una lista de tuplas `(created_at naive-UTC, is_on: bool)` del scope=organization.
+        `to_iso` es un callable que convierte un `datetime` naive-UTC a ISO en la tz local (mismo
+        patrón que `_to_local_iso` usado para `org_entry_datetimes`). Reglas de emparejado:
+          * ON sin abierto → abre tramo (start = ese ts).
+          * ON con abierto → se ignora (re-activación redundante; NO reinicia el tramo).
+          * OFF con abierto → cierra [start, ts]; open_at_start=False, open_at_end=False.
+          * OFF sin abierto → tramo heredado del mes anterior → start=cycle_start
+            (open_at_start=True), end=ts, duración = ts - cycle_start.
+          * Al final, si queda un abierto (ON sin OFF) → end=cutoff (open_at_end=True),
+            duración = cutoff - start.
+
+        Cada tramo es un dict:
+          {start_iso, end_iso, duration_seconds (>=0), open_at_start, open_at_end}.
+        Las duraciones negativas (datos inconsistentes) se saturan a 0.
+        """
+        intervals: list = []
+        opened = None  # timestamp del ON abierto sin cerrar
+
+        for created_at, is_on in sorted(events, key=lambda e: e[0]):
+            if is_on:
+                if opened is None:
+                    opened = created_at
+                # con abierto → re-activación redundante: ignorar (no reinicia).
+            else:  # OFF
+                if opened is not None:
+                    delta = (created_at - opened).total_seconds()
+                    intervals.append(
+                        {
+                            "start_iso": to_iso(opened),
+                            "end_iso": to_iso(created_at),
+                            "duration_seconds": max(0, int(delta)),
+                            "open_at_start": False,
+                            "open_at_end": False,
+                        }
+                    )
+                    opened = None
+                else:
+                    # OFF sin ON previo: contingencia heredada del mes anterior (arranca en cycle_start).
+                    delta = (created_at - cycle_start).total_seconds()
+                    intervals.append(
+                        {
+                            "start_iso": None,
+                            "end_iso": to_iso(created_at),
+                            "duration_seconds": max(0, int(delta)),
+                            "open_at_start": True,
+                            "open_at_end": False,
+                        }
+                    )
+
+        # ON sin OFF al cierre → tramo vigente, se corta en cutoff.
+        if opened is not None:
+            delta = (cutoff - opened).total_seconds()
+            intervals.append(
+                {
+                    "start_iso": to_iso(opened),
+                    "end_iso": None,
+                    "duration_seconds": max(0, int(delta)),
+                    "open_at_start": False,
+                    "open_at_end": True,
+                }
+            )
+
+        return intervals
 
     @staticmethod
     def _count_paired_interventions(events) -> int:
@@ -1932,8 +2029,10 @@ def compose_pdf(
       6. Tabla resumen del desglose por tramo (from, to, rate, ips_in_tier, subtotal).
       6b. Contingencia del ciclo: TABLA de estadisticas de uso (ingresos/salidas y tiempo de
           proteccion por nivel org y agencia/VLAN, intervenciones workstation emparejadas, mayor
-          intervencion y contingencia forzada vigente), mas las fechas de entrada org en la tz de
-          la org (o nota fail-safe si `contingency is None` o no hay datos). Va JUSTO DESPUES de
+          intervencion y contingencia forzada vigente), mas la CRONOLOGIA de tramos de contingencia
+          a nivel org en la tz de la org (tabla con cada ENTRADA en ambar y cada SALIDA en verde,
+          la duracion por tramo y una fila de TIEMPO TOTAL == org_protection_seconds; o nota
+          fail-safe si `contingency is None` o no hay datos). Va JUSTO DESPUES de
           conceptos/tarifas + tabla de tramos y ANTES del analisis IA.
       7. Analisis IA, o nota fail-safe si `analysis is None` (Req 5.4).
       8. Nota explicita USD sin impuestos (Req 3.7).
@@ -2466,17 +2565,20 @@ def compose_pdf(
             pdf.cell(value_w, line_h, _sanitize_latin1(value), border=1, align="C", fill=True)
             pdf.ln(line_h)
 
-        # Fechas y horas de entrada a contingencia a nivel organización (si las hubo): CADA fecha
-        # en SU PROPIA FILA resaltada (verde suave), indicando que hubo protección activa en cada
-        # una. Máximo 10 filas; si hay más, una fila "y N mas".
-        entry_dts = contingency.org_entry_datetimes or []
-        if entry_dts:
+        # Cronología de contingencia a nivel organización (si hubo tramos): TABLA cronológica
+        # con CADA entrada y CADA salida, la DURACIÓN de cada tramo y una fila de TIEMPO TOTAL.
+        # Cada tramo genera DOS filas: ENTRADA (ámbar) y SALIDA (verde, con la duración del tramo).
+        # Máximo 12 tramos (24 filas); si hay más, una fila "y N tramos mas". El total siempre es
+        # `org_protection_seconds` (fuente de verdad).
+        org_intervals = contingency.org_intervals or []
+        if org_intervals:
             tz_label = contingency.timezone or "UTC"
-            shown = entry_dts[:10]
-            extra = len(entry_dts) - len(shown)
+            max_intervals = 12
+            shown_intervals = org_intervals[:max_intervals]
+            extra_intervals = len(org_intervals) - len(shown_intervals)
 
             pdf.ln(2)
-            # Encabezado de la lista de fechas.
+            # Encabezado de la cronología.
             pdf.set_font("Helvetica", "B", 9)
             pdf.set_text_color(0, 0, 0)
             pdf.set_x(pdf.l_margin)
@@ -2484,42 +2586,137 @@ def compose_pdf(
                 0,
                 6,
                 _sanitize_latin1(
-                    f"Fechas y horas de entrada a contingencia - Organizacion ({tz_label})"
+                    f"Cronologia de contingencia - Organizacion ({tz_label})"
                 ),
                 ln=True,
             )
             pdf.ln(1)
 
-            # Una fila por fecha, resaltada en verde suave #dcfce7, texto verde oscuro #166534.
+            # Anchos de columna: Evento ~40%, Fecha ~38%, Duracion ~22%.
+            event_w = effective_width * 0.40
+            date_w = effective_width * 0.38
+            dur_w = effective_width - event_w - date_w
+            line_h = 6
+
+            # Cabecera de la tabla (azul #2563eb con texto blanco), como las otras tablas.
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_fill_color(37, 99, 235)  # #2563eb
+            pdf.set_text_color(255, 255, 255)
+            pdf.set_x(pdf.l_margin)
+            pdf.cell(event_w, line_h, _sanitize_latin1("Evento"), border=1, align="L", fill=True)
+            pdf.cell(
+                date_w,
+                line_h,
+                _sanitize_latin1(f"Fecha y hora ({tz_label})"),
+                border=1,
+                align="L",
+                fill=True,
+            )
+            pdf.cell(
+                dur_w, line_h, _sanitize_latin1("Duracion del tramo"), border=1, align="C", fill=True
+            )
+            pdf.ln(line_h)
+
             pdf.set_font("Helvetica", "", 9)
-            for dt in shown:
-                pdf.set_fill_color(220, 252, 231)  # #dcfce7 (protección activa)
-                pdf.set_text_color(22, 101, 52)  # #166534
+            for iv in shown_intervals:
+                start_iso = iv.get("start_iso")
+                end_iso = iv.get("end_iso")
+                open_at_start = bool(iv.get("open_at_start"))
+                open_at_end = bool(iv.get("open_at_end"))
+                duration_seconds = iv.get("duration_seconds") or 0
+
+                # Fila ENTRADA: ámbar suave #fef3c7, texto ámbar oscuro #92400e. Duración vacía ("-").
+                if open_at_start:
+                    entry_date = "(inicio del ciclo)"
+                else:
+                    entry_date = _fmt_entry_datetime(start_iso) if start_iso else "-"
+                pdf.set_fill_color(254, 243, 199)  # #fef3c7 (entrada a contingencia)
+                pdf.set_text_color(146, 64, 14)  # #92400e
                 pdf.set_x(pdf.l_margin)
-                # Bullet ASCII (no unicode: _sanitize_latin1 no lo soportaría) + fecha legible.
                 pdf.cell(
-                    effective_width,
-                    6,
-                    _sanitize_latin1(f"- {_fmt_entry_datetime(dt)}"),
+                    event_w,
+                    line_h,
+                    _sanitize_latin1("Entrada a contingencia"),
                     border=1,
                     align="L",
                     fill=True,
                 )
-                pdf.ln(6)
+                pdf.cell(
+                    date_w, line_h, _sanitize_latin1(entry_date), border=1, align="L", fill=True
+                )
+                pdf.cell(dur_w, line_h, _sanitize_latin1("-"), border=1, align="C", fill=True)
+                pdf.ln(line_h)
 
-            if extra > 0:
+                # Fila SALIDA: verde suave #dcfce7, texto verde oscuro #166534. Lleva la duración.
+                if open_at_end:
+                    exit_date = "(vigente al cierre)"
+                else:
+                    exit_date = _fmt_entry_datetime(end_iso) if end_iso else "-"
+                pdf.set_fill_color(220, 252, 231)  # #dcfce7 (salida de contingencia)
+                pdf.set_text_color(22, 101, 52)  # #166534
+                pdf.set_x(pdf.l_margin)
+                pdf.cell(
+                    event_w,
+                    line_h,
+                    _sanitize_latin1("Salida de contingencia"),
+                    border=1,
+                    align="L",
+                    fill=True,
+                )
+                pdf.cell(
+                    date_w, line_h, _sanitize_latin1(exit_date), border=1, align="L", fill=True
+                )
+                pdf.cell(
+                    dur_w,
+                    line_h,
+                    _sanitize_latin1(_fmt_hm(duration_seconds)),
+                    border=1,
+                    align="C",
+                    fill=True,
+                )
+                pdf.ln(line_h)
+
+            # Fila de tramos omitidos (si se superó el máximo mostrado).
+            if extra_intervals > 0:
                 pdf.set_fill_color(241, 245, 249)  # #f1f5f9
                 pdf.set_text_color(100, 116, 139)  # #64748b
                 pdf.set_x(pdf.l_margin)
                 pdf.cell(
-                    effective_width,
-                    6,
-                    _sanitize_latin1(f"y {extra} mas"),
+                    event_w + date_w,
+                    line_h,
+                    _sanitize_latin1(f"y {extra_intervals} tramos mas"),
                     border=1,
                     align="L",
                     fill=True,
                 )
-                pdf.ln(6)
+                pdf.cell(dur_w, line_h, _sanitize_latin1("-"), border=1, align="C", fill=True)
+                pdf.ln(line_h)
+
+            # Fila TOTAL: "Tiempo total de proteccion (Organizacion)" ocupa Evento+Fecha; la
+            # duración es _fmt_hm(org_protection_seconds) (fuente de verdad). Fondo #e2e8f0,
+            # texto azul oscuro #1e3a8a, bold.
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_fill_color(226, 232, 240)  # #e2e8f0
+            pdf.set_text_color(30, 58, 138)  # #1e3a8a
+            pdf.set_x(pdf.l_margin)
+            pdf.cell(
+                event_w + date_w,
+                line_h,
+                _sanitize_latin1("Tiempo total de proteccion (Organizacion)"),
+                border=1,
+                align="L",
+                fill=True,
+            )
+            pdf.cell(
+                dur_w,
+                line_h,
+                _sanitize_latin1(_fmt_hm(contingency.org_protection_seconds)),
+                border=1,
+                align="C",
+                fill=True,
+            )
+            pdf.ln(line_h)
+            pdf.set_font("Helvetica", "", 9)
             pdf.set_text_color(51, 65, 85)
 
     pdf.ln(2)
