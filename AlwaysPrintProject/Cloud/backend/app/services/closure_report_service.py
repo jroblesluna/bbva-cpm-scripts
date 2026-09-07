@@ -1229,6 +1229,182 @@ def _tier_label(tier: object, index: int) -> str:
     return f"{tier_from}-{tier_to}"
 
 
+# === HELPERS DE ESTILO DE GRÁFICOS (funciones puras, sin estado, headless-safe) ===
+#
+# Estos helpers dan un look corporativo "elegante" a los charts (relieve 3D sutil + gradiente
+# de fondo suave) sin tocar NADA de la lógica de datos. Son robustos bajo el backend "Agg"
+# (headless) y no interfieren con el guardado a PNG: el gradiente de fondo se dibuja con
+# `imshow` en `zorder=0` y las barras se pintan por encima (`zorder>=2`).
+
+# Paleta corporativa (hex) reutilizada por los helpers y los render_*.
+_CHART_BLUE = "#2563eb"        # azul primario AlwaysPrint
+_CHART_BLUE_DARK = "#1e3a8a"   # azul oscuro (base del gradiente / anotaciones)
+_CHART_GREEN = "#16a34a"       # verde monto
+_CHART_SHADOW = "#cbd5e1"      # gris de la barra sombra (relieve)
+_CHART_GRID = "#e2e8f0"        # gris grilla horizontal
+_CHART_SPINE = "#cbd5e1"       # gris spines izq/inf
+_CHART_TEXT = "#1e293b"        # gris texto de títulos/labels
+_CHART_BG_SOFT = "#f1f5f9"     # gris fondo suave (parte baja del gradiente)
+
+
+def _hex_to_rgb01(hex_color: str) -> tuple:
+    """Convierte '#rrggbb' a una tupla (r, g, b) en el rango 0..1 (para arrays de gradiente)."""
+    h = hex_color.lstrip("#")
+    return tuple(int(h[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
+
+
+def _style_axes(ax, fig) -> None:
+    """
+    Aplica el look elegante a un `Axes`: gradiente de fondo muy suave, spines sobrios y grilla fina.
+
+    - Fondo del área de plot: gradiente vertical claro (#ffffff arriba -> #f1f5f9 abajo) dibujado
+      con `imshow` en `zorder=0` y `aspect="auto"`, clip-eado a los límites del `Axes`. Si algo
+      falla al construirlo, cae a un `set_facecolor("#f8fafc")` (fail-safe: nunca rompe el render).
+    - Spines: se ocultan top/right; left/bottom quedan en gris #cbd5e1.
+    - Grilla horizontal fina (#e2e8f0) por debajo de las barras (`zorder=0`).
+    - Tipografía de títulos/labels en #1e293b (los títulos en bold los fija cada render_*).
+    - Fondo de la figura en blanco.
+
+    Es puramente estético: no toca datos ni límites de datos (el gradiente se re-encaja a los
+    límites vigentes al momento de llamarlo, por eso conviene invocarlo tras dibujar las series).
+    """
+    fig.patch.set_facecolor("white")
+
+    # Gradiente de fondo suave detrás de todo (zorder=0). Fail-safe a facecolor plano.
+    try:
+        import numpy as np
+
+        top_rgb = _hex_to_rgb01("#ffffff")
+        bot_rgb = _hex_to_rgb01(_CHART_BG_SOFT)
+        # Rampa vertical (256 filas): fila 0 arriba (blanco), última abajo (gris suave).
+        ramp = np.linspace(0.0, 1.0, 256).reshape(-1, 1)
+        grad = np.empty((256, 1, 3), dtype=float)
+        for ch in range(3):
+            grad[:, 0, ch] = top_rgb[ch] + (bot_rgb[ch] - top_rgb[ch]) * ramp[:, 0]
+
+        x0, x1 = ax.get_xlim()
+        y0, y1 = ax.get_ylim()
+        ax.imshow(
+            grad,
+            extent=(x0, x1, y0, y1),
+            aspect="auto",
+            origin="upper",
+            zorder=0,
+            interpolation="bilinear",
+        )
+        # imshow reajusta los límites; restaurarlos para no alterar el encuadre de las series.
+        ax.set_xlim(x0, x1)
+        ax.set_ylim(y0, y1)
+    except Exception:
+        ax.set_facecolor("#f8fafc")
+
+    # Spines sobrios: sin top/right; left/bottom en gris.
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_visible(True)
+        ax.spines[side].set_color(_CHART_SPINE)
+
+    # Grilla horizontal fina por debajo de las series.
+    ax.grid(axis="y", color=_CHART_GRID, linewidth=0.8, zorder=0)
+    ax.set_axisbelow(True)
+
+    # Tipografía de ticks/labels en gris oscuro corporativo.
+    ax.tick_params(colors=_CHART_TEXT, labelsize=8)
+    ax.xaxis.label.set_color(_CHART_TEXT)
+    ax.yaxis.label.set_color(_CHART_TEXT)
+
+
+def _gradient_bars(ax, x_positions, heights, width, base_color, dark_color):
+    """
+    Dibuja barras con gradiente vertical (oscuro abajo -> claro arriba) + sombra para relieve 3D.
+
+    Enfoque robusto y headless-safe:
+      1. Una barra "sombra" gris (#cbd5e1) ligeramente desplazada a la derecha/abajo (zorder=2,
+         alpha 0.5) para dar sensación de profundidad.
+      2. La barra real dibujada con `imshow` de un gradiente vertical clip-eado al rectángulo de
+         cada barra (zorder=3), `aspect="auto"`. Si numpy/imshow fallan, cae a una barra plana
+         `ax.bar(color=base_color, zorder=3)` (fail-safe: nunca rompe el guardado a PNG).
+      3. Un borde superior más oscuro (dark_color) sobre cada barra para acentuar el relieve.
+
+    `x_positions` son los centros de barra (0..N-1), `heights` las alturas (valores), `width` el
+    ancho de barra. Devuelve la lista de centros x (para que el llamador anote los valores).
+    Función pura: no fija título/labels ni cierra la figura.
+    """
+    x_positions = list(x_positions)
+    heights = [float(h) for h in heights]
+
+    # Sombra de relieve: barra gris desplazada ligeramente (relleno plano, semi-transparente).
+    x0, x1 = ax.get_xlim() if ax.has_data() else (0, 1)
+    span = (x1 - x0) or 1.0
+    dx = width * 0.10  # desplazamiento horizontal de la sombra
+    ax.bar(
+        [x + dx for x in x_positions],
+        heights,
+        width=width,
+        color=_CHART_SHADOW,
+        alpha=0.5,
+        zorder=2,
+        edgecolor="none",
+    )
+
+    used_gradient = False
+    try:
+        import numpy as np
+
+        base_rgb = _hex_to_rgb01(base_color)
+        dark_rgb = _hex_to_rgb01(dark_color)
+        # Rampa vertical: arriba (fila 0) = base_color claro; abajo (última fila) = dark_color.
+        ramp = np.linspace(0.0, 1.0, 256).reshape(-1, 1)
+        grad = np.empty((256, 1, 3), dtype=float)
+        for ch in range(3):
+            grad[:, 0, ch] = base_rgb[ch] + (dark_rgb[ch] - base_rgb[ch]) * ramp[:, 0]
+
+        for x, h in zip(x_positions, heights):
+            if h <= 0:
+                continue
+            left = x - width / 2.0
+            im = ax.imshow(
+                grad,
+                extent=(left, left + width, 0, h),
+                aspect="auto",
+                origin="upper",
+                zorder=3,
+                interpolation="bilinear",
+            )
+            # Clip al rectángulo de la barra (por si imshow desborda por interpolación).
+            im.set_clip_on(True)
+        used_gradient = True
+    except Exception:
+        used_gradient = False
+
+    if not used_gradient:
+        # Fail-safe: barras planas de color base por encima de la sombra.
+        ax.bar(
+            x_positions,
+            heights,
+            width=width,
+            color=base_color,
+            zorder=3,
+            edgecolor="none",
+        )
+
+    # Borde superior más oscuro para acentuar el relieve 3D.
+    for x, h in zip(x_positions, heights):
+        if h <= 0:
+            continue
+        ax.plot(
+            [x - width / 2.0, x + width / 2.0],
+            [h, h],
+            color=dark_color,
+            linewidth=1.5,
+            zorder=4,
+            solid_capstyle="round",
+        )
+
+    return x_positions
+
+
 def _placeholder_png(message: str) -> bytes:
     """
     Genera un PNG mínimo con un texto centrado (sin ejes) usado como degradación elegante.
@@ -1239,6 +1415,7 @@ def _placeholder_png(message: str) -> bytes:
     fig = plt.figure(figsize=(6, 3.5))
     try:
         ax = fig.add_subplot(111)
+        ax.set_facecolor("#f8fafc")  # combina con el fondo suave de los charts elegantes
         ax.axis("off")
         ax.text(
             0.5,
@@ -1301,23 +1478,47 @@ def render_tiers_chart(tiers_applied: list) -> bytes:
     fig = plt.figure(figsize=(7, 4))
     try:
         ax = fig.add_subplot(111)
-        bars = ax.bar(labels, values, color="#2563eb")
-        ax.set_title("Composición de estaciones IP facturables por tramo")
+
+        # Posiciones numéricas de barra (0..N-1) para el gradiente/relieve; etiquetas categóricas.
+        x_positions = list(range(len(values)))
+        bar_width = 0.6
+
+        # Fijar límites ANTES del gradiente de fondo para que _style_axes encuadre bien.
+        ax.set_xlim(-0.5, len(values) - 0.5)
+        ax.set_ylim(0, max(values) * 1.15 if values else 1)
+
+        # Barras con gradiente vertical + relieve 3D (azul primario -> azul oscuro).
+        _gradient_bars(
+            ax, x_positions, values, bar_width, _CHART_BLUE, _CHART_BLUE_DARK
+        )
+
+        ax.set_xticks(x_positions)
+        ax.set_xticklabels(labels)
+        ax.set_title(
+            "Composición de estaciones IP facturables por tramo",
+            fontweight="bold",
+            color=_CHART_TEXT,
+        )
         ax.set_xlabel("Tramo (rango de estaciones IP)")
         ax.set_ylabel("Estaciones IP facturables")
-        ax.margins(y=0.15)  # espacio para las anotaciones sobre las barras
 
-        # Anotar el valor sobre cada barra.
-        for bar, value in zip(bars, values):
+        # Anotar el valor sobre cada barra (bold, azul oscuro).
+        for x, value in zip(x_positions, values):
             ax.annotate(
                 str(value),
-                xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+                xy=(x, value),
                 xytext=(0, 3),
                 textcoords="offset points",
                 ha="center",
                 va="bottom",
                 fontsize=9,
+                fontweight="bold",
+                color=_CHART_BLUE_DARK,
+                zorder=5,
             )
+
+        # Look elegante (gradiente de fondo, spines sobrios, grilla fina) tras dibujar las series.
+        _style_axes(ax, fig)
 
         buf = io.BytesIO()
         fig.savefig(buf, format="png", dpi=_CHART_DPI, bbox_inches="tight")
@@ -1363,32 +1564,45 @@ def render_history_chart(history: list) -> bytes:
         ax_bill = fig.add_subplot(111)
 
         if len(points) == 1:
-            # Render mínimo: un solo ciclo. Marcador único para facturables + monto y nota.
+            # Render mínimo: un solo ciclo. Marcador único (borde blanco) para facturables + monto.
             ax_bill.plot(
                 labels,
                 billable,
                 marker="o",
-                markersize=9,
-                color="#2563eb",
+                markersize=10,
+                color=_CHART_BLUE,
+                markeredgecolor="white",
+                markeredgewidth=1.2,
                 linestyle="None",
                 label="Estaciones facturables",
+                zorder=4,
             )
-            ax_bill.set_ylabel("Estaciones facturables", color="#2563eb")
+            ax_bill.set_ylabel("Estaciones facturables", color=_CHART_BLUE)
             ax_bill.margins(x=0.5, y=0.3)
+
+            # Look elegante para el eje principal (fondo/spines/grilla).
+            _style_axes(ax_bill, fig)
 
             ax_amount = ax_bill.twinx()
             ax_amount.plot(
                 labels,
                 amounts,
                 marker="s",
-                markersize=8,
-                color="#16a34a",
+                markersize=9,
+                color=_CHART_GREEN,
+                markeredgecolor="white",
+                markeredgewidth=1.2,
                 linestyle="None",
                 label="Monto (USD)",
+                zorder=4,
             )
-            ax_amount.set_ylabel("Monto (USD)", color="#16a34a")
+            ax_amount.set_ylabel("Monto (USD)", color=_CHART_GREEN)
+            # No duplicar grilla en el eje secundario.
+            ax_amount.grid(False)
 
-            ax_bill.set_title("Evolución histórica")
+            ax_bill.set_title(
+                "Evolución histórica", fontweight="bold", color=_CHART_TEXT
+            )
             ax_bill.set_xlabel("Periodo (YYYY-MM)")
             # Nota explícita de degradación elegante para el primer ciclo.
             ax_bill.text(
@@ -1399,27 +1613,49 @@ def render_history_chart(history: list) -> bytes:
                 ha="center",
                 va="top",
                 fontsize=9,
-                color="#666666",
+                color=_CHART_TEXT,
             )
         else:
-            # Serie completa: barras (facturables) + línea (monto) en eje secundario.
-            ax_bill.bar(labels, billable, color="#2563eb", label="Estaciones facturables")
-            ax_bill.set_ylabel("Estaciones facturables", color="#2563eb")
+            # Serie completa: barras (facturables, gradiente/relieve) + línea (monto) en eje 2rio.
+            x_positions = list(range(len(billable)))
+            bar_width = 0.6
+
+            ax_bill.set_xlim(-0.5, len(billable) - 0.5)
+            ax_bill.set_ylim(0, max(billable) * 1.15 if billable else 1)
+
+            _gradient_bars(
+                ax_bill, x_positions, billable, bar_width, _CHART_BLUE, _CHART_BLUE_DARK
+            )
+            ax_bill.set_xticks(x_positions)
+            ax_bill.set_xticklabels(labels)
+            ax_bill.set_ylabel("Estaciones facturables", color=_CHART_BLUE)
             ax_bill.set_xlabel("Periodo (YYYY-MM)")
-            ax_bill.margins(y=0.15)
+
+            # Look elegante para el eje principal ANTES de la línea de monto.
+            _style_axes(ax_bill, fig)
 
             ax_amount = ax_bill.twinx()
             ax_amount.plot(
-                labels,
+                x_positions,
                 amounts,
                 marker="o",
-                color="#16a34a",
-                linewidth=2,
+                markersize=6,
+                color=_CHART_GREEN,
+                linewidth=2.5,
+                markeredgecolor="white",
+                markeredgewidth=1.2,
                 label="Monto (USD)",
+                zorder=5,
             )
-            ax_amount.set_ylabel("Monto (USD)", color="#16a34a")
+            ax_amount.set_ylabel("Monto (USD)", color=_CHART_GREEN)
+            # No duplicar grilla en el eje secundario (monto).
+            ax_amount.grid(False)
 
-            ax_bill.set_title("Evolución histórica de estaciones facturables y monto")
+            ax_bill.set_title(
+                "Evolución histórica de estaciones facturables y monto",
+                fontweight="bold",
+                color=_CHART_TEXT,
+            )
 
         # Rotar etiquetas del eje X si hay varios ciclos (evita solape).
         for label in ax_bill.get_xticklabels():
@@ -1683,12 +1919,55 @@ def compose_pdf(
     robles_logo = os.path.join(static_dir, "robles_ai_logo.png")
 
     class ClosureReportPDF(FPDF):
-        """PDF con footer de copyright de Inversiones On Line S.A.C. en cada página (sección 9)."""
+        """
+        PDF con cabecera de marca en TODAS las páginas (banda azul corporativa) y footer de
+        copyright de Inversiones On Line S.A.C. en cada página (sección 9).
+
+        `header()`/`footer()` los invoca fpdf2 automáticamente dentro de `add_page()`, por lo
+        que los atributos de instancia que consume `header()` (`report_org_name`,
+        `report_period`, `report_logo_path`) deben setearse ANTES del primer `add_page()`. El
+        header los lee de forma defensiva con `getattr`: si faltan, dibuja solo la banda.
+        """
+
+        def header(self) -> None:
+            # Banda superior degradada (simulada con dos rects): azul oscuro arriba, azul primario abajo.
+            self.set_fill_color(30, 58, 138)  # #1e3a8a
+            self.rect(0, 0, self.w, 9, "F")
+            self.set_fill_color(37, 99, 235)  # #2563eb
+            self.rect(0, 9, self.w, 9, "F")
+
+            # Logo mini de AlwaysPrint a la izquierda (si existe el asset).
+            logo_path = getattr(self, "report_logo_path", None)
+            text_left_x = 8.0
+            if logo_path and os.path.exists(logo_path):
+                try:
+                    self.image(logo_path, x=8, y=3, h=12)
+                    text_left_x = 24.0  # dejar espacio al logo
+                except Exception:
+                    text_left_x = 8.0
+
+            # Título corto (blanco, bold) tras el logo.
+            self.set_text_color(255, 255, 255)
+            self.set_font("Helvetica", "B", 11)
+            self.set_xy(text_left_x, 5)
+            self.cell(90, 8, _sanitize_latin1("Reporte de Cierre Mensual"), align="L")
+
+            # A la derecha: "{org} - {periodo}" (blanco, normal).
+            org_name = getattr(self, "report_org_name", None)
+            period = getattr(self, "report_period", None)
+            if org_name or period:
+                right_txt = " - ".join(str(v) for v in (org_name, period) if v)
+                self.set_font("Helvetica", "", 8)
+                self.set_xy(self.w - 100 - 8, 6)
+                self.cell(100, 6, _sanitize_latin1(right_txt), align="R")
+
+            # Restaurar color de texto para el contenido del cuerpo.
+            self.set_text_color(0, 0, 0)
 
         def footer(self) -> None:
             self.set_y(-15)
             self.set_font("Helvetica", "I", 7)
-            self.set_text_color(150, 150, 150)
+            self.set_text_color(100, 116, 139)  # #64748b
             year = datetime.utcnow().year
             self.cell(
                 0,
@@ -1698,40 +1977,90 @@ def compose_pdf(
             )
 
     pdf = ClosureReportPDF()
+    # Márgenes decentes: top 24 deja espacio bajo la banda de 18mm; footer con auto-break a 20.
+    pdf.set_margins(left=15, top=24, right=15)
     pdf.set_auto_page_break(auto=True, margin=20)
+
+    # Atributos que consume header() (setear ANTES del primer add_page para que la banda de la
+    # portada ya muestre org/periodo/logo).
+    _org_name_hdr = getattr(org, "name", None) or getattr(org, "id", "N/A")
+    pdf.report_org_name = _org_name_hdr
+    pdf.report_period = _fmt_period(header)
+    pdf.report_logo_path = alwaysprint_logo if os.path.exists(alwaysprint_logo) else None
+
     pdf.add_page()
     effective_width = pdf.w - pdf.l_margin - pdf.r_margin
 
+    # --- Helpers locales de estilo de sección (color corporativo + acento azul) ---
+    def _section_title(text: str) -> None:
+        """
+        Dibuja un título de sección a todo el ancho: azul oscuro #1e3a8a (Helvetica B 12) con una
+        línea de acento azul #2563eb (~30mm) debajo. AVANZA a nueva línea (uso en secciones
+        stacked, NO en columnas alineadas). Restaura color de texto de cuerpo al terminar.
+        """
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_text_color(30, 58, 138)  # #1e3a8a
+        pdf.set_x(pdf.l_margin)
+        pdf.cell(0, 7, _sanitize_latin1(text), ln=True)
+        # Línea de acento azul corta debajo del título.
+        accent_y = pdf.get_y() + 0.5
+        pdf.set_draw_color(37, 99, 235)  # #2563eb
+        pdf.set_line_width(0.8)
+        pdf.line(pdf.l_margin, accent_y, pdf.l_margin + 30, accent_y)
+        pdf.set_line_width(0.2)  # restaurar grosor por defecto
+        pdf.ln(2)
+        pdf.set_text_color(0, 0, 0)
+
+    def _section_title_at(text: str, x: float, width: float, y: float) -> None:
+        """
+        Variante para títulos de columnas alineadas: pinta el texto en azul oscuro y su acento
+        azul en una `(x, y)` dada SIN avanzar el flujo vertical (no rompe el layout de columnas).
+        No cambia la `y` del cursor de forma persistente; el llamador controla el flujo.
+        """
+        pdf.set_xy(x, y)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_text_color(30, 58, 138)  # #1e3a8a
+        pdf.cell(width, 7, _sanitize_latin1(text), ln=True)
+        accent_y = y + 7.5
+        accent_w = min(30.0, width)
+        pdf.set_draw_color(37, 99, 235)  # #2563eb
+        pdf.set_line_width(0.8)
+        pdf.line(x, accent_y, x + accent_w, accent_y)
+        pdf.set_line_width(0.2)
+        pdf.set_text_color(0, 0, 0)
+
     # ==================================================================================
     # Sección 1 — Portada / header (logos, título, organización, periodo, modalidad, fecha)
+    # La banda de marca (header()) ocupa 0-18mm en TODAS las páginas; el contenido de portada
+    # empieza debajo (logos en y=24, título en y=44) para no solaparse con la banda.
     # ==================================================================================
     if os.path.exists(alwaysprint_logo):
-        pdf.image(alwaysprint_logo, x=10, y=8, w=20)
+        pdf.image(alwaysprint_logo, x=10, y=24, w=20)
 
     if os.path.exists(robles_logo):
         # Logo Robles.AI a la derecha + subtítulo "División de Automatización".
-        pdf.image(robles_logo, x=155, y=8, w=35)
+        pdf.image(robles_logo, x=155, y=24, w=35)
         pdf.set_font("Helvetica", "I", 6.5)
         pdf.set_text_color(100, 100, 100)
-        pdf.set_xy(145, 19)
+        pdf.set_xy(145, 35)
         pdf.cell(55, 3, _sanitize_latin1("Division de Automatizacion"), align="R")
     else:
         # Fallback textual si no está el asset.
         pdf.set_font("Helvetica", "B", 9)
         pdf.set_text_color(100, 100, 100)
-        pdf.set_xy(130, 10)
+        pdf.set_xy(130, 26)
         pdf.cell(70, 4, "Robles.AI", align="R")
 
-    # Título centrado.
-    pdf.set_xy(10, 30)
+    # Título centrado (debajo de los logos de portada).
+    pdf.set_xy(10, 44)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(0, 10, _sanitize_latin1("Reporte de Cierre Mensual - Sustento de Factura"), ln=True, align="C")
     pdf.ln(3)
 
-    # Separador.
-    pdf.set_draw_color(200, 200, 200)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    # Separador (hairline gris #cbd5e1, entre márgenes).
+    pdf.set_draw_color(203, 213, 225)
+    pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
     pdf.ln(5)
 
     # ==================================================================================
@@ -1751,12 +2080,10 @@ def compose_pdf(
     blocks_top_y = pdf.get_y()
 
     # --- Columna izquierda: "Datos del cierre" ---
-    pdf.set_xy(meta_left_x, blocks_top_y)
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(meta_col_width, 7, _sanitize_latin1("Datos del cierre"), ln=True)
+    _section_title_at("Datos del cierre", meta_left_x, meta_col_width, blocks_top_y)
+    pdf.set_xy(meta_left_x, blocks_top_y + 9)
     pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(60, 60, 60)
+    pdf.set_text_color(100, 116, 139)  # #64748b texto secundario
     datos_lines = [
         f"Organizacion: {org_name}",
         f"Periodo: {_fmt_period(header)}",
@@ -1770,12 +2097,10 @@ def compose_pdf(
     left_bottom_y = pdf.get_y()
 
     # --- Columna derecha: "Resumen del cierre" ---
-    pdf.set_xy(meta_right_x, blocks_top_y)
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(meta_col_width, 7, _sanitize_latin1("Resumen del cierre"), ln=True)
+    _section_title_at("Resumen del cierre", meta_right_x, meta_col_width, blocks_top_y)
+    pdf.set_xy(meta_right_x, blocks_top_y + 9)
     pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(60, 60, 60)
+    pdf.set_text_color(100, 116, 139)  # #64748b texto secundario
     resumen_lines = [
         f"Estaciones facturables: {header.total_billable}",
         f"Estaciones recicladas: {header.total_recycled}",
@@ -1798,11 +2123,11 @@ def compose_pdf(
         pdf.set_text_color(180, 50, 50)
         pdf.set_x(pdf.l_margin)
         pdf.multi_cell(effective_width, 5, _sanitize_latin1(reconciliation.note))
-        pdf.set_text_color(60, 60, 60)
+        pdf.set_text_color(100, 116, 139)
 
     pdf.ln(4)
-    pdf.set_draw_color(200, 200, 200)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.set_draw_color(203, 213, 225)
+    pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
     pdf.ln(5)
 
     # ==================================================================================
@@ -1833,16 +2158,25 @@ def compose_pdf(
         # Fallback al aspect ratio de figsize (7x4) si no se pudo leer el PNG.
         return width_mm * (4.0 / 7.0)
 
-    # Títulos de ambas columnas a la misma altura.
+    # Títulos de ambas columnas a la misma altura (azul oscuro + acento azul centrado).
     titles_y = pdf.get_y()
-    pdf.set_text_color(0, 0, 0)
+    pdf.set_text_color(30, 58, 138)  # #1e3a8a
     pdf.set_font("Helvetica", "B", 12)
     pdf.set_xy(left_x, titles_y)
     pdf.cell(col_width, 7, _sanitize_latin1("Composicion de tramos"), align="C")
     pdf.set_xy(right_x, titles_y)
     pdf.cell(col_width, 7, _sanitize_latin1("Evolucion historica"), align="C")
+    # Acento azul centrado bajo cada título de columna (~30mm).
+    accent_y = titles_y + 7.5
+    accent_w = min(30.0, col_width)
+    pdf.set_draw_color(37, 99, 235)  # #2563eb
+    pdf.set_line_width(0.8)
+    pdf.line(left_x + (col_width - accent_w) / 2, accent_y, left_x + (col_width + accent_w) / 2, accent_y)
+    pdf.line(right_x + (col_width - accent_w) / 2, accent_y, right_x + (col_width + accent_w) / 2, accent_y)
+    pdf.set_line_width(0.2)
+    pdf.set_text_color(0, 0, 0)
 
-    images_y = titles_y + 9  # debajo de los títulos
+    images_y = titles_y + 10  # debajo de los títulos + acento
     left_h = 0.0
     right_h = 0.0
     if tiers_png:
@@ -1858,8 +2192,8 @@ def compose_pdf(
 
     # Avanzar el cursor por debajo del gráfico más alto y dibujar el separador.
     pdf.set_y(images_y + max(left_h, right_h) + 4)
-    pdf.set_draw_color(200, 200, 200)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.set_draw_color(203, 213, 225)
+    pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
     pdf.ln(5)
 
     # ==================================================================================
@@ -1877,12 +2211,10 @@ def compose_pdf(
     info_top_y = pdf.get_y()
 
     # --- Columna izquierda: Conceptos, tarifas y modalidad (stacked) ---
-    pdf.set_xy(info_left_x, info_top_y)
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(info_col_width, 7, _sanitize_latin1("Conceptos, tarifas y modalidad"), ln=True)
+    _section_title_at("Conceptos, tarifas y modalidad", info_left_x, info_col_width, info_top_y)
+    pdf.set_xy(info_left_x, info_top_y + 9)
     pdf.set_font("Helvetica", "", 9)
-    pdf.set_text_color(60, 60, 60)
+    pdf.set_text_color(100, 116, 139)  # #64748b
     conceptos = [
         "Facturable: estacion (IP privada) contabilizada para el cobro del periodo "
         "(la unidad de cobro es la estacion IP, no impresiones).",
@@ -1896,10 +2228,7 @@ def compose_pdf(
     left_info_bottom_y = pdf.get_y()
 
     # --- Columna derecha: Tabla del desglose por tramo ---
-    pdf.set_xy(info_right_x, info_top_y)
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(info_col_width, 7, _sanitize_latin1("Desglose por tramo"), ln=True)
+    _section_title_at("Desglose por tramo", info_right_x, info_col_width, info_top_y)
 
     # Anchos de columna de la tabla, proporcionales al ancho de la columna derecha.
     tbl_col_widths = [
@@ -1911,19 +2240,20 @@ def compose_pdf(
     ]
     tbl_headers = ["Desde", "Hasta", "Tarifa", "Estaciones", "Subtotal"]
 
-    # Cabecera de la tabla.
-    pdf.set_xy(info_right_x, info_top_y + 8)
+    # Cabecera de la tabla (azul #2563eb con texto blanco).
+    pdf.set_xy(info_right_x, info_top_y + 9)
     pdf.set_font("Helvetica", "B", 8)
-    pdf.set_fill_color(230, 230, 230)
-    pdf.set_text_color(0, 0, 0)
+    pdf.set_fill_color(37, 99, 235)  # #2563eb
+    pdf.set_text_color(255, 255, 255)
     for width, title in zip(tbl_col_widths, tbl_headers):
         pdf.cell(width, 6, _sanitize_latin1(title), border=1, align="C", fill=True)
     pdf.ln(6)
 
-    # Filas de tramos.
+    # Filas de tramos (zebra striping: impares #f1f5f9, pares blanco).
     pdf.set_font("Helvetica", "", 8)
-    pdf.set_text_color(60, 60, 60)
+    pdf.set_text_color(51, 65, 85)  # #334155
     if tiers_applied:
+        row_index = 0
         for tier in tiers_applied:
             if not isinstance(tier, dict):
                 continue
@@ -1939,10 +2269,16 @@ def compose_pdf(
                 str(ips_in_tier),
                 str(subtotal),
             ]
+            # Zebra striping suave: filas impares con fill gris #f1f5f9.
+            if row_index % 2 == 1:
+                pdf.set_fill_color(241, 245, 249)  # #f1f5f9
+            else:
+                pdf.set_fill_color(255, 255, 255)
             pdf.set_x(info_right_x)
             for width, cell in zip(tbl_col_widths, row):
-                pdf.cell(width, 6, _sanitize_latin1(cell), border=1, align="C")
+                pdf.cell(width, 6, _sanitize_latin1(cell), border=1, align="C", fill=True)
             pdf.ln(6)
+            row_index += 1
     else:
         pdf.set_x(info_right_x)
         pdf.cell(
@@ -1954,29 +2290,27 @@ def compose_pdf(
         )
         pdf.ln(6)
 
-    # Fila de total (reconcilia con header.amount, la fuente de verdad).
+    # Fila de total (reconcilia con header.amount, la fuente de verdad). Fill azul suave.
     pdf.set_font("Helvetica", "B", 8)
-    pdf.set_text_color(0, 0, 0)
+    pdf.set_text_color(30, 58, 138)  # #1e3a8a
+    pdf.set_fill_color(226, 232, 240)  # #e2e8f0 (azul/gris suave para destacar el total)
     pdf.set_x(info_right_x)
-    pdf.cell(sum(tbl_col_widths[:4]), 6, _sanitize_latin1("Total"), border=1, align="R")
-    pdf.cell(tbl_col_widths[4], 6, _sanitize_latin1(f"USD {reconciliation.header_amount}"), border=1, align="C")
+    pdf.cell(sum(tbl_col_widths[:4]), 6, _sanitize_latin1("Total"), border=1, align="R", fill=True)
+    pdf.cell(tbl_col_widths[4], 6, _sanitize_latin1(f"USD {reconciliation.header_amount}"), border=1, align="C", fill=True)
     pdf.ln(6)
     right_info_bottom_y = pdf.get_y()
 
     # Continuar debajo de la columna más alta y dibujar el separador.
     pdf.set_y(max(left_info_bottom_y, right_info_bottom_y))
     pdf.ln(2)
-    pdf.set_draw_color(200, 200, 200)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.set_draw_color(203, 213, 225)
+    pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
     pdf.ln(5)
 
     # ==================================================================================
     # Sección 6b — Contingencia del ciclo (JUSTO DESPUÉS de conceptos/tramos, ANTES del IA)
     # ==================================================================================
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 7, _sanitize_latin1("Contingencia del ciclo"), ln=True)
-    pdf.ln(2)
+    _section_title("Contingencia del ciclo")
 
     if contingency is None or not contingency.data_available:
         # Fail-safe: estadísticas no disponibles → nota en cursiva gris, no bloquea el reporte.
@@ -2037,22 +2371,26 @@ def compose_pdf(
         value_w = effective_width - metric_w
         line_h = 6
 
-        # Cabecera de la tabla (con fill), al estilo del resto del PDF.
+        # Cabecera de la tabla (azul #2563eb con texto blanco).
         pdf.set_font("Helvetica", "B", 9)
-        pdf.set_fill_color(230, 230, 230)
-        pdf.set_text_color(0, 0, 0)
+        pdf.set_fill_color(37, 99, 235)  # #2563eb
+        pdf.set_text_color(255, 255, 255)
         pdf.set_x(pdf.l_margin)
         pdf.cell(metric_w, line_h, _sanitize_latin1("Metrica"), border=1, align="L", fill=True)
         pdf.cell(value_w, line_h, _sanitize_latin1("Valor"), border=1, align="C", fill=True)
         pdf.ln(line_h)
 
-        # Filas de datos.
+        # Filas de datos (zebra striping: impares #f1f5f9, pares blanco).
         pdf.set_font("Helvetica", "", 9)
-        pdf.set_text_color(60, 60, 60)
-        for metric, value in rows:
+        pdf.set_text_color(51, 65, 85)  # #334155
+        for row_index, (metric, value) in enumerate(rows):
+            if row_index % 2 == 1:
+                pdf.set_fill_color(241, 245, 249)  # #f1f5f9
+            else:
+                pdf.set_fill_color(255, 255, 255)
             pdf.set_x(pdf.l_margin)
-            pdf.cell(metric_w, line_h, _sanitize_latin1(metric), border=1, align="L")
-            pdf.cell(value_w, line_h, _sanitize_latin1(value), border=1, align="C")
+            pdf.cell(metric_w, line_h, _sanitize_latin1(metric), border=1, align="L", fill=True)
+            pdf.cell(value_w, line_h, _sanitize_latin1(value), border=1, align="C", fill=True)
             pdf.ln(line_h)
 
         # Fechas y horas de entrada a contingencia a nivel organización (si las hubo).
@@ -2066,7 +2404,7 @@ def compose_pdf(
             tz_label = contingency.timezone or "UTC"
             pdf.ln(2)
             pdf.set_font("Helvetica", "", 9)
-            pdf.set_text_color(60, 60, 60)
+            pdf.set_text_color(100, 116, 139)  # #64748b
             pdf.set_x(pdf.l_margin)
             pdf.multi_cell(
                 effective_width,
@@ -2078,18 +2416,15 @@ def compose_pdf(
             )
 
     pdf.ln(2)
-    pdf.set_text_color(60, 60, 60)
-    pdf.set_draw_color(200, 200, 200)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.set_text_color(100, 116, 139)
+    pdf.set_draw_color(203, 213, 225)
+    pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
     pdf.ln(5)
 
     # ==================================================================================
     # Sección 7 — Análisis IA (o nota fail-safe si no está disponible)
     # ==================================================================================
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 7, _sanitize_latin1("Analisis IA del consumo"), ln=True)
-    pdf.ln(2)
+    _section_title("Analisis IA del consumo")
 
     if analysis is None:
         # Fail-safe (Req 5.4): nota explícita, el reporte no se bloquea por ausencia de IA.
@@ -2128,8 +2463,8 @@ def compose_pdf(
                 pdf.multi_cell(effective_width, 5, line)
 
     pdf.ln(4)
-    pdf.set_draw_color(200, 200, 200)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.set_draw_color(203, 213, 225)
+    pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
     pdf.ln(5)
 
     # ==================================================================================
