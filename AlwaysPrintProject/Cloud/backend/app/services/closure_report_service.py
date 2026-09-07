@@ -1986,7 +1986,8 @@ def compose_pdf(
             self.set_text_color(255, 255, 255)
             self.set_font("Helvetica", "B", 11)
             self.set_xy(text_left_x, 4)
-            self.cell(90, 8, _sanitize_latin1("Reporte de Cierre Mensual"), align="L")
+            # Título corto que describe el ROL del documento (el subtítulo largo va en la portada).
+            self.cell(90, 8, _sanitize_latin1("Detalle de Servicios Prestados"), align="L")
 
             # A la derecha: "{org} - {periodo}" (blanco, normal), también dentro de la banda.
             org_name = getattr(self, "report_org_name", None)
@@ -2014,9 +2015,10 @@ def compose_pdf(
             )
 
     pdf = ClosureReportPDF()
-    # Márgenes: la banda del header mide 16mm; top margin 22mm deja 6mm de aire para que el
-    # contenido de páginas 2+ NO se solape con la banda. Footer con auto-break a 20mm.
-    pdf.set_margins(left=15, top=22, right=15)
+    # Márgenes: la banda del header mide 16mm; top margin 24mm deja 8mm de aire para que el
+    # contenido de páginas 2+ (y el acento azul bajo el título) NO se solapen con la banda.
+    # Footer con auto-break a 20mm.
+    pdf.set_margins(left=15, top=24, right=15)
     pdf.set_auto_page_break(auto=True, margin=20)
 
     # Atributos que consume header() (setear ANTES del primer add_page para que la banda de la
@@ -2036,6 +2038,11 @@ def compose_pdf(
         línea de acento azul #2563eb (~30mm) debajo. AVANZA a nueva línea (uso en secciones
         stacked, NO en columnas alineadas). Restaura color de texto de cuerpo al terminar.
         """
+        # Guard anti-solapamiento: si la `y` heredada quedó por encima del top margin (p. ej. por
+        # un set_y negativo previo al abrir una página nueva), forzarla al top margin para que el
+        # título NUNCA caiga dentro de la banda del header.
+        if pdf.get_y() < pdf.t_margin:
+            pdf.set_y(pdf.t_margin)
         pdf.set_font("Helvetica", "B", 12)
         pdf.set_text_color(30, 58, 138)  # #1e3a8a
         pdf.set_x(pdf.l_margin)
@@ -2115,7 +2122,7 @@ def compose_pdf(
     pdf.set_xy(10, 44)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, _sanitize_latin1("Reporte de Cierre Mensual - Sustento de Factura"), ln=True, align="C")
+    pdf.cell(0, 10, _sanitize_latin1("Reporte de Cierre Mensual - Detalle de Servicios Prestados"), ln=True, align="C")
     pdf.ln(3)
 
     # Separador (hairline gris #cbd5e1, entre márgenes).
@@ -2366,6 +2373,12 @@ def compose_pdf(
     # + Conceptos/tramos + disclaimer USD al pie). Contingencia y Análisis IA empiezan en pág 2.
     # ==================================================================================
     pdf.add_page()
+    # Fuerza el cursor al top margin tras abrir la página 2: el disclaimer USD previo usó
+    # set_y(-30) (zona de footer), y tras add_page() la `y` residual podía caer DENTRO de la
+    # banda del header (16mm), solapando el título con el título de la banda. Anclar aquí al
+    # top margin garantiza que "Contingencia del ciclo" arranque debajo de la banda.
+    pdf.set_y(pdf.t_margin)
+    pdf.set_x(pdf.l_margin)
 
     # ==================================================================================
     # Sección 6b — Contingencia del ciclo (página 2, ANTES del análisis IA)
