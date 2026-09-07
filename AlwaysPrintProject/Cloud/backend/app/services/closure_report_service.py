@@ -2383,7 +2383,7 @@ def compose_pdf(
     pdf.set_xy(_iol_text_x, 36.0)
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(60, 60, 60)
-    pdf.cell(_iol_text_w, 5, _sanitize_latin1("+1 (408) 590-0153 / +1 (669) 300-2772"), align="L")
+    pdf.cell(_iol_text_w, 5, _sanitize_latin1("+1 (408) 590-0153"), align="L")
     # L4: URL en azul (simula enlace).
     pdf.set_xy(_iol_text_x, 41.0)
     pdf.set_font("Helvetica", "", 10)
