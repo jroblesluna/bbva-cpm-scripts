@@ -2355,19 +2355,37 @@ def compose_pdf(
     # empieza debajo (logo en y=24, título en y=44) para no solaparse con la banda. El logo mini
     # de AlwaysPrint ya va en la banda del header → NO se repite grande en la portada.
     # ==================================================================================
-    # Logo IOL (Inversiones On Line) arriba a la IZQUIERDA, ~20% más grande (w=42, antes 35).
-    # El logo Robles.AI YA NO va en la portada: ahora se dibuja en footer() abajo a la derecha.
+    # Isotipo IOL (Inversiones On Line) arriba a la IZQUIERDA: ahora es SOLO el icono (candado)
+    # cuadrado, dimensionado por ALTO y centrado verticalmente respecto al bloque de texto de
+    # contacto. El logo Robles.AI YA NO va en la portada: se dibuja en footer() abajo a la derecha.
     if os.path.exists(iol_logo):
         try:
-            pdf.image(iol_logo, x=pdf.l_margin, y=24.0, w=42.0)
+            # Isotipo cuadrado (o cualquier aspect): calcular el ANCHO que produce el ALTO
+            # objetivo para no deformar la imagen, a partir del aspect ratio real del PNG.
+            _iol_logo_h = 18.0  # alto objetivo, alineado al bloque de texto de contacto (~20mm)
+            try:
+                with open(iol_logo, "rb") as _f:
+                    _iol_bytes = _f.read()
+                # _png_height_for_width devuelve alto para un ancho dado; invertimos con un ancho
+                # de sondeo de 100mm para obtener el ratio alto/ancho y despejar el ancho objetivo.
+                _probe_w = 100.0
+                _probe_h = _png_height_for_width(_iol_bytes, _probe_w)
+                _ratio_h_per_w = (_probe_h / _probe_w) if _probe_w else 1.0
+                _iol_logo_w = (_iol_logo_h / _ratio_h_per_w) if _ratio_h_per_w else _iol_logo_h
+            except Exception:
+                _iol_logo_w = _iol_logo_h  # fallback: asumir cuadrado
+            # Centrar verticalmente el logo respecto al bloque de texto (y=26..46 → centro 36).
+            _iol_logo_y = 36.0 - (_iol_logo_h / 2.0)
+            pdf.image(iol_logo, x=pdf.l_margin, y=_iol_logo_y, w=_iol_logo_w, h=_iol_logo_h)
         except Exception:
             # Fail-safe: si el asset no se puede incrustar, no romper la generacion del PDF.
             pass
 
-    # Bloque de datos de contacto a la DERECHA del logo IOL (logo ocupa x=15..57 con w=42; el
-    # texto arranca en x≈60 = l_margin + 44). Todos los textos pasan por _sanitize_latin1 para
-    # quedar Latin-1 safe. "Peru" sin tilde a propósito para máxima seguridad de encoding.
-    _iol_text_x = pdf.l_margin + 44  # ≈ 59
+    # Bloque de datos de contacto a la DERECHA del isotipo IOL (el icono ocupa x=15..~33 con
+    # w≈18; el texto arranca en x≈37 = l_margin + 22, dejando ~4mm de aire tras el icono). Todos
+    # los textos pasan por _sanitize_latin1 para quedar Latin-1 safe. "Peru" sin tilde a propósito
+    # para máxima seguridad de encoding.
+    _iol_text_x = pdf.l_margin + 22  # ≈ 37
     _iol_text_w = 120.0  # ancho suficiente para no truncar teléfonos ni URL
     # L1: razón social (negrita, negro).
     pdf.set_xy(_iol_text_x, 26.0)
