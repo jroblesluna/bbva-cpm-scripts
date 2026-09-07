@@ -832,6 +832,18 @@ class ClosureReportService:
                 "organizacion (cuanto tiempo estuvo el servicio de impresion resguardado por la "
                 "contingencia)."
             )
+            # Si hubo contingencia forzada a nivel organizacion en el ciclo, destaca su valor:
+            # el ruteo pasa a ser directo (bypass del flujo CPM/Linux), sin generar nuevos tickets.
+            if contingency.org_entries > 0:
+                observaciones_extra += (
+                    " Ademas, DESTACA que al activarse la contingencia a nivel ORGANIZACION la "
+                    "impresion pasa a ser DIRECTA (bypass del flujo normal CPM/Linux), por lo que "
+                    "durante ese periodo NO se generan nuevos tickets de impresion y el servicio "
+                    "sigue operativo sin intervencion de la Mesa de Ayuda. RECOMIENDA, para que el "
+                    "usuario identifique rapidamente ese enrutamiento directo, mantener "
+                    "correctamente asignadas las impresoras disponibles como parte de la AGENCIA y "
+                    "las impresoras FAVORITAS por usuario."
+                )
         sections.append(
             "## Solicitud\n"
             "Redacta un analisis en espanol con exactamente estas tres secciones:\n"
