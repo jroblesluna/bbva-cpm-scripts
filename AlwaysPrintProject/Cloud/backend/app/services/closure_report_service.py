@@ -26,6 +26,7 @@ Nota sobre matplotlib (headless + LAZY import):
 
 import io
 import os
+import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import List, Optional
@@ -749,6 +750,9 @@ class ClosureReportService:
             "Eres un analista de consumo y facturacion de servicios de impresion corporativa. "
             "Redacta en espanol, con tono profesional y objetivo, sin exagerar hallazgos. "
             "Todos los precios estan expresados en dolares americanos (USD) y NO incluyen impuestos. "
+            "MONEDA: escribe SIEMPRE los importes con el prefijo 'USD ' (formato correcto: "
+            "'USD 171.25'). NUNCA uses los simbolos '$', 'US$', 'USD$' ni la palabra 'dolares' con "
+            "simbolo; usa unicamente 'USD ' seguido del numero. "
             "IMPORTANTE: la unidad de facturacion es la ESTACION IP (una IP privada / workstation "
             "contabilizada), NO impresiones, paginas ni copias. Los tramos de tarifa se aplican "
             "sobre la CANTIDAD DE ESTACIONES IP facturables del periodo. Nunca describas los tramos "
@@ -766,9 +770,9 @@ class ClosureReportService:
         # Resumen del cierre objetivo (totales por estado y monto).
         sections.append(
             "## Resumen del mes objetivo\n"
-            f"- Estaciones facturables: {header.total_billable}\n"
-            f"- Estaciones recicladas: {header.total_recycled}\n"
-            f"- Estaciones archivadas: {header.total_archived}\n"
+            f"- Estaciones IP facturables: {header.total_billable}\n"
+            f"- Estaciones IP recicladas: {header.total_recycled}\n"
+            f"- Estaciones IP archivadas: {header.total_archived}\n"
             f"- Monto del mes: USD {header.amount}\n"
             f"- Tipo de cierre: {'retroactivo' if header.is_retroactive else 'normal'}"
         )
@@ -1070,6 +1074,10 @@ class ClosureReportService:
                 exc,
             )
             return None
+
+        # Normalizar la moneda del texto libre de la IA a "USD " ANTES de persistir (fail-safe:
+        # no depende de que el LLM obedezca el prompt). Solo toca el texto, no los montos.
+        analysis_text = _normalize_currency(analysis_text)
 
         # 3. Persistir el análisis (texto + modelo + fecha) en la tabla auxiliar.
         self.upsert_report_row(
@@ -1840,6 +1848,26 @@ def _fmt_money(value: object) -> str:
         return "0.00"
 
 
+# Símbolos de dólar que puede emitir la IA en texto libre (se normalizan a "USD ").
+_CURRENCY_RE = re.compile(r"(?:US\$|USD\$|U\$S|\$)\s*(?=\d)")
+
+
+def _normalize_currency(text: str) -> str:
+    """
+    Normaliza cualquier simbolo de dolar en el texto a la forma 'USD ' (Req: moneda siempre USD).
+    Convierte '$171.25', 'US$171.25', 'USD$171.25', 'U$S171.25' -> 'USD 171.25'. Colapsa
+    'USD USD' accidental a un solo 'USD'. No toca numeros ni la logica de montos.
+    """
+    if not text:
+        return text
+    out = _CURRENCY_RE.sub("USD ", text)
+    # Evitar duplicados tipo "USD USD " si el texto ya traia "USD $".
+    out = re.sub(r"\bUSD\s+USD\b", "USD", out)
+    # Colapsar espacios multiples que pudiera dejar el reemplazo.
+    out = re.sub(r"USD\s{2,}", "USD ", out)
+    return out
+
+
 def _fmt_closure_date(header, org) -> str:
     """
     Devuelve la "Fecha de cierre" como el primer instante del mes SIGUIENTE al periodo.
@@ -1922,12 +1950,23 @@ def _render_inline_md(pdf, text, width, height, base_size=11) -> None:
     """
     Renderiza una línea con negrita inline `**...**` usando `pdf.write` (fpdf2).
 
-    Segmenta con `_split_bold_segments` y pinta cada fragmento cambiando la fuente a "B" para
-    los segmentos en negrita y "" para el resto, todo en la misma línea; termina con un salto
-    de línea (`ln`). Así ningún `**` queda como texto literal en el PDF. Restaura la fuente
-    normal al final.
+    Segmenta con `_split_bold_segments`. Dos caminos:
+    - Sin negrita inline (párrafo normal): usa `multi_cell(..., align="J")` para JUSTIFICAR el
+      párrafo (mejor lectura en párrafos largos, con wrapping correcto).
+    - Con negrita inline: pinta cada fragmento cambiando la fuente a "B"/"" en la misma línea con
+      `pdf.write` (preserva la negrita; suelen ser etiquetas cortas donde el justificado es
+      irrelevante). Termina con un salto de línea (`ln`).
+    Así ningún `**` queda como texto literal en el PDF. Restaura la fuente normal al final.
     """
-    for fragment, is_bold in _split_bold_segments(text):
+    segments = _split_bold_segments(text)
+    # Sin negrita inline: párrafo normal → justificar (mejor lectura de párrafos largos).
+    if len(segments) <= 1 and (not segments or not segments[0][1]):
+        pdf.set_font("Helvetica", "", base_size)
+        contenido = segments[0][0] if segments else ""
+        pdf.multi_cell(width, height, contenido, align="J")
+        return
+    # Con negrita inline: render por segmentos con write() (preserva negrita en la misma linea).
+    for fragment, is_bold in segments:
         pdf.set_font("Helvetica", "B" if is_bold else "", base_size)
         pdf.write(height, fragment)
     pdf.set_font("Helvetica", "", base_size)
@@ -2266,8 +2305,11 @@ def compose_pdf(
             if robles_path:
                 try:
                     _rw = 22.0
-                    # Abajo a la derecha: x = ancho pagina - margen der - ancho logo; y cerca del pie.
-                    self.image(robles_path, x=self.w - self.r_margin - _rw, y=self.h - 16, w=_rw)
+                    # Abajo a la derecha: x = ancho pagina - margen der - ancho logo. Se centra
+                    # verticalmente con el texto del copyright: el texto ocupa la banda y=(h-15)
+                    # a (h-5), con centro vertical en h-10; el logo (w=22, ratio ~3:1 -> alto ~7mm)
+                    # se centra en h-10, es decir y ~ h - 10 - 7/2 ~ h - 13.5.
+                    self.image(robles_path, x=self.w - self.r_margin - _rw, y=self.h - 13.5, w=_rw)
                 except Exception:
                     pass
 
@@ -2460,9 +2502,9 @@ def compose_pdf(
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(100, 116, 139)  # #64748b texto secundario
     resumen_lines = [
-        f"Estaciones facturables: {header.total_billable}",
-        f"Estaciones recicladas: {header.total_recycled}",
-        f"Estaciones archivadas: {header.total_archived}",
+        f"Estaciones IP facturables: {header.total_billable}",
+        f"Estaciones IP recicladas: {header.total_recycled}",
+        f"Estaciones IP archivadas: {header.total_archived}",
         f"Monto total: USD {_fmt_money(reconciliation.header_amount)}",
         f"Tipo de cierre: {tipo_cierre}",
     ]
@@ -2929,6 +2971,9 @@ def compose_pdf(
         pdf.set_x(pdf.l_margin)
         pdf.multi_cell(effective_width, 5, _sanitize_latin1(_AI_FAILSAFE_NOTE))
     else:
+        # Normalizar la moneda del texto IA a "USD " tambien al renderizar: cubre los textos ya
+        # cacheados en BD (generados antes de este cambio) sin re-invocar el LLM. Fail-safe.
+        analysis = _normalize_currency(analysis)
         # Render del texto IA con soporte básico de markdown (encabezados / viñetas / negritas),
         # replicando el estilo de `debugging_analysis._generate_pdf`.
         pdf.set_font("Helvetica", "", 11)

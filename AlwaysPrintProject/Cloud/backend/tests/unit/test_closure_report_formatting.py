@@ -22,6 +22,7 @@ import pytest
 from app.services.closure_report_service import (
     _fmt_closure_date,
     _fmt_money,
+    _normalize_currency,
     _split_bold_segments,
 )
 
@@ -201,3 +202,52 @@ def test_split_bold_segments_ningun_asterisco_en_salida():
 def test_split_bold_segments_vacio():
     """Cadena vacía → lista vacía."""
     assert _split_bold_segments("") == []
+
+
+# === _normalize_currency ===
+# Normaliza cualquier simbolo de dolar del texto libre de la IA a la forma "USD " (moneda
+# SIEMPRE USD). No debe tocar numeros ni textos ya correctos ni romper con None/"".
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        # Simbolo "$" simple antes de numero → "USD ".
+        ("$171.25", "USD 171.25"),
+        # "US$" con espacio → "USD " (un solo espacio).
+        ("US$ 6.50", "USD 6.50"),
+        # "USD$" pegado → "USD ".
+        ("USD$50", "USD 50"),
+        # Varios importes en la misma frase se normalizan todos.
+        ("cuesta $50 y $6.50", "cuesta USD 50 y USD 6.50"),
+        # Texto sin simbolos monetarios permanece inalterado.
+        ("sin importes monetarios aqui", "sin importes monetarios aqui"),
+        # Texto ya correcto ("USD 171.25") permanece igual.
+        ("USD 171.25", "USD 171.25"),
+        # "U$S" (variante rioplatense) tambien se normaliza.
+        ("U$S171.25", "USD 171.25"),
+    ],
+)
+def test_normalize_currency_convierte_simbolos_a_usd(text, expected):
+    """Convierte '$', 'US$', 'USD$', 'U$S' a 'USD '; deja intactos textos correctos/sin simbolos."""
+    assert _normalize_currency(text) == expected
+
+
+def test_normalize_currency_no_duplica_usd():
+    """'USD $50' no debe quedar como 'USD USD 50', sino colapsar a un solo 'USD'."""
+    assert _normalize_currency("USD $50") == "USD 50"
+
+
+def test_normalize_currency_none_se_devuelve_tal_cual():
+    """None se maneja sin romper: devuelve None."""
+    assert _normalize_currency(None) is None
+
+
+def test_normalize_currency_cadena_vacia_se_devuelve_tal_cual():
+    """Cadena vacia → cadena vacia (fail-safe)."""
+    assert _normalize_currency("") == ""
+
+
+def test_normalize_currency_no_toca_simbolo_sin_numero():
+    """Un '$' que NO precede a un digito no se toca (evita falsos positivos)."""
+    assert _normalize_currency("precio en $ por unidad") == "precio en $ por unidad"
