@@ -2190,6 +2190,7 @@ def compose_pdf(
     static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
     alwaysprint_logo = os.path.join(static_dir, "alwaysprint_logo.png")
     robles_logo = os.path.join(static_dir, "robles_ai_logo.png")
+    iol_logo = os.path.join(static_dir, "iol_logo.png")
 
     class ClosureReportPDF(FPDF):
         """
@@ -2340,6 +2341,14 @@ def compose_pdf(
     # empieza debajo (logo en y=24, título en y=44) para no solaparse con la banda. El logo mini
     # de AlwaysPrint ya va en la banda del header → NO se repite grande en la portada.
     # ==================================================================================
+    # Logo IOL (Inversiones On Line) arriba a la IZQUIERDA, a la MISMA altura y ancho que el
+    # logo Robles.AI de la derecha (IOL izquierda, Robles.AI derecha).
+    if os.path.exists(iol_logo):
+        try:
+            pdf.image(iol_logo, x=pdf.l_margin, y=24.0, w=35.0)
+        except Exception:
+            # Fail-safe: si el asset no se puede incrustar, no romper la generacion del PDF.
+            pass
     if os.path.exists(robles_logo):
         # Logo Robles.AI a la derecha (x=155..190, w=35) + subtítulo "Division de Automatizacion"
         # JUSTO DEBAJO del logo, alineado a la izquierda del mismo (a la altura de la "R").
