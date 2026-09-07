@@ -1871,6 +1871,42 @@ def _fmt_hm(total_seconds: int) -> str:
     return f"{hours}h {minutes}m"
 
 
+def _fmt_entry_datetime(iso_dt: str) -> str:
+    """
+    Formatea una fecha ISO de entrada a contingencia para lectura humana.
+
+    Entrada típica: "2026-08-27T08:48:49.372716-05:00" → salida "2026-08-27 08:48:49 (UTC-05:00)".
+    Parseo defensivo con `datetime.fromisoformat`; si falla, recorta los microsegundos y sustituye
+    la "T" por un espacio sobre el string tal cual (no propaga la excepción).
+    """
+    raw = str(iso_dt)
+    try:
+        dt = datetime.fromisoformat(raw)
+        base = dt.strftime("%Y-%m-%d %H:%M:%S")
+        offset = dt.utcoffset()
+        if offset is None:
+            return base
+        # Offset a "(UTC±HH:MM)".
+        total_min = int(offset.total_seconds() // 60)
+        sign = "+" if total_min >= 0 else "-"
+        total_min = abs(total_min)
+        return f"{base} (UTC{sign}{total_min // 60:02d}:{total_min % 60:02d})"
+    except Exception:
+        # Fallback: recortar microsegundos (".######") y cambiar la "T" por espacio.
+        trimmed = raw
+        if "." in trimmed:
+            head, _, tail = trimmed.partition(".")
+            # Conservar el offset de zona que va tras los microsegundos (ej. "-05:00").
+            offset_part = ""
+            for marker in ("+", "-"):
+                idx = tail.find(marker)
+                if idx != -1:
+                    offset_part = tail[idx:]
+                    break
+            trimmed = f"{head}{(' ' + offset_part) if offset_part else ''}"
+        return trimmed.replace("T", " ")
+
+
 def compose_pdf(
     header: BillingClosure,
     items: List[BillingClosureItem],
@@ -1930,38 +1966,39 @@ def compose_pdf(
         """
 
         def header(self) -> None:
-            # Banda superior degradada (simulada con dos rects): azul oscuro arriba, azul primario abajo.
-            self.set_fill_color(30, 58, 138)  # #1e3a8a
-            self.rect(0, 0, self.w, 9, "F")
+            # Banda de marca: UNA SOLA banda de color plano azul #2563eb de 0 a 16mm.
+            # (Antes eran dos rects apilados de 9mm y el título caía en el filo, cortándose.)
             self.set_fill_color(37, 99, 235)  # #2563eb
-            self.rect(0, 9, self.w, 9, "F")
+            self.rect(0, 0, self.w, 16, "F")
 
             # Logo mini de AlwaysPrint a la izquierda (si existe el asset).
             logo_path = getattr(self, "report_logo_path", None)
             text_left_x = 8.0
             if logo_path and os.path.exists(logo_path):
                 try:
-                    self.image(logo_path, x=8, y=3, h=12)
+                    self.image(logo_path, x=8, y=2, h=12)
                     text_left_x = 24.0  # dejar espacio al logo
                 except Exception:
                     text_left_x = 8.0
 
-            # Título corto (blanco, bold) tras el logo.
+            # Título corto (blanco, bold) tras el logo, centrado VERTICALMENTE en la banda de 16mm
+            # (set_xy a y=4 + cell alto 8 → ocupa 4..12, dentro de la banda, no en un borde).
             self.set_text_color(255, 255, 255)
             self.set_font("Helvetica", "B", 11)
-            self.set_xy(text_left_x, 5)
+            self.set_xy(text_left_x, 4)
             self.cell(90, 8, _sanitize_latin1("Reporte de Cierre Mensual"), align="L")
 
-            # A la derecha: "{org} - {periodo}" (blanco, normal).
+            # A la derecha: "{org} - {periodo}" (blanco, normal), también dentro de la banda.
             org_name = getattr(self, "report_org_name", None)
             period = getattr(self, "report_period", None)
             if org_name or period:
                 right_txt = " - ".join(str(v) for v in (org_name, period) if v)
                 self.set_font("Helvetica", "", 8)
-                self.set_xy(self.w - 100 - 8, 6)
+                self.set_xy(self.w - 100 - 8, 5)
                 self.cell(100, 6, _sanitize_latin1(right_txt), align="R")
 
-            # Restaurar color de texto para el contenido del cuerpo.
+            # Restaurar color de texto para el contenido del cuerpo. NO reposicionar el cursor:
+            # fpdf2 lo coloca en el top margin tras header(), así el cuerpo no se solapa con la banda.
             self.set_text_color(0, 0, 0)
 
         def footer(self) -> None:
@@ -1977,8 +2014,9 @@ def compose_pdf(
             )
 
     pdf = ClosureReportPDF()
-    # Márgenes decentes: top 24 deja espacio bajo la banda de 18mm; footer con auto-break a 20.
-    pdf.set_margins(left=15, top=24, right=15)
+    # Márgenes: la banda del header mide 16mm; top margin 22mm deja 6mm de aire para que el
+    # contenido de páginas 2+ NO se solape con la banda. Footer con auto-break a 20mm.
+    pdf.set_margins(left=15, top=22, right=15)
     pdf.set_auto_page_break(auto=True, margin=20)
 
     # Atributos que consume header() (setear ANTES del primer add_page para que la banda de la
@@ -2029,21 +2067,43 @@ def compose_pdf(
         pdf.set_line_width(0.2)
         pdf.set_text_color(0, 0, 0)
 
-    # ==================================================================================
-    # Sección 1 — Portada / header (logos, título, organización, periodo, modalidad, fecha)
-    # La banda de marca (header()) ocupa 0-18mm en TODAS las páginas; el contenido de portada
-    # empieza debajo (logos en y=24, título en y=44) para no solaparse con la banda.
-    # ==================================================================================
-    if os.path.exists(alwaysprint_logo):
-        pdf.image(alwaysprint_logo, x=10, y=24, w=20)
+    # Helper de altura de PNG (usado tanto por la portada como por la sección de gráficos).
+    from PIL import Image as _PILImage  # backend de imagen ya presente (matplotlib/fpdf2)
 
+    def _png_height_for_width(png_bytes: bytes, width_mm: float) -> float:
+        """Altura (mm) que tendrá el PNG al escalarlo a `width_mm`, según su aspect ratio."""
+        try:
+            with _PILImage.open(io.BytesIO(png_bytes)) as im:
+                w_px, h_px = im.size
+            if w_px:
+                return width_mm * (h_px / w_px)
+        except Exception:
+            pass
+        # Fallback al aspect ratio de figsize (7x4) si no se pudo leer el PNG.
+        return width_mm * (4.0 / 7.0)
+
+    # ==================================================================================
+    # Sección 1 — Portada / header (logo Robles.AI, título, organización, periodo, modalidad, fecha)
+    # La banda de marca (header()) ocupa 0-16mm en TODAS las páginas; el contenido de portada
+    # empieza debajo (logo en y=24, título en y=44) para no solaparse con la banda. El logo mini
+    # de AlwaysPrint ya va en la banda del header → NO se repite grande en la portada.
+    # ==================================================================================
     if os.path.exists(robles_logo):
-        # Logo Robles.AI a la derecha + subtítulo "División de Automatización".
-        pdf.image(robles_logo, x=155, y=24, w=35)
+        # Logo Robles.AI a la derecha (x=155..190, w=35) + subtítulo "Division de Automatizacion"
+        # JUSTO DEBAJO del logo, alineado a la izquierda del mismo (a la altura de la "R").
+        _robles_logo_y = 24.0
+        _robles_logo_w = 35.0
+        pdf.image(robles_logo, x=155, y=_robles_logo_y, w=_robles_logo_w)
+        # Altura real del logo Robles.AI para pegar el subtítulo justo debajo (aspect ratio del PNG).
+        try:
+            with open(robles_logo, "rb") as _f:
+                _robles_h = _png_height_for_width(_f.read(), _robles_logo_w)
+        except Exception:
+            _robles_h = _robles_logo_w * (1.0 / 3.0)  # fallback aproximado
         pdf.set_font("Helvetica", "I", 6.5)
         pdf.set_text_color(100, 100, 100)
-        pdf.set_xy(145, 35)
-        pdf.cell(55, 3, _sanitize_latin1("Division de Automatizacion"), align="R")
+        pdf.set_xy(155, _robles_logo_y + _robles_h + 1)
+        pdf.cell(40, 3, _sanitize_latin1("Division de Automatizacion"), align="L")
     else:
         # Fallback textual si no está el asset.
         pdf.set_font("Helvetica", "B", 9)
@@ -2139,24 +2199,11 @@ def compose_pdf(
     # imágenes se colocan con `x` explícito y la MISMA `y` de tope. fpdf2 calcula la altura de
     # cada imagen por su aspect ratio (ambos PNG comparten figsize 7x4 → misma altura), de modo
     # que quedan alineados. Al final, el cursor avanza por debajo del gráfico más alto.
-    from PIL import Image as _PILImage  # backend de imagen ya presente (matplotlib/fpdf2)
-
+    # (El helper `_png_height_for_width` ya está definido arriba, antes de la portada.)
     _GUTTER = 6.0  # separación horizontal entre columnas (mm)
     col_width = (effective_width - _GUTTER) / 2.0
     left_x = pdf.l_margin
     right_x = pdf.l_margin + col_width + _GUTTER
-
-    def _png_height_for_width(png_bytes: bytes, width_mm: float) -> float:
-        """Altura (mm) que tendrá el PNG al escalarlo a `width_mm`, según su aspect ratio."""
-        try:
-            with _PILImage.open(io.BytesIO(png_bytes)) as im:
-                w_px, h_px = im.size
-            if w_px:
-                return width_mm * (h_px / w_px)
-        except Exception:
-            pass
-        # Fallback al aspect ratio de figsize (7x4) si no se pudo leer el PNG.
-        return width_mm * (4.0 / 7.0)
 
     # Títulos de ambas columnas a la misma altura (azul oscuro + acento azul centrado).
     titles_y = pdf.get_y()
@@ -2300,15 +2347,28 @@ def compose_pdf(
     pdf.ln(6)
     right_info_bottom_y = pdf.get_y()
 
-    # Continuar debajo de la columna más alta y dibujar el separador.
+    # Continuar debajo de la columna más alta.
     pdf.set_y(max(left_info_bottom_y, right_info_bottom_y))
-    pdf.ln(2)
-    pdf.set_draw_color(203, 213, 225)
-    pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
-    pdf.ln(5)
 
     # ==================================================================================
-    # Sección 6b — Contingencia del ciclo (JUSTO DESPUÉS de conceptos/tramos, ANTES del IA)
+    # Sección 8 (movida) — Nota explícita USD sin impuestos al PIE de la PÁGINA 1 (Req 3.7).
+    # Va tras el "Desglose por tramo" y ANTES del add_page() que abre la página 2, para que quede
+    # claramente en la página del resumen. Se ancla cerca del pie (por encima del footer en -15).
+    # ==================================================================================
+    pdf.set_y(-30)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(effective_width, 5, _sanitize_latin1(_USD_DISCLAIMER))
+
+    # ==================================================================================
+    # Salto de página: la página 1 contiene SOLO el resumen (portada + Datos/Resumen + gráficos
+    # + Conceptos/tramos + disclaimer USD al pie). Contingencia y Análisis IA empiezan en pág 2.
+    # ==================================================================================
+    pdf.add_page()
+
+    # ==================================================================================
+    # Sección 6b — Contingencia del ciclo (página 2, ANTES del análisis IA)
     # ==================================================================================
     _section_title("Contingencia del ciclo")
 
@@ -2393,27 +2453,61 @@ def compose_pdf(
             pdf.cell(value_w, line_h, _sanitize_latin1(value), border=1, align="C", fill=True)
             pdf.ln(line_h)
 
-        # Fechas y horas de entrada a contingencia a nivel organización (si las hubo).
+        # Fechas y horas de entrada a contingencia a nivel organización (si las hubo): CADA fecha
+        # en SU PROPIA FILA resaltada (verde suave), indicando que hubo protección activa en cada
+        # una. Máximo 10 filas; si hay más, una fila "y N mas".
         entry_dts = contingency.org_entry_datetimes or []
         if entry_dts:
+            tz_label = contingency.timezone or "UTC"
             shown = entry_dts[:10]
             extra = len(entry_dts) - len(shown)
-            joined = "; ".join(str(dt) for dt in shown)
-            if extra > 0:
-                joined = f"{joined} y {extra} mas"
-            tz_label = contingency.timezone or "UTC"
+
             pdf.ln(2)
-            pdf.set_font("Helvetica", "", 9)
-            pdf.set_text_color(100, 116, 139)  # #64748b
+            # Encabezado de la lista de fechas.
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_text_color(0, 0, 0)
             pdf.set_x(pdf.l_margin)
-            pdf.multi_cell(
-                effective_width,
-                5,
+            pdf.cell(
+                0,
+                6,
                 _sanitize_latin1(
-                    f"Fechas y horas de entrada a contingencia (Organizacion) "
-                    f"({tz_label}): {joined}"
+                    f"Fechas y horas de entrada a contingencia - Organizacion ({tz_label})"
                 ),
+                ln=True,
             )
+            pdf.ln(1)
+
+            # Una fila por fecha, resaltada en verde suave #dcfce7, texto verde oscuro #166534.
+            pdf.set_font("Helvetica", "", 9)
+            for dt in shown:
+                pdf.set_fill_color(220, 252, 231)  # #dcfce7 (protección activa)
+                pdf.set_text_color(22, 101, 52)  # #166534
+                pdf.set_x(pdf.l_margin)
+                # Bullet ASCII (no unicode: _sanitize_latin1 no lo soportaría) + fecha legible.
+                pdf.cell(
+                    effective_width,
+                    6,
+                    _sanitize_latin1(f"- {_fmt_entry_datetime(dt)}"),
+                    border=1,
+                    align="L",
+                    fill=True,
+                )
+                pdf.ln(6)
+
+            if extra > 0:
+                pdf.set_fill_color(241, 245, 249)  # #f1f5f9
+                pdf.set_text_color(100, 116, 139)  # #64748b
+                pdf.set_x(pdf.l_margin)
+                pdf.cell(
+                    effective_width,
+                    6,
+                    _sanitize_latin1(f"y {extra} mas"),
+                    border=1,
+                    align="L",
+                    fill=True,
+                )
+                pdf.ln(6)
+            pdf.set_text_color(51, 65, 85)
 
     pdf.ln(2)
     pdf.set_text_color(100, 116, 139)
@@ -2462,18 +2556,6 @@ def compose_pdf(
             else:
                 pdf.multi_cell(effective_width, 5, line)
 
-    pdf.ln(4)
-    pdf.set_draw_color(203, 213, 225)
-    pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
-    pdf.ln(5)
-
-    # ==================================================================================
-    # Sección 8 — Nota explícita USD sin impuestos (contenido obligatorio, Req 3.7)
-    # ==================================================================================
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_x(pdf.l_margin)
-    pdf.multi_cell(effective_width, 5, _sanitize_latin1(_USD_DISCLAIMER))
-
+    # (La nota USD sin impuestos —sección 8, Req 3.7— se dibuja al pie de la PÁGINA 1, no aquí.)
     # Sección 9 (footer de copyright) se dibuja automáticamente en cada página vía footer().
     return bytes(pdf.output())
