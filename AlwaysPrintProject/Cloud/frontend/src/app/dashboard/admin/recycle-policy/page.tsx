@@ -69,6 +69,30 @@ const DEFAULT_FORM: RecyclePolicyIn = {
 };
 
 /**
+ * Normaliza la Recycle_Rule al formato con signo explícito que exige el backend.
+ *
+ * El backend valida la regla con el regex `^[+-]\d+/[+-]\d+/[+-]\d+$` (cada offset con signo
+ * explícito). Un usuario puede tipear `+1/0/-1` (el `0` sin signo), que es semánticamente
+ * válido pero rompe el regex y devuelve 422. Aquí se antepone `+` a cualquier componente sin
+ * signo (positivo o cero) para que el payload cumpla el contrato SIN debilitar la validación
+ * del servidor. Solo toca componentes numéricos; entradas malformadas se dejan pasar tal cual
+ * para que el backend las rechace con su mensaje de formato.
+ */
+function normalizeRecycleRule(rule: string): string {
+  const parts = rule.split('/');
+  if (parts.length !== 3) return rule;
+  return parts
+    .map((p) => {
+      const trimmed = p.trim();
+      // Ya tiene signo explícito (+/-) o no es un entero: no tocar.
+      if (/^[+-]\d+$/.test(trimmed)) return trimmed;
+      if (/^\d+$/.test(trimmed)) return `+${trimmed}`;
+      return trimmed;
+    })
+    .join('/');
+}
+
+/**
  * Extrae la lista de errores por regla de un error de API 422.
  * El interceptor de apiClient normaliza el error a `{ detail, status }`; en 422 `detail` es
  * el objeto `{ errors: [{rule, message}, ...] }`. Devuelve [] si no aplica.
@@ -219,7 +243,7 @@ export default function RecyclePolicyPage() {
     e.preventDefault();
     setGlobalRuleErrors([]);
     setGlobalConflict(null);
-    globalMutation.mutate(globalForm);
+    globalMutation.mutate({ ...globalForm, rule: normalizeRecycleRule(globalForm.rule) });
   };
 
   const handleOrgSubmit = (e: React.FormEvent) => {
@@ -227,7 +251,7 @@ export default function RecyclePolicyPage() {
     if (!selectedOrgId) return;
     setOrgRuleErrors([]);
     setOrgConflict(null);
-    orgMutation.mutate(orgForm);
+    orgMutation.mutate({ ...orgForm, rule: normalizeRecycleRule(orgForm.rule) });
   };
 
   return (
