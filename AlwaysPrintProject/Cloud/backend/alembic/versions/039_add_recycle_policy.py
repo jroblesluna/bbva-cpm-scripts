@@ -151,7 +151,8 @@ def upgrade() -> None:
     op.execute(
         sa.text(
             "UPDATE billing_closures SET recycle_policy_applied = :freeze "
-            "WHERE recycle_policy_applied = '{}' OR recycle_policy_applied IS NULL"
+            # CAST a TEXT: el tipo json de PostgreSQL no tiene operador de igualdad (=).
+            "WHERE CAST(recycle_policy_applied AS TEXT) = '{}' OR recycle_policy_applied IS NULL"
         ).bindparams(freeze=_LEGACY_FREEZE)
     )
     # Verificación fail-closed (Req 6.3): si queda alguna fila sin política válida, abortar.
@@ -160,9 +161,10 @@ def upgrade() -> None:
     remaining = op.get_bind().execute(
         sa.text(
             "SELECT COUNT(*) FROM billing_closures "
+            # CAST a TEXT: el tipo json de PostgreSQL no tiene operador de igualdad (=).
             "WHERE recycle_policy_applied IS NULL "
-            "OR recycle_policy_applied = '{}' "
-            "OR recycle_policy_applied = ''"
+            "OR CAST(recycle_policy_applied AS TEXT) = '{}' "
+            "OR CAST(recycle_policy_applied AS TEXT) = ''"
         )
     ).scalar()
     if remaining and remaining > 0:
