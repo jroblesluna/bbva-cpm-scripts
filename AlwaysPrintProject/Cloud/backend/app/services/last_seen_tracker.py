@@ -139,7 +139,7 @@ class LastSeenTracker:
         self._flushed.pop(workstation_id, None)
 
 
-def _reactivate_if_needed(ws: Workstation) -> bool:
+def _reactivate_if_needed(ws: Workstation, ts: datetime) -> bool:
     """
     Reactiva a `billable` una workstation en `recycled`/`archived` (Req 2.8).
 
@@ -149,6 +149,15 @@ def _reactivate_if_needed(ws: Workstation) -> bool:
     en un solo lugar; el comportamiento observable no cambia (sigue reactivando exactamente
     esos dos estados de origen).
 
+    Efecto adicional (Req 18.3): SOLO en esta transición `recycled`/`archived → billable` se
+    reinicia el ciclo de facturación `billing_cycle_started_at = ts` (el timestamp de la
+    actividad que reactiva). La actividad normal (que no reactiva) NO toca el campo, y
+    `created_at` nunca se modifica (Req 18.5).
+
+    Args:
+        ws: instancia de `Workstation` gestionada por la sesión del caller.
+        ts: timestamp de la actividad real (datetime naive en UTC) al que se reinicia el ciclo.
+
     Returns:
         True si cambió el estado; False si no había que reactivar.
     """
@@ -156,6 +165,9 @@ def _reactivate_if_needed(ws: Workstation) -> bool:
         ws.billing_status, _BILLABLE
     ):
         ws.billing_status = _BILLABLE
+        # Reset del ciclo de facturación al ts de la actividad (Req 18.3). No se toca
+        # `created_at` (Req 18.5): el ciclo vigente arranca de nuevo, la fecha de alta no.
+        ws.billing_cycle_started_at = ts
         return True
     return False
 
@@ -170,7 +182,8 @@ def mark_activity(db: Session, ws: Workstation, ts: datetime) -> None:
 
     1. `ws.last_seen = ts`.
     2. Si `ws.billing_status` es `recycled` o `archived` → `billable` (reactivación
-       inmediata).
+       inmediata) y, SOLO en esa transición, se reinicia `billing_cycle_started_at = ts`
+       (Req 18.3). La actividad normal NO toca `billing_cycle_started_at` ni `created_at`.
 
     Este helper NO hace `commit`: respeta la transacción del caller (el mismo patrón que
     el resto de `services/workstation.py`, donde el commit lo controla el flujo de nivel
@@ -183,7 +196,7 @@ def mark_activity(db: Session, ws: Workstation, ts: datetime) -> None:
     """
     ws.last_seen = ts
 
-    if _reactivate_if_needed(ws):
+    if _reactivate_if_needed(ws, ts):
         logger.info(
             "billing.reactivacion_por_actividad",
             workstation_id=str(ws.id),

@@ -34,6 +34,7 @@ from app.models import (
     BillingClosureItem,
     BillingOrgPlan,
     BillingRatePlan,
+    BillingRecyclePolicy,
     ConnectivityResult,
     ContainerMetric,
     DebuggingProfile,
@@ -86,6 +87,10 @@ TABLE_MODEL_MAP: list[tuple[str, Any]] = [
     ("billing_closures", BillingClosure),
     ("billing_closure_items", BillingClosureItem),  # FK → billing_closures (va después)
     ("billing_annual_subscriptions", BillingAnnualSubscription),
+    # billing_recycle_policies tiene FK → organizations (nullable, para override
+    # por org; NULL = Global_Default) y → users (created_by_id), ambos ya listados
+    # arriba, por lo que ubicarla en el grupo de facturación respeta el orden de FK.
+    ("billing_recycle_policies", BillingRecyclePolicy),
     ("public_ips", PublicIP),
     ("messages", Message),
     ("message_deliveries", MessageDelivery),

@@ -35,6 +35,7 @@ _Requirements: 5, 6, 7.4, 7.6, 8.3, 8.4_
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import Optional
 
 import pytest
 from sqlalchemy import create_engine
@@ -52,7 +53,11 @@ from app.services.billing_close_service import (
     BillingSequenceError,
 )
 from app.services.billing_seed import seed_default_rate_plans
-from app.services.billing_time import compute_cuts
+from app.services.billing_time import RecycleRule, compute_cuts
+
+# Regla legacy (+1/-2/-3): reproduce el comportamiento hardcodeado previo mientras
+# task 4.2 no cablee la política resuelta en close_month (puente temporal).
+_LEGACY_RULE = RecycleRule(1, -2, -3)
 
 
 # ── Fixtures y helpers ──────────────────────────────────────────────────────
@@ -124,8 +129,16 @@ def _add_ws(
     last_seen: datetime,
     billing_status: str = "new",
     is_online: bool = False,
+    billing_cycle_started_at: Optional[datetime] = None,
 ) -> Workstation:
-    """Inserta una workstation con los campos relevantes para el cierre."""
+    """Inserta una workstation con los campos relevantes para el cierre.
+
+    `billing_cycle_started_at` se inicializa igual a `created_at` cuando no se especifica
+    (invariante del ciclo de actividad, Req 18.2/18.4): el uso efímero se mide como
+    `last_seen - billing_cycle_started_at`, así que para una ws que nunca se reactivó ese
+    inicio coincide con el alta. Los tests que simulan una reactivación pueden pasarlo
+    explícito.
+    """
     ws = Workstation(
         id=uuid.uuid4(),
         organization_id=db._org.id,
@@ -135,6 +148,7 @@ def _add_ws(
         last_seen=last_seen,
         billing_status=billing_status,
         is_online=is_online,
+        billing_cycle_started_at=billing_cycle_started_at or created_at,
     )
     db.add(ws)
     db.commit()
@@ -194,7 +208,7 @@ class TestCaso1PocoUso:
     YEAR, MONTH = 2026, 5
 
     def _cuts(self):
-        return compute_cuts("UTC", self.YEAR, self.MONTH)
+        return compute_cuts("UTC", self.YEAR, self.MONTH, _LEGACY_RULE)
 
     def test_last_seen_justo_antes_de_cut1_y_uso_menor_24h_recicla(self, db_utc):
         """last_seen 1s antes de cut1 y uso <24h → recycled."""
@@ -279,7 +293,7 @@ class TestCaso2Abandono:
     YEAR, MONTH = 2026, 5
 
     def _cuts(self):
-        return compute_cuts("UTC", self.YEAR, self.MONTH)
+        return compute_cuts("UTC", self.YEAR, self.MONTH, _LEGACY_RULE)
 
     def test_last_seen_justo_antes_de_cut2_recicla_pese_a_uso_largo(self, db_utc):
         """last_seen 1s antes de cut2 recicla aunque el uso sea >> 24h (abandono)."""
@@ -349,7 +363,7 @@ class TestPaso1NewABillable:
     YEAR, MONTH = 2026, 5
 
     def test_new_en_alcance_pasa_a_billable(self, db_utc):
-        cuts = compute_cuts("UTC", self.YEAR, self.MONTH)
+        cuts = compute_cuts("UTC", self.YEAR, self.MONTH, _LEGACY_RULE)
         # last_seen reciente para que no recicle tras convertirse a billable.
         ws = _add_ws(
             db_utc,
@@ -389,7 +403,7 @@ class TestAlcanceYArchived:
 
     def test_created_at_en_o_despues_de_cutoff_se_excluye(self, db_utc):
         """Una ws creada en/después del cutoff no entra al cierre (ni recalc ni snapshot)."""
-        cuts = compute_cuts("UTC", self.YEAR, self.MONTH)
+        cuts = compute_cuts("UTC", self.YEAR, self.MONTH, _LEGACY_RULE)
         ws_fuera = _add_ws(
             db_utc,
             ip_private="10.4.0.99",
@@ -412,7 +426,7 @@ class TestAlcanceYArchived:
 
     def test_archived_no_se_recalcula_pero_entra_al_snapshot(self, db_utc):
         """Una ws archived dentro del corte se conserva archived y aparece en el snapshot."""
-        cuts = compute_cuts("UTC", self.YEAR, self.MONTH)
+        cuts = compute_cuts("UTC", self.YEAR, self.MONTH, _LEGACY_RULE)
         ws_arch = _add_ws(
             db_utc,
             ip_private="10.4.0.1",
@@ -446,7 +460,7 @@ class TestCappingSnapshot:
     YEAR, MONTH = 2026, 5
 
     def test_last_seen_posterior_a_cutoff_se_capa_en_snapshot(self, db_utc):
-        cuts = compute_cuts("UTC", self.YEAR, self.MONTH)
+        cuts = compute_cuts("UTC", self.YEAR, self.MONTH, _LEGACY_RULE)
         raw_last_seen = cuts.cutoff + timedelta(days=20)  # actividad posterior al mes cerrado
         ws = _add_ws(
             db_utc,
@@ -467,7 +481,7 @@ class TestCappingSnapshot:
         assert _refresh(db_utc, ws).last_seen == raw_last_seen
 
     def test_last_seen_anterior_a_cutoff_no_se_modifica_en_snapshot(self, db_utc):
-        cuts = compute_cuts("UTC", self.YEAR, self.MONTH)
+        cuts = compute_cuts("UTC", self.YEAR, self.MONTH, _LEGACY_RULE)
         raw_last_seen = cuts.cutoff - timedelta(days=3)
         ws = _add_ws(
             db_utc,
@@ -494,7 +508,7 @@ class TestIdempotencia:
     YEAR, MONTH = 2026, 5
 
     def test_cerrar_dos_veces_lanza_already_closed(self, db_utc):
-        cuts = compute_cuts("UTC", self.YEAR, self.MONTH)
+        cuts = compute_cuts("UTC", self.YEAR, self.MONTH, _LEGACY_RULE)
         _add_ws(
             db_utc,
             ip_private="10.6.0.1",
@@ -839,7 +853,7 @@ class TestMontoMensual:
         Crea `n` workstations que quedarán billable en el cierre de mayo (last_seen reciente,
         creadas dentro del corte). Devuelve la lista de ws creadas.
         """
-        cuts = compute_cuts("UTC", self.YEAR, self.MONTH)
+        cuts = compute_cuts("UTC", self.YEAR, self.MONTH, _LEGACY_RULE)
         wss = []
         for i in range(n):
             ws = _add_ws(
@@ -910,7 +924,7 @@ class TestMontoMensual:
 
     def test_recycled_no_factura(self, db_utc):
         """Una ws que recicla en el cierre no aporta monto (amount=0, tier_index=None)."""
-        cuts = compute_cuts("UTC", self.YEAR, self.MONTH)
+        cuts = compute_cuts("UTC", self.YEAR, self.MONTH, _LEGACY_RULE)
         # 1 billable activa (creada dentro del corte de mayo, last_seen reciente).
         self._add_billable(db_utc, 1)
         # 1 ws abandonada: creada mucho antes y con last_seen < cut2 → recycled (Caso 2).
@@ -965,7 +979,7 @@ class TestModalidadAnual:
             engine.dispose()
 
     def test_anual_amount_cero_y_items_sin_aporte(self, db_annual):
-        cuts = compute_cuts("UTC", self.YEAR, self.MONTH)
+        cuts = compute_cuts("UTC", self.YEAR, self.MONTH, _LEGACY_RULE)
         for i in range(3):
             _add_ws(
                 db_annual,

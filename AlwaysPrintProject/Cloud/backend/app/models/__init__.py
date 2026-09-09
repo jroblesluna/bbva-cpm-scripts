@@ -21,6 +21,7 @@ from app.models.billing import (
     BillingClosure,
     BillingClosureItem,
     BillingAnnualSubscription,
+    BillingRecyclePolicy,
 )
 from app.models.device import Device
 from app.models.document import Document
@@ -80,6 +81,7 @@ __all__ = [
     "BillingClosure",
     "BillingClosureItem",
     "BillingAnnualSubscription",
+    "BillingRecyclePolicy",
     
     # Device models
     "Device",

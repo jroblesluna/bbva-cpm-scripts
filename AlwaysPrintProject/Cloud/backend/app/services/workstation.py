@@ -612,9 +612,12 @@ class WorkstationService:
             # Fallback: detectar VLAN por IP privada (legacy)
             vlan_id = self.detect_vlan_for_ip(db, organization_id, ip_private)
         
-        # Un único timestamp para first_seen/last_seen/last_connection en la creación,
-        # de modo que last_seen == first_seen exactamente (Req 1.2). El objeto es nuevo,
-        # así que se asigna last_seen directamente en el constructor (no vía mark_activity).
+        # Un único timestamp para first_seen/last_seen/last_connection/created_at en la
+        # creación, de modo que last_seen == first_seen exactamente (Req 1.2). El objeto es
+        # nuevo, así que se asigna last_seen directamente en el constructor (no vía
+        # mark_activity). billing_cycle_started_at se inicializa al MISMO instante que
+        # created_at (Req 18.2): ambos comparten `now`, igual que last_seen == first_seen.
+        # No se toca created_at (el ORM lo fija con este mismo instante vía default).
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         workstation = Workstation(
             organization_id=account.id,
@@ -629,7 +632,9 @@ class WorkstationService:
             contingency_active=False,
             last_connection=now,
             first_seen=now,
-            last_seen=now
+            last_seen=now,
+            created_at=now,
+            billing_cycle_started_at=now
         )
         
         db.add(workstation)

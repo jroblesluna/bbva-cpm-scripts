@@ -62,6 +62,7 @@ def _make_closure(db, org: Organization, year: int = 2025, month: int = 1) -> Bi
         total_archived=1,
         amount=Decimal("5.00"),
         tiers_applied=[],
+        recycle_policy_applied={"cutoff": 1, "cut1": -2, "cut2": -3, "ephemeral_hours": 24},
     )
     db.add(closure)
     db.flush()

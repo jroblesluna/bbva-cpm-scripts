@@ -14,8 +14,11 @@ Diseño (ver `design.md`, sección "Motor de cierre mensual (`BillingCloseServic
    cerrar dentro del rango activo de la organización (desde el mes del `created_at` más
    antiguo de una IP hasta M). El mes inmediatamente anterior a M debe tener cierre, salvo
    que M sea el primer mes cerrable de la organización.
-3. Cortes (task 12): `compute_cuts(org.timezone, year, month)` → `cutoff` (M+1),
-   `cut1` (M−2, Caso 1), `cut2` (M−3, Caso 2).
+3. Cortes (task 12): se resuelve primero la política de reciclaje aplicable al periodo
+   (`recycle_policy_service.resolve_recycle_policy`) y se derivan sus offsets en un
+   `RecycleRule`; luego `compute_cuts(org.timezone, year, month, rule)` → `cutoff` (M+cutoff),
+   `cut1` (M+cut1, Caso 1), `cut2` (M+cut2, Caso 2). La política se congela en
+   `recycle_policy_applied` (freeze inmutable, Req 4.1).
 4. Alcance: `organization_id = org.id AND created_at < cutoff AND billing_status != 'archived'`
    para el RECÁLCULO. Las `archived` no se tocan (Req 5.3), pero SÍ se incluyen en el
    snapshot si `created_at < cutoff` (Req 6.3: registrar todas las creadas antes del corte).
@@ -68,12 +71,14 @@ from app.services.billing_state_machine import (
     RECYCLED,
     billing_state_machine,
 )
-from app.services.billing_time import BillingCuts, compute_cuts
+from app.services.billing_time import BillingCuts, RecycleRule, compute_cuts
+from app.services.recycle_decision import RecycleInputs, decide_recycle
+from app.services.recycle_policy_service import (
+    ResolvedRecyclePolicy,
+    recycle_policy_service,
+)
 
 logger = get_logger(__name__)
-
-# 24 horas en segundos: umbral de "poco uso" del Caso 1 (Req 5.4).
-_CASE1_MAX_USE_SECONDS = 24 * 60 * 60
 
 # Monto cero (modalidad anual vigente o ausencia de base facturable).
 _ZERO_AMOUNT = Decimal("0.00")
@@ -162,8 +167,19 @@ class BillingCloseService:
         # más antiguo de una IP de la org.
         self._assert_sequential(db, org, year, month)
 
-        # ── 3. Cortes en la timezone de la organización (task 12) ────────────
-        cuts: BillingCuts = compute_cuts(org.timezone, year, month)
+        # ── 3. Resolver la política de reciclaje ANTES de compute_cuts (Req 3, 4.1) ──
+        # Se resuelve la política aplicable al periodo M (Org_Override → Global_Default →
+        # legacy), versionada por periodo e independiente de la fecha de ejecución (robusta
+        # ante cierres retroactivos). De ella se derivan los offsets (RecycleRule) y el umbral
+        # de uso efímero (ephemeral_hours), y se congela en `recycle_policy_applied` para
+        # garantizar inmutabilidad histórica y determinismo del recálculo (Req 4.1/10.2).
+        policy: ResolvedRecyclePolicy = recycle_policy_service.resolve_recycle_policy(
+            db, org, year, month
+        )
+        rule = RecycleRule(policy.cutoff, policy.cut1, policy.cut2)
+
+        # ── 3'. Cortes en la timezone de la organización con la regla resuelta (task 12) ──
+        cuts: BillingCuts = compute_cuts(org.timezone, year, month, rule)
 
         # ── 4. Alcance del recálculo (Req 5.2, 5.3, 5.8) ─────────────────────
         # created_at < cutoff, tenant isolation por organization_id. Se excluyen las
@@ -206,7 +222,7 @@ class BillingCloseService:
         for ws in recalc_scope:
             if resulting_state[ws] != BILLABLE:
                 continue
-            if self._should_recycle(ws, cuts):
+            if self._should_recycle(ws, org, year, month, policy):
                 billing_state_machine.assert_can_transition(
                     BILLABLE, RECYCLED, automatic=True
                 )
@@ -257,6 +273,9 @@ class BillingCloseService:
             total_archived=total_archived,
             amount=amount,
             tiers_applied=tiers_applied,
+            # Freeze inmutable de la política aplicada (Req 4.1): el PDF, el prompt de IA y
+            # cualquier recálculo leen SIEMPRE de aquí, nunca de la política vigente.
+            recycle_policy_applied=policy.freeze_dict(),
             is_retroactive=is_retroactive,
             created_by_id=actor_id,
         )
@@ -406,26 +425,41 @@ class BillingCloseService:
 
     # ── Helpers ──────────────────────────────────────────────────────────────
 
-    def _should_recycle(self, ws: Workstation, cuts: BillingCuts) -> bool:
+    def _should_recycle(
+        self,
+        ws: Workstation,
+        org: Organization,
+        year: int,
+        month: int,
+        policy: ResolvedRecyclePolicy,
+    ) -> bool:
         """
         Evalúa si una workstation `billable` debe reciclarse, con `last_seen` CRUDO (Req 5.6).
 
-        - Caso 2 (abandono, Req 5.5): `last_seen < cut2` (independiente del tiempo de uso).
-        - Caso 1 (poco uso, Req 5.4): `last_seen < cut1` AND `(last_seen − created_at) < 24h`.
+        Es un ADAPTADOR: construye los cinco insumos permitidos (`RecycleInputs`) a partir de
+        la `Workstation`, la timezone de la organización y la política congelada, y delega la
+        decisión en la función pura `decide_recycle` (recycle-policy-config). El núcleo de
+        decisión no accede a la BD ni al "reloj de pared", lo que hace la reproducibilidad
+        verificable por property-based testing (Req 10.2/10.3).
 
-        El Caso 2 se evalúa primero por ser el más amplio (`cut2 < cut1`): cualquier
-        `last_seen < cut2` recicla sin importar el uso.
+        Semántica (idéntica al comportamiento previo, pero parametrizada por la política):
+        - Caso 2 (abandono, Req 5.5): `last_seen < cut2` (independiente del tiempo de uso).
+        - Caso 1 (poco uso, Req 5.4): `last_seen < cut1` AND el uso del ciclo de actividad
+          vigente `(last_seen − billing_cycle_started_at)` es menor que
+          `policy.ephemeral_hours * 3600` segundos. El uso se mide contra
+          `billing_cycle_started_at` (Req 18.4), NO contra `created_at`.
+
+        El umbral de uso efímero proviene de la política congelada (`policy.ephemeral_hours`),
+        no de una constante hardcodeada.
         """
-        last_seen = ws.last_seen
-        # Caso 2 — abandono.
-        if last_seen < cuts.cut2:
-            return True
-        # Caso 1 — poco uso.
-        if last_seen < cuts.cut1:
-            uso = (last_seen - ws.created_at).total_seconds()
-            if uso < _CASE1_MAX_USE_SECONDS:
-                return True
-        return False
+        inputs = RecycleInputs(
+            created_at=ws.created_at,
+            billing_cycle_started_at=ws.billing_cycle_started_at,
+            last_seen=ws.last_seen,  # crudo (Req 10.1)
+            timezone=org.timezone,
+            policy=policy,
+        )
+        return decide_recycle(inputs, year, month)
 
     def _build_item(
         self,

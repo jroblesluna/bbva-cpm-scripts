@@ -82,6 +82,7 @@ class ActionType(str, enum.Enum):
     RATE_PLAN_EDIT = "RATE_PLAN_EDIT"                # Edición de tarifas (default u org).
     BILLING_CLOSURE = "BILLING_CLOSURE"              # Ejecución de un cierre (auto/retroactivo).
     ANNUAL_SETTLEMENT = "ANNUAL_SETTLEMENT"          # Liquidación anual (creación/confirmación).
+    BILLING_RECYCLE_POLICY_CHANGE = "BILLING_RECYCLE_POLICY_CHANGE"  # Cambio de política de reciclaje (global u org).
 
 
 class AuditLog(Base):

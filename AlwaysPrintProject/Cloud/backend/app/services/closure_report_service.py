@@ -42,6 +42,12 @@ from app.core.logging import get_logger
 from app.models.billing import BillingClosure, BillingClosureItem, BillingClosureReport
 from app.models.organization import Organization
 from app.schemas.billing_closures import HistoryPoint
+from app.services.recycle_policy_service import (
+    FrozenPolicyCorruptError,
+    ResolvedRecyclePolicy,
+    format_recycle_rule,
+    parse_frozen_policy,
+)
 
 logger = get_logger(__name__)
 
@@ -742,7 +748,23 @@ class ClosureReportService:
         la Mesa de Ayuda gracias a la entrada/salida de contingencia automatizada y masiva, además
         del valor del tiempo de protección a nivel organización. Si es `None` o no hay datos, la
         sección se omite (compatibilidad hacia atrás).
+
+        Fail-closed con degradación (Req 12.1/12.3): ANTES de construir el prompt se valida el
+        freeze de política del cierre con `parse_frozen_policy(header.recycle_policy_applied)` y se
+        añade una sección describiendo la Recycle_Policy CONGELADA (regla `"+1/-2/-3"` y significado
+        de cutoff/cut1/cut2 y ephemeral_hours) para que el LLM conozca la política aplicada. Se lee
+        SIEMPRE el freeze del cierre, NUNCA la política vigente. Si el freeze falta o está corrupto,
+        `parse_frozen_policy` lanza `FrozenPolicyCorruptError` y se deja PROPAGAR: el fallo se limita
+        al AI_Analysis (el llamador `resolve_ai_analysis` lo captura como fail-safe y devuelve `None`,
+        por lo que el PDF se genera igual con la nota "IA no disponible"). No se recalcula ningún
+        total: `build_ai_prompt` solo LEE campos del `header`, nunca los modifica (Req 12.2).
         """
+        # Fail-closed (Req 12.3): validar/reconstruir la política congelada ANTES de construir el
+        # prompt. Si falta o está corrupta, `parse_frozen_policy` lanza `FrozenPolicyCorruptError`
+        # y se propaga (el fallo se limita al AI_Analysis; el PDF sigue generándose fail-safe). Se
+        # lee SIEMPRE el freeze del cierre, nunca la política vigente (Req 12.1).
+        frozen_policy = parse_frozen_policy(header.recycle_policy_applied)
+
         sections: List[str] = []
 
         # Contexto/rol del modelo y reglas de tono y moneda.
@@ -775,6 +797,31 @@ class ClosureReportService:
             f"- Estaciones IP archivadas: {header.total_archived}\n"
             f"- Monto del mes: USD {header.amount}\n"
             f"- Tipo de cierre: {'retroactivo' if header.is_retroactive else 'normal'}"
+        )
+
+        # Política de reciclaje CONGELADA del cierre (Req 12.1): se incluye para que el LLM conozca
+        # la política que rigió el reciclaje del mes y pueda sustentarlo. Se describe la Recycle_Rule
+        # `"+1/-2/-3"` y el significado de cutoff/cut1/cut2 y ephemeral_hours. Se lee el FREEZE del
+        # cierre (`frozen_policy`), nunca la política vigente.
+        rule = format_recycle_rule(
+            frozen_policy.cutoff, frozen_policy.cut1, frozen_policy.cut2
+        )
+        sections.append(
+            "## Politica de reciclaje aplicada (congelada en el cierre)\n"
+            f"- Regla de reciclaje (Recycle_Rule): {rule} "
+            "(offsets de mes cutoff/cut1/cut2 respecto al periodo facturado M).\n"
+            f"- cutoff ({frozen_policy.cutoff:+d}): fin del periodo facturado (M{frozen_policy.cutoff:+d}); "
+            "corte superior a partir del cual se evalua el reciclaje.\n"
+            f"- cut1 ({frozen_policy.cut1:+d}): corte de poco uso (Caso 1). Una estacion IP cuya "
+            f"ultima actividad cae antes de M{frozen_policy.cut1:+d} y cuyo uso efectivo fue efimero "
+            "se recicla.\n"
+            f"- cut2 ({frozen_policy.cut2:+d}): corte de abandono (Caso 2). Una estacion IP cuya "
+            f"ultima actividad cae antes de M{frozen_policy.cut2:+d} se recicla por abandono.\n"
+            f"- ephemeral_hours ({frozen_policy.ephemeral_hours}h): umbral de uso efimero. Duracion "
+            "maxima de uso (desde el inicio del ciclo de facturacion hasta la ultima actividad) por "
+            "debajo de la cual el uso se considera efimero para el Caso 1.\n"
+            "Esta politica es la que se aplico y quedo CONGELADA en el cierre (inmutable): usala "
+            "para explicar los reciclajes y archivados del mes."
         )
 
         # Serie histórica por ciclo de servicio (para el análisis de evolución).
@@ -1063,8 +1110,15 @@ class ClosureReportService:
                 return cached.ai_analysis
 
         # 2. Construir prompt e invocar el LLM (fail-safe ante cualquier fallo).
-        prompt = self.build_ai_prompt(header, history, items, contingency=contingency)
+        #    La construcción del prompt va DENTRO del try porque `build_ai_prompt` valida el freeze
+        #    de política con `parse_frozen_policy` y puede lanzar `FrozenPolicyCorruptError` si el
+        #    freeze falta o está corrupto (Req 12.3). Ese fallo debe LIMITARSE al AI_Analysis: se
+        #    captura como fail-safe (devuelve None) y el PDF se genera igual con la nota "IA no
+        #    disponible", sin abortar la generación completa del reporte.
         try:
+            prompt = self.build_ai_prompt(
+                header, history, items, contingency=contingency
+            )
             analysis_text, model_id = await self._invoke_llm(prompt, org)
         except Exception as exc:
             # FAIL-SAFE: no propagar. El PDF se genera con la nota de "IA no disponible".
@@ -2122,6 +2176,36 @@ def _sanitize_latin1(text: str) -> str:
     return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
+def _recycle_policy_prose_lines(policy: ResolvedRecyclePolicy) -> List[str]:
+    """
+    Describe en PROSA la política de reciclaje CONGELADA de un cierre (Req 11.1/11.2).
+
+    Recibe la política ya reconstruida desde el freeze (`parse_frozen_policy` sobre
+    `billing_closures.recycle_policy_applied`); NUNCA lee la política vigente, de modo que el
+    reporte refleja exactamente los parámetros aplicados en el cierre (Req 11.3, inmutabilidad
+    histórica). Devuelve líneas de texto ya saneadas con `_sanitize_latin1` (fuente Helvetica de
+    fpdf2), listas para incrustar tanto en el PDF como en cualquier otro medio textual.
+
+    La regla se formatea como Recycle_Rule `"+1/-2/-3"` (signo explícito) vía
+    `format_recycle_rule`, y se explica el significado de cada offset y del umbral efímero.
+    """
+    rule = format_recycle_rule(policy.cutoff, policy.cut1, policy.cut2)
+    lineas = [
+        f"Regla de reciclaje aplicada (Recycle_Rule): {rule} "
+        "(formato cutoff/cut1/cut2, offsets de mes respecto al periodo facturado M).",
+        f"- cutoff ({policy.cutoff:+d}): marca el fin del periodo facturado (M{policy.cutoff:+d}); "
+        "es el corte superior a partir del cual se evalua el reciclaje.",
+        f"- cut1 ({policy.cut1:+d}): corte de poco uso (Caso 1). Una workstation cuya ultima "
+        f"actividad cae antes de M{policy.cut1:+d} y cuyo uso efectivo fue efimero se recicla.",
+        f"- cut2 ({policy.cut2:+d}): corte de abandono (Caso 2). Una workstation cuya ultima "
+        f"actividad cae antes de M{policy.cut2:+d} se recicla por abandono.",
+        f"- ephemeral_hours ({policy.ephemeral_hours}h): umbral de uso efimero. Es la duracion "
+        "maxima de uso (desde el inicio del ciclo de facturacion hasta la ultima actividad) por "
+        "debajo de la cual el uso se considera efimero para el Caso 1.",
+    ]
+    return [_sanitize_latin1(linea) for linea in lineas]
+
+
 def _fmt_period(header: BillingClosure) -> str:
     """Formatea el periodo del cierre como `YYYY-MM` (p. ej. 2026-03)."""
     return f"{int(header.period_year):04d}-{int(header.period_month):02d}"
@@ -2219,8 +2303,20 @@ def compose_pdf(
     no reconcilia, anota la discrepancia en la seccion de resumen SIN alterar `header.amount`.
 
     Devuelve los `bytes` del PDF (empiezan con `%PDF`).
+
+    Fail-closed (Req 11.3/11.4): ANTES de componer nada se valida el freeze de política del
+    cierre con `parse_frozen_policy(header.recycle_policy_applied)`. Si el freeze falta o esta
+    corrupto (`FrozenPolicyCorruptError`), se aborta la generacion y la excepcion se propaga: NO
+    se produce un PDF sin la politica que sustenta el reciclaje. Se lee SIEMPRE lo congelado en el
+    cierre, nunca la politica vigente.
     """
     from fpdf import FPDF
+
+    # Fail-closed (Req 11.4): validar/reconstruir la política congelada ANTES de componer. Si
+    # falta o está corrupta, `parse_frozen_policy` lanza `FrozenPolicyCorruptError` y se aborta sin
+    # generar un PDF sin política. Se lee SIEMPRE el freeze del cierre, nunca la política vigente
+    # (Req 11.3).
+    frozen_policy = parse_frozen_policy(header.recycle_policy_applied)
 
     # Validación de reconciliación ANTES de componer (task 6.2). No altera header.amount.
     reconciliation = validate_reconciliation(header, items)
@@ -2958,6 +3054,20 @@ def compose_pdf(
     pdf.set_draw_color(203, 213, 225)
     pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
     pdf.ln(5)
+
+    # ==================================================================================
+    # Sección — Política de reciclaje aplicada (prosa, política CONGELADA del cierre)
+    # Describe en prosa la Recycle_Rule y el significado de cada offset y del umbral efímero
+    # (Req 11.1/11.2), leyendo SIEMPRE el freeze del cierre (Req 11.3). El texto ya viene saneado
+    # con `_sanitize_latin1` desde `_recycle_policy_prose_lines`.
+    # ==================================================================================
+    _section_title("Politica de reciclaje aplicada")
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(0, 0, 0)
+    for linea in _recycle_policy_prose_lines(frozen_policy):
+        pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(effective_width, 5, linea)
+    pdf.ln(4)
 
     # ==================================================================================
     # Sección 7 — Análisis IA (o nota fail-safe si no está disponible)

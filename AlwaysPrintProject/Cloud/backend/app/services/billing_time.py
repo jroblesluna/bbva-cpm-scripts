@@ -43,14 +43,36 @@ class BillingCuts(NamedTuple):
     Los tres cortes de un cierre mensual, como `datetime` naive en UTC.
 
     Attributes:
-        cutoff: 00:00 del día 1 de (M+1) en la tz de la org, en UTC (fin del mes M).
-        cut1:   00:00 del día 1 de (M−2) en la tz de la org, en UTC (Caso 1, inactividad).
-        cut2:   00:00 del día 1 de (M−3) en la tz de la org, en UTC (Caso 2, abandono).
+        cutoff: 00:00 del día 1 de (M+cutoff_offset) en la tz de la org, en UTC (fin del mes M).
+        cut1:   00:00 del día 1 de (M+cut1_offset) en la tz de la org, en UTC (Caso 1, inactividad).
+        cut2:   00:00 del día 1 de (M+cut2_offset) en la tz de la org, en UTC (Caso 2, abandono).
     """
 
     cutoff: datetime
     cut1: datetime
     cut2: datetime
+
+
+class RecycleRule(NamedTuple):
+    """
+    Los tres offsets de mes (con signo) que parametrizan un cierre mensual.
+
+    Sustituye a los literales antes hardcodeados en `compute_cuts` (`+1/-2/-3`). Cada offset
+    se aplica sobre el mes M del cierre vía `_shift_month`, de modo que la política de
+    reciclaje sea configurable (recycle-policy-config) sin tocar el motor de fechas.
+
+    La política legacy es `RecycleRule(cutoff=1, cut1=-2, cut2=-3)` y reproduce byte-a-byte
+    el comportamiento previo (backward-compat).
+
+    Attributes:
+        cutoff: offset del corte de fin de mes (legacy +1 → 00:00 día 1 de M+1).
+        cut1:   offset del corte de poco uso / Caso 1 (legacy -2 → 00:00 día 1 de M−2).
+        cut2:   offset del corte de abandono / Caso 2 (legacy -3 → 00:00 día 1 de M−3).
+    """
+
+    cutoff: int
+    cut1: int
+    cut2: int
 
 
 def _shift_month(year: int, month: int, delta: int) -> tuple[int, int]:
@@ -89,23 +111,32 @@ def _local_month_start_utc_naive(timezone_name: str, year: int, month: int) -> d
     return local_midnight.astimezone(timezone.utc).replace(tzinfo=None)
 
 
-def compute_cuts(timezone_name: str, year: int, month: int) -> BillingCuts:
+def compute_cuts(
+    timezone_name: str, year: int, month: int, rule: RecycleRule
+) -> BillingCuts:
     """
-    Calcula los tres cortes de un cierre mensual para el mes M=`month` del año Y=`year`.
+    Calcula los tres cortes de un cierre mensual para el mes M=`month` del año Y=`year`,
+    aplicando los offsets de `rule` (política de reciclaje resuelta/congelada).
 
     Todos los cortes se construyen como 00:00 del día 1 del mes correspondiente en la zona
     horaria de la organización (`timezone_name`) y se devuelven como `datetime` naive en UTC.
+
+    Los offsets se exigen explícitamente vía `rule` (sin default silencioso) para que ningún
+    caller herede accidentalmente la política legacy: el único caller (`close_month`) resuelve
+    la política antes de invocar. Con `RecycleRule(1, -2, -3)` el resultado es byte-a-byte
+    idéntico al comportamiento hardcodeado previo (backward-compat).
 
     Args:
         timezone_name: nombre IANA de la zona horaria de la organización.
         year: año del mes a cerrar (M).
         month: mes a cerrar (1..12).
+        rule: offsets de mes con signo (`cutoff`, `cut1`, `cut2`).
 
     Returns:
         `BillingCuts(cutoff, cut1, cut2)`:
-        - cutoff = 00:00 día 1 de (M+1)  (Req 5.1)
-        - cut1   = 00:00 día 1 de (M−2)  (Req 5.4, Caso 1)
-        - cut2   = 00:00 día 1 de (M−3)  (Req 5.5, Caso 2)
+        - cutoff = 00:00 día 1 de (M+rule.cutoff)  (legacy +1, Req 5.1)
+        - cut1   = 00:00 día 1 de (M+rule.cut1)    (legacy -2, Req 5.4, Caso 1)
+        - cut2   = 00:00 día 1 de (M+rule.cut2)    (legacy -3, Req 5.5, Caso 2)
 
     Raises:
         ValueError: si `month` no está en 1..12.
@@ -114,9 +145,9 @@ def compute_cuts(timezone_name: str, year: int, month: int) -> BillingCuts:
     if not 1 <= month <= 12:
         raise ValueError(f"month debe estar en 1..12, se recibió {month}")
 
-    cutoff_year, cutoff_month = _shift_month(year, month, +1)  # M+1
-    cut1_year, cut1_month = _shift_month(year, month, -2)      # M−2
-    cut2_year, cut2_month = _shift_month(year, month, -3)      # M−3
+    cutoff_year, cutoff_month = _shift_month(year, month, rule.cutoff)  # M+cutoff
+    cut1_year, cut1_month = _shift_month(year, month, rule.cut1)        # M+cut1
+    cut2_year, cut2_month = _shift_month(year, month, rule.cut2)        # M+cut2
 
     return BillingCuts(
         cutoff=_local_month_start_utc_naive(timezone_name, cutoff_year, cutoff_month),
