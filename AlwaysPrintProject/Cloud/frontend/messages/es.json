@@ -84,7 +84,8 @@
     "bulkActions": "Acciones Masivas",
     "remoteView": "Vista Remota",
     "knowledgeBase": "Base de Conocimiento",
-    "usageAndBilling": "Uso y Facturación"
+    "usageAndBilling": "Uso y Facturación",
+    "recyclePolicy": "Política de Reciclaje"
   },
   "login": {
     "title": "AlwaysPrint Cloud Manager",

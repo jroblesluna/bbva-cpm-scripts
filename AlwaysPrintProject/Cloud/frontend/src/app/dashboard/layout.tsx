@@ -44,6 +44,7 @@ import {
   Zap,
   Eye,
   Receipt,
+  Recycle,
 } from 'lucide-react'
 
 // Definición de items de navegación
@@ -127,6 +128,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       items: [
         { key: 'users', href: '/dashboard/admin/users', icon: Users },
         { key: 'usageAndBilling', href: '/dashboard/admin/usage-and-billing', icon: Receipt },
+        { key: 'recyclePolicy', href: '/dashboard/admin/recycle-policy', icon: Recycle, adminOnly: true },
         { key: 'updates', href: '/dashboard/admin/updates', icon: Download },
         { key: 'knowledgeBase', href: '/dashboard/admin/knowledge-base', icon: Library },
         { key: 'documentation', href: '/dashboard/documentation', icon: BookOpen },
