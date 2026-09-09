@@ -93,6 +93,26 @@ function normalizeRecycleRule(rule: string): string {
 }
 
 /**
+ * Indica si un Effective_From_Period (año/mes) es anterior al mes actual.
+ *
+ * Regla de negocio: una política solo puede configurarse para el ciclo actual o uno futuro
+ * (los periodos pasados o ya cerrados son inmutables y el backend los rechaza con 409). Esta
+ * guarda evita siquiera intentar el PUT para un periodo pasado y da un mensaje claro en vez del
+ * error genérico del servidor.
+ */
+function isPastPeriod(year: number, month: number): boolean {
+  const now = new Date();
+  const currentKey = now.getFullYear() * 12 + now.getMonth(); // getMonth() es 0-based
+  const targetKey = year * 12 + (month - 1);
+  return targetKey < currentKey;
+}
+
+/** Formatea un año/mes como "AAAA-MM" para los mensajes. */
+function formatPeriod(year: number, month: number): string {
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}`;
+}
+
+/**
  * Extrae la lista de errores por regla de un error de API 422.
  * El interceptor de apiClient normaliza el error a `{ detail, status }`; en 422 `detail` es
  * el objeto `{ errors: [{rule, message}, ...] }`. Devuelve [] si no aplica.
@@ -243,6 +263,16 @@ export default function RecyclePolicyPage() {
     e.preventDefault();
     setGlobalRuleErrors([]);
     setGlobalConflict(null);
+    // Guarda de negocio: solo ciclo actual o futuro (no reintentar periodos pasados/cerrados).
+    if (isPastPeriod(globalForm.effective_from_year, globalForm.effective_from_month)) {
+      const msg = t('pastPeriodError', {
+        period: formatPeriod(globalForm.effective_from_year, globalForm.effective_from_month),
+        current: formatPeriod(new Date().getFullYear(), new Date().getMonth() + 1),
+      });
+      setGlobalConflict(msg);
+      toast({ title: t('errorTitle'), description: msg, variant: 'destructive' });
+      return;
+    }
     globalMutation.mutate({ ...globalForm, rule: normalizeRecycleRule(globalForm.rule) });
   };
 
@@ -251,6 +281,16 @@ export default function RecyclePolicyPage() {
     if (!selectedOrgId) return;
     setOrgRuleErrors([]);
     setOrgConflict(null);
+    // Guarda de negocio: solo ciclo actual o futuro (no reintentar periodos pasados/cerrados).
+    if (isPastPeriod(orgForm.effective_from_year, orgForm.effective_from_month)) {
+      const msg = t('pastPeriodError', {
+        period: formatPeriod(orgForm.effective_from_year, orgForm.effective_from_month),
+        current: formatPeriod(new Date().getFullYear(), new Date().getMonth() + 1),
+      });
+      setOrgConflict(msg);
+      toast({ title: t('errorTitle'), description: msg, variant: 'destructive' });
+      return;
+    }
     orgMutation.mutate({ ...orgForm, rule: normalizeRecycleRule(orgForm.rule) });
   };
 

@@ -2175,6 +2175,7 @@
     "conflictTitle": "Conflict with existing closures",
     "conflictGeneric": "The change would affect already-closed, immutable periods and is therefore not persisted.",
     "errorTitle": "Error",
-    "errorSave": "Could not save the policy."
+    "errorSave": "Could not save the policy.",
+    "pastPeriodError": "The effective period ({period}) is earlier than the current month ({current}). You can only configure the current or a future cycle."
   }
 }

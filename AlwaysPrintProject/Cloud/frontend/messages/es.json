@@ -2175,6 +2175,7 @@
     "conflictTitle": "Conflicto con cierres existentes",
     "conflictGeneric": "El cambio afectaría periodos ya cerrados e inmutables y por eso no se persiste.",
     "errorTitle": "Error",
-    "errorSave": "No se pudo guardar la política."
+    "errorSave": "No se pudo guardar la política.",
+    "pastPeriodError": "El periodo de vigencia ({period}) es anterior al mes actual ({current}). Solo puedes configurar el ciclo actual o uno futuro."
   }
 }
