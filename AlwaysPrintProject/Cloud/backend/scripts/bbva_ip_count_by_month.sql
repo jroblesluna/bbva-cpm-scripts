@@ -11,7 +11,10 @@
 --
 --   PROFILE=AlwaysPrint-prod-425642439683
 --   REGION=us-west-2
---   INSTANCE=i-0b42738edf1860c00        # alwaysprint-prod-ec2 (verificar vigencia)
+--   # INSTANCE se calcula por tag Name (no hardcodear; el id cambia al recrear la EC2):
+--   INSTANCE=$(aws ec2 describe-instances --profile $PROFILE --region $REGION \
+--     --filters "Name=tag:Name,Values=alwaysprint-prod-ec2" "Name=instance-state-name,Values=running" \
+--     --query "Reservations[0].Instances[0].InstanceId" --output text)
 --
 --   SQL_B64=$(base64 < scripts/bbva_ip_count_by_month.sql | tr -d '\n')
 --   REMOTE="echo $SQL_B64 | base64 -d | docker exec -i alwaysprint-backend-1 \

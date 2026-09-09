@@ -15,7 +15,14 @@ Sin la config, la acción `WriteAppSetting AutoUpdateEnabled=1` nunca se ejecuta
 ## Prerequisitos
 
 - AWS CLI configurado con perfil `AlwaysPrint-prod-425642439683`
-- Instance ID del servidor: `i-0b42738edf1860c00`
+- Instance ID del servidor: se calcula por tag `Name` (no hardcodear; el id cambia al recrear la EC2):
+
+  ```bash
+  export INSTANCE_ID=$(aws ec2 describe-instances \
+    --profile AlwaysPrint-prod-425642439683 --region us-west-2 \
+    --filters "Name=tag:Name,Values=alwaysprint-prod-ec2" "Name=instance-state-name,Values=running" \
+    --query "Reservations[0].Instances[0].InstanceId" --output text)
+  ```
 - Org ID de BBVA: `cc22b376-15c1-4849-8c5b-662ca4aa0b66`
 - DB URL: `postgresql://alwaysprint_admin:XlpP1KD8ZkI5Nl0QIbgyHqTEKpqVnmRU@alwaysprint-prod-postgres.croiioqgsskk.us-west-2.rds.amazonaws.com/alwaysprint`
 
@@ -34,7 +41,7 @@ cat > /tmp/ssm_cmd.json << 'EOF'
 EOF
 
 aws --profile AlwaysPrint-prod-425642439683 ssm send-command \
-  --instance-ids i-0b42738edf1860c00 \
+  --instance-ids "$INSTANCE_ID" \
   --document-name AWS-RunShellScript \
   --parameters file:///tmp/ssm_cmd.json
 ```
@@ -51,7 +58,7 @@ cat > /tmp/ssm_cmd.json << 'EOF'
 EOF
 
 aws --profile AlwaysPrint-prod-425642439683 ssm send-command \
-  --instance-ids i-0b42738edf1860c00 \
+  --instance-ids "$INSTANCE_ID" \
   --document-name AWS-RunShellScript \
   --parameters file:///tmp/ssm_cmd.json
 ```
@@ -66,7 +73,7 @@ cat > /tmp/ssm_cmd.json << 'EOF'
 EOF
 
 aws --profile AlwaysPrint-prod-425642439683 ssm send-command \
-  --instance-ids i-0b42738edf1860c00 \
+  --instance-ids "$INSTANCE_ID" \
   --document-name AWS-RunShellScript \
   --parameters file:///tmp/ssm_cmd.json
 ```
@@ -107,7 +114,7 @@ cat > /tmp/ssm_cmd.json << 'EOF'
 EOF
 
 aws --profile AlwaysPrint-prod-425642439683 ssm send-command \
-  --instance-ids i-0b42738edf1860c00 \
+  --instance-ids "$INSTANCE_ID" \
   --document-name AWS-RunShellScript \
   --parameters file:///tmp/ssm_cmd.json
 ```
@@ -122,7 +129,7 @@ cat > /tmp/ssm_cmd.json << 'EOF'
 EOF
 
 aws --profile AlwaysPrint-prod-425642439683 ssm send-command \
-  --instance-ids i-0b42738edf1860c00 \
+  --instance-ids "$INSTANCE_ID" \
   --document-name AWS-RunShellScript \
   --parameters file:///tmp/ssm_cmd.json
 ```
@@ -137,7 +144,7 @@ aws --profile AlwaysPrint-prod-425642439683 ssm send-command \
 # Después de enviar un comando, copiar el CommandId y ejecutar:
 aws --profile AlwaysPrint-prod-425642439683 ssm get-command-invocation \
   --command-id <COMMAND_ID> \
-  --instance-id i-0b42738edf1860c00
+  --instance-id "$INSTANCE_ID"
 ```
 
 ## Troubleshooting

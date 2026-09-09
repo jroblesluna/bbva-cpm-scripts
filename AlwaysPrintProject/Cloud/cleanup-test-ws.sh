@@ -5,7 +5,20 @@
 #   ./cleanup-test-ws.sh --delete     # Eliminar
 
 PROFILE="AlwaysPrint-dev-747301449278"
-INSTANCE="i-071e328b4dc75a63d"
+REGION="us-west-2"
+EC2_NAME_TAG="alwaysprint-dev-ec2"
+# Resolver el Instance ID dinámicamente por tag Name + estado running (NO hardcodear:
+# el id de la EC2 cambia al recrear la instancia; el tag Name es estable).
+INSTANCE=$(aws ec2 describe-instances \
+    --profile "$PROFILE" --region "$REGION" \
+    --filters "Name=tag:Name,Values=$EC2_NAME_TAG" \
+              "Name=instance-state-name,Values=running" \
+    --query "Reservations[0].Instances[0].InstanceId" \
+    --output text 2>/dev/null)
+if [ -z "$INSTANCE" ] || [ "$INSTANCE" = "None" ]; then
+    echo "ERROR: no se encontró EC2 running con tag Name='$EC2_NAME_TAG' en $REGION"
+    exit 1
+fi
 PATTERN="W10-LT"
 ACTION="count"
 
@@ -50,6 +63,7 @@ fi
 
 CMD_ID=$(aws ssm send-command \
     --profile "$PROFILE" \
+    --region "$REGION" \
     --instance-ids "$INSTANCE" \
     --document-name "AWS-RunShellScript" \
     --parameters "file://$PARAMS_FILE" \
@@ -69,6 +83,7 @@ sleep 8
 
 aws ssm get-command-invocation \
     --profile "$PROFILE" \
+    --region "$REGION" \
     --instance-id "$INSTANCE" \
     --command-id "$CMD_ID" \
     --output text \
@@ -77,6 +92,7 @@ aws ssm get-command-invocation \
 
 STDERR=$(aws ssm get-command-invocation \
     --profile "$PROFILE" \
+    --region "$REGION" \
     --instance-id "$INSTANCE" \
     --command-id "$CMD_ID" \
     --output text \

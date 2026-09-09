@@ -24,12 +24,12 @@ get_config() {
     case "$ENV" in
         prod)
             PROFILE="AlwaysPrint-prod-425642439683"
-            INSTANCE="i-0b42738edf1860c00"
+            EC2_NAME_TAG="alwaysprint-prod-ec2"
             BUCKET="alwaysprint-prod-docs"
             ;;
         dev)
             PROFILE="AlwaysPrint-dev-747301449278"
-            INSTANCE="i-071e328b4dc75a63d"
+            EC2_NAME_TAG="alwaysprint-dev-ec2"
             BUCKET="alwaysprint-dev-docs"
             ;;
         *)
@@ -57,6 +57,23 @@ done
 
 # Cargar configuración del entorno seleccionado
 get_config
+
+# Resolver el Instance ID dinámicamente por tag Name + estado running (NO hardcodear:
+# el id de la EC2 cambia al recrear la instancia; el tag Name es estable). Mismo criterio
+# que los workflows de deploy.
+INSTANCE=$(aws ec2 describe-instances \
+    --profile "$PROFILE" --region "$REGION" \
+    --filters "Name=tag:Name,Values=$EC2_NAME_TAG" \
+              "Name=instance-state-name,Values=running" \
+    --query "Reservations[0].Instances[0].InstanceId" \
+    --output text 2>/dev/null)
+
+if [ -z "$INSTANCE" ] || [ "$INSTANCE" = "None" ]; then
+    echo "❌ No se encontró una instancia EC2 running con tag Name='$EC2_NAME_TAG' en $ENV ($REGION)."
+    echo "   Verificá el tag/estado: aws ec2 describe-instances --profile $PROFILE --region $REGION \\"
+    echo "     --filters Name=tag:Name,Values=$EC2_NAME_TAG Name=instance-state-name,Values=running"
+    exit 1
+fi
 
 echo "============================================================"
 echo "  Sync Inventario AlwaysPrint"

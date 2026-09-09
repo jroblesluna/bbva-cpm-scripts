@@ -150,11 +150,12 @@ Via AWS SSM en la EC2 con el container Docker del backend:
 
 | Dato | PROD | DEV |
 |------|------|-----|
-| EC2 Instance | `i-0b42738edf1860c00` | (consultar) |
+| EC2 Instance (tag `Name`) | `alwaysprint-prod-ec2` | `alwaysprint-dev-ec2` |
 | Container | `alwaysprint-backend-1` | `alwaysprint-backend-1` |
 | S3 Bucket | `alwaysprint-prod-docs` | `alwaysprint-dev-docs` |
 | Profile | `AlwaysPrint-prod-425642439683` | `AlwaysPrint-dev-747301449278` |
 | Region | `us-west-2` | `us-west-2` |
+
 
 ## Models & Imports
 
