@@ -111,6 +111,7 @@ def _make_closure(db, org: Organization, *, timezone: str = "UTC") -> BillingClo
         total_archived=0,
         amount=Decimal("0.00"),
         tiers_applied=[],
+        recycle_policy_applied={"cutoff": 1, "cut1": -2, "cut2": -3, "ephemeral_hours": 24},
     )
     db.add(closure)
     db.flush()
@@ -627,6 +628,7 @@ def _minimal_pdf_header():
         tiers_applied=[
             {"from": 1, "to": 100, "rate": "1.00", "ips_in_tier": 10, "subtotal": "10.00"}
         ],
+        recycle_policy_applied={"cutoff": 1, "cut1": -2, "cut2": -3, "ephemeral_hours": 24},
     )
 
 

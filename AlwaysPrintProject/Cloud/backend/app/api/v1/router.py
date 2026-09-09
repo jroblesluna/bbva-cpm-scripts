@@ -37,6 +37,7 @@ from app.api.v1.endpoints import (
     billing_rates,
     billing_annual,
     billing_closures,
+    recycle_policy,
 )
 
 # Router principal de la API v1
@@ -258,6 +259,14 @@ api_router.include_router(
     billing_closures.router,
     prefix="/billing",
     tags=["Facturación - Cierres"]
+)
+
+# Política de reciclaje (Usage and Billing): lectura/edición del Global_Default y de los
+# Org_Override, solo superadmin.
+api_router.include_router(
+    recycle_policy.router,
+    prefix="/billing",
+    tags=["Facturación - Política de Reciclaje"]
 )
 
 # Gestión de certificado SSL (solo Corporate Admin)

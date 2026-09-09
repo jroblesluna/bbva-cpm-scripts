@@ -1,0 +1,686 @@
+{
+  "pbtResults": {
+    "2.3 Property test — facturación garantizada en primer cierre": {
+      "status": "passed",
+      "lastRunTimestamp": 1788982869466
+    },
+    "3.2 Property test — resolución selecciona máximo effective_key con fallback": {
+      "status": "passed",
+      "lastRunTimestamp": 1788983819666
+    },
+    "3.9 Property test — cambio que afecta periodos ya cerrados se rechaza": {
+      "status": "passed",
+      "lastRunTimestamp": 1788984416500
+    }
+  },
+  "executionHistory": {
+    "1.1 Crear el modelo `BillingRecyclePolicy` en `app/models/billing.py`": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431231
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982441720
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982540570
+      }
+    ],
+    "1.2 Añadir columnas `recycle_policy_applied` y `billing_cycle_started_at`": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431328
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982550232
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982699125
+      }
+    ],
+    "1.3 Añadir `BILLING_RECYCLE_POLICY_CHANGE` al enum `ActionType`": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431395
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982551191
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982700529
+      }
+    ],
+    "2.1 Crear `app/services/recycle_decision.py` con `decide_recycle` puro": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431438
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982552335
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982701445
+      }
+    ],
+    "2.2 Property test — decisión pura por tipo de uso con `+1/0/-1`": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431478
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982711799
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983029677
+      }
+    ],
+    "2.3 Property test — facturación garantizada en primer cierre": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431512
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982713263
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983030632
+      }
+    ],
+    "3.1 Crear `app/services/recycle_policy_service.py` con `ResolvedRecyclePolicy` y `resolve_recycle_policy`": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431548
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982714649
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983028318
+      }
+    ],
+    "3.2 Property test — resolución selecciona máximo effective_key con fallback": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431580
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983039187
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983907569
+      }
+    ],
+    "3.3 Property test — resolución independiente de la fecha de ejecución": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431609
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983040588
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983908935
+      }
+    ],
+    "3.4 Property test — periodos efectivos duplicados se rechazan sin mutar estado": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431650
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983042036
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983906589
+      }
+    ],
+    "3.5 Implementar validación fail-closed en `recycle_policy_service.py`": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431677
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983043500
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983905357
+      }
+    ],
+    "3.6 Property test — round-trip parse/format de la Recycle_Rule": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431723
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983916613
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788984142743
+      }
+    ],
+    "3.7 Property test — validación fail-closed y un error por regla violada": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431752
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983918056
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788984139023
+      }
+    ],
+    "3.8 Implementar `assert_no_closed_periods_affected` y `parse_frozen_policy`": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431784
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983919451
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788984141703
+      }
+    ],
+    "3.9 Property test — cambio que afecta periodos ya cerrados se rechaza": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431810
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788984159889
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788985463348
+      }
+    ],
+    "4.1 Parametrizar `compute_cuts` con `RecycleRule` en `app/services/billing_time.py`": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431836
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982715895
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983031992
+      }
+    ],
+    "4.2 Actualizar `_should_recycle` y `close_month` en `app/services/billing_close_service.py`": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431868
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983044449
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983910198
+      }
+    ],
+    "4.3 Property test — reproducibilidad e inmutabilidad del recálculo": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431897
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788984158898
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788985465860
+      }
+    ],
+    "4.4 Implementar ciclo de vida de `billing_cycle_started_at`": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431926
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983920576
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788984140358
+      }
+    ],
+    "4.5 Property tests — inicialización, reset condicional e invariancia de created_at": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431958
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788984156100
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788985464766
+      }
+    ],
+    "5. Checkpoint — asegurar que los tests del núcleo pasan": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982431985
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788985470961
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788985739748
+      }
+    ],
+    "6.1 Crear `app/services/recycle_policy_seed.py` (idempotente + atómico)": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982432016
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788984157864
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788985461973
+      }
+    ],
+    "6.2 Crear migración Alembic `039_add_recycle_policy.py` (`down_revision = \"038\"`)": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982432042
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788985747411
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986175808
+      }
+    ],
+    "6.3 Tests de migración/seed/backfill (unit + integration)": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982432069
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986181277
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986571473
+      }
+    ],
+    "7.1 Implementar persist con auditoría transaccional en `recycle_policy_service.py`": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982432100
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788985748776
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986174736
+      }
+    ],
+    "7.2 Tests de auditoría transaccional": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982432125
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986182230
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986567465
+      }
+    ],
+    "7.3 PDF: describir la política congelada en prosa (fail-closed) en `app/services/closure_report_service.py`": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982432153
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986184130
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986569286
+      }
+    ],
+    "7.4 Prompt IA: incluir la política congelada (fail-closed con degradación) en `closure_report_service.py`": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982432185
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986185528
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986812484
+      }
+    ],
+    "7.5 Tests de PDF y prompt IA fail-closed": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982432213
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986818019
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788987146587
+      }
+    ],
+    "8.1 Crear schemas Pydantic `RecyclePolicyIn`/`RecyclePolicyOut`": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982432243
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986579571
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788987145526
+      }
+    ],
+    "8.2 Crear `app/api/v1/endpoints/recycle_policy.py` y registrar el router": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982432275
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788987152791
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788987305787
+      }
+    ],
+    "8.3 Integration tests de endpoints y permisos": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982432302
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788987310395
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788987634661
+      }
+    ],
+    "9.1 Incluir `billing_recycle_policies` en backup y restore": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982432335
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788985749675
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986173458
+      }
+    ],
+    "9.2 Test de backup/restore de las columnas y tabla nuevas": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982432366
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986186367
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986570238
+      }
+    ],
+    "9.3 Crear la página `app/dashboard/admin/recycle-policy` (solo Superadmin) con i18n": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982432394
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788987311562
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788987635456
+      }
+    ],
+    "10. Checkpoint final — asegurar que todos los tests pasan": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982432428
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788987642018
+      },
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788988099596
+      }
+    ],
+    "1. Modelos de datos y enum de auditoría": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788982700568
+      }
+    ],
+    "2. Núcleo puro de decisión de reciclaje": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788983030668
+      }
+    ],
+    "3. Recycle_Policy_Service: resolución, validación y conflictos": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788985463387
+      }
+    ],
+    "4. Integración en el motor de cierre y ciclo de vida de actividad": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788985465926
+      }
+    ],
+    "6. Seed y migración": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788986571512
+      }
+    ],
+    "7. Persistencia con auditoría, PDF y prompt IA": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788987146625
+      }
+    ],
+    "8. API de gestión de la política": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788987634759
+      }
+    ],
+    "9. Backup/restore y UI": [
+      {
+        "executionId": "07c1939d-22fd-4587-994a-a259863cc317",
+        "chatSessionId": "sess_3ab643ec-6963-4626-9300-3c90441c4692",
+        "timestamp": 1788987635492
+      }
+    ]
+  }
+}

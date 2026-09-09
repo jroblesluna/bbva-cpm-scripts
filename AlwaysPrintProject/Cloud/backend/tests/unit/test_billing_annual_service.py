@@ -66,7 +66,10 @@ from app.services.billing_annual_service import (
 )
 from app.services.billing_close_service import billing_close_service
 from app.services.billing_seed import seed_default_rate_plans
-from app.services.billing_time import compute_cuts
+from app.services.billing_time import RecycleRule, compute_cuts
+
+# Regla legacy (+1/-2/-3): reproduce el comportamiento hardcodeado previo (puente temporal).
+_LEGACY_RULE = RecycleRule(1, -2, -3)
 
 
 # ── Fixtures y helpers ──────────────────────────────────────────────────────
@@ -583,7 +586,7 @@ class TestInvoiceMensualCeroEnAnual:
     YEAR, MONTH = 2026, 6
 
     def test_cierre_mensual_es_cero_con_suscripcion_activa(self, db):
-        cuts = compute_cuts("UTC", self.YEAR, self.MONTH)
+        cuts = compute_cuts("UTC", self.YEAR, self.MONTH, _LEGACY_RULE)
 
         # Altas dentro del corte de junio (created_at < cutoff, last_seen reciente).
         for i in range(4):

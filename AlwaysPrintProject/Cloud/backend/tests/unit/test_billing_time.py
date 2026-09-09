@@ -19,7 +19,11 @@ from datetime import datetime
 
 import pytest
 
-from app.services.billing_time import BillingCuts, compute_cuts
+from app.services.billing_time import BillingCuts, RecycleRule, compute_cuts
+
+# Política legacy (+1/-2/-3): estos tests fijan el comportamiento hardcodeado previo,
+# que compute_cuts debe reproducir byte-a-byte con esta regla (backward-compat, task 4.1).
+_LEGACY_RULE = RecycleRule(1, -2, -3)
 
 
 class TestCortesAmericaLima:
@@ -27,7 +31,7 @@ class TestCortesAmericaLima:
 
     def test_cerrando_noviembre_ejemplo_del_requisito(self):
         # Cerrando noviembre 2025 (M=11): el requisito dice cut1 = 1 sep, cut2 = 1 ago.
-        cuts = compute_cuts("America/Lima", 2025, 11)
+        cuts = compute_cuts("America/Lima", 2025, 11, _LEGACY_RULE)
 
         # cutoff = 00:00 del 1 de diciembre en Lima = 05:00 UTC del 1 de diciembre.
         assert cuts.cutoff == datetime(2025, 12, 1, 5, 0, 0)
@@ -37,7 +41,7 @@ class TestCortesAmericaLima:
         assert cuts.cut2 == datetime(2025, 8, 1, 5, 0, 0)
 
     def test_devuelve_namedtuple_naive(self):
-        cuts = compute_cuts("America/Lima", 2025, 6)
+        cuts = compute_cuts("America/Lima", 2025, 6, _LEGACY_RULE)
         assert isinstance(cuts, BillingCuts)
         # Todos los cortes son naive (sin tzinfo).
         assert cuts.cutoff.tzinfo is None
@@ -49,7 +53,7 @@ class TestCortesUTC:
     """En UTC la medianoche local coincide con la medianoche UTC (offset 0)."""
 
     def test_mes_intermedio(self):
-        cuts = compute_cuts("UTC", 2025, 6)  # cerrando junio
+        cuts = compute_cuts("UTC", 2025, 6, _LEGACY_RULE)  # cerrando junio
         assert cuts.cutoff == datetime(2025, 7, 1, 0, 0, 0)  # M+1 = julio
         assert cuts.cut1 == datetime(2025, 4, 1, 0, 0, 0)    # M−2 = abril
         assert cuts.cut2 == datetime(2025, 3, 1, 0, 0, 0)    # M−3 = marzo
@@ -59,7 +63,7 @@ class TestRolloverMes:
     """cutoff = M+1 debe cruzar a enero del año siguiente cuando M = diciembre."""
 
     def test_cerrando_diciembre_cutoff_enero_siguiente(self):
-        cuts = compute_cuts("UTC", 2025, 12)  # cerrando diciembre 2025
+        cuts = compute_cuts("UTC", 2025, 12, _LEGACY_RULE)  # cerrando diciembre 2025
         # cutoff = 00:00 del 1 de enero de 2026.
         assert cuts.cutoff == datetime(2026, 1, 1, 0, 0, 0)
         # cut1 = M−2 = octubre 2025, cut2 = M−3 = septiembre 2025.
@@ -71,7 +75,7 @@ class TestRolloverAnioHaciaAtras:
     """cut1 (M−2) y cut2 (M−3) deben cruzar al año anterior en meses tempranos."""
 
     def test_cerrando_enero_cortes_del_anio_anterior(self):
-        cuts = compute_cuts("UTC", 2025, 1)  # cerrando enero 2025
+        cuts = compute_cuts("UTC", 2025, 1, _LEGACY_RULE)  # cerrando enero 2025
         # cutoff = M+1 = febrero 2025.
         assert cuts.cutoff == datetime(2025, 2, 1, 0, 0, 0)
         # cut1 = M−2 = noviembre 2024.
@@ -80,13 +84,13 @@ class TestRolloverAnioHaciaAtras:
         assert cuts.cut2 == datetime(2024, 10, 1, 0, 0, 0)
 
     def test_cerrando_febrero_cut2_cruza_anio(self):
-        cuts = compute_cuts("UTC", 2025, 2)  # cerrando febrero 2025
+        cuts = compute_cuts("UTC", 2025, 2, _LEGACY_RULE)  # cerrando febrero 2025
         assert cuts.cutoff == datetime(2025, 3, 1, 0, 0, 0)   # marzo 2025
         assert cuts.cut1 == datetime(2024, 12, 1, 0, 0, 0)    # diciembre 2024
         assert cuts.cut2 == datetime(2024, 11, 1, 0, 0, 0)    # noviembre 2024
 
     def test_cerrando_marzo_cut2_es_diciembre_anterior(self):
-        cuts = compute_cuts("UTC", 2025, 3)  # cerrando marzo 2025
+        cuts = compute_cuts("UTC", 2025, 3, _LEGACY_RULE)  # cerrando marzo 2025
         assert cuts.cutoff == datetime(2025, 4, 1, 0, 0, 0)   # abril 2025
         assert cuts.cut1 == datetime(2025, 1, 1, 0, 0, 0)     # enero 2025
         assert cuts.cut2 == datetime(2024, 12, 1, 0, 0, 0)    # diciembre 2024
@@ -103,7 +107,7 @@ class TestZonaConDST:
         #   cutoff = 1 de agosto 2025 (verano, UTC+2) → 22:00 UTC del 31 de julio.
         #   cut1   = 1 de mayo   2025 (verano, UTC+2) → 22:00 UTC del 30 de abril.
         #   cut2   = 1 de abril  2025 (verano, UTC+2) → 22:00 UTC del 31 de marzo.
-        cuts = compute_cuts("Europe/Madrid", 2025, 7)
+        cuts = compute_cuts("Europe/Madrid", 2025, 7, _LEGACY_RULE)
         assert cuts.cutoff == datetime(2025, 7, 31, 22, 0, 0)
         assert cuts.cut1 == datetime(2025, 4, 30, 22, 0, 0)
         assert cuts.cut2 == datetime(2025, 3, 31, 22, 0, 0)
@@ -113,7 +117,7 @@ class TestZonaConDST:
         #   cutoff = 1 de marzo    2025 (invierno, UTC+1) → 23:00 UTC del 28 de febrero.
         #   cut1   = 1 de diciembre 2024 (invierno, UTC+1) → 23:00 UTC del 30 de noviembre.
         #   cut2   = 1 de noviembre 2024 (invierno, UTC+1) → 23:00 UTC del 31 de octubre.
-        cuts = compute_cuts("Europe/Madrid", 2025, 2)
+        cuts = compute_cuts("Europe/Madrid", 2025, 2, _LEGACY_RULE)
         assert cuts.cutoff == datetime(2025, 2, 28, 23, 0, 0)
         assert cuts.cut1 == datetime(2024, 11, 30, 23, 0, 0)
         assert cuts.cut2 == datetime(2024, 10, 31, 23, 0, 0)
@@ -125,11 +129,11 @@ class TestZonaConDST:
         #   cut2   = 1 de junio   2025 (verano, UTC+2) → 22:00 UTC del 31 de mayo.
         # Y cerrando marzo 2025 (M=3):
         #   cut2   = 1 de diciembre 2024 (invierno, UTC+1) → 23:00 UTC del 30 de noviembre.
-        verano = compute_cuts("Europe/Madrid", 2025, 9)
+        verano = compute_cuts("Europe/Madrid", 2025, 9, _LEGACY_RULE)
         assert verano.cutoff == datetime(2025, 9, 30, 22, 0, 0)
         assert verano.cut2 == datetime(2025, 5, 31, 22, 0, 0)
 
-        invierno = compute_cuts("Europe/Madrid", 2025, 3)
+        invierno = compute_cuts("Europe/Madrid", 2025, 3, _LEGACY_RULE)
         assert invierno.cut2 == datetime(2024, 11, 30, 23, 0, 0)
 
 
@@ -139,13 +143,13 @@ class TestValidacion:
     @pytest.mark.parametrize("month", [0, 13, -1, 100])
     def test_mes_fuera_de_rango_lanza_valueerror(self, month):
         with pytest.raises(ValueError):
-            compute_cuts("UTC", 2025, month)
+            compute_cuts("UTC", 2025, month, _LEGACY_RULE)
 
     def test_timezone_invalida_lanza_error(self):
         from zoneinfo import ZoneInfoNotFoundError
 
         with pytest.raises(ZoneInfoNotFoundError):
-            compute_cuts("No/Existe", 2025, 6)
+            compute_cuts("No/Existe", 2025, 6, _LEGACY_RULE)
 
 
 class TestConsistenciaOrden:
@@ -162,5 +166,5 @@ class TestConsistenciaOrden:
         ],
     )
     def test_orden_de_cortes(self, tz, year, month):
-        cuts = compute_cuts(tz, year, month)
+        cuts = compute_cuts(tz, year, month, _LEGACY_RULE)
         assert cuts.cut2 < cuts.cut1 < cuts.cutoff

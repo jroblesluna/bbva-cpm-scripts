@@ -87,6 +87,8 @@ def _make_closure(*, amount, tiers, is_retroactive=False):
     Cabecera de cierre en memoria con totales coherentes y `tiers_applied` dados.
 
     `amount` es la fuente de verdad de la factura; `tiers` es la lista de dicts de tramos.
+    Se incluye un freeze de política válido (`recycle_policy_applied`) porque `compose_pdf`
+    aborta fail-closed (Req 11.4) si el freeze falta o está corrupto.
     """
     return BillingClosure(
         id=uuid.uuid4(),
@@ -101,6 +103,7 @@ def _make_closure(*, amount, tiers, is_retroactive=False):
         amount=Decimal(str(amount)),
         tiers_applied=tiers,
         is_retroactive=is_retroactive,
+        recycle_policy_applied={"cutoff": 1, "cut1": -2, "cut2": -3, "ephemeral_hours": 24},
     )
 
 

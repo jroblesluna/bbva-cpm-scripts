@@ -119,6 +119,12 @@ def _make_closure(db, org, *, year=2026, month=5) -> BillingClosure:
             }
         ],
         is_retroactive=False,
+        # Freeze de política de reciclaje aplicado al cierre (feature recycle-policy-config,
+        # Req 4.4/11.4). `compose_pdf`/`build_ai_prompt` leen SIEMPRE este freeze y fallan
+        # fail-closed (FrozenPolicyCorruptError) si está ausente/vacío. En producción la
+        # migración 039 hace backfill del freeze legacy en todos los cierres; aquí el fixture
+        # lo reproduce con la política legacy "+1/-2/-3" + 24h para ejercer el pipeline real.
+        recycle_policy_applied={"cutoff": 1, "cut1": -2, "cut2": -3, "ephemeral_hours": 24},
         created_at=datetime(year, month, 1, 12, 0, 0),
     )
     db.add(closure)

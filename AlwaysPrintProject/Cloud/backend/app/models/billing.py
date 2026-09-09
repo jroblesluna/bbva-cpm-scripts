@@ -27,6 +27,8 @@ from sqlalchemy import (
     JSON,
     Text,
     UniqueConstraint,
+    CheckConstraint,
+    Index,
 )
 
 from app.core.database import Base
@@ -121,6 +123,10 @@ class BillingClosure(Base):
     amount = Column(Numeric(12, 2), nullable=False)  # monto del mes (0.00 si anual vigente)
     tiers_applied = Column(JSON, nullable=False)  # desglose por tramo
     is_retroactive = Column(Boolean, nullable=False, default=False)
+    # Freeze inmutable de la política de reciclaje aplicada en este cierre
+    # ({cutoff, cut1, cut2, ephemeral_hours}). El server_default "{}" es solo red de
+    # seguridad para el backfill; un freeze vacío se trata como corrupto (fail-closed).
+    recycle_policy_applied = Column(JSON, nullable=False, server_default="{}")
     created_by_id = Column(GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
@@ -248,4 +254,66 @@ class BillingClosureReport(Base):
         return (
             f"<BillingClosureReport(id={self.id}, closure_id={self.closure_id}, "
             f"organization_id={self.organization_id})>"
+        )
+
+
+class BillingRecyclePolicy(Base):
+    """
+    Política de reciclaje configurable, versionada por periodo (año-mes) prospectivo.
+
+    organization_id NULL     -> Global_Default del sistema.
+    organization_id != NULL  -> Org_Override de esa organización (tenant isolation).
+
+    Una fila por (scope, periodo efectivo). La resolución elige la de mayor
+    effective_key <= M_key para el periodo M del cierre, con fallback a
+    Global_Default y, en su defecto, a la política legacy (+1/-2/-3 + 24h).
+
+    Nota: NO se usa UniqueConstraint sobre (organization_id, effective_key) porque en
+    PostgreSQL NULL != NULL y no agruparía los Global_Default; la unicidad por scope se
+    valida en el servicio (fail-closed) y se detecta en la resolución (empate en el tope
+    aplicable => RecyclePolicyResolutionError).
+    """
+    __tablename__ = "billing_recycle_policies"
+
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    # NULL = Global_Default; no-NULL = Org_Override (aislamiento por organización).
+    organization_id = Column(
+        GUID,
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+
+    # Recycle_Rule: tres offsets de mes con signo.
+    cutoff_offset = Column(Integer, nullable=False)  # legacy +1
+    cut1_offset = Column(Integer, nullable=False)    # legacy -2
+    cut2_offset = Column(Integer, nullable=False)    # legacy -3
+
+    # Ephemeral_Use_Threshold en horas.
+    ephemeral_hours = Column(Integer, nullable=False)  # legacy 24
+
+    # Effective_From_Period como año-mes + clave cronológica entera (year*12 + (month-1)).
+    # effective_key se persiste para indexar y comparar sin recomputar; año/mes se guardan
+    # para lectura humana y para reconstruir el AAAA-MM en la API/UI.
+    effective_from_year = Column(Integer, nullable=False)   # 2000..2999
+    effective_from_month = Column(Integer, nullable=False)  # 1..12
+    effective_key = Column(Integer, nullable=False, index=True)  # year*12 + (month-1)
+
+    created_by_id = Column(GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        CheckConstraint(
+            "effective_from_month BETWEEN 1 AND 12",
+            name="ck_recycle_policy_month",
+        ),
+        Index("ix_recycle_policy_scope_key", "organization_id", "effective_key"),
+    )
+
+    def __repr__(self):
+        return (
+            f"<BillingRecyclePolicy(id={self.id}, "
+            f"organization_id={self.organization_id}, "
+            f"effective={self.effective_from_year}-{self.effective_from_month:02d})>"
         )

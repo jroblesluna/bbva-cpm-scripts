@@ -75,6 +75,20 @@ class Workstation(Base):
     # Valores válidos: 'new', 'billable', 'recycled', 'archived' (ver CheckConstraint abajo).
     billing_status = Column(String(16), nullable=False, server_default="new")
 
+    # Inicio del ciclo de actividad de facturación vigente. Se inicializa = created_at al
+    # registrar la workstation y se reinicia al valor de la actividad SOLO en la transición
+    # recycled/archived -> billable (reactivación). Mide el uso efímero como
+    # (last_seen - billing_cycle_started_at), no (last_seen - created_at), preservando la
+    # semántica histórica de created_at. Sigue el mismo patrón que last_seen: NOT NULL con
+    # server_default CURRENT_TIMESTAMP como red de seguridad (un DEFAULT SQL no puede
+    # referenciar created_at de la misma fila); el default=datetime.utcnow inicializa en ORM.
+    billing_cycle_started_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+
     # === TIMESTAMPS ===
     last_connection = Column(DateTime, nullable=True)
     first_seen = Column(DateTime, nullable=False, default=datetime.utcnow)
