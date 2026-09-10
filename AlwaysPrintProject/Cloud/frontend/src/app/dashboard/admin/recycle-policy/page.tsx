@@ -61,11 +61,14 @@ import type {
 import type { Organization } from '@/types/organization';
 
 // Valores por defecto del formulario (política legacy Global_Default).
+// El Effective_From_Period por defecto es el mes EN CURSO: la política entra en efecto a partir
+// del ciclo actual (a su cierre), que es el periodo más temprano configurable (no se permiten
+// periodos pasados/cerrados). getMonth() es 0-based, por eso +1.
 const DEFAULT_FORM: RecyclePolicyIn = {
   rule: '+1/-2/-3',
   ephemeral_hours: 24,
   effective_from_year: new Date().getFullYear(),
-  effective_from_month: 1,
+  effective_from_month: new Date().getMonth() + 1,
 };
 
 /**
