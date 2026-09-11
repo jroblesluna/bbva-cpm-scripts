@@ -344,9 +344,29 @@ step_check_files() {
   [[ $DRY -eq 1 ]] && { ok "(dry-run)"; return 0; }
 
   local base=/Library/Lexmark/PrintManagementClient miss=0
-  for f in .lpmc-universal-service.sh .lpmc-ui.sh .lpmc-print-queue-helper.sh jre; do
+  for f in .lpmc-universal-service.sh .lpmc-ui.sh .lpmc-print-queue-helper.sh; do
     if [[ -e "$base/$f" ]]; then ok "$f"; else fail "missing $f"; miss=1; fi
   done
+
+  # El JRE embebido NO se llama siempre "jre": en 4.0.2 sobre Apple Silicon viene
+  # como un Azul Zulu con nombre versionado (p. ej.
+  # "zulu25.36.15-ca-fx-jre25.0.4-macosx_aarch64"). Por eso NO se busca la ruta
+  # literal "jre" (falso negativo), sino cualquier runtime plausible: un dir
+  # "jre", uno "zulu*"/"jdk*", o un binario "java" ejecutable embebido.
+  local jre_dir=""
+  jre_dir=$(find "$base" -maxdepth 1 \( -iname 'jre' -o -iname 'zulu*' -o -iname 'jdk*' \) -type d 2>/dev/null | head -1)
+  if [[ -z "$jre_dir" ]]; then
+    # Fallback: buscar el ejecutable java dentro del árbol de LPMC.
+    local java_bin; java_bin=$(find "$base" -maxdepth 4 -type f -name 'java' 2>/dev/null | head -1)
+    [[ -n "$java_bin" ]] && jre_dir=$(dirname "$java_bin")
+  fi
+  if [[ -n "$jre_dir" ]]; then
+    ok "JRE: $(basename "$jre_dir")"
+  else
+    fail "missing JRE (no se encontró jre/zulu*/jdk* ni un ejecutable java bajo $base)"
+    miss=1
+  fi
+
   ls "$base"/lpmc-universal-service-*.jar >/dev/null 2>&1 && ok "service jar" || { fail "missing the service jar"; miss=1; }
   [[ $miss -eq 0 ]] || return 1
 
