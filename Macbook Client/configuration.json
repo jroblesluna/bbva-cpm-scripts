@@ -1,0 +1,56 @@
+{
+  "loggerSettings" : {
+    "loggingLevel" : "info",
+    "logIpAddresses" : true,
+    "redactPrivateInformation" : false
+  },
+  "serverSettings" : {
+    "apiVersion" : "3.0",
+    "cpmServerUrl" : "https://apis.us.iss.lexmark.com/cpm",
+    "idpServerUrl" : "https://apis.us.iss.lexmark.com/ciam/identity-authorization-service"
+  },
+  "hybridPrintSettings" : {
+    "queueName" : "LexmarkBBVA",
+    "loopbackPort" : 9167,
+    "lateBindingEnabled" : true
+  },
+  "offlinePrintSettings" : {
+    "printMethods" : [ "raw" ],
+    "rawPrintPort" : 9100
+  },
+  "uiSettings" : {
+    "authenticationMode" : "DefaultBrowser",
+    "displayConnectionErrorMessageBoxes" : true,
+    "displayNotifications" : true
+  },
+  "certificateValidationSettings" : {
+    "certificateRevocationMode" : 0,
+    "certificateValidationDebugMode" : false,
+    "certificateValidationSwitch" : true,
+    "printerCertificateValidationSwitch" : false
+  },
+  "webProxySettings" : {
+    "address" : "",
+    "enabled" : true
+  },
+  "networkInterfaceSelectorSettings" : {
+    "filterAutoIpAddresses" : false,
+    "prioritizeVirtualAdapters" : false,
+    "subnetFilter" : {
+      "exclude" : [ ],
+      "include" : [ ]
+    }
+  },
+  "scheduleSettings" : {
+    "ipChangeMonitorIntervalInSeconds" : 60,
+    "proxyCacheResetIntervalInSeconds" : 60
+  },
+  "listenerPortSettings" : {
+    "authCodePort" : 3333,
+    "universalServicePort" : 9443
+  },
+  "driverName" : "Lexmark Universal Color",
+  "defaultQueueName" : "LexmarkBBVA",
+  "printJobFileNameFormat" : "%d_%i.ps",
+  "passThroughForProcessingFailures" : false
+}
