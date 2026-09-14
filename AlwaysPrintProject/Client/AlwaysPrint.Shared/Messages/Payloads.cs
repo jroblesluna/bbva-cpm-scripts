@@ -441,7 +441,35 @@ namespace AlwaysPrint.Shared.Messages
         [JsonProperty("color")]
         public string Color { get; set; } = "#FFFFFF";
     }
-}
+
+    // ── Token de Credencial Lexmark CPM (exclusivo Lexmark CPM) ───────────────────
+
+    /// <summary>
+    /// Payload push del Service al Tray para mostrar la ventana de "ausencia de credencial
+    /// de impresión" del Lexmark CPM. Se envía únicamente cuando NO hay contingencia activa
+    /// y el archivo 'token' del usuario logueado no existe en su carpeta Jobs del CPM.
+    /// El Tray muestra una ventana topmost modal, ofrece generar una impresión de prueba
+    /// (que fuerza al CPM a solicitar credenciales) y monitorea la aparición del token.
+    /// EXCLUSIVO Lexmark CPM. Service → Tray.
+    /// </summary>
+    public class ShowCpmTokenPromptPayload
+    {
+        /// <summary>Usuario de consola cuyo token se verifica (para logs y contexto).</summary>
+        [JsonProperty("username")]
+        public string Username { get; set; } = string.Empty;
+
+        /// <summary>Ruta absoluta al archivo 'token' que el Tray debe monitorear.</summary>
+        [JsonProperty("tokenPath")]
+        public string TokenPath { get; set; } = string.Empty;
+
+        /// <summary>Label del trigger OnDemand de impresión de prueba a disparar desde el botón.</summary>
+        [JsonProperty("testPrintLabel")]
+        public string TestPrintLabel { get; set; } = "Imprimir Página de Prueba";
+
+        /// <summary>Segundos máximos de polling del token tras la impresión de prueba (0 = sin límite).</summary>
+        [JsonProperty("pollTimeoutSeconds")]
+        public int PollTimeoutSeconds { get; set; } = 180;
+    }
 
     // ── Debugging Remoto (captura con privilegios LocalSystem) ────────────────────
 
@@ -671,3 +699,4 @@ namespace AlwaysPrint.Shared.Messages
         [JsonProperty("content")]
         public string Content { get; set; } = string.Empty;
     }
+}

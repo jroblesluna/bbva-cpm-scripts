@@ -1336,6 +1336,11 @@ namespace AlwaysPrintTray
                         var connectivityPayload = message.GetPayload<ConnectivityCheckPayload>();
                         _ = Task.Run(() => _connectivityHandler?.ExecuteCheckAsync(connectivityPayload));
                         break;
+                    case MessageType.ShowCpmTokenPrompt:
+                        var tokenPromptPayload = message.GetPayload<ShowCpmTokenPromptPayload>();
+                        if (tokenPromptPayload != null)
+                            ShowCpmTokenPrompt(tokenPromptPayload);
+                        break;
                     default:
                         // Otros mensajes push se ignoran aquí (CloudManager los maneja por separado)
                         break;
@@ -1346,6 +1351,77 @@ namespace AlwaysPrintTray
                 AlwaysPrintLogger.WriteTrayError(
                     $"OnPipeMessageReceived: error procesando mensaje push tipo='{message.Type}'. {ex.Message}",
                     AlwaysPrintLogger.EvtGenericError);
+            }
+        }
+
+        /// <summary>
+        /// EXCLUSIVO Lexmark CPM. Muestra la ventana modal de ausencia de credencial CPM.
+        /// Se ejecuta en un thread STA dedicado con su propio message loop (patrón idéntico a
+        /// ConnectivityNotificationForm), para no bloquear el hilo del NotifyIcon.
+        /// El botón "Generar impresión de prueba" dispara el OnDemand indicado en el payload.
+        /// </summary>
+        private void ShowCpmTokenPrompt(ShowCpmTokenPromptPayload payload)
+        {
+            AlwaysPrintLogger.WriteTrayInfo(
+                $"ShowCpmTokenPrompt: mostrando ventana de credencial CPM para '{payload.Username}' " +
+                $"(token esperado: {payload.TokenPath}).");
+
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    Application.EnableVisualStyles();
+                    Forms.CpmTokenPromptForm.ShowModal(payload, TriggerOnDemandByLabel);
+                }
+                catch (Exception ex)
+                {
+                    AlwaysPrintLogger.WriteTrayError(
+                        $"ShowCpmTokenPrompt: error mostrando la ventana. {ex.Message}",
+                        AlwaysPrintLogger.EvtGenericError);
+                }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.IsBackground = true;
+            thread.Name = "CpmTokenPrompt";
+            thread.Start();
+        }
+
+        /// <summary>
+        /// Dispara un trigger OnDemand por label vía Named Pipe (sin confirmación de usuario).
+        /// Usado por CpmTokenPromptForm para lanzar la impresión de prueba.
+        /// Retorna true si el Service confirmó la ejecución (Ack con Success=true).
+        /// </summary>
+        private bool TriggerOnDemandByLabel(string label)
+        {
+            try
+            {
+                if (!_pipe.IsConnected && !_pipe.Connect())
+                {
+                    AlwaysPrintLogger.WriteTrayWarning(
+                        $"TriggerOnDemandByLabel: pipe no disponible para '{label}'.");
+                    return false;
+                }
+
+                var payload = new ExecuteOnDemandTriggerPayload { Label = label };
+                var request = PipeMessage.Create(MessageType.ExecuteOnDemandTrigger, payload);
+                var response = _pipe.Send(request);
+
+                if (response?.Type == MessageType.Ack)
+                {
+                    var ack = response.GetPayload<AckPayload>();
+                    return ack?.Success == true;
+                }
+
+                AlwaysPrintLogger.WriteTrayWarning(
+                    $"TriggerOnDemandByLabel: respuesta inesperada del Service para '{label}'.");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteTrayError(
+                    $"TriggerOnDemandByLabel: error ejecutando '{label}'. {ex.Message}",
+                    AlwaysPrintLogger.EvtGenericError);
+                return false;
             }
         }
 

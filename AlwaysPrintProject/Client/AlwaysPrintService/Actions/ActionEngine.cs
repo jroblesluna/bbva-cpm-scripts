@@ -522,6 +522,9 @@ namespace AlwaysPrintService.Actions
                 
                 case ActionTypes.ConnectivityCheck:
                     return ExecuteConnectivityCheck(action);
+
+                case ActionTypes.CheckCpmTokenAndPrompt:
+                    return ExecuteCheckCpmTokenAndPrompt(action);
                 
                 default:
                     AlwaysPrintLogger.WriteWarning($"ActionEngine: tipo de acción desconocido: {action.Type}");
@@ -802,8 +805,10 @@ namespace AlwaysPrintService.Actions
                 return true;
             }
 
-            // Modo discovery: descubrir y eliminar carpetas huérfanas (comportamiento original)
+            // Modo discovery: descubrir y eliminar carpetas huérfanas con inactividad CONFIRMADA (fail-closed)
             bool excludeActiveConsole = action.Parameters?["exclude_active_console_user"]?.Value<bool>() ?? true;
+            int staleAfterDays = GetParameter<int>(action, "stale_after_days", 0);
+            if (staleAfterDays < 0) staleAfterDays = 0;
 
             var excludeUsers = new List<string>();
             string? excludeVariable = action.Parameters?["exclude_users_variable"]?.ToString();
@@ -821,7 +826,7 @@ namespace AlwaysPrintService.Actions
                 }
             }
 
-            int deletedCount = AdminActions.DeleteOrphanedFolders(basePath!, excludeUsers, excludeActiveConsole);
+            int deletedCount = AdminActions.DeleteOrphanedFolders(basePath!, excludeUsers, excludeActiveConsole, staleAfterDays);
             return true; // Siempre retorna éxito (los errores individuales se loguean internamente)
         }
 
@@ -1140,6 +1145,131 @@ namespace AlwaysPrintService.Actions
             {
                 AlwaysPrintLogger.WriteError($"ActionEngine: ConnectivityCheck - error: {ex.Message}", ex);
                 return true; // Fire-and-forget: no bloquear el trigger por errores
+            }
+        }
+
+        /// <summary>
+        /// EXCLUSIVO Lexmark CPM. Verifica que el usuario logueado tenga su archivo 'token' de
+        /// credencial CPM. Si NO hay contingencia activa y el token no existe, envía un push al
+        /// Tray (ShowCpmTokenPrompt) para mostrar la ventana que guía al usuario a autenticarse.
+        ///
+        /// Reglas:
+        /// - Si hay contingencia activa (ContingencyEnabled=1) → no hace nada y sale (el CPM no
+        ///   se usa en contingencia, no tiene sentido pedir credenciales).
+        /// - Si no hay usuario de consola → no hace nada (nadie a quien mostrar la ventana).
+        /// - Si el token existe → no hace nada (usuario ya autenticado).
+        /// - Si falta el token → push al Tray. Fire-and-forget: nunca falla el trigger.
+        ///
+        /// Parámetros opcionales del config:
+        /// - jobs_base_path (string, default "C:\ProgramData\LPMC\Jobs")
+        /// - token_file_name (string, default "token")
+        /// - test_print_label (string, default "Imprimir Página de Prueba")
+        /// - poll_timeout_seconds (int, default 180)
+        /// </summary>
+        private bool ExecuteCheckCpmTokenAndPrompt(ActionConfig action)
+        {
+            try
+            {
+                // 1. Fail-fast: si hay contingencia activa, el CPM no se usa → no pedir credenciales.
+                bool contingencyActive = IsContingencyEnabled();
+                if (contingencyActive)
+                {
+                    AlwaysPrintLogger.WriteInfo(
+                        "CheckCpmTokenAndPrompt: contingencia activa. No se verifica token CPM (fin del trigger).");
+                    return true;
+                }
+
+                // 2. Resolver el usuario de consola (a quien se le mostraría la ventana).
+                string? user = AdminActions.GetActiveConsoleUser();
+                if (string.IsNullOrWhiteSpace(user))
+                {
+                    AlwaysPrintLogger.WriteInfo(
+                        "CheckCpmTokenAndPrompt: no hay usuario de consola activo. Nada que verificar.");
+                    return true;
+                }
+
+                // El WTSUserName puede venir como "DOMINIO\usuario"; la carpeta Jobs usa solo el username.
+                string userName = user!;
+                int slash = userName.IndexOf('\\');
+                if (slash >= 0 && slash < userName.Length - 1)
+                    userName = userName.Substring(slash + 1);
+
+                // 3. Construir la ruta del token y verificar su existencia.
+                string jobsBasePath = GetParameter<string>(action, "jobs_base_path") ?? @"C:\ProgramData\LPMC\Jobs";
+                string tokenFileName = GetParameter<string>(action, "token_file_name") ?? "token";
+                string tokenPath = Path.Combine(jobsBasePath, userName, tokenFileName);
+
+                if (File.Exists(tokenPath))
+                {
+                    AlwaysPrintLogger.WriteInfo(
+                        $"CheckCpmTokenAndPrompt: token presente para '{userName}' ({tokenPath}). No se muestra ventana.");
+                    return true;
+                }
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"CheckCpmTokenAndPrompt: token AUSENTE para '{userName}' ({tokenPath}). Notificando al Tray.");
+
+                // 4. Push al Tray (mismo patrón fire-and-forget que ConnectivityCheck).
+                if (_sendPipeMessageCallback == null)
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        "CheckCpmTokenAndPrompt: no hay callback de pipe configurado. No se puede notificar al Tray.",
+                        AlwaysPrintLogger.EvtGenericWarning);
+                    return true;
+                }
+
+                var payload = new ShowCpmTokenPromptPayload
+                {
+                    Username = userName,
+                    TokenPath = tokenPath,
+                    TestPrintLabel = GetParameter<string>(action, "test_print_label") ?? "Imprimir Página de Prueba",
+                    PollTimeoutSeconds = GetParameter<int>(action, "poll_timeout_seconds", 180)
+                };
+
+                var message = PipeMessage.Create(MessageType.ShowCpmTokenPrompt, payload);
+                bool sent = _sendPipeMessageCallback(message);
+
+                if (!sent)
+                {
+                    AlwaysPrintLogger.WriteWarning(
+                        "CheckCpmTokenAndPrompt: pipe no conectado, no se pudo notificar al Tray. " +
+                        "Se reintentará en el próximo trigger.",
+                        AlwaysPrintLogger.EvtGenericWarning);
+                    return true;
+                }
+
+                AlwaysPrintLogger.WriteInfo(
+                    $"CheckCpmTokenAndPrompt: push ShowCpmTokenPrompt enviado al Tray para '{userName}'.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteError($"ActionEngine: CheckCpmTokenAndPrompt - error: {ex.Message}", ex);
+                return true; // Fire-and-forget: no bloquear el trigger por errores
+            }
+        }
+
+        /// <summary>
+        /// Lee el semáforo ContingencyEnabled (DWORD) del registro HKLM de la aplicación.
+        /// Retorna true si vale "1". Usa la misma clave que ReadAppSetting/WriteAppSetting.
+        /// </summary>
+        private bool IsContingencyEnabled()
+        {
+            try
+            {
+                string keyPath = RegistryConfigManager.RegistryPath;
+                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(keyPath, writable: false))
+                {
+                    if (key == null) return false;
+                    var value = key.GetValue("ContingencyEnabled");
+                    if (value == null) return false;
+                    return value.ToString() == "1";
+                }
+            }
+            catch (Exception ex)
+            {
+                AlwaysPrintLogger.WriteWarning($"IsContingencyEnabled: error leyendo registro: {ex.Message}");
+                return false; // Ante duda, asumir NO contingencia (se verificará el token igualmente)
             }
         }
 

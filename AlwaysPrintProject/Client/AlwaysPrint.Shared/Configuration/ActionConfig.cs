@@ -176,6 +176,14 @@ namespace AlwaysPrint.Shared.Configuration
         public const string ReadPrintDriverVersion = "ReadPrintDriverVersion";
         public const string EnableWindowsFeature = "EnableWindowsFeature";
         public const string ConnectivityCheck = "ConnectivityCheck";
+
+        /// <summary>
+        /// EXCLUSIVO Lexmark CPM. Verifica la existencia del archivo 'token' de credencial
+        /// del usuario logueado en su carpeta Jobs del CPM (C:\ProgramData\LPMC\Jobs\{user}\token).
+        /// Si NO hay contingencia activa y el token no existe, envía un push al Tray para
+        /// mostrar una ventana que guía al usuario a autenticarse. Fail-fast en contingencia.
+        /// </summary>
+        public const string CheckCpmTokenAndPrompt = "CheckCpmTokenAndPrompt";
     }
 
     // ═══════════════════════════════════════════════════════════════════════

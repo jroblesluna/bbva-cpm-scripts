@@ -211,7 +211,12 @@ namespace AlwaysPrintService.Actions
             return users;
         }
         
-        private static string? GetActiveConsoleUser()
+        /// <summary>
+        /// Obtiene el nombre del usuario con sesión interactiva activa en la consola física.
+        /// Retorna null si no hay sesión activa o no se pudo resolver el nombre.
+        /// Público para uso desde ActionEngine (ej: verificación de token CPM por usuario).
+        /// </summary>
+        public static string? GetActiveConsoleUser()
         {
             try
             {
@@ -319,22 +324,36 @@ namespace AlwaysPrintService.Actions
         // ═══════════════════════════════════════════════════════════════════════
         
         /// <summary>
-        /// Elimina carpetas de usuarios que no tienen sesión abierta (ni activa ni desconectada).
-        /// Enumera subdirectorios de basePath y elimina los que no están en la lista de exclusión.
+        /// Elimina carpetas de usuarios sin sesión abierta cuya inactividad esté CONFIRMADA.
+        /// Enumera subdirectorios de basePath y elimina únicamente los que: (a) no están en la
+        /// lista de exclusión, y (b) tienen fecha real de última actividad (NTUSER.DAT) anterior
+        /// al umbral staleAfterDays. Política fail-closed: si no hay fecha fiable, la carpeta se
+        /// preserva — nunca se borra la credencial por falta de evidencia de inactividad.
         /// </summary>
         /// <param name="basePath">Directorio base que contiene carpetas por usuario.</param>
         /// <param name="excludeUsers">Lista de usuarios cuyas carpetas se deben preservar.</param>
         /// <param name="excludeActiveConsoleUser">Si true, también preserva la carpeta del usuario de consola activa.</param>
+        /// <param name="staleAfterDays">
+        /// Días de inactividad confirmada requeridos para eliminar. 0 = umbral en medianoche de hoy;
+        /// N &gt; 0 = ahora - N*24h. Sin fecha confirmada nunca se elimina (fail-closed).
+        /// </param>
         /// <returns>Cantidad de carpetas eliminadas.</returns>
-        public static int DeleteOrphanedFolders(string basePath, List<string> excludeUsers, bool excludeActiveConsoleUser = true)
+        public static int DeleteOrphanedFolders(string basePath, List<string> excludeUsers,
+            bool excludeActiveConsoleUser = true, int staleAfterDays = 0)
         {
             int deleted = 0;
             
             try
             {
+                if (staleAfterDays < 0) staleAfterDays = 0;
+                DateTime threshold = staleAfterDays <= 0
+                    ? DateTime.Today
+                    : DateTime.Now.AddDays(-staleAfterDays);
+
                 AlwaysPrintLogger.WriteInfo(
                     $"DeleteOrphanedFolders: iniciando en {basePath}, " +
-                    $"excludeUsers=[{string.Join(", ", excludeUsers)}], excludeActiveConsole={excludeActiveConsoleUser}");
+                    $"excludeUsers=[{string.Join(", ", excludeUsers)}], excludeActiveConsole={excludeActiveConsoleUser}, " +
+                    $"staleAfterDays={staleAfterDays}, threshold={threshold:yyyy-MM-dd HH:mm:ss}");
                 
                 if (!Directory.Exists(basePath))
                 {
@@ -357,7 +376,7 @@ namespace AlwaysPrintService.Actions
                 
                 AlwaysPrintLogger.WriteInfo($"DeleteOrphanedFolders: usuarios a preservar: [{string.Join(", ", preserveUsers)}]");
                 
-                // Enumerar subdirectorios y eliminar los huérfanos
+                // Enumerar subdirectorios y eliminar solo los huérfanos con inactividad confirmada
                 foreach (var dir in Directory.GetDirectories(basePath))
                 {
                     string folderName = Path.GetFileName(dir);
@@ -367,12 +386,28 @@ namespace AlwaysPrintService.Actions
                         AlwaysPrintLogger.WriteInfo($"DeleteOrphanedFolders: preservando carpeta: {folderName}");
                         continue;
                     }
+
+                    // Fail-closed: solo eliminar con inactividad CONFIRMADA (fecha real anterior al umbral)
+                    DateTime? lastActivity = GetUserLastLogoffTime(folderName);
+                    if (lastActivity == null)
+                    {
+                        AlwaysPrintLogger.WriteInfo(
+                            $"DeleteOrphanedFolders: preservando '{folderName}' — inactividad NO confirmada (sin fecha fiable)");
+                        continue;
+                    }
+                    if (lastActivity.Value >= threshold)
+                    {
+                        AlwaysPrintLogger.WriteInfo(
+                            $"DeleteOrphanedFolders: preservando '{folderName}' — actividad reciente ({lastActivity.Value:yyyy-MM-dd HH:mm:ss})");
+                        continue;
+                    }
                     
                     try
                     {
                         Directory.Delete(dir, recursive: true);
                         deleted++;
-                        AlwaysPrintLogger.WriteInfo($"DeleteOrphanedFolders: carpeta eliminada: {dir}");
+                        AlwaysPrintLogger.WriteInfo(
+                            $"DeleteOrphanedFolders: carpeta eliminada: {dir} (última actividad: {lastActivity.Value:yyyy-MM-dd HH:mm:ss})");
                     }
                     catch (Exception ex)
                     {
@@ -400,27 +435,37 @@ namespace AlwaysPrintService.Actions
         /// </summary>
         public class OrphanedClassification
         {
-            /// <summary>Usuarios con logoff hoy (NTUSER.DAT modificado hoy). Preservar token.</summary>
+            /// <summary>
+            /// Usuarios a preservar: actividad dentro del umbral, O inactividad NO confirmada
+            /// (sin fecha fiable de NTUSER.DAT). Solo se limpian jobs, se conserva el token.
+            /// </summary>
             public List<string> Recent { get; set; } = new List<string>();
 
-            /// <summary>Usuarios con logoff antes de hoy (NTUSER.DAT no modificado hoy). Borrar completo.</summary>
+            /// <summary>
+            /// Usuarios con inactividad CONFIRMADA más allá del umbral (NTUSER.DAT con fecha real
+            /// anterior al threshold). Se borra la carpeta completa (incluida la credencial).
+            /// </summary>
             public List<string> Stale { get; set; } = new List<string>();
         }
 
         /// <summary>
         /// Clasifica usuarios huérfanos (sin sesión activa) en "recientes" y "stale"
         /// basándose en la fecha de última modificación de NTUSER.DAT.
-        /// - Recientes: NTUSER.DAT modificado dentro del umbral → preservar token, solo limpiar jobs.
-        /// - Stale: NTUSER.DAT modificado antes del umbral → borrar carpeta completa.
+        /// Política fail-closed: un usuario solo se marca STALE con inactividad CONFIRMADA
+        /// (fecha real de NTUSER.DAT anterior al umbral). Si no hay fecha fiable, se clasifica
+        /// como RECENT y se preserva su credencial — nunca se borra por falta de evidencia.
+        /// - Recientes: NTUSER.DAT dentro del umbral, o sin fecha fiable → preservar token, solo limpiar jobs.
+        /// - Stale: NTUSER.DAT con fecha real anterior al umbral → borrar carpeta completa.
         /// </summary>
         /// <param name="basePath">Directorio base donde están las carpetas de usuarios (ej: C:\ProgramData\LPMC\Jobs)</param>
         /// <param name="excludeUsers">Lista de usuarios a excluir (ej: inactive_users con sesión disconnected)</param>
         /// <param name="excludeActiveConsoleUser">Si true, excluye al usuario activo en consola</param>
         /// <param name="staleAfterDays">
-        /// Días (múltiplos de 24h) desde la última actividad para considerar un usuario como stale.
-        /// 0 (default) = umbral en medianoche del día actual (DateTime.Today), comportamiento original.
-        /// N > 0 = umbral en DateTime.Now - N*24h (ej: 3 → ahora menos 72 horas exactas).
+        /// Días (múltiplos de 24h) desde la última actividad confirmada para considerar un usuario como stale.
+        /// 0 (default) = umbral en medianoche del día actual (DateTime.Today).
+        /// N > 0 = umbral en DateTime.Now - N*24h (ej: 30 → ahora menos 720 horas exactas).
         /// Mínimo efectivo: 0. Valores negativos se tratan como 0.
+        /// Nota: independientemente del umbral, sin fecha confirmada nunca se marca stale (fail-closed).
         /// </param>
         /// <returns>Clasificación con listas de usuarios recientes y stale</returns>
         public static OrphanedClassification ClassifyOrphanedUsers(
@@ -470,19 +515,28 @@ namespace AlwaysPrintService.Actions
                         continue;
                     }
 
-                    DateTime lastActivity = GetUserLastLogoffTime(folderName);
+                    DateTime? lastActivity = GetUserLastLogoffTime(folderName);
 
-                    if (lastActivity >= threshold)
+                    // Fail-closed: solo se marca STALE con inactividad CONFIRMADA (fecha real anterior al umbral).
+                    // Sin fecha confiable (null) → RECENT: se preserva la credencial (no hay 30 días confirmados).
+                    if (lastActivity == null)
                     {
                         result.Recent.Add(folderName);
                         AlwaysPrintLogger.WriteInfo(
-                            $"ClassifyOrphanedUsers: '{folderName}' clasificado como RECENT (última actividad: {lastActivity:yyyy-MM-dd HH:mm:ss})");
+                            $"ClassifyOrphanedUsers: '{folderName}' clasificado como RECENT " +
+                            "(inactividad NO confirmada: sin fecha de última actividad → se preserva)");
+                    }
+                    else if (lastActivity.Value >= threshold)
+                    {
+                        result.Recent.Add(folderName);
+                        AlwaysPrintLogger.WriteInfo(
+                            $"ClassifyOrphanedUsers: '{folderName}' clasificado como RECENT (última actividad: {lastActivity.Value:yyyy-MM-dd HH:mm:ss})");
                     }
                     else
                     {
                         result.Stale.Add(folderName);
                         AlwaysPrintLogger.WriteInfo(
-                            $"ClassifyOrphanedUsers: '{folderName}' clasificado como STALE (última actividad: {lastActivity:yyyy-MM-dd HH:mm:ss})");
+                            $"ClassifyOrphanedUsers: '{folderName}' clasificado como STALE (última actividad: {lastActivity.Value:yyyy-MM-dd HH:mm:ss})");
                     }
                 }
 
@@ -499,10 +553,11 @@ namespace AlwaysPrintService.Actions
         }
 
         /// <summary>
-        /// Obtiene la fecha de último logoff del usuario consultando NTUSER.DAT.
-        /// Si no se puede acceder al archivo, se usa la fecha de modificación del perfil como fallback.
+        /// Obtiene la fecha de último logoff del usuario consultando el LastWriteTime de NTUSER.DAT.
+        /// Retorna null cuando NO se puede confirmar una fecha real (NTUSER.DAT ausente o error de acceso).
+        /// El llamador debe tratar null como "inactividad NO confirmada" (fail-closed: no eliminar credenciales).
         /// </summary>
-        private static DateTime GetUserLastLogoffTime(string username)
+        private static DateTime? GetUserLastLogoffTime(string username)
         {
             try
             {
@@ -533,15 +588,19 @@ namespace AlwaysPrintService.Actions
                     return lastWrite;
                 }
 
+                // Fail-closed: sin NTUSER.DAT no hay evidencia de inactividad → null (NO stale)
                 AlwaysPrintLogger.WriteWarning(
-                    $"GetUserLastLogoffTime: NTUSER.DAT no encontrado para '{username}'. Usando DateTime.MinValue (stale).");
-                return DateTime.MinValue;
+                    $"GetUserLastLogoffTime: NTUSER.DAT no encontrado para '{username}'. " +
+                    "Inactividad NO confirmada → se preserva (null).");
+                return null;
             }
             catch (Exception ex)
             {
+                // Fail-closed: ante error de acceso no se puede confirmar inactividad → null (NO stale)
                 AlwaysPrintLogger.WriteWarning(
-                    $"GetUserLastLogoffTime: error accediendo NTUSER.DAT de '{username}': {ex.Message}. Usando DateTime.MinValue (stale).");
-                return DateTime.MinValue;
+                    $"GetUserLastLogoffTime: error accediendo NTUSER.DAT de '{username}': {ex.Message}. " +
+                    "Inactividad NO confirmada → se preserva (null).");
+                return null;
             }
         }
 

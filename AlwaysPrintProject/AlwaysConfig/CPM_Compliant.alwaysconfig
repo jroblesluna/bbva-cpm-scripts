@@ -1,5 +1,5 @@
 {
-  "version": "14.2",
+  "version": "15.0",
   "name": "CPM_Compliant",
   "description": "Configuración de cumplimiento para Lexmark Cloud Print Manager. En modo normal, LPMCHybridPort apunta a 127.0.0.1:9167 (CPM local). En contingencia, apunta a IP directa de impresora.",
   "created_at": "2026-05-15T12:00:00Z",
@@ -131,7 +131,7 @@
         },
         {
           "type": "RunProcess",
-          "description": "Otorgar Lectura/Escritura a Everyone en C:\\ProgramData\\LPMC\\",
+          "description": "Otorgar Lectura/Ejecución y Escritura a Everyone en C:\\ProgramData\\LPMC\\",
           "parameters": {
             "file_path": "icacls.exe",
             "arguments": "\"C:\\ProgramData\\LPMC\" /grant *S-1-1-0:(OI)(CI)(RX,W) /T /C /Q",
@@ -236,12 +236,12 @@
         },
         {
           "type": "ClassifyOrphanedUsers",
-          "description": "Clasificar usuarios sin sesión: recientes (logoff hoy) vs stale (logoff antes de hoy)",
+          "description": "Clasificar usuarios sin sesión según stale_after_days (30): recientes (última actividad dentro de los últimos 30 días) vs stale (última actividad hace más de 30 días o perfil ilegible)",
           "parameters": {
             "base_path": "C:\\ProgramData\\LPMC\\Jobs",
             "exclude_active_console_user": true,
             "exclude_users_variable": "inactive_users",
-            "stale_after_days": 7
+            "stale_after_days": 30
           },
           "store_result_in": "orphaned"
         },
@@ -277,7 +277,7 @@
         },
         {
           "type": "Conditional",
-          "description": "Si hay orphaned stale: eliminar carpetas completas (sin actividad hoy)",
+          "description": "Si hay orphaned stale: eliminar carpetas completas (sin actividad en más de 30 días)",
           "condition": {
             "variable": "orphaned_stale",
             "operator": "not_empty"
@@ -285,7 +285,7 @@
           "actions": [
             {
               "type": "DeleteOrphanedFolders",
-              "description": "Eliminar carpetas completas de orphaned sin actividad hoy",
+              "description": "Eliminar carpetas completas de orphaned sin actividad en más de 30 días",
               "parameters": {
                 "base_path": "C:\\ProgramData\\LPMC\\Jobs",
                 "users_variable": "{{orphaned_stale}}"
@@ -450,6 +450,16 @@
             "timeout_seconds": 15,
             "window_style": "Hidden",
             "run_as_logged_in_user": true
+          }
+        },
+        {
+          "type": "CheckCpmTokenAndPrompt",
+          "description": "EXCLUSIVO Lexmark CPM: si no hay contingencia y falta el token del usuario logueado, mostrar ventana guiando su autenticación",
+          "parameters": {
+            "jobs_base_path": "C:\\ProgramData\\LPMC\\Jobs",
+            "token_file_name": "token",
+            "test_print_label": "Imprimir Página de Prueba",
+            "poll_timeout_seconds": 180
           }
         }
       ]
@@ -712,6 +722,16 @@
             "window_style": "Hidden",
             "run_as_logged_in_user": true
           }
+        },
+        {
+          "type": "CheckCpmTokenAndPrompt",
+          "description": "EXCLUSIVO Lexmark CPM: si no hay contingencia y falta el token del usuario logueado, mostrar ventana guiando su autenticación",
+          "parameters": {
+            "jobs_base_path": "C:\\ProgramData\\LPMC\\Jobs",
+            "token_file_name": "token",
+            "test_print_label": "Imprimir Página de Prueba",
+            "poll_timeout_seconds": 180
+          }
         }
       ]
     },
@@ -801,6 +821,16 @@
             "timeout_seconds": 15,
             "window_style": "Hidden",
             "run_as_logged_in_user": true
+          }
+        },
+        {
+          "type": "CheckCpmTokenAndPrompt",
+          "description": "EXCLUSIVO Lexmark CPM: si no hay contingencia y falta el token del usuario logueado, mostrar ventana guiando su autenticación",
+          "parameters": {
+            "jobs_base_path": "C:\\ProgramData\\LPMC\\Jobs",
+            "token_file_name": "token",
+            "test_print_label": "Imprimir Página de Prueba",
+            "poll_timeout_seconds": 180
           }
         }
       ]
@@ -1226,6 +1256,16 @@
             "timeout_seconds": 15,
             "window_style": "Hidden",
             "run_as_logged_in_user": true
+          }
+        },
+        {
+          "type": "CheckCpmTokenAndPrompt",
+          "description": "EXCLUSIVO Lexmark CPM: si no hay contingencia y falta el token del usuario logueado, mostrar ventana guiando su autenticación",
+          "parameters": {
+            "jobs_base_path": "C:\\ProgramData\\LPMC\\Jobs",
+            "token_file_name": "token",
+            "test_print_label": "Imprimir Página de Prueba",
+            "poll_timeout_seconds": 180
           }
         }
       ]

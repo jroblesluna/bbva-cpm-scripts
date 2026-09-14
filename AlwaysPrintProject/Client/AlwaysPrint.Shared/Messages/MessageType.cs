@@ -77,5 +77,8 @@ namespace AlwaysPrint.Shared.Messages
 
         // Certificado ECDSA
         ResetCertVersion,            // Tray → Service: resetear CertVersion a 0 (requiere HKLM, el Tray no tiene permisos)
+
+        // Token de credencial Lexmark CPM (exclusivo Lexmark CPM)
+        ShowCpmTokenPrompt,          // Service → Tray (push): mostrar ventana de ausencia de credencial CPM y guiar al usuario
     }
 }
