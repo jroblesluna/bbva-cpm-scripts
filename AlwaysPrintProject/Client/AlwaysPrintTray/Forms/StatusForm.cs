@@ -504,7 +504,9 @@ namespace AlwaysPrintTray.Forms
 
         /// <summary>
         /// Lee el estado de cada servicio con ServiceController y actualiza la UI.
-        /// Solo muestra el estado en gris (sin colores ni botones de inicio).
+        /// Coloreado: Running=verde; Stopped/NotFound cuando el servicio DEBERÍA estar
+        /// arriba (watchdog activo en el modo actual)=rojo; Stopped esperado (sin watchdog
+        /// activo en este modo)=gris.
         /// </summary>
         private void RefreshServiceStates()
         {
@@ -526,8 +528,30 @@ namespace AlwaysPrintTray.Forms
                     state = "NotFound";
                 }
 
+                // ¿Este servicio debería estar levantado ahora? Sí, si tiene watchdog
+                // activo en el modo operativo actual (normal/contingencia).
+                bool shouldBeRunning = row.WatchdogEntry != null
+                    && IsWatchdogActiveForEntry(row.WatchdogEntry, contingencyActive);
+
+                bool isRunning = state == "Running";
+
                 row.StateLabel.Text = state;
-                row.StateLabel.ForeColor = Color.FromArgb(0x66, 0x66, 0x66); // Siempre gris
+
+                if (isRunning)
+                {
+                    // Corriendo → verde.
+                    row.StateLabel.ForeColor = Color.FromArgb(0x22, 0x8B, 0x22); // Verde
+                }
+                else if (shouldBeRunning)
+                {
+                    // Detenido/NotFound pero DEBERÍA estar arriba → rojo (alerta).
+                    row.StateLabel.ForeColor = Color.FromArgb(0xC6, 0x28, 0x28); // Rojo
+                }
+                else
+                {
+                    // Detenido pero no se espera que esté arriba en este modo → gris (normal).
+                    row.StateLabel.ForeColor = Color.FromArgb(0x66, 0x66, 0x66); // Gris
+                }
 
                 // Actualizar indicador de watchdog según modo actual
                 if (row.WatchdogEntry == null)

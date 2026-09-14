@@ -1325,12 +1325,15 @@ namespace AlwaysPrintTray
                         // suscripción temporal a MessageReceived. No se necesita acción aquí.
                         break;
                     case MessageType.ServiceStopping:
-                        // Servicio se está deteniendo: ocultar icono inmediatamente para evitar fantasmas
-                        AlwaysPrintLogger.WriteTrayInfo("Tray: mensaje ServiceStopping recibido. Ocultando icono.");
-                        _uiContext.Post(_ =>
-                        {
-                            _trayIcon.Visible = false;
-                        }, null);
+                        // El Service va a detenerse/relanzar el Tray. Ocultar el icono Y cerrar
+                        // la aplicación por completo: si dependiéramos solo de que el Service nos
+                        // mate, un kill fallido o la carrera del mutex single-instance dejaría el
+                        // proceso vivo con el icono oculto para siempre (no hay path que lo re-muestre).
+                        // Cerrar aquí es fail-safe: libera el mutex limpiamente y evita el Tray fantasma.
+                        AlwaysPrintLogger.WriteTrayInfo(
+                            "Tray: mensaje ServiceStopping recibido. Ocultando icono y cerrando la aplicación.");
+                        // ExitApplication ya marshaliza al hilo UI internamente (_uiContext.Post).
+                        ExitApplication();
                         break;
                     case MessageType.ConnectivityCheck:
                         var connectivityPayload = message.GetPayload<ConnectivityCheckPayload>();

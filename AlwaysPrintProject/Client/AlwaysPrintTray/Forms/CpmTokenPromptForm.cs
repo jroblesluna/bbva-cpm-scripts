@@ -48,8 +48,13 @@ namespace AlwaysPrintTray.Forms
         private readonly Func<string, bool> _triggerTestPrint;
 
         private bool _allowClose;
+        private bool _testPrintTriggered;   // true tras pulsar "Generar impresión de prueba"
         private System.Windows.Forms.Timer _pollTimer;
         private DateTime _pollStartedUtc;
+
+        // === SINGLETON (una sola ventana viva a la vez, aunque lleguen triggers sucesivos) ===
+        private static readonly object _instanceLock = new object();
+        private static CpmTokenPromptForm _instance;
 
         // === CONTROLES ===
         private Panel _headerBar;
@@ -79,15 +84,79 @@ namespace AlwaysPrintTray.Forms
         }
 
         /// <summary>
-        /// Crea y muestra la ventana de forma MODAL en el thread actual (debe ser STA).
+        /// Muestra la ventana de forma MODAL en el thread actual (debe ser STA).
+        /// SINGLETON: si ya hay una ventana viva (de un trigger anterior), no abre otra —
+        /// trae la existente al frente (cross-thread seguro) y retorna de inmediato.
+        /// La primera aparición nace TopMost; una vez cerrada, la próxima vuelve a nacer TopMost.
         /// Bloquea hasta que el usuario cierre con Salir o Esc.
         /// </summary>
         public static void ShowModal(ShowCpmTokenPromptPayload payload, Func<string, bool> triggerTestPrint)
         {
-            using (var form = new CpmTokenPromptForm(payload, triggerTestPrint))
+            lock (_instanceLock)
             {
-                form.ShowDialog();
+                var existing = _instance;
+                if (existing != null && !existing.IsDisposed)
+                {
+                    // Ya hay una ventana abierta: traerla al frente en su propio thread UI.
+                    try
+                    {
+                        existing.BeginInvoke(new Action(() => existing.BringExistingToFront()));
+                    }
+                    catch (Exception ex)
+                    {
+                        AlwaysPrintLogger.WriteTrayWarning(
+                            $"CpmTokenPromptForm: no se pudo reactivar la ventana existente: {ex.Message}");
+                    }
+                    return;
+                }
             }
+
+            var form = new CpmTokenPromptForm(payload, triggerTestPrint);
+            lock (_instanceLock) { _instance = form; }
+
+            // IMPORTANTE: usar Application.Run(form), NO form.ShowDialog().
+            // Este método corre en un thread STA dedicado. Application.Run crea un message
+            // loop AISLADO para este thread; cuando el form se cierra, solo termina ESE loop.
+            // Con ShowDialog() (sin Application.Run) el cierre del diálogo propaga el fin del
+            // message loop al hilo principal del Tray, matando el NotifyIcon y dejando el
+            // proceso vivo sin ícono. Application.Run aísla el ciclo de vida de esta ventana.
+            try
+            {
+                Application.Run(form);
+            }
+            finally
+            {
+                lock (_instanceLock)
+                {
+                    if (ReferenceEquals(_instance, form)) _instance = null;
+                }
+                form.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Trae la ventana ya existente al frente. Si aún NO se ha disparado la impresión de
+        /// prueba (sigue en estado inicial), se re-fuerza TopMost; si ya está en modo polling,
+        /// solo se activa sin volverse TopMost (para no tapar el navegador).
+        /// </summary>
+        private void BringExistingToFront()
+        {
+            try
+            {
+                if (WindowState == FormWindowState.Minimized)
+                    WindowState = FormWindowState.Normal;
+
+                if (!_testPrintTriggered)
+                {
+                    TopMost = false;
+                    TopMost = true;
+                }
+                Activate();
+                BringToFront();
+                Focus();
+                SetForegroundWindow(Handle);
+            }
+            catch { /* no crítico */ }
         }
 
         private void BuildUi()
@@ -312,6 +381,12 @@ namespace AlwaysPrintTray.Forms
                 _testPrintButton.Enabled = true;
                 return;
             }
+
+            // A partir de aquí la ventana ya no debe tapar el navegador donde el usuario
+            // se autentica: soltar TopMost (deja de estar siempre encima). Sigue visible y
+            // usable, pero el foreground puede pasar al browser.
+            _testPrintTriggered = true;
+            TopMost = false;
 
             _pollStatusLabel.Text =
                 "Impresión enviada. Revisa tu navegador (puede estar minimizado) y autentícate. " +
