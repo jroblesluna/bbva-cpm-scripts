@@ -52,6 +52,11 @@ namespace AlwaysPrintTray.Forms
         private System.Windows.Forms.Timer _pollTimer;
         private DateTime _pollStartedUtc;
 
+        // Auto-cierre tras confirmar credencial (estado verde).
+        private const int AutoCloseSeconds = 10;
+        private System.Windows.Forms.Timer _autoCloseTimer;
+        private int _autoCloseRemaining;
+
         // === SINGLETON (una sola ventana viva a la vez, aunque lleguen triggers sucesivos) ===
         private static readonly object _instanceLock = new object();
         private static CpmTokenPromptForm _instance;
@@ -451,7 +456,6 @@ namespace AlwaysPrintTray.Forms
                 "Ya puedes enviar tus impresiones de forma segura. Puedes cerrar esta ventana.";
             _userLabel.Parent.BackColor = GreenBg;
             _pollStatusLabel.ForeColor = GreenAccent;
-            _pollStatusLabel.Text = "Autenticación completada.";
             _testPrintButton.Visible = false;
 
             // Resaltar el botón Salir como acción principal en estado verde.
@@ -461,12 +465,59 @@ namespace AlwaysPrintTray.Forms
 
             AlwaysPrintLogger.WriteTrayInfo(
                 $"CpmTokenPromptForm: token confirmado para '{_username}'.");
+
+            // Volver a traer la ventana al frente (TopMost) para evidenciar que el flujo
+            // terminó con éxito. Durante el polling se había soltado TopMost para no tapar
+            // el navegador; ahora que ya se autenticó, sí queremos que el usuario lo vea.
+            try
+            {
+                TopMost = true;
+                TopMost = false;
+                TopMost = true;
+                Activate();
+                BringToFront();
+                Focus();
+                SetForegroundWindow(Handle);
+            }
+            catch { /* no crítico */ }
+
+            // Iniciar cuenta regresiva de auto-cierre para no estorbar al usuario.
+            StartAutoClose();
+        }
+
+        /// <summary>
+        /// Inicia la cuenta regresiva de auto-cierre (AutoCloseSeconds) tras confirmar la
+        /// credencial. Actualiza el mensaje con los segundos restantes y cierra la ventana
+        /// al llegar a cero. El usuario puede cerrar antes con "Cerrar" o Esc.
+        /// </summary>
+        private void StartAutoClose()
+        {
+            _autoCloseRemaining = AutoCloseSeconds;
+            _pollStatusLabel.Text =
+                $"Autenticación completada. Esta ventana se cerrará en {_autoCloseRemaining} segundos…";
+
+            _autoCloseTimer?.Dispose();
+            _autoCloseTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+            _autoCloseTimer.Tick += (s, e) =>
+            {
+                _autoCloseRemaining--;
+                if (_autoCloseRemaining <= 0)
+                {
+                    _autoCloseTimer.Stop();
+                    CloseByUser();
+                    return;
+                }
+                _pollStatusLabel.Text =
+                    $"Autenticación completada. Esta ventana se cerrará en {_autoCloseRemaining} segundos…";
+            };
+            _autoCloseTimer.Start();
         }
 
         private void CloseByUser()
         {
             _allowClose = true;
             _pollTimer?.Stop();
+            _autoCloseTimer?.Stop();
             Close();
         }
 
@@ -516,7 +567,10 @@ namespace AlwaysPrintTray.Forms
         protected override void Dispose(bool disposing)
         {
             if (disposing)
+            {
                 _pollTimer?.Dispose();
+                _autoCloseTimer?.Dispose();
+            }
             base.Dispose(disposing);
         }
     }
