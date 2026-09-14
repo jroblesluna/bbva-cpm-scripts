@@ -1,8 +1,7 @@
 using System;
-using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.Threading;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using AlwaysPrint.Shared.Logging;
 using AlwaysPrint.Shared.Messages;
@@ -24,6 +23,9 @@ namespace AlwaysPrintTray.Forms
     ///
     /// La ventana es topmost + modal, centrada, y solo se cierra con el botón "Salir" o con Esc.
     /// El botón [X] y Alt+F4 están bloqueados hasta que el usuario decida salir.
+    ///
+    /// Layout basado en paneles con Dock (no coordenadas absolutas) para que los botones y el
+    /// contenido se ubiquen correctamente independientemente del escalado DPI.
     /// </summary>
     public sealed class CpmTokenPromptForm : Form
     {
@@ -34,9 +36,9 @@ namespace AlwaysPrintTray.Forms
         // Verde: token confirmado.
         private static readonly Color GreenBg = Color.FromArgb(232, 245, 233);
         private static readonly Color GreenAccent = Color.FromArgb(46, 125, 50);
-
-        private const int FormW = 560;
-        private const int FormH = 420;
+        private static readonly Color TextDark = Color.FromArgb(30, 41, 59);
+        private static readonly Color TextBody = Color.FromArgb(45, 55, 72);
+        private static readonly Color FooterBg = Color.FromArgb(241, 245, 249);
 
         // === ESTADO ===
         private readonly string _username;
@@ -51,8 +53,9 @@ namespace AlwaysPrintTray.Forms
 
         // === CONTROLES ===
         private Panel _headerBar;
-        private Label _statusIcon;
-        private Label _titleLabel;
+        private PictureBox _statusIconBox;
+        private Label _statusTitleLabel;
+        private Label _userLabel;
         private Label _bodyLabel;
         private Label _pollStatusLabel;
         private Button _testPrintButton;
@@ -91,75 +94,33 @@ namespace AlwaysPrintTray.Forms
         {
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterScreen;
+            AutoScaleMode = AutoScaleMode.Dpi;
             TopMost = true;
-            ShowInTaskbar = false;
+            ShowInTaskbar = true;             // visible en Alt+Tab por si pierde foco
             MaximizeBox = false;
             MinimizeBox = false;
             ControlBox = false;               // sin botón [X]
-            Size = new Size(FormW, FormH);
+            ClientSize = new Size(580, 440);  // área CLIENTE (no incluye borde/título)
+            MinimumSize = new Size(560, 400);
             Text = "AlwaysPrint - Credencial de impresión";
             BackColor = AmberRedBg;
             Font = new Font("Segoe UI", 9.75f);
             KeyPreview = true;                // para capturar Esc a nivel de form
 
-            // Barra de encabezado con acento de estado.
-            _headerBar = new Panel
+            // ── Footer con botones (Dock=Bottom): se ancla SIEMPRE al fondo del área cliente ──
+            var footer = new Panel
             {
-                Dock = DockStyle.Top,
-                Height = 6,
-                BackColor = AmberRedAccent
+                Dock = DockStyle.Bottom,
+                Height = 68,
+                BackColor = FooterBg,
+                Padding = new Padding(16, 14, 16, 14)
             };
-            Controls.Add(_headerBar);
-
-            _statusIcon = new Label
-            {
-                AutoSize = false,
-                Size = new Size(FormW - 40, 34),
-                Location = new Point(20, 22),
-                Font = new Font("Segoe UI", 15f, FontStyle.Bold),
-                ForeColor = AmberRedAccent,
-                Text = "⚠  Falta tu credencial de impresión"
-            };
-            Controls.Add(_statusIcon);
-
-            _titleLabel = new Label
-            {
-                AutoSize = false,
-                Size = new Size(FormW - 40, 24),
-                Location = new Point(20, 60),
-                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(30, 41, 59),
-                Text = $"Usuario: {_username}"
-            };
-            Controls.Add(_titleLabel);
-
-            _bodyLabel = new Label
-            {
-                AutoSize = false,
-                Size = new Size(FormW - 44, 190),
-                Location = new Point(22, 92),
-                ForeColor = Color.FromArgb(45, 55, 72),
-                Font = new Font("Segoe UI", 9.75f),
-                Text = BuildInstructions()
-            };
-            Controls.Add(_bodyLabel);
-
-            _pollStatusLabel = new Label
-            {
-                AutoSize = false,
-                Size = new Size(FormW - 44, 40),
-                Location = new Point(22, 286),
-                Font = new Font("Segoe UI", 9.75f, FontStyle.Bold),
-                ForeColor = AmberRedAccent,
-                Text = string.Empty
-            };
-            Controls.Add(_pollStatusLabel);
 
             _testPrintButton = new Button
             {
                 Text = "Generar impresión de prueba",
-                Size = new Size(260, 40),
-                Location = new Point(22, FormH - 66),
+                Dock = DockStyle.Left,
+                Width = 260,
                 FlatStyle = FlatStyle.Flat,
                 BackColor = AmberRedAccent,
                 ForeColor = Color.White,
@@ -168,22 +129,106 @@ namespace AlwaysPrintTray.Forms
             };
             _testPrintButton.FlatAppearance.BorderSize = 0;
             _testPrintButton.Click += OnTestPrintClick;
-            Controls.Add(_testPrintButton);
 
             _exitButton = new Button
             {
                 Text = "Salir",
-                Size = new Size(120, 40),
-                Location = new Point(FormW - 142, FormH - 66),
+                Dock = DockStyle.Right,
+                Width = 130,
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(226, 232, 240),
-                ForeColor = Color.FromArgb(30, 41, 59),
+                ForeColor = TextDark,
                 Font = new Font("Segoe UI", 9.75f, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             _exitButton.FlatAppearance.BorderSize = 0;
             _exitButton.Click += (s, e) => CloseByUser();
-            Controls.Add(_exitButton);
+
+            footer.Controls.Add(_testPrintButton);
+            footer.Controls.Add(_exitButton);
+
+            // ── Barra de acento superior (Dock=Top) ──
+            _headerBar = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 6,
+                BackColor = AmberRedAccent
+            };
+
+            // ── Encabezado con ícono de Warning + título (Dock=Top) ──
+            var headerPanel = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 64,
+                BackColor = AmberRedBg,
+                Padding = new Padding(20, 12, 20, 8)
+            };
+
+            _statusIconBox = new PictureBox
+            {
+                Dock = DockStyle.Left,
+                Width = 48,
+                SizeMode = PictureBoxSizeMode.CenterImage,
+                Image = SystemIcons.Warning.ToBitmap()
+            };
+
+            _statusTitleLabel = new Label
+            {
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = new Font("Segoe UI", 15f, FontStyle.Bold),
+                ForeColor = AmberRedAccent,
+                Text = "Falta tu credencial de impresión"
+            };
+
+            headerPanel.Controls.Add(_statusTitleLabel);
+            headerPanel.Controls.Add(_statusIconBox);
+
+            // ── Cuerpo (Dock=Fill): ocupa el resto entre header y footer ──
+            var body = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = AmberRedBg,
+                Padding = new Padding(22, 8, 22, 8)
+            };
+
+            _userLabel = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 26,
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = TextDark,
+                Text = $"Usuario: {_username}"
+            };
+
+            _bodyLabel = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 190,
+                ForeColor = TextBody,
+                Font = new Font("Segoe UI", 9.75f),
+                Text = BuildInstructions()
+            };
+
+            _pollStatusLabel = new Label
+            {
+                Dock = DockStyle.Bottom,
+                Height = 48,
+                Font = new Font("Segoe UI", 9.75f, FontStyle.Bold),
+                ForeColor = AmberRedAccent,
+                Text = string.Empty
+            };
+
+            // Orden de inserción: los Dock=Top se apilan según orden inverso de Add.
+            body.Controls.Add(_pollStatusLabel);
+            body.Controls.Add(_bodyLabel);
+            body.Controls.Add(_userLabel);
+
+            // Agregar en orden: primero Fill, luego los Top/Bottom (WinForms respeta z-order).
+            Controls.Add(body);
+            Controls.Add(headerPanel);
+            Controls.Add(_headerBar);
+            Controls.Add(footer);
 
             // Esc cierra la ventana (mismo efecto que "Salir").
             KeyDown += (s, e) =>
@@ -201,6 +246,33 @@ namespace AlwaysPrintTray.Forms
                 if (!_allowClose)
                     e.Cancel = true;
             };
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        /// <summary>
+        /// Fuerza que la ventana quede al frente y con foco. TopMost por sí solo no basta
+        /// cuando la ventana se crea en un thread STA separado y otra app tiene el foco.
+        /// Se combina toggle de TopMost + Activate + SetForegroundWindow (mismo patrón que
+        /// ConsentPopup, probado para forzar la ventana sobre apps maximizadas).
+        /// </summary>
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            try
+            {
+                TopMost = true;
+                // Toggle para forzar reevaluación del z-order por el window manager.
+                TopMost = false;
+                TopMost = true;
+                Activate();
+                BringToFront();
+                Focus();
+                SetForegroundWindow(Handle);
+            }
+            catch { /* no crítico */ }
         }
 
         private string BuildInstructions()
@@ -292,11 +364,17 @@ namespace AlwaysPrintTray.Forms
         {
             BackColor = GreenBg;
             _headerBar.BackColor = GreenAccent;
-            _statusIcon.ForeColor = GreenAccent;
-            _statusIcon.Text = "✔  Credencial verificada";
+            if (_statusIconBox.Parent != null)
+                _statusIconBox.Parent.BackColor = GreenBg;
+            _statusIconBox.Image = SystemIcons.Information.ToBitmap();
+            _statusTitleLabel.Parent.BackColor = GreenBg;
+            _statusTitleLabel.ForeColor = GreenAccent;
+            _statusTitleLabel.Text = "Credencial verificada";
+            _bodyLabel.Parent.BackColor = GreenBg;
             _bodyLabel.Text =
                 "Tu credencial de impresión fue detectada correctamente.\r\n\r\n" +
                 "Ya puedes enviar tus impresiones de forma segura. Puedes cerrar esta ventana.";
+            _userLabel.Parent.BackColor = GreenBg;
             _pollStatusLabel.ForeColor = GreenAccent;
             _pollStatusLabel.Text = "Autenticación completada.";
             _testPrintButton.Visible = false;
