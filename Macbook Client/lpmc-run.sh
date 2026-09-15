@@ -208,6 +208,58 @@ daemon_last_exit() {
     | awk -F'=' '/last exit code/{gsub(/ /,"",$2); print $2; exit}'
 }
 
+# Reconstruye INSTALL_PATH/jre cuando el postinstall dejó 'mv Contents/Home -> jre'
+# a medias (queda el bundle 'zulu*'/'jdk*' pero no 'jre/' ni los launchers lpmc-*).
+# Replica exactamente lo que hace extractJre() del postinstall de LPMC:
+#   mv <bundle>/Contents/Home -> jre  +  cp java a 4 launchers  +  chmod.
+# Devuelve 0 si el launcher del servicio queda ejecutable; 1 si no pudo repararlo.
+rebuild_jre() {
+  local base=/Library/Lexmark/PrintManagementClient
+  local home=""
+
+  # 1) Si ya existe un jre/ real con java, no hay bundle que mover: solo faltan
+  #    los launchers (caso raro pero posible si un mv previo dejó el java suelto).
+  if [[ -x "$base/jre/bin/java" ]]; then
+    home="$base/jre"
+  else
+    # 2) Ubicar el <bundle>/Contents/Home poblado (con bin/java) del JRE embebido.
+    #    Se prefiere el que coincide con la arquitectura, con fallback a cualquiera.
+    local arch; arch=$(uname -m)
+    local pat="zulu*"
+    case "$arch" in
+      arm64|arm64e) pat="zulu*aarch64" ;;
+      x86_64|x86_64h) pat="zulu*x64" ;;
+    esac
+    local bundle
+    bundle=$(find "$base" -maxdepth 1 -type d \( -iname "$pat" -o -iname 'zulu*' -o -iname 'jdk*' \) 2>/dev/null | head -1)
+    [[ -n "$bundle" && -x "$bundle/Contents/Home/bin/java" ]] || { fail "no se encontró un bundle JRE con Contents/Home/bin/java bajo $base"; return 1; }
+
+    warn "reconstruyendo jre/ desde $(basename "$bundle") (postinstall incompleto)"
+    # Detener el servicio para no mover archivos en uso.
+    run sudo launchctl bootout system/com.lexmark.lpmc.universal.service 2>/dev/null
+    [[ -d "$base/jre" ]] && run sudo rm -rf "$base/jre"
+    run sudo mv "$bundle/Contents/Home" "$base/jre" || { fail "el mv Contents/Home -> jre falló"; return 1; }
+    home="$base/jre"
+  fi
+
+  # 3) Crear los 4 launchers como copias de java (argv[0] decide qué arranca).
+  local l
+  for l in lpmc-universal-service lpmc-install-agent lpmc-systemtray-app lpmc-universal-ui; do
+    run sudo cp -f "$home/bin/java" "$home/bin/$l" || { fail "no se pudo crear el launcher $l"; return 1; }
+  done
+
+  # 4) cacerts.original + permisos, idéntico a setPermissions() del postinstall.
+  [[ -f "$home/lib/security/cacerts" ]] && run sudo cp -f "$home/lib/security/cacerts" "$home/lib/security/cacerts.original"
+  run sudo chmod 500 "$home/bin/lpmc-universal-service"
+  run sudo chmod 500 "$home/bin/lpmc-install-agent"
+  run sudo chmod 555 "$home/bin/lpmc-systemtray-app"
+  run sudo chmod 555 "$home/bin/lpmc-universal-ui"
+
+  [[ -x "$home/bin/lpmc-universal-service" ]] || { fail "el launcher del servicio sigue sin ser ejecutable"; return 1; }
+  ok "jre/ reconstruido: $home/bin/lpmc-universal-service"
+  return 0
+}
+
 # ==================================================================== STEPS
 # Each step returns 0 (continue) or 1 (definitive failure). The ones that have
 # a remediation attempt it internally and check again.
@@ -374,11 +426,28 @@ step_check_files() {
     ok "JRE launcher: ${jre_exec#$base/}"
   else
     fail "missing JRE launcher: $jre_exec"
-    if [[ ! -d "$base/jre" ]] && find "$base" -maxdepth 1 -iname 'zulu*' -o -iname 'jdk*' 2>/dev/null | grep -q .; then
-      info "hay un bundle Zulu/JDK pero falta 'jre/': el postinstall no completó 'mv Contents/Home -> jre'"
-      info "reconstruir: mv <zulu>/Contents/Home -> $base/jre y copiar java a los 4 launchers lpmc-*"
+    # Remediation: el postinstall dejó el 'mv Contents/Home -> jre' a medias.
+    # Si hay un bundle Zulu/JDK con un java utilizable, reconstruir jre/ nosotros.
+    local have_bundle=0
+    find "$base" -maxdepth 1 -type d \( -iname 'zulu*' -o -iname 'jdk*' \) 2>/dev/null | grep -q . && have_bundle=1
+    if [[ $have_bundle -eq 1 || -x "$base/jre/bin/java" ]]; then
+      info "el postinstall no completó 'mv Contents/Home -> jre'; intentando reconstruir automáticamente"
+      if ask "Reconstruir jre/ (mv Contents/Home + launchers lpmc-*)?" && rebuild_jre; then
+        # Re-verificar el launcher tras la remediación.
+        [[ -x "$jre_exec" ]] || jre_exec="$base/jre/bin/lpmc-universal-service"
+        if [[ -x "$jre_exec" ]]; then
+          ok "JRE launcher: ${jre_exec#$base/} (reconstruido)"
+        else
+          miss=1
+        fi
+      else
+        info "reconstrucción manual: sudo mv <zulu>/Contents/Home -> $base/jre y copiar java a los 4 launchers lpmc-*"
+        miss=1
+      fi
+    else
+      info "no hay bundle Zulu/JDK para reconstruir jre/ — reinstalar el .pkg o traer el JRE"
+      miss=1
     fi
-    miss=1
   fi
 
   ls "$base"/lpmc-universal-service-*.jar >/dev/null 2>&1 && ok "service jar" || { fail "missing the service jar"; miss=1; }
