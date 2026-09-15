@@ -201,6 +201,12 @@ ppd_present()    { lpinfo -m 2>/dev/null | grep -qi "$DRIVER_NAME"; }
 queue_present()  { lpstat -p "$QUEUE_NAME" >/dev/null 2>&1; }
 port_listening() { sudo lsof -nP -iTCP:"$LOOPBACK_PORT" -sTCP:LISTEN >/dev/null 2>&1; }
 daemon_loaded()  { sudo launchctl print system/com.lexmark.lpmc.universal.service >/dev/null 2>&1; }
+# Devuelve el "last exit code" del daemon (vacío si no está cargado). Un valor
+# 127 en bucle = crash-loop por binario/launcher inexistente (JRE mal armado).
+daemon_last_exit() {
+  sudo launchctl print system/com.lexmark.lpmc.universal.service 2>/dev/null \
+    | awk -F'=' '/last exit code/{gsub(/ /,"",$2); print $2; exit}'
+}
 
 # ==================================================================== STEPS
 # Each step returns 0 (continue) or 1 (definitive failure). The ones that have
@@ -350,22 +356,28 @@ step_check_files() {
     if [[ -e "$base/$f" ]]; then ok "$f"; else fail "missing $f"; miss=1; fi
   done
 
-  # El JRE embebido NO se llama siempre "jre": en 4.0.2 sobre Apple Silicon viene
-  # como un Azul Zulu con nombre versionado (p. ej.
-  # "zulu25.36.15-ca-fx-jre25.0.4-macosx_aarch64"). Por eso NO se busca la ruta
-  # literal "jre" (falso negativo), sino cualquier runtime plausible: un dir
-  # "jre", uno "zulu*"/"jdk*", o un binario "java" ejecutable embebido.
-  local jre_dir=""
-  jre_dir=$(find "$base" -maxdepth 1 \( -iname 'jre' -o -iname 'zulu*' -o -iname 'jdk*' \) -type d 2>/dev/null | head -1)
-  if [[ -z "$jre_dir" ]]; then
-    # Fallback: buscar el ejecutable java dentro del árbol de LPMC.
-    local java_bin; java_bin=$(find "$base" -maxdepth 4 -type f -name 'java' 2>/dev/null | head -1)
-    [[ -n "$java_bin" ]] && jre_dir=$(dirname "$java_bin")
+  # NO basta con que exista ALGÚN runtime (un dir jre/zulu*/jdk*): el postinstall
+  # de LPMC hace 'mv <zulu>/Contents/Home -> jre' y luego copia 'java' a 4
+  # launchers (lpmc-universal-service, etc.). Si ese postinstall queda a medias
+  # (p. ej. el .zip del JRE ya fue borrado en una corrida previa y el unzip falla
+  # en silencio), queda el dir 'zulu*' pero NO 'jre/' ni los launchers → el daemon
+  # crashea con exit 127 ("No such file or directory"). Por eso se verifica el
+  # binario EXACTO que el wrapper .lpmc-universal-service.sh va a invocar.
+  local svc_wrapper="$base/.lpmc-universal-service.sh"
+  local jre_exec=""
+  if [[ -r "$svc_wrapper" ]]; then
+    # Extrae el primer token que apunta a .../jre/... o .../bin/lpmc-universal-service
+    jre_exec=$(grep -oE '/[^"[:space:]]*jre/bin/[^"[:space:]]+' "$svc_wrapper" 2>/dev/null | head -1)
   fi
-  if [[ -n "$jre_dir" ]]; then
-    ok "JRE: $(basename "$jre_dir")"
+  [[ -z "$jre_exec" ]] && jre_exec="$base/jre/bin/lpmc-universal-service"
+  if [[ -x "$jre_exec" ]]; then
+    ok "JRE launcher: ${jre_exec#$base/}"
   else
-    fail "missing JRE (no se encontró jre/zulu*/jdk* ni un ejecutable java bajo $base)"
+    fail "missing JRE launcher: $jre_exec"
+    if [[ ! -d "$base/jre" ]] && find "$base" -maxdepth 1 -iname 'zulu*' -o -iname 'jdk*' 2>/dev/null | grep -q .; then
+      info "hay un bundle Zulu/JDK pero falta 'jre/': el postinstall no completó 'mv Contents/Home -> jre'"
+      info "reconstruir: mv <zulu>/Contents/Home -> $base/jre y copiar java a los 4 launchers lpmc-*"
+    fi
     miss=1
   fi
 
@@ -456,6 +468,20 @@ step_check_services() {
   echo
 
   fail "the services did not come up"
+
+  # Diagnóstico de causa raíz: si el daemon está cargado pero muere con exit 127,
+  # es crash-loop por binario inexistente — típicamente el launcher del JRE
+  # (jre/bin/lpmc-universal-service) que el postinstall no creó (mv Home->jre
+  # incompleto). En ese caso esperar más NO ayuda; hay que reconstruir el jre/.
+  local lec; lec=$(daemon_last_exit)
+  if [[ "$lec" == "127" ]]; then
+    fail "daemon crash-loop (last exit code 127): el launcher del servicio no existe o no es ejecutable"
+    info "causa probable: postinstall dejó 'mv Contents/Home -> jre' a medias; falta jre/bin/lpmc-universal-service"
+    info "verificar: ls -la /Library/Lexmark/PrintManagementClient/jre/bin/lpmc-universal-service"
+    info "reconstruir: sudo mv <zulu>/Contents/Home /Library/Lexmark/PrintManagementClient/jre && copiar java a los 4 launchers lpmc-*"
+  elif [[ -n "$lec" && "$lec" != "0" ]]; then
+    fail "daemon crash-loop (last exit code $lec)"
+  fi
   info "look at: sudo launchctl print system/com.lexmark.lpmc.universal.service"
   info "and:     sudo tail -50 /var/Lexmark/PrintManagementClient/Logs/*.log"
   return 1
