@@ -119,6 +119,13 @@ run() {
   "$@"
 }
 
+# Elevación condicional. Si ya somos root (caso habitual en este flujo), NO se
+# antepone 'sudo': en máquinas gestionadas (MDM/Jamf) el sudoers suele restringir
+# qué comandos puede correr 'sudo' aunque el usuario ya sea root, y meter 'sudo'
+# delante hace fallar cosas tan básicas como /bin/mv ("user root is not allowed
+# to execute ... as root"). Si no somos root, se usa sudo para escalar.
+if [[ "$(id -u)" -eq 0 ]]; then SUDO=""; else SUDO="sudo"; fi
+
 ask() {
   [[ $ASSUME_YES -eq 1 ]] && return 0
   local a; read -r -p "    $1 [y/N] " a
@@ -191,6 +198,9 @@ state_load() { [[ -f "$STATE" ]] && cat "$STATE" || echo ""; }
 
 sudo_keepalive() {
   [[ $DRY -eq 1 ]] && return 0
+  # Si ya somos root no hace falta escalar (y 'sudo -v' puede estar vetado por el
+  # sudoers gestionado). El keepalive solo aplica cuando realmente usamos sudo.
+  [[ -z "$SUDO" ]] && return 0
   sudo -v || die "sudo is required."
   ( while true; do sudo -n true; sleep 50; kill -0 "$$" 2>/dev/null || exit; done ) 2>/dev/null &
   SUDO_PID=$!
@@ -199,12 +209,12 @@ sudo_keepalive() {
 lpmc_installed() { [[ -d /Library/Lexmark/PrintManagementClient ]]; }
 ppd_present()    { lpinfo -m 2>/dev/null | grep -qi "$DRIVER_NAME"; }
 queue_present()  { lpstat -p "$QUEUE_NAME" >/dev/null 2>&1; }
-port_listening() { sudo lsof -nP -iTCP:"$LOOPBACK_PORT" -sTCP:LISTEN >/dev/null 2>&1; }
-daemon_loaded()  { sudo launchctl print system/com.lexmark.lpmc.universal.service >/dev/null 2>&1; }
+port_listening() { $SUDO lsof -nP -iTCP:"$LOOPBACK_PORT" -sTCP:LISTEN >/dev/null 2>&1; }
+daemon_loaded()  { $SUDO launchctl print system/com.lexmark.lpmc.universal.service >/dev/null 2>&1; }
 # Devuelve el "last exit code" del daemon (vacío si no está cargado). Un valor
 # 127 en bucle = crash-loop por binario/launcher inexistente (JRE mal armado).
 daemon_last_exit() {
-  sudo launchctl print system/com.lexmark.lpmc.universal.service 2>/dev/null \
+  $SUDO launchctl print system/com.lexmark.lpmc.universal.service 2>/dev/null \
     | awk -F'=' '/last exit code/{gsub(/ /,"",$2); print $2; exit}'
 }
 
@@ -236,24 +246,24 @@ rebuild_jre() {
 
     warn "reconstruyendo jre/ desde $(basename "$bundle") (postinstall incompleto)"
     # Detener el servicio para no mover archivos en uso.
-    run sudo launchctl bootout system/com.lexmark.lpmc.universal.service 2>/dev/null
-    [[ -d "$base/jre" ]] && run sudo rm -rf "$base/jre"
-    run sudo mv "$bundle/Contents/Home" "$base/jre" || { fail "el mv Contents/Home -> jre falló"; return 1; }
+    run $SUDO launchctl bootout system/com.lexmark.lpmc.universal.service 2>/dev/null
+    [[ -d "$base/jre" ]] && run $SUDO rm -rf "$base/jre"
+    run $SUDO mv "$bundle/Contents/Home" "$base/jre" || { fail "el mv Contents/Home -> jre falló"; return 1; }
     home="$base/jre"
   fi
 
   # 3) Crear los 4 launchers como copias de java (argv[0] decide qué arranca).
   local l
   for l in lpmc-universal-service lpmc-install-agent lpmc-systemtray-app lpmc-universal-ui; do
-    run sudo cp -f "$home/bin/java" "$home/bin/$l" || { fail "no se pudo crear el launcher $l"; return 1; }
+    run $SUDO cp -f "$home/bin/java" "$home/bin/$l" || { fail "no se pudo crear el launcher $l"; return 1; }
   done
 
   # 4) cacerts.original + permisos, idéntico a setPermissions() del postinstall.
-  [[ -f "$home/lib/security/cacerts" ]] && run sudo cp -f "$home/lib/security/cacerts" "$home/lib/security/cacerts.original"
-  run sudo chmod 500 "$home/bin/lpmc-universal-service"
-  run sudo chmod 500 "$home/bin/lpmc-install-agent"
-  run sudo chmod 555 "$home/bin/lpmc-systemtray-app"
-  run sudo chmod 555 "$home/bin/lpmc-universal-ui"
+  [[ -f "$home/lib/security/cacerts" ]] && run $SUDO cp -f "$home/lib/security/cacerts" "$home/lib/security/cacerts.original"
+  run $SUDO chmod 500 "$home/bin/lpmc-universal-service"
+  run $SUDO chmod 500 "$home/bin/lpmc-install-agent"
+  run $SUDO chmod 555 "$home/bin/lpmc-systemtray-app"
+  run $SUDO chmod 555 "$home/bin/lpmc-universal-ui"
 
   [[ -x "$home/bin/lpmc-universal-service" ]] || { fail "el launcher del servicio sigue sin ser ejecutable"; return 1; }
   ok "jre/ reconstruido: $home/bin/lpmc-universal-service"
@@ -334,13 +344,13 @@ step_uninstall_previous() {
   # Reinstalling on top works (the postinstall does stopServices), but if the
   # previous installation ended up with wrong owners it is better to clean up.
   local notroot
-  notroot=$(sudo find /Library/Lexmark/PrintManagementClient -maxdepth 1 ! -user root 2>/dev/null | head -1)
+  notroot=$($SUDO find /Library/Lexmark/PrintManagementClient -maxdepth 1 ! -user root 2>/dev/null | head -1)
   if [[ -n "$notroot" ]]; then
     warn "there are files not owned by root — previous installation is corrupt"
     if ask "Uninstall before continuing?"; then
-      run sudo /Library/Lexmark/PrintManagementClient/uninstall.sh
-      run sudo pkgutil --forget com.lexmark.LPMClientUniversal.pkg 2>/dev/null
-      run sudo pkgutil --forget com.lexmark.Universal_Color_Print.pkg 2>/dev/null
+      run $SUDO /Library/Lexmark/PrintManagementClient/uninstall.sh
+      run $SUDO pkgutil --forget com.lexmark.LPMClientUniversal.pkg 2>/dev/null
+      run $SUDO pkgutil --forget com.lexmark.Universal_Color_Print.pkg 2>/dev/null
       ok "uninstalled"
     else
       warn "continuing on top of an installation with dubious permissions"
@@ -373,7 +383,7 @@ step_install() {
 
   if [[ "$MODE" == "combined" ]]; then
     info "combined mode — original signed package"
-    run sudo installer -pkg "$STAGED_PKG" -target / -verbose
+    run $SUDO installer -pkg "$STAGED_PKG" -target / -verbose
   else
     info "split mode — re-flattened components (driver first)"
     local full="$WORK/expanded-full" flat="$WORK/expanded"
@@ -389,7 +399,7 @@ step_install() {
       run rm -f "$out"
       run pkgutil --flatten "$comp" "$out" || { fail "could not flatten $(basename "$comp")"; return 1; }
       info "installing $(basename "$comp")"
-      run sudo installer -pkg "$out" -target / -verbose
+      run $SUDO installer -pkg "$out" -target / -verbose
     done
   fi
 
@@ -463,7 +473,7 @@ step_check_files() {
   fi
 
   local notroot
-  notroot=$(sudo find "$base" -maxdepth 1 ! -user root 2>/dev/null | head -5)
+  notroot=$($SUDO find "$base" -maxdepth 1 ! -user root 2>/dev/null | head -5)
   [[ -z "$notroot" ]] && ok "ownership root:wheel" || { warn "non-root files:"; echo "$notroot"; }
   return 0
 }
@@ -475,7 +485,7 @@ step_check_config() {
   # WATCH OUT: the real path is /var/..., not /Library/... It is the classic mistake.
   local live=/var/Lexmark/PrintManagementClient/configuration.json
 
-  if ! sudo test -f "$live"; then
+  if ! $SUDO test -f "$live"; then
     fail "the configuration was not copied to $live"
     info "this means the postinstall did not find configuration.json next to the .pkg"
     info "remediation: re-run from the stage step"
@@ -483,11 +493,11 @@ step_check_config() {
   fi
   ok "config installed at $live"
 
-  if sudo diff -q "$CONF" "$live" >/dev/null 2>&1; then
+  if $SUDO diff -q "$CONF" "$live" >/dev/null 2>&1; then
     ok "identical to the one you passed"
   else
     warn "the installed config differs from the source one:"
-    sudo diff "$CONF" "$live" | head -20
+    $SUDO diff "$CONF" "$live" | head -20
   fi
   return 0
 }
@@ -521,7 +531,7 @@ step_check_services() {
   [[ $dae -eq 1 ]] || fail "daemon not loaded"
   fail "port $LOOPBACK_PORT not listening after ${SVC_TIMEOUT}s"
   warn "remediating with launchctl bootstrap…"
-  run sudo launchctl bootstrap system /Library/LaunchDaemons/com.lexmark.lpmc.universal.service.plist 2>/dev/null
+  run $SUDO launchctl bootstrap system /Library/LaunchDaemons/com.lexmark.lpmc.universal.service.plist 2>/dev/null
   run launchctl bootstrap "gui/$(id -u)" /Library/LaunchAgents/com.lexmark.lpmc.systemtray.app.plist 2>/dev/null
 
   # Segunda espera tras el bootstrap.
@@ -582,9 +592,9 @@ step_check_queue() {
   fail "the queue did not appear in ${QUEUE_TIMEOUT}s"
 
   if ask "Restart the services and wait again?"; then
-    run sudo launchctl bootout system/com.lexmark.lpmc.universal.service 2>/dev/null
+    run $SUDO launchctl bootout system/com.lexmark.lpmc.universal.service 2>/dev/null
     sleep 3
-    run sudo launchctl bootstrap system /Library/LaunchDaemons/com.lexmark.lpmc.universal.service.plist
+    run $SUDO launchctl bootstrap system /Library/LaunchDaemons/com.lexmark.lpmc.universal.service.plist
     waited=0
     while [[ $waited -lt 45 ]]; do
       queue_present && { ok "queue created after the restart"; return 0; }
@@ -597,8 +607,8 @@ step_check_queue() {
   if ask "Create it with lpadmin?"; then
     local ppd; ppd=$(lpinfo -m | grep -i "$DRIVER_NAME" | head -1 | awk '{print $1}')
     [[ -n "$ppd" ]] || { fail "PPD not found"; return 1; }
-    run sudo lpadmin -p "$QUEUE_NAME" -E -v "socket://127.0.0.1:$LOOPBACK_PORT" -P "$ppd" -o printer-is-shared=false
-    run sudo lpadmin -d "$QUEUE_NAME"
+    run $SUDO lpadmin -p "$QUEUE_NAME" -E -v "socket://127.0.0.1:$LOOPBACK_PORT" -P "$ppd" -o printer-is-shared=false
+    run $SUDO lpadmin -d "$QUEUE_NAME"
     queue_present && { ok "queue created manually"; warn "an LPMC reinstall may replace it"; return 0; }
   fi
 
@@ -611,7 +621,7 @@ step_smoke() {
   if [[ $SMOKE -eq 0 ]]; then info "skipped (pass --smoke to run it)"; return 0; fi
   [[ $DRY -eq 1 ]] && { ok "(dry-run)"; return 0; }
 
-  local before; before=$(sudo ls /var/Lexmark/PrintManagementClient/Jobs 2>/dev/null | wc -l | tr -d ' ')
+  local before; before=$($SUDO ls /var/Lexmark/PrintManagementClient/Jobs 2>/dev/null | wc -l | tr -d ' ')
   run lp -d "$QUEUE_NAME" /etc/hosts >/dev/null || { fail "lp rejected the job"; return 1; }
   info "job sent; watching for 20s…"
 
@@ -621,7 +631,7 @@ step_smoke() {
     sleep 2; i=$((i+2))
   done
 
-  local after; after=$(sudo ls /var/Lexmark/PrintManagementClient/Jobs 2>/dev/null | wc -l | tr -d ' ')
+  local after; after=$($SUDO ls /var/Lexmark/PrintManagementClient/Jobs 2>/dev/null | wc -l | tr -d ' ')
   [[ $ui -eq 1 ]] && ok "the authentication UI opened — the flow works" \
                   || warn "the authentication UI did not appear"
   info "jobs in spool: $before → $after"
