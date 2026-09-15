@@ -126,6 +126,10 @@ run() {
 # to execute ... as root"). Si no somos root, se usa sudo para escalar.
 if [[ "$(id -u)" -eq 0 ]]; then SUDO=""; else SUDO="sudo"; fi
 
+# Directorio del propio script, para ubicar assets versionados en el repo
+# (p. ej. assets/keystore.jks, usado para remediar un keystore faltante).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+
 ask() {
   [[ $ASSUME_YES -eq 1 ]] && return 0
   local a; read -r -p "    $1 [y/N] " a
@@ -267,7 +271,77 @@ rebuild_jre() {
 
   [[ -x "$home/bin/lpmc-universal-service" ]] || { fail "el launcher del servicio sigue sin ser ejecutable"; return 1; }
   ok "jre/ reconstruido: $home/bin/lpmc-universal-service"
+
+  # 5) Re-cargar el daemon que hicimos bootout arriba. Si no lo recargamos, queda
+  #    descargado y check_services reportaría "daemon not loaded" (no crash).
+  run $SUDO launchctl bootstrap system /Library/LaunchDaemons/com.lexmark.lpmc.universal.service.plist 2>/dev/null
   return 0
+}
+
+# Asegura /var/Lexmark/PrintManagementClient/keystore.jks.
+#
+# Causa raíz (confirmada en install.log de una workstation gestionada): el
+# postinstall de LPMC usa 'sudo mv/cp' internamente en extractJre, y el sudoers
+# de la máquina VETA esos comandos aunque el proceso ya sea root ("user root is
+# not allowed to execute /bin/mv ... as root"). Resultado en cascada:
+#   1) no se crea jre/  ->  2) no hay jre/bin/keytool  ->
+#   3) .createkeystore.sh falla ("keytool: No such file or directory") y el
+#      keystore NUNCA se genera.
+# Por eso el servicio arranca la JVM pero aborta con
+# 'FileNotFoundException: keystore.jks' y jamás abre el puerto.
+#
+# Como rebuild_jre ya repone jre/ (y por tanto keytool), aquí regeneramos el
+# keystore replicando EXACTAMENTE .createkeystore.sh del pkg (mismo alias,
+# algoritmo, dname, SAN y storepass), en vez de bypassear TLS o traer un .jks
+# externo. Los valores son los del propio instalador de Lexmark.
+KEYSTORE_LIVE="/var/Lexmark/PrintManagementClient/keystore.jks"
+LPMC_KEYSTORE_ALIAS="lpmc_self_signed_cert"
+LPMC_KEYSTORE_STOREPASS="h5Tv4PB67fNkRBWL"
+LPMC_CLIENT_SECRET_ALIAS="lpmc_client_secret"
+LPMC_CLIENT_SECRET="b50313da01274ce868934536efea7e8c5f9f782a78d05776a7b8032d4f8b3eb3"
+ensure_keystore() {
+  if $SUDO test -f "$KEYSTORE_LIVE"; then
+    ok "keystore.jks presente"
+    return 0
+  fi
+  fail "missing $KEYSTORE_LIVE"
+
+  local kt=/Library/Lexmark/PrintManagementClient/jre/bin/keytool
+  if [[ ! -x "$kt" ]]; then
+    info "no está $kt — el jre/ debe reconstruirse primero (rebuild_jre)"
+    return 1
+  fi
+
+  info "el postinstall no generó el keystore (sudoers bloqueó extractJre); regenerando con keytool"
+  if ! ask "Regenerar keystore.jks (self-signed loopback, igual que el instalador)?"; then
+    return 1
+  fi
+
+  run $SUDO mkdir -p "$(dirname "$KEYSTORE_LIVE")"
+
+  # 1) keypair self-signed para el loopback 127.0.0.1 (idéntico a .createkeystore.sh)
+  run $SUDO "$kt" -genkeypair \
+      -alias "$LPMC_KEYSTORE_ALIAS" -keyalg RSA -keysize 2048 \
+      -keystore "$KEYSTORE_LIVE" \
+      -dname "CN=LPMC, OU=Software, O=Lexmark, L=Lexington, S=KY, C=US" \
+      -ext "SAN=IP:127.0.0.1" \
+      -storepass "$LPMC_KEYSTORE_STOREPASS" -keypass "$LPMC_KEYSTORE_STOREPASS" \
+      -validity 365000 \
+    || { fail "keytool -genkeypair falló"; return 1; }
+
+  # 2) secret del cliente (entrada -importpass), igual que el instalador
+  if [[ $DRY -eq 1 ]]; then
+    c 36 "    [dry-run] $SUDO $kt -importpass -alias $LPMC_CLIENT_SECRET_ALIAS ..."
+  else
+    printf '%s\n' "$LPMC_CLIENT_SECRET" | $SUDO "$kt" -importpass \
+      -alias "$LPMC_CLIENT_SECRET_ALIAS" -keystore "$KEYSTORE_LIVE" \
+      -storepass "$LPMC_KEYSTORE_STOREPASS" -keypass "$LPMC_KEYSTORE_STOREPASS" \
+      || warn "keytool -importpass del client secret falló (el servicio puede regenerarlo)"
+  fi
+
+  run $SUDO chmod 644 "$KEYSTORE_LIVE"
+  $SUDO test -f "$KEYSTORE_LIVE" && { ok "keystore.jks regenerado"; return 0; }
+  return 1
 }
 
 # ==================================================================== STEPS
@@ -461,6 +535,11 @@ step_check_files() {
   fi
 
   ls "$base"/lpmc-universal-service-*.jar >/dev/null 2>&1 && ok "service jar" || { fail "missing the service jar"; miss=1; }
+
+  # keystore.jks: precondición del servicio (sin él la JVM arranca pero aborta al
+  # cargar el keypair y nunca abre el puerto). Se remedia desde el asset del repo.
+  ensure_keystore || miss=1
+
   [[ $miss -eq 0 ]] || return 1
 
   # The PPD is a precondition for the queue to be created.
