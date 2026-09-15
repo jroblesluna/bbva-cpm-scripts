@@ -23,6 +23,7 @@
 #   --resume                continue from the last completed step
 #   --list-steps            list the steps and exit
 #   --queue-timeout <sec>   max wait for the queue to appear (default 90)
+#   --svc-timeout <sec>     max wait for the daemon + port 9167 (default 60)
 #   --smoke                 at the end, send a test job
 #   --yes                   do not ask anything (unattended)
 #   --dry-run               show what it would do, without touching the system
@@ -42,12 +43,12 @@ set -uo pipefail    # no -e: the checks return != 0 on purpose
 
 # ------------------------------------------------------------------ options
 PKG="" ; CONF="" ; WORK="$HOME/lpmc-lab" ; MODE="combined"
-FROM="" ; RESUME=0 ; QUEUE_TIMEOUT=90 ; SMOKE=0 ; ASSUME_YES=0 ; DRY=0
+FROM="" ; RESUME=0 ; QUEUE_TIMEOUT=90 ; SVC_TIMEOUT=60 ; SMOKE=0 ; ASSUME_YES=0 ; DRY=0
 
 STEPS=(preflight uninstall_previous stage install check_files check_config
        check_services check_queue smoke)
 
-usage() { sed -n '2,29p' "$0" | sed 's|^# \{0,1\}||'; }
+usage() { sed -n '2,30p' "$0" | sed 's|^# \{0,1\}||'; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -58,6 +59,7 @@ while [[ $# -gt 0 ]]; do
     --from)          FROM="$2"; shift 2 ;;
     --resume)        RESUME=1; shift ;;
     --queue-timeout) QUEUE_TIMEOUT="$2"; shift 2 ;;
+    --svc-timeout)   SVC_TIMEOUT="$2"; shift 2 ;;
     --smoke)         SMOKE=1; shift ;;
     --yes|-y)        ASSUME_YES=1; shift ;;
     --dry-run)       DRY=1; shift ;;
@@ -413,23 +415,45 @@ step_check_services() {
   hdr "7/9 Services"
   [[ $DRY -eq 1 ]] && { ok "(dry-run)"; return 0; }
 
-  local tries=0
-  while [[ $tries -lt 2 ]]; do
-    local dae=0 prt=0
-    daemon_loaded  && { ok "daemon com.lexmark.lpmc.universal.service loaded"; dae=1; } || fail "daemon not loaded"
-    port_listening && { ok "listening on $LOOPBACK_PORT"; prt=1; } || fail "nobody is listening on $LOOPBACK_PORT"
-    [[ $dae -eq 1 && $prt -eq 1 ]] && return 0
+  # El daemon NO abre el socket 9167 apenas launchd lo carga: hay un warm-up
+  # (arranca la JVM, inicializa el listener) que tarda varios segundos. Por eso
+  # NO se chequea una sola vez (falso negativo por probear demasiado pronto),
+  # sino que se espera con polling hasta SVC_TIMEOUT, igual que check_queue.
+  info "waiting for the daemon + port $LOOPBACK_PORT (up to ${SVC_TIMEOUT}s; the service needs a warm-up)"
+  local dae=0 prt=0
+  daemon_loaded  && { ok "daemon com.lexmark.lpmc.universal.service loaded"; dae=1; }
 
-    tries=$((tries+1))
-    [[ $tries -ge 2 ]] && break
-
-    # Remediation: the legacy launchctl load/unload calls fail outside the
-    # installd context ("Input/output error"). bootstrap is the modern equivalent.
-    warn "remediating with launchctl bootstrap…"
-    run sudo launchctl bootstrap system /Library/LaunchDaemons/com.lexmark.lpmc.universal.service.plist 2>/dev/null
-    run launchctl bootstrap "gui/$(id -u)" /Library/LaunchAgents/com.lexmark.lpmc.systemtray.app.plist 2>/dev/null
-    sleep 8
+  local waited=0
+  while [[ $waited -lt $SVC_TIMEOUT ]]; do
+    [[ $dae -eq 1 ]] || daemon_loaded && dae=1
+    if [[ $dae -eq 1 ]] && port_listening; then
+      ok "listening on $LOOPBACK_PORT after ${waited}s"
+      return 0
+    fi
+    sleep 5; waited=$((waited+5)); printf '.'
   done
+  echo
+
+  # Solo tras agotar la espera se recurre al remediation: bootstrap del daemon.
+  # Las llamadas legacy launchctl load/unload fallan fuera del contexto de
+  # installd ("Input/output error"); bootstrap es el equivalente moderno.
+  [[ $dae -eq 1 ]] || fail "daemon not loaded"
+  fail "port $LOOPBACK_PORT not listening after ${SVC_TIMEOUT}s"
+  warn "remediating with launchctl bootstrap…"
+  run sudo launchctl bootstrap system /Library/LaunchDaemons/com.lexmark.lpmc.universal.service.plist 2>/dev/null
+  run launchctl bootstrap "gui/$(id -u)" /Library/LaunchAgents/com.lexmark.lpmc.systemtray.app.plist 2>/dev/null
+
+  # Segunda espera tras el bootstrap.
+  waited=0
+  while [[ $waited -lt $SVC_TIMEOUT ]]; do
+    daemon_loaded && dae=1
+    if [[ $dae -eq 1 ]] && port_listening; then
+      ok "listening on $LOOPBACK_PORT after remediation (${waited}s)"
+      return 0
+    fi
+    sleep 5; waited=$((waited+5)); printf '.'
+  done
+  echo
 
   fail "the services did not come up"
   info "look at: sudo launchctl print system/com.lexmark.lpmc.universal.service"
